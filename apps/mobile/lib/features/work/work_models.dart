@@ -1905,6 +1905,9 @@ class WorkspaceLedgerCheckpoint {
       ) &&
       supplierLedgers.values.expand((ledger) => ledger.purchaseBills.keys).toSet().length ==
           supplierLedgers.values.fold<int>(0, (count, ledger) => count + ledger.purchaseBills.length) &&
+      supplierLedgers.values.expand((ledger) => ledger.billGoodsAllocations.keys).toSet().length ==
+          supplierLedgers.values.fold<int>(0, (count, ledger) => count + ledger.billGoodsAllocations.length) &&
+      _manualGoodsReceiptsValid &&
       billedInvoices.length == billedOrders.length &&
       billedInvoices.entries.every(
         (entry) =>
@@ -1973,6 +1976,59 @@ class WorkspaceLedgerCheckpoint {
               !finance.customerLedgers
                   .expand((ledger) => ledger.entries)
                   .any((entry) => entry.operationId == pending!.operationId)));
+
+  bool get _manualGoodsReceiptsValid {
+    final receiptIds = <String>{};
+    final groupSuppliers = <String, String>{};
+    final movements = {for (final movement in inventory?.movements ?? const <WorkspaceStockMovement>[])
+      movement.id: movement};
+    final ownedMovements = <String, WorkspaceStockMovement>{};
+    final reservations = <String, int>{};
+    for (final ledger in supplierLedgers.values) {
+      for (final receipt in ledger.goodsReceipts.values) {
+        if (!receiptIds.add(receipt.id)) {
+          return false;
+        }
+        final supplier = groupSuppliers[receipt.expectedDeliveryId];
+        if (supplier != null && supplier != ledger.supplierId) {
+          return false;
+        }
+        groupSuppliers[receipt.expectedDeliveryId] = ledger.supplierId;
+        for (final line in receipt.lines) {
+          final addition = receipt.movementFor(line);
+          if (addition != null) {
+            if (ownedMovements.containsKey(addition.id) ||
+                movements[addition.id]?.contentIdentity != addition.contentIdentity) {
+              return false;
+            }
+            ownedMovements[addition.id] = addition;
+          }
+          for (final entry in line.priorStockUnits.entries) {
+            final original = movements[entry.key];
+            // Only unassigned original stock evidence can be linked. A platform
+            // or manual receipt's movement already has an owner and is ineligible.
+            if (original == null || original.productId != line.productId ||
+                original.referenceKind != null || original.referenceId != null ||
+                !{WorkspaceStockMovementKind.openingStock,
+                  WorkspaceStockMovementKind.goodsReceived}.contains(original.kind) ||
+                original.quantityDelta <= 0 || original.occurredAt.isAfter(receipt.recordedAt)) {
+              return false;
+            }
+            final reserved = (reservations[entry.key] ?? 0) + entry.value;
+            if (reserved > original.quantityDelta) {
+              return false;
+            }
+            reservations[entry.key] = reserved;
+          }
+        }
+      }
+    }
+    // Reverse ownership is required too: an orphan manual receipt movement
+    // cannot be smuggled into Stock without its immutable receipt evidence.
+    return movements.values.where((movement) =>
+      movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt)
+      .every((movement) => ownedMovements[movement.id]?.contentIdentity == movement.contentIdentity);
+  }
 
   bool _validPendingRefund() {
     final request = pendingRefund!;
@@ -2723,7 +2779,9 @@ class WorkspaceSupplierBillAcceptance {
         (line['name'] ?? '').trim().isNotEmpty &&
         (line['pack'] ?? '').trim().isNotEmpty &&
         RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(line['quantity'] ?? '') &&
-        RegExp(r'[1-9]').hasMatch(line['quantity'] ?? '') &&
+        (RegExp(r'[1-9]').hasMatch(line['quantity'] ?? '') ||
+          (RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(line['freeQuantity'] ?? '') &&
+            RegExp(r'[1-9]').hasMatch(line['freeQuantity'] ?? ''))) &&
         WorkspacePurchaseEntryDraft.printedPaise(line['cost']) != null &&
         WorkspacePurchaseEntryDraft.printedPaise(line['cost'])! >= 0) &&
       WorkspacePurchaseEntryDraft.reviewAmounts(copy.draft.details).isEmpty;
@@ -2750,9 +2808,187 @@ class WorkspaceSupplierBillAcceptance {
   }
 }
 
+/// One immutable delivery line. Quantities use thousandths of the supplier's
+/// unit, converted exactly into the existing Stock unit; never rounded.
+class WorkspaceSupplierGoodsReceiptLine {
+  WorkspaceSupplierGoodsReceiptLine({required this.sourceLineId,
+    required this.productId, required this.productLabel,
+    required this.purchaseUnit, required this.stockUnit, required this.unitsPerPack,
+    required this.deliveredMilli, required this.acceptedMilli,
+    required this.damagedMilli, required this.shortMilli,
+    this.expectedMilli, Map<String, int> priorStockUnits = const {},
+  }) : priorStockUnits = Map.unmodifiable(priorStockUnits);
+  final String sourceLineId, productId, productLabel, purchaseUnit, stockUnit;
+  final int unitsPerPack, deliveredMilli, acceptedMilli, damagedMilli, shortMilli;
+  final int? expectedMilli;
+  final Map<String, int> priorStockUnits;
+  int get acceptedStockUnits => acceptedMilli * unitsPerPack ~/ 1000;
+  int get linkedStockUnits => priorStockUnits.values.fold(0, (a, b) => a + b);
+  int get newStockUnits => acceptedStockUnits - linkedStockUnits;
+  bool get valid =>
+      [sourceLineId, productId, productLabel, purchaseUnit, stockUnit]
+        .every((v) => v.trim().isNotEmpty && v.length <= 240) &&
+      unitsPerPack > 0 && unitsPerPack <= 1000000 &&
+      [deliveredMilli, acceptedMilli, damagedMilli, shortMilli]
+        .every((v) => v >= 0 && v <= 2147483647) &&
+      deliveredMilli > 0 && deliveredMilli == acceptedMilli + damagedMilli &&
+      (expectedMilli == null || (expectedMilli! > 0 && expectedMilli! <= 2147483647 &&
+        deliveredMilli + shortMilli <= expectedMilli!)) &&
+      acceptedMilli * unitsPerPack % 1000 == 0 &&
+      acceptedStockUnits <= 2147483647 && priorStockUnits.length <= 200 &&
+      priorStockUnits.entries.every((e) => e.key.trim().isNotEmpty &&
+        e.key.length <= 512 && e.value > 0 && e.value <= 2147483647) &&
+      linkedStockUnits <= acceptedStockUnits;
+  Object get mappingIdentity =>
+      (productId, productLabel, purchaseUnit, stockUnit, unitsPerPack, expectedMilli);
+  Map<String, Object?> toJson() => {
+    'sourceLineId': sourceLineId, 'productId': productId, 'productLabel': productLabel,
+    'purchaseUnit': purchaseUnit, 'stockUnit': stockUnit, 'unitsPerPack': unitsPerPack,
+    'deliveredMilli': deliveredMilli, 'acceptedMilli': acceptedMilli,
+    'damagedMilli': damagedMilli, 'shortMilli': shortMilli,
+    'expectedMilli': expectedMilli, 'priorStockUnits': priorStockUnits,
+  };
+  static WorkspaceSupplierGoodsReceiptLine fromJson(Object? raw) {
+    const keys = {'sourceLineId', 'productId', 'productLabel', 'purchaseUnit',
+      'stockUnit', 'unitsPerPack', 'deliveredMilli', 'acceptedMilli', 'damagedMilli',
+      'shortMilli', 'expectedMilli', 'priorStockUnits'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid received item');
+    }
+    final result = WorkspaceSupplierGoodsReceiptLine(
+      sourceLineId: raw['sourceLineId'] as String, productId: raw['productId'] as String,
+      productLabel: raw['productLabel'] as String, purchaseUnit: raw['purchaseUnit'] as String,
+      stockUnit: raw['stockUnit'] as String, unitsPerPack: raw['unitsPerPack'] as int,
+      deliveredMilli: raw['deliveredMilli'] as int, acceptedMilli: raw['acceptedMilli'] as int,
+      damagedMilli: raw['damagedMilli'] as int, shortMilli: raw['shortMilli'] as int,
+      expectedMilli: raw['expectedMilli'] as int?,
+      priorStockUnits: Map<String, int>.from(raw['priorStockUnits'] as Map));
+    if (!result.valid) {
+      throw const FormatException('Invalid received item');
+    }
+    return result;
+  }
+}
+
+/// A physical arrival event, independent of bill acceptance and money. A group
+/// identifies one expected delivery across partial arrivals, not one arrival.
+class WorkspaceSupplierGoodsReceipt {
+  WorkspaceSupplierGoodsReceipt({required this.id, required this.expectedDeliveryId,
+    required this.reference, required this.deliveredOn, required this.recordedAt,
+    required List<WorkspaceSupplierGoodsReceiptLine> lines,
+  }) : lines = List.unmodifiable(lines);
+  final String id, expectedDeliveryId, reference, deliveredOn;
+  final DateTime recordedAt;
+  final List<WorkspaceSupplierGoodsReceiptLine> lines;
+  bool get valid {
+    final day = DateTime.tryParse(deliveredOn);
+    final local = recordedAt.toLocal();
+    return [id, expectedDeliveryId, reference].every((v) =>
+        v.trim().isNotEmpty && v.length <= 240) &&
+      RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(deliveredOn) && day != null &&
+      day.toIso8601String().substring(0, 10) == deliveredOn &&
+      !DateTime.utc(day.year, day.month, day.day).isAfter(
+        DateTime.utc(local.year, local.month, local.day)) &&
+      lines.isNotEmpty && lines.length <= 200 && lines.every((line) => line.valid) &&
+      lines.map((line) => line.sourceLineId).toSet().length == lines.length;
+  }
+  String stockReference(WorkspaceSupplierGoodsReceiptLine line) =>
+      jsonEncode([id, line.sourceLineId]);
+  WorkspaceStockMovement? movementFor(WorkspaceSupplierGoodsReceiptLine line) =>
+      line.newStockUnits <= 0 ? null : WorkspaceStockMovement(
+        id: jsonEncode(['manual-supplier-receipt', id, line.sourceLineId]),
+        productId: line.productId, productLabel: line.productLabel,
+        kind: WorkspaceStockMovementKind.goodsReceived, quantityDelta: line.newStockUnits,
+        reason: 'Supplier delivery $reference', occurredAt: recordedAt,
+        referenceKind: WorkspaceStockReferenceKind.manualSupplierReceipt,
+        referenceId: stockReference(line));
+  Map<String, Object?> toJson() => {'id': id, 'expectedDeliveryId': expectedDeliveryId,
+    'reference': reference, 'deliveredOn': deliveredOn,
+    'recordedAt': recordedAt.toUtc().toIso8601String(),
+    'lines': lines.map((line) => line.toJson()).toList()};
+  static WorkspaceSupplierGoodsReceipt fromJson(Object? raw) {
+    const keys = {'id', 'expectedDeliveryId', 'reference', 'deliveredOn', 'recordedAt', 'lines'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid supplier delivery');
+    }
+    final result = WorkspaceSupplierGoodsReceipt(id: raw['id'] as String,
+      expectedDeliveryId: raw['expectedDeliveryId'] as String,
+      reference: raw['reference'] as String, deliveredOn: raw['deliveredOn'] as String,
+      recordedAt: DateTime.parse(raw['recordedAt'] as String),
+      lines: [for (final line in raw['lines'] as List)
+        WorkspaceSupplierGoodsReceiptLine.fromJson(line)]);
+    if (!result.valid) {
+      throw const FormatException('Invalid supplier delivery');
+    }
+    return result;
+  }
+}
+
 /// A supplier-scoped projection, supplied independently of fulfilment facts.
 /// A positive balance is payable; a negative balance is credit with the supplier.
 /// Missing opening/history evidence must never be presented as a zero balance.
+class WorkspaceSupplierBillGoodsAllocation {
+  const WorkspaceSupplierBillGoodsAllocation({required this.operationId,
+    required this.receiptId, required this.receiptLineId, required this.billId,
+    required this.copyId, required this.copyRevision, required this.billLineIndex,
+    required this.productId, required this.billUnit, required this.stockUnit,
+    required this.stockUnitsNumerator, required this.stockUnitsDenominator,
+    required this.billQuantityMilli, required this.acceptedReceiptMilli,
+    required this.damagedReceiptMilli, required this.conversionReviewed,
+    required this.linkedAt, this.freeBillQuantityMilli = 0});
+  final String operationId, receiptId, receiptLineId, billId, copyId, productId, billUnit, stockUnit;
+  final int copyRevision, billLineIndex, stockUnitsNumerator, stockUnitsDenominator,
+      billQuantityMilli, freeBillQuantityMilli, acceptedReceiptMilli, damagedReceiptMilli;
+  final bool conversionReviewed;
+  final DateTime linkedAt;
+  bool get valid => [operationId, receiptId, receiptLineId, billId, copyId, productId, billUnit, stockUnit]
+      .every((v) => v.trim().isNotEmpty && v.length <= 512) &&
+      copyRevision > 0 && billLineIndex >= 0 && billLineIndex < 200 && conversionReviewed &&
+      stockUnitsNumerator > 0 && stockUnitsNumerator <= 1000000 &&
+      stockUnitsDenominator > 0 && stockUnitsDenominator <= 1000000 &&
+      BigInt.from(stockUnitsNumerator).gcd(BigInt.from(stockUnitsDenominator)) == BigInt.one &&
+      billQuantityMilli >= 0 && freeBillQuantityMilli >= 0 &&
+      billQuantityMilli + freeBillQuantityMilli > 0 &&
+      billQuantityMilli + freeBillQuantityMilli <= 2147483647 &&
+      acceptedReceiptMilli >= 0 && damagedReceiptMilli >= 0 &&
+      acceptedReceiptMilli + damagedReceiptMilli > 0 &&
+      acceptedReceiptMilli + damagedReceiptMilli <= 2147483647;
+  Object get unitBinding => (copyId, copyRevision, productId, billUnit, stockUnit,
+      stockUnitsNumerator, stockUnitsDenominator);
+  Map<String, Object?> toJson() => {'operationId': operationId, 'receiptId': receiptId,
+    'receiptLineId': receiptLineId, 'billId': billId, 'copyId': copyId,
+    'copyRevision': copyRevision, 'billLineIndex': billLineIndex, 'productId': productId,
+    'billUnit': billUnit, 'stockUnit': stockUnit, 'stockUnitsNumerator': stockUnitsNumerator,
+    'stockUnitsDenominator': stockUnitsDenominator, 'billQuantityMilli': billQuantityMilli,
+    if (freeBillQuantityMilli > 0) 'freeBillQuantityMilli': freeBillQuantityMilli,
+    'acceptedReceiptMilli': acceptedReceiptMilli, 'damagedReceiptMilli': damagedReceiptMilli,
+    'conversionReviewed': conversionReviewed, 'linkedAt': linkedAt.toUtc().toIso8601String()};
+  static WorkspaceSupplierBillGoodsAllocation fromJson(Object? raw) {
+    const keys = {'operationId', 'receiptId', 'receiptLineId', 'billId', 'copyId',
+      'copyRevision', 'billLineIndex', 'productId', 'billUnit', 'stockUnit',
+      'stockUnitsNumerator', 'stockUnitsDenominator', 'billQuantityMilli',
+      'acceptedReceiptMilli', 'damagedReceiptMilli', 'conversionReviewed', 'linkedAt'};
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        !raw.keys.every((key) => keys.contains(key) || key == 'freeBillQuantityMilli')) {
+      throw const FormatException('Invalid purchase goods link');
+    }
+    final result = WorkspaceSupplierBillGoodsAllocation(operationId: raw['operationId'] as String,
+      receiptId: raw['receiptId'] as String, receiptLineId: raw['receiptLineId'] as String,
+      billId: raw['billId'] as String, copyId: raw['copyId'] as String,
+      copyRevision: raw['copyRevision'] as int, billLineIndex: raw['billLineIndex'] as int,
+      productId: raw['productId'] as String, billUnit: raw['billUnit'] as String,
+      stockUnit: raw['stockUnit'] as String, stockUnitsNumerator: raw['stockUnitsNumerator'] as int,
+      stockUnitsDenominator: raw['stockUnitsDenominator'] as int,
+      billQuantityMilli: raw['billQuantityMilli'] as int, acceptedReceiptMilli: raw['acceptedReceiptMilli'] as int,
+      freeBillQuantityMilli: raw['freeBillQuantityMilli'] as int? ?? 0,
+      damagedReceiptMilli: raw['damagedReceiptMilli'] as int,
+      conversionReviewed: raw['conversionReviewed'] as bool,
+      linkedAt: DateTime.parse(raw['linkedAt'] as String));
+    if (!result.valid) throw const FormatException('Invalid purchase goods link');
+    return result;
+  }
+}
+
 class WorkspaceSupplierLedger {
   WorkspaceSupplierLedger({
     required this.accountScope,
@@ -2766,8 +3002,12 @@ class WorkspaceSupplierLedger {
     this.openingBalanceMinor,
     this.openingRecord,
     Map<String, WorkspaceSupplierBillAcceptance> purchaseBills = const {},
+    Map<String, WorkspaceSupplierGoodsReceipt> goodsReceipts = const {},
+    Map<String, WorkspaceSupplierBillGoodsAllocation> billGoodsAllocations = const {},
   }) : entries = List.unmodifiable(entries),
-       purchaseBills = Map.unmodifiable(purchaseBills);
+       purchaseBills = Map.unmodifiable(purchaseBills),
+       goodsReceipts = Map.unmodifiable(goodsReceipts),
+       billGoodsAllocations = Map.unmodifiable(billGoodsAllocations);
 
   final String accountScope, workspaceId, supplierId, supplierName;
   final int revision;
@@ -2779,6 +3019,8 @@ class WorkspaceSupplierLedger {
   /// pointer to the supplier's newest unposted record.
   final WorkspaceSupplierOpeningRecord? openingRecord;
   final Map<String, WorkspaceSupplierBillAcceptance> purchaseBills;
+  final Map<String, WorkspaceSupplierGoodsReceipt> goodsReceipts;
+  final Map<String, WorkspaceSupplierBillGoodsAllocation> billGoodsAllocations;
 
   static WorkspaceSupplierLedger? confirmedOpening(
     WorkspaceSupplierOpeningRecord record, {
@@ -2825,6 +3067,10 @@ class WorkspaceSupplierLedger {
     if (openingRecord != null) 'openingRecord': openingRecord!.toJson(),
     if (purchaseBills.isNotEmpty) 'purchaseBills': purchaseBills.map(
       (id, bill) => MapEntry(id, bill.toJson())),
+    if (goodsReceipts.isNotEmpty) 'goodsReceipts': goodsReceipts.map(
+      (id, receipt) => MapEntry(id, receipt.toJson())),
+    if (billGoodsAllocations.isNotEmpty) 'billGoodsAllocations': billGoodsAllocations.map(
+      (id, allocation) => MapEntry(id, allocation.toJson())),
     'historyComplete': historyComplete,
     'entries': entries.map((entry) => entry.toJson()).toList(),
   };
@@ -2834,7 +3080,9 @@ class WorkspaceSupplierLedger {
       return null;
     }
     try {
-      if (value.containsKey('purchaseBills') && value['purchaseBills'] is! Map) {
+      if ((value.containsKey('purchaseBills') && value['purchaseBills'] is! Map) ||
+          (value.containsKey('goodsReceipts') && value['goodsReceipts'] is! Map) ||
+          (value.containsKey('billGoodsAllocations') && value['billGoodsAllocations'] is! Map)) {
         return null;
       }
       final result = WorkspaceSupplierLedger(
@@ -2852,6 +3100,14 @@ class WorkspaceSupplierLedger {
         purchaseBills: {
           for (final entry in ((value['purchaseBills'] as Map?) ?? const {}).entries)
             entry.key as String: WorkspaceSupplierBillAcceptance.fromJson(entry.value),
+        },
+        goodsReceipts: {
+          for (final entry in ((value['goodsReceipts'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceSupplierGoodsReceipt.fromJson(entry.value),
+        },
+        billGoodsAllocations: {
+          for (final entry in ((value['billGoodsAllocations'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceSupplierBillGoodsAllocation.fromJson(entry.value),
         },
         entries: [
           for (final entry in value['entries'] as List)
@@ -2892,6 +3148,8 @@ class WorkspaceSupplierLedger {
       _amountsValid &&
       _openingProofValid &&
       _purchaseBillsValid &&
+      _goodsReceiptsValid &&
+      _billGoodsAllocationsValid &&
       entries.every((entry) => entry.valid && !entry.postedAt.isAfter(asOf)) &&
       entries.map((entry) => entry.operationId).toSet().length ==
           entries.length &&
@@ -3026,6 +3284,8 @@ class WorkspaceSupplierLedger {
       asOf: bill.acceptedAt.isAfter(asOf) ? bill.acceptedAt : asOf,
       historyComplete: historyComplete, openingBalanceMinor: openingBalanceMinor,
       openingRecord: openingRecord, purchaseBills: {...purchaseBills, bill.billId: bill},
+      goodsReceipts: goodsReceipts,
+      billGoodsAllocations: billGoodsAllocations,
       entries: [...entries, if (bill.addsLiability) WorkspaceSupplierLedgerEntry(
         operationId: 'manual-bill:${bill.billId}',
         reference: bill.copy.draft.invoiceReference,
@@ -3034,6 +3294,140 @@ class WorkspaceSupplierLedger {
         kind: WorkspaceSupplierEntryKind.bill,
         amountMinor: bill.amountMinor!, postedAt: bill.acceptedAt)],
     );
+    return next.valid && next.canFollow(this) ? next : null;
+  }
+
+  bool get _goodsReceiptsValid {
+    if (goodsReceipts.isEmpty) {
+      return true;
+    }
+    if (openingRecord == null || !historyComplete || goodsReceipts.length > 1000) {
+      return false;
+    }
+    final groups = <(String, String), (Object, int)>{};
+    for (final entry in goodsReceipts.entries) {
+      final receipt = entry.value;
+      if (entry.key != receipt.id || !receipt.valid || receipt.recordedAt.isAfter(asOf)) {
+        return false;
+      }
+      for (final line in receipt.lines) {
+        final key = (receipt.expectedDeliveryId, line.sourceLineId);
+        final previous = groups[key];
+        final delivered = (previous?.$2 ?? 0) + line.deliveredMilli;
+        if ((previous != null && previous.$1 != line.mappingIdentity) ||
+            delivered > 2147483647 ||
+            (line.expectedMilli != null && delivered > line.expectedMilli!)) {
+          return false;
+        }
+        groups[key] = (line.mappingIdentity, delivered);
+      }
+    }
+    return true;
+  }
+
+  WorkspaceSupplierLedger? receiveGoods(WorkspaceSupplierGoodsReceipt receipt,
+      {required int expectedRevision}) {
+    if (!valid || !receipt.valid) {
+      return null;
+    }
+    final previous = goodsReceipts[receipt.id];
+    if (previous != null) {
+      return jsonEncode(previous.toJson()) == jsonEncode(receipt.toJson()) ? this : null;
+    }
+    if (expectedRevision != revision) {
+      return null;
+    }
+    final next = WorkspaceSupplierLedger(accountScope: accountScope,
+      workspaceId: workspaceId, supplierId: supplierId, supplierName: supplierName,
+      revision: revision + 1, historyComplete: historyComplete,
+      asOf: receipt.recordedAt.isAfter(asOf) ? receipt.recordedAt : asOf,
+      entries: entries, openingBalanceMinor: openingBalanceMinor, openingRecord: openingRecord,
+      purchaseBills: purchaseBills, goodsReceipts: {...goodsReceipts, receipt.id: receipt},
+      billGoodsAllocations: billGoodsAllocations);
+    return next.valid && next.canFollow(this) ? next : null;
+  }
+
+  bool get _billGoodsAllocationsValid {
+    if (billGoodsAllocations.length > 10000) return false;
+    final receiptTotals = <(String, String), (int, int)>{};
+    final billTotals = <(String, int), (int, int)>{};
+    final bindings = <(String, int), Object>{};
+    for (final entry in billGoodsAllocations.entries) {
+      final link = entry.value;
+      final receipt = goodsReceipts[link.receiptId];
+      final bill = purchaseBills[link.billId];
+      if (!link.valid || entry.key != link.operationId || receipt == null || bill == null ||
+          link.copyId != bill.copy.id || link.copyRevision != bill.copy.revision ||
+          link.billLineIndex >= bill.copy.draft.goods.length ||
+          link.linkedAt.isAfter(asOf) || link.linkedAt.isBefore(receipt.recordedAt) ||
+          link.linkedAt.isBefore(bill.acceptedAt)) {
+        return false;
+      }
+      final lines = receipt.lines.where((line) => line.sourceLineId == link.receiptLineId).toList();
+      if (lines.length != 1) return false;
+      final line = lines.single;
+      final printed = bill.copy.draft.goods[link.billLineIndex];
+      // No display-name inference or silently repaired legacy product mapping.
+      if (printed['productId'] != link.productId || line.productId != link.productId ||
+          printed['pack']?.trim() != link.billUnit || line.stockUnit != link.stockUnit ||
+          (link.billUnit == link.stockUnit &&
+           (link.stockUnitsNumerator != 1 || link.stockUnitsDenominator != 1)) ||
+          (link.billUnit == line.purchaseUnit &&
+           (link.stockUnitsNumerator != line.unitsPerPack || link.stockUnitsDenominator != 1))) {
+        return false;
+      }
+      final matched = link.acceptedReceiptMilli + link.damagedReceiptMilli;
+      if (BigInt.from(link.billQuantityMilli + link.freeBillQuantityMilli) * BigInt.from(link.stockUnitsNumerator) !=
+          BigInt.from(matched) * BigInt.from(line.unitsPerPack) * BigInt.from(link.stockUnitsDenominator)) {
+        return false;
+      }
+      final quantity = printed['quantity'] ?? '';
+      if (!RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(quantity)) return false;
+      final parts = quantity.split('.');
+      final invoiced = BigInt.parse(parts[0]) * BigInt.from(1000) +
+          (parts.length == 2 ? BigInt.parse(parts[1].padRight(3, '0')) : BigInt.zero);
+      if (invoiced > BigInt.from(2147483647)) return false;
+      final freeText = (printed['freeQuantity'] ?? '').trim();
+      if (freeText.isNotEmpty && !RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(freeText)) return false;
+      final freeParts = freeText.isEmpty ? ['0'] : freeText.split('.');
+      final free = BigInt.parse(freeParts[0]) * BigInt.from(1000) +
+          (freeParts.length == 2 ? BigInt.parse(freeParts[1].padRight(3, '0')) : BigInt.zero);
+      if (free > BigInt.from(2147483647) || invoiced + free <= BigInt.zero) return false;
+      final receiptKey = (link.receiptId, link.receiptLineId);
+      final previous = receiptTotals[receiptKey] ?? (0, 0);
+      final accepted = previous.$1 + link.acceptedReceiptMilli;
+      final damaged = previous.$2 + link.damagedReceiptMilli;
+      if (accepted > line.acceptedMilli || damaged > line.damagedMilli) return false;
+      receiptTotals[receiptKey] = (accepted, damaged);
+      final billKey = (link.billId, link.billLineIndex);
+      final priorBill = billTotals[billKey] ?? (0, 0);
+      final paid = priorBill.$1 + link.billQuantityMilli;
+      final freeAllocated = priorBill.$2 + link.freeBillQuantityMilli;
+      if (BigInt.from(paid) > invoiced || BigInt.from(freeAllocated) > free ||
+          (bindings[billKey] != null && bindings[billKey] != link.unitBinding)) {
+        return false;
+      }
+      billTotals[billKey] = (paid, freeAllocated);
+      bindings[billKey] = link.unitBinding;
+    }
+    return true;
+  }
+
+  /// Matching existing records adds neither Stock nor a second bill liability.
+  WorkspaceSupplierLedger? allocateBillGoods(WorkspaceSupplierBillGoodsAllocation link,
+      {required int expectedRevision}) {
+    if (!valid || !link.valid) return null;
+    final previous = billGoodsAllocations[link.operationId];
+    if (previous != null) {
+      return jsonEncode(previous.toJson()) == jsonEncode(link.toJson()) ? this : null;
+    }
+    if (revision != expectedRevision) return null;
+    final next = WorkspaceSupplierLedger(accountScope: accountScope, workspaceId: workspaceId,
+      supplierId: supplierId, supplierName: supplierName, revision: revision + 1,
+      asOf: link.linkedAt.isAfter(asOf) ? link.linkedAt : asOf, entries: entries,
+      historyComplete: historyComplete, openingBalanceMinor: openingBalanceMinor,
+      openingRecord: openingRecord, purchaseBills: purchaseBills, goodsReceipts: goodsReceipts,
+      billGoodsAllocations: {...billGoodsAllocations, link.operationId: link});
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -3088,6 +3482,8 @@ class WorkspaceSupplierLedger {
       openingBalanceMinor: openingBalanceMinor,
       openingRecord: openingRecord,
       purchaseBills: purchaseBills,
+      goodsReceipts: goodsReceipts,
+      billGoodsAllocations: billGoodsAllocations,
     );
     return next.valid && next.canFollow(this) ? next : null;
   }
@@ -3118,9 +3514,21 @@ class WorkspaceSupplierLedger {
         return false;
       }
     }
+    for (final entry in previous.goodsReceipts.entries) {
+      if (jsonEncode(goodsReceipts[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) {
+        return false;
+      }
+    }
+    for (final entry in previous.billGoodsAllocations.entries) {
+      if (jsonEncode(billGoodsAllocations[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) {
+        return false;
+      }
+    }
     return revision > previous.revision ||
         (entries.length == previous.entries.length &&
             purchaseBills.length == previous.purchaseBills.length &&
+            goodsReceipts.length == previous.goodsReceipts.length &&
+            billGoodsAllocations.length == previous.billGoodsAllocations.length &&
             historyComplete == previous.historyComplete &&
             asOf == previous.asOf &&
             supplierName == previous.supplierName);
@@ -4752,7 +5160,7 @@ enum WorkspaceStockMovementKind {
   supplierReturn,
 }
 
-enum WorkspaceStockReferenceKind { order, supplierReceipt }
+enum WorkspaceStockReferenceKind { order, supplierReceipt, manualSupplierReceipt }
 
 typedef WorkspaceLedgerFormKey = ({
   String account,
@@ -6951,6 +7359,7 @@ class WorkspaceSavedInventory {
     required this.savedAt,
     required List<WorkspaceCatalogueItem> products,
     required List<WorkspaceStockMovement> movements,
+    this.manualReceiptCheckpointRevision,
   }) : products = List.unmodifiable(products),
        movements = List.unmodifiable(movements);
   final String account, store;
@@ -6959,6 +7368,9 @@ class WorkspaceSavedInventory {
   final DateTime savedAt;
   final List<WorkspaceCatalogueItem> products;
   final List<WorkspaceStockMovement> movements;
+  /// Last authoritative manual-receipt checkpoint projected here. Retained even
+  /// when all goods were already in Stock or damaged and no movement was added.
+  final int? manualReceiptCheckpointRevision;
 
   Map<String, Object?> toJson() => {
     'version': products.any((p) => p.stockEntry != null) ? 2 : 1,
@@ -6967,6 +7379,8 @@ class WorkspaceSavedInventory {
     'qa': qa,
     'revision': revision,
     'savedAt': savedAt.toUtc().toIso8601String(),
+    if (manualReceiptCheckpointRevision != null)
+      'manualReceiptCheckpointRevision': manualReceiptCheckpointRevision,
     'products': products.map((p) => p.toInventoryJson()).toList(),
     'movements': [
       for (final m in movements)
@@ -7002,6 +7416,7 @@ class WorkspaceSavedInventory {
         qa: raw['qa'] as bool,
         revision: raw['revision'] as int,
         savedAt: DateTime.parse(raw['savedAt'] as String),
+        manualReceiptCheckpointRevision: raw['manualReceiptCheckpointRevision'] as int?,
         products: [
           for (final p in raw['products'] as List)
             WorkspaceCatalogueItem.fromInventoryJson(p),
@@ -7033,6 +7448,14 @@ class WorkspaceSavedInventory {
           raw['version'] != (result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
+          (raw.containsKey('manualReceiptCheckpointRevision') &&
+              raw['manualReceiptCheckpointRevision'] == null) ||
+          (result.manualReceiptCheckpointRevision == null &&
+              result.movements.any((m) =>
+                  m.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt)) ||
+          (result.manualReceiptCheckpointRevision != null &&
+              (result.manualReceiptCheckpointRevision! <= 0 ||
+               result.manualReceiptCheckpointRevision! > 2147483647)) ||
           result.products.any(
             (p) =>
                 !ids.add(p.id) ||

@@ -91,6 +91,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   final writes = <String>[];
   bool failRead = false, failWrite = false;
   bool loseWriteResponseOnce = false;
+  String? failWriteKey;
   Completer<void>? holdWrite;
   @override
   Future<String?> read({
@@ -119,7 +120,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   }) async {
     writes.add(key);
     await holdWrite?.future;
-    if (failWrite) throw StateError('test write failure');
+    if (failWrite || key == failWriteKey) throw StateError('test write failure');
     values[key] = value!;
     if (loseWriteResponseOnce) {
       loseWriteResponseOnce = false;
@@ -3771,6 +3772,331 @@ void main() {
     confirmedAt: at ?? DateTime.utc(2026, 10, 3),
   );
 
+  WorkspaceSupplierGoodsReceipt goodsReceiptFixture({String id = 'receipt-A',
+    String group = 'expected-delivery-A', String lineId = 'line-A',
+    String product = 'saved-product-A', int delivered = 6000, int accepted = 6000,
+    int damaged = 0, int short = 0, int? expected = 12000, int factor = 1,
+    Map<String, int> prior = const {},
+  }) => WorkspaceSupplierGoodsReceipt(id: id, expectedDeliveryId: group,
+    reference: 'DEL-$id', deliveredOn: '2026-10-02', recordedAt: DateTime.utc(2026, 10, 3),
+    lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: lineId, productId: product,
+      productLabel: 'Evaluation rice', purchaseUnit: '1 kg', stockUnit: '1 kg',
+      unitsPerPack: factor, deliveredMilli: delivered, acceptedMilli: accepted,
+      damagedMilli: damaged, shortMilli: short, expectedMilli: expected,
+      priorStockUnits: prior)]);
+
+  WorkspaceFinanceSnapshot receiptFinanceFixture() => WorkspaceFinanceSnapshot(
+    accountScope: 'account-A', workspaceId: 'store-A', revision: 1,
+    asOf: DateTime.utc(2026, 10, 3), salesTodayMinor: 0, duesMinor: 0,
+    availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+    feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+    payments: const [], payouts: const [], historyComplete: true);
+
+  WorkspaceInventoryLedger receiptInventoryFixture(List<WorkspaceStockMovement> movements) =>
+    WorkspaceInventoryLedger(accountScope: 'account-A', workspaceId: 'store-A',
+      revision: 1, asOf: DateTime.utc(2026, 10, 3),
+      openingQuantities: const {'saved-product-A': 0}, movements: movements);
+
+  WorkspaceStockMovement originalGoodsFixture({String id = 'original-stock',
+    int quantity = 10, WorkspaceStockReferenceKind? referenceKind}) => WorkspaceStockMovement(
+      id: id, productId: 'saved-product-A', productLabel: 'Evaluation rice',
+      kind: WorkspaceStockMovementKind.openingStock, quantityDelta: quantity,
+      reason: 'Opening quantity', occurredAt: DateTime.utc(2026, 10, 2),
+      referenceKind: referenceKind, referenceId: referenceKind == null ? null : 'platform-receipt');
+
+  WorkspaceSavedInventory receiptProjectionFixture({int revision = 1, int stock = 10,
+    int? marker, List<WorkspaceStockMovement> movements = const [],
+  }) => WorkspaceSavedInventory(account: 'account-A', store: 'store-A', qa: true,
+    revision: revision, savedAt: DateTime.utc(2026, 10, 3),
+    manualReceiptCheckpointRevision: marker,
+    products: [workspaceMasterCatalogue.last.copyWith(stock: stock, publicListing: false)],
+    movements: movements);
+
+  WorkspaceSavedInventory projectedReceiptFixture() {
+    final base = receiptProjectionFixture();
+    final receipt = goodsReceiptFixture(product: base.products.single.id);
+    return receiptProjectionFixture(revision: 2, stock: 16, marker: 2,
+      movements: [receipt.movementFor(receipt.lines.single)!]);
+  }
+
+  // Host-only authoritative journal fixture, never phone storage injection.
+  Future<void> seedReceiptJournalFixture(_OrderJournalStorage storage) async {
+    final projection = projectedReceiptFixture();
+    final receipt = goodsReceiptFixture(product: projection.products.single.id);
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final owner = SecureWorkLedgerCheckpointStore(accountScope: () => 'account-A', storage: storage);
+    final inventory = WorkspaceInventoryLedger(accountScope: 'account-A', workspaceId: 'store-A',
+      revision: 1, asOf: receipt.recordedAt,
+      openingQuantities: {projection.products.single.id: 10}, movements: const []);
+    await owner.save(WorkspaceLedgerCheckpoint(revision: 1, finance: receiptFinanceFixture(),
+      inventory: inventory, supplierLedgers: {opening.supplierId: opening}), expectedRevision: null);
+    final received = opening.receiveGoods(receipt, expectedRevision: 1)!;
+    await owner.save(WorkspaceLedgerCheckpoint(revision: 2, finance: receiptFinanceFixture(),
+      inventory: inventory.post(projection.movements, at: receipt.recordedAt),
+      supplierLedgers: {received.supplierId: received}), expectedRevision: 1);
+  }
+
+  test('PURCHASERECEIVE inventory guard serializes projection against stale Stock writers', () async {
+    final storage = _OrderJournalStorage();
+    SecureWorkInventoryStore owner() => SecureWorkInventoryStore(
+      accountScope: () => 'account-A', storage: storage);
+    await owner().save(receiptProjectionFixture(), expectedRevision: null);
+    final entered = Completer<void>(), release = Completer<void>();
+    final projecting = owner().projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async {
+        expect(previous!.products.single.stock, 10);
+        entered.complete();
+        await release.future;
+        return projectedReceiptFixture();
+      });
+    await entered.future;
+    final stale = owner().save(receiptProjectionFixture(revision: 2, stock: 5), expectedRevision: 1);
+    final rejected = expectLater(stale, throwsA(isA<WorkGatewayException>()));
+    release.complete();
+    expect(await projecting, isTrue);
+    await rejected;
+    final saved = (await owner().read('account-A', 'store-A', qa: true))!;
+    expect(saved.products.single.stock, 16);
+    expect(saved.manualReceiptCheckpointRevision, 2);
+    expect(saved.movements.length, 1);
+  });
+
+  test('PURCHASERECEIVE pending Stock write invalidates receipt baseline before callback', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(receiptProjectionFixture(), expectedRevision: null);
+    final writing = owner.save(receiptProjectionFixture(revision: 2), expectedRevision: 1);
+    var commits = 0;
+    final posting = owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async { commits++; return projectedReceiptFixture(); });
+    final rejected = expectLater(posting, throwsA(isA<WorkGatewayException>()));
+    await writing;
+    await rejected;
+    expect(commits, 0);
+    expect((await owner.read('account-A', 'store-A', qa: true))!.revision, 2);
+  });
+
+  test('PURCHASERECEIVE projected Stock cannot lose receipt history or change units', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(receiptProjectionFixture(), expectedRevision: null);
+    final projection = projectedReceiptFixture();
+    expect(await owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async => projection), isTrue);
+    final writes = storage.writes.length;
+    await expectLater(owner.save(
+      receiptProjectionFixture(revision: 3, stock: 16, movements: projection.movements),
+      expectedRevision: 2), throwsFormatException,
+      reason: 'A manual receipt movement without its projection marker is malformed.');
+    for (final changed in [
+      receiptProjectionFixture(revision: 3, stock: 16, marker: 2),
+      receiptProjectionFixture(revision: 3, stock: 10, marker: 2, movements: projection.movements),
+      WorkspaceSavedInventory.fromJson({...projection.toJson(), 'revision': 3,
+        'products': [projection.products.single.copyWith(pack: 'Changed pack').toInventoryJson()]}),
+    ]) {
+      await expectLater(owner.save(changed, expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+    }
+    expect(storage.writes.length, writes);
+    final priceOnly = WorkspaceSavedInventory.fromJson({...projection.toJson(), 'revision': 3,
+      'products': [projection.products.single.copyWith(sellingPrice: 31).toInventoryJson()]});
+    await expectLater(owner.save(priceOnly, expectedRevision: 2), throwsA(isA<WorkGatewayException>()),
+      reason: 'A projection marker alone does not supply authoritative receipt evidence.');
+    await seedReceiptJournalFixture(storage);
+    await owner.save(priceOnly, expectedRevision: 2);
+    final saved = (await owner.read('account-A', 'store-A', qa: true))!;
+    expect(saved.products.single.stock, 16);
+    expect(saved.products.single.sellingPrice, 31);
+    expect(saved.manualReceiptCheckpointRevision, 2);
+  });
+
+  test('PURCHASERECEIVE projection failure and lost reply retain exact replay quantity', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(receiptProjectionFixture(), expectedRevision: null);
+    await expectLater(owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async {
+        storage.failWrite = true;
+        return projectedReceiptFixture();
+      }), throwsStateError);
+    storage.failWrite = false;
+    expect((await owner.read('account-A', 'store-A', qa: true))!.products.single.stock, 10);
+    storage.loseWriteResponseOnce = true;
+    expect(await owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async => projectedReceiptFixture()), isTrue);
+    final saved = (await owner.read('account-A', 'store-A', qa: true))!;
+    expect(saved.products.single.stock, 16);
+    expect(saved.movements.length, 1);
+    final writes = storage.writes.length;
+    await owner.save(saved, expectedRevision: 1);
+    expect(storage.writes.length, writes);
+  });
+
+  test('PURCHASERECEIVE fully linked goods still preserve a projection checkpoint marker', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(receiptProjectionFixture(), expectedRevision: null);
+    expect(await owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async => receiptProjectionFixture(revision: 2, marker: 2)), isTrue);
+    await expectLater(owner.save(receiptProjectionFixture(revision: 3), expectedRevision: 2),
+      throwsA(isA<WorkGatewayException>()));
+    await expectLater(owner.save(receiptProjectionFixture(revision: 3, stock: 5, marker: 2), expectedRevision: 2),
+      throwsA(isA<WorkGatewayException>()));
+    expect((await owner.read('account-A', 'store-A', qa: true))!.products.single.stock, 10);
+  });
+
+  test('PURCHASERECEIVE inventory guard rejects production and wrong scope', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    var called = false;
+    Future<WorkspaceSavedInventory?> commit(WorkspaceSavedInventory? previous) async {
+      called = true;
+      return projectedReceiptFixture();
+    }
+    await expectLater(owner.projectReceipt('account-A', 'store-A', qa: false,
+      expectedRevision: null, commit: commit), throwsA(isA<WorkGatewayException>()));
+    await expectLater(owner.projectReceipt('other-account', 'store-A', qa: true,
+      expectedRevision: null, commit: commit), throwsA(isA<WorkGatewayException>()));
+    expect(called, isFalse);
+    expect(storage.writes, isEmpty);
+  });
+
+  test('PURCHASERECEIVE latest journal Stock movement cannot be lost in a price edit', () async {
+    final storage = _OrderJournalStorage();
+    final owner = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    await owner.save(receiptProjectionFixture(), expectedRevision: null);
+    final projection = projectedReceiptFixture();
+    await seedReceiptJournalFixture(storage);
+    expect(await owner.projectReceipt('account-A', 'store-A', qa: true,
+      expectedRevision: 1, commit: (previous) async => projection), isTrue);
+    final journal = SecureWorkLedgerCheckpointStore(accountScope: () => 'account-A', storage: storage);
+    final old = (await journal.read('account-A', 'store-A'))!;
+    final adjustment = WorkspaceStockMovement(id: 'later-counted-adjustment',
+      productId: projection.products.single.id, productLabel: 'Evaluation rice',
+      kind: WorkspaceStockMovementKind.adjustment, quantityDelta: -2,
+      reason: 'Counted two fewer', occurredAt: DateTime.utc(2026, 10, 3));
+    await journal.save(WorkspaceLedgerCheckpoint(revision: 3, finance: old.finance,
+      inventory: old.inventory!.post([adjustment], at: adjustment.occurredAt),
+      supplierLedgers: old.supplierLedgers), expectedRevision: 2);
+    final stalePriceEdit = WorkspaceSavedInventory.fromJson({...projection.toJson(),
+      'revision': 3, 'products': [projection.products.single.copyWith(sellingPrice: 31).toInventoryJson()]});
+    final writes = storage.writes.length;
+    await expectLater(owner.save(stalePriceEdit, expectedRevision: 2), throwsA(isA<WorkGatewayException>()));
+    expect(storage.writes.length, writes);
+    expect((await journal.read('account-A', 'store-A'))!.inventory!.quantities![adjustment.productId], 14);
+    expect(() => WorkspaceSavedInventory.fromJson({...projection.toJson(),
+      'manualReceiptCheckpointRevision': null}), throwsFormatException);
+    expect(() => WorkspaceSavedInventory.fromJson({for (final entry in projection.toJson().entries)
+      if (entry.key != 'manualReceiptCheckpointRevision') entry.key: entry.value}), throwsFormatException);
+  });
+
+  test('PURCHASERECEIVE partial damage and shortage retain evidence without money effects', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000))!;
+    final first = goodsReceiptFixture(accepted: 5000, damaged: 1000, short: 6000);
+    final second = goodsReceiptFixture(id: 'receipt-B');
+    final partial = opening.receiveGoods(first, expectedRevision: 1)!;
+    final completedDelivery = partial.receiveGoods(second, expectedRevision: 2)!;
+    expect(completedDelivery.balanceMinor, 50000);
+    expect(completedDelivery.entries, isEmpty);
+    expect(completedDelivery.goodsReceipts.length, 2);
+    expect(completedDelivery.goodsReceipts['receipt-A']!.lines.single.shortMilli, 6000);
+    expect(completedDelivery.goodsReceipts['receipt-A']!.lines.single.damagedMilli, 1000);
+    expect(completedDelivery.goodsReceipts.values.expand((r) => r.lines)
+      .fold<int>(0, (sum, line) => sum + line.acceptedMilli), 11000);
+    expect(completedDelivery.receiveGoods(second, expectedRevision: 1), same(completedDelivery));
+    expect(completedDelivery.receiveGoods(goodsReceiptFixture(id: 'receipt-C'),
+      expectedRevision: 3), isNull);
+    expect(WorkspaceSupplierLedger.fromJson(completedDelivery.toJson())!.toJson(), completedDelivery.toJson());
+  });
+
+  test('PURCHASERECEIVE exact fractional conversion rejects rounding and overflow', () {
+    expect(goodsReceiptFixture(delivered: 1250, accepted: 1250, factor: 4).lines.single.acceptedStockUnits, 5);
+    expect(goodsReceiptFixture(delivered: 1250, accepted: 1250, factor: 4).valid, isTrue);
+    expect(goodsReceiptFixture(delivered: 1250, accepted: 1250).valid, isFalse);
+    expect(goodsReceiptFixture(accepted: 5000).valid, isFalse);
+    expect(goodsReceiptFixture(accepted: -1000).valid, isFalse);
+    expect(goodsReceiptFixture(factor: 1000001).valid, isFalse);
+    expect(goodsReceiptFixture(delivered: 2147483647, accepted: 2147483647,
+      expected: null, factor: 1000000).valid, isFalse);
+    expect(goodsReceiptFixture(prior: const {'original-stock': 7}).valid, isFalse);
+  });
+
+  test('PURCHASERECEIVE partial line mapping cannot switch product or units', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final saved = opening.receiveGoods(goodsReceiptFixture(), expectedRevision: 1)!;
+    expect(saved.receiveGoods(goodsReceiptFixture(id: 'receipt-B', product: 'different-product'),
+      expectedRevision: 2), isNull);
+    expect(saved.receiveGoods(goodsReceiptFixture(id: 'receipt-B', factor: 2),
+      expectedRevision: 2), isNull);
+    expect(saved.receiveGoods(goodsReceiptFixture(id: 'receipt-B', expected: null),
+      expectedRevision: 2), isNull);
+    final repeatChanged = goodsReceiptFixture(accepted: 5000, damaged: 1000);
+    expect(saved.receiveGoods(repeatChanged, expectedRevision: 1), isNull);
+    final dropped = WorkspaceSupplierLedger.fromJson({
+      for (final entry in saved.toJson().entries)
+        if (entry.key != 'goodsReceipts') entry.key: entry.value,
+    })!;
+    expect(dropped.canFollow(saved), isFalse);
+    expect(WorkspaceSupplierLedger.fromJson({...saved.toJson(), 'goodsReceipts': null}), isNull);
+  });
+
+  test('PURCHASERECEIVE stock increment and receipt proof must commit together', () {
+    final receipt = goodsReceiptFixture();
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final saved = opening.receiveGoods(receipt, expectedRevision: 1)!;
+    final movement = receipt.movementFor(receipt.lines.single)!;
+    WorkspaceLedgerCheckpoint checkpoint(WorkspaceSupplierLedger ledger,
+      List<WorkspaceStockMovement> movements) => WorkspaceLedgerCheckpoint(
+        revision: 1, finance: receiptFinanceFixture(), inventory: receiptInventoryFixture(movements),
+        supplierLedgers: {ledger.supplierId: ledger});
+    expect(checkpoint(saved, [movement]).valid, isTrue);
+    expect(checkpoint(saved, const []).valid, isFalse);
+    expect(checkpoint(opening, [movement]).valid, isFalse);
+    final changed = WorkspaceStockMovement(id: movement.id, productId: movement.productId,
+      productLabel: movement.productLabel, kind: movement.kind, quantityDelta: 5,
+      reason: movement.reason, occurredAt: movement.occurredAt,
+      referenceKind: movement.referenceKind, referenceId: movement.referenceId);
+    expect(checkpoint(saved, [changed]).valid, isFalse);
+  });
+
+  test('PURCHASERECEIVE prior stock links exactly once and survives subsequent sales', () {
+    final receipt = goodsReceiptFixture(prior: const {'original-stock': 4});
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final saved = opening.receiveGoods(receipt, expectedRevision: 1)!;
+    final original = originalGoodsFixture();
+    final addition = receipt.movementFor(receipt.lines.single)!;
+    expect(addition.quantityDelta, 2);
+    final sale = WorkspaceStockMovement(id: 'later-sale', productId: original.productId,
+      productLabel: original.productLabel, kind: WorkspaceStockMovementKind.sale,
+      quantityDelta: -8, reason: 'Counter sale', occurredAt: DateTime.utc(2026, 10, 3));
+    final inventory = receiptInventoryFixture([original, sale, addition]);
+    final checkpoint = WorkspaceLedgerCheckpoint(revision: 1, finance: receiptFinanceFixture(),
+      inventory: inventory, supplierLedgers: {saved.supplierId: saved});
+    expect(checkpoint.valid, isTrue);
+    expect(inventory.quantities!['saved-product-A'], 4);
+    final fullyLinked = goodsReceiptFixture(prior: const {'original-stock': 6});
+    expect(fullyLinked.movementFor(fullyLinked.lines.single), isNull);
+    final linkedLedger = opening.receiveGoods(fullyLinked, expectedRevision: 1)!;
+    expect(WorkspaceLedgerCheckpoint(revision: 1, finance: receiptFinanceFixture(),
+      inventory: receiptInventoryFixture([original, sale]),
+      supplierLedgers: {linkedLedger.supplierId: linkedLedger}).valid, isTrue);
+  });
+
+  test('PURCHASERECEIVE prior movement cannot be overallocated or claimed from platform receipt', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0))!;
+    final first = goodsReceiptFixture(prior: const {'original-stock': 6});
+    final second = goodsReceiptFixture(id: 'receipt-B', prior: const {'original-stock': 6});
+    final saved = opening.receiveGoods(first, expectedRevision: 1)!
+      .receiveGoods(second, expectedRevision: 2)!;
+    WorkspaceLedgerCheckpoint checkpoint(WorkspaceSupplierLedger ledger,
+      WorkspaceStockMovement original) => WorkspaceLedgerCheckpoint(revision: 1,
+        finance: receiptFinanceFixture(), inventory: receiptInventoryFixture([original]),
+        supplierLedgers: {ledger.supplierId: ledger});
+    expect(checkpoint(saved, originalGoodsFixture()).valid, isFalse);
+    final one = opening.receiveGoods(first, expectedRevision: 1)!;
+    expect(checkpoint(one, originalGoodsFixture(referenceKind: WorkspaceStockReferenceKind.supplierReceipt)).valid, isFalse);
+    expect(checkpoint(one, originalGoodsFixture(id: 'other-movement')).valid, isFalse);
+  });
+
   test('PURCHASEPOST confirmed opening distinguishes zero dues and advance', () {
     for (final (amount, credit, balance) in [
       (0, false, 0),
@@ -4092,7 +4418,8 @@ void main() {
 
   // Automated session fixtures only, not injected device acceptance records.
   Future<WorkSession> openingPostingSession(_OrderJournalStorage storage,
-      {WorkspaceSupplierOpeningRecord? initialRecord}) async {
+      {WorkspaceSupplierOpeningRecord? initialRecord, bool inventory = false,
+      WorkspaceStockEntryMethod method = WorkspaceStockEntryMethod.manual}) async {
     final account = _CommandAccountStore();
     final purchaseStore = SecureWorkPurchaseEntryStore(
       accountScope: () => account.accountScope, storage: storage);
@@ -4102,7 +4429,9 @@ void main() {
       await purchaseStore.save(openingBook(records: [initialRecord]), expectedRevision: 2);
     }
     final session = WorkSession(gateway: ReviewWorkGateway(),
-      contactDraftStore: account, purchaseEntryStore: purchaseStore)
+      contactDraftStore: account, purchaseEntryStore: purchaseStore,
+      inventoryStore: inventory ? SecureWorkInventoryStore(
+        accountScope: () => account.accountScope, storage: storage) : null)
       ..activeWorkspace = _commandStore;
     addTearDown(session.dispose);
     final finance = WorkspaceFinanceSnapshot(accountScope: 'account-A',
@@ -4117,8 +4446,178 @@ void main() {
       checkpointStore: SecureWorkLedgerCheckpointStore(
         accountScope: () => account.accountScope, storage: storage)), isTrue);
     expect(await session.loadWorkspaceSuppliers(), isTrue);
+    if (inventory) {
+      expect(await session.loadWorkspaceInventory(), isTrue);
+      if (session.workspaceCatalogueItems.isEmpty) {
+        final product = workspaceMasterCatalogue.last.copyWith(stock: 10, publicListing: false);
+        expect(method == WorkspaceStockEntryMethod.csv
+          ? session.importWorkspaceProducts([product], addOnly: true, stockEntryMethod: method)
+          : session.addOrUpdateWorkspaceProduct(product, stockEntryMethod: method), isTrue);
+        expect(await session.workspaceInventorySaved, isTrue);
+      }
+    }
     return session;
   }
+
+  WorkspaceSupplierGoodsReceipt sessionReceipt(WorkSession session, {Map<String, int> prior = const {}}) {
+    final product = session.workspaceCatalogueItems.single;
+    return WorkspaceSupplierGoodsReceipt(id: 'session-receipt-A', expectedDeliveryId: 'session-delivery-A',
+      reference: 'DEL-SESSION-A', deliveredOn: '2026-10-02', recordedAt: DateTime.now().toUtc(),
+      lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'session-line-A', productId: product.id,
+        productLabel: '${product.title} · ${product.pack}', purchaseUnit: product.pack,
+        stockUnit: product.pack, unitsPerPack: 1, deliveredMilli: 6000, acceptedMilli: 6000,
+        damagedMilli: 0, shortMilli: 0, expectedMilli: 12000, priorStockUnits: prior)]);
+  }
+
+  for (final method in WorkspaceStockEntryMethod.values) {
+    test('PURCHASERECEIVE SESSION ${method.name} prior Stock and restart preserve one receipt', () async {
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final session = await openingPostingSession(storage, initialRecord: opening, inventory: true, method: method);
+      expect(await session.confirmWorkspaceSupplierOpeningRecord(opening,
+        scope: session.workspaceSupplierScope!, expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final receipt = sessionReceipt(session, prior: {session.workspaceStockMovements.single.id: 4});
+      final financial = session.workspaceFinance;
+      Future<WorkspaceGoodsReceiptSaveResult> receive(WorkSession owner) => owner.confirmWorkspaceSupplierGoodsReceipt(
+        receipt, supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!,
+        expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
+      expect(await receive(session), WorkspaceGoodsReceiptSaveResult.saved, reason: session.workspaceSupplierError);
+      expect(session.workspaceCatalogueItems.single.stock, 12);
+      expect(session.workspaceFinance, same(financial));
+      final writes = storage.writes.length;
+      expect(await receive(session), WorkspaceGoodsReceiptSaveResult.saved);
+      expect(storage.writes.length, writes);
+      final restarted = await openingPostingSession(storage, inventory: true);
+      expect(await restarted.recoverCustomerLedger(), isTrue);
+      expect(restarted.workspaceCatalogueItems.single.stock, 12);
+      expect(restarted.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts.length, 1);
+      expect(await receive(restarted), WorkspaceGoodsReceiptSaveResult.saved);
+      expect(storage.writes.length, writes);
+      expect(restarted.workspaceCatalogueItems.single.stockEntry!.method, method);
+    });
+  }
+
+  test('PURCHASERECEIVE SESSION lease rejects Stock edits while saving and keeps originals', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final product = session.workspaceCatalogueItems.single;
+    storage.holdWrite = Completer<void>();
+    final posting = session.confirmWorkspaceSupplierGoodsReceipt(sessionReceipt(session), supplierId: opening.supplierId,
+      scope: session.workspaceSupplierScope!, expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
+    expect(session.workspaceGoodsReceiptBusy, isTrue);
+    expect(session.addOrUpdateWorkspaceProduct(product.copyWith(stock: 99)), isFalse);
+    expect(session.importWorkspaceProducts([product.copyWith(stock: 99)]), isFalse);
+    expect(session.updateWorkspaceStock(productId: product.id, quantity: 99, reason: 'Count'), isFalse);
+    expect(session.retireWorkspaceProduct(product.id), isFalse);
+    expect(session.restoreWorkspaceProduct(product.id), isFalse);
+    expect(await session.retryWorkspaceInventorySave(), isFalse);
+    expect(session.workspaceCatalogueItems.single.stock, 10);
+    storage.holdWrite!.complete();
+    expect(await posting, WorkspaceGoodsReceiptSaveResult.saved, reason: session.workspaceSupplierError);
+    storage.holdWrite = null;
+    expect(session.workspaceGoodsReceiptBusy, isFalse);
+    expect(session.workspaceCatalogueItems.single.stock, 16);
+  });
+
+  test('PURCHASERECEIVE SESSION committed receipt projection failure blocks stale writers and recovers', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final stockStore = SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage);
+    final oldStock = (await stockStore.read('account-A', 'store-A', qa: true))!;
+    final receipt = sessionReceipt(session);
+    final stockKey = storage.values.keys.singleWhere((key) => key.contains('workspace.inventory.'));
+    storage.failWriteKey = stockKey;
+    Future<WorkspaceGoodsReceiptSaveResult> receive(WorkSession owner) => owner.confirmWorkspaceSupplierGoodsReceipt(
+      receipt, supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!,
+      expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
+    expect(await receive(session), WorkspaceGoodsReceiptSaveResult.stockRecoveryPending);
+    expect(session.workspaceCatalogueItems.single.stock, 10);
+    expect(session.addOrUpdateWorkspaceProduct(session.workspaceCatalogueItems.single.copyWith(stock: 99)), isFalse);
+    final ledgerStore = SecureWorkLedgerCheckpointStore(accountScope: () => 'account-A', storage: storage);
+    final committed = (await ledgerStore.read('account-A', 'store-A'))!;
+    expect(committed.inventory!.quantities!.values.single, 16);
+    expect(committed.supplierLedgers[opening.supplierId]!.goodsReceipts.length, 1);
+    storage.failWriteKey = null;
+    await expectLater(stockStore.save(WorkspaceSavedInventory.fromJson({...oldStock.toJson(),
+      'revision': oldStock.revision + 1,
+      'products': [oldStock.products.single.copyWith(sellingPrice: 77).toInventoryJson()]}),
+      expectedRevision: oldStock.revision), throwsA(isA<WorkGatewayException>()),
+      reason: 'Another instance with no marker must not overwrite a committed first receipt.');
+    final restarted = await openingPostingSession(storage, inventory: true);
+    expect(restarted.addOrUpdateWorkspaceProduct(restarted.workspaceCatalogueItems.single.copyWith(stock: 99)), isFalse,
+      reason: 'A restarted session must block editing its unprojected receipt before mutation.');
+    expect(await receive(restarted), WorkspaceGoodsReceiptSaveResult.saved,
+      reason: restarted.workspaceSupplierError);
+    expect(restarted.workspaceCatalogueItems.single.stock, 16);
+    final recovered = (await ledgerStore.read('account-A', 'store-A'))!;
+    expect(recovered.revision, committed.revision);
+    expect(recovered.supplierLedgers[opening.supplierId]!.goodsReceipts.length, 1);
+    final writes = storage.writes.length;
+    expect(await receive(restarted), WorkspaceGoodsReceiptSaveResult.saved);
+    expect(storage.writes.length, writes);
+  });
+
+  test('PURCHASERECEIVE SESSION exact receipt retry survives a later purchase book revision', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final receipt = sessionReceipt(session);
+    Future<WorkspaceGoodsReceiptSaveResult> receive() => session.confirmWorkspaceSupplierGoodsReceipt(
+      receipt, supplierId: opening.supplierId, scope: session.workspaceSupplierScope!,
+      expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
+    expect(await receive(), WorkspaceGoodsReceiptSaveResult.saved);
+    final books = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final previous = (await books.read('account-A', 'store-A', qa: true))!;
+    await books.save(WorkspacePurchaseEntryBook.fromJson({...previous.toJson(), 'revision': 4}), expectedRevision: 3);
+    final writes = storage.writes.length;
+    expect(await receive(), WorkspaceGoodsReceiptSaveResult.saved);
+    expect(storage.writes.length, writes);
+    expect(session.workspaceCatalogueItems.single.stock, 16);
+  });
+
+  test('PURCHASERECEIVE SESSION uncertain save and lost reply retry one goods operation', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final receipt = sessionReceipt(session);
+    Future<WorkspaceGoodsReceiptSaveResult> receive() => session.confirmWorkspaceSupplierGoodsReceipt(
+      receipt, supplierId: opening.supplierId, scope: session.workspaceSupplierScope!,
+      expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
+    storage.failWrite = true;
+    expect(await receive(), WorkspaceGoodsReceiptSaveResult.statusUnknown);
+    expect(session.workspaceCatalogueItems.single.stock, 10);
+    storage.failWrite = false;
+    storage.loseWriteResponseOnce = true;
+    expect(await receive(), WorkspaceGoodsReceiptSaveResult.saved, reason: session.workspaceSupplierError);
+    expect(session.workspaceCatalogueItems.single.stock, 16);
+    expect(session.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts.length, 1);
+  });
+
+  test('PURCHASERECEIVE SESSION receiving preserves independent unavailability', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(session.addOrUpdateWorkspaceProduct(session.workspaceCatalogueItems.single.copyWith(available: false)), isTrue);
+    expect(await session.workspaceInventorySaved, isTrue);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    expect(await session.confirmWorkspaceSupplierGoodsReceipt(sessionReceipt(session), supplierId: opening.supplierId,
+      scope: session.workspaceSupplierScope!, expectedPurchaseRevision: 3, expectedSupplierRevision: 1),
+      WorkspaceGoodsReceiptSaveResult.saved);
+    expect(session.workspaceCatalogueItems.single.stock, 16);
+    expect(session.workspaceCatalogueItems.single.available, isFalse);
+    expect(session.workspaceCatalogueItems.single.publicListing, isFalse);
+  });
 
   test('PURCHASEPOST opening confirmation saves once and reopens without stock changes', () async {
     final storage = _OrderJournalStorage();
@@ -4240,6 +4739,275 @@ void main() {
     id: 'new-copy', draftId: 'new-bill', date: '2026-10-02',
     reference: 'SUP-NEW-1', total: '2840.75',
     treatment: WorkspaceOpeningBillInclusion.excluded);
+
+  WorkspaceSupplierBillAcceptance allocatedBillFixture({String unit = '1 kg', String quantity = '12',
+      String product = 'saved-product-A', String? freeQuantity, String total = '2840.75'}) {
+    final bill = acceptanceFixture(id: 'new-copy', draftId: 'new-bill', date: '2026-10-02',
+      reference: 'SUP-NEW-1', total: total, treatment: WorkspaceOpeningBillInclusion.excluded);
+    final goods = {...bill.copy.draft.goods.first, 'productId': product,
+      'pack': unit, 'quantity': quantity};
+    if (freeQuantity != null) {
+      goods['freeQuantity'] = freeQuantity;
+    }
+    final copy = WorkspacePurchaseSavedCopy.fromJson({...bill.copy.toJson(),
+      'draft': {...bill.copy.draft.toJson(), 'goods': [goods]}});
+    return WorkspaceSupplierBillAcceptance(copy: copy, acceptedAt: bill.acceptedAt,
+      openingTreatment: bill.openingTreatment);
+  }
+  WorkspaceSupplierBillGoodsAllocation billGoodsLink(WorkspaceSupplierBillAcceptance bill, {
+    String id = 'link-A', String receipt = 'receipt-A', int accepted = 5000,
+    int damaged = 1000, int quantity = 6000, int numerator = 1, int denominator = 1,
+    int freeQuantity = 0,
+  }) => WorkspaceSupplierBillGoodsAllocation(operationId: id, receiptId: receipt,
+    receiptLineId: 'line-A', billId: bill.billId, copyId: bill.copy.id,
+    copyRevision: bill.copy.revision, billLineIndex: 0, productId: 'saved-product-A',
+    billUnit: bill.copy.draft.goods.first['pack']!, stockUnit: '1 kg',
+    stockUnitsNumerator: numerator, stockUnitsDenominator: denominator,
+    billQuantityMilli: quantity, acceptedReceiptMilli: accepted, damagedReceiptMilli: damaged,
+    freeBillQuantityMilli: freeQuantity,
+    conversionReviewed: true, linkedAt: DateTime.utc(2026, 10, 4));
+
+  for (final goodsFirst in [true, false]) {
+    test('PURCHASELINK bill and goods arrival order $goodsFirst preserves separate effects', () {
+      final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+      final bill = allocatedBillFixture();
+      final receipt = goodsReceiptFixture(accepted: 5000, damaged: 1000);
+      final both = goodsFirst
+        ? opening.receiveGoods(receipt, expectedRevision: 1)!.acceptReviewedBill(bill, expectedRevision: 2)!
+        : opening.acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+      final linked = both.allocateBillGoods(billGoodsLink(bill), expectedRevision: 3)!;
+      expect(linked.valid, isTrue);
+      expect(linked.balanceMinor, both.balanceMinor);
+      expect(linked.entries.map((e) => e.toJson()).toList(), both.entries.map((e) => e.toJson()).toList());
+      expect(linked.goodsReceipts['receipt-A']!.toJson(), receipt.toJson());
+      expect(linked.billGoodsAllocations.values.single.billQuantityMilli, 6000);
+      expect(WorkspaceSupplierLedger.fromJson(linked.toJson())!.toJson(), linked.toJson());
+    });
+  }
+
+  test('PURCHASELINK cumulative accepted damaged and invoiced caps reject duplicates', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final bill = allocatedBillFixture();
+    final both = opening.acceptReviewedBill(bill, expectedRevision: 1)!
+      .receiveGoods(goodsReceiptFixture(accepted: 5000, damaged: 1000), expectedRevision: 2)!;
+    final first = billGoodsLink(bill);
+    final linked = both.allocateBillGoods(first, expectedRevision: 3)!;
+    expect(linked.allocateBillGoods(first, expectedRevision: 1), same(linked));
+    expect(linked.allocateBillGoods(billGoodsLink(bill, id: 'another'), expectedRevision: 4), isNull);
+    expect(linked.allocateBillGoods(billGoodsLink(bill, accepted: 4000, quantity: 5000), expectedRevision: 4), isNull);
+    final received = linked.receiveGoods(goodsReceiptFixture(id: 'receipt-B'), expectedRevision: 4)!;
+    final complete = received.allocateBillGoods(billGoodsLink(bill, id: 'link-B', receipt: 'receipt-B',
+      accepted: 6000, damaged: 0), expectedRevision: 5)!;
+    expect(complete.billGoodsAllocations.length, 2);
+    expect(complete.balanceMinor, both.balanceMinor);
+    final removed = WorkspaceSupplierLedger.fromJson({...complete.toJson(), 'revision': 7,
+      'billGoodsAllocations': <String, Object?>{}})!;
+    expect(removed.canFollow(complete), isFalse);
+    final extra = WorkspaceSupplierLedgerEntry(operationId: 'account-advance',
+      origin: WorkspaceSupplierEntryOrigin.supplierAccount, reference: 'ADV-1',
+      kind: WorkspaceSupplierEntryKind.advance, amountMinor: 100,
+      postedAt: DateTime.utc(2026, 10, 4));
+    expect(complete.appendConfirmed(extra, expectedRevision: 6)!.billGoodsAllocations.length, 2);
+  });
+
+  test('PURCHASELINK reviewed unit conversion is exact and fractional damage is retained', () {
+    final bill = allocatedBillFixture(unit: 'Carton', quantity: '3');
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!
+      .receiveGoods(goodsReceiptFixture(accepted: 5000, damaged: 1000), expectedRevision: 2)!;
+    final link = billGoodsLink(bill, quantity: 3000, numerator: 2);
+    expect(both.allocateBillGoods(link, expectedRevision: 3), isNotNull);
+    expect(both.allocateBillGoods(billGoodsLink(bill, quantity: 2999, numerator: 2), expectedRevision: 3), isNull);
+    final broken = WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+      'copyId': 'different-copy'});
+    expect(both.allocateBillGoods(broken, expectedRevision: 3), isNull);
+    expect(() => WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+      'conversionReviewed': false}), throwsFormatException);
+    expect(() => WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+      'stockUnitsNumerator': 4, 'stockUnitsDenominator': 2}), throwsFormatException);
+    final bill2 = allocatedBillFixture(quantity: '1.5');
+    final receipt = goodsReceiptFixture(delivered: 1500, accepted: 1000, damaged: 500, expected: 1500);
+    final fractional = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill2, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+    expect(fractional.allocateBillGoods(billGoodsLink(bill2, accepted: 1000, damaged: 500,
+      quantity: 1500), expectedRevision: 3), isNotNull);
+  });
+
+  for (final mode in ['ordinary', 'lost-response', 'competing']) {
+  test('PURCHASELINK SESSION $mode preserves Stock money scope and exact retry', () async {
+    final storage = _OrderJournalStorage();
+    final opening = openingFixture(amount: 0);
+    final session = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+    expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+      expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+    final receipt = sessionReceipt(session);
+    expect(await session.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+      scope: session.workspaceSupplierScope!, expectedPurchaseRevision: 3, expectedSupplierRevision: 1),
+      WorkspaceGoodsReceiptSaveResult.saved);
+    final product = session.workspaceCatalogueItems.single;
+    final base = allocatedBillFixture(product: product.id, unit: product.pack);
+    final bill = WorkspaceSupplierBillAcceptance(copy: base.copy,
+      acceptedAt: DateTime.now().toUtc(), openingTreatment: base.openingTreatment);
+    final books = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+    final old = (await books.read('account-A', 'store-A', qa: true))!;
+    await books.save(WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 4,
+      'copies': [...old.copies.map((c) => c.toJson()), bill.copy.toJson()]}), expectedRevision: 3);
+    expect(await session.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await session.confirmWorkspacePurchaseBill(bill.copy, scope: session.workspaceSupplierScope!,
+      expectedPurchaseRevision: 4, expectedLedgerRevision: 2, openingTreatment: bill.openingTreatment,
+      confirmedAt: bill.acceptedAt), isTrue);
+    final link = WorkspaceSupplierBillGoodsAllocation.fromJson({...billGoodsLink(bill).toJson(),
+      'receiptId': receipt.id, 'receiptLineId': receipt.lines.single.sourceLineId,
+      'productId': product.id, 'stockUnit': product.pack, 'acceptedReceiptMilli': 6000,
+      'damagedReceiptMilli': 0, 'linkedAt': DateTime.now().toUtc().toIso8601String()});
+    final selectedLink = mode == 'competing'
+        ? WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+            'acceptedReceiptMilli': 3000, 'billQuantityMilli': 3000}) : link;
+    WorkSession? competing;
+    if (mode == 'competing') {
+      competing = await openingPostingSession(storage, inventory: true);
+      expect(await competing.recoverCustomerLedger(), isTrue);
+    }
+    final before = session.workspaceSupplierLedger(opening.supplierId)!;
+    final stock = session.workspaceCatalogueItems.single.stock;
+    if (mode == 'lost-response') {
+      storage.loseWriteResponseOnce = true;
+      expect(await session.confirmWorkspaceSupplierBillGoodsAllocation(selectedLink, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedSupplierRevision: 3), isFalse);
+      expect(session.noticeMessage, contains('unverified'));
+      final journal = SecureWorkLedgerCheckpointStore(accountScope: () => 'account-A', storage: storage);
+      final saved = (await journal.read('account-A', 'store-A'))!;
+      expect(saved.supplierLedgers[opening.supplierId]!.billGoodsAllocations.length, 1);
+      final attempts = storage.writes.length;
+      expect(await session.recoverCustomerLedger(), isTrue);
+      expect(await session.confirmWorkspaceSupplierBillGoodsAllocation(selectedLink, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedSupplierRevision: 3), isTrue);
+      expect(storage.writes.length, attempts);
+    } else {
+      expect(await session.confirmWorkspaceSupplierBillGoodsAllocation(selectedLink, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedSupplierRevision: 3), isTrue);
+    }
+    expect(session.workspaceCatalogueItems.single.stock, stock);
+    expect(session.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, before.balanceMinor);
+    final writes = storage.writes.length;
+    expect(await session.confirmWorkspaceSupplierBillGoodsAllocation(selectedLink, supplierId: opening.supplierId,
+      scope: session.workspaceSupplierScope!, expectedSupplierRevision: 3), isTrue);
+    expect(storage.writes.length, writes);
+    expect(await session.confirmWorkspaceSupplierBillGoodsAllocation(selectedLink, supplierId: opening.supplierId,
+      scope: ('account-A', 'another-store', true), expectedSupplierRevision: 4), isFalse);
+    if (competing != null) {
+      final otherLink = WorkspaceSupplierBillGoodsAllocation.fromJson({...selectedLink.toJson(),
+        'operationId': 'other-session-link'});
+      expect(await competing.confirmWorkspaceSupplierBillGoodsAllocation(otherLink, supplierId: opening.supplierId,
+        scope: competing.workspaceSupplierScope!, expectedSupplierRevision: 3), isFalse);
+      expect(await competing.recoverCustomerLedger(), isTrue);
+      expect(competing.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations.length, 1);
+      expect(await competing.confirmWorkspaceSupplierBillGoodsAllocation(otherLink, supplierId: opening.supplierId,
+        scope: competing.workspaceSupplierScope!, expectedSupplierRevision: 4), isTrue);
+      expect(competing.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations.length, 2);
+      expect(competing.workspaceCatalogueItems.single.stock, stock);
+      expect(competing.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, before.balanceMinor);
+    }
+    final restart = await openingPostingSession(storage, inventory: true);
+    expect(await restart.recoverCustomerLedger(), isTrue);
+    expect(restart.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations.length, mode == 'competing' ? 2 : 1);
+    expect(restart.workspaceCatalogueItems.single.stock, stock);
+  });
+  }
+
+  test('PURCHASELINK bill already in Stock units must use identity conversion', () {
+    final bill = allocatedBillFixture();
+    final base = goodsReceiptFixture();
+    final receipt = WorkspaceSupplierGoodsReceipt.fromJson({...base.toJson(), 'lines': [
+      {...base.lines.single.toJson(), 'purchaseUnit': 'Carton', 'unitsPerPack': 2},
+    ]});
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+    expect(both.allocateBillGoods(billGoodsLink(bill, accepted: 6000, damaged: 0,
+      quantity: 12000), expectedRevision: 3), isNotNull);
+    expect(both.allocateBillGoods(billGoodsLink(bill, accepted: 6000, damaged: 0,
+      quantity: 6000, numerator: 2), expectedRevision: 3), isNull);
+  });
+
+  test('PURCHASELINK free goods have a separate cap and cannot inflate paid quantities', () {
+    final bill = allocatedBillFixture(quantity: '10', freeQuantity: '2');
+    final receipt = goodsReceiptFixture(delivered: 12000, accepted: 12000, expected: 12000);
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+    expect(both.allocateBillGoods(billGoodsLink(bill, accepted: 12000, damaged: 0,
+      quantity: 10000, freeQuantity: 2000), expectedRevision: 3), isNotNull);
+    expect(both.allocateBillGoods(billGoodsLink(bill, accepted: 12000, damaged: 0,
+      quantity: 12000), expectedRevision: 3), isNull);
+    final partial = both.allocateBillGoods(billGoodsLink(bill, accepted: 10000, damaged: 0,
+      quantity: 8000, freeQuantity: 2000), expectedRevision: 3)!;
+    expect(partial.allocateBillGoods(billGoodsLink(bill, id: 'free-overflow', accepted: 1000,
+      damaged: 0, quantity: 0, freeQuantity: 1000), expectedRevision: 4), isNull);
+    expect(WorkspaceSupplierLedger.fromJson(partial.toJson())!.billGoodsAllocations.values.single.freeBillQuantityMilli, 2000);
+  });
+
+  test('PURCHASELINK partial allocations cannot switch the reviewed bill unit conversion', () {
+    final bill = allocatedBillFixture(unit: 'Carton', quantity: '12');
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(goodsReceiptFixture(), expectedRevision: 2)!;
+    final first = both.allocateBillGoods(billGoodsLink(bill, accepted: 6000, damaged: 0,
+      quantity: 3000, numerator: 2), expectedRevision: 3)!;
+    final second = first.receiveGoods(goodsReceiptFixture(id: 'receipt-B'), expectedRevision: 4)!;
+    expect(second.allocateBillGoods(billGoodsLink(bill, id: 'changed-conversion', receipt: 'receipt-B',
+      accepted: 6000, damaged: 0, quantity: 6000), expectedRevision: 5), isNull);
+  });
+
+  test('PURCHASELINK free-only goods retain bill evidence without creating payable', () {
+    final bill = allocatedBillFixture(quantity: '0', freeQuantity: '2', total: '0');
+    expect(bill.valid, isTrue);
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final receipt = goodsReceiptFixture(delivered: 2000, accepted: 2000, expected: 2000);
+    final both = opening.acceptReviewedBill(bill, expectedRevision: 1)!
+      .receiveGoods(receipt, expectedRevision: 2)!;
+    final linked = both.allocateBillGoods(billGoodsLink(bill, accepted: 2000, damaged: 0,
+      quantity: 0, freeQuantity: 2000), expectedRevision: 3)!;
+    expect(linked.balanceMinor, 0);
+    expect(linked.entries, isEmpty);
+    expect(linked.purchaseBills.length, 1);
+    expect(linked.billGoodsAllocations.values.single.freeBillQuantityMilli, 2000);
+    expect(allocatedBillFixture(quantity: '0', freeQuantity: '0', total: '0').valid, isFalse);
+  });
+
+  test('PURCHASELINK legacy free text stays readable and blank means no free goods', () {
+    for (final freeText in ['-', ' ', '0']) {
+      final bill = allocatedBillFixture(freeQuantity: freeText);
+      expect(bill.valid, isTrue);
+      final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+        .acceptReviewedBill(bill, expectedRevision: 1)!
+        .receiveGoods(goodsReceiptFixture(), expectedRevision: 2)!;
+      final reopened = WorkspaceSupplierLedger.fromJson(both.toJson())!;
+      expect(reopened.toJson(), both.toJson());
+      final allocated = reopened.allocateBillGoods(
+        billGoodsLink(bill, accepted: 6000, damaged: 0), expectedRevision: 3);
+      if (freeText == '-') {
+        expect(allocated, isNull);
+      } else {
+        expect(allocated, isNotNull);
+        expect(allocated!.billGoodsAllocations.values.single.freeBillQuantityMilli, 0);
+      }
+      expect(allocatedBillFixture(quantity: '0', freeQuantity: freeText).valid, isFalse);
+    }
+  });
+
+  test('PURCHASERECEIVE goods before bill remains durable when bill later accepted', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final receipt = goodsReceiptFixture();
+    final received = opening.receiveGoods(receipt, expectedRevision: 1)!;
+    expect(received.purchaseBills, isEmpty);
+    expect(received.entries, isEmpty);
+    final bill = newBillFixture();
+    final billed = received.acceptReviewedBill(bill, expectedRevision: 2)!;
+    expect(billed.goodsReceipts['receipt-A']!.toJson(), receipt.toJson());
+    expect(billed.balanceMinor, 284075);
+    final firstBill = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    final laterGoods = firstBill.receiveGoods(receipt, expectedRevision: 2)!;
+    expect(laterGoods.purchaseBills['new-bill']!.toJson(), bill.toJson());
+    expect(laterGoods.balanceMinor, billed.balanceMinor);
+  });
 
   Future<bool> confirmBill(WorkSession session, WorkspaceSupplierBillAcceptance bill,
       {int bookRevision = 4, int ledgerRevision = 1}) =>

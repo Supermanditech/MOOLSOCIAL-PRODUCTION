@@ -1868,9 +1868,20 @@ abstract interface class WorkInventoryStore {
   });
 }
 
+/// Review receipt coordinator using the same queue as every inventory writer.
+/// The callback may commit the separate authoritative ledger, but must not call
+/// public inventory read/save methods: those would queue behind this guard.
+abstract interface class WorkInventoryReceiptProjectionGuard {
+  Future<bool> projectReceipt(String account, String store, {
+    required bool qa,
+    required int? expectedRevision,
+    required Future<WorkspaceSavedInventory?> Function(WorkspaceSavedInventory? previous) commit,
+  });
+}
+
 /// Encrypted local inventory, deliberately separate from financial journals.
 /// No deletion/migration fallback: corrupt or newer records stay recoverable.
-class SecureWorkInventoryStore implements WorkInventoryStore {
+class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryReceiptProjectionGuard {
   SecureWorkInventoryStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -1943,10 +1954,52 @@ class SecureWorkInventoryStore implements WorkInventoryStore {
     final bytes = jsonEncode(inventory.toJson());
     final frozen = WorkspaceSavedInventory.fromJson(jsonDecode(bytes));
     final key = _key(frozen.account, frozen.store, frozen.qa);
-    await _serial(key, () async {
+    await _serial(key, () => _saveUnderGuard(frozen, bytes, expectedRevision));
+  }
+
+  @override
+  Future<bool> projectReceipt(String account, String store, {
+    required bool qa,
+    required int? expectedRevision,
+    required Future<WorkspaceSavedInventory?> Function(WorkspaceSavedInventory? previous) commit,
+  }) => _serial(_key(account, store, qa), () async {
+    _check(account, store);
+    if (!qa) {
+      throw const WorkGatewayException('Supplier receipt projection needs the production inventory adapter.');
+    }
+    final previous = await _read(account, store, qa);
+    if (previous?.revision != expectedRevision) {
+      throw const WorkGatewayException('Store stock changed. Reopen it before receiving goods.');
+    }
+    final projection = await commit(previous);
+    _check(account, store);
+    if (projection == null) {
+      return false;
+    }
+    final bytes = jsonEncode(projection.toJson());
+    final frozen = WorkspaceSavedInventory.fromJson(jsonDecode(bytes));
+    if (frozen.account != account || frozen.store != store || frozen.qa != qa) {
+      throw const WorkGatewayException('Supplier receipt stock scope changed. Saved records are kept.');
+    }
+    if (frozen.manualReceiptCheckpointRevision == null) {
+      throw const WorkGatewayException('Supplier receipt projection needs its committed checkpoint reference.');
+    }
+    await _saveUnderGuard(frozen, bytes, expectedRevision, receiptProjection: true);
+    return true;
+  });
+
+  Future<void> _saveUnderGuard(WorkspaceSavedInventory frozen, String bytes,
+      int? expectedRevision, {bool receiptProjection = false}) async {
+      final key = _key(frozen.account, frozen.store, frozen.qa);
       _check(frozen.account, frozen.store);
       final previous = await _read(frozen.account, frozen.store, frozen.qa);
       if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if ((!receiptProjection && previous?.manualReceiptCheckpointRevision !=
+          frozen.manualReceiptCheckpointRevision) ||
+          (receiptProjection && previous?.manualReceiptCheckpointRevision != null &&
+              frozen.manualReceiptCheckpointRevision! < previous!.manualReceiptCheckpointRevision!)) {
+        throw const WorkGatewayException('Keep the saved supplier receipt checkpoint reference. Reopen Stock.');
+      }
       if (previous?.revision != expectedRevision ||
           frozen.revision != (expectedRevision ?? 0) + 1 ||
           (previous != null && frozen.savedAt.isBefore(previous.savedAt))) {
@@ -1966,6 +2019,64 @@ class SecureWorkInventoryStore implements WorkInventoryStore {
             'Original stock-entry details changed. Reload Stock before saving again.',
           );
         }
+        final receiptProducts = {
+          for (final movement in [...previous.movements, ...frozen.movements])
+            if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt)
+              movement.productId,
+        };
+        if (receiptProducts.isNotEmpty || previous.manualReceiptCheckpointRevision != null ||
+            frozen.manualReceiptCheckpointRevision != null) {
+          final nextMovements = {for (final m in frozen.movements) m.id: m};
+          if (previous.movements.any((m) => nextMovements[m.id]?.contentIdentity != m.contentIdentity)) {
+            throw const WorkGatewayException('Supplier receipt stock history must be kept. Reopen Stock.');
+          }
+          final previousMovements = previous.movements.map((m) => m.id).toSet();
+          final additions = frozen.movements.where((m) => !previousMovements.contains(m.id));
+          for (final product in previous.products) {
+            final nextProduct = next[product.id];
+            final delta = additions.where((m) => m.productId == product.id)
+              .fold<int>(0, (sum, m) => sum + m.quantityDelta);
+            if (nextProduct == null || nextProduct.stock != product.stock + delta) {
+              throw const WorkGatewayException('Stock quantity does not match its saved receipt and adjustments. Reopen Stock.');
+            }
+            if (receiptProducts.contains(product.id) &&
+                (nextProduct.pack != product.pack || nextProduct.stockMode != product.stockMode)) {
+              throw const WorkGatewayException('Keep this received product’s Stock unit. Add a separate product for a different pack.');
+            }
+          }
+        }
+      }
+      if (!receiptProjection && frozen.qa) {
+        // Every standalone writer participates in this inventory queue. Check
+        // the current authoritative journal inside it, not before awaiting it.
+        final ledger = await SecureWorkLedgerCheckpointStore(
+          accountScope: accountScope, storage: _storage).read(frozen.account, frozen.store);
+        final hasReceipts = ledger?.supplierLedgers.values.any((supplier) =>
+          supplier.goodsReceipts.isNotEmpty) ?? false;
+        if (hasReceipts && frozen.manualReceiptCheckpointRevision == null) {
+          throw const WorkGatewayException('Goods receipt is saved. Recover Stock before saving this edit.');
+        }
+        if (frozen.manualReceiptCheckpointRevision != null) {
+        final authoritative = ledger?.inventory;
+        final quantities = authoritative?.quantities;
+        final nextMovements = {for (final m in frozen.movements) m.id: m};
+        if (ledger == null || authoritative == null || quantities == null ||
+            ledger.revision < frozen.manualReceiptCheckpointRevision! ||
+            !ledger.supplierLedgers.values.any((supplier) => supplier.goodsReceipts.isNotEmpty) ||
+            authoritative.movements.any((m) => nextMovements[m.id]?.contentIdentity != m.contentIdentity)) {
+          throw const WorkGatewayException('Saved supplier receipts or sales changed. Reopen Stock before saving this edit.');
+        }
+        final journalIds = authoritative.movements.map((m) => m.id).toSet();
+        final localTail = frozen.movements.where((m) => !journalIds.contains(m.id));
+        for (final product in frozen.products) {
+          final base = quantities[product.id];
+          if (base != null && product.stock != base + localTail
+              .where((m) => m.productId == product.id)
+              .fold<int>(0, (sum, m) => sum + m.quantityDelta)) {
+            throw const WorkGatewayException('Stock changed after receipt. Keep your edit and reopen its saved quantity.');
+          }
+        }
+        }
       }
       try {
         await _storage.write(key: key, value: bytes);
@@ -1977,7 +2088,6 @@ class SecureWorkInventoryStore implements WorkInventoryStore {
       }
       // A scope change cannot apply this completion to another account.
       _check(frozen.account, frozen.store);
-    });
   }
 }
 

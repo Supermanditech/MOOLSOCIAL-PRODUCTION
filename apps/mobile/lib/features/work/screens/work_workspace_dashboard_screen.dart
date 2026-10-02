@@ -16879,9 +16879,11 @@ class _WorkspaceCatalogueSurfaceState
       );
       return;
     }
-    widget.session.addOrUpdateWorkspaceProduct(
+    if (!widget.session.addOrUpdateWorkspaceProduct(
       product.copyWith(publicListing: makePublic),
-    );
+    )) {
+      return;
+    }
     setState(() {});
   }
 
@@ -17169,11 +17171,13 @@ class _WorkspaceCatalogueSurfaceState
                   return 'Store stock changed or contains a duplicate. Import the file again; nothing was added.';
                 }
               }
-              widget.session.importWorkspaceProducts(
+              if (!widget.session.importWorkspaceProducts(
                 products.map((p) => p.copyWith(publicListing: false)).toList(),
                 addOnly: true,
                 stockEntryMethod: csvOnly ? WorkspaceStockEntryMethod.csv : null,
-              );
+              )) {
+                return 'Goods receipt is being saved. Your reviewed products are kept; try again when it finishes.';
+              }
               savedCount = products.length;
               // Freeze both sides of the attempted save. Provenance is created
               // by the session, not the review editor; retry it without inventing
@@ -19910,11 +19914,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       _reject('This product is no longer in your catalogue.');
       return;
     }
-    if (restore) {
-      widget.session.restoreWorkspaceProduct(widget.product.id);
-    } else {
-      widget.session.retireWorkspaceProduct(widget.product.id);
-    }
+    final changed = restore
+        ? widget.session.restoreWorkspaceProduct(widget.product.id)
+        : widget.session.retireWorkspaceProduct(widget.product.id);
+    if (!changed) return;
     _finish();
   }
 
@@ -20596,8 +20599,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           reviewedProduct.copyWith(publicListing: false)));
         return;
       }
-      widget.session.addOrUpdateWorkspaceProduct(
-        reviewedProduct, stockEntryMethod: widget.stockEntryMethod);
+      if (!widget.session.addOrUpdateWorkspaceProduct(
+        reviewedProduct, stockEntryMethod: widget.stockEntryMethod)) {
+        _reject('Goods receipt is being saved. Your changes are kept; try again when it finishes.');
+        return;
+      }
       if (widget.session.localInventoryEnabled) {
         final persisted = _pendingInventorySave
             ? await widget.session.retryWorkspaceInventorySave()

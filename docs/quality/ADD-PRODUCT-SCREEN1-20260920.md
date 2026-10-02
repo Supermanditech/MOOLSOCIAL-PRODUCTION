@@ -3627,3 +3627,67 @@ checkpoint; stop for founder review. Existing approved layouts stay intact.
 No APK/native OCR, auth bypass, backend/integration, actual money transfer, other
 worktree mutation, broad merge, release or push. Integration/native-dependent
 checks remain explicitly parked, not passed. Current goal is active/incomplete.
+
+### 3 October continuation: manual goods receipt authority (host only)
+
+Immutable supplier arrivals and line/unit/prior-Stock reservations now accompany
+the authoritative Store journal. Manual goods receiving posts its proof and exact
+stock increment together, with no bill liability or payment effect. A separate
+Stock projection shares the existing inventory writer queue. Interrupted saves
+have explicit unconfirmed/recovery-pending states; committed receipts replay the
+same proof rather than receiving goods twice. Catalogue/manual/CSV provenance and
+independent product availability remain preserved.
+
+Session Stock edits/imports/sales wait during receipt posting; product and CSV
+callers retain input on rejection. Projection recovery also blocks stale writers
+with an old unmarked Stock snapshot, including a different local store instance.
+An already-correct projection is acknowledged without another revision/write.
+Later purchase-book revisions do not hide an existing committed receipt.
+
+Current host evidence: 42 focused PURCHASEPOST/PURCHASERECEIVE tests passed;
+full atomic owner 500 passed, 11 existing skipped, zero failed, native exit0 and
+JSON done.success=true. Reporter in task outputs:
+`purchase-goods-receipt-session-atomic-20261003-v1.jsonl`, SHA256
+`A01AE74DA6404490A1740CC8F0E805010FA34E6ADE75B53FDD58AFBE7734E4E7`.
+Five changed source/test owners analyze clean. Existing P04/PURCHASEPOST/CSV
+widget subset: 58 passed, native exit0. These are labelled host fixtures, not
+runtime Stock injection, OPPO acceptance, production atomicity or backend reuse.
+
+Remaining in this goal: receipt-to-bill quantity allocations; reachable receiving
+and bill-confirmation controls using the approved purchase layout; supplier
+payments/advance allocations, returns/credits/refunds, statements and reconciliation;
+real-user-flow OPPO hot reload/restart/screenshots plus bounded defect correction.
+Architect re-review is pending; previous findings and runner failures retained in
+the existing regression record. No APK, runtime transactions, push or broad merge.
+
+### 3 October continuation: exact bill-to-goods links (host only)
+
+Immutable allocations bind a reviewed bill copy/revision and line to an exact
+supplier arrival line, saved product and reviewed unit conversion. Paid and free
+bill quantities have separate cumulative limits; accepted and damaged arrival
+quantities also have separate limits. Shortages remain unreceived. Bill and goods
+may be saved in either order. Linking does not receive Stock again, create another
+payable or record payment. Same-operation retries acknowledge the existing proof;
+changed-content retries and stale competing allocations reject without overwriting
+the winner. Lost supplier-save replies are reported as unverified, not definitely
+unsaved, and recovery permits an exact retry without another write.
+
+Fresh evidence: 12 focused PURCHASELINK tests passed. Full atomic owner: 512
+passed, 11 existing skips, zero failures, native exit0 and JSON done.success=true.
+Task reporter `purchase-bill-goods-allocation-atomic-20261003-v4.jsonl`, SHA256
+`95D24E204193D42EC7CFEA87B7A37D54AF1B3A634A121F1304B4F0CF0A68BA68`.
+Five changed application/test owners analyze clean. Free-only goods with paid
+quantity zero are covered and do not create liability when the bill total is zero.
+Earlier 508-test evidence precedes the latest recovery/free-only corrections and
+is historical, not current qualification. Architect review caught a legacy-bill
+compatibility issue: unresolved printed free text must remain readable on a paid
+bill. The correction preserves that history: dash remains unresolved and blocks
+allocation; whitespace means blank/no free quantity. Matching-quantity tests
+include the numeric zero-free positive control. The initial rejection test had
+an unrelated damage mismatch; its false-positive and correction are retained.
+
+These are automated fixtures only. Retailer unit-review and receiving controls,
+bill confirmation, payments/advance allocation, supplier returns/credits/refunds,
+statements and actual OPPO journeys remain required. Allocation totals do not tell
+whether damaged goods were paid or free; later monetary credits must collect that
+explicitly. No native/backend/production atomicity or founder acceptance claimed.
