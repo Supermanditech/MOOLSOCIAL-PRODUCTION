@@ -18,7 +18,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "P05-R12: retailer saves a reviewed purchase copy and retrieves its frozen details/files from existing Purchases independently of later draft edits.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "60D886C679AB42934A1AD5E3F85B9AC2544E612053DC67653B59D4B329E528E7",
+      "manifestSha256": "37D7FB49E85984056CF850120262FCD17A02E50A667AE50891B879D7002844A0",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -30,12 +30,13 @@
         "apps/mobile/lib/features/work/work_models.dart",
         "apps/mobile/lib/features/work/work_session.dart",
         "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_stock_export.dart",
         "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Existing purchase book only retains an editable draft. Add immutable snapshots inside that same encrypted owner; reuse existing purchase-paper preview, private attachment viewer and download. No new implementation owner, screen, route or accounting rules.",
+      "necessityProof": "R12 reviewed snapshots reuse existing purchase-paper preview and download. C04 admits the existing work_stock_export.dart owner for explicit saved-copy versus draft wording; it is already held in the primary claim. Preserve all fields, default draft behavior and unposted disclosure. No new owner, screen, route, storage or accounting rules.",
       "robustnessCoverage": [
         "Legacy version1 reads and strict saved-copy validation",
         "Frozen draft/supplier/Store identity after edits; preserve history on draft save",

@@ -3218,3 +3218,43 @@ Draft. Next bounded batch must admit its exact existing PDF-export owner and
 correct saved-copy heading/metadata/footer/recovery wording while preserving
 ordinary draft exports and unposted status. Do not close R12 or start posting.
 Details: C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/purchase-r12-export-child-20261002.json.
+
+R12-C04 bounded correction authorized by founder next (2 October): admit the
+exact existing shared exporter apps/mobile/lib/features/work/work_stock_export.dart,
+already held in the primary ownership claim. No new route or implementation
+owner. Use explicit saved-copy display state, not inferred receipt/payment or
+posting state; preserve default editable-draft export wording. Correct saved
+copy header, metadata, footer, trace, voucher placeholder and UI recovery text.
+Keep all entered supplier/document/item/tax/additional/reference facts, source
+bytes and approved paper/table geometry unchanged. The unposted disclosure
+must remain. Host fixtures produce both states for extraction/render checks;
+OPPO reuses the same saved revision9, without another purchase save or posting.
+
+R12-C04 host qualification (2026-10-02): saved-copy export uses explicit
+isSavedCopy=true only from verified read-only history. Default/explicit-false
+draft wording is unchanged. Header, subject, footer, tracing label and unposted
+voucher placeholder distinguish the two display states; no values or IDs change.
+Saved-copy invalid/changed/cancel/failure/success recovery has focused coverage.
+Focused C04 v4 passes2; P05 passes59; atomic/invoice passes442 with11 skipped;
+STOCK17 passes4; three-owner Dart analysis is clean. Do not sum overlapping suites.
+Six labelled host PDFs preserve fields/source terms; default and explicit-false
+text/metadata match, excluding CreationDate only. Ten rendered pages
+were inspected. C05 records existing word-splitting/orphan-row pagination on
+long terms, reproduced in both states; no geometry correction is admitted here.
+Device C04 qualification and founder approval remain separate from these checks.
+
+C04 OPPO qualification: restore the existing labelled Store review defines
+after lost attach, debug-restart current source without APK/auth/data clearing.
+Reuse EVAL-P-3009-01 revision9, total2840.00, On credit. One absent-before uniquely
+named recorded PDF downloaded successfully; cancellation retains the saved copy.
+History still shows one immutable copy, not a new save. Two device PDF pages
+rendered/inspected: saved-not-posted metadata/header/footer/voucher, original
+record/product IDs, quantities/rates and supplier digest retained. Older phone
+recorded/source downloads retain SHA55B2177F/65D3C260. After enumerated C04 wording
+normalization, only the existing local-to-UTC saved-on representation differs
+from the prior PDF; C06 tracks explicit timezone wording, no record mutation.
+No full baseline byte-equivalence claim. Founder acceptance remains pending.
+Local verification incident: failed scalar filename projection caused an
+unintended task-directory copy of phone Downloads; phone untouched. Exact cleanup
+was blocked; user notified, cleanup pending. Do not inspect/share/commit its
+unrelated contents. App checkout is separate; stage only the seven exact owners.

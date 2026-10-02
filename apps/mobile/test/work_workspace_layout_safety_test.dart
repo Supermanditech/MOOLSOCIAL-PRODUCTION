@@ -3431,6 +3431,99 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('P05-R12-C04 saved copy download wording preserves readonly state', (tester) async {
+    // Labelled host fixture only, never runtime acceptance data.
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 2);
+    final profile = WorkspaceSupplierProfile(id: 'host-c04-supplier',
+      name: 'HOST ONLY C04 supplier', createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-c04-entry', supplierId: profile.id,
+      invoiceReference: 'HOST-C04-1', invoiceDate: '02/10/2026', createdAt: at, updatedAt: at,
+      goods: [{'name': 'HOST ONLY C04 rice', 'pack': '1 kg', 'quantity': '2', 'cost': '40', 'productId': ''}],
+      details: {'invoiceTotal': '80', 'paymentStatus': 'On credit', 'receiptStatus': 'Already added to Stock'});
+    final copy = WorkspacePurchaseSavedCopy(id: 'host-c04-copy-r1', storeName: 'HOST ONLY Store',
+      revision: 1, savedAt: at, supplier: profile, draft: draft, labels: const {});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: [profile], draft: draft, copies: [copy]);
+    final original = jsonEncode(entry.value!.toJson());
+    final picker = _PurchaseOriginalSaveFixture();
+    final previous = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const ValueKey('work-purchase-copy-host-c04-copy-r1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Not assigned (not posted)'), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
+    Future<void> download() async {
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+        for (var i = 0; i < 40 && picker.bytes == null; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 25));
+        }
+      });
+      await tester.pumpAndSettle();
+    }
+    await download();
+    expect(find.text('Download cancelled. Your saved purchase copy is kept.'), findsOneWidget);
+    picker.bytes = null; picker.fail = true;
+    await download();
+    expect(find.text('Could not download the purchase copy. It is kept; retry.'), findsOneWidget);
+    picker.bytes = null; picker.fail = false; picker.result = Uri.file('/host-only/c04.pdf');
+    await download();
+    expect(find.text('Purchase copy downloaded.'), findsOneWidget);
+    expect(jsonEncode(entry.value!.toJson()), original);
+    expect(work.workspacePurchases, isEmpty);
+    expect(work.workspaceStockMovements, isEmpty);
+    // Lose the saved-copy membership while the PDF font is loading. This is a
+    // controlled host race, not a runtime storage or device injection.
+    final font = await tester.runAsync(() => rootBundle.load('assets/fonts/Inter-Variable.ttf'));
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    picker.bytes = null;
+    final downloadControl = find.byKey(const Key('purchase-recorded-download'));
+    await revealPurchaseInput(tester, downloadControl);
+    final downloadCallback = tester.widget<IconButton>(downloadControl).onPressed;
+    expect(downloadCallback, isNotNull);
+    await tester.runAsync(() async {
+      final started = Completer<void>();
+      final heldFont = Completer<ByteData?>();
+      messenger.setMockMessageHandler('flutter/assets', (message) {
+        expect(utf8.decode(message!.buffer.asUint8List(message.offsetInBytes, message.lengthInBytes)),
+          'assets/fonts/Inter-Variable.ttf');
+        started.complete();
+        return heldFont.future;
+      });
+      try {
+        final operation = Function.apply(downloadCallback!, const []) as Future<void>;
+        await started.future.timeout(const Duration(seconds: 2));
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 2, profiles: [profile], draft: draft);
+        await work.loadWorkspaceSuppliers(retry: true);
+        heldFont.complete(font);
+        await operation.timeout(const Duration(seconds: 5));
+      } finally {
+        if (!heldFont.isCompleted) { heldFont.complete(font); }
+        messenger.setMockMessageHandler('flutter/assets', null);
+      }
+    });
+    await tester.pumpAndSettle();
+    expect(picker.bytes, isNull);
+    expect(find.text('Saved purchase copy changed or is unavailable. Reopen it from Purchases before downloading.'), findsOneWidget);
+    final unavailable = jsonEncode(entry.value!.toJson());
+    await tester.tap(find.byKey(const Key('purchase-recorded-download')));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved purchase copy is unavailable. Reopen it from Purchases and retry.'), findsOneWidget);
+    expect(picker.bytes, isNull);
+    expect(jsonEncode(entry.value!.toJson()), unavailable);
+    expect(work.workspacePurchases, isEmpty);
+    expect(work.workspaceStockMovements, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final stale in [false, true]) {
     testWidgets('P05-R12 refresh preserves typed input after ${stale ? 'stale revision' : 'failed save'}', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
@@ -5177,6 +5270,43 @@ void main() {
       expect(tester.takeException(),isNull);await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('P05-R12-C04 PDF draft and saved copy preserve invoice fields', (tester) async {
+    // Labelled automated renderer fixtures only; no app store writes.
+    final at = DateTime.utc(2026, 10, 2);
+    final supplier = WorkspaceSupplierProfile(id: 'host-c04-supplier', name: 'HOST ONLY C04 supplier',
+      address: 'HOST ONLY address', createdAt: at, updatedAt: at);
+    for (final long in [false, true]) {
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-c04-entry', supplierId: supplier.id,
+        invoiceReference: 'HOST-C04-1', invoiceDate: '02/10/2026', createdAt: at, updatedAt: at,
+        goods: [{'name': 'HOST ONLY C04 rice', 'pack': '1 kg', 'quantity': '2', 'cost': '40',
+          'productId': 'host-c04-product', 'hsn': '1006', 'taxableValue': '80', 'taxAmount': '4', 'lineTotal': '84'}],
+        details: {'documentTitle': 'TAX INVOICE', 'invoiceTotal': '84', 'paymentStatus': 'On credit',
+          'receiptStatus': 'Already added to Stock', 'buyerName': 'HOST ONLY buyer',
+          'terms': long ? List.filled(70, 'Source wording kept exactly. ').join() : 'Source wording kept exactly.'},
+        additionalFields: [WorkspacePurchaseAdditionalField(id: 'host-c04-extra', section: 'items', itemIndex: 0,
+          label: 'Warranty on item', value: 'Two years')]);
+      final before = jsonEncode(draft.toJson());
+      expect(draft.valid, isTrue);
+      for (final state in ['default', 'explicit-draft', 'saved']) {
+        final bytes = await tester.runAsync(() => state == 'default'
+          ? generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier, storeName: 'HOST ONLY Store',
+            storeId: 'host-c04-store', revision: 9, labels: const {})
+          : generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier, storeName: 'HOST ONLY Store',
+            storeId: 'host-c04-store', revision: 9, labels: const {}, isSavedCopy: state == 'saved'));
+        expect(ascii.decode(bytes!.take(4).toList()), '%PDF');
+        expect(jsonEncode(draft.toJson()), before);
+        final output = Platform.environment['PURCHASE_PDF_QA_OUT_DIR'];
+        if (output != null) {
+          await tester.runAsync(() async {
+            final file = File('$output/purchase-c04-${long ? 'long' : 'short'}-$state.pdf');
+            if (await file.exists()) { throw StateError('Preserve previous PDF evidence'); }
+            await file.writeAsBytes(bytes);
+          });
+        }
+      }
+    }
+  });
 
   testWidgets('P05-R11-C02 PDF keeps reference-field union and paginates long extra values', (tester) async {
     final at = DateTime.utc(2026, 9, 30);

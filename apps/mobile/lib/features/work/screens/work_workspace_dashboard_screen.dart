@@ -12027,7 +12027,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     if (_recordedSaving) return;
     final draft = _original, supplier = _supplier, revision = _revision;
     if (draft == null || supplier == null || revision == null || !_recordedCurrent(draft, supplier, revision)) {
-      setState(() => _recordedNotice = _dirty || draft == null
+      setState(() => _recordedNotice = _readOnly
+        ? 'Saved purchase copy is unavailable. Reopen it from Purchases and retry.'
+        : _dirty || draft == null
         ? 'Save draft, then reopen it to download the saved copy. Your entries are kept.'
         : 'Saved details changed or are unavailable. Reopen this purchase draft and retry.');
       return;
@@ -12036,27 +12038,33 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     try {
       final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
         storeName: widget.savedCopy?.storeName ?? widget.session.activeWorkspace?.name ?? 'Store', storeId: _scope!.$2,
-        revision: revision, labels: widget.savedCopy?.labels ?? _exportLabels);
+        revision: revision, labels: widget.savedCopy?.labels ?? _exportLabels, isSavedCopy: _readOnly);
       if (!_recordedCurrent(draft, supplier, revision)) {
         if (mounted && _current) {
-          setState(() => _recordedNotice = 'Saved details changed. Reopen this purchase draft before downloading.');
+          setState(() => _recordedNotice = _readOnly
+            ? 'Saved purchase copy changed or is unavailable. Reopen it from Purchases before downloading.'
+            : 'Saved details changed. Reopen this purchase draft before downloading.');
         }
         return;
       }
-      // Filename binds to the saved immutable draft version, not typed bill text.
+      // Filename binds to the saved entry version, not typed bill text.
       final stamp = draft.updatedAt.microsecondsSinceEpoch;
       final result = await FilePicker.saveFile(dialogTitle: 'Save recorded purchase copy',
         fileName: 'purchase-recorded-$stamp-r$revision.pdf', mimeType: 'application/pdf',
         type: FileType.custom, allowedExtensions: ['pdf'], bytes: bytes);
       if (_recordedCurrent(draft, supplier, revision)) {
         setState(() => _recordedNotice = result == null
-          ? 'Download cancelled. Your saved draft is kept.' : 'Recorded copy saved.');
+          ? _readOnly ? 'Download cancelled. Your saved purchase copy is kept.'
+            : 'Download cancelled. Your saved draft is kept.'
+          : _readOnly ? 'Purchase copy downloaded.' : 'Recorded copy saved.');
       }
     } on FormatException catch (error) {
       if (mounted && _current) setState(() => _recordedNotice = error.message);
     } on Object {
       if (mounted && _current) {
-        setState(() => _recordedNotice = 'Could not download the recorded copy. Your saved draft is kept; retry.');
+        setState(() => _recordedNotice = _readOnly
+          ? 'Could not download the purchase copy. It is kept; retry.'
+          : 'Could not download the recorded copy. Your saved draft is kept; retry.');
       }
     } finally {
       if (mounted) setState(() => _recordedSaving = false);
@@ -12459,7 +12467,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_details['printedFooter']!.text.isNotEmpty) column([detail('printedFooter')]),
     ]);
     final pos = <Widget>[
-      value('Purchase voucher No.', storePurchaseUnpostedVoucherNumber, 'voucher-reference'),
+      value('Purchase voucher No.', _readOnly ? storePurchaseSavedCopyVoucherNumber
+        : storePurchaseUnpostedVoucherNumber, 'voucher-reference'),
       ...selected(recordedPaymentKeys),
       ...details('payment'),
       ...details('receipt'),

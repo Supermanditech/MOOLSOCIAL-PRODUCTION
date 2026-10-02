@@ -1252,6 +1252,7 @@ String storePurchaseSupplierDocumentHeading({required String title, required Str
 }
 
 const storePurchaseUnpostedVoucherNumber = 'Not assigned (draft)';
+const storePurchaseSavedCopyVoucherNumber = 'Not assigned (not posted)';
 
 /// A copy of saved, unposted retailer entries, never a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
@@ -1262,14 +1263,19 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   required String storeId,
   required int revision,
   required Map<String, String> labels,
+  bool isSavedCopy = false,
 }) async {
   if (!draft.valid || supplier.validationError != null ||
       draft.supplierId != supplier.id || storeId.isEmpty || revision < 0) {
-    throw const FormatException('Reopen the saved purchase draft before downloading.');
+    throw FormatException(isSavedCopy
+      ? 'Reopen the saved purchase copy before downloading.'
+      : 'Reopen the saved purchase draft before downloading.');
   }
   final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Variable.ttf'));
   final document = pw.Document(title: 'Recorded purchase copy - ${draft.invoiceReference}',
-    author: 'MoolSocial', subject: 'Saved unposted purchase draft; supplier copy retained separately');
+    author: 'MoolSocial', subject: isSavedCopy
+      ? 'Saved unposted purchase copy; supplier copy retained separately'
+      : 'Saved unposted purchase draft; supplier copy retained separately');
   final embedded = font.getFont(pw.Context(document: document.document));
   final allText = [storeName, storeId, draft.id, supplier.id, supplier.name,
     supplier.phone, supplier.address, supplier.gstin, draft.invoiceReference, draft.invoiceDate,
@@ -1371,7 +1377,8 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     ]),
   ]);
   final widgets = <pw.Widget>[
-    text('Purchase entry - Recorded copy (Draft)', size: 11, bold: true),
+    text(isSavedCopy ? 'Purchase entry - Saved copy (Not posted)'
+      : 'Purchase entry - Recorded copy (Draft)', size: 11, bold: true),
     pw.SizedBox(height: 5),
     text('Saved bill details for review. Supplier copy kept separately. No stock, dues or payment posting.', size: 8),
     pw.SizedBox(height: 10),
@@ -1483,16 +1490,20 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   ];
   widgets.addAll([
     if (posKeys.any((key) => d[key]?.isNotEmpty ?? false) || retailerItemRows.isNotEmpty)
-      ...[pw.SizedBox(height: 10), text('Goods & payment details - retailer draft, not posted', bold: true),
+      ...[pw.SizedBox(height: 10), text(isSavedCopy
+        ? 'Goods & payment details - retailer record, not posted'
+        : 'Goods & payment details - retailer draft, not posted', bold: true),
         if (posKeys.any((key) => d[key]?.isNotEmpty ?? false)) fields(posKeys),
         if (retailerItemRows.isNotEmpty) table(const ['Item', 'Retailer detail', 'As entered'], retailerItemRows)],
     pw.NewPage(),
     pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [text('Record details - saved references', size: 13, bold: true),
-      text('For tracing this saved draft. These references are not supplier-invoice fields.', size: 8),
+      text(isSavedCopy
+        ? 'For tracing this saved purchase copy. These references are not supplier-invoice fields.'
+        : 'For tracing this saved draft. These references are not supplier-invoice fields.', size: 8),
       pw.SizedBox(height: 8), table(const ['Detail', 'Saved value'], [
-      ['Purchase voucher No.', storePurchaseUnpostedVoucherNumber],
-      ['Store', storeName], ['Store ID', storeId], ['Draft ID', draft.id], ['Supplier ID', supplier.id],
+      ['Purchase voucher No.', isSavedCopy ? storePurchaseSavedCopyVoucherNumber : storePurchaseUnpostedVoucherNumber],
+      ['Store', storeName], ['Store ID', storeId], [isSavedCopy ? 'Source entry ID' : 'Draft ID', draft.id], ['Supplier ID', supplier.id],
       ['Saved revision', '$revision'], ['Saved on', draft.updatedAt.toIso8601String()],
       for (final (index, line) in draft.goods.indexed)
         if (line['productId']?.isNotEmpty ?? false) ['Item ${index + 1} product ID', line['productId']!],
@@ -1503,7 +1514,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     margin: const pw.EdgeInsets.all(24), maxPages: 1000,
     theme: pw.ThemeData.withFont(base: font, bold: font),
     footer: (context) => pw.Padding(padding: const pw.EdgeInsets.only(top: 8), child:
-      text('Recorded purchase copy | ${draft.invoiceReference} | Unposted draft | Page ${context.pageNumber} of ${context.pagesCount}', size: 8)),
+      text('Recorded purchase copy | ${draft.invoiceReference} | ${isSavedCopy ? 'Saved copy - not posted' : 'Unposted draft'} | Page ${context.pageNumber} of ${context.pagesCount}', size: 8)),
     build: (_) => widgets));
   return document.save();
 }
