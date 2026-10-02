@@ -667,6 +667,8 @@ class WorkSession extends ChangeNotifier {
   final _supplierDirectories = <(String, String, bool), WorkspacePurchaseEntryBook?>{};
   final _supplierLoads = <(String, String, bool), Future<bool>>{};
   final _supplierErrors = <(String, String, bool), String>{};
+  // Definite pre-write rejection is not a failed read or an uncertain save.
+  final _supplierValidationErrors = <(String, String, bool), String>{};
   final _supplierWrites = <(String, String, bool)>{};
   final _supplierNeedsReload = <(String, String, bool)>{};
   (String, String, bool)? get _supplierKey {
@@ -685,7 +687,12 @@ class WorkSession extends ChangeNotifier {
   bool get workspacePurchaseDraftReviewed =>
       _supplierDirectories[_supplierKey]?.draftHasReviewedCopy == true;
   bool get workspaceSupplierSaving => _supplierWrites.contains(_supplierKey);
-  String? get workspaceSupplierError => _supplierErrors[_supplierKey];
+  String? get workspaceSupplierRecoveryError => _supplierErrors[_supplierKey];
+  String? get workspaceSupplierError => workspaceSupplierRecoveryError ?? _supplierValidationErrors[_supplierKey];
+  void dismissWorkspacePurchaseValidation((String, String, bool) scope) {
+    if (_supplierKey != scope || _supplierWrites.contains(scope)) return;
+    if (_supplierValidationErrors.remove(scope) != null) notifyListeners();
+  }
   List<WorkspaceSupplierProfile> get workspaceSuppliers =>
       _supplierDirectories[_supplierKey]?.profiles ?? const [];
   Future<bool> loadWorkspaceSuppliers({bool retry = false}) {
@@ -703,6 +710,7 @@ class WorkSession extends ChangeNotifier {
         _supplierDirectories[key] = saved;
         _supplierNeedsReload.remove(key);
         _supplierErrors.remove(key);
+        _supplierValidationErrors.remove(key);
         return true;
       } on Object {
         if (_supplierKey == key) {
@@ -732,8 +740,11 @@ class WorkSession extends ChangeNotifier {
     if (reviewedCopy != null) {
       final prior = old?.copies.where((c) => c.id == reviewedCopy.id).firstOrNull;
       if (prior != null) {
-        if (jsonEncode(prior.toJson()) == jsonEncode(reviewedCopy.toJson())) return true;
-        _supplierErrors[key] = 'This saved copy has different details. Reopen Purchases before saving again.';
+        if (jsonEncode(prior.toJson()) == jsonEncode(reviewedCopy.toJson())) {
+          dismissWorkspacePurchaseValidation(key);
+          return true;
+        }
+        _supplierValidationErrors[key] = 'This saved copy has different details. Reopen Purchases before saving again.';
         notifyListeners();
         return false;
       }
@@ -741,18 +752,18 @@ class WorkSession extends ChangeNotifier {
           jsonEncode(reviewedCopy.draft.toJson()) != jsonEncode(draft.toJson()) ||
           jsonEncode(reviewedCopy.supplier.toJson()) != jsonEncode(profile.toJson()) ||
           (old?.copies.length ?? 0) >= 1000) {
-        _supplierErrors[key] = 'Cannot save this purchase copy. Your draft and earlier copies are kept; reopen Purchases.';
+        _supplierValidationErrors[key] = 'Cannot save this purchase copy. Your draft and earlier copies are kept; reopen Purchases.';
         notifyListeners();
         return false;
       }
       if (draft.invoiceFinancialYear == null) {
-        _supplierErrors[key] = 'Check Invoice date. Enter a valid date as DD/MM/YYYY before saving the purchase copy. Your entries are kept.';
+        _supplierValidationErrors[key] = 'Check Invoice date. Enter a valid date as DD/MM/YYYY before saving the purchase copy. Your entries are kept.';
         notifyListeners();
         return false;
       }
       final duplicateBill = old?.duplicateInvoice(draft);
       if (duplicateBill != null) {
-        _supplierErrors[key] = 'Bill ${duplicateBill.draft.invoiceReference} dated ${duplicateBill.draft.invoiceDate} is already saved for ${duplicateBill.supplier.name}. Check the bill number, or cancel to reopen its saved copy in Purchases. Your entries are kept.';
+        _supplierValidationErrors[key] = 'Bill ${duplicateBill.draft.invoiceReference} dated ${duplicateBill.draft.invoiceDate} is already saved for ${duplicateBill.supplier.name}. Check the bill number, or cancel to reopen its saved copy in Purchases. Your entries are kept.';
         notifyListeners();
         return false;
       }
@@ -764,13 +775,13 @@ class WorkSession extends ChangeNotifier {
         (replaceReviewedDraftId != null && !replacesReviewedDraft) ||
         (old?.draft != null && !replacesReviewedDraft && (old!.draft!.id != draft.id ||
           old.draft!.createdAt != draft.createdAt))) {
-      _supplierErrors[key] = 'This purchase draft changed. Reopen it before saving again.';
+      _supplierValidationErrors[key] = 'This purchase draft changed. Reopen it before saving again.';
       notifyListeners();
       return false;
     }
     final error = profile.validationError;
     if (error != null) {
-      _supplierErrors[key] = error;
+      _supplierValidationErrors[key] = error;
       notifyListeners();
       return false;
     }
@@ -779,14 +790,14 @@ class WorkSession extends ChangeNotifier {
       ((profile.phone.isNotEmpty && p.phone == profile.phone) ||
        (profile.gstin.isNotEmpty && p.gstin == profile.gstin))).firstOrNull;
     if (duplicate != null) {
-      _supplierErrors[key] = 'These contact details belong to ${duplicate.name}. Select that supplier in the Supplier name or phone field.';
+      _supplierValidationErrors[key] = 'These contact details belong to ${duplicate.name}. Select that supplier in the Supplier name or phone field.';
       notifyListeners();
       return false;
     }
     final existing = profiles.where((p) => p.id == profile.id).firstOrNull;
     if (existing != null && (existing.createdAt != profile.createdAt ||
         profile.updatedAt.isBefore(existing.updatedAt))) {
-      _supplierErrors[key] = 'Supplier details changed. Reopen that supplier before editing again.';
+      _supplierValidationErrors[key] = 'Supplier details changed. Reopen that supplier before editing again.';
       notifyListeners();
       return false;
     }
@@ -796,6 +807,7 @@ class WorkSession extends ChangeNotifier {
       copies: [...?old?.copies, ?reviewedCopy]);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
     notifyListeners();
     try {
       await _supplierStorage.save(saved, expectedRevision: old?.revision);

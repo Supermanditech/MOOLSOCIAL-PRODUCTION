@@ -11394,6 +11394,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   static const _taxComponentLabels = {'cgst': 'CGST ₹', 'sgstAmount': 'SGST ₹',
     'utgst': 'UTGST ₹', 'igst': 'IGST ₹', 'cess': 'Cess ₹'};
   final _reviewAnchor = GlobalKey();
+  final _saveErrorAnchor = GlobalKey();
   final _itemsAnchor = GlobalKey();
   final _sourceViewport = GlobalKey();
   final _documentPage = GlobalKey();
@@ -11520,6 +11521,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))])) == true;
     _leaving = false;
+    if (mounted && discard && !_readOnly && _scope != null) {
+      widget.session.dismissWorkspacePurchaseValidation(_scope!);
+    }
     return mounted && discard;
   }
   Future<void> _back() async {
@@ -11588,7 +11592,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     if (reviewed) {
       if (_name.text.trim().isEmpty || _reference.text.trim().isEmpty || _date.text.trim().isEmpty ||
           !_goods.any((line) => line.name.text.trim().isNotEmpty)) {
-        setState(() => _error = 'Enter supplier, invoice number/date and items before saving a purchase copy. Save draft to finish later.');
+        _showSaveError('Enter supplier, invoice number/date and items before saving a purchase copy. Save draft to finish later.');
         return;
       }
       if (_copyAttempt == null || _copyAttemptInput != _input) {
@@ -11603,7 +11607,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       draft = _copyAttempt!.draft;
     }
     if (profile.validationError != null || !draft.valid) {
-      setState(() => _error = profile.validationError ??
+      _showSaveError(profile.validationError ??
         'Check your entries before saving. Each extra detail needs a heading (up to 120 characters) and details (up to 4,000). Keep up to 200 extra details and 48,000 characters in total. Your entries are kept.');
       return;
     }
@@ -11615,8 +11619,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       }
     } on Object catch (e) {
       if (mounted) {
-        setState(() { _busy = false; _error = e is WorkGatewayException ? e.message :
-          'Could not open the attached bill. Your entries are kept; attach the original again.'; });
+        setState(() => _busy = false);
+        _showSaveError(e is WorkGatewayException ? e.message :
+          'Could not open the attached bill. Your entries are kept; attach the original again.');
       }
       return;
     }
@@ -11633,9 +11638,23 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       _baseline = _input;
       widget.onBack();
     } else {
-      setState(() => _error = widget.session.workspaceSupplierError ??
+      _showSaveError(widget.session.workspaceSupplierError ??
         'Return to the Store where you started this bill. Your entries are kept.');
     }
+  }
+  void _showSaveError(String message) {
+    if (!mounted) return;
+    if (_current) FocusScope.of(context).unfocus();
+    setState(() => _error = message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_current || _error != message) return;
+      final target = _saveErrorAnchor.currentContext;
+      if (target != null && target.mounted) {
+        // Reveal the beginning even when large text exceeds a short viewport.
+        unawaited(Scrollable.ensureVisible(target, alignment: 0,
+          duration: const Duration(milliseconds: 200)));
+      }
+    });
   }
   Future<void> _refreshSaved() async {
     if (_busy || !_current) return;
@@ -12996,8 +13015,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   : 'Check bill details before saving'),
               if (_notice != null) Text(_notice!, key: const Key('work-purchase-entry-notice'),
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-              if (_error != null) Text(_error!, key: const Key('work-purchase-entry-error'),
-                style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
+              if (_error != null) KeyedSubtree(key: _saveErrorAnchor,
+                child: Semantics(liveRegion: true, child: Text(_error!,
+                  key: const Key('work-purchase-entry-error'),
+                  style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))))),
               if (_error != null && !_readOnly) TextButton(key: const Key('work-purchase-refresh-saved'),
                 onPressed: _refreshSaved, child: const Text('Refresh saved records · keep my entries')),
               if (!pinned) _draftActions(),
@@ -13571,8 +13592,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
             if (index == 0) { return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (!statement && session.workspaceSupplierError != null) ...[
-              Text(session.workspaceSupplierError!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+            if (!statement && session.workspaceSupplierRecoveryError != null) ...[
+              Text(session.workspaceSupplierRecoveryError!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               TextButton(onPressed: () async { await session.loadWorkspaceSuppliers(retry: true);
                 if (mounted) setState(() {}); }, child: const Text('Retry saved purchases')),
             ],

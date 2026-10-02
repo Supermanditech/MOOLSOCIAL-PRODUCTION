@@ -3671,6 +3671,101 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final geometry in [(const Size(360, 806), 1.0), (const Size(806, 360), 1.6)]) {
+    testWidgets('P05-C11 duplicate feedback and Cancel preserve loaded history ${geometry.$1}', (tester) async {
+      // Host-only fixture; physical acceptance uses the existing app-created bill.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      final supplier = WorkspaceSupplierProfile(id: 'c11-supplier', name: 'Evaluation C11 supplier',
+        phone: '', address: '', createdAt: at, updatedAt: at);
+      final draft = WorkspacePurchaseEntryDraft(id: 'c11-saved-draft', supplierId: supplier.id,
+        invoiceReference: 'EVAL-C11-01', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [{'name': 'Evaluation rice', 'quantity': '1', 'cost': '95'}]);
+      final copy = WorkspacePurchaseSavedCopy(id: 'c11-saved-copy', storeName: 'Evaluation Store',
+        revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier], draft: draft, copies: [copy]);
+      await work.loadWorkspaceSuppliers(retry: true);
+      await tester.pumpAndSettle();
+      final saved = jsonEncode(entry.value!.toJson());
+      await tester.tap(find.byKey(const Key('work-purchase-new')));
+      await tester.pumpAndSettle();
+      await expandPurchasePrimarySections(tester);
+      final name = find.byKey(const Key('work-purchase-supplier-name'));
+      await revealPurchaseInput(tester, name);
+      await tester.enterText(name, 'Evaluation C11');
+      await tester.pumpAndSettle();
+      final suggestion = find.widgetWithText(TextButton, supplier.name);
+      await revealPurchaseInput(tester, suggestion);
+      await tester.tap(suggestion);
+      await tester.pumpAndSettle();
+      for (final field in {'work-purchase-reference': 'EVAL-C11-01',
+        'work-purchase-date': '30/09/2026', 'work-purchase-item-0': 'Evaluation rice'}.entries) {
+        final input = find.byKey(Key(field.key));
+        await revealPurchaseInput(tester, input);
+        await tester.enterText(input, field.value);
+      }
+      await usePurchaseControl(tester, 'work-purchase-preview');
+      await usePurchaseControl(tester, 'work-purchase-copy-save');
+      final error = find.byKey(const Key('work-purchase-entry-error'));
+      expect(error, findsOneWidget);
+      expect(error.hitTestable(), findsOneWidget, reason: 'Rejected save is visible without another scroll.');
+      expect(tester.getTopLeft(error).dy, greaterThanOrEqualTo(0));
+      expect(work.workspaceSupplierRecoveryError, isNull);
+      work.dismissWorkspacePurchaseValidation((scope.$1, 'different-store', scope.$3));
+      expect(work.workspaceSupplierError, contains('already saved'));
+      expect(jsonEncode(entry.value!.toJson()), saved);
+      final cancel = find.widgetWithText(TextButton, 'Cancel');
+      await revealPurchaseInput(tester, cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(work.workspaceSupplierError, contains('already saved'));
+      await revealPurchaseInput(tester, cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      expect(find.text('Retry saved purchases'), findsNothing);
+      expect(work.workspaceSupplierError, isNull);
+      expect(work.workspacePurchaseCopies.single.id, copy.id);
+      expect(jsonEncode(entry.value!.toJson()), saved);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('P05-C11 genuine load failure keeps Purchases recovery available', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final scope = work.workspaceSupplierScope!;
+    entry.failRead = true;
+    expect(await work.loadWorkspaceSuppliers(retry: true), isFalse);
+    work.dismissWorkspacePurchaseValidation(scope);
+    await tester.pumpAndSettle();
+    expect(work.workspaceSupplierRecoveryError, contains('could not be opened'));
+    final retry = find.text('Retry saved purchases');
+    expect(retry, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(retry));
+    await tester.pumpAndSettle();
+    entry.failRead = false;
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(work.workspaceSupplierError, isNull);
+    expect(find.text('Retry saved purchases'), findsNothing);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final stale in [false, true]) {
     testWidgets('P05-R12 refresh preserves typed input after ${stale ? 'stale revision' : 'failed save'}', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
@@ -3703,6 +3798,7 @@ void main() {
       await tester.tap(find.byKey(const Key('work-purchase-copy-save')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-purchase-entry-error')), findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-entry-error')).hitTestable(), findsOneWidget);
       expect(entry.value?.copies ?? const <WorkspacePurchaseSavedCopy>[], isEmpty);
       expect(entry.value?.revision, stale ? 2 : null);
       entry.failSave = false;
@@ -46174,9 +46270,12 @@ class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
 
 class _PurchaseEntryFixtureStore implements WorkPurchaseEntryStore {
   WorkspacePurchaseEntryBook? value;
-  bool failSave = false;
+  bool failRead = false, failSave = false;
   @override
-  Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) async => value;
+  Future<WorkspacePurchaseEntryBook?> read(String account, String store, {required bool qa}) async {
+    if (failRead) throw StateError('Fixture read failure');
+    return value;
+  }
   @override
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) async {
     if (failSave || value?.revision != expectedRevision) throw StateError('Fixture write failure');
