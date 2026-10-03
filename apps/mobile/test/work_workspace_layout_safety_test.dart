@@ -3649,7 +3649,10 @@ void main() {
     await openPurchaseList(tester);
     await tester.tap(find.byKey(const ValueKey('work-purchase-copy-host-c04-copy-r1')));
     await tester.pumpAndSettle();
-    expect(find.text('Not assigned (not posted)'), findsOneWidget);
+    // This fixture supplies a purchase book, not a recovered accounting journal.
+    expect(work.workspaceInvoiceHistoryLoaded, isFalse);
+    expect(find.text('No system voucher assigned'), findsOneWidget);
+    expect(find.text('Supplier account status unavailable'), findsWidgets);
     expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
     Future<void> download() async {
       await tester.runAsync(() async {

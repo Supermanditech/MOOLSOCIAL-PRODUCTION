@@ -12400,6 +12400,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (mounted) setState(() => _sourceSaving = false);
     }
   }
+  StorePurchaseAccountingSnapshot get _accountingSnapshot => !_readOnly
+    ? StorePurchaseAccountingSnapshot.draft
+    : StorePurchaseAccountingSnapshot.capture(copy: widget.savedCopy!, scope: _scope,
+        recovered: _current && widget.session.workspaceSupplierScope == _scope &&
+          widget.session.workspaceInvoiceHistoryLoaded && !widget.session.workspaceSupplierRecoveryRequired,
+        ledger: widget.session.workspaceSupplierLedger(widget.savedCopy!.supplier.id));
   bool _recordedCurrent(WorkspacePurchaseEntryDraft draft, WorkspaceSupplierProfile supplier, int revision) =>
     mounted && _current && widget.session.workspaceSuppliersLoaded && !_dirty && !_busy && !widget.session.workspaceSupplierSaving &&
     (_readOnly ? widget.session.workspacePurchaseCopies.any((c) => c.id == widget.savedCopy!.id &&
@@ -12418,15 +12424,21 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         : 'Saved details changed or are unavailable. Reopen this purchase draft and retry.');
       return;
     }
+    final accounting = _accountingSnapshot;
+    bool evidenceCurrent() => _recordedCurrent(draft, supplier, revision) &&
+      accounting.sameEvidence(_accountingSnapshot);
     setState(() { _recordedSaving = true; _recordedNotice = null; });
     try {
       final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
         storeName: widget.savedCopy?.storeName ?? widget.session.activeWorkspace?.name ?? 'Store', storeId: _scope!.$2,
-        revision: revision, labels: widget.savedCopy?.labels ?? _exportLabels, isSavedCopy: _readOnly);
-      if (!_recordedCurrent(draft, supplier, revision)) {
+        revision: revision, labels: widget.savedCopy?.labels ?? _exportLabels, isSavedCopy: _readOnly,
+        accounting: accounting);
+      if (!evidenceCurrent()) {
         if (mounted && _current) {
           setState(() => _recordedNotice = _readOnly
-            ? 'Saved purchase copy changed or is unavailable. Reopen it from Purchases before downloading.'
+            ? !_recordedCurrent(draft, supplier, revision)
+              ? 'Saved purchase copy changed or is unavailable. Reopen it from Purchases before downloading.'
+              : 'Supplier account status changed. Reopen this purchase before downloading.'
             : 'Saved details changed. Reopen this purchase draft before downloading.');
         }
         return;
@@ -12436,7 +12448,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final result = await FilePicker.saveFile(dialogTitle: 'Save recorded purchase copy',
         fileName: 'purchase-recorded-$stamp-r$revision.pdf', mimeType: 'application/pdf',
         type: FileType.custom, allowedExtensions: ['pdf'], bytes: bytes);
-      if (_recordedCurrent(draft, supplier, revision)) {
+      if (evidenceCurrent()) {
         setState(() => _recordedNotice = result == null
           ? _readOnly ? 'Download cancelled. Your saved purchase copy is kept.'
             : 'Download cancelled. Your saved draft is kept.'
@@ -12857,8 +12869,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       if (_details['printedFooter']!.text.isNotEmpty) column([detail('printedFooter')]),
     ]);
     final pos = <Widget>[
-      value('Purchase voucher No.', _readOnly ? storePurchaseSavedCopyVoucherNumber
-        : storePurchaseUnpostedVoucherNumber, 'voucher-reference'),
+      value('Purchase voucher No.', _accountingSnapshot.voucher, 'voucher-reference'),
+      if (_readOnly) value('Supplier account status', _accountingSnapshot.label, 'accounting-status'),
       ...selected(recordedPaymentKeys),
       ...details('payment'),
       ...details('receipt'),

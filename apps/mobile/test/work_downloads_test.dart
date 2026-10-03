@@ -119,6 +119,62 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('PURCHASEACCOUNTING captured status distinguishes confirmed unavailable and revisions', () async {
+    // Host-only evidence. Never written into a device evaluation Store.
+    final at = DateTime.utc(2026, 10, 1);
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-accounting-supplier', name: 'HOST supplier',
+      createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-accounting-bill', supplierId: supplier.id,
+      invoiceReference: 'HOST-BILL-1', invoiceDate: '02/10/2026', createdAt: at, updatedAt: at,
+      goods: [{'name': 'HOST rice', 'pack': '1 kg', 'quantity': '1', 'cost': '40', 'productId': ''}],
+      details: {'invoiceTotal': '40'});
+    WorkspacePurchaseSavedCopy copy(int revision) => WorkspacePurchaseSavedCopy(id: 'HOST-copy-$revision',
+      storeName: 'HOST Store', revision: revision, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    const scope = ('HOST-account', 'HOST-store', true);
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening-status', basisId: 'HOST-status-basis',
+      account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+      asOfDate: '2026-10-01', savedAt: at, amountMinor: 0, supplierCredit: false,
+      sourceNote: 'HOST verified zero', bills: const []);
+    final ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: scope.$1,
+      workspaceId: scope.$2, supplierId: supplier.id, supplierName: supplier.name, qa: true, confirmedAt: at)!;
+    StorePurchaseAccountingSnapshot capture({WorkspaceSupplierLedger? source, bool recovered = true,
+      WorkspacePurchaseSavedCopy? displayed, (String, String, bool)? identity = scope}) =>
+      StorePurchaseAccountingSnapshot.capture(copy: displayed ?? copy(1), scope: identity,
+        recovered: recovered, ledger: source);
+    expect(capture().state, StorePurchaseAccountingState.unconfirmed);
+    expect(capture(source: ledger).state, StorePurchaseAccountingState.unconfirmed);
+    expect(capture(source: ledger, recovered: false).state, StorePurchaseAccountingState.unavailable);
+    expect(capture(source: ledger, identity: ('foreign', scope.$2, true)).state, StorePurchaseAccountingState.unavailable);
+    expect(capture(source: ledger, identity: (scope.$1, scope.$2, false)).state, StorePurchaseAccountingState.unavailable);
+    final before = jsonEncode(ledger.toJson());
+    final accepted = WorkspaceSupplierBillAcceptance(copy: copy(1), acceptedAt: DateTime.utc(2026, 10, 2),
+      openingTreatment: WorkspaceOpeningBillInclusion.excluded);
+    final posted = ledger.acceptReviewedBill(accepted, expectedRevision: ledger.revision)!;
+    final confirmed = capture(source: posted);
+    expect(confirmed.state, StorePurchaseAccountingState.confirmed);
+    expect(confirmed.label, 'Recorded in supplier account');
+    expect(confirmed.voucher, 'No system voucher assigned');
+    expect(confirmed.copyHeading, 'Purchase entry - Saved copy');
+    expect(confirmed.copyExplanation,
+      'Supplier copy kept separately. Downloading this copy does not change stock, dues or payments.');
+    for (final snapshot in [confirmed, capture(), capture(recovered: false),
+      capture(source: posted, displayed: copy(2))]) {
+      expect(snapshot.copyHeading, isNot(contains('Not posted')),
+        reason: 'A saved copy heading must not contradict its captured account status.');
+    }
+    expect(StorePurchaseAccountingSnapshot.draft.copyHeading,
+      'Purchase entry - Recorded copy (Draft)');
+    expect(capture(source: posted, displayed: copy(2)).state, StorePurchaseAccountingState.otherRevision);
+    expect(confirmed.sameEvidence(capture(source: ledger)), isFalse);
+    expect(confirmed.sameEvidence(capture(source: posted)), isTrue);
+    expect(confirmed.matches(draft, supplier, 1, scope.$2), isTrue);
+    expect(confirmed.matches(draft, supplier, 2, scope.$2), isFalse);
+    final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
+      storeName: 'HOST Store', storeId: scope.$2, revision: 1, labels: const {}, isSavedCopy: true,
+      accounting: confirmed);
+    expect(ascii.decode(bytes.take(4).toList()), '%PDF');
+    expect(jsonEncode(ledger.toJson()), before, reason: 'Presentation must not mutate the accounting source.');
+  });
   test('SUPPLIERSTATEMENTSAVER uses installed picker for strict PDF CSV and cancellation', () async {
     final original = FilePickerPlatform.instance;
     final picker = SupplierStatementPickerFixture();

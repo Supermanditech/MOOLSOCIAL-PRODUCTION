@@ -1257,6 +1257,68 @@ String storePurchaseSupplierDocumentHeading({required String title, required Str
 const storePurchaseUnpostedVoucherNumber = 'Not assigned (draft)';
 const storePurchaseSavedCopyVoucherNumber = 'Not assigned (not posted)';
 
+enum StorePurchaseAccountingState { draft, unconfirmed, confirmed, otherRevision, unavailable }
+
+/// Presentation evidence only: this cannot post a bill or assign a voucher.
+class StorePurchaseAccountingSnapshot {
+  const StorePurchaseAccountingSnapshot._(this.state, this.copy, this.scope, this.ledgerProof,
+    this.ledgerRevision, this.asOf);
+  static const draft = StorePurchaseAccountingSnapshot._(
+    StorePurchaseAccountingState.draft, null, null, null, null, null);
+  static const unavailable = StorePurchaseAccountingSnapshot._(
+    StorePurchaseAccountingState.unavailable, null, null, null, null, null);
+  factory StorePurchaseAccountingSnapshot.capture({required WorkspacePurchaseSavedCopy copy,
+    required (String, String, bool)? scope, required bool recovered, WorkspaceSupplierLedger? ledger}) {
+    if (!copy.valid || scope == null || !recovered) return unavailable;
+    // A recovered journal with no supplier ledger proves this bill unconfirmed;
+    // failed recovery does not. Do not conflate empty and unavailable records.
+    if (ledger == null) {
+      return StorePurchaseAccountingSnapshot._(StorePurchaseAccountingState.unconfirmed,
+        copy, scope, 'no-supplier-ledger', null, null);
+    }
+    if (!ledger.valid ||
+        ledger.accountScope != scope.$1 || ledger.workspaceId != scope.$2 ||
+        ledger.supplierId != copy.supplier.id || ledger.openingRecord?.qa != scope.$3) {
+      return unavailable;
+    }
+    final accepted = ledger.purchaseBills[copy.draft.id];
+    final state = accepted == null ? StorePurchaseAccountingState.unconfirmed
+      : jsonEncode(accepted.copy.toJson()) == jsonEncode(copy.toJson())
+        ? StorePurchaseAccountingState.confirmed : StorePurchaseAccountingState.otherRevision;
+    return StorePurchaseAccountingSnapshot._(state, copy, scope,
+      jsonEncode(ledger.toJson()), ledger.revision, ledger.asOf);
+  }
+  final StorePurchaseAccountingState state;
+  final WorkspacePurchaseSavedCopy? copy;
+  final (String, String, bool)? scope;
+  final String? ledgerProof;
+  final int? ledgerRevision;
+  final DateTime? asOf;
+  String get label => switch (state) {
+    StorePurchaseAccountingState.draft => 'Draft · not recorded in supplier account',
+    StorePurchaseAccountingState.unconfirmed => 'Not recorded in supplier account',
+    StorePurchaseAccountingState.confirmed => 'Recorded in supplier account',
+    StorePurchaseAccountingState.otherRevision => 'Another revision is recorded · this copy is not recorded',
+    StorePurchaseAccountingState.unavailable => 'Supplier account status unavailable',
+  };
+  String get voucher => switch (state) {
+    StorePurchaseAccountingState.draft => storePurchaseUnpostedVoucherNumber,
+    StorePurchaseAccountingState.unconfirmed => storePurchaseSavedCopyVoucherNumber,
+    _ => 'No system voucher assigned',
+  };
+  String get copyHeading => state == StorePurchaseAccountingState.draft
+    ? 'Purchase entry - Recorded copy (Draft)' : 'Purchase entry - Saved copy';
+  String get copyExplanation =>
+    'Supplier copy kept separately. Downloading this copy does not change stock, dues or payments.';
+  bool sameEvidence(StorePurchaseAccountingSnapshot other) => state == other.state &&
+    scope == other.scope && ledgerProof == other.ledgerProof &&
+    jsonEncode(copy?.toJson()) == jsonEncode(other.copy?.toJson());
+  bool matches(WorkspacePurchaseEntryDraft draft, WorkspaceSupplierProfile supplier,
+    int revision, String storeId) => copy == null || (scope?.$2 == storeId &&
+      copy!.revision == revision && jsonEncode(copy!.draft.toJson()) == jsonEncode(draft.toJson()) &&
+      jsonEncode(copy!.supplier.toJson()) == jsonEncode(supplier.toJson()));
+}
+
 /// Bounded PDF continuations; joining them preserves the exact source text.
 List<String> storePurchasePdfTextParts(String value) {
   if (value.isEmpty) return [''];
@@ -1277,7 +1339,7 @@ List<String> storePurchasePdfTextParts(String value) {
   return parts;
 }
 
-/// A copy of saved, unposted retailer entries, never a reissued supplier bill.
+/// A copy of retailer entries with captured account status, not a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
 Future<Uint8List> generateStorePurchaseRecordedCopy({
   required WorkspacePurchaseEntryDraft draft,
@@ -1287,18 +1349,21 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
   required int revision,
   required Map<String, String> labels,
   bool isSavedCopy = false,
+  StorePurchaseAccountingSnapshot? accounting,
 }) async {
+  final status = accounting ?? (isSavedCopy
+    ? StorePurchaseAccountingSnapshot.unavailable : StorePurchaseAccountingSnapshot.draft);
   if (!draft.valid || supplier.validationError != null ||
-      draft.supplierId != supplier.id || storeId.isEmpty || revision < 0) {
+      draft.supplierId != supplier.id || storeId.isEmpty || revision < 0 ||
+      !status.matches(draft, supplier, revision, storeId) ||
+      (isSavedCopy == (status.state == StorePurchaseAccountingState.draft))) {
     throw FormatException(isSavedCopy
       ? 'Reopen the saved purchase copy before downloading.'
       : 'Reopen the saved purchase draft before downloading.');
   }
   final font = pw.Font.ttf(await rootBundle.load('assets/fonts/Inter-Variable.ttf'));
   final document = pw.Document(title: 'Recorded purchase copy - ${draft.invoiceReference}',
-    author: 'MoolSocial', subject: isSavedCopy
-      ? 'Saved unposted purchase copy; supplier copy retained separately'
-      : 'Saved unposted purchase draft; supplier copy retained separately');
+    author: 'MoolSocial', subject: '${status.label}; supplier copy retained separately');
   final embedded = font.getFont(pw.Context(document: document.document));
   final allText = [storeName, storeId, draft.id, supplier.id, supplier.name,
     supplier.phone, supplier.address, supplier.gstin, draft.invoiceReference, draft.invoiceDate,
@@ -1398,10 +1463,9 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     ]),
   ]);
   final widgets = <pw.Widget>[
-    text(isSavedCopy ? 'Purchase entry - Saved copy (Not posted)'
-      : 'Purchase entry - Recorded copy (Draft)', size: 11, bold: true),
+    text(status.copyHeading, size: 11, bold: true),
     pw.SizedBox(height: 5),
-    text('Saved bill details for review. Supplier copy kept separately. No stock, dues or payment posting.', size: 8),
+    text(status.copyExplanation, size: 8),
     pw.SizedBox(height: 10),
     pw.Container(width: PdfPageFormat.a4.width - 48, padding: const pw.EdgeInsets.all(9),
       decoration: pw.BoxDecoration(border: border),
@@ -1514,9 +1578,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     // must not leave a lone payment row between supplier and reference pages.
     pw.NewPage(),
     if (posKeys.any((key) => d[key]?.isNotEmpty ?? false) || retailerItemRows.isNotEmpty)
-      ...[text(isSavedCopy
-        ? 'Goods & payment details - retailer record, not posted'
-        : 'Goods & payment details - retailer draft, not posted', bold: true),
+      ...[text('Goods & payment details - retailer record', bold: true),
         if (posKeys.any((key) => d[key]?.isNotEmpty ?? false)) fields(posKeys),
         if (retailerItemRows.isNotEmpty) table(const ['Item', 'Retailer detail', 'As entered'], retailerItemRows)],
     // Keep the heading and first short row together, without making an
@@ -1528,7 +1590,10 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
         ? 'For tracing this saved purchase copy. These references are not supplier-invoice fields.'
         : 'For tracing this saved draft. These references are not supplier-invoice fields.', size: 8),
       pw.SizedBox(height: 8), table(const ['Detail', 'Saved value'], [
-      ['Purchase voucher No.', isSavedCopy ? storePurchaseSavedCopyVoucherNumber : storePurchaseUnpostedVoucherNumber],
+      ['Purchase voucher No.', status.voucher],
+      ['Supplier account status', status.label],
+      if (status.ledgerRevision != null) ['Account revision', '${status.ledgerRevision}'],
+      if (status.asOf != null) ['Account status as of (UTC)', status.asOf!.toUtc().toIso8601String()],
       ['Store', storeName], ['Store ID', storeId], [isSavedCopy ? 'Source entry ID' : 'Draft ID', draft.id], ['Supplier ID', supplier.id],
       ['Saved revision', '$revision'], ['Saved on (UTC)', draft.updatedAt.toUtc().toIso8601String()],
       for (final (index, line) in draft.goods.indexed)
@@ -1540,7 +1605,7 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     margin: const pw.EdgeInsets.all(24), maxPages: 1000,
     theme: pw.ThemeData.withFont(base: font, bold: font),
     footer: (context) => pw.Padding(padding: const pw.EdgeInsets.only(top: 8), child:
-      text('Recorded purchase copy | ${draft.invoiceReference} | ${isSavedCopy ? 'Saved copy - not posted' : 'Unposted draft'} | Page ${context.pageNumber} of ${context.pagesCount}', size: 8)),
+      text('Recorded purchase copy | ${draft.invoiceReference} | ${status.label} | Page ${context.pageNumber} of ${context.pagesCount}', size: 8)),
     build: (_) => widgets));
   return document.save();
 }
