@@ -4562,13 +4562,17 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
-    for (final kind in ['dues', 'credit', 'zero', 'unknown']) {
-      testWidgets('PURCHASEOPENINGUI starting balance history $kind $display', (tester) async {
+    for (final variant in ['dues', 'credit', 'zero', 'unknown',
+        'dues-read-only', 'credit-read-only', 'zero-read-only', 'unknown-read-only',
+        'credit-read-only-recovery', 'credit-read-only-scope']) {
+      final readOnly = variant.contains('-read-only');
+      final kind = variant.split('-').first;
+      testWidgets('PURCHASEOPENINGUI starting balance history $variant $display', (tester) async {
         // Host-only fixtures, never physical OPPO acceptance records.
         FlutterSecureStorage.setMockInitialValues({});
         final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
         final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
-        final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+        var work = postingOpeningFixture(entry, checkpoint, moneyStore: readOnly ? null : forms);
         final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
         final day = at.toIso8601String().substring(0, 10);
         final supplier = WorkspaceSupplierProfile(id: 'opening-history-$kind', name: 'HOST opening $kind',
@@ -4584,7 +4588,17 @@ void main() {
           expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
             expectedRevision: 1, confirmedAt: at), isTrue);
         }
+        final failedRecovery = variant.endsWith('-recovery');
+        if (failedRecovery) {
+          // Cold host recovery from the preserved confirmed checkpoint, not
+          // a synthetic phone storage mutation or a cached-success shortcut.
+          work = postingOpeningFixture(entry, checkpoint);
+          expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+          checkpoint.creditFailure = 'unavailable-read';
+          expect(await work.recoverCustomerLedger(), isFalse);
+        }
         final beforeWrites = checkpoint.saveAttempts;
+        final beforeCheckpoint = checkpoint.value?.toJson();
         final beforeLedger = work.workspaceSupplierLedger(supplier.id)?.toJson();
         final beforeStock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
         await mount(tester, route: '/app/work/workspace/dashboard', work: work,
@@ -4595,8 +4609,18 @@ void main() {
         final picker = find.byType(DropdownButtonFormField<String>);
         await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
         await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+        if (readOnly) {
+          expect(find.byKey(const Key('work-opening-record-payment')), findsNothing);
+          expect(find.byKey(const Key('work-opening-record-advance')), findsNothing);
+        }
         final row = find.byKey(const Key('supplier-ledger-starting-balance'));
-        if (kind == 'unknown') {
+        if (failedRecovery) {
+          await revealOpening(tester, find.byKey(const Key('work-opening-posting-status')), delta: -120);
+          expect(row, findsNothing);
+          expect(find.text('Confirmed in supplier account'), findsNothing);
+          expect(find.text('Supplier account status unavailable'), findsOneWidget);
+          expect(find.byKey(const Key('work-opening-confirm')), findsNothing);
+        } else if (kind == 'unknown') {
           expect(row, findsNothing);
           expect(find.text('Confirmed in supplier account'), findsNothing);
           expect(work.workspaceSupplierLedger(supplier.id)?.openingRecord, isNull);
@@ -4617,6 +4641,18 @@ void main() {
         expect(checkpoint.saveAttempts, beforeWrites);
         expect(work.workspaceSupplierLedger(supplier.id)?.toJson(), beforeLedger);
         expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), beforeStock);
+        if (variant.endsWith('-scope')) {
+          final original = work.activeWorkspace!;
+          work.activateWorkspace(WorkWorkspace(id: 'HOST-OTHER-STORE', name: 'Host other Store',
+            profileId: original.profileId, profileLabel: original.profileLabel,
+            area: original.area, verified: true));
+          await tester.pumpAndSettle();
+          expect(row, findsNothing);
+          expect(find.byKey(const Key('work-opening-record-payment')), findsNothing);
+          expect(find.byKey(const Key('work-opening-confirm')), findsNothing);
+          expect(checkpoint.saveAttempts, beforeWrites);
+        }
+        expect(checkpoint.value?.toJson(), beforeCheckpoint);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });
@@ -5854,14 +5890,14 @@ void main() {
   }
 
   for (final mode in ['normal', 'unknown', 'included', 'historical-unlinked',
-      'late-included', 'late-landscape', 'late-same-day', 'late-changed-dialog', 'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape']) {
+      'late-included', 'late-landscape', 'late-same-day', 'late-changed-dialog', 'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape', 'read-only', 'read-only-landscape']) {
     testWidgets('PURCHASEBILLUI saved bill confirmation $mode', (tester) async {
       // Labelled host fixture: not runtime or physical device acceptance data.
       FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore();
       final checkpoint = _LedgerCheckpointFixtureStore();
       final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
-      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: mode.startsWith('read-only') ? null : forms);
       final scope = work.workspaceSupplierScope!;
       final at = DateTime.utc(2026, 9, 30);
       final supplier = WorkspaceSupplierProfile(id: 'bill-ui-supplier', name: 'Evaluation supplier',
@@ -5993,6 +6029,11 @@ void main() {
           expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills.length, 1,
             reason: '${work.workspaceSupplierError} / ${find.byKey(const Key('work-purchase-bill-notice')).evaluate().map((e) => (e.widget as Text).data).join()}');
           expect(find.text('Bill confirmed in supplier account'), findsOneWidget);
+          if (mode.startsWith('read-only')) {
+            expect(find.byKey(const Key('work-purchase-record-payment')), findsNothing);
+            expect(find.byKey(const Key('work-purchase-allocate-money')), findsNothing);
+            expect(tester.widget<Text>(find.byKey(const Key('work-purchase-payment-status'))).data, 'Bill due ₹100');
+          }
           final billAccount = find.text('Supplier account');
           await tester.ensureVisible(billAccount); await tester.pumpAndSettle();
           await tester.tap(billAccount); await tester.pumpAndSettle();

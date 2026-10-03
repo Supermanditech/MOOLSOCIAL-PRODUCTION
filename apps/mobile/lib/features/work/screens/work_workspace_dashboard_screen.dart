@@ -13445,7 +13445,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Widget _savedBillActions(WorkspacePurchaseSavedCopy copy) {
     final session = widget.session;
-    final ready = session.workspaceInvoiceHistoryLoaded;
+    final ready = _current && session.workspaceInvoiceHistoryLoaded &&
+        !session.workspaceSupplierRecoveryRequired;
     final ledger = ready ? session.workspaceSupplierLedger(copy.supplier.id) : null;
     final accepted = ledger?.purchaseBills[copy.draft.id];
     final same = accepted != null && jsonEncode(accepted.copy.toJson()) == jsonEncode(copy.toJson());
@@ -13464,7 +13465,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
       if (same) const Text('Stock receipt and supplier payment are recorded separately.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
-      if (same && session.workspaceSupplierMoneyInputAvailable) ...[
+      if (same) ...[
         Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
             ? 'Individual bill due not yet verified'
@@ -13472,6 +13473,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               ? 'Credit with supplier ${_purchaseAmount(-ledger.manualBillRemainingMinor(copy.draft.id)!)}'
               : 'Bill due ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
             key: const Key('work-purchase-payment-status')),
+          if (session.workspaceSupplierMoneyInputAvailable)
           TextButton.icon(key: const Key('work-purchase-record-payment'),
             onPressed: _busy ? null : () async {
               if (!await confirmLeave() || !mounted) return;
@@ -13810,16 +13812,18 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
     });
   }
 
+  bool get _accountReady => _current && _postingRecovered &&
+      !session.workspaceSupplierRecoveryRequired;
   bool get _posted {
     final proof = _supplierId == null ? null :
         session.workspaceSupplierLedger(_supplierId!)?.openingRecord;
-    return _postingRecovered && proof != null && _viewed != null &&
+    return _accountReady && proof != null && _viewed != null &&
         jsonEncode(proof.toJson()) == jsonEncode(_viewed!.toJson());
   }
 
   Future<void> _confirmOpening() async {
     final record = _viewed;
-    if (_busy || _editing || !_current || record == null || _revision == null ||
+    if (_busy || _editing || !_accountReady || record == null || _revision == null ||
         !session.workspaceSupplierOpeningConfirmationAvailable) {
       return;
     }
@@ -14079,7 +14083,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
               ),
             ),
             Text(
-              _posted ? 'Confirmed in supplier account' : 'Not posted',
+              !_accountReady
+                ? 'Supplier account status unavailable'
+                : _posted ? 'Confirmed in supplier account' : 'Not posted',
               key: const Key('work-opening-posting-status'),
               style: const TextStyle(
                 fontSize: 12,
@@ -14118,8 +14124,9 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 if (mounted && _current) await _recoverPosting();
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18), label: const Text('Record advance paid')),
           ]),
-          _StoreSupplierLedgerSummary(session: session, ledger: session.workspaceSupplierLedger(_supplierId!)),
         ],
+        if (_posted && _supplierId != null)
+          _StoreSupplierLedgerSummary(session: session, ledger: session.workspaceSupplierLedger(_supplierId!)),
         if (_posted && _supplierId != null && session.workspaceSupplierOpeningRecord(_supplierId!) != null)
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
             key: const Key('work-opening-record-refund'), onPressed: _busy || !_current ? null : () async {
@@ -14377,7 +14384,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                         }),
                   child: const Text('Correct record'),
                 ),
-              if (!_editing && !_posted && _viewed != null &&
+              if (_accountReady && !_editing && !_posted && _viewed != null &&
                   _viewed == session.workspaceSupplierOpeningRecord(_supplierId!) &&
                   session.workspaceSupplierOpeningConfirmationAvailable)
                 FilledButton(
@@ -14388,7 +14395,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                       ? _confirmOpening : null,
                   child: Text(_busy ? 'Confirming…' : 'Confirm opening balance'),
                 ),
-              if (!_postingRecovered && session.workspaceSupplierOpeningConfirmationAvailable)
+              if (!_accountReady && session.workspaceSupplierOpeningConfirmationAvailable)
                 TextButton(key: const Key('work-opening-recover'),
                   onPressed: usable ? _recoverPosting : null,
                   child: const Text('Reopen supplier account')),
