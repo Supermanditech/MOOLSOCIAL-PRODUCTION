@@ -921,6 +921,15 @@ abstract interface class WorkSupplierCreditDraftGuard {
   });
 }
 
+abstract interface class WorkSupplierRefundDraftGuard {
+  Future<bool> withFrozenSupplierRefund(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierRefundDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierRefundIntent intent) verifyCommitted,
+  });
+}
+
 abstract interface class WorkSupplierShortageDraftGuard {
   Future<bool> withFrozenSupplierShortage(WorkspaceLedgerFormKey key, String intent,
       Future<bool> Function() action);
@@ -932,7 +941,7 @@ abstract interface class WorkSupplierShortageDraftGuard {
 
 class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSupplierMoneyDraftGuard,
     WorkSupplierAllocationDraftGuard, WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard,
-    WorkSupplierShortageDraftGuard {
+    WorkSupplierShortageDraftGuard, WorkSupplierRefundDraftGuard {
   SecureWorkLedgerFormDraftStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -1017,12 +1026,45 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     }
     if ((previous?.supplierMoneyAttempt != null || previous?.supplierAllocationIntent != null ||
         previous?.supplierGoodsReturnIntent != null || previous?.supplierCreditIntent != null ||
-        previous?.supplierShortageIntent != null) &&
+        previous?.supplierShortageIntent != null || previous?.supplierRefundIntent != null) &&
         jsonEncode(previous!.fields) != jsonEncode(draft.fields)) {
       throw const WorkGatewayException('This payment attempt is retained. Verify its saved status before recording another.');
     }
     await _storage.write(key: _key(draft.key), value: encoded);
     _check(draft.key);
+  });
+
+  @override
+  Future<bool> withFrozenSupplierRefund(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierRefund' || draft?.supplierRefundIntent == null || draft!.fields['attempt'] != intent) {
+      throw const WorkGatewayException('Reopen the saved supplier refund before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierRefundDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierRefundIntent intent) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierRefund' || !next.valid || next.supplierRefundIntent != null ||
+        next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved supplier refund cannot be reset.');
+    }
+    final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierRefundIntent == null ||
+        !await verifyCommitted(previous!.supplierRefundIntent!)) {
+      throw const WorkGatewayException('Verify this exact refund before recording another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
   });
 
   @override

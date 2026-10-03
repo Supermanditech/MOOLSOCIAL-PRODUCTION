@@ -5859,6 +5859,77 @@ void main() {
     expect(storage.writes.length, writes);
   });
 
+  for (final fault in ['ordinary', 'lost-refund-reply', 'failed-refund-save', 'unavailable-read']) {
+    test('PURCHASEREFUNDSESSION $fault preserves review and refunds exactly once', () async {
+      // Host-only encrypted-storage evidence, not phone acceptance data.
+      final storage = _OrderJournalStorage();
+      final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+      final opening = openingFixture(amount: 50000, credit: true);
+      var owner = await openingPostingSession(storage, initialRecord: opening, inventory: true, moneyStore: forms);
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: owner.workspaceSupplierScope!,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final ledger = owner.workspaceSupplierLedger(opening.supplierId)!;
+      final intent = WorkspaceSupplierRefundIntent.fromJson({...refundIntentFixture(ledger).toJson(),
+        'requestedAt': DateTime.now().toUtc().toIso8601String()});
+      final key = owner.supplierRefundRecoveryFormKey(supplierId: opening.supplierId,
+        sourceKind: intent.sourceKind, sourceId: intent.sourceId, openingRevision: intent.openingRevision)!;
+      expect(key, intent.formKey);
+      final draft = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'amount': '10.00', 'channel': intent.paymentMethod, 'reference': intent.reference,
+        'occurredOn': intent.occurredOn, 'sourceKind': intent.sourceKind.name,
+        'sourceId': intent.sourceId, 'attempt': jsonEncode(intent.toJson()),
+      });
+      expect(draft.valid, isTrue);
+      await owner.saveLedgerForm(draft, expectedRevision: null);
+      final stock = owner.workspaceCatalogueItems.single.stock;
+      expect(await owner.readWorkspaceSupplierRefundStatus(key, intent), isNull);
+      await expectLater(forms.save(WorkspaceLedgerFormDraft(key: key, revision: 2,
+        fields: const {}), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+      expect(await owner.resetConfirmedWorkspaceSupplierRefundDraft(
+        WorkspaceLedgerFormDraft(key: key, revision: 2, fields: const {}), expectedRevision: 1), isFalse);
+      if (fault == 'lost-refund-reply') storage.loseWriteResponseOnce = true;
+      if (fault == 'failed-refund-save') storage.failWrite = true;
+      if (fault == 'unavailable-read') storage.failRead = true;
+      expect(await owner.recordWorkspaceSupplierRefundDraft(key, intent),
+        fault != 'failed-refund-save' && fault != 'unavailable-read');
+      storage.failWrite = false;
+      storage.failRead = false;
+      expect((await forms.read(key))!.supplierRefundIntent!.toJson(), intent.toJson());
+      owner = await openingPostingSession(storage, inventory: true, moneyStore: forms);
+      expect(await owner.recordWorkspaceSupplierRefundDraft(key, intent), isTrue);
+      expect((await owner.readWorkspaceSupplierRefundStatus(key, intent))!.intent.toJson(), intent.toJson());
+      expect(await owner.recoverCustomerLedger(), isTrue);
+      final saved = owner.workspaceSupplierLedger(opening.supplierId)!;
+      expect(saved.refunds.length, 1);
+      expect(saved.balanceMinor, -49000);
+      expect(owner.workspaceCatalogueItems.single.stock, stock);
+      final writes = storage.writes.length;
+      expect(await owner.recordWorkspaceSupplierRefundDraft(key, intent), isTrue);
+      expect(storage.writes.length, writes);
+      final changed = WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(), 'amountMinor': 1001});
+      expect(await owner.recordWorkspaceSupplierRefundDraft(key, changed), isFalse);
+      expect(storage.writes.length, writes);
+      if (fault == 'ordinary') {
+        // A later receipt has committed, but its independent Stock projection
+        // fails. That must not hide an already recorded refund or write it twice.
+        final stockKey = storage.values.keys.singleWhere((k) => k.contains('workspace.inventory.'));
+        storage.failWriteKey = stockKey;
+        expect(await owner.confirmWorkspaceSupplierGoodsReceipt(sessionReceipt(owner),
+          supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!,
+          expectedPurchaseRevision: 3, expectedSupplierRevision: saved.revision),
+          WorkspaceGoodsReceiptSaveResult.stockRecoveryPending);
+        final pendingWrites = storage.writes.length;
+        expect(await owner.recordWorkspaceSupplierRefundDraft(key, intent), isTrue);
+        expect(storage.writes.length, pendingWrites);
+        expect((await owner.readWorkspaceSupplierRefundStatus(key, intent))!.intent.toJson(), intent.toJson());
+        storage.failWriteKey = null;
+      }
+      expect(await owner.resetConfirmedWorkspaceSupplierRefundDraft(
+        WorkspaceLedgerFormDraft(key: key, revision: 2, fields: const {}), expectedRevision: 1), isTrue);
+      expect((await forms.read(key))!.supplierRefundIntent, isNull);
+    });
+  }
+
   for (final fault in ['ordinary', 'lost-credit-reply', 'failed-credit-save', 'unavailable-read']) {
     test('PURCHASECREDITSESSION $fault posts one credit through saved bill and delivery', () async {
       // Host-only native-storage journey; not phone acceptance data.

@@ -2360,6 +2360,7 @@ class WorkSession extends ChangeNotifier {
   String newWorkspaceSupplierMoneyAllocationId() => _newCounterIdentity('supplier-money-allocation');
   String newWorkspaceSupplierGoodsReturnId() => _newCounterIdentity('supplier-goods-return');
   String newWorkspaceSupplierCreditId() => _newCounterIdentity('supplier-credit');
+  String newWorkspaceSupplierRefundId() => _newCounterIdentity('supplier-refund');
   String newWorkspaceSupplierShortageId() => _newCounterIdentity('supplier-shortage');
   final Set<String> _supplierShortageSubmissions = {};
   /// Recovery reads use the original copy namespace, not hydrated ledger state.
@@ -2392,6 +2393,21 @@ class WorkSession extends ChangeNotifier {
     return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
       invoice: copy.draft.id, order: 'credit-copy:${copy.id}', kind: 'supplierCredit', ledgerRevision: copy.revision);
   }
+  /// Stable source namespace also works before account cache/eligibility recovery.
+  WorkspaceLedgerFormKey? supplierRefundRecoveryFormKey({required String supplierId,
+    required WorkspaceSupplierRefundSourceKind sourceKind, required String sourceId,
+    required int openingRevision, String? copyId, int? copyRevision}) {
+    final scope = workspaceSupplierScope;
+    if (_disposed || scope == null || _ledgerFormStorage is! WorkSupplierRefundDraftGuard ||
+        (sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus
+          ? copyId == null || (copyRevision ?? 0) <= 0
+          : copyId != null || copyRevision != null)) { return null; }
+    final key = (account: scope.$1, store: scope.$2, customer: supplierId, invoice: sourceId,
+      order: 'supplier-refund:${!_productionSession ? 'qa' : 'live'}:${sourceKind.name}:${copyId ?? 'account'}',
+      kind: 'supplierRefund', ledgerRevision: copyRevision ?? openingRevision);
+    return _ledgerFormScopeCurrent(key) ? key : null;
+  }
+
   WorkspaceLedgerFormKey? supplierGoodsReturnFormKey(String supplierId, String receiptId) {
     if (!workspaceSupplierOpeningConfirmationAvailable ||
         _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || !workspaceSuppliersLoaded) {
@@ -2473,6 +2489,10 @@ class WorkSession extends ChangeNotifier {
     if (key.kind == 'supplierAllocation') {
       final copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
       return copy != null && supplierAllocationFormKey(copy) == key;
+    }
+    if (key.kind == 'supplierRefund') {
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid &&
+        key.order.startsWith('supplier-refund:${!_productionSession ? 'qa' : 'live'}:');
     }
     if (key.kind == 'supplierCredit' || key.kind == 'supplierShortage') {
       // Stable accepted-copy namespace; native read/submit independently checks
@@ -6358,6 +6378,107 @@ class WorkSession extends ChangeNotifier {
       return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
     } on Object {
       showNotice('The supplier credit request is kept. Verify it before starting another.');
+      return false;
+    }
+  }
+
+  bool _supplierRefundIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) =>
+    _ledgerFormScopeCurrent(key) && intent.valid && key == intent.formKey && intent.qa == !_productionSession;
+
+  WorkspaceSupplierRefund? _matchingWorkspaceSupplierRefund(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierRefundIntent intent) {
+    final matches = saved.supplierLedgers.values.expand((l) => l.refunds.values)
+      .where((r) => r.intent.operationId == intent.operationId).toList();
+    final entries = saved.supplierLedgers.values.expand((l) => l.entries)
+      .where((e) => e.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) =>
+      l.creditNotes.containsKey(intent.operationId) || l.goodsReturns.containsKey(intent.operationId) ||
+      l.shortageClaims.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId) ||
+      l.billGoodsAllocations.containsKey(intent.operationId) || l.goodsReceipts.containsKey(intent.operationId)) ||
+      saved.finance.customerLedgers.any((l) => l.entries.any((e) => e.operationId == intent.operationId));
+    if (matches.isEmpty && entries.isEmpty && !other) return null;
+    if (other || matches.length != 1 || entries.length != 1 ||
+        jsonEncode(matches.single.intent.toJson()) != jsonEncode(intent.toJson()) ||
+        jsonEncode(matches.single.entry.toJson()) != jsonEncode(entries.single.toJson())) {
+      throw const WorkGatewayException('Saved supplier refund differs. Keep the request for review.');
+    }
+    return matches.single;
+  }
+
+  Future<WorkspaceSupplierRefund?> readWorkspaceSupplierRefundStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) async {
+    final data = _storeData;
+    if (!_supplierRefundIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier refund.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierRefundIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store) {
+      throw const WorkGatewayException('Saved refund status is unavailable. Keep the request and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierRefund(saved, intent);
+    if (matched != null) return matched;
+    final ledger = saved.supplierLedgers[key.customer];
+    if (ledger == null || ledger.openingRecord?.id != intent.openingId ||
+        ledger.openingRecord?.revision != intent.openingRevision || ledger.openingRecord?.qa != intent.qa) {
+      throw const WorkGatewayException('The original supplier account is unavailable. Keep the refund request.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierRefundDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierRefundIntentScope(key, intent);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierRefundDraftGuard || data.ledgerCheckpointStore == null) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).withFrozenSupplierRefund(
+        key, jsonEncode(intent.toJson()), () async {
+          // Already recorded is independent of unrelated Stock/cache recovery.
+          if (await readWorkspaceSupplierRefundStatus(key, intent) != null) return current();
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          if (_matchingWorkspaceSupplierRefund(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null) return false;
+          final next = ledger.recordReviewedRefund(intent, expectedRevision: ledger.revision, recordedAt: now);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              _matchingWorkspaceSupplierRefund(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          try {
+            if (!await recoverCustomerLedger() && current()) {
+              showNotice('Supplier refund recorded. Account refresh is pending; do not record it again.');
+            }
+          } on Object {
+            if (current()) showNotice('Supplier refund recorded. Account refresh is pending; retry refresh.');
+          }
+          return current();
+        });
+    } on Object {
+      showNotice('Supplier refund status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierRefundDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierRefundDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).resetConfirmedSupplierRefundDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierRefundStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The supplier refund is kept. Verify it before recording another.');
       return false;
     }
   }

@@ -2934,6 +2934,11 @@ class WorkspaceSupplierRefundIntent {
 
   WorkspaceSupplierRefund commit({required int revision, required DateTime at}) =>
     WorkspaceSupplierRefund(intent: this, committedRevision: revision, recordedAt: at);
+
+  WorkspaceLedgerFormKey get formKey => (account: accountScope, store: workspaceId,
+    customer: supplierId, invoice: sourceId,
+    order: 'supplier-refund:${qa ? 'qa' : 'live'}:${sourceKind.name}:${copyId ?? 'account'}',
+    kind: 'supplierRefund', ledgerRevision: copyRevision ?? openingRevision);
 }
 
 /// Proof and source consumption accompany exactly one incoming-money entry.
@@ -6886,6 +6891,7 @@ class WorkspaceLedgerFormDraft {
         'supplierGoodsReturn',
         'supplierCredit',
         'supplierShortage',
+        'supplierRefund',
         'expense',
       ].contains(key.kind) &&
       fields.keys.every(
@@ -6908,6 +6914,8 @@ class WorkspaceLedgerFormDraft {
                     ? const ['amount', 'reference', 'reason', 'occurredOn', 'supports', 'attempt']
                     : key.kind == 'supplierShortage'
                     ? const ['billLineIndex', 'deliveryId', 'lineId', 'quantityMilli', 'attributionReviewed', 'attempt']
+                    : key.kind == 'supplierRefund'
+                    ? const ['amount', 'channel', 'reference', 'occurredOn', 'sourceKind', 'sourceId', 'attempt']
                     : key.kind == 'return'
                     ? const ['product', 'quantity', 'sellable', 'reason', 'reasonCode', 'items']
                     : key.kind == 'refund'
@@ -6928,6 +6936,8 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144 && _validSupplierCreditIntent(entry.value)
               : entry.key == 'attempt' && key.kind == 'supplierShortage'
               ? entry.value.length <= 262144 && _validSupplierShortageIntent(entry.value)
+              : entry.key == 'attempt' && key.kind == 'supplierRefund'
+              ? entry.value.length <= 8192 && _validSupplierRefundIntent(entry.value)
               : entry.key == 'supports' && key.kind == 'supplierCredit'
               ? entry.value.length <= 262144
               : entry.key == 'reason' && key.kind == 'supplierCredit'
@@ -6936,12 +6946,31 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144
               : entry.value.length <= 512) &&
       (key.kind != 'supplierMoney' || _supplierMoneyNamespaceValid) &&
+      (key.kind != 'supplierRefund' || RegExp(
+        r'^supplier-refund:(qa|live):(openingAdvance|accountAdvance|manualBillSurplus):.+$').hasMatch(key.order)) &&
       (key.kind != 'supplierCredit' || (key.order.startsWith('credit-copy:') && key.order.length > 12)) &&
       (key.kind != 'supplierShortage' || (key.order.startsWith('shortage-copy:') && key.order.length > 14)) &&
       (key.kind != 'supplierGoodsReturn' ||
         (key.ledgerRevision == 1 && key.order == 'return-receipt:${key.invoice}')) &&
       (key.kind != 'supplierAllocation' ||
         (key.order.startsWith('allocation-copy:') && key.order.length > 16));
+
+  WorkspaceSupplierRefundIntent? get supplierRefundIntent {
+    final text = fields['attempt'];
+    if (key.kind != 'supplierRefund' || text == null || text.isEmpty || text.length > 8192) return null;
+    try { return WorkspaceSupplierRefundIntent.fromJson(jsonDecode(text)); }
+    on Object { return null; }
+  }
+
+  bool _validSupplierRefundIntent(String text) {
+    if (text.isEmpty) return true;
+    final intent = supplierRefundIntent;
+    return intent != null && intent.formKey == key &&
+      intent.reference == fields['reference'] && intent.occurredOn == fields['occurredOn'] &&
+      intent.paymentMethod == fields['channel'] && intent.sourceKind.name == fields['sourceKind'] &&
+      intent.sourceId == fields['sourceId'] &&
+      WorkspacePurchaseEntryDraft.printedPaise(fields['amount']) == intent.amountMinor;
+  }
 
   WorkspaceSupplierShortageIntent? get supplierShortageIntent {
     final text = fields['attempt'];
