@@ -13480,8 +13480,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 copy: ledger.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
               if (mounted && _current) await _load(retry: true);
             }, icon: const Icon(Icons.payments_outlined, size: 18),
-            label: Text((ledger.payableMinor ?? 0) <= 0 ? 'Payment records'
-              : ledger.manualBillRemainingMinor(copy.draft.id) == null ? 'Record account payment' : 'Record payment')),
+            label: Text(ledger.manualBillRemainingMinor(copy.draft.id) == null
+              ? 'Record account payment' : 'Record payment')),
         ]),
         _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id),
       ],
@@ -14110,9 +14110,8 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 ? null : () async {
                   await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!));
                   if (mounted && _current) await _recoverPosting();
-                }, icon: const Icon(Icons.payments_outlined, size: 18), label: Text(
-                  (session.workspaceSupplierLedger(_supplierId!)?.payableMinor ?? 0) <= 0
-                    ? 'Payment records' : 'Record payment')),
+                }, icon: const Icon(Icons.payments_outlined, size: 18),
+                label: const Text('Record account payment')),
             TextButton.icon(key: const Key('work-opening-record-advance'),
               onPressed: _busy || !_current ? null : () async {
                 await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!, advance: true));
@@ -15489,6 +15488,8 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     }
     final credit = current.creditMinor;
     final payable = current.payableMinor;
+    final starting = orderId == null && billId == null &&
+        current.openingBalanceMinor != null ? current.openingRecord : null;
     final entries = current.entries.where((entry) => orderId != null
       ? entry.orderId == orderId : billId != null ? entry.billId == billId : true);
     return ExpansionTile(
@@ -15520,8 +15521,19 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
           ),
         Text(orderId != null ? 'Entries for this order' : billId != null
           ? 'Entries linked to this bill' : 'Supplier account entries'),
+        if (starting != null)
+          ListTile(
+            key: const Key('supplier-ledger-starting-balance'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(current.openingBalanceMinor! < 0
+              ? 'Starting credit with supplier' : 'Starting dues'),
+            subtitle: Text('As on ${_registerDate(DateTime.parse(starting.asOfDate))} · Not a new payment'),
+            trailing: Text(_purchaseAmount(current.openingBalanceMinor!.abs())),
+          ),
         if (entries.isEmpty)
-          const Text('No confirmed financial entries available'),
+          Text(starting != null ? 'No subsequent financial entries'
+            : 'No confirmed financial entries available'),
         for (final entry in entries)
           ListTile(
             contentPadding: EdgeInsets.zero,
