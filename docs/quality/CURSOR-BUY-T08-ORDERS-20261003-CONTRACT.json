@@ -1,0 +1,36 @@
+{
+  "id": "CURSOR-BUY-T08-ORDERS-20261003",
+  "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+  "baselineCommit": "8499799adc06bd224687efa685d1cc50a93d3919",
+  "classification": "mvp_required",
+  "actor": "Buyer",
+  "parent": "BUY-ACTION-POLISH-20260926-01",
+  "runtimeOwner": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+  "testOwner": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+  "observableOutcome": "Existing delivery order cards show per-order supplied payment status and remaining balance. Validated balance state overrides stale status/amount. Pending/default zero never establishes payment. Missing status stays unavailable. No list payment action.",
+  "integration": "Store/backend/live provider deferred; workspace Codex after integration; Google separate",
+  "exclusions": [
+    "No order/payment submission, APK build/install, new screen/service/model/provider or Collection changes",
+    "No supplier-policy Cart section or formal closure/promotion"
+  ],
+  "acceptance": {
+    "focusedMixedCases": 2,
+    "textScales": [
+      1,
+      2
+    ],
+    "selectedDistinctCases": 985,
+    "selectedReferences": 1045,
+    "nativeJourney": "Existing legacy review Orders/detail/Back, normal200percent with ordinary scroll; original font restored; unchanged installed APK",
+    "liveAcceptance": false
+  },
+  "unresolved": [
+    "25 pre-existing legacy test names reproduce same assertions at exact baseline; affected suite failed and is not qualification",
+    "Native live balance/payment snapshots require provider integration; host fixtures isolated",
+    "T10 repeated Payment prefix copy polish",
+    "Checkout raw-evidence byte conversion on fresh clone remains open integration child",
+    "Historic0e90a6ca formal ticket_close subject-prefix blocker preserved",
+    "Live balance adapter enablement blocked pending current account/order correlation, identity clearing, late callback rejection and fresh zero-balance validation; existing getter does not establish freshness. Current runtime has no adapter injection or map restoration path."
+  ],
+  "next": "T09 replacement/refunds only after founder continuation and fresh scope/admission; stop current sweep at safe checkpoint"
+}

@@ -1,0 +1,14 @@
+{"protocolVersion":"0.1.1","runnerVersion":"1.31.0","pid":8400,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":3}
+{"count":1,"time":13,"type":"allSuites"}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":1,"messageType":"print","message":"Warning: A tag was used that wasn't specified in dart_test.yaml.\n  protected-reference was used in:\n    the test \"R58.8.6 responsive 320x568-android candidate capture\"\n    the test \"R58.8.6 responsive 360x800-android candidate capture\"\n    the test \"R58.8.6 responsive 390x844-ios candidate capture\"\n    the test \"R58.8.6 responsive 430x932-ios candidate capture\"\n    the test \"R58.8.6 responsive 320x568-a11y140-reduced candidate capture\"\n","type":"print","time":31303}
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":31312}
+{"group":{"id":2,"suiteID":0,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":2,"line":null,"column":null,"url":null},"type":"group","time":31317}
+{"test":{"id":3,"name":"T08 mixed order payment summaries at 1.0 text","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":543,"root_column":5,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"},"type":"testStart","time":31318}
+{"testID":3,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":33524}
+{"test":{"id":4,"name":"T08 mixed order payment summaries at 2.0 text","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":543,"root_column":5,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"},"type":"testStart","time":33525}
+{"testID":4,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":34530}
+{"success":true,"type":"done","time":34612}

@@ -25115,6 +25115,24 @@ class _OrderCard extends StatelessWidget {
       fontWeight: FontWeight.w900,
     );
     final amount = _buyV2OrderMoney(order);
+    final balance = session.balancePaymentFor(order.id);
+    final paymentStatus = switch (balance?.state) {
+      BuyV2BalancePaymentState.paid => 'Balance paid',
+      BuyV2BalancePaymentState.paymentPending => 'Payment pending',
+      BuyV2BalancePaymentState.unknown => 'Payment needs checking',
+      BuyV2BalancePaymentState.offline => 'Balance status offline',
+      BuyV2BalancePaymentState.unavailable => 'Balance status unavailable',
+      BuyV2BalancePaymentState.paymentActionRequired =>
+        'Balance payment not confirmed',
+      BuyV2BalancePaymentState.due => 'Balance due',
+      BuyV2BalancePaymentState.overdue => 'Balance overdue',
+      BuyV2BalancePaymentState.upcoming || null =>
+        order.paymentStatusLabel?.trim().isNotEmpty == true
+            ? order.paymentStatusLabel!.trim()
+            : 'Payment status unavailable',
+    };
+    final remainingBalance = balance?.amountDue ?? order.balanceDue;
+    final balanceLabel = balance?.dueLabel ?? order.balanceDueLabel;
     final amountNeedsRow =
         buyV2ValueTextSize(context, amount, amountStyle).width >
         (MediaQuery.sizeOf(context).width - 32) * .45;
@@ -25272,6 +25290,20 @@ class _OrderCard extends StatelessWidget {
                   Text(
                     '${order.customerPartner} · ${order.partnerType}',
                     style: context.buyMeta.copyWith(fontSize: 11),
+                  ),
+                  const SizedBox(height: 5),
+                  Column(
+                    key: ValueKey('buy-order-payment-summary-${order.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Payment · $paymentStatus', style: context.buyBody),
+                      if (remainingBalance > 0)
+                        Text(
+                          'Remaining balance · ${buyV2Money(remainingBalance)}'
+                          '${balanceLabel?.trim().isNotEmpty == true ? ' · ${balanceLabel!.trim()}' : ''}',
+                          style: context.buyMeta,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   LayoutBuilder(

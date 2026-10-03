@@ -1,0 +1,215 @@
+{
+  "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+  "contract": {
+    "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-CONTRACT.json",
+    "sha256": "d53189ab00ac498329975b31990b918c4f79e7c59e5aab74f236cb15a52c399d"
+  },
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.zip",
+    "sha256": "4b628b7bbbd0419ab7136e016c60c6e9589ff904ad14d90ce1dec7f77c9de94b",
+    "members": 106,
+    "memberHashesVerified": true
+  },
+  "closedReceipts": {
+    "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+    "evidence": [
+      {
+        "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-FOCUSED.jsonl",
+        "sha256": "09806d52ee7b6e81581c4445090c62be6ea8403e8e5d57058c7a6d972e2639c6",
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-1.jsonl",
+        "sha256": "d63b22543beef0f1497c198d8491b6d383b2a9fb828d80cbe88a5145190c5339",
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-2.jsonl",
+        "sha256": "6183246bdb816a795d2bbb06d91991ce38f6f84e1031c7970d39bf42f1b05e61",
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-3.jsonl",
+        "sha256": "5eff39576ed32611e1d2f009aaab222936a22e675fffc770ea59b9311ab3af53",
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
+      }
+    ],
+    "analysis": {
+      "exitCode": 0,
+      "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t08-final-analysis-20261003.log",
+      "sha256": "0613275567c842882ca0825b88293dfc84ed6d1bf9888283ccd7dc3ec04edfaf",
+      "passed": 0,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "focused": {
+      "exitCode": 0,
+      "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t08-final-focused-20261003.jsonl",
+      "sha256": "09806d52ee7b6e81581c4445090c62be6ea8403e8e5d57058c7a6d972e2639c6",
+      "passed": 2,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "selected": [
+      {
+        "batch": 1,
+        "exitCode": 0,
+        "passed": 433,
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "d63b22543beef0f1497c198d8491b6d383b2a9fb828d80cbe88a5145190c5339"
+      },
+      {
+        "batch": 2,
+        "exitCode": 0,
+        "passed": 488,
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "6183246bdb816a795d2bbb06d91991ce38f6f84e1031c7970d39bf42f1b05e61"
+      },
+      {
+        "batch": 3,
+        "exitCode": 0,
+        "passed": 64,
+        "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "5eff39576ed32611e1d2f009aaab222936a22e675fffc770ea59b9311ab3af53"
+      }
+    ],
+    "selectedReferences": 1045
+  },
+  "nativeIdentity": {
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.36-cursorreview",
+    "versionCode": "2026092701",
+    "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+    "fontScale": "1.0",
+    "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+    "apkUnchanged": true,
+    "noInstallOrSubmission": true
+  },
+  "nativeFinalLabels": [
+    "t08-final-orders-normal",
+    "t08-final-orders-large",
+    "t08-final-orders-large-scrolled",
+    "t08-final-orders-return",
+    "t08-final-order-detail",
+    "t08-final-back-to-orders"
+  ],
+  "failedAffectedRun": {
+    "exitCode": 1,
+    "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+    "unchangedSource": true,
+    "path": "apps/mobile/build/t06-t07-cart-20261002/t08-final-affected-20261003.jsonl",
+    "sha256": "9c6f4505e60026e68b418a9f8e3e050748e0e2cc4c7cb6e77256314002bd5f73",
+    "passed": 219,
+    "failures": 52,
+    "warnings": 0,
+    "terminalSuccess": false
+  },
+  "baselineReproduction": {
+    "exitCode": 1,
+    "baselineCommit": "8499799adc06bd224687efa685d1cc50a93d3919",
+    "baselineSourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+    "restoredSourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+    "restored": true,
+    "executedNames": [
+      "R66 checkout complete action INR1 at 320.0 text1.0",
+      "R66 checkout complete action INR1 at 320.0 text2.0",
+      "R66 checkout complete action INR1 at 360.0 text1.0",
+      "R66 checkout complete action INR1 at 360.0 text2.0",
+      "R66 checkout complete action INR1 at 430.0 text1.0",
+      "R66 checkout complete action INR1 at 430.0 text2.0",
+      "R66 checkout complete action INR10000000 at 320.0 text1.0",
+      "R66 checkout complete action INR10000000 at 320.0 text2.0",
+      "R66 checkout complete action INR10000000 at 360.0 text1.0",
+      "R66 checkout complete action INR10000000 at 360.0 text2.0",
+      "R66 checkout complete action INR10000000 at 430.0 text1.0",
+      "R66 checkout complete action INR10000000 at 430.0 text2.0",
+      "R66 missing Card handoff cannot simulate payment",
+      "R66 missing UPI handoff cannot simulate payment",
+      "R669 cart subtotal and mixed invoice scope Size(320.0, 711.0) 1.0",
+      "R669 cart subtotal and mixed invoice scope Size(320.0, 711.0) 2.0",
+      "R669 cart subtotal and mixed invoice scope Size(711.0, 320.0) 1.0",
+      "R669 cart subtotal and mixed invoice scope Size(711.0, 320.0) 2.0",
+      "R669 final delivery estimate recovery Size(320.0, 711.0) 1.0",
+      "R669 final delivery estimate recovery Size(320.0, 711.0) 2.0",
+      "R669 final delivery estimate recovery Size(711.0, 320.0) 1.0",
+      "R669 final delivery estimate recovery Size(711.0, 320.0) 2.0",
+      "T02 changed amount never automatically opens payment",
+      "T02 changed method never automatically opens payment",
+      "provider promise continues from product to Checkout and Tracking"
+    ],
+    "logSha256": "3bd447c9871bbf023d65716ef431c3893922ff49ca900908ab2b1652ecb81b6c",
+    "failedTestIds": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ]
+  },
+  "baselineAssertionComparison": {
+    "distinctFailedNames": 25,
+    "failedInstances": 25,
+    "baselineFailedInstances": 25,
+    "sameAssertions": true,
+    "mismatchNames": []
+  },
+  "integrationChildren": [
+    "25 pre-existing legacy test names reproduce same assertions at exact baseline; affected suite failed and is not qualification",
+    "Native live balance/payment snapshots require provider integration; host fixtures isolated",
+    "T10 repeated Payment prefix copy polish",
+    "Checkout raw-evidence byte conversion on fresh clone remains open integration child",
+    "Historic0e90a6ca formal ticket_close subject-prefix blocker preserved",
+    "Live balance adapter enablement blocked pending current account/order correlation, identity clearing, late callback rejection and fresh zero-balance validation; existing getter does not establish freshness. Current runtime has no adapter injection or map restoration path."
+  ],
+  "checkoutPortability": "Raw Git blobs and archive preserve authentic bytes; fresh-clone SHA reproducibility remains unqualified.",
+  "checkpoint": "Fresh pre_commit, scoped commit/push and clean exact remote readback pending; not pre-claimed.",
+  "metadataStagingRepair": {
+    "cause": "Generated Python metadata CRLF was normalized by Git; fixed writer to explicit UTF8LF bytes. Raw4closedJSONLfiles and immutable106member archive unchanged.",
+    "supersededContract": {
+      "sha256": "b004ef4e9c403d48e2d8213992b2fa7fc131fac9f36d711d48f24778c6bd5959",
+      "rawUtf8": "{\r\n  \"id\": \"CURSOR-BUY-T08-ORDERS-20261003\",\r\n  \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n  \"baselineCommit\": \"8499799adc06bd224687efa685d1cc50a93d3919\",\r\n  \"classification\": \"mvp_required\",\r\n  \"actor\": \"Buyer\",\r\n  \"parent\": \"BUY-ACTION-POLISH-20260926-01\",\r\n  \"runtimeOwner\": \"apps/mobile/lib/ui_v2/buy/buy_v2_views.dart\",\r\n  \"testOwner\": \"apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart\",\r\n  \"observableOutcome\": \"Existing delivery order cards show per-order supplied payment status and remaining balance. Validated balance state overrides stale status/amount. Pending/default zero never establishes payment. Missing status stays unavailable. No list payment action.\",\r\n  \"integration\": \"Store/backend/live provider deferred; workspace Codex after integration; Google separate\",\r\n  \"exclusions\": [\r\n    \"No order/payment submission, APK build/install, new screen/service/model/provider or Collection changes\",\r\n    \"No supplier-policy Cart section or formal closure/promotion\"\r\n  ],\r\n  \"acceptance\": {\r\n    \"focusedMixedCases\": 2,\r\n    \"textScales\": [\r\n      1,\r\n      2\r\n    ],\r\n    \"selectedDistinctCases\": 985,\r\n    \"selectedReferences\": 1045,\r\n    \"nativeJourney\": \"Existing legacy review Orders/detail/Back, normal200percent with ordinary scroll; original font restored; unchanged installed APK\",\r\n    \"liveAcceptance\": false\r\n  },\r\n  \"unresolved\": [\r\n    \"25 pre-existing legacy test names reproduce same assertions at exact baseline; affected suite failed and is not qualification\",\r\n    \"Native live balance/payment snapshots require provider integration; host fixtures isolated\",\r\n    \"T10 repeated Payment prefix copy polish\",\r\n    \"Checkout raw-evidence byte conversion on fresh clone remains open integration child\",\r\n    \"Historic0e90a6ca formal ticket_close subject-prefix blocker preserved\",\r\n    \"Live balance adapter enablement blocked pending current account/order correlation, identity clearing, late callback rejection and fresh zero-balance validation; existing getter does not establish freshness. Current runtime has no adapter injection or map restoration path.\"\r\n  ],\r\n  \"next\": \"T09 replacement/refunds only after founder continuation and fresh scope/admission; stop current sweep at safe checkpoint\"\r\n}"
+    },
+    "supersededEvidence": {
+      "sha256": "90eeb5b63ef9f831e1bbdb316daa815c3886bd43b3828d581d98bf725193dec1",
+      "rawUtf8": "{\r\n  \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n  \"contract\": {\r\n    \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-CONTRACT.json\",\r\n    \"sha256\": \"b004ef4e9c403d48e2d8213992b2fa7fc131fac9f36d711d48f24778c6bd5959\"\r\n  },\r\n  \"archive\": {\r\n    \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.zip\",\r\n    \"sha256\": \"4b628b7bbbd0419ab7136e016c60c6e9589ff904ad14d90ce1dec7f77c9de94b\",\r\n    \"members\": 106,\r\n    \"memberHashesVerified\": true\r\n  },\r\n  \"closedReceipts\": {\r\n    \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n    \"evidence\": [\r\n      {\r\n        \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-FOCUSED.jsonl\",\r\n        \"sha256\": \"09806d52ee7b6e81581c4445090c62be6ea8403e8e5d57058c7a6d972e2639c6\",\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\"\r\n      },\r\n      {\r\n        \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-1.jsonl\",\r\n        \"sha256\": \"d63b22543beef0f1497c198d8491b6d383b2a9fb828d80cbe88a5145190c5339\",\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\"\r\n      },\r\n      {\r\n        \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-2.jsonl\",\r\n        \"sha256\": \"6183246bdb816a795d2bbb06d91991ce38f6f84e1031c7970d39bf42f1b05e61\",\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\"\r\n      },\r\n      {\r\n        \"path\": \"docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-3.jsonl\",\r\n        \"sha256\": \"5eff39576ed32611e1d2f009aaab222936a22e675fffc770ea59b9311ab3af53\",\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\"\r\n      }\r\n    ],\r\n    \"analysis\": {\r\n      \"exitCode\": 0,\r\n      \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n      \"unchangedSource\": true,\r\n      \"path\": \"apps/mobile/build/t06-t07-cart-20261002/t08-final-analysis-20261003.log\",\r\n      \"sha256\": \"0613275567c842882ca0825b88293dfc84ed6d1bf9888283ccd7dc3ec04edfaf\",\r\n      \"passed\": 0,\r\n      \"failures\": 0,\r\n      \"warnings\": 0,\r\n      \"terminalSuccess\": true\r\n    },\r\n    \"focused\": {\r\n      \"exitCode\": 0,\r\n      \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n      \"unchangedSource\": true,\r\n      \"path\": \"apps/mobile/build/t06-t07-cart-20261002/t08-final-focused-20261003.jsonl\",\r\n      \"sha256\": \"09806d52ee7b6e81581c4445090c62be6ea8403e8e5d57058c7a6d972e2639c6\",\r\n      \"passed\": 2,\r\n      \"failures\": 0,\r\n      \"warnings\": 0,\r\n      \"terminalSuccess\": true\r\n    },\r\n    \"selected\": [\r\n      {\r\n        \"batch\": 1,\r\n        \"exitCode\": 0,\r\n        \"passed\": 433,\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n        \"unchangedSource\": true,\r\n        \"terminalSuccess\": true,\r\n        \"failures\": 0,\r\n        \"warnings\": 0,\r\n        \"sha256\": \"d63b22543beef0f1497c198d8491b6d383b2a9fb828d80cbe88a5145190c5339\"\r\n      },\r\n      {\r\n        \"batch\": 2,\r\n        \"exitCode\": 0,\r\n        \"passed\": 488,\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n        \"unchangedSource\": true,\r\n        \"terminalSuccess\": true,\r\n        \"failures\": 0,\r\n        \"warnings\": 0,\r\n        \"sha256\": \"6183246bdb816a795d2bbb06d91991ce38f6f84e1031c7970d39bf42f1b05e61\"\r\n      },\r\n      {\r\n        \"batch\": 3,\r\n        \"exitCode\": 0,\r\n        \"passed\": 64,\r\n        \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n        \"unchangedSource\": true,\r\n        \"terminalSuccess\": true,\r\n        \"failures\": 0,\r\n        \"warnings\": 0,\r\n        \"sha256\": \"5eff39576ed32611e1d2f009aaab222936a22e675fffc770ea59b9311ab3af53\"\r\n      }\r\n    ],\r\n    \"selectedReferences\": 1045\r\n  },\r\n  \"nativeIdentity\": {\r\n    \"package\": \"com.moolsocial.app.cursorreview\",\r\n    \"versionName\": \"1.0.0-r66.36-cursorreview\",\r\n    \"versionCode\": \"2026092701\",\r\n    \"installedSha256\": \"7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5\",\r\n    \"fontScale\": \"1.0\",\r\n    \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n    \"apkUnchanged\": true,\r\n    \"noInstallOrSubmission\": true\r\n  },\r\n  \"nativeFinalLabels\": [\r\n    \"t08-final-orders-normal\",\r\n    \"t08-final-orders-large\",\r\n    \"t08-final-orders-large-scrolled\",\r\n    \"t08-final-orders-return\",\r\n    \"t08-final-order-detail\",\r\n    \"t08-final-back-to-orders\"\r\n  ],\r\n  \"failedAffectedRun\": {\r\n    \"exitCode\": 1,\r\n    \"sourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n    \"unchangedSource\": true,\r\n    \"path\": \"apps/mobile/build/t06-t07-cart-20261002/t08-final-affected-20261003.jsonl\",\r\n    \"sha256\": \"9c6f4505e60026e68b418a9f8e3e050748e0e2cc4c7cb6e77256314002bd5f73\",\r\n    \"passed\": 219,\r\n    \"failures\": 52,\r\n    \"warnings\": 0,\r\n    \"terminalSuccess\": false\r\n  },\r\n  \"baselineReproduction\": {\r\n    \"exitCode\": 1,\r\n    \"baselineCommit\": \"8499799adc06bd224687efa685d1cc50a93d3919\",\r\n    \"baselineSourceSha256\": \"6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19\",\r\n    \"restoredSourceSha256\": \"d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf\",\r\n    \"restored\": true,\r\n    \"executedNames\": [\r\n      \"R66 checkout complete action INR1 at 320.0 text1.0\",\r\n      \"R66 checkout complete action INR1 at 320.0 text2.0\",\r\n      \"R66 checkout complete action INR1 at 360.0 text1.0\",\r\n      \"R66 checkout complete action INR1 at 360.0 text2.0\",\r\n      \"R66 checkout complete action INR1 at 430.0 text1.0\",\r\n      \"R66 checkout complete action INR1 at 430.0 text2.0\",\r\n      \"R66 checkout complete action INR10000000 at 320.0 text1.0\",\r\n      \"R66 checkout complete action INR10000000 at 320.0 text2.0\",\r\n      \"R66 checkout complete action INR10000000 at 360.0 text1.0\",\r\n      \"R66 checkout complete action INR10000000 at 360.0 text2.0\",\r\n      \"R66 checkout complete action INR10000000 at 430.0 text1.0\",\r\n      \"R66 checkout complete action INR10000000 at 430.0 text2.0\",\r\n      \"R66 missing Card handoff cannot simulate payment\",\r\n      \"R66 missing UPI handoff cannot simulate payment\",\r\n      \"R669 cart subtotal and mixed invoice scope Size(320.0, 711.0) 1.0\",\r\n      \"R669 cart subtotal and mixed invoice scope Size(320.0, 711.0) 2.0\",\r\n      \"R669 cart subtotal and mixed invoice scope Size(711.0, 320.0) 1.0\",\r\n      \"R669 cart subtotal and mixed invoice scope Size(711.0, 320.0) 2.0\",\r\n      \"R669 final delivery estimate recovery Size(320.0, 711.0) 1.0\",\r\n      \"R669 final delivery estimate recovery Size(320.0, 711.0) 2.0\",\r\n      \"R669 final delivery estimate recovery Size(711.0, 320.0) 1.0\",\r\n      \"R669 final delivery estimate recovery Size(711.0, 320.0) 2.0\",\r\n      \"T02 changed amount never automatically opens payment\",\r\n      \"T02 changed method never automatically opens payment\",\r\n      \"provider promise continues from product to Checkout and Tracking\"\r\n    ],\r\n    \"logSha256\": \"3bd447c9871bbf023d65716ef431c3893922ff49ca900908ab2b1652ecb81b6c\",\r\n    \"failedTestIds\": [\r\n      3,\r\n      4,\r\n      5,\r\n      6,\r\n      7,\r\n      8,\r\n      9,\r\n      10,\r\n      11,\r\n      12,\r\n      13,\r\n      14,\r\n      15,\r\n      16,\r\n      17,\r\n      18,\r\n      19,\r\n      20,\r\n      21,\r\n      22,\r\n      23,\r\n      24,\r\n      25,\r\n      26,\r\n      27\r\n    ]\r\n  },\r\n  \"baselineAssertionComparison\": {\r\n    \"distinctFailedNames\": 25,\r\n    \"failedInstances\": 25,\r\n    \"baselineFailedInstances\": 25,\r\n    \"sameAssertions\": true,\r\n    \"mismatchNames\": []\r\n  },\r\n  \"integrationChildren\": [\r\n    \"25 pre-existing legacy test names reproduce same assertions at exact baseline; affected suite failed and is not qualification\",\r\n    \"Native live balance/payment snapshots require provider integration; host fixtures isolated\",\r\n    \"T10 repeated Payment prefix copy polish\",\r\n    \"Checkout raw-evidence byte conversion on fresh clone remains open integration child\",\r\n    \"Historic0e90a6ca formal ticket_close subject-prefix blocker preserved\",\r\n    \"Live balance adapter enablement blocked pending current account/order correlation, identity clearing, late callback rejection and fresh zero-balance validation; existing getter does not establish freshness. Current runtime has no adapter injection or map restoration path.\"\r\n  ],\r\n  \"checkoutPortability\": \"Raw Git blobs and archive preserve authentic bytes; fresh-clone SHA reproducibility remains unqualified.\",\r\n  \"checkpoint\": \"Fresh pre_commit, scoped commit/push and clean exact remote readback pending; not pre-claimed.\"\r\n}"
+    }
+  }
+}

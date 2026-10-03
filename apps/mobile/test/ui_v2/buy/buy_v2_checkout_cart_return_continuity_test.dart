@@ -524,7 +524,132 @@ class _ChangingCheckoutCommitFixture extends BuyV2Session {
   }
 }
 
+class _T08OrderSummarySession extends BuyV2Session {
+  _T08OrderSummarySession(this.records, this.balances)
+    : super(core: BuySession(), reviewDataEnabled: false);
+  final List<BuyV2Order> records;
+  final Map<String, BuyV2BalancePaymentResult> balances;
+  @override
+  List<BuyV2Order> get visibleOrders => records;
+  @override
+  bool get catalogueAvailable => true;
+  @override
+  BuyV2BalancePaymentResult? balancePaymentFor(String orderId) =>
+      balances[orderId];
+}
+
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T08 mixed order payment summaries at $scale text', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      BuyV2Order order(String id, String? status, int balance) => BuyV2Order(
+        id: id,
+        destination: BuyV2Destination.shop,
+        title: 'Order $id',
+        itemSummary: '1 product',
+        total: 500,
+        partner: 'Store $id',
+        partnerType: 'Store',
+        promise: 'Awaiting update',
+        destinationLabel: 'Home',
+        progress: .4,
+        status: BuyV2OrderStatus.preparing,
+        purchaseId: 'mixed-purchase',
+        paymentStatusLabel: status,
+        balanceDue: balance,
+        balanceDueLabel: 'at delivery',
+      );
+      final records = [
+        order('paid', 'Paid', 0),
+        order('advance', 'Advance paid', 300),
+        order('pending', 'Payment pending', 300),
+        order('missing', null, 0),
+        order('settled', 'Payment pending', 300),
+        order('zero-pending', 'Paid', 300),
+      ];
+      final session = _T08OrderSummarySession(records, {
+        'settled': const BuyV2BalancePaymentResult(
+          state: BuyV2BalancePaymentState.paid,
+          amountDue: 0,
+          dueLabel: 'Paid',
+          customerMessage: 'Confirmed',
+        ),
+        'zero-pending': const BuyV2BalancePaymentResult(
+          state: BuyV2BalancePaymentState.paymentPending,
+          amountDue: 0,
+          dueLabel: 'Checking',
+          customerMessage: 'Awaiting verification',
+          paymentReference: 'pending-ref',
+        ),
+      });
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: Scaffold(
+            body: BuyV2OrdersView(session: session, onOpenOrderHelp: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final record in records) {
+        final summary = find.byKey(
+          ValueKey('buy-order-payment-summary-${record.id}'),
+        );
+        await tester.scrollUntilVisible(
+          summary,
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final texts = tester
+            .widgetList<Text>(
+              find.descendant(of: summary, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? '')
+            .join('\n');
+        switch (record.id) {
+          case 'paid':
+            expect(texts, contains('Payment · Paid'));
+          case 'advance':
+            expect(texts, contains('Payment · Advance paid'));
+            expect(texts, contains('₹300 · at delivery'));
+          case 'pending':
+            expect(texts, contains('Payment · Payment pending'));
+            expect(texts, contains('₹300 · at delivery'));
+          case 'missing':
+            expect(texts, contains('Payment status unavailable'));
+            expect(texts, isNot(contains('Paid')));
+          case 'settled':
+            expect(texts, contains('Balance paid'));
+            expect(texts, isNot(contains('pending')));
+            expect(texts, isNot(contains('₹300')));
+          case 'zero-pending':
+            expect(texts, contains('Payment pending'));
+            expect(texts, isNot(contains('Paid')));
+            expect(texts, isNot(contains('No balance')));
+        }
+        expect(
+          find.descendant(
+            of: summary,
+            matching: find.byType(ButtonStyleButton),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 't08-${record.id}-$scale');
+      }
+    });
+  }
   _purchaseOrderControllerCases();
   _purchaseOrderPanelCases();
   for (final fault in [

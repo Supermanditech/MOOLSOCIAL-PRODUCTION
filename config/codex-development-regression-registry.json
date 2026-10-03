@@ -109387,6 +109387,204 @@
           "workspace": "Codex after integration",
           "google": "separately listed",
           "checkpoint": "pending memory/pre_commit + commit/push/exact clean remote readback; no success pre-claimed"
+        },
+        "t08OrderStatusBalances20261003": {
+          "status": "scope_recorded_pending_fresh_admission",
+          "authority": "Founder continue after supplier-policy checkpoint8499799adc06bd224687efa685d1cc50a93d3919 selects next frontend Cart subjourney T08 under the same open Buy parent/lane; not a new independent ticket or formal closure.",
+          "actor": "Buyer viewing submitted order groups and their payment/delivery status",
+          "classification": "mvp_required",
+          "reason": "Buyer must distinguish settled payments, pending verification and authoritative later balances without duplicate charge or invented order completion.",
+          "outcome": "Existing Orders and order-detail views clearly identify each order, Store, authoritative order/payment status and remaining amount; absent provider data remains unavailable and retry does not submit a new payment/order.",
+          "reuse": {
+            "runtime": [
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
+            ],
+            "tests": [
+              "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+              "apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart"
+            ],
+            "newScreenServiceOrBackend": false
+          },
+          "smallestChange": "Audit existing Orders journey after admitted Redmi refresh; register reproduced frontend defects and change only exact owned presentation/state paths needed. Do not invent supplier/provider contracts.",
+          "boundaries": [
+            "No live payment, order submission, APK build/install, backend or other-worktree edits",
+            "Live-provider recovery remains deferred; workspace Codex after integration; Google separate",
+            "Supplier-policy consent remains Product/Add only",
+            "Preserve T07/A09 pending status and evidence checkout integration child"
+          ],
+          "acceptance": [
+            "Actual Git checkpoint/readback and fresh unchanged admission gates before execution",
+            "Observed native Orders journey with truthful missing-data state",
+            "Isolated tests for supplied authoritative order/payment snapshots, stale/unavailable states and enlarged text",
+            "Focused analysis/regression qualification, retest, durable child or verified status, safe scoped Git checkpoint then stop"
+          ],
+          "baseline": "8499799adc06bd224687efa685d1cc50a93d3919",
+          "readBoundaryIncident": "Initial broad T08 rg output exceeded requested display budget; no mutation or source qualification affected. Subsequent searches bounded to exact literal owner/limit."
+        },
+        "t08InitialObservations20261003": {
+          "admission": "t08-initial-admission-20261003 all four closed exit0; full restart8522 closed0",
+          "native": "Existing review-only fixture Orders show17 active and3 delivered. No order/payment submitted. Current Basket one tomato item preserved; no attempt to restore older basket.",
+          "captureIncident": "t08-orders-settled PNG captured Shop transition while XML subsequently shows Orders. Unqualified image retained; recapture only after registered coordinator closes.",
+          "defect": "T08 child A01 under existing REG4647/Buy parent: delivery Orders cards show total and fulfilment status but omit existing authoritative paymentStatusLabel and balanceDue. Mixed paid/pending/later-balance orders cannot be distinguished until opening each detail. Source _OrderCard exact lines25185-25276 confirms omission.",
+          "fixBoundary": "Add a compact read-only per-order payment status and remaining balance summary using existing supplied order fields and current validated balance result. No group-wide inference, inferred Paid or balance collection action. Keep financial actions on existing detail.",
+          "testOwner": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "runtimeOwner": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "stateOwner": "Existing session balance result getter; no new model/provider needed.",
+          "acceptance": "Mixed status/remaining amount visible per card, legacy missing status explicitly unverified, current validated balance paid suppresses stale due label, pending remains check-only in detail; normal/200percent screenshots and regression evidence."
+        },
+        "t08A01Reproduction20261003": {
+          "status": "reproduced_before_runtime_fix",
+          "path": "apps/mobile/build/supplier-policy-20261003/t08-reproduce.jsonl",
+          "sha256": "fd376532e31f62cfce41c5e2472530387c0a5ae429b774ef6c20a8cfee56aecf",
+          "closedExitCode": 1,
+          "failedCases": 2,
+          "description": "Mixed grouped order list has no per-order payment summary at1x/2x. This expected failing reproducer is not passing qualification.",
+          "architect": "Astra facts-only plan review: keep per-order exact identity, consistent status/balance source; only validated paid zero clears stale due; nonterminal zero/missing/default may not imply Paid. No direct source diff review claimed.",
+          "fix": "Exact existing views owner, read-only summary. Supplied payment label or unavailable; validated balance state overrides stale label, paid suppresses stale due, pending zero remains checking. Existing Collection path unchanged; no pay action or provider contract changes."
+        },
+        "t08GeneratedPackageGraphIncident20261003": {
+          "status": "registered_before_restoration",
+          "gateExitCode": 1,
+          "cause": "Flutter test auto-pub regenerated tracked apps/mobile/.dart_tool/package_graph.json, outside root claim. Actual diff13 additions13 deletions only reorders equatable/web package entries; no dependency versions changed.",
+          "preservation": "Preserve generated bytes and diff under ignored supplier-policy folder, assert identical parsed package maps before exact HEAD-byte restoration. Root-authorized preservation repair only, no dependency/config change or destructive Git.",
+          "next": "Use --no-pub on subsequent Flutter verification, then fresh unchanged ownership gate."
+        },
+        "t08GeneratedPackageGraphRestored20261003": {
+          "status": "generated_bytes_and_diff_preserved_exact_HEAD_bytes_restored",
+          "assertion": "Parsed package map identical, versions/dependencies unchanged; no package graph Git diff remains. Subsequent tests --no-pub."
+        },
+        "t08ImplementationCaseAdmission20261003": {
+          "status": "scoped_fix_implemented_final_qualification_pending",
+          "runtime": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "test": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "reproducedCases": 2,
+          "firstFocusedPassed": 2,
+          "selectedNewCaseReferences": 2,
+          "parentCases": 228,
+          "states": "Mixed paid/advance/pending/missing/settled/pendingzero across1x2x, per-order exact values, no pay action",
+          "fixtures": "Isolated test subclass only; production review data/provider not changed",
+          "exclusions": "Collection cards unchanged. No session/model/backend changes. Provider/workspace acceptance deferred. Existing balance account/order correlation integration concerns remain provider qualification, not inferred from list UI."
+        },
+        "t08AffectedFailure20261003": {
+          "status": "closed_failed_do_not_qualify",
+          "path": "apps/mobile/build/t06-t07-cart-20261002/t08-final-affected-20261003.jsonl",
+          "sha256": "9c6f4505e60026e68b418a9f8e3e050748e0e2cc4c7cb6e77256314002bd5f73",
+          "exitCode": 1,
+          "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "passed": 219,
+          "failureEvents": 52,
+          "distinctFailedNames": 25,
+          "selectedIntersection": 0,
+          "firstObservedAssertions": "Older checkout Pay labels expected but absent; list-only runtime change cannot be assumed unrelated without baseline proof.",
+          "next": "Preserve exact two current edited owner bytes/hash, temporarily test exact HEAD8499799a owner blobs against failed-name subset, finally restore current bytes with fingerprint assertion; no weakening original assertions or gates. Legacy-test child only after actual baseline evidence.",
+          "readBoundary": "One scoped claim-tree introspection emitted more contexts than needed and exceeded display budget; subsequent lookup activeClaims0 only. No owner mutation from read."
+        },
+        "t08LegacyVerificationChild20261003": {
+          "status": "open_preexisting_test_failures_reproduced_at_exact_baseline",
+          "parent": "REG-20260923-4647-BUY-VISUAL-BATCH-BOUNDARIES",
+          "candidateSource": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "candidateAffectedPassed": 219,
+          "candidateAffectedDistinctFailedNames": 25,
+          "failureEvents": 52,
+          "baselineCommit": "8499799adc06bd224687efa685d1cc50a93d3919",
+          "baselineSource": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+          "baselineLogSha256": "3bd447c9871bbf023d65716ef431c3893922ff49ca900908ab2b1652ecb81b6c",
+          "baselineExitCode": 1,
+          "executedExactFailedNames": 25,
+          "failedInstances": 25,
+          "sameAssertionBodies": true,
+          "allT08RuntimeTestDifferencesRestored": true,
+          "restoreReceipt": "apps/mobile/build/t06-t07-cart-20261002/t08-baseline-recovery.json",
+          "comparisonReceipt": "apps/mobile/build/t06-t07-cart-20261002/t08-baseline-assertion-comparison.json",
+          "scope": "Existing Checkout/pay-label assertions fail before T08. Required selected ledger intersection0. Do not call wider suite passing or erase limitation. Original assertions/gates retained; exact legacy-test correction separately scoped.",
+          "next": "Required selected985 distinct/1045references, native final-source refresh/retest, durable evidence and safe checkpoint; no T09 execution in this sweep."
+        },
+        "t08FinalNativeCaptureIncident20261003": {
+          "status": "unqualified_failed_capture_retained",
+          "closedExitCode": 1,
+          "hotRestart": "t08-final-hot-restart-20261003 closed0 detached true at source d1621fe",
+          "capture": "t08-final-entry; uiautomator returned0 but remote XML missing after restart; dump log retained. No PNG/XML qualification or source defect inferred.",
+          "next": "Rerun settled read-only capture under fresh ownership gate with new absent label; no install/data clear/fixture injection."
+        },
+        "t08NativeQualification20261003": {
+          "status": "frontend_native_readonly_journey_verified_live_provider_deferred",
+          "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "refresh": "t08-final-hot-restart-20261003 closed0, no new APK",
+          "captures": "t08-native final Orders normal/large/scrolled/return, orderdetail and Back all XML+PNG; viewed normal/large/scrolled/detail. Large Track reachable after ordinary scroll bounds[165,822][555,910]. Font1.0 restored/read back.",
+          "identity": "apps/mobile/build/t06-t07-cart-20261002/t08-native/final-identity.json; installed originalr66.36SHAunchanged",
+          "actual": "MS-NEW-12 legacy review fixture, COD detail, payment status absent therefore list unavailable; Live delivery lastknown/unavailable, Back returns same order. No payment/order/financial action submitted.",
+          "hostOnly": "Authoritative supplied mixed paid/advance/pending/settled/later balances verified isolated host fixtures at1x2x; no live provider acceptance claim.",
+          "remaining": "Required selected985 qualification, immutable evidence/current receipts/precommit/checkpoint. Legacy25-test child, provider/workspace Codex after integration, Google and checkout-evidence portability child stay open.",
+          "visualChild": "T10 copy polish: prefix Payment plus Payment status unavailable/pending is redundant; truthfulness/scroll/navigation qualified, shorten during scoped polish. No new regression ID."
+        },
+        "t08LiveBalanceEnablementChild20261003": {
+          "status": "open_blocks_live_adapter_enablement",
+          "scope": "Provider/backend/workspace deferred; Codex after integration",
+          "risk": "Existing balance-result getter is an orderId cache and does not by itself prove current-account freshness. Identity-change clearing, late-callback rejection and current order/account correlation require integration qualification before enabling the live adapter.",
+          "currentReachability": "No balancePaymentAdapter named injection in apps/mobile/lib; constructor adapter final optional defaultnull. Private map initialized empty, exhaustive12 references show no restore/serialization path. Only load/start/reconcile write from guarded nonnulladapter; Continue requires an existing result. Current native path cannot populate/restore a result with null adapter. Native actual status remains unavailable; no live acceptance inferred.",
+          "architect": "Astra facts-only confirms deferral acceptable only if disabled-adapter native reachability cannot restore cached results; root inspected exact references/injections and established boundary. No source diff review or account-isolation test claimed.",
+          "acceptanceBeforeLive": [
+            "Current owner/order correlation and identity clearing",
+            "Late/old session callback invalidation and result freshness after order update",
+            "Validated zero-balance settlement",
+            "Real provider/device evidence"
+          ],
+          "frontend": "T08 isolated supplied-state presentation remains qualified only within stated fixture/native missing-data coverage; selected suite does not prove live account isolation."
+        },
+        "t08ActualArtifactAdmission20261003": {
+          "status": "actual_closed_proof_preserved_claim_admission_now",
+          "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "selectedSession99261ClosedExitCode": 0,
+          "selectedDistinctPassed": 985,
+          "selectedReferences": 1045,
+          "focusedPassed": 2,
+          "analysisClosedExitCode": 0,
+          "artifactPrefix": "docs/quality/CURSOR-BUY-T08-ORDERS-20261003",
+          "actualArtifactFiles": 7,
+          "archiveVerifiedMembers": 106,
+          "ownerAdmission": "Append only seven actual nonempty proof files to root exact claim and existing literal evidence allowlist; no wildcard/check weakening. Fresh unchanged ownership gate immediately after admission.",
+          "remaining": "Metadata/handoff current qualification, staged raw Git blob SHA checks, memory/pre_commit, safe scoped checkpoint/push/readback. Legacy25 failures/integration children remain open."
+        },
+        "t08ActualArtifactAdmitted20261003": {
+          "status": "actual7_files_claimed_and_literal_allowlisted_fresh_gate",
+          "rootClaims": 278,
+          "archiveMembers": 106,
+          "sourceUnchanged": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "noPlaceholderOrWildcard": true
+        },
+        "t08CheckpointReady20261003": {
+          "status": "frontend_qualified_children_retained_checkpoint_pending",
+          "sourceSha256": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf",
+          "selectedPassed": 985,
+          "selectedReferences": 1045,
+          "focusedPassed": 2,
+          "archiveMembers": 106,
+          "parentCases": 228,
+          "owners": 15,
+          "rootClaims": 278,
+          "handoffPrefixProof": "apps/mobile/build/t06-t07-cart-20261002/t08-handoff-prefix-proof.json",
+          "architectFinal": "Facts-only supplied-facts review no additional material blocker; staged bytes/gates/checkpoint/readback pending. Not independent diff audit.",
+          "limits": "25 pre-existing failed names same baseline assertion bodies; live current-owner/order/late callbacks balance enablement blocked deferred; T10 duplicate prefix; evidence-checkout conversion child; historic0e90formalclosure. No live acceptance or formal close.",
+          "next": "Memory/precommit exact15-owner checkpoint/push/cleanreadback then stop; T09 futurecontinue/freshscope."
+        },
+        "t08StagedMetadataByteIncident20261003": {
+          "status": "registered_before_correction_no_commit",
+          "stageExitCode": 1,
+          "cause": "Generated contract Path.write_text used Windows CRLF35 while Git staged LF. Raw4JSONLproofs staged byte-exact. Existing global core.autocrlf unchanged.",
+          "expectedContractSha256": "b004ef4e9c403d48e2d8213992b2fa7fc131fac9f36d711d48f24778c6bd5959",
+          "stagedContractSha256": "d53189ab00ac498329975b31990b918c4f79e7c59e5aab74f236cb15a52c399d",
+          "scope": "Fix only this task generated contract/report writer to explicit UTF8LF bytes. Preserve original contract/report raw UTF8 and SHA within new report staging-incident history plus ignored original files; archive106 raw evidence members unchanged.",
+          "bindings": "Update only current T08 ledger evidence/contract SHA and append corrective handoff bytes; retain previous handoff prefixes and old declared hashes as superseded history. Restage same15owners, verify5rawproofs plus current report/ZIP SHA.",
+          "source": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf unchanged; no runtime/test/gate/Git configuration changes."
+        },
+        "t08MetadataByteCorrected20261003": {
+          "status": "generated_metadata_UTF8LF_superseded_bytes_preserved",
+          "rawProofsAndArchiveUnchanged": true,
+          "history": "EVIDENCE.json metadataStagingRepair embeds exact original contract/report rawUTF8 strings and SHA256, roundtrip bytehash verified. Corrective handoff appended with oldprefix preserved.",
+          "currentBindings": "T08 ledger contract/evidence SHA refreshed; no globalGit/config/.gitattributes change. Restage same15owners; verify4rawlogs+contract+report+archive byte hashes.",
+          "sourceUnchanged": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
