@@ -481,6 +481,235 @@ class _StoreSalesStatementPanelState extends State<StoreSalesStatementPanel> {
 /// Adapter over the existing ledger, not a second transaction or payment owner.
 /// Dated reports need the provider's opening-balance coverage date. A first
 /// visible transaction is not evidence of that date.
+/// Immutable supplier-account projection. Positive balances are dues; negative
+/// balances are credit held with the supplier. No goods or money are posted here.
+class StoreSupplierStatement {
+  StoreSupplierStatement({required WorkspaceSupplierLedger source,
+    required this.storeName, required DateTime from, required DateTime until,
+    required this.generatedAt, required this.reviewOnly})
+    : ledger = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(source.toJson())))
+        ?? (throw const FormatException('Supplier records need recovery before reporting.')),
+      from = day(from), until = day(until) {
+    if (!ledger.valid || !this.from.isBefore(this.until) ||
+        this.until.isAfter(DateTime(generatedAt.year, generatedAt.month, generatedAt.day + 1)) ||
+        ledger.asOf.isAfter(generatedAt) ||
+        (ledger.openingRecord != null && ledger.openingRecord!.qa != reviewOnly)) {
+      throw const FormatException('Check the supplier records and statement dates.');
+    }
+  }
+  final WorkspaceSupplierLedger ledger;
+  final String storeName;
+  final DateTime from, until, generatedAt;
+  final bool reviewOnly;
+  static DateTime day(DateTime value) => DateTime(value.year, value.month, value.day);
+  static DateTime previousDay(DateTime value) => DateTime(value.year, value.month, value.day - 1);
+  static String date(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+  static String amount(int? minor) {
+    if (minor == null) return 'Unavailable';
+    final digits = (minor.abs() ~/ 100).toString();
+    var head = digits.length > 3 ? digits.substring(0, digits.length - 3) : '';
+    final groups = <String>[];
+    while (head.length > 2) { groups.insert(0, head.substring(head.length - 2)); head = head.substring(0, head.length - 2); }
+    if (head.isNotEmpty) groups.insert(0, head);
+    final number = groups.isEmpty ? digits : '${groups.join(',')},${digits.substring(digits.length - 3)}';
+    return '${minor < 0 ? '-' : ''}₹$number.${(minor.abs() % 100).toString().padLeft(2, '0')}';
+  }
+  DateTime? get coverage => ledger.openingRecord == null ? null : day(DateTime.parse(ledger.openingRecord!.asOfDate));
+  bool get balancesReady => ledger.historyComplete && ledger.openingBalanceMinor != null &&
+    coverage != null && !from.isBefore(coverage!);
+  DateTime occurred(WorkspaceSupplierLedgerEntry entry) {
+    final refund = ledger.refunds[entry.operationId];
+    final credit = ledger.creditNotes[entry.operationId];
+    final bill = ledger.purchaseBills[entry.billId];
+    if (refund != null) return day(DateTime.parse(refund.intent.occurredOn));
+    if (credit != null) return day(DateTime.parse(credit.occurredOn));
+    if (entry.kind == WorkspaceSupplierEntryKind.bill && bill != null) return day(bill.copy.draft.invoiceIssuedDay!);
+    if (entry.moneyReview != null) return day(DateTime.parse(entry.moneyReview!.occurredOn));
+    return day(entry.postedAt.toLocal());
+  }
+  bool inPeriod(DateTime at) => !at.isBefore(from) && at.isBefore(until);
+  List<WorkspaceSupplierLedgerEntry> get entries => ledger.entries.where((e) => inPeriod(occurred(e))).toList()
+    ..sort((a, b) {
+      final compared = occurred(a).compareTo(occurred(b));
+      if (compared != 0) return compared;
+      final recorded = a.postedAt.compareTo(b.postedAt);
+      return recorded != 0 ? recorded : a.operationId.compareTo(b.operationId);
+    });
+  int? get opening => !balancesReady ? null : ledger.entries.where((e) => occurred(e).isBefore(from))
+    .fold<int>(ledger.openingBalanceMinor!, (sum, e) => sum + e.payableDeltaMinor);
+  int get addedMinor => entries.where((e) => e.payableDeltaMinor > 0).fold<int>(0, (sum, e) => sum + e.amountMinor);
+  int get reducedMinor => entries.where((e) => e.payableDeltaMinor < 0).fold<int>(0, (sum, e) => sum + e.amountMinor);
+  int? get closing => opening == null ? null : opening! + addedMinor - reducedMinor;
+  String get reference => sha256.convert(utf8.encode(jsonEncode([
+    ledger.toJson(), storeName, from.toIso8601String(), until.toIso8601String(), generatedAt.toIso8601String(), reviewOnly,
+  ]))).toString().substring(0, 16);
+  static const headers = ['Date', 'Particulars', 'Reference', 'Added to dues (₹)',
+    'Reduced dues (₹)', 'Dues / credit (₹)', 'Details'];
+  static String label(WorkspaceSupplierEntryKind kind) => switch (kind) {
+    WorkspaceSupplierEntryKind.bill => 'Purchase bill',
+    WorkspaceSupplierEntryKind.creditNote => 'Supplier credit note',
+    WorkspaceSupplierEntryKind.payment => 'Payment recorded',
+    WorkspaceSupplierEntryKind.advance => 'Advance paid',
+    WorkspaceSupplierEntryKind.refund => 'Refund received',
+  };
+  List<List<Object?>> get rows {
+    int? balance = opening;
+    final result = <List<Object?>>[
+      ['', 'Opening balance', '', '', '', balance == null ? null : balance / 100, 'Dues (+), credit with supplier (-)'],
+    ];
+    for (final entry in entries) {
+      if (balance != null) balance += entry.payableDeltaMinor;
+      final bill = ledger.purchaseBills[entry.billId];
+      result.add([date(occurred(entry)), label(entry.kind), entry.reference,
+        entry.payableDeltaMinor > 0 ? entry.amountMinor / 100 : '',
+        entry.payableDeltaMinor < 0 ? entry.amountMinor / 100 : '',
+        balance == null ? null : balance / 100,
+        [if (bill != null && entry.kind != WorkspaceSupplierEntryKind.bill) 'Bill ${bill.copy.draft.invoiceReference}',
+          if (entry.orderId != null) 'Order ${entry.orderId}',
+          if (entry.paymentMethod != null) entry.paymentMethod!].join(' · ')]);
+    }
+    result.add(['', 'Closing balance', '', '', '', balance == null ? null : balance / 100, '']);
+    // Already-in-opening and zero-value documents are evidence, not new dues.
+    for (final bill in ledger.purchaseBills.values.where((b) => !b.addsLiability)) {
+      if (bill.openingTreatment != WorkspaceOpeningBillInclusion.included && !inPeriod(day(bill.copy.draft.invoiceIssuedDay!))) continue;
+      result.add([date(bill.copy.draft.invoiceIssuedDay!), 'Supporting purchase bill', bill.copy.draft.invoiceReference,
+        '', '', '', '${bill.openingTreatment == WorkspaceOpeningBillInclusion.included ? 'Already in starting balance' : 'Zero-value bill'} · ${amount(bill.amountMinor)} · no additional dues']);
+    }
+    for (final entry in ledger.entries.where((e) => balancesReady && occurred(e).isBefore(coverage!))) {
+      result.add([date(occurred(entry)), 'Earlier adjustment', entry.reference, '', '', '',
+        '${label(entry.kind)} · ${amount(entry.amountMinor)} · included in report opening, not counted again']);
+    }
+    for (final link in ledger.billMoneyAllocations.values.where((a) => inPeriod(day(a.recordedAt.toLocal())))) {
+      result.add([date(link.recordedAt.toLocal()), 'Recorded money linked',
+        ledger.purchaseBills[link.billId]?.copy.draft.invoiceReference ?? link.billId,
+        '', '', '', '${amount(link.amountMinor)} · not another payment; no account-balance change']);
+    }
+    return result;
+  }
+  StoreTabularReport get report => StoreTabularReport(title: 'Supplier account statement',
+    disclosure: '${reviewOnly ? 'Evaluation only. ' : ''}Supporting purchase records, not a bank statement or GST return. '
+      'Positive balance: dues. Negative balance: credit with supplier. '
+      'Business dates are used when recorded; legacy entries use the local recording date. '
+      'Later-entered backdated records can restate a period. Goods movements and linked money are not counted twice.',
+    metadata: [['Document', 'Supplier account statement'], ['Store', storeName], ['Supplier', ledger.supplierName],
+      ['Period', '${date(from)} to ${date(previousDay(until))}'],
+      ['Added to dues', amount(addedMinor)], ['Reduced dues', amount(reducedMinor)],
+      ['Records available at', generatedAt.toIso8601String()], ['Ledger revision', ledger.revision],
+      ['Statement reference', reference], ['Coverage', balancesReady ? 'Confirmed starting balance and recorded entries'
+        : 'Incomplete history or dates before verified coverage; balances unavailable'],
+      ['Store identity', ledger.workspaceId], ['Supplier identity', ledger.supplierId],
+      for (final entry in entries) ['Entry identity · ${entry.reference}',
+        '${entry.operationId}${entry.billId == null ? '' : ' · bill ${entry.billId}'}'],
+      for (final bill in ledger.purchaseBills.values) ['Bill identity · ${bill.copy.draft.invoiceReference}',
+        '${bill.billId} · copy ${bill.copy.id}'],
+      for (final link in ledger.billMoneyAllocations.values.where((a) => inPeriod(day(a.recordedAt.toLocal()))))
+        ['Linked money identity', '${link.operationId} · bill ${link.billId} · source ${link.sourceId}']],
+    headers: headers, rows: rows, moneyColumns: {3, 4, 5}, nullLabel: 'Unavailable');
+}
+
+class StoreSupplierStatementPanel extends StatefulWidget {
+  const StoreSupplierStatementPanel({super.key, required this.statement, required this.isCurrent,
+    required this.changes, this.saveFile = saveStoreStockFile});
+  final StoreSupplierStatement statement;
+  final bool Function() isCurrent;
+  final Listenable changes;
+  final StoreStockFileSaver saveFile;
+  @override
+  State<StoreSupplierStatementPanel> createState() => _StoreSupplierStatementPanelState();
+}
+
+class _StoreSupplierStatementPanelState extends State<StoreSupplierStatementPanel> {
+  late StoreSupplierStatement snapshot;
+  late final TextEditingController from, to;
+  bool stale = false, busy = false;
+  String? notice;
+  bool get current => mounted && !stale && widget.isCurrent();
+  bool get unappliedDates => from.text != StoreSupplierStatement.date(snapshot.from) ||
+    to.text != StoreSupplierStatement.date(StoreSupplierStatement.previousDay(snapshot.until));
+  @override
+  void initState() {
+    super.initState(); snapshot = widget.statement;
+    from = TextEditingController(text: StoreSupplierStatement.date(snapshot.from));
+    to = TextEditingController(text: StoreSupplierStatement.date(StoreSupplierStatement.previousDay(snapshot.until)));
+    widget.changes.addListener(invalidate);
+  }
+  void invalidate() { stale = true; if (mounted) setState(() {}); }
+  DateTime? parse(String text) {
+    final m = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(text.trim());
+    if (m == null) return null;
+    final d = DateTime(int.parse(m[3]!), int.parse(m[2]!), int.parse(m[1]!));
+    return StoreSupplierStatement.date(d) == text.trim() ? d : null;
+  }
+  void applyPeriod() {
+    if (!current || busy) return;
+    try {
+      final start = parse(from.text), end = parse(to.text);
+      if (start == null || end == null) throw const FormatException('Enter dates as DD/MM/YYYY.');
+      final next = StoreSupplierStatement(source: snapshot.ledger, storeName: snapshot.storeName,
+        from: start, until: DateTime(end.year, end.month, end.day + 1), generatedAt: snapshot.generatedAt, reviewOnly: snapshot.reviewOnly);
+      setState(() { snapshot = next; notice = null; });
+    } on FormatException catch (e) { setState(() => notice = e.message); }
+  }
+  Future<void> download(StoreStockExportFormat format) async {
+    if (busy || !current || unappliedDates) return;
+    final captured = snapshot;
+    setState(() { busy = true; notice = null; });
+    try {
+      final bytes = await captured.report.generate(format);
+      if (!current || !identical(captured, snapshot)) throw const FormatException('Records changed. Close and reopen the statement.');
+      final saved = await widget.saveFile(bytes, 'supplier-statement-${captured.reference}.${format.extension}', format);
+      if (current) setState(() => notice = saved ? '${format.label} saved.' : 'Download cancelled.');
+    } catch (e) {
+      if (mounted) setState(() => notice = e is FormatException ? e.message : 'Could not download. Please retry.');
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  @override
+  void dispose() { widget.changes.removeListener(invalidate); from.dispose(); to.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => SafeArea(top: false, child: SingleChildScrollView(padding: const EdgeInsets.all(16),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Expanded(child: Text('Supplier statement', style: Theme.of(context).textTheme.titleMedium)),
+        TextButton(onPressed: busy ? null : () => Navigator.pop(context), child: const Text('Close'))]),
+      Text(snapshot.ledger.supplierName, style: Theme.of(context).textTheme.titleSmall),
+      if (snapshot.reviewOnly) const Text('Evaluation records only'),
+      Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        SizedBox(width: (150 * MediaQuery.textScalerOf(context).scale(14) / 14).clamp(150.0, MediaQuery.sizeOf(context).width - 64), child: TextField(key: const Key('supplier-statement-from'), controller: from,
+          style: const TextStyle(fontSize: 14),
+          keyboardType: TextInputType.datetime, onChanged: (_) => setState(() {}),
+          enabled: current && !busy, decoration: const InputDecoration(labelText: 'From', hintText: 'DD/MM/YYYY',
+            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)))),
+        SizedBox(width: (150 * MediaQuery.textScalerOf(context).scale(14) / 14).clamp(150.0, MediaQuery.sizeOf(context).width - 64), child: TextField(key: const Key('supplier-statement-to'), controller: to,
+          style: const TextStyle(fontSize: 14),
+          keyboardType: TextInputType.datetime, onChanged: (_) => setState(() {}),
+          enabled: current && !busy, decoration: const InputDecoration(labelText: 'To', hintText: 'DD/MM/YYYY',
+            isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14)))),
+        TextButton(onPressed: current && !busy ? applyPeriod : null, child: const Text('Apply dates'))]),
+      Text('Opening ${StoreSupplierStatement.amount(snapshot.opening)} · Closing ${StoreSupplierStatement.amount(snapshot.closing)}',
+        key: const Key('supplier-statement-balances')),
+      const Text('Positive balance = dues; negative balance = credit with supplier.'),
+      if (!snapshot.balancesReady) const Text('Full balance unavailable. Showing recorded activity only.'),
+      if (unappliedDates) const Text('Apply dates to update the preview before downloading.'),
+      Wrap(spacing: 8, children: [for (final format in [StoreStockExportFormat.pdf, StoreStockExportFormat.csv])
+        TextButton.icon(key: ValueKey('supplier-statement-download-${format.extension}'),
+          onPressed: current && !busy && !unappliedDates ? () => download(format) : null,
+          icon: const Icon(Icons.download_outlined, size: 18), label: Text('Download ${format.label}'))]),
+      if (!current) const Text('Records changed. Close and reopen the statement.'),
+      if (notice != null) Text(notice!), if (busy) const LinearProgressIndicator(),
+      const Text('Swipe the table left or right to see amounts and references.'),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columnSpacing: 16,
+        dataRowMinHeight: 40, dataRowMaxHeight: double.infinity,
+        columns: [for (var i = 0; i < StoreSupplierStatement.headers.length; i++)
+          DataColumn(label: Text(StoreSupplierStatement.headers[i]), numeric: i >= 3 && i <= 5)],
+        rows: [for (final row in snapshot.rows) DataRow(cells: [for (var i = 0; i < row.length; i++)
+          DataCell(SizedBox(width: i == 6 ? 240 : i == 2 ? 180 : i == 1 ? 150 : 110,
+            child: Text(row[i] == null ? 'Unavailable' : row[i] is num
+              ? StoreSupplierStatement.amount(((row[i] as num) * 100).round()) : row[i].toString(),
+              textAlign: i >= 3 && i <= 5 ? TextAlign.right : TextAlign.left)))])])),
+      Text('Snapshot ${snapshot.reference} · revision ${snapshot.ledger.revision}', style: Theme.of(context).textTheme.bodySmall),
+    ])));
+}
+
 class StoreCustomerStatement {
   const StoreCustomerStatement({
     required this.ledger,

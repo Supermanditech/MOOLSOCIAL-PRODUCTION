@@ -101,6 +101,76 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  StoreSupplierStatement supplierStatementFixture() {
+    // Host-only report fixture, never inserted into OPPO evaluation records.
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening', basisId: 'HOST-basis',
+      account: 'review-account', store: 'review-store', qa: true, supplierId: 'HOST-supplier',
+      revision: 1, asOfDate: '2026-10-01', savedAt: DateTime.utc(2026, 10, 1),
+      amountMinor: 10000, supplierCredit: true, sourceNote: 'HOST reviewed advance', bills: const []);
+    final ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: opening.account,
+      workspaceId: opening.store, supplierId: opening.supplierId, supplierName: 'HOST Evaluation supplier',
+      qa: true, confirmedAt: opening.savedAt)!;
+    final intent = WorkspaceSupplierRefundIntent(operationId: 'HOST-refund', accountScope: opening.account,
+      workspaceId: opening.store, supplierId: opening.supplierId, qa: true,
+      sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id,
+      openingId: opening.id, openingRevision: opening.revision, reference: 'HOST-REFUND-40',
+      occurredOn: '2026-10-02', paymentMethod: 'Bank transfer', amountMinor: 4000,
+      requestedAt: DateTime.utc(2026, 10, 3));
+    final posted = ledger.recordReviewedRefund(intent, expectedRevision: 1, recordedAt: intent.requestedAt)!;
+    return StoreSupplierStatement(source: posted, storeName: 'HOST Evaluation Store',
+      from: DateTime(2026, 10, 1), until: DateTime(2026, 10, 4),
+      generatedAt: DateTime.utc(2026, 10, 4), reviewOnly: true);
+  }
+  test('SUPPLIERSTATEMENTEXPORT CSV and PDF retain preview rows and snapshot identity', () async {
+    final snapshot = supplierStatementFixture(), document = supplierStatementFixture().report;
+    expect(document.rows, snapshot.rows);
+    final csv = utf8.decode(await document.generate(StoreStockExportFormat.csv));
+    expect(csv, contains('HOST-REFUND-40')); expect(csv, contains('02/10/2026'));
+    expect(csv, contains(snapshot.reference)); expect(csv, contains('Closing balance'));
+    expect(document.summary, isEmpty, reason: 'No summary-only cover page.');
+    expect(csv, contains('HOST-supplier')); expect(csv, contains('review-store'));
+    expect(csv, contains('HOST-refund'));
+    expect(StoreSupplierStatement.previousDay(DateTime(2026, 3, 1)), DateTime(2026, 2, 28));
+    final pdf = await document.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    expect(document.rows, snapshot.rows);
+    const output = String.fromEnvironment('MOOL_SUPPLIER_STATEMENT_TEST_DIR');
+    if (output.isNotEmpty) {
+      final directory = Directory(output)..createSync(recursive: true);
+      final file = File('${directory.path}/host-supplier-statement.pdf');
+      if (file.existsSync()) throw StateError('Preserve prior report evidence; choose a new directory.');
+      file.writeAsBytesSync(pdf);
+    }
+  });
+  for (final size in [const Size(320, 568), const Size(915, 412)]) {
+    testWidgets('SUPPLIERSTATEMENTUI enlarged preview stale scope and unapplied dates $size', (tester) async {
+      tester.view.physicalSize = size; tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final changes = ValueNotifier<int>(0); addTearDown(changes.dispose);
+      var saves = 0;
+      await tester.pumpWidget(MaterialApp(home: MediaQuery(data: MediaQueryData(size: size,
+        textScaler: TextScaler.linear(size.width > 500 ? 2 : 1.4)), child: Scaffold(body: StoreSupplierStatementPanel(
+          statement: supplierStatementFixture(), isCurrent: () => true, changes: changes,
+          saveFile: (bytes, name, format) async { saves++; return true; })))));
+      await tester.pumpAndSettle();
+      expect(find.text('Opening -₹100.00 · Closing -₹60.00'), findsOneWidget);
+      final download = find.byKey(const ValueKey('supplier-statement-download-csv'));
+      await tester.ensureVisible(download); await tester.pumpAndSettle();
+      expect(download.hitTestable(), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('supplier-statement-from')), '02/10/2026'); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(download).onPressed, isNull);
+      final apply = find.text('Apply dates'); await tester.ensureVisible(apply); await tester.pumpAndSettle();
+      await tester.tap(apply); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(download).onPressed, isNotNull);
+      await tester.ensureVisible(download); await tester.pumpAndSettle();
+      await tester.tap(download);
+      changes.value++; // Invalidate while async CSV generation is outstanding.
+      await tester.runAsync(() async { await Future<void>.delayed(const Duration(milliseconds: 200)); });
+      await tester.pumpAndSettle();
+      expect(saves, 0); expect(find.text('Records changed. Close and reopen the statement.'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  }
   test('PDFGROUP sections reject omitted fields duplicate or missing records', () {
     StoreTabularReport grouped(List<StoreReportPdfGroup> groups) => StoreTabularReport(
       title: 'Evaluation', disclosure: 'Evaluation only', metadata: const [],

@@ -4614,6 +4614,85 @@ void main() {
     expect(legacy.canFollow(posted), isFalse);
   });
 
+  StoreSupplierStatement supplierStatement(WorkspaceSupplierLedger ledger, {DateTime? from, DateTime? until}) =>
+    StoreSupplierStatement(source: ledger, storeName: 'HOST evaluation Store', reviewOnly: true,
+      from: from ?? DateTime(2026, 10, 1), until: until ?? DateTime(2026, 10, 4), generatedAt: DateTime.utc(2026, 10, 4));
+
+  test('SUPPLIERSTATEMENT negative opening and backdated refund reconcile exact period', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000, credit: true, bills: const []))!;
+    final intent = WorkspaceSupplierRefundIntent.fromJson({...refundIntentFixture(opening).toJson(),
+      'amountMinor': 4000, 'occurredOn': '2026-10-02'});
+    final posted = opening.recordReviewedRefund(intent, expectedRevision: 1, recordedAt: DateTime.utc(2026, 10, 3))!;
+    final report = supplierStatement(posted, from: DateTime(2026, 10, 2), until: DateTime(2026, 10, 3));
+    expect(report.opening, -50000); expect(report.addedMinor, 4000); expect(report.reducedMinor, 0);
+    expect(report.closing, -46000); expect(report.entries.single.operationId, intent.operationId);
+    expect(report.rows[1][0], '02/10/2026'); expect(report.rows[1][5], -460);
+    expect(report.report.rows, report.rows);
+    final later = supplierStatement(posted, from: DateTime(2026, 10, 3));
+    expect(later.opening, -46000); expect(later.entries, isEmpty); expect(later.closing, -46000);
+    expect(posted.entries.single.postedAt, DateTime.utc(2026, 10, 3));
+    expect(report.reference, supplierStatement(posted, from: report.from, until: report.until).reference);
+    expect(StoreSupplierStatement.amount(-12345678), '-₹1,23,456.78');
+  });
+
+  test('SUPPLIERSTATEMENT opening-included and zero bills retain evidence without new dues', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000))!;
+    final accepted = opening.acceptReviewedBill(acceptanceFixture(), expectedRevision: 1)!;
+    final report = supplierStatement(accepted);
+    expect(report.opening, 50000); expect(report.closing, 50000); expect(report.entries, isEmpty);
+    expect(report.addedMinor, 0); expect(report.rows.where((r) => r[1] == 'Supporting purchase bill'), hasLength(1));
+    expect(report.rows.last[6], contains('Already in starting balance'));
+    final zeroOpening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final zero = acceptanceFixture(id: 'zero-copy', draftId: 'zero-bill', total: '0', date: '2026-10-02',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final zeroAccount = zeroOpening.acceptReviewedBill(zero, expectedRevision: 1)!;
+    expect(supplierStatement(zeroAccount).rows.last[6], contains('Zero-value bill'));
+    expect(supplierStatement(zeroAccount).closing, 0);
+  });
+
+  test('SUPPLIERSTATEMENT excluded historical bill is in opening not silently omitted or doubled', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const [
+      WorkspaceOpeningBillLink(copyId: 'reviewed-copy-A', copyRevision: 2, draftId: 'manual-draft-A',
+        inclusion: WorkspaceOpeningBillInclusion.excluded)]))!;
+    final accepted = opening.acceptReviewedBill(acceptanceFixture(treatment: WorkspaceOpeningBillInclusion.excluded), expectedRevision: 1)!;
+    final report = supplierStatement(accepted);
+    expect(report.opening, 50000); expect(report.closing, 50000); expect(report.addedMinor, 0);
+    expect(report.rows.last[1], 'Earlier adjustment'); expect(report.rows.last[2], 'EVAL-P-001');
+    expect(report.rows.last[6], contains('included in report opening'));
+    final before = supplierStatement(accepted, from: DateTime(2026, 9, 30));
+    expect(before.opening, isNull);
+    expect(before.rows.where((row) => row[1] == 'Earlier adjustment'), isEmpty);
+    expect(before.entries, hasLength(1));
+    expect(before.addedMinor, 50000);
+  });
+
+  test('SUPPLIERSTATEMENT advance allocation is information not another payment', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000, credit: true, bills: const []))!;
+    final bill = acceptanceFixture(id: 'statement-copy', draftId: 'statement-bill', date: '2026-10-02',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final accepted = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    final allocated = accepted.allocateRecordedMoney(moneyAllocationFixture(accepted, bill, amount: 50000), expectedRevision: 2)!;
+    final report = supplierStatement(allocated);
+    expect(report.opening, -50000); expect(report.addedMinor, 50000); expect(report.reducedMinor, 0);
+    expect(report.closing, 0); expect(report.entries, hasLength(1));
+    expect(report.rows.last[1], 'Recorded money linked'); expect(report.rows.last[5], '');
+    expect(report.rows.last[6], contains('no account-balance change'));
+  });
+
+  test('SUPPLIERSTATEMENT incomplete or before-coverage history never becomes zero balance', () {
+    final legacy = WorkspaceSupplierLedger(accountScope: 'account-A', workspaceId: 'store-A',
+      supplierId: 'legacy-supplier', supplierName: 'HOST legacy supplier', revision: 1,
+      asOf: DateTime.utc(2026, 10, 3), historyComplete: false, entries: const []);
+    final report = supplierStatement(legacy);
+    expect(report.balancesReady, isFalse); expect(report.opening, isNull); expect(report.closing, isNull);
+    expect(report.rows.first[5], isNull);
+    expect(report.report.metadata.singleWhere((row) => row.first == 'Coverage').last, contains('balances unavailable'));
+    final known = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    expect(supplierStatement(known, from: DateTime(2026, 9, 30)).opening, isNull);
+    expect(() => StoreSupplierStatement(source: known, storeName: 'HOST', reviewOnly: false,
+      from: DateTime(2026, 10, 1), until: DateTime(2026, 10, 4), generatedAt: DateTime.utc(2026, 10, 4)), throwsFormatException);
+  });
+
   test('PURCHASEREFUND statement uses received date and preserves recording date and legacy fallback', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 10000,
       credit: true, bills: const []))!;

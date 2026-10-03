@@ -13471,7 +13471,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             label: Text((ledger.payableMinor ?? 0) <= 0 ? 'Payment records'
               : ledger.manualBillRemainingMinor(copy.draft.id) == null ? 'Record account payment' : 'Record payment')),
         ]),
-        _StoreSupplierLedgerSummary(ledger: ledger, billId: copy.draft.id),
+        _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id),
       ],
       if (same && session.workspaceSupplierAllocationInputAvailable)
         Align(alignment: Alignment.centerLeft, child: TextButton.icon(
@@ -14103,7 +14103,7 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
                 if (mounted && _current) await _recoverPosting();
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18), label: const Text('Record advance paid')),
           ]),
-          _StoreSupplierLedgerSummary(ledger: session.workspaceSupplierLedger(_supplierId!)),
+          _StoreSupplierLedgerSummary(session: session, ledger: session.workspaceSupplierLedger(_supplierId!)),
         ],
         if (_posted && _supplierId != null && session.workspaceSupplierOpeningRecord(_supplierId!) != null)
           Align(alignment: Alignment.centerLeft, child: TextButton.icon(
@@ -15018,6 +15018,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 : selected.paymentLabel,
           ),
           _StoreSupplierLedgerSummary(
+            session: session,
             ledger: session.workspaceSupplierLedger(selected.supplierId),
             orderId: selected.orderId,
           ),
@@ -15427,12 +15428,40 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   }
 }
 
+Future<void> _showSupplierStatement(BuildContext context, WorkSession session,
+    WorkspaceSupplierLedger ledger) async {
+  final scope = session.workspaceSupplierScope;
+  if (scope == null || scope.$1 != ledger.accountScope || scope.$2 != ledger.workspaceId) return;
+  final identity = jsonEncode(ledger.toJson());
+  try {
+    final now = DateTime.now();
+    final statement = StoreSupplierStatement(source: ledger, storeName: session.activeWorkspace!.name,
+      from: ledger.openingRecord == null
+        ? ledger.entries.isEmpty ? now : ledger.entries.map((e) => e.postedAt.toLocal()).reduce((a, b) => a.isBefore(b) ? a : b)
+        : DateTime.parse(ledger.openingRecord!.asOfDate),
+      until: DateTime(now.year, now.month, now.day + 1), generatedAt: now, reviewOnly: scope.$3);
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+      builder: (_) => FractionallySizedBox(heightFactor: .95, child: StoreSupplierStatementPanel(
+        statement: statement, changes: session,
+        isCurrent: () => session.workspaceSupplierScope == scope &&
+          jsonEncode(session.workspaceSupplierLedger(ledger.supplierId)?.toJson()) == identity)));
+  } on Object {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Supplier records need recovery. Close and reopen the account.')));
+    }
+  }
+}
+
 class _StoreSupplierLedgerSummary extends StatelessWidget {
   const _StoreSupplierLedgerSummary({
+    required this.session,
     required this.ledger,
     this.orderId,
     this.billId,
   });
+  final WorkSession session;
   final WorkspaceSupplierLedger? ledger;
   final String? orderId, billId;
 
@@ -15465,6 +15494,10 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
             : 'Amount payable ${_purchaseAmount(payable)}',
       ),
       children: [
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: ValueKey('supplier-statement-open-${current.supplierId}'),
+          onPressed: () => _showSupplierStatement(context, session, current),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18), label: const Text('Supplier statement'))),
         if (!current.historyComplete || current.openingBalanceMinor == null)
           const Text(
             'Showing available entries. Full account history is unavailable.',
