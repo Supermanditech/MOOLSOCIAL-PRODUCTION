@@ -2931,6 +2931,42 @@ class WorkspaceSupplierRefundIntent {
     if (!intent.valid) throw const FormatException('Invalid supplier refund review');
     return intent;
   }
+
+  WorkspaceSupplierRefund commit({required int revision, required DateTime at}) =>
+    WorkspaceSupplierRefund(intent: this, committedRevision: revision, recordedAt: at);
+}
+
+/// Proof and source consumption accompany exactly one incoming-money entry.
+class WorkspaceSupplierRefund {
+  const WorkspaceSupplierRefund({required this.intent,
+    required this.committedRevision, required this.recordedAt});
+  final WorkspaceSupplierRefundIntent intent;
+  final int committedRevision;
+  final DateTime recordedAt;
+  bool get valid => intent.valid && committedRevision > 1 &&
+    !recordedAt.isBefore(intent.requestedAt);
+  Map<String, Object?> toJson() => {'intent': intent.toJson(),
+    'committedRevision': committedRevision,
+    'recordedAt': recordedAt.toUtc().toIso8601String()};
+  static WorkspaceSupplierRefund fromJson(Object? raw) {
+    if (raw is! Map || raw.length != 3 || !raw.containsKey('intent') ||
+        !raw.containsKey('committedRevision') || !raw.containsKey('recordedAt')) {
+      throw const FormatException('Invalid supplier refund proof');
+    }
+    final proof = WorkspaceSupplierRefund(intent: WorkspaceSupplierRefundIntent.fromJson(raw['intent']),
+      committedRevision: raw['committedRevision'] as int,
+      recordedAt: DateTime.parse(raw['recordedAt'] as String));
+    if (!proof.valid) throw const FormatException('Invalid supplier refund proof');
+    return proof;
+  }
+  WorkspaceSupplierLedgerEntry get entry => WorkspaceSupplierLedgerEntry(
+    operationId: intent.operationId, reference: intent.reference,
+    origin: intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus
+      ? WorkspaceSupplierEntryOrigin.manualPurchase : WorkspaceSupplierEntryOrigin.supplierAccount,
+    purchaseId: intent.copyId,
+    billId: intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus ? intent.sourceId : null,
+    kind: WorkspaceSupplierEntryKind.refund, amountMinor: intent.amountMinor,
+    paymentMethod: intent.paymentMethod, postedAt: recordedAt);
 }
 
 /// Immutable bill acceptance, independent of receipt and payment. The supplier
@@ -3730,6 +3766,7 @@ class WorkspaceSupplierLedger {
     Map<String, WorkspaceSupplierGoodsReturn> goodsReturns = const {},
     Map<String, WorkspaceSupplierCreditNote> creditNotes = const {},
     Map<String, WorkspaceSupplierShortageClaim> shortageClaims = const {},
+    Map<String, WorkspaceSupplierRefund> refunds = const {},
   }) : entries = List.unmodifiable(entries),
        purchaseBills = Map.unmodifiable(purchaseBills),
        goodsReceipts = Map.unmodifiable(goodsReceipts),
@@ -3737,7 +3774,8 @@ class WorkspaceSupplierLedger {
        billMoneyAllocations = Map.unmodifiable(billMoneyAllocations),
        goodsReturns = Map.unmodifiable(goodsReturns),
        creditNotes = Map.unmodifiable(creditNotes),
-       shortageClaims = Map.unmodifiable(shortageClaims);
+       shortageClaims = Map.unmodifiable(shortageClaims),
+       refunds = Map.unmodifiable(refunds);
 
   final String accountScope, workspaceId, supplierId, supplierName;
   final int revision;
@@ -3755,6 +3793,7 @@ class WorkspaceSupplierLedger {
   final Map<String, WorkspaceSupplierGoodsReturn> goodsReturns;
   final Map<String, WorkspaceSupplierCreditNote> creditNotes;
   final Map<String, WorkspaceSupplierShortageClaim> shortageClaims;
+  final Map<String, WorkspaceSupplierRefund> refunds;
 
   static WorkspaceSupplierLedger? confirmedOpening(
     WorkspaceSupplierOpeningRecord record, {
@@ -3810,6 +3849,7 @@ class WorkspaceSupplierLedger {
     if (goodsReturns.isNotEmpty) 'goodsReturns': goodsReturns.map((id, returned) => MapEntry(id, returned.toJson())),
     if (creditNotes.isNotEmpty) 'creditNotes': creditNotes.map((id, note) => MapEntry(id, note.toJson())),
     if (shortageClaims.isNotEmpty) 'shortageClaims': shortageClaims.map((id, claim) => MapEntry(id, claim.toJson())),
+    if (refunds.isNotEmpty) 'refunds': refunds.map((id, proof) => MapEntry(id, proof.toJson())),
     'historyComplete': historyComplete,
     'entries': entries.map((entry) => entry.toJson()).toList(),
   };
@@ -3825,7 +3865,8 @@ class WorkspaceSupplierLedger {
           (value.containsKey('billMoneyAllocations') && value['billMoneyAllocations'] is! Map) ||
           (value.containsKey('goodsReturns') && value['goodsReturns'] is! Map) ||
           (value.containsKey('creditNotes') && value['creditNotes'] is! Map) ||
-          (value.containsKey('shortageClaims') && value['shortageClaims'] is! Map)) {
+          (value.containsKey('shortageClaims') && value['shortageClaims'] is! Map) ||
+          (value.containsKey('refunds') && value['refunds'] is! Map)) {
         return null;
       }
       final result = WorkspaceSupplierLedger(
@@ -3862,6 +3903,8 @@ class WorkspaceSupplierLedger {
           entry.key as String: WorkspaceSupplierCreditNote.fromJson(entry.value)},
         shortageClaims: {for (final entry in ((value['shortageClaims'] as Map?) ?? const {}).entries)
           entry.key as String: WorkspaceSupplierShortageClaim.fromJson(entry.value)},
+        refunds: {for (final entry in ((value['refunds'] as Map?) ?? const {}).entries)
+          entry.key as String: WorkspaceSupplierRefund.fromJson(entry.value)},
         entries: [
           for (final entry in value['entries'] as List)
             WorkspaceSupplierLedgerEntry(
@@ -3911,6 +3954,7 @@ class WorkspaceSupplierLedger {
       _creditNotesValid &&
       _shortageClaimsValid &&
       _reviewedMoneyValid &&
+      _refundsValid &&
       entries.every((entry) => entry.valid && !entry.postedAt.isAfter(asOf)) &&
       entries.map((entry) => entry.operationId).toSet().length ==
           entries.length &&
@@ -4056,6 +4100,7 @@ class WorkspaceSupplierLedger {
       goodsReturns: goodsReturns,
       creditNotes: creditNotes,
       shortageClaims: shortageClaims,
+      refunds: refunds,
       entries: [...entries, if (bill.addsLiability) WorkspaceSupplierLedgerEntry(
         operationId: 'manual-bill:${bill.billId}',
         reference: bill.copy.draft.invoiceReference,
@@ -4114,7 +4159,8 @@ class WorkspaceSupplierLedger {
       entries: entries, openingBalanceMinor: openingBalanceMinor, openingRecord: openingRecord,
       purchaseBills: purchaseBills, goodsReceipts: {...goodsReceipts, receipt.id: receipt},
       billGoodsAllocations: billGoodsAllocations, billMoneyAllocations: billMoneyAllocations,
-      goodsReturns: goodsReturns, creditNotes: creditNotes, shortageClaims: shortageClaims);
+      goodsReturns: goodsReturns, creditNotes: creditNotes, shortageClaims: shortageClaims,
+      refunds: refunds);
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -4200,7 +4246,7 @@ class WorkspaceSupplierLedger {
       openingRecord: openingRecord, purchaseBills: purchaseBills, goodsReceipts: goodsReceipts,
       billGoodsAllocations: {...billGoodsAllocations, link.operationId: link},
       billMoneyAllocations: billMoneyAllocations, goodsReturns: goodsReturns,
-      creditNotes: creditNotes, shortageClaims: shortageClaims);
+      creditNotes: creditNotes, shortageClaims: shortageClaims, refunds: refunds);
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -4243,7 +4289,7 @@ class WorkspaceSupplierLedger {
       openingRecord: openingRecord, purchaseBills: purchaseBills, goodsReceipts: goodsReceipts,
       billGoodsAllocations: billGoodsAllocations, billMoneyAllocations: billMoneyAllocations,
       goodsReturns: {...goodsReturns, returned.operationId: returned}, creditNotes: creditNotes,
-      shortageClaims: shortageClaims);
+      shortageClaims: shortageClaims, refunds: refunds);
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -4359,7 +4405,7 @@ class WorkspaceSupplierLedger {
       entries: entries, purchaseBills: purchaseBills, goodsReceipts: goodsReceipts,
       billGoodsAllocations: billGoodsAllocations, billMoneyAllocations: billMoneyAllocations,
       goodsReturns: goodsReturns, creditNotes: creditNotes,
-      shortageClaims: {...shortageClaims, operationId: claim});
+      shortageClaims: {...shortageClaims, operationId: claim}, refunds: refunds);
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -4539,6 +4585,7 @@ class WorkspaceSupplierLedger {
       billGoodsAllocations: billGoodsAllocations, billMoneyAllocations: billMoneyAllocations,
       creditNotes: {...creditNotes, note.operationId: note},
       shortageClaims: shortageClaims,
+      refunds: refunds,
       entries: [...entries, WorkspaceSupplierLedgerEntry(operationId: note.operationId,
         reference: note.reference, origin: WorkspaceSupplierEntryOrigin.manualPurchase,
         purchaseId: note.copyId, billId: note.billId, kind: WorkspaceSupplierEntryKind.creditNote,
@@ -4567,54 +4614,180 @@ class WorkspaceSupplierLedger {
   /// Read-only preflight. Posting must atomically consume this exact source
   /// together with the ledger entry; a positive result is not posting authority.
   /// Conservative policy requires both source capacity and net supplier credit.
-  int? reviewedRefundCapacity(WorkspaceSupplierRefundIntent intent) {
+  int? reviewedRefundCapacity(WorkspaceSupplierRefundIntent intent, {DateTime? checkedAt}) {
     final opening = openingRecord;
+    final at = checkedAt ?? intent.requestedAt;
     if (!valid || !intent.valid || !historyComplete || opening == null ||
         intent.accountScope != accountScope || intent.workspaceId != workspaceId ||
         intent.supplierId != supplierId || intent.qa != opening.qa ||
         intent.openingId != opening.id || intent.openingRevision != opening.revision ||
-        intent.requestedAt.isBefore(asOf) ||
+        at.isBefore(asOf) || at.isBefore(intent.requestedAt) ||
         intent.occurredOn.compareTo(opening.asOfDate) < 0) {
       return null;
     }
     final credit = creditMinor;
     if (credit == null) return null;
+    final capacity = _refundSourceCapacity(intent, entries.length, revision + 1);
+    if (capacity == null || capacity < 0) return null;
+    return capacity < credit ? capacity : credit;
+  }
+
+  /// Re-derive capacity from facts preceding this refund, not its own proof or
+  /// later credits. Allocation revisions provide order for non-money entries.
+  int? _refundSourceCapacity(WorkspaceSupplierRefundIntent intent, int entryLimit, int revisionLimit) {
+    final prior = entries.take(entryLimit).toList();
+    final priorRefunds = refunds.values.where((r) => r.committedRevision < revisionLimit);
+    final priorLinks = billMoneyAllocations.values.where((a) => a.committedRevision < revisionLimit);
     int? capacity;
     switch (intent.sourceKind) {
       case WorkspaceSupplierRefundSourceKind.openingAdvance:
-        capacity = unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
-          intent.sourceId);
+        capacity = _moneySourceAmount(WorkspaceSupplierMoneySourceKind.openingAdvance, intent.sourceId);
       case WorkspaceSupplierRefundSourceKind.accountAdvance:
-        final source = entries.where((entry) => entry.operationId == intent.sourceId).toList();
+        final source = prior.where((entry) => entry.operationId == intent.sourceId).toList();
         if (source.length != 1 || source.single.moneyReview == null ||
             intent.occurredOn.compareTo(source.single.moneyReview!.occurredOn) < 0) {
           return null;
         }
-        capacity = unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance,
-          intent.sourceId);
+        capacity = _moneySourceAmount(WorkspaceSupplierMoneySourceKind.accountAdvance, intent.sourceId);
       case WorkspaceSupplierRefundSourceKind.manualBillSurplus:
         final bill = purchaseBills[intent.sourceId];
         if (bill == null || bill.copy.id != intent.copyId ||
-            bill.copy.revision != intent.copyRevision) {
+            bill.copy.revision != intent.copyRevision ||
+            bill.openingTreatment != WorkspaceOpeningBillInclusion.excluded ||
+            !prior.any((e) => e.kind == WorkspaceSupplierEntryKind.bill && e.billId == bill.billId)) {
           return null;
         }
         final refundDay = DateTime.parse('${intent.occurredOn}T00:00:00Z');
         final invoiceDay = bill.copy.draft.invoiceIssuedDay;
+        final fundingLinks = priorLinks.where((a) => a.billId == bill.billId).toList();
+        if (fundingLinks.any((link) => link.sourceKind != WorkspaceSupplierMoneySourceKind.openingAdvance &&
+            !prior.any((entry) => entry.operationId == link.sourceId && entry.moneyReview != null &&
+              intent.occurredOn.compareTo(entry.moneyReview!.occurredOn) >= 0))) {
+          return null;
+        }
         if (invoiceDay == null || refundDay.isBefore(invoiceDay) ||
             creditNotes.values.any((note) => note.billId == bill.billId &&
+              note.committedRevision < revisionLimit &&
               intent.occurredOn.compareTo(note.occurredOn) < 0) ||
-            entries.any((entry) => entry.billId == bill.billId &&
+            prior.any((entry) => entry.billId == bill.billId &&
               entry.kind == WorkspaceSupplierEntryKind.payment &&
               (entry.moneyReview == null ||
                 intent.occurredOn.compareTo(entry.moneyReview!.occurredOn) < 0))) {
           return null;
         }
-        final remaining = manualBillRemainingMinor(bill.billId);
-        if (remaining == null) return null;
+        if (prior.any((e) => e.billId == bill.billId &&
+            e.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(e.operationId))) {
+          return null;
+        }
+        final paid = prior.where((e) => e.billId == bill.billId &&
+          e.kind == WorkspaceSupplierEntryKind.payment && e.origin == WorkspaceSupplierEntryOrigin.manualPurchase)
+          .fold<int>(0, (sum, e) => sum + e.amountMinor);
+        final allocated = priorLinks.where((a) => a.billId == bill.billId)
+          .fold<int>(0, (sum, a) => sum + a.amountMinor);
+        final credited = creditNotes.values.where((n) => n.billId == bill.billId &&
+          n.committedRevision < revisionLimit && prior.any((e) => e.operationId == n.operationId))
+          .fold<int>(0, (sum, n) => sum + n.amountMinor);
+        final returnedMoney = priorRefunds.where((r) =>
+          r.intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus &&
+          r.intent.sourceId == bill.billId).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
+        final remaining = bill.amountMinor! - paid - allocated - credited + returnedMoney;
         capacity = remaining < 0 ? -remaining : 0;
     }
-    if (capacity == null || capacity < 0) return null;
-    return capacity < credit ? capacity : credit;
+    if (capacity == null) return null;
+    if (intent.sourceKind != WorkspaceSupplierRefundSourceKind.manualBillSurplus) {
+      final kind = intent.sourceKind == WorkspaceSupplierRefundSourceKind.openingAdvance
+        ? WorkspaceSupplierMoneySourceKind.openingAdvance : WorkspaceSupplierMoneySourceKind.accountAdvance;
+      capacity -= priorLinks.where((a) => a.sourceKind == kind && a.sourceId == intent.sourceId)
+        .fold<int>(0, (sum, a) => sum + a.amountMinor);
+      capacity -= priorRefunds.where((r) => r.intent.sourceKind == intent.sourceKind &&
+        r.intent.sourceId == intent.sourceId).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
+    }
+    return capacity;
+  }
+
+  bool get _refundsValid {
+    if (refunds.isEmpty) return true; // Retain legacy facts; not new posting authority.
+    final opening = openingRecord;
+    if (opening == null || !historyComplete || refunds.length > 10000 ||
+        refunds.values.map((r) => r.committedRevision).toSet().length != refunds.length ||
+        refunds.values.map((r) => r.intent.reference.toUpperCase()).toSet().length != refunds.length) {
+      return false;
+    }
+    var running = openingBalanceMinor!, found = 0, lastRevision = 0;
+    DateTime? lastAt;
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i], proof = refunds[entries[i].operationId];
+      if (proof != null) {
+        final intent = proof.intent;
+        final capacity = _refundSourceCapacity(intent, i, proof.committedRevision);
+        if (!proof.valid || !intent.valid ||
+            intent.accountScope != accountScope || intent.workspaceId != workspaceId ||
+            intent.supplierId != supplierId || intent.qa != opening.qa ||
+            intent.openingId != opening.id || intent.openingRevision != opening.revision ||
+            intent.occurredOn.compareTo(opening.asOfDate) < 0 ||
+            proof.committedRevision > revision || proof.committedRevision <= lastRevision ||
+            creditNotes.values.any((n) => n.committedRevision == proof.committedRevision) ||
+            shortageClaims.values.any((c) => c.committedRevision == proof.committedRevision) ||
+            goodsReturns.values.any((r) => r.committedRevision == proof.committedRevision) ||
+            billMoneyAllocations.values.any((a) => a.committedRevision == proof.committedRevision) ||
+            proof.recordedAt.isAfter(asOf) || proof.recordedAt.isBefore(opening.savedAt) ||
+            entries.take(i).any((e) => e.postedAt.isAfter(proof.recordedAt)) ||
+            (lastAt != null && proof.recordedAt.isBefore(lastAt)) ||
+            jsonEncode(entry.toJson()) != jsonEncode(proof.entry.toJson()) ||
+            capacity == null || capacity < intent.amountMinor ||
+            running >= 0 || intent.amountMinor > -running ||
+            billMoneyAllocations.containsKey(intent.operationId) ||
+            goodsReturns.containsKey(intent.operationId) || creditNotes.containsKey(intent.operationId) ||
+            shortageClaims.containsKey(intent.operationId)) {
+          return false;
+        }
+        if (intent.sourceKind != WorkspaceSupplierRefundSourceKind.manualBillSurplus) {
+          final kind = intent.sourceKind == WorkspaceSupplierRefundSourceKind.openingAdvance
+            ? WorkspaceSupplierMoneySourceKind.openingAdvance : WorkspaceSupplierMoneySourceKind.accountAdvance;
+          final total = billMoneyAllocations.values.where((a) => a.sourceKind == kind && a.sourceId == intent.sourceId)
+            .fold<int>(0, (sum, a) => sum + a.amountMinor) +
+            refunds.values.where((r) => r.intent.sourceKind == intent.sourceKind && r.intent.sourceId == intent.sourceId)
+              .fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
+          final sourceAmount = _moneySourceAmount(kind, intent.sourceId);
+          if (sourceAmount == null || total > sourceAmount) return false;
+        }
+        lastRevision = proof.committedRevision;
+        lastAt = proof.recordedAt;
+        found++;
+      }
+      running += entry.payableDeltaMinor;
+    }
+    return found == refunds.length && refunds.entries.every((p) => p.key == p.value.intent.operationId);
+  }
+
+  /// Exact proof is checked before fresh capacity, so a lost acknowledgement
+  /// cannot consume funds twice after the ledger or UI eligibility has changed.
+  WorkspaceSupplierLedger? recordReviewedRefund(WorkspaceSupplierRefundIntent intent, {
+    required int expectedRevision, required DateTime recordedAt,
+  }) {
+    if (!valid || !intent.valid || expectedRevision <= 0 || expectedRevision > revision) {
+      return null;
+    }
+    final old = refunds[intent.operationId];
+    if (old != null) {
+      return jsonEncode(old.intent.toJson()) == jsonEncode(intent.toJson()) ? this : null;
+    }
+    if (expectedRevision != revision || recordedAt.isBefore(asOf) ||
+        (reviewedRefundCapacity(intent, checkedAt: recordedAt) ?? -1) < intent.amountMinor ||
+        entries.any((e) => e.operationId == intent.operationId) ||
+        billMoneyAllocations.containsKey(intent.operationId) || goodsReturns.containsKey(intent.operationId) ||
+        shortageClaims.containsKey(intent.operationId)) {
+      return null;
+    }
+    final proof = intent.commit(revision: revision + 1, at: recordedAt);
+    final next = WorkspaceSupplierLedger(accountScope: accountScope, workspaceId: workspaceId,
+      supplierId: supplierId, supplierName: supplierName, revision: revision + 1, asOf: recordedAt,
+      historyComplete: historyComplete, openingBalanceMinor: openingBalanceMinor, openingRecord: openingRecord,
+      purchaseBills: purchaseBills, goodsReceipts: goodsReceipts, billGoodsAllocations: billGoodsAllocations,
+      billMoneyAllocations: billMoneyAllocations, goodsReturns: goodsReturns, creditNotes: creditNotes,
+      shortageClaims: shortageClaims, refunds: {...refunds, intent.operationId: proof},
+      entries: [...entries, proof.entry]);
+    return next.valid && next.canFollow(this) ? next : null;
   }
 
   /// An opening-included invoice has no independently reviewed remaining due.
@@ -4631,7 +4804,7 @@ class WorkspaceSupplierLedger {
     }
     if (entries.any((entry) => entry.billId == billId &&
         ((entry.kind == WorkspaceSupplierEntryKind.creditNote && !creditNotes.containsKey(entry.operationId)) ||
-          entry.kind == WorkspaceSupplierEntryKind.refund ||
+          (entry.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(entry.operationId)) ||
           (entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
             entry.kind == WorkspaceSupplierEntryKind.payment && entry.moneyReview == null)))) {
       return null;
@@ -4644,7 +4817,9 @@ class WorkspaceSupplierLedger {
       .fold<int>(0, (total, link) => total + link.amountMinor);
     final credited = creditNotes.values.where((note) => note.billId == billId)
       .fold<int>(0, (total, note) => total + note.amountMinor);
-    return bill.amountMinor! - paid - allocated - credited;
+    final refunded = refunds.values.where((r) => r.intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus &&
+      r.intent.sourceId == billId).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
+    return bill.amountMinor! - paid - allocated - credited + refunded;
   }
 
   int? _moneySourceAmount(WorkspaceSupplierMoneySourceKind kind, String id) {
@@ -4653,7 +4828,7 @@ class WorkspaceSupplierLedger {
     // Refund attribution is not inferred from net credit. Its separate source
     // consumption adapter must qualify before affected funds can be assigned.
     if (entries.any((e) => e.origin == WorkspaceSupplierEntryOrigin.supplierAccount &&
-        e.kind == WorkspaceSupplierEntryKind.refund)) {
+        e.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(e.operationId))) {
       return null;
     }
     if (kind == WorkspaceSupplierMoneySourceKind.openingAdvance) {
@@ -4673,8 +4848,13 @@ class WorkspaceSupplierLedger {
     if (!valid) return null;
     final amount = _moneySourceAmount(kind, id);
     if (amount == null) return null;
+    final refundKind = kind == WorkspaceSupplierMoneySourceKind.openingAdvance
+      ? WorkspaceSupplierRefundSourceKind.openingAdvance : WorkspaceSupplierRefundSourceKind.accountAdvance;
+    final refunded = kind == WorkspaceSupplierMoneySourceKind.accountPayment ? 0 :
+      refunds.values.where((r) => r.intent.sourceKind == refundKind && r.intent.sourceId == id)
+        .fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
     return amount - billMoneyAllocations.values.where((a) => a.sourceKind == kind && a.sourceId == id)
-      .fold<int>(0, (sum, a) => sum + a.amountMinor);
+      .fold<int>(0, (sum, a) => sum + a.amountMinor) - refunded;
   }
 
   /// Reconciles aggregate dues against known excluded manual-bill residuals.
@@ -4746,7 +4926,7 @@ class WorkspaceSupplierLedger {
       openingRecord: openingRecord, purchaseBills: purchaseBills, goodsReceipts: goodsReceipts,
       billGoodsAllocations: billGoodsAllocations,
       billMoneyAllocations: {...billMoneyAllocations, link.operationId: link}, goodsReturns: goodsReturns,
-      creditNotes: creditNotes, shortageClaims: shortageClaims);
+      creditNotes: creditNotes, shortageClaims: shortageClaims, refunds: refunds);
     return next.valid && next.canFollow(this) ? next : null;
   }
 
@@ -4788,7 +4968,7 @@ class WorkspaceSupplierLedger {
           entry.postedAt.isBefore(bill.acceptedAt) ||
           entries.any((other) => other.billId == entry.billId &&
             ((other.kind == WorkspaceSupplierEntryKind.creditNote && !creditNotes.containsKey(other.operationId)) ||
-              other.kind == WorkspaceSupplierEntryKind.refund ||
+              (other.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(other.operationId)) ||
               (other.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
                 other.kind == WorkspaceSupplierEntryKind.payment && other.moneyReview == null)))) {
         return false;
@@ -4846,6 +5026,10 @@ class WorkspaceSupplierLedger {
     if (entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
         (entry.kind == WorkspaceSupplierEntryKind.creditNote ||
           entry.kind == WorkspaceSupplierEntryKind.refund)) { return null; }
+    if (entry.origin != WorkspaceSupplierEntryOrigin.moolSocialOrder &&
+        entry.kind == WorkspaceSupplierEntryKind.refund) {
+      return null;
+    }
     if (entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
         entry.kind == WorkspaceSupplierEntryKind.payment &&
         (_manualBillRemainingMinor(entry.billId ?? '') ?? -1) < entry.amountMinor) { return null; }
@@ -4867,6 +5051,7 @@ class WorkspaceSupplierLedger {
       goodsReturns: goodsReturns,
       creditNotes: creditNotes,
       shortageClaims: shortageClaims,
+      refunds: refunds,
     );
     return next.valid && next.canFollow(this) ? next : null;
   }
@@ -4900,7 +5085,11 @@ class WorkspaceSupplierLedger {
       }
       if (entry.origin == WorkspaceSupplierEntryOrigin.manualPurchase &&
           ((entry.kind == WorkspaceSupplierEntryKind.creditNote && !creditNotes.containsKey(entry.operationId)) ||
-            entry.kind == WorkspaceSupplierEntryKind.refund)) { return false; }
+            (entry.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(entry.operationId)))) { return false; }
+      if (entry.origin != WorkspaceSupplierEntryOrigin.moolSocialOrder &&
+          entry.kind == WorkspaceSupplierEntryKind.refund && !refunds.containsKey(entry.operationId)) {
+        return false;
+      }
     }
     for (final entry in previous.purchaseBills.entries) {
       if (jsonEncode(purchaseBills[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) {
@@ -4929,6 +5118,27 @@ class WorkspaceSupplierLedger {
     for (final entry in previous.shortageClaims.entries) {
       if (jsonEncode(shortageClaims[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) return false;
     }
+    for (final entry in previous.refunds.entries) {
+      if (jsonEncode(refunds[entry.key]?.toJson()) != jsonEncode(entry.value.toJson())) return false;
+    }
+    final addedRefunds = refunds.values.where((r) => !previous.refunds.containsKey(r.intent.operationId)).toList();
+    if (addedRefunds.isNotEmpty) {
+      if (addedRefunds.length != 1 || revision != previous.revision + 1 ||
+          entries.length != previous.entries.length + 1 ||
+          purchaseBills.length != previous.purchaseBills.length || goodsReceipts.length != previous.goodsReceipts.length ||
+          goodsReturns.length != previous.goodsReturns.length || creditNotes.length != previous.creditNotes.length ||
+          shortageClaims.length != previous.shortageClaims.length ||
+          billGoodsAllocations.length != previous.billGoodsAllocations.length ||
+          billMoneyAllocations.length != previous.billMoneyAllocations.length) {
+        return false;
+      }
+      final proof = addedRefunds.single;
+      if (proof.committedRevision != revision || proof.recordedAt != asOf ||
+          (previous.reviewedRefundCapacity(proof.intent, checkedAt: proof.recordedAt) ?? -1) < proof.intent.amountMinor ||
+          jsonEncode(entries.last.toJson()) != jsonEncode(proof.entry.toJson())) {
+        return false;
+      }
+    }
     final addedClaims = shortageClaims.values.where((c) => !previous.shortageClaims.containsKey(c.operationId)).toList();
     if (addedClaims.isNotEmpty) {
       if (addedClaims.length != 1 || revision != previous.revision + 1 ||
@@ -4936,7 +5146,8 @@ class WorkspaceSupplierLedger {
           goodsReceipts.length != previous.goodsReceipts.length || goodsReturns.length != previous.goodsReturns.length ||
           purchaseBills.length != previous.purchaseBills.length ||
           billGoodsAllocations.length != previous.billGoodsAllocations.length ||
-          billMoneyAllocations.length != previous.billMoneyAllocations.length) { return false; }
+          billMoneyAllocations.length != previous.billMoneyAllocations.length ||
+          refunds.length != previous.refunds.length) { return false; }
       final claim = addedClaims.single;
       if (claim.committedRevision != revision || claim.recordedAt.isBefore(previous.asOf)) return false;
       final derived = previous._deriveShortageClaim(operationId: claim.operationId, billId: claim.billId,
@@ -4956,7 +5167,7 @@ class WorkspaceSupplierLedger {
           purchaseBills.length != previous.purchaseBills.length ||
           billGoodsAllocations.length != previous.billGoodsAllocations.length ||
           billMoneyAllocations.length != previous.billMoneyAllocations.length) { return false; }
-      if (shortageClaims.length != previous.shortageClaims.length) return false;
+      if (shortageClaims.length != previous.shortageClaims.length || refunds.length != previous.refunds.length) return false;
       final note = addedCredits.single;
       if (note.committedRevision != revision || note.recordedAt.isBefore(previous.asOf) ||
           !previous.purchaseBills.containsKey(note.billId) ||
@@ -5000,6 +5211,7 @@ class WorkspaceSupplierLedger {
             goodsReturns.length == previous.goodsReturns.length &&
             creditNotes.length == previous.creditNotes.length &&
             shortageClaims.length == previous.shortageClaims.length &&
+            refunds.length == previous.refunds.length &&
             historyComplete == previous.historyComplete &&
             asOf == previous.asOf &&
             supplierName == previous.supplierName);

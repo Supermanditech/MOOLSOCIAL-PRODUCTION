@@ -4561,6 +4561,105 @@ void main() {
     expect(ledger.entries, hasLength(1));
   });
 
+  test('PURCHASEREFUND native posting consumes advance once and exact retry precedes capacity', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 10000,
+      credit: true, bills: const []))!;
+    final intent = WorkspaceSupplierRefundIntent.fromJson(
+      {...refundIntentFixture(opening).toJson(), 'amountMinor': 4000});
+    final posted = opening.recordReviewedRefund(intent, expectedRevision: opening.revision,
+      recordedAt: opening.asOf)!;
+    expect(posted.balanceMinor, -6000);
+    expect(posted.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+      opening.openingRecord!.id), 6000);
+    expect(posted.entries.single.kind, WorkspaceSupplierEntryKind.refund);
+    expect(posted.entries.single.payableDeltaMinor, 4000);
+    expect(posted.refunds, hasLength(1));
+    expect(posted.goodsReceipts, isEmpty);
+    expect(posted.goodsReturns, isEmpty);
+    expect(posted.recordReviewedRefund(intent, expectedRevision: 1,
+      recordedAt: opening.asOf.add(const Duration(days: 1))), same(posted));
+    final restored = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(posted.toJson())))!;
+    expect(restored.toJson(), posted.toJson());
+    expect(restored.recordReviewedRefund(intent, expectedRevision: 1,
+      recordedAt: opening.asOf), same(restored));
+    final changed = WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(), 'amountMinor': 4001});
+    expect(restored.recordReviewedRefund(changed, expectedRevision: 1,
+      recordedAt: opening.asOf), isNull);
+    final secondIntent = WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(),
+      'operationId': 'second-refund', 'reference': 'REFUND-2', 'amountMinor': 2000});
+    final second = restored.recordReviewedRefund(secondIntent, expectedRevision: restored.revision,
+      recordedAt: restored.asOf)!;
+    expect(second.creditMinor, 4000);
+    expect(second.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+      opening.openingRecord!.id), 4000);
+    expect(second.refunds, hasLength(2));
+    expect(second.recordReviewedRefund(intent, expectedRevision: 1,
+      recordedAt: opening.asOf), same(second));
+    final excess = WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(),
+      'operationId': 'new-refund', 'reference': 'NEW-REFUND', 'amountMinor': 6001});
+    expect(restored.recordReviewedRefund(excess, expectedRevision: restored.revision,
+      recordedAt: restored.asOf), isNull);
+    expect(restored.appendConfirmed(excess.commit(revision: restored.revision + 1,
+      at: restored.asOf).entry, expectedRevision: restored.revision), isNull);
+    expect(WorkspaceSupplierLedger.fromJson({...posted.toJson(),
+      'refunds': {'wrong-key': posted.refunds.values.single.toJson()}}), isNull);
+    expect(WorkspaceSupplierLedger.fromJson({...posted.toJson(), 'refunds': {
+      intent.operationId: {...posted.refunds.values.single.toJson(),
+        'intent': {...intent.toJson(), 'amountMinor': 4001}},
+    }}), isNull);
+    final legacy = WorkspaceSupplierLedger.fromJson({...posted.toJson(), 'refunds': {}})!;
+    expect(legacy.entries.single.toJson(), posted.entries.single.toJson());
+    expect(legacy.reviewedRefundCapacity(refundIntentFixture(legacy)), isNull,
+      reason: 'Legacy unallocated refunds remain readable, not guessed source authority.');
+    expect(legacy.canFollow(posted), isFalse);
+  });
+
+  test('PURCHASEREFUND allocation and refund share capacity in both commit orders', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 100000,
+      credit: true, bills: const []))!;
+    final bill = acceptanceFixture(id: 'refund-race-copy', draftId: 'refund-race-bill',
+      date: '2026-10-02', treatment: WorkspaceOpeningBillInclusion.excluded);
+    final billed = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    final intent = WorkspaceSupplierRefundIntent.fromJson(
+      {...refundIntentFixture(billed).toJson(), 'amountMinor': 50000});
+    for (final refundFirst in [true, false]) {
+      var ledger = billed;
+      if (refundFirst) {
+        ledger = ledger.recordReviewedRefund(intent, expectedRevision: ledger.revision,
+          recordedAt: ledger.asOf)!;
+      }
+      ledger = ledger.allocateRecordedMoney(moneyAllocationFixture(ledger, bill,
+        amount: 50000), expectedRevision: ledger.revision)!;
+      if (!refundFirst) {
+        expect(ledger.recordReviewedRefund(intent, expectedRevision: billed.revision,
+          recordedAt: ledger.asOf), isNull, reason: 'New posting requires a fresh ledger revision.');
+        ledger = ledger.recordReviewedRefund(intent, expectedRevision: ledger.revision,
+          recordedAt: ledger.asOf)!;
+      }
+      expect(ledger.balanceMinor, 0);
+      expect(ledger.manualBillRemainingMinor(bill.billId), 0);
+      expect(ledger.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+        opening.openingRecord!.id), 0);
+      expect(WorkspaceSupplierLedger.fromJson(ledger.toJson())!.valid, isTrue);
+      expect(ledger.recordReviewedRefund(intent, expectedRevision: billed.revision,
+        recordedAt: ledger.asOf), same(ledger));
+    }
+  });
+
+  test('PURCHASEREFUND frozen request survives unrelated ledger progress at fresh commit time', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 10000,
+      credit: true, bills: const []))!;
+    final intent = refundIntentFixture(opening);
+    final updated = opening.receiveGoods(goodsReceiptFixture(), expectedRevision: opening.revision)!;
+    final at = updated.asOf.add(const Duration(hours: 1));
+    final posted = updated.recordReviewedRefund(intent, expectedRevision: updated.revision,
+      recordedAt: at)!;
+    expect(posted.refunds.values.single.intent.requestedAt, intent.requestedAt);
+    expect(posted.goodsReceipts, updated.goodsReceipts);
+    expect(posted.recordReviewedRefund(intent, expectedRevision: opening.revision,
+      recordedAt: opening.asOf), same(posted));
+  });
+
   test('PURCHASEREFUND unpaid accepted bill has no refundable money', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
     final bill = acceptanceFixture(id: 'refund-copy', draftId: 'refund-bill',
@@ -6132,6 +6231,42 @@ void main() {
     final finalNote = credit('CN-02', 1000, 1000);
     final complete = ledger.recordSupplierCredit(finalNote, expectedRevision: ledger.revision)!;
     expect(complete.balanceMinor, -3000);
+    final refundIntent = WorkspaceSupplierRefundIntent.fromJson({
+      ...refundIntentFixture(ledger, kind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
+        source: bill.billId, bill: bill).toJson(), 'amountMinor': 2000,
+    });
+    final refunded = ledger.recordReviewedRefund(refundIntent, expectedRevision: ledger.revision,
+      recordedAt: ledger.asOf)!;
+    expect(refunded.balanceMinor, 0);
+    expect(refunded.manualBillRemainingMinor(bill.billId), 0);
+    expect(refunded.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance, 'advance'), 0);
+    expect(refunded.billMoneyAllocations, ledger.billMoneyAllocations);
+    expect(refunded.entries.where((e) => e.kind == WorkspaceSupplierEntryKind.payment)
+      .map((e) => e.toJson()), ledger.entries.where((e) => e.kind == WorkspaceSupplierEntryKind.payment)
+      .map((e) => e.toJson()));
+    expect(refunded.goodsReceipts[receipt.id]!.toJson(), ledger.goodsReceipts[receipt.id]!.toJson());
+    final refundRestored = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(refunded.toJson())))!;
+    expect(refundRestored.recordReviewedRefund(refundIntent, expectedRevision: ledger.revision,
+      recordedAt: ledger.asOf), same(refundRestored));
+    final changedSource = WorkspaceSupplierRefundIntent.fromJson({...refundIntent.toJson(),
+      'sourceKind': 'accountAdvance', 'sourceId': 'advance', 'copyId': null, 'copyRevision': null});
+    expect(refundRestored.recordReviewedRefund(changedSource, expectedRevision: ledger.revision,
+      recordedAt: ledger.asOf), isNull);
+    final forgedOrder = refunded.entries.toList();
+    final refundEntry = forgedOrder.removeLast();
+    forgedOrder.insert(forgedOrder.indexWhere((e) => e.operationId == note.operationId), refundEntry);
+    expect(WorkspaceSupplierLedger.fromJson({...refunded.toJson(),
+      'entries': forgedOrder.map((e) => e.toJson()).toList()}), isNull,
+      reason: 'A refund cannot use a credit that occurs later in the journal.');
+    expect(WorkspaceSupplierLedger.fromJson({...refunded.toJson(), 'refunds': {
+      refundIntent.operationId: {...refunded.refunds.values.single.toJson(),
+        'committedRevision': note.committedRevision},
+    }}), isNull, reason: 'Credit and refund cannot share a committed revision.');
+    final laterCredit = WorkspaceSupplierCreditNote.fromJson({...finalNote.toJson(),
+      'committedRevision': refunded.revision + 1});
+    final afterCredit = refunded.recordSupplierCredit(laterCredit, expectedRevision: refunded.revision)!;
+    expect(afterCredit.balanceMinor, -1000);
+    expect(afterCredit.refunds.values.single.toJson(), refunded.refunds.values.single.toJson());
     expect(complete.goodsReceipts[receipt.id]!.toJson(), receipt.toJson());
     expect(complete.goodsReturns, isEmpty);
     final restored = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(complete.toJson())))!;
