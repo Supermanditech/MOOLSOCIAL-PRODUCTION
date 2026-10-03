@@ -4702,3 +4702,20 @@ Founder visual approval, live integration and formal closure remain pending. His
 T08 generated-metadata staged-byte correction — 3 October 2026
 
 The original generated contract/report used Python Windows CRLF and were superseded before commit because staged hashes differed. Their authentic raw UTF8 bytes and checksums remain in EVIDENCE.json metadataStagingRepair. Current contract SHA256 d53189ab00ac498329975b31990b918c4f79e7c59e5aab74f236cb15a52c399d; current evidence report SHA256 9e5429c190b9e9ca49930b3fdf469adcd062906f83eccd003f53bdab6ad72410. Four raw closed JSONL receipts and immutable106-member archive remain unchanged. Explicit UTF8LF writing fixes generated metadata only; no Git configuration, source/test or raw-evidence hash checks changed. Fresh staged-byte verification and memory/pre_commit/checkpoint still required; no success pre-claimed.
+
+
+### T09 replacement/refunds — scoped frontend qualification, 3 October 2026
+
+Founder continuation selects T09 under the same open Buy parent/lane after clean remotely matchedc4959047. Buyer, mvp_required. Reuse buy_v2_views.dart, buy_v2_session.dart and existing buy_v2_order_resolution_test.dart; no new screen/service/model/provider/storage. Final source SHA256 9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f.
+
+Matching order detail and reopened ready resolution sheet show Request received, server-supplied message and selectable reference. Eligibility refresh preserves accepted in-memory receipt and clears rejected feedback. Refund/replacement completion is never inferred. Supplier policies stay Product/Add only; no Cart terms.
+
+Analysis three owners exit0; eight focused refund/replacement accepted/rejected cases at1x/2x passed. Required993 distinct cases/1053 references across53files passed. Broader order/support run129 passed, two existing optional founder capture cases skipped; no full-suite qualification claimed. Inherited25 legacy Checkout failures remain open.
+
+Redmi existingr66.36 package fully restarted at final source, unchanged installed checksum verified. Delivered order → replacement/refund with unavailable eligibility → read-only check again → Back detail/Orders tested at1x/2x; font1.0 restored. No financial request/support message/payment/order/build/install. Accepted response screenshots are isolated host fixtures, not live acceptance. Initial debug attach timeout and corrected parse/test-harness/eligibility-refresh failures retained. Raw session-specific attach logs remain ignored and excluded from archive.
+
+Evidence docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json SHA256 4e0d1b4c1e4f5e5795f7587cbef94fa38eeff518b2767f1a9bb44220eacf6cba; contract SHA256 05d0dd50871a4690a7e82abc855c1f75004a9d7ddace6e25c4058dc9845a03e5; archive SHA256 06c37b96918e1203dd6934dd8053770341dab433898dfed7706faa21ac32f0be (196 verified members). Generated JSON uses explicitUTF8LF; immutable raw JSONL Git blobs require exact staged/commit SHA readback. Fresh-checkout conversion child remains open.
+
+Backend/provider deferred; workspace Codex after integration; Google separate. Before live resolution enablement prove account/order/request correlation, identity clearing/late response rejection, duplicate prevention/reconciliation and accepted history retention. Latest in-memory receipt only; restart persistence unqualified. Preserve T08 live balance hold, historic0e90a6ca formal-closure blocker, legacy verification and T10 visual polish children. Founder visual approval pending.
+
+Fresh memory/pre_commit/scoped ordinary commit/push/clean remote readback follows this capture; no success pre-claimed. Stop at safe checkpoint. Next T10 requires founder continuation and fresh scope/admission.

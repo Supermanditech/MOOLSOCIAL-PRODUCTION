@@ -1,0 +1,195 @@
+{
+  "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+  "contract": {
+    "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json",
+    "sha256": "05d0dd50871a4690a7e82abc855c1f75004a9d7ddace6e25c4058dc9845a03e5"
+  },
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip",
+    "sha256": "06c37b96918e1203dd6934dd8053770341dab433898dfed7706faa21ac32f0be",
+    "members": 196,
+    "memberHashesVerified": true
+  },
+  "closedReceipts": {
+    "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+    "evidence": [
+      {
+        "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-FOCUSED.jsonl",
+        "sha256": "f4d4838e5883e12f483bd0166d6a11addcb96baebaa6ca2a8e3d67da8f2beed5",
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-1.jsonl",
+        "sha256": "6fcdd7c988b3d1a9d3c227a7fe77b0ca0a7eddf9fd9de9186ed59ca4dab79771",
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-2.jsonl",
+        "sha256": "8e8b6b56bbfd5a601b1060d8363cdf4689be63efb31e8f9ea4c6585d57b71859",
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-3.jsonl",
+        "sha256": "34b98ba425bc9886cc2886fd9c32e2dc566dbbe7953e0fb32fe43b1c8851d874",
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f"
+      }
+    ],
+    "analysis": {
+      "exitCode": 0,
+      "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t09-qualified-analysis-20261003.log",
+      "sha256": "5f8d6b54f7cf2db6dbbe110b3942eb6156b94c3d12a1dfad8542c6a84996b6f0",
+      "passed": 0,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "focused": {
+      "exitCode": 0,
+      "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t09-qualified-focused-20261003.jsonl",
+      "sha256": "f4d4838e5883e12f483bd0166d6a11addcb96baebaa6ca2a8e3d67da8f2beed5",
+      "passed": 8,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "selected": [
+      {
+        "batch": 1,
+        "exitCode": 0,
+        "passed": 362,
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "6fcdd7c988b3d1a9d3c227a7fe77b0ca0a7eddf9fd9de9186ed59ca4dab79771"
+      },
+      {
+        "batch": 2,
+        "exitCode": 0,
+        "passed": 356,
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "8e8b6b56bbfd5a601b1060d8363cdf4689be63efb31e8f9ea4c6585d57b71859"
+      },
+      {
+        "batch": 3,
+        "exitCode": 0,
+        "passed": 275,
+        "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "34b98ba425bc9886cc2886fd9c32e2dc566dbbe7953e0fb32fe43b1c8851d874"
+      }
+    ],
+    "selectedReferences": 1053
+  },
+  "native": {
+    "labels": [
+      "t09-final-shop",
+      "t09-final-orders",
+      "t09-final-delivered",
+      "t09-final-detail",
+      "t09-final-detail-scrolled-0",
+      "t09-final-sheet",
+      "t09-final-replacement",
+      "t09-final-refund",
+      "t09-final-refund-large",
+      "t09-final-refund-large-scrolled-0",
+      "t09-final-refund-large-scrolled-1",
+      "t09-final-refund-large-scrolled-2",
+      "t09-final-eligibility-retry-large",
+      "t09-final-back-detail-large",
+      "t09-final-detail-return-normal",
+      "t09-final-back-orders"
+    ],
+    "fontRestored": true,
+    "nativeAcceptedReceipt": false,
+    "noSubmission": true,
+    "eligibilityUnavailable": true,
+    "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f"
+  },
+  "nativeIdentity": {
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.36-cursorreview",
+    "versionCode": "2026092701",
+    "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+    "fontScale": "1.0",
+    "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+    "apkUnchanged": true,
+    "noInstallOrSubmission": true
+  },
+  "affected": {
+    "receipt": {
+      "exitCode": 0,
+      "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t09-qualified-affected-20261003.jsonl",
+      "sha256": "ee4dfd262f745e01485f98418c4965f28c4d868c318e0fae6ca5f6753a8de960",
+      "passed": 129,
+      "failures": 2,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "status": "129 passed; 2 optional capture skips; not full-suite qualification"
+  },
+  "integrationChildren": [
+    "Backend/live order resolution adapter deferred; workspace Codex after integration; Google dependencies remain separate.",
+    "Before live enablement prove account/order/request identity correlation, identity clearing and late-response rejection, duplicate prevention/reconciliation and accepted request history retention. Current receipt is latest in-memory response only; no restart persistence claim.",
+    "Native review adapter exposes no confirmed item eligibility and never accepts a request. Host accepted/rejected responses are isolated test fixtures, not live refund or replacement evidence.",
+    "Broader affected run:129 passed, two existing optional founder-capture tests skipped; no full-suite qualification claimed.",
+    "Inherited25 legacy Checkout test failures reproduced at T08 baseline remain open and unchanged.",
+    "T08 live balance enablement, raw-evidence fresh-checkout conversion and historic0e90a6ca formal-closure blockers remain open.",
+    "T10 visual polish and founder visual approval remain pending."
+  ],
+  "refresh": {
+    "initialFailed": true,
+    "successfulRelaunchBeforeFix": true,
+    "finalRestartExit0": true,
+    "rawSessionSpecificLogsExcluded": true
+  },
+  "checkpoint": "Fresh staged-byte readback/memory/pre_commit/scoped commit/push/clean remote equality required; no success pre-claimed",
+  "activationBoundaryAudit": {
+    "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+    "applicationInjectionScan": {
+      "scope": "apps/mobile/lib/**/*.dart",
+      "namedParameter": "orderResolutionAdapter:",
+      "exitCode": 1,
+      "matches": 0
+    },
+    "session": {
+      "path": "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "sha256": "0688599d5f6befff75425ce679da036b6eec477884c965a2f6431b8c6056138c",
+      "resultMapInitiallyEmpty": true,
+      "resultMapReferenceCount": 5,
+      "noResultMapRestoreOrSerialization": true,
+      "adapterFinal": true
+    },
+    "builtInAdapters": {
+      "path": "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+      "sha256": "aa49aa6f0353f3492dd2354537c8a6f48a69f6c29cfb9ca76a3bf7db63271250",
+      "implementations": 2,
+      "bothSubmitAcceptedFalse": true
+    },
+    "conclusion": "Current app source has no injected accepting resolution adapter or accepted-result restoration path. Accepted receipts are isolated host fixtures. Reaudit before integration enables live acceptance; proof does not establish account freshness/idempotency/history or restart persistence."
+  },
+  "finalRefreshProof": {
+    "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+    "unchangedSource": true,
+    "attachExit": 0,
+    "restarted": true,
+    "detached": true,
+    "noBuildInstallOrDataClear": true,
+    "existingPackageRelaunched": true,
+    "rawSessionSpecificLogExcluded": true
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "CURSOR-BUY-T09-REFUNDS-20261003",
+  "actor": "Buyer",
+  "classification": "mvp_required",
+  "parent": "BUY-ACTION-POLISH-20260926-01",
+  "baselineCommit": "c4959047e8eb918c52816ef60c7ba1c489c5bbf8",
+  "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+  "runtimeOwners": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart"
+  ],
+  "testOwner": "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+  "observableOutcome": "Accepted request message and selectable supplied reference are visible on the matching order detail and reopened ready resolution sheet. Eligibility refresh preserves accepted receipt and clears rejected feedback. Request received is distinct from financial settlement or replacement completion.",
+  "reuse": "Existing views/session/order-resolution adapter; no new screen/service/model/provider/storage",
+  "supplierPolicies": "Product/Add only; never Cart",
+  "acceptance": {
+    "focusedCases": 8,
+    "textScales": [
+      1,
+      2
+    ],
+    "selectedDistinct": 993,
+    "selectedReferences": 1053,
+    "native": "Delivered review order → replacement/refund unavailable eligibility → read-only eligibility retry → Back detail/Orders; 200percent text; font restored; unchanged installed r66.36",
+    "liveAcceptance": false
+  },
+  "children": [
+    "Backend/live order resolution adapter deferred; workspace Codex after integration; Google dependencies remain separate.",
+    "Before live enablement prove account/order/request identity correlation, identity clearing and late-response rejection, duplicate prevention/reconciliation and accepted request history retention. Current receipt is latest in-memory response only; no restart persistence claim.",
+    "Native review adapter exposes no confirmed item eligibility and never accepts a request. Host accepted/rejected responses are isolated test fixtures, not live refund or replacement evidence.",
+    "Broader affected run:129 passed, two existing optional founder-capture tests skipped; no full-suite qualification claimed.",
+    "Inherited25 legacy Checkout test failures reproduced at T08 baseline remain open and unchanged.",
+    "T08 live balance enablement, raw-evidence fresh-checkout conversion and historic0e90a6ca formal-closure blockers remain open.",
+    "T10 visual polish and founder visual approval remain pending."
+  ],
+  "next": "Stop at scoped safe Git checkpoint. T10 visual polish only after founder continuation and fresh admission.",
+  "formalClosure": false
+}

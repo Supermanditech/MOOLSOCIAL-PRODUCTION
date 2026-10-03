@@ -109585,6 +109585,221 @@
           "history": "EVIDENCE.json metadataStagingRepair embeds exact original contract/report rawUTF8 strings and SHA256, roundtrip bytehash verified. Corrective handoff appended with oldprefix preserved.",
           "currentBindings": "T08 ledger contract/evidence SHA refreshed; no globalGit/config/.gitattributes change. Restage same15owners; verify4rawlogs+contract+report+archive byte hashes.",
           "sourceUnchanged": "d1621fe1c19f578cb2eb4e9e03a511ec5db75ec6c6bc9c1b58b12c8dd13a9caf"
+        },
+        "t09ReplacementRefundScope20261003": {
+          "actor": "Buyer",
+          "capability": "Inspect purchased-item replacement/refund eligibility and request recovery without claiming financial settlement",
+          "observableOutcome": "Existing order detail opens accessible item-scoped resolution sheet with authoritative unavailable/eligibility/submission states",
+          "classification": "mvp_required",
+          "reason": "Required commerce order support and refund/replacement journey",
+          "reuseOwners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart"
+          ],
+          "smallestScope": "T09 frontend subjourney within existing open Buy parent. Inspect device, register observed defects, repair only demonstrated frontend root causes and existing focused tests",
+          "exclusions": [
+            "Backend/provider integration deferred",
+            "Workspace Codex after integration",
+            "Google separate",
+            "No new APK or install",
+            "No real support message/payment/order/refund",
+            "Supplier policies Product/Add only; no Cart terms",
+            "No formal ticket closure"
+          ],
+          "authority": "Existing order service adapter and purchased-item eligibility; review fixtures isolated, no simulated acceptance/settlement",
+          "recovery": "Preserve request state, no unsupported success or duplicate submission; backend revalidation required",
+          "acceptance": [
+            "Fresh machine admission",
+            "Existing Redmi runtime refresh and actual screenshots",
+            "Proportionate focused tests plus required selected regression evidence",
+            "Durable scoped checkpoint and remote readback; stop"
+          ],
+          "baseline": "c4959047e8eb918c52816ef60c7ba1c489c5bbf8",
+          "dependencies": "Scope then admission then device inspection then registered defect then fix then frozen verification; live integration separate"
+        },
+        "t09InitialRefreshFailure20261003": {
+          "status": "failed_unqualified",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t09-before-refresh-20261003.log",
+          "attachExit": 1,
+          "restarted": false,
+          "detached": false,
+          "observed": "ADB device available; attach waited for debug connection and timed out",
+          "preservation": "No source edits/build/install/data clear; initial screen retained as pre-refresh evidence",
+          "next": "Fresh coordinator then relaunch existing review package without clearing data and retry one fresh-label attach",
+          "helperReadFailure": "Initial bounded source read exceeded179lines and was rejected; corrected bounded read completed without mutation"
+        },
+        "t09RequestReceiptDefect20261003": {
+          "status": "registered_before_fix",
+          "evidence": "Static exact call paths: session validates accepted reference at12361-12368; submit closes sheet16981-16982; views only reads result in sheet16995 and shows message17256, never reference",
+          "defect": "Accepted request reference disappears from buyer journey after sheet closes; no order-detail receipt",
+          "scope": "Reuse order detail and sheet; read-only order-scoped received-request receipt and selectable supplied reference",
+          "tests": "Isolated refund/replacement at1x2x accepted receipt on detail/reopen, rejected/no response never fabricates accepted receipt; existing eligibility coverage preserved",
+          "integrationChild": "Before live adapter enablement prove account/order/request correlation, late response rejection, duplicate prevention/reconciliation, prior accepted history retention and restart persistence; frontend read-only receipt uses current existing in-memory result only",
+          "architectReview": "Facts-only existing architect supports bounded view fix; no independent diff audit or live acceptance claimed"
+        },
+        "t09FirstParseFailure20261003": {
+          "status": "failed_unqualified",
+          "observed": "Formatter rejected new receipt widget because closing class brace omitted; downstream parser cascade. Focused runner started and must close before source correction",
+          "rootCause": "Missing closing brace in newly added view widget",
+          "next": "After closed failed run add missing class brace then formatter and fresh focused verification",
+          "sourceAndRawFailuresRetained": true
+        },
+        "t09WidgetRevealFailure20261003": {
+          "status": "failed_unqualified",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t09-second-focused-20261003.jsonl",
+          "source": "14688f4fe29ff3f22189e7063744ea96548e882b9a17a1fec4748680d4c5363f",
+          "observed": "All8 new cases failed before manage-sheet interaction: ensureVisible asked for lazy ListView child before mounted",
+          "rootCause": "Test harness reveal needs existing scrollUntilVisible pattern, not a runtime acceptance issue",
+          "next": "Use existing tracking scroll reveal and add unique dedicated optional host-capture directory; no assertion weakening",
+          "readHelper": "Another oversized EOF read was rejected without mutations; replaced with bounded Tail35"
+        },
+        "t09EligibilityRefreshReceiptLoss20261003": {
+          "status": "registered_before_fix",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t09-third-focused-20261003.jsonl",
+          "passed": 4,
+          "failedCases": 4,
+          "observed": "Accepted refund/replacement receipts render on detail and survive detail return, but reopening sheet refreshes eligibility and unconditionally deletes accepted request result",
+          "rootCause": "Existing session.refreshOrderResolution removes result before loading policy; accepted receipt is evidence of submission, not eligibility",
+          "smallestAdditionalOwner": "apps/mobile/lib/features/buy/buy_v2_session.dart (existing assessment/root claim; verify before edit)",
+          "fix": "Eligibility refresh retains accepted in-memory receipt; clears prior rejected feedback. No new model/storage/provider or terminal financial state",
+          "test": "Same8cases retain assertions; ensure reopened sheet exposes same supplied reference with no new submit",
+          "remainingChild": "Multiple requests/accepted-history storage/account freshness/duplicate reconciliation deferred before live integration"
+        },
+        "t09AffectedVerificationBoundary20261003": {
+          "status": "not_full_suite_qualification",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t09-qualified-affected-20261003.jsonl",
+          "source": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+          "flutterExit": 0,
+          "passed": 129,
+          "skipped": 2,
+          "terminalSuccess": true,
+          "skippedNames": [
+            "R58.8.4 responsive founder captures",
+            "R58.8.2 Assist responsive founder captures"
+          ],
+          "decision": "Preserve existing optional capture opt-ins and original receipts. No skipped case is called passed. Required selected gate will prove its exact case set separately.",
+          "inheritedChildren": "25 legacy Checkout failures and T08 live balance/evidence portability/formal closure holds remain unchanged",
+          "verificationHelperFailures": "Two PowerShell/Python quote-boundary SyntaxErrors before helper edits; corrected using literal apply_patch Python helper; no evidence or source loss"
+        },
+        "t09SelectedAndActivationProof20261003": {
+          "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+          "selected": {
+            "closedExit": 0,
+            "distinct": 993,
+            "references": 1053,
+            "files": 53,
+            "batches": [
+              362,
+              356,
+              275
+            ],
+            "failures": 0,
+            "warnings": 0,
+            "sourceUnchanged": true,
+            "folder": "apps/mobile/build/t06-t07-cart-20261002/t09-qualified-selected-20261003"
+          },
+          "activationBoundary": {
+            "proof": "apps/mobile/build/t06-t07-cart-20261002/t09-activation-boundary.json",
+            "applicationInjectedAdapters": 0,
+            "builtInAdapters": 2,
+            "bothSubmitAcceptedFalse": true,
+            "resultMapEmptyAndNoRestore": true,
+            "qualification": "Current source only; accepting integration requires identity/order/request validation, late-response rejection, duplicate reconciliation and persistent history evidence"
+          },
+          "next": "Fresh post-tests device admission; final existing review package restart and native unavailable eligibility/Retry/Back atnormal200percent, original font restored; nofinancialsubmission"
+        },
+        "t09ActualEvidenceAdmission20261003": {
+          "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+          "native": {
+            "finalRefreshClosedExit": 0,
+            "journeyClosedExit": 0,
+            "captures": 16,
+            "normalAnd200percent": true,
+            "replacementRefundUnavailableEligibility": true,
+            "readOnlyRetry": true,
+            "backDetailOrders": true,
+            "fontRestored": "1.0",
+            "installedApkSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+            "noInstallOrSubmission": true,
+            "liveAcceptedReceipt": false
+          },
+          "host": {
+            "focused": 8,
+            "generatedScreenshots": 12,
+            "representativeScreensInspected": true
+          },
+          "actualEvidenceOwners": [
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-FOCUSED.jsonl",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-3.jsonl",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json",
+            "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip"
+          ],
+          "admission": "Atomic exact-owner admission and actual closed-proof generation, then unchanged coordinator implementation. No placeholder file/wildcard/gate weakening.",
+          "checkpoint": "Only actual16 owners; 7 authentic staged/committed Git-blob SHA checks, fresh memory/pre_commit before ordinary commit/push; no formal closure or preclaimed remote success"
+        },
+        "t09FinalFrontendVerification20261003": {
+          "status": "frontend_verified_founder_visual_and_live_integration_pending",
+          "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+          "evidence": {
+            "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json",
+            "sha256": "4e0d1b4c1e4f5e5795f7587cbef94fa38eeff518b2767f1a9bb44220eacf6cba"
+          },
+          "contract": {
+            "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json",
+            "sha256": "05d0dd50871a4690a7e82abc855c1f75004a9d7ddace6e25c4058dc9845a03e5"
+          },
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip",
+            "sha256": "06c37b96918e1203dd6934dd8053770341dab433898dfed7706faa21ac32f0be",
+            "members": 196,
+            "memberHashesVerified": true
+          },
+          "analysis": {
+            "owners": 3,
+            "closedExit": 0
+          },
+          "focused": {
+            "passed": 8,
+            "scales": [
+              1,
+              2
+            ],
+            "generatedCaptures": 12,
+            "representativeScreensInspected": true
+          },
+          "selected": {
+            "distinct": 993,
+            "references": 1053,
+            "files": 53,
+            "closedExit": 0,
+            "failures": 0,
+            "warnings": 0,
+            "sourceUnchanged": true
+          },
+          "affected": {
+            "passed": 129,
+            "skipped": 2,
+            "fullSuiteQualification": false
+          },
+          "native": {
+            "closedExit": 0,
+            "captures": 16,
+            "normalAnd200percent": true,
+            "unavailableEligibility": true,
+            "readOnlyRetry": true,
+            "backNavigation": true,
+            "fontRestored": true,
+            "apkChecksumUnchanged": true,
+            "noBuildInstallOrFinancialSubmission": true
+          },
+          "activation": "Current app has no accepting resolution adapter injection or result-map restore path; before live enablement identity/order/request correlation, late-callback rejection, duplicate reconciliation, accepted history and restart persistence remain required",
+          "preservation": "Both handoffs appended with verified original raw byte prefixes. Original failed attempts/skips included; session-specific refresh logs excluded.",
+          "children": "Backend deferred; workspace Codex after integration; Google separate. Existing25 legacy failures, live balance hold, fresh-checkout evidence conversion, formalclose0e90 and T10 polish unchanged.",
+          "checkpoint": "Fresh exact16-owner staging and7 raw Git-blob SHA proof plus memory/pre_commit then ordinary commit/push/clean remote readback. Not preclaimed; stop afterward."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

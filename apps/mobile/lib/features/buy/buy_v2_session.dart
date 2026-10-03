@@ -12233,7 +12233,10 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     _orderResolutionBusyIds.add(orderId);
-    _orderResolutionResults.remove(orderId);
+    // Eligibility refresh does not revoke a confirmed request receipt.
+    if (_orderResolutionResults[orderId]?.accepted != true) {
+      _orderResolutionResults.remove(orderId);
+    }
     _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
       orderId: orderId,
       state: BuyV2OrderResolutionState.loading,

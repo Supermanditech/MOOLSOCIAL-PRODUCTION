@@ -16823,6 +16823,11 @@ class BuyV2TrackingView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
+        if (session.orderResolutionResultFor(order.id) case final result?
+            when result.accepted) ...[
+          _OrderResolutionReceipt(orderId: order.id, result: result),
+          const SizedBox(height: 6),
+        ],
         Wrap(
           key: ValueKey('buy-tracking-secondary-actions-${order.id}'),
           spacing: 8,
@@ -17252,16 +17257,22 @@ class _BuyV2OrderResolutionSheetState
                   ],
                   if (result != null) ...[
                     const SizedBox(height: 8),
-                    Text(
-                      result.customerMessage,
-                      key: const ValueKey('buy-order-resolution-result'),
-                      style: context.buyMeta.copyWith(
-                        color: result.accepted
-                            ? BuyV2Colors.green
-                            : BuyV2Colors.orange,
-                        fontWeight: FontWeight.w800,
+                    if (result.accepted)
+                      _OrderResolutionReceipt(
+                        orderId: widget.order.id,
+                        result: result,
+                      )
+                    else
+                      Text(
+                        result.customerMessage,
+                        key: const ValueKey('buy-order-resolution-result'),
+                        style: context.buyMeta.copyWith(
+                          color: result.accepted
+                              ? BuyV2Colors.green
+                              : BuyV2Colors.orange,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
                   ],
                   const SizedBox(height: 8),
                   TextButton.icon(
@@ -17278,6 +17289,39 @@ class _BuyV2OrderResolutionSheetState
       },
     );
   }
+}
+
+class _OrderResolutionReceipt extends StatelessWidget {
+  const _OrderResolutionReceipt({required this.orderId, required this.result});
+
+  final String orderId;
+  final BuyV2OrderResolutionResult result;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: ValueKey('buy-order-resolution-receipt-$orderId'),
+    padding: const EdgeInsets.all(12),
+    decoration: buyV2CardDecoration(color: BuyV2Colors.softBlue, radius: 13),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Request received', style: context.buyBody),
+        const SizedBox(height: 4),
+        Text(result.customerMessage, style: context.buyMeta),
+        const SizedBox(height: 4),
+        SelectableText(
+          'Reference: ${result.reference!.trim()}',
+          key: const ValueKey('buy-order-resolution-reference'),
+          style: context.buyBody,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'The request outcome will be confirmed separately.',
+          style: context.buyMeta,
+        ),
+      ],
+    ),
+  );
 }
 
 class _OrderResolutionItemTile extends StatelessWidget {

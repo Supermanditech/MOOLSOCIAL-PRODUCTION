@@ -25,6 +25,7 @@ void main() {
   _collectionWidgetCases();
   _collectionCameraCases();
   _collectionOrdersReadabilityCases();
+  _t09RequestReceiptCases();
   for (var state = 0; state < 3; state++) {
     final stateName = [
       'normal Android',
@@ -523,8 +524,165 @@ void main() {
   );
 }
 
+void _t09RequestReceiptCases() {
+  for (final kind in [
+    BuyV2OrderResolutionKind.refund,
+    BuyV2OrderResolutionKind.replacement,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final accepted in [true, false]) {
+        testWidgets(
+          'T09 ${kind.name} request receipt accepted $accepted text $scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(320, 800);
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final adapter = _AcceptedResolutionAdapter()
+              ..kind = kind
+              ..accepted = accepted
+              ..reference = 'RR-1001-LONG-REFERENCE-1234567890-ABCDEFGHIJ'
+              ..itemEligibility = [_eligible(kind: kind)];
+            final session = await _sessionWithOrder(adapter);
+            expect(session.openTracking('order-policy'), isTrue);
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => RepaintBoundary(
+                  key: const ValueKey('r66-order-policy-capture'),
+                  child: child!,
+                ),
+                home: BuyV2Screen(
+                  session: session,
+                  initialDestination: BuyV2Destination.orders,
+                  initialView: BuyV2View.tracking,
+                  orderId: 'order-policy',
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final receipt = find.byKey(
+              const ValueKey('buy-order-resolution-receipt-order-policy'),
+            );
+            expect(receipt, findsNothing);
+            final manage = find.byKey(
+              const ValueKey('buy-tracking-manage-order-order-policy'),
+            );
+            await _t09Reveal(tester, manage);
+            await tester.pumpAndSettle();
+            await tester.tap(manage);
+            await tester.pumpAndSettle();
+            await _tapSheet(tester, 'buy-order-resolution-${kind.name}');
+            await _tapSheet(tester, 'buy-order-resolution-item-s-tomato');
+            await _tapSheet(tester, 'buy-order-resolution-reason-${kind.name}');
+            await tester.tap(find.text('Damaged item').last);
+            await tester.pumpAndSettle();
+            await _tapSheet(tester, 'buy-order-resolution-submit');
+            expect(adapter.submitCalls, 1);
+            expect(adapter.requests.single.kind, kind);
+            expect(adapter.requests.single.itemQuantities, {'s-tomato': 1});
+            final sheet = find.byKey(
+              const ValueKey('buy-order-resolution-sheet'),
+            );
+            if (accepted) {
+              expect(sheet, findsNothing);
+              expect(receipt, findsOneWidget);
+              await _t09Reveal(tester, receipt);
+              await tester.pumpAndSettle();
+              final reference = find.byKey(
+                const ValueKey('buy-order-resolution-reference'),
+              );
+              expect(
+                tester.widget<SelectableText>(reference).data,
+                'Reference: ${adapter.reference}',
+              );
+              expect(
+                find.text('The request outcome will be confirmed separately.'),
+                findsOneWidget,
+              );
+              await _t09Capture(tester, 't09-${kind.name}-$scale-detail');
+              // Reopening the same detail retains the existing in-memory receipt.
+              session.returnToOrders();
+              await tester.pumpAndSettle();
+              expect(session.openTracking('order-policy'), isTrue);
+              await tester.pumpAndSettle();
+              expect(receipt, findsOneWidget);
+              await _t09Reveal(tester, manage);
+              await tester.pumpAndSettle();
+              await tester.tap(manage);
+              await tester.pumpAndSettle();
+              expect(
+                find.descendant(of: sheet, matching: receipt),
+                findsOneWidget,
+              );
+              await tester.ensureVisible(
+                find.descendant(of: sheet, matching: receipt),
+              );
+              await tester.pumpAndSettle();
+              await _t09Capture(tester, 't09-${kind.name}-$scale-reopened');
+              expect(adapter.submitCalls, 1);
+            } else {
+              expect(sheet, findsOneWidget);
+              expect(receipt, findsNothing);
+              expect(
+                find.byKey(const ValueKey('buy-order-resolution-reference')),
+                findsNothing,
+              );
+              expect(
+                find.text('This request could not be sent.'),
+                findsOneWidget,
+              );
+              await _t09Capture(tester, 't09-${kind.name}-$scale-rejected');
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+}
+
+Future<void> _t09Reveal(WidgetTester tester, Finder target) async {
+  final scroll = find
+      .descendant(
+        of: find.byKey(const PageStorageKey('buy-tracking-order-policy')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  await tester.scrollUntilVisible(target, 220, scrollable: scroll);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _t09Capture(WidgetTester tester, String label) async {
+  if (!const bool.fromEnvironment('BUY_T09_CAPTURE')) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-order-policy-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory(
+      const String.fromEnvironment('BUY_T09_DIRECTORY'),
+    );
+    await directory.create(recursive: true);
+    final output = File('${directory.path}/$label.png');
+    if (await output.exists()) throw StateError('T09 capture already exists');
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('T09 capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
 final class _AcceptedResolutionAdapter implements BuyV2OrderResolutionAdapter {
   int submitCalls = 0;
+  bool accepted = true;
   BuyV2OrderResolutionKind kind = BuyV2OrderResolutionKind.refund;
   List<BuyV2OrderResolutionItemEligibility> itemEligibility = [];
   String? orderIdOverride;
@@ -542,8 +700,12 @@ final class _AcceptedResolutionAdapter implements BuyV2OrderResolutionAdapter {
         options: [
           BuyV2OrderResolutionOption(
             kind: kind,
-            title: 'Request refund',
-            detail: 'Request a refund review.',
+            title: kind == BuyV2OrderResolutionKind.replacement
+                ? 'Request replacement'
+                : 'Request refund',
+            detail: kind == BuyV2OrderResolutionKind.replacement
+                ? 'Request a replacement review.'
+                : 'Request a refund review.',
             reasons: ['Damaged item'],
           ),
         ],
@@ -556,8 +718,10 @@ final class _AcceptedResolutionAdapter implements BuyV2OrderResolutionAdapter {
     submitCalls += 1;
     requests.add(request);
     return BuyV2OrderResolutionResult(
-      accepted: true,
-      customerMessage: 'Your refund request was submitted.',
+      accepted: accepted,
+      customerMessage: accepted
+          ? 'Your ${kind.name} request was submitted.'
+          : 'This request could not be sent.',
       reference: reference,
     );
   }
