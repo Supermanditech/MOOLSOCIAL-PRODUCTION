@@ -15441,7 +15441,7 @@ Future<void> _showSupplierStatement(BuildContext context, WorkSession session,
         : DateTime.parse(ledger.openingRecord!.asOfDate),
       until: DateTime(now.year, now.month, now.day + 1), generatedAt: now, reviewOnly: scope.$3);
     if (!context.mounted) return;
-    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true,
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, useSafeArea: true, showDragHandle: false,
       builder: (_) => FractionallySizedBox(heightFactor: .95, child: StoreSupplierStatementPanel(
         statement: statement, changes: session,
         isCurrent: () => session.workspaceSupplierScope == scope &&

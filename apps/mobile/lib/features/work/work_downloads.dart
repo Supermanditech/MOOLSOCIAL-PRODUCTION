@@ -598,7 +598,8 @@ class StoreSupplierStatement {
       ['Records available at', generatedAt.toIso8601String()], ['Ledger revision', ledger.revision],
       ['Statement reference', reference], ['Coverage', balancesReady ? 'Confirmed starting balance and recorded entries'
         : 'Incomplete history or dates before verified coverage; balances unavailable'],
-      ['Store identity', ledger.workspaceId], ['Supplier identity', ledger.supplierId],
+      ['Store identity', ledger.workspaceId], ['Supplier identity', ledger.supplierId]],
+    machineMetadata: [
       for (final entry in entries) ['Entry identity · ${entry.reference}',
         '${entry.operationId}${entry.billId == null ? '' : ' · bill ${entry.billId}'}'],
       for (final bill in ledger.purchaseBills.values) ['Bill identity · ${bill.copy.draft.invoiceReference}',

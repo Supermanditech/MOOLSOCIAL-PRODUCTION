@@ -175,6 +175,11 @@ void main() {
     expect(document.summary, isEmpty, reason: 'No summary-only cover page.');
     expect(csv, contains('HOST-supplier')); expect(csv, contains('review-store'));
     expect(csv, contains('HOST-refund'));
+    expect(document.metadata.where((row) => row.first.toString().startsWith('Entry identity')), isEmpty,
+      reason: 'PDF headers must not repeat internal entry identities.');
+    expect(document.machineMetadata.single.last, contains('HOST-refund'));
+    expect(() => document.machineMetadata.add(['Changed', 'identity']), throwsUnsupportedError);
+    expect(() => document.machineMetadata.single[1] = 'Changed', throwsUnsupportedError);
     expect(StoreSupplierStatement.previousDay(DateTime(2026, 3, 1)), DateTime(2026, 2, 28));
     final pdf = await document.generate(StoreStockExportFormat.pdf);
     expect(ascii.decode(pdf.take(5).toList()), '%PDF-');

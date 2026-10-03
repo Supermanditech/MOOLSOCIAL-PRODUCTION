@@ -1560,6 +1560,7 @@ class StoreTabularReport {
     required this.title,
     required this.disclosure,
     required List<List<Object?>> metadata,
+    List<List<Object?>> machineMetadata = const [],
     required List<String> headers,
     required List<List<Object?>> rows,
     required Set<int> moneyColumns,
@@ -1570,6 +1571,9 @@ class StoreTabularReport {
     List<StoreReportPdfGroup> pdfGroups = const [],
   }) : metadata = List.unmodifiable(
          metadata.map((r) => List<Object?>.unmodifiable(r)),
+       ),
+       machineMetadata = List.unmodifiable(
+         machineMetadata.map((r) => List<Object?>.unmodifiable(r)),
        ),
        headers = List.unmodifiable(headers),
        rows = List.unmodifiable(rows.map((r) => List<Object?>.unmodifiable(r))),
@@ -1607,7 +1611,7 @@ class StoreTabularReport {
     }
   }
   final String title, disclosure;
-  final List<List<Object?>> metadata, rows;
+  final List<List<Object?>> metadata, machineMetadata, rows;
   final List<String> headers;
   final Set<int> moneyColumns;
   final Set<int> rightAlignedColumns;
@@ -1642,6 +1646,7 @@ Future<Uint8List> _generateStoreTable(
   final (report, format, fontData) = input;
   final metadata = [
         ...report.metadata,
+        if (format != StoreStockExportFormat.pdf) ...report.machineMetadata,
         if (format != StoreStockExportFormat.pdf) ...report.summary,
       ],
       rows = report.rows;
