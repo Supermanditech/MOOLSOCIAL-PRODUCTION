@@ -3817,3 +3817,38 @@ navigation must consult receiving's dirty/uncertain-save leave guard; and later
 partial arrivals must allow only the arriving subset of inherited lines while
 preserving stable history. Current UI tests do not qualify these paths. Do not
 call receiving ready or record a device receipt before resolving them.
+
+### Receiving correctness continuation
+
+Root Back/local navigation, workspace mutations and external Work navigation now
+consult the receiving leave decision before discarding input or changing scope.
+Busy and uncertain saves refuse leaving; the parent owns Android Back and
+concurrent leave requests share one decision. The existing WorkPageScaffold gains
+an optional guard only; no new navigation owner or route.
+
+Inherited items can be marked not received this time. Fully delivered expected
+items default out; later arrival editors gather every prior group line, not only
+the last subset. Host tests use persisted Stock and receipt APIs: A+B followed by
+B-only retains the original A identity/history in the next editor. No zero or
+fabricated positive quantities are used. Automated fixtures are not OPPO data.
+
+Retained test setup/compile failures are recorded in REG4635. Latest v11 wider
+widget run: 39 passed, zero failed, terminal0/native done.success=true, including
+single system-Back decision, dirty/uncertain-save Stock/workspace/external route
+protection, partial subset commit and restoring omitted A in the next editor.
+Reporter SHA256 A0776E7171BDDE610B12D4E01588D71B2E3023E3B58FE1D73332C2C43E14C50F.
+Three changed app/test owners have clean final analysis. Narrow architect review
+found no further blocker in these guards/subset corrections; not whole-goal proof.
+
+OPPO actual navigation: own unsaved reference, keyboard Back then system Back
+opens one Leave dialog; Keep editing retains reference. Stock-current action
+asks before Discard and returns to oil3/rice97 unchanged. The oversized dialog
+was corrected; latest Dart restart and screenshot verify compact14/12 text and
+padding. Discard only this own unsaved inspection returns to Purchases with
+billr9/2840 unchanged. Evidence correctness-oppo-back-dialog/kept/stock-return-v2
+and compact-dialog/register-final-v2 PNG/XML retained in task outputs/evidence.
+No goods/payment/Stock record was saved; both debug attaches detached cleanly.
+
+Physical partial delivery posting/restart/failure/accessibility, product search,
+date/conversion guidance, bill-context receiving, payment/advance allocations,
+supplier returns/refunds and statements remain open. Full goal remains active.

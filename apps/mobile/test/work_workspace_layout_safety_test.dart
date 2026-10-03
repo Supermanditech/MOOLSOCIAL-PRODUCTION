@@ -2038,6 +2038,7 @@ void main() {
     WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryStore,
     WorkPurchaseEntryStore? purchaseEntryStore,
     WorkPurchaseInvoiceCapture? purchaseInvoiceCapture,
+    WorkInventoryStore? inventoryStore,
   ]) {
     final work =
         WorkSession(
@@ -2045,6 +2046,7 @@ void main() {
             contactDraftStore: contactStore,
             purchaseEntryStore: purchaseEntryStore,
             purchaseInvoiceCapture: purchaseInvoiceCapture,
+            inventoryStore: inventoryStore,
             pendingProofStore: pendingProofStore,
             counterDraftStore: _CounterDraftFixtureStore(),
             ledgerFormDraftStore: _LedgerFormFixtureStore(),
@@ -4494,8 +4496,11 @@ void main() {
     await tester.pumpAndSettle();
   }
   WorkSession postingOpeningFixture(_OpeningPostingFixtureStore entry,
-      _LedgerCheckpointFixtureStore checkpoint) {
-    final work = manualPurchaseFixture(entry);
+      _LedgerCheckpointFixtureStore checkpoint, {bool inventory = false}) {
+    final account = _ContactDraftFixtureStore();
+    final work = inventory ? storeViewFixture(null, account, null, null, null, null, null, null, null, entry, null,
+      SecureWorkInventoryStore(accountScope: () => account.accountScope, storage: const FlutterSecureStorage()))
+      : manualPurchaseFixture(entry);
     final scope = work.workspaceSupplierScope!;
     final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1,
       workspaceId: scope.$2, revision: 1, asOf: DateTime.now(),
@@ -4604,6 +4609,170 @@ void main() {
     expect(find.byKey(const Key('work-receive-product-1')), findsNothing);
     expect(entry.value!.goodsReceiptDrafts, isEmpty);
     expect(checkpoint.saveAttempts, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final (mode, destination) in [('dirty', 'stock'), ('unknown-save', 'stock'), ('dirty', 'workspace'), ('unknown-save', 'workspace'), ('dirty', 'external'), ('unknown-save', 'external')]) {
+    testWidgets('PURCHASERECEIVEUI outer navigation protects $mode $destination', (tester) async {
+      // Host fixture only: neither injected runtime data nor device acceptance.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      work.otherWorkspaces.add(const WorkWorkspace(id: 'receiving-other-store', name: 'HOST other Store',
+        profileLabel: 'Speciality Retail Shop', profileId: 'retailer-speciality', area: 'Jaipur', verified: true));
+      final supplier = WorkspaceSupplierProfile(id: 'outer-receiving', name: 'Evaluation receiving supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      Future<void> reveal(String key, {double delta = 120}) async {
+        final field = find.byKey(Key(key));
+        await tester.scrollUntilVisible(field, delta, scrollable: scroll); await tester.pumpAndSettle();
+        await Scrollable.ensureVisible(tester.element(field), alignment: .5); await tester.pumpAndSettle();
+        expect(field.hitTestable(), findsOneWidget);
+      }
+      await reveal('work-receive-supplier'); await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      await reveal('work-receive-reference'); await tester.enterText(find.byKey(const Key('work-receive-reference')), 'HOST delivery');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      if (mode == 'unknown-save') {
+        final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+        await reveal('work-receive-product-0'); await tester.tap(find.byKey(const Key('work-receive-product-0'))); await tester.pumpAndSettle();
+        await tester.tap(find.text('${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
+        await reveal('work-receive-delivered-0'); await tester.enterText(find.byKey(const Key('work-receive-delivered-0')), '2');
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        entry.failSave = true;
+        await reveal('work-receive-review'); await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-receive-retry-review')), findsOneWidget);
+      }
+      await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+      if (mode == 'dirty') {
+        expect(find.text('Leave receiving?'), findsOneWidget, reason: 'System Back has exactly one leave-decision owner.');
+        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+      }
+      expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-operation-back'))); await tester.pumpAndSettle();
+      if (mode == 'dirty') {
+        expect(find.text('Leave receiving?'), findsOneWidget);
+        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+      } else {
+        expect(find.text('Leave receiving?'), findsNothing);
+        await reveal('work-receive-error');
+        expect(find.textContaining('Review save is unverified.'), findsOneWidget);
+      }
+      expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+      if (destination == 'workspace') {
+        await tester.tap(find.byKey(const Key('work-dashboard-workspace-switcher'))); await tester.pumpAndSettle();
+        final target = find.byKey(const ValueKey('work-switch-receiving-other-store'));
+        final sheetScroll = find.descendant(of: find.byKey(const Key('work-workspace-switcher-sheet')), matching: find.byType(Scrollable));
+        await tester.scrollUntilVisible(target, 120, scrollable: sheetScroll); await tester.pumpAndSettle();
+        expect(target.hitTestable(), findsOneWidget);
+        await tester.tap(target); await tester.pumpAndSettle();
+        expect(work.workspaceSupplierScope, scope, reason: 'Scope must not mutate before leave is accepted.');
+      } else if (destination == 'external') {
+        await tester.tap(find.byKey(const Key('mool-home-launcher'))); await tester.pumpAndSettle();
+        final target = find.byKey(const ValueKey('mool-navigator-family-buy'));
+        expect(target.hitTestable(), findsOneWidget);
+        await tester.tap(target); await tester.pumpAndSettle();
+      } else {
+        await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      }
+      if (mode == 'dirty') {
+        expect(find.text('Leave receiving?'), findsOneWidget);
+        await tester.tap(find.text('Discard')); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')), findsNothing);
+        if (destination == 'workspace') expect(work.activeWorkspace!.id, 'receiving-other-store');
+      } else {
+        expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+        expect(entry.value!.goodsReceiptDrafts, isEmpty);
+        expect(work.workspaceSupplierScope, scope);
+      }
+      expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('PURCHASERECEIVEUI partial arrival retains all group lines but records arriving subset', (tester) async {
+    // Automated session/UI fixture only, not physical posting qualification.
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint, inventory: true);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+    final supplier = WorkspaceSupplierProfile(id: 'partial-ui', name: 'Evaluation partial supplier', phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+    final opening = WorkspaceSupplierOpeningRecord(id: 'partial-opening', basisId: 'partial-basis', account: scope.$1,
+      store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1, asOfDate: '2026-10-01', savedAt: at,
+      amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero', bills: const []);
+    final original = work.workspaceCatalogueItems.first;
+    work.workspaceCatalogueItems.add(WorkspaceCatalogueItem(id: 'host-partial-second', canonicalId: 'host-partial-second',
+      categoryId: original.categoryId, brand: 'HOST', title: 'HOST second delivery item', variant: original.variant,
+      pack: original.pack, sku: 'HOST-PARTIAL-2', barcode: '', purchasePrice: original.purchasePrice,
+      sellingPrice: original.sellingPrice, unitPrice: original.unitPrice, stock: 0,
+      deliveryPromise: original.deliveryPromise, origin: 'Host fixture', visualLabel: 'HOST', visualKind: original.visualKind));
+    final products = work.workspaceCatalogueItems.take(2).map((p) => p.copyWith(stockMode: WorkspaceStockMode.exactQuantity)).toList();
+    expect(products.length, 2);
+    for (final product in products) {
+      final index = work.workspaceCatalogueItems.indexWhere((p) => p.id == product.id);
+      work.workspaceCatalogueItems[index] = product;
+    }
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    for (final product in products) {
+      expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock: product.stock + 1)), isTrue);
+      expect(await work.workspaceInventorySaved, isTrue);
+    }
+    final first = WorkspaceSupplierGoodsReceipt(id: 'partial-first', expectedDeliveryId: 'partial-group', reference: 'HOST partial delivery',
+      deliveredOn: '2026-10-03', recordedAt: at, lines: [for (final (index, product) in products.indexed)
+        WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'partial-line-$index', productId: product.id, productLabel: product.title,
+          purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1, deliveredMilli: 1000, acceptedMilli: 1000,
+          damagedMilli: 0, shortMilli: 0, expectedMilli: index == 0 ? 1000 : 3000)]);
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
+      profiles: [supplier], openingRecords: [opening], goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 1, receipt: first)]);
+    expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+    expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope, expectedRevision: 1, confirmedAt: at), isTrue);
+    final ledger = work.workspaceSupplierLedger(supplier.id)!;
+    expect(await work.confirmWorkspaceSupplierGoodsReceipt(first, supplierId: supplier.id, scope: scope,
+      expectedPurchaseRevision: 1, expectedSupplierRevision: ledger.revision, requireSavedReview: true),
+      WorkspaceGoodsReceiptSaveResult.saved, reason: work.workspaceSupplierError);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final action = find.byKey(const Key('work-purchase-receive-goods'));
+    await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+    final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+    Future<void> reveal(String key, {double delta = 120}) async {
+      final field = find.byKey(Key(key)); await tester.scrollUntilVisible(field, delta, scrollable: scroll); await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(field), alignment: .5); await tester.pumpAndSettle();
+      expect(field.hitTestable(), findsOneWidget);
+    }
+    await reveal('work-receive-supplier'); await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
+    await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+    await reveal('work-receive-next'); await tester.tap(find.byKey(const Key('work-receive-next'))); await tester.pumpAndSettle();
+    await reveal('work-receive-arrives-0', delta: -120);
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('work-receive-arrives-0'))).value, isFalse);
+    await reveal('work-receive-arrives-1');
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('work-receive-arrives-1'))).value, isTrue);
+    await reveal('work-receive-delivered-1'); await tester.enterText(find.byKey(const Key('work-receive-delivered-1')), '1');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await reveal('work-receive-review'); await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+    expect(entry.value!.goodsReceiptDrafts.length, 2, reason: work.workspaceSupplierError);
+    final next = entry.value!.goodsReceiptDrafts.last.receipt;
+    expect(next.expectedDeliveryId, first.expectedDeliveryId);
+    expect(next.lines.single.sourceLineId, 'partial-line-1');
+    expect(next.lines.single.mappingIdentity, first.lines.last.mappingIdentity);
+    expect(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.keys, [first.id]);
+    await reveal('work-receive-confirm'); await tester.tap(find.byKey(const Key('work-receive-confirm'))); await tester.pumpAndSettle();
+    expect(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.keys, [first.id, next.id]);
+    await reveal('work-receive-next'); await tester.tap(find.byKey(const Key('work-receive-next'))); await tester.pumpAndSettle();
+    await reveal('work-receive-arrives-0', delta: -120);
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('work-receive-arrives-0'))).value, isFalse,
+      reason: 'The omitted first item remains visible in a later arrival, with its original history.');
+    await reveal('work-receive-arrives-1');
+    expect(tester.widget<CheckboxListTile>(find.byKey(const Key('work-receive-arrives-1'))).value, isTrue);
+    expect(entry.value!.goodsReceiptDrafts.length, 2, reason: 'Starting another editor cannot post or save it.');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });

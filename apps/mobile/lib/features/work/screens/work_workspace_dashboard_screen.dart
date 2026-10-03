@@ -605,6 +605,7 @@ class _WorkWorkspaceDashboardScreenState
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
   final _purchaseEntryKey = GlobalKey<_StoreRecordPurchaseState>();
+  final _receivingKey = GlobalKey<_StoreReceiveGoodsState>();
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   final _saleSearchController = TextEditingController();
@@ -1317,6 +1318,7 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
+      beforeExternalNavigation: () => _receivingKey.currentState?.confirmLeave() ?? Future.value(true),
       contentMaxWidth: (salesOpen || ordersContext) &&
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
@@ -1753,6 +1755,7 @@ class _WorkWorkspaceDashboardScreenState
             }),
             counterKey: _counterKey,
             purchaseEntryKey: _purchaseEntryKey,
+            receivingKey: _receivingKey,
             saleQuery: _saleSearchController.text,
             stockStatementBookmark: _stockStatementViews.putIfAbsent(
               session.workspaceStockHistoryScope()?.key ?? workspace.id,
@@ -2420,6 +2423,9 @@ class _WorkWorkspaceDashboardScreenState
           session.workspaceOrderQuantities.isNotEmpty);
 
   Future<bool> _confirmDiscardCounterOrder() async {
+    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true))) {
+      return false;
+    }
     if (_view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.sourcing &&
         !await (_purchaseEntryKey.currentState?.confirmLeave() ??
@@ -2484,6 +2490,11 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveOperation({bool exitSale = false}) async {
+    final receiving = _receivingKey.currentState;
+    if (receiving != null) {
+      await receiving._close();
+      return;
+    }
     final purchaseEntry = _purchaseEntryKey.currentState;
     if (_operation == _WorkspaceOperation.sourcing && purchaseEntry != null) {
       await purchaseEntry._back();
@@ -2590,7 +2601,8 @@ class _WorkWorkspaceDashboardScreenState
     });
   }
 
-  void _openProfile(BuildContext context, WorkWorkspace workspace) {
+  Future<void> _openProfile(BuildContext context, WorkWorkspace workspace) async {
+    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) || !context.mounted) return;
     showGlobalProfilePanelV2(
       context,
       accountAuthenticated: widget.accountAuthenticated,
@@ -2685,7 +2697,9 @@ class _WorkWorkspaceDashboardScreenState
                   selected: workspace.id == current.id,
                   onTap: workspace.id == current.id
                       ? null
-                      : () {
+                      : () async {
+                          if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                              !mounted || !sheetContext.mounted) { return; }
                           session.activateWorkspace(workspace);
                           Navigator.of(sheetContext).pop();
                           _showDashboard();
@@ -2714,7 +2728,9 @@ class _WorkWorkspaceDashboardScreenState
                     subtitle: Text(
                       '${application.profileLabel} · ${application.status}',
                     ),
-                    onTap: () {
+                    onTap: () async {
+                      if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                          !mounted || !sheetContext.mounted) { return; }
                       if (!session.resumeWorkspaceApplication(application.id)) {
                         return;
                       }
@@ -2735,7 +2751,9 @@ class _WorkWorkspaceDashboardScreenState
                 padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 12),
                 child: OutlinedButton.icon(
                   key: const Key('work-switch-add-workspace'),
-                  onPressed: () {
+                  onPressed: () async {
+                    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                        !mounted || !sheetContext.mounted) { return; }
                     if (session.startAnotherWork()) {
                       Navigator.of(sheetContext).pop();
                       context.push('/app/work/workspace/choose');
@@ -13909,6 +13927,7 @@ class _ReceivingLineInput {
   final String id;
   final WorkspaceSupplierGoodsReceiptLine? original;
   String productId;
+  bool arrives = true;
   final TextEditingController unit, factor, expected, delivered, damaged, short;
   final Map<String, TextEditingController> prior;
   static String _quantity(int value) => (value / 1000).toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
@@ -13925,7 +13944,7 @@ class _ReceivingLineInput {
 /// Receiving is independent of entering a supplier bill. Persist the reviewed
 /// operation before posting and always resume its exact immutable snapshot.
 class _StoreReceiveGoodsSurface extends StatefulWidget {
-  const _StoreReceiveGoodsSurface({required this.session, required this.onBack});
+  const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack});
   final WorkSession session;
   final VoidCallback onBack;
   @override
@@ -13945,6 +13964,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   String _baseline = '';
   final _supplierPicker = GlobalKey<FormFieldState<String>>();
   bool _busy = true, _loaded = false, _reviewVerified = false;
+  Future<bool>? _leaveDecision;
   String? _error, _notice;
   WorkSession get session => widget.session;
   bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
@@ -13953,7 +13973,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   bool get _cancelled => _frozen != null && session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == _frozen!.id);
   bool get _conflict => _committed && _cancelled;
   String get _input => jsonEncode([_reference.text, _day.text, for (final line in _lines)
-    [line.id, line.productId, line.unit.text, line.factor.text, line.expected.text,
+    [line.id, line.productId, line.arrives, line.unit.text, line.factor.text, line.expected.text,
       line.delivered.text, line.damaged.text, line.short.text,
       {for (final e in line.prior.entries) if (e.value.text.isNotEmpty) e.key: e.value.text}]]);
   @override
@@ -13987,6 +14007,10 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     if (_supplierId != null && _frozen == null && _input != _baseline) {
       final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Change supplier?'), content: const Text('Unsaved goods details belong to the current supplier.'),
+        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
+        contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+        titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16), actionsPadding: const EdgeInsets.all(8),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard & change'))]));
       if (!_current) return;
@@ -14004,9 +14028,19 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     for (final line in _lines) { line.dispose(); }
     _lines.clear();
     if (previous != null) {
-      for (final saved in previous.lines) {
+      final inherited = <String, WorkspaceSupplierGoodsReceiptLine>{
+        for (final receipt in _ledger?.goodsReceipts.values ?? const <WorkspaceSupplierGoodsReceipt>[])
+          if (receipt.expectedDeliveryId == previous.expectedDeliveryId)
+            for (final line in receipt.lines) line.sourceLineId: line,
+        for (final line in previous.lines) line.sourceLineId: line,
+      };
+      for (final saved in inherited.values) {
         final line = _ReceivingLineInput(saved.sourceLineId, saved: saved);
         line.delivered.clear(); line.damaged.text = '0'; line.short.text = '0';
+        final earlier = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == previous.expectedDeliveryId)
+          .expand((r) => r.lines).where((l) => l.sourceLineId == saved.sourceLineId)
+          .fold<int>(0, (sum, l) => sum + l.deliveredMilli) ?? 0;
+        line.arrives = saved.expectedMilli == null || earlier < saved.expectedMilli!;
         for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
         _lines.add(line);
       }
@@ -14022,6 +14056,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   WorkspaceSupplierGoodsReceipt? _snapshot() {
     final values = <WorkspaceSupplierGoodsReceiptLine>[];
     for (final input in _lines) {
+      if (!input.arrives) continue;
       final product = session.workspaceCatalogueItems.where((p) => p.id == input.productId).singleOrNull;
       final delivered = _ReceivingLineInput.milli(input.delivered.text);
       final damage = _ReceivingLineInput.milli(input.damaged.text);
@@ -14084,20 +14119,36 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     setState(() { _busy = false; _bookRevision = session.workspacePurchaseEntryRevision;
       if (!saved) _error = session.workspaceSupplierError ?? 'Cancellation is unverified. Retry recovery before replacing this review.'; });
   }
-  Future<void> _close() async {
-    if (_busy) return;
+  Future<bool> confirmLeave() {
+    final active = _leaveDecision;
+    if (active != null) return active;
+    final decision = _confirmLeave();
+    _leaveDecision = decision;
+    return decision.whenComplete(() {
+      if (identical(_leaveDecision, decision)) _leaveDecision = null;
+    });
+  }
+  Future<bool> _confirmLeave() async {
+    if (_busy) return false;
     if (_frozen != null && !_reviewVerified) {
       setState(() { _error = 'Review save is unverified. Recover saved status or retry this exact review before closing.'; });
-      return;
+      return false;
     }
-    if (_frozen == null && _supplierId != null) {
+    if (_frozen == null && _supplierId != null && _input != _baseline) {
       final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Leave receiving?'), content: const Text('These unsaved goods details will not be kept.'),
+        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
+        contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
+        titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16), actionsPadding: const EdgeInsets.all(8),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard'))]));
-      if (discard != true || !_current) return;
+      if (discard != true || !_current || _busy) return false;
     }
-    if (_current) widget.onBack();
+    return _current;
+  }
+  Future<void> _close() async {
+    if (await confirmLeave() && _current) widget.onBack();
   }
   Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true}) =>
     SizedBox(width: number ? 116 : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
@@ -14114,8 +14165,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   @override
   Widget build(BuildContext context) {
     final editable = !_busy && _frozen == null;
-    return PopScope(canPop: false, onPopInvokedWithResult: (didPop, _) { if (!didPop) unawaited(_close()); },
-      child: ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+    // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
+    return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
         Row(children: [const Expanded(child: Text('Receive goods', style: TextStyle(fontSize: 16,
           fontWeight: FontWeight.w700, color: MoolColors.navy))),
           TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
@@ -14168,7 +14219,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         ],
         if (_error != null) Text(_error!, key: const Key('work-receive-error'), style: const TextStyle(fontSize: 12, color: Color(0xffa52a2a))),
         if (_notice != null) Text(_notice!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-      ]));
+      ]);
   }
   Widget _lineView(_ReceivingLineInput line, int index) {
     final product = session.workspaceCatalogueItems.where((p) => p.id == line.productId).singleOrNull;
@@ -14187,6 +14238,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       Row(children: [Expanded(child: Text('Item ${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy))),
         if (!_busy && _frozen == null && !inherited && _lines.length > 1) TextButton(key: ValueKey('work-receive-remove-$index'),
           onPressed: () => setState(() { _lines.remove(line); line.dispose(); }), child: const Text('Remove item'))]),
+      if (inherited && _frozen == null) CheckboxListTile(key: ValueKey('work-receive-arrives-$index'),
+        value: line.arrives, dense: true, contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
+        title: const Text('Received in this delivery', style: TextStyle(fontSize: 12)),
+        onChanged: _busy ? null : (value) => setState(() => line.arrives = value ?? false)),
+      if (!line.arrives) Text('${line.original?.productLabel ?? product?.title ?? 'Saved item'} · not received this time. Earlier goods history is unchanged.',
+        style: const TextStyle(fontSize: 12)),
+      if (line.arrives) ...[
       DropdownButtonFormField<String>(key: ValueKey('work-receive-product-$index'), initialValue: line.productId.isEmpty ? null : line.productId,
         isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
         decoration: const InputDecoration(labelText: 'Match saved Stock product', filled: false,
@@ -14217,6 +14275,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       Text(stock == null ? 'Check conversion: accepted goods must equal whole Stock units.' : 'Accepted Stock units $stock − earlier linked $linked = add ${stock - linked}',
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
       Text(expected == null ? 'Pending qty: expected quantity not entered' : 'Earlier delivered ${_ReceivingLineInput._quantity(earlier)} · pending before this arrival ${_ReceivingLineInput._quantity(expected - earlier)}', style: const TextStyle(fontSize: 12)),
+      ],
       const Divider(height: 16),
     ]));
   }
@@ -14229,12 +14288,14 @@ class _StorePurchasesSurface extends StatefulWidget {
     this.onTrackPurchase,
     this.onPurchaseBack,
     this.purchaseEntryKey,
+    this.receivingKey,
   });
   final WorkSession session;
   final bool statement;
   final ValueChanged<String>? onTrackPurchase;
   final VoidCallback? onPurchaseBack;
   final GlobalKey<_StoreRecordPurchaseState>? purchaseEntryKey;
+  final GlobalKey<_StoreReceiveGoodsState>? receivingKey;
 
   @override
   State<_StorePurchasesSurface> createState() => _StorePurchasesSurfaceState();
@@ -14308,7 +14369,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _savedCopy = null;
     }
     if (_receiveGoods && !statement) {
-      return _StoreReceiveGoodsSurface(session: session, onBack: () => setState(() => _receiveGoods = false));
+      return _StoreReceiveGoodsSurface(key: widget.receivingKey, session: session, onBack: () => setState(() => _receiveGoods = false));
     }
     if ((_recordPurchase || _savedCopy != null) && !statement) {
       return _StoreRecordPurchaseSurface(
@@ -16178,6 +16239,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onToggleStockActions,
     required this.counterKey,
     required this.purchaseEntryKey,
+    required this.receivingKey,
     required this.saleQuery,
     required this.requirementDraft,
     required this.stockStatementBookmark,
@@ -16199,6 +16261,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final VoidCallback onToggleStockActions;
   final GlobalKey<_CounterOrderSurfaceState> counterKey;
   final GlobalKey<_StoreRecordPurchaseState> purchaseEntryKey;
+  final GlobalKey<_StoreReceiveGoodsState> receivingKey;
   final String saleQuery;
   final Map<String, String> requirementDraft;
   final _StockStatementBookmark stockStatementBookmark;
@@ -16255,6 +16318,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         child: _StorePurchasesSurface(
           session: session,
           purchaseEntryKey: purchaseEntryKey,
+          receivingKey: receivingKey,
           onTrackPurchase: onTrackPurchase,
           onPurchaseBack: onPurchaseBack,
         ),

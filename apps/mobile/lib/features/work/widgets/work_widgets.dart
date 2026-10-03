@@ -637,6 +637,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.hideNavigationWhenKeyboardVisible = false,
     this.navigationOverBody = false,
     this.resizeToAvoidBottomInset = true,
+    this.beforeExternalNavigation,
     super.key,
   });
 
@@ -664,6 +665,7 @@ class WorkPageScaffold extends StatelessWidget {
   final bool hideNavigationWhenKeyboardVisible;
   final bool navigationOverBody;
   final bool resizeToAvoidBottomInset;
+  final Future<bool> Function()? beforeExternalNavigation;
 
   @override
   Widget build(BuildContext context) {
@@ -701,7 +703,8 @@ class WorkPageScaffold extends StatelessWidget {
       }
     }
 
-    void openGlobal(String route) {
+    Future<void> openGlobal(String route) async {
+      if (!await (beforeExternalNavigation?.call() ?? Future.value(true)) || !context.mounted) return;
       session.clearMessages();
       context.push(route);
     }
@@ -721,7 +724,8 @@ class WorkPageScaffold extends StatelessWidget {
       context.push(route);
     }
 
-    void switchGlobalDestination(String route) {
+    Future<void> switchGlobalDestination(String route) async {
+      if (!await (beforeExternalNavigation?.call() ?? Future.value(true)) || !context.mounted) return;
       session.clearMessages();
       openMoolConnectedRoute(context, activeFamilyId: 'work', route: route);
     }
