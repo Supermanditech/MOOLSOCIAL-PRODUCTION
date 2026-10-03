@@ -4562,6 +4562,65 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
+    for (final kind in ['dues', 'credit', 'zero', 'unknown']) {
+      testWidgets('PURCHASEOPENINGUI starting balance history $kind $display', (tester) async {
+        // Host-only fixtures, never physical OPPO acceptance records.
+        FlutterSecureStorage.setMockInitialValues({});
+        final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+        final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
+        final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+        final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+        final day = at.toIso8601String().substring(0, 10);
+        final supplier = WorkspaceSupplierProfile(id: 'opening-history-$kind', name: 'HOST opening $kind',
+          phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+        final opening = WorkspaceSupplierOpeningRecord(id: 'opening-history-record-$kind', basisId: 'opening-history-basis-$kind',
+          account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+          asOfDate: day, savedAt: at, amountMinor: kind == 'unknown' ? null : kind == 'zero' ? 0 : 50000,
+          supplierCredit: kind == 'credit', sourceNote: 'HOST starting balance qualification', bills: const []);
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+          revision: 1, profiles: [supplier], openingRecords: [opening]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+        if (kind != 'unknown') {
+          expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+            expectedRevision: 1, confirmedAt: at), isTrue);
+        }
+        final beforeWrites = checkpoint.saveAttempts;
+        final beforeLedger = work.workspaceSupplierLedger(supplier.id)?.toJson();
+        final beforeStock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: display, textScale: display.width > 500 ? 2 : 1.4);
+        await openPurchaseList(tester);
+        final action = find.byKey(const Key('work-purchase-opening'));
+        await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+        final picker = find.byType(DropdownButtonFormField<String>);
+        await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
+        await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+        final row = find.byKey(const Key('supplier-ledger-starting-balance'));
+        if (kind == 'unknown') {
+          expect(row, findsNothing);
+          expect(find.text('Confirmed in supplier account'), findsNothing);
+          expect(work.workspaceSupplierLedger(supplier.id)?.openingRecord, isNull);
+        } else {
+          final summary = find.text('Supplier account');
+          await revealOpening(tester, summary); await tester.tap(summary); await tester.pumpAndSettle();
+          await revealOpening(tester, row);
+          expect(find.descendant(of: row, matching: find.text(kind == 'credit'
+            ? 'Starting credit with supplier' : 'Starting dues')), findsOneWidget);
+          expect(find.descendant(of: row, matching: find.text(kind == 'zero' ? '₹0' : '₹500')), findsOneWidget);
+          expect(find.descendant(of: row, matching: find.textContaining('Not a new payment')), findsOneWidget);
+          expect(find.text('No subsequent financial entries'), findsOneWidget);
+          expect(find.text('No confirmed financial entries available'), findsNothing);
+          expect(work.workspaceSupplierLedger(supplier.id)!.entries, isEmpty);
+          expect(work.workspaceSupplierLedger(supplier.id)!.openingBalanceMinor,
+            kind == 'credit' ? -50000 : kind == 'zero' ? 0 : 50000);
+        }
+        expect(checkpoint.saveAttempts, beforeWrites);
+        expect(work.workspaceSupplierLedger(supplier.id)?.toJson(), beforeLedger);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), beforeStock);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
     testWidgets('PURCHASEREFUNDUI opening advance saved request remains reachable $display', (tester) async {
       // Automated UI fixtures only; never injected into phone acceptance storage.
       FlutterSecureStorage.setMockInitialValues({});
@@ -5798,9 +5857,11 @@ void main() {
       'late-included', 'late-landscape', 'late-same-day', 'late-changed-dialog', 'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape']) {
     testWidgets('PURCHASEBILLUI saved bill confirmation $mode', (tester) async {
       // Labelled host fixture: not runtime or physical device acceptance data.
+      FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore();
       final checkpoint = _LedgerCheckpointFixtureStore();
-      final work = postingOpeningFixture(entry, checkpoint);
+      final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
       final scope = work.workspaceSupplierScope!;
       final at = DateTime.utc(2026, 9, 30);
       final supplier = WorkspaceSupplierProfile(id: 'bill-ui-supplier', name: 'Evaluation supplier',
@@ -5932,6 +5993,13 @@ void main() {
           expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills.length, 1,
             reason: '${work.workspaceSupplierError} / ${find.byKey(const Key('work-purchase-bill-notice')).evaluate().map((e) => (e.widget as Text).data).join()}');
           expect(find.text('Bill confirmed in supplier account'), findsOneWidget);
+          final billAccount = find.text('Supplier account');
+          await tester.ensureVisible(billAccount); await tester.pumpAndSettle();
+          await tester.tap(billAccount); await tester.pumpAndSettle();
+          expect(find.text('Entries linked to this bill'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-ledger-starting-balance')), findsNothing,
+            reason: 'A whole-account opening must not be attributed to this bill.');
+          await tester.tap(billAccount); await tester.pumpAndSettle();
           expect(confirm, findsNothing);
           final match = find.byKey(const Key('work-bill-goods-open'));
           await Scrollable.ensureVisible(tester.element(match), alignment: 0.5);
