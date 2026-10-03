@@ -1894,6 +1894,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }) {
     final careNavigation =
         session.activeDockDestination == BuyV2Destination.medicine;
+    final cartSelected =
+        session.view == BuyV2View.cart || session.view == BuyV2View.checkout;
     final delivery = _buildDeliveryControl(session, update ?? setState);
     final localNavigation = careNavigation
         ? _buildCareLocalNavigation()
@@ -1939,10 +1941,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       destinationLabel: careNavigation ? 'Care' : 'Shop',
       familyRootSelected:
           !careNavigation &&
+          !cartSelected &&
           !_offersActive &&
           session.activeDockDestination == BuyV2Destination.shop,
       selectedLocalIndex: careNavigation
           ? 1
+          : cartSelected && parkedCart != null
+          ? navigationCount - 1
           : _offersActive
           ? 2
           : switch (session.activeDockDestination) {
@@ -2008,7 +2013,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       familyId: 'buy',
       surfaceTone: MoolLocalNavigationSurfaceTone.light,
       semanticLabel: 'Shop choices: Wholesale, Orders and Offers.',
-      activeId: _offersActive ? 'offers' : active.name,
+      activeId:
+          session.view == BuyV2View.cart || session.view == BuyV2View.checkout
+          ? 'cart'
+          : _offersActive
+          ? 'offers'
+          : active.name,
       actions: [
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-wholesale',
@@ -2162,7 +2172,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
               ? session.countForDestination(BuyV2Destination.medicine)
               : session.itemCount) >
           0 &&
-      (session.view == BuyV2View.product ||
+      (session.activeDockDestination != BuyV2Destination.medicine ||
+          _offersActive ||
+          session.view == BuyV2View.product ||
           session.view == BuyV2View.catalogue);
 
   void _openGlobalMool() {
@@ -3786,7 +3798,12 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
         (destination == BuyV2Destination.shop ||
             destination == BuyV2Destination.wholesale) &&
         session.countForDestination(destination) == 0;
-    final aggregate = widget.aggregate || otherBaskets;
+    final activeMixedCart =
+        (session.view == BuyV2View.cart ||
+            session.view == BuyV2View.checkout) &&
+        destination != BuyV2Destination.medicine &&
+        session.usesMixedCartSelection;
+    final aggregate = widget.aggregate || otherBaskets || activeMixedCart;
     final scope = aggregate
         ? BuyV2CartScope.all
         : switch (destination) {
@@ -3836,8 +3853,11 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
     final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
 
     void activate() {
+      if (session.view == BuyV2View.cart) return;
       HapticFeedback.selectionClick();
-      session.openCart(scope: scope);
+      session.openCart(
+        scope: session.view == BuyV2View.checkout ? session.cartScope : scope,
+      );
     }
 
     final semanticsLabel =
@@ -3848,6 +3868,9 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
         container: true,
         label: semanticsLabel,
         button: true,
+        selected:
+            session.view == BuyV2View.cart ||
+            session.view == BuyV2View.checkout,
         liveRegion: true,
         onTap: activate,
         excludeSemantics: true,

@@ -990,7 +990,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.quantityFor('s-rice'), 0);
           expect(session.view, BuyV2View.catalogue);
-          expect(session.notice, isNull);
+          expect(session.notice, contains('payment'));
           expect(session.legacyCheckoutAttempt, same(attempt));
           await captureR66Visual(tester, 't10-held-add-disabled-$scale');
           expect(tester.takeException(), isNull);
@@ -4309,7 +4309,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-t03-20261001/'
+            'candidate_captures/cursor-t10-navigation-20261003/'
             'buy-v2-t02-checkout-${viewport.label}.png',
           ),
         );

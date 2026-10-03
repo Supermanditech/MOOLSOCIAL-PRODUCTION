@@ -9097,9 +9097,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                 onPressed: session.itemCount == 0 || session.cartChangesBlocked
                     ? null
                     : () => unawaited(_confirmBuyV2CartClear(context, session)),
-                icon: const Icon(
+                icon: Icon(
                   Icons.delete_outline_rounded,
-                  color: Color(0xFFB42318),
+                  color: session.itemCount == 0 || session.cartChangesBlocked
+                      ? BuyV2Colors.muted
+                      : const Color(0xFFB42318),
                 ),
               ),
             ],
@@ -20983,10 +20985,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                       minimumSize: const Size(44, 44),
                       padding: EdgeInsets.zero,
                     ),
-                    child: Opacity(
-                      opacity: enabled ? 1 : .38,
-                      child: const BuyV2AddFace(),
-                    ),
+                    child: const BuyV2AddFace(),
                   ),
                 ),
               )
@@ -24601,9 +24600,7 @@ class _CartLine extends StatelessWidget {
             child: DecoratedBox(
               key: ValueKey('buy-cart-quantity-pill-${product.id}'),
               decoration: BoxDecoration(
-                color: session.cartChangesBlocked
-                    ? BuyV2Colors.canvas
-                    : BuyV2ActionStyle.primaryFill,
+                color: BuyV2ActionStyle.primaryFill,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),

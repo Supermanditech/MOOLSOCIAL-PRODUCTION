@@ -615,7 +615,17 @@ void main() {
       final paymentChoice = find.byKey(
         const ValueKey('buy-checkout-confirm-payment'),
       );
-      await tester.scrollUntilVisible(paymentChoice, 150, maxScrolls: 50);
+      final checkoutScroll = find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      );
+      expect(checkoutScroll, findsOneWidget);
+      await tester.scrollUntilVisible(
+        paymentChoice,
+        150,
+        maxScrolls: 50,
+        scrollable: checkoutScroll,
+      );
       await Scrollable.ensureVisible(
         tester.element(paymentChoice),
         alignment: .2,
@@ -625,7 +635,17 @@ void main() {
       await tester.tap(paymentChoice);
       await tester.pumpAndSettle();
       final pine = find.byKey(const ValueKey('buy-payment-Card'));
-      await tester.scrollUntilVisible(pine, 150, maxScrolls: 50);
+      final paymentScroll = find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      );
+      expect(paymentScroll, findsOneWidget);
+      await tester.scrollUntilVisible(
+        pine,
+        150,
+        maxScrolls: 50,
+        scrollable: paymentScroll,
+      );
       await Scrollable.ensureVisible(tester.element(pine), alignment: .2);
       await tester.pumpAndSettle();
       expect(pine.hitTestable(), findsOneWidget);

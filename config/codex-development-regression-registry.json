@@ -107653,9 +107653,9 @@
         }
       },
       "cartT06T07Execution20261002": {
-        "status": "host_qualified_native_activation_child_open_before_scoped_checkpoint",
-        "authority": "Founder execute these authorizes T06 payment grouping, then T07 recovery including A09 as sequential frontend subworkflows of existing BUY-ACTION-POLISH-20260926-01 / UAW-CURSOR-BUY-READY-20260921. No formal ticket closure, new branch, backend/Google execution, new APK or live payment authority inferred.",
-        "baseline": "e329d01a144ae5348a19d9e714a2c175eb62cca7",
+        "status": "registered_before_source_edits",
+        "authority": "Founder reports regressions a-e and orders fresh journey from start through last frontend screen with additional defect discovery and scoped implementation.",
+        "baseline": "c11229924b0df99f1940a1dc8c95cfa616797b07",
         "branch": "work/cursor-ui/buy-ready-20260921",
         "initialGit": {
           "bytes": 0,
@@ -109986,7 +109986,7 @@
             "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
           ]
         },
-        "key": "t10QualifiedFrontendHandoff20261003",
+        "key": "t10FounderFreshJourneyAudit20261003",
         "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
         "actualResults": {
           "firstColdReload": "Reloaded 0 libraries",
@@ -110051,7 +110051,296 @@
         },
         "remaining": "Native activation and disabled red Empty icon visual follow-up; host glyph artifacts; inherited25 legacy Checkout failures; backend/provider deferred; workspace Codex after integration; Google separate; founder review/formal closure pending",
         "checkpoint": "Mandatory staged byte readback, memory/pre_commit actual0 then ordinary scoped17owner commit/push/clean origin equality; not preclaimed",
-        "stopAfterCheckpoint": true
+        "stopAfterCheckpoint": true,
+        "capability": "Public Shop/Wholesale/Offers/Orders/Product→Cart→Checkout navigation, Add and established frontend last state",
+        "reuse": "Existing buy_v2_screen/session/catalogue/views/design and existing scoped dock/checkout continuity tests; no new service/backend/provider or globalnavigation changes",
+        "owners": [
+          "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+        ],
+        "reportedDefects": {
+          "a": "Add color/shape changed",
+          "b": "Add does not add",
+          "c": "Shop remains selected in Cart",
+          "d": "Cart target missing across Shop Wholesale Offers Orders",
+          "e": "Product/Cart destination selection inconsistent"
+        },
+        "dependencyOrder": "Register→device held reproduction/source mapping/accepted reference→prove isolated review-state fresh restoration without losing original attempt→scoped fixes→fresh and held tests→real native journey/reload/screens→evidence/checkpoint/stop",
+        "boundaries": "Exact device-review owner only for fresh isolation if proven reversible; never app-wide data clear or authentication material copying; no livepayment/order/support/build/install/backend. Supplier policies Product/Add only; standard shared instruction.",
+        "acceptance": "Classify fresh vsheld separately; consistent add style/cart quantity/count/total; persistent Cart target; Cart actual selection independent oforigin; Product→Cart→Back Shop/Wholesale/Offers and Orders; safe keyboard/enlargedtext; supported frontendlastscreen only",
+        "architect": "Facts-only review requests preserved exactreviewattempt provenance and fresh state backup before reset; correct guards retained",
+        "currentUnknown": "Exact reversible review-state isolation and native reproduction pending",
+        "t10FreshIsolationExecution20261003": {
+          "status": "authorized_fresh_review_only_before_execution",
+          "authority": "Founder explicitly requests restart/fresh Buy journey; latest instruction overrides earlier prohibition on clearing review attempts provided original is preserved exactly.",
+          "owner": "device-review:buy",
+          "key": "moolsocial.buy.customer-state.device-review:buy.v1",
+          "backup": {
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t10-original-device-review-state-20261003.json",
+            "bytes": 23430,
+            "sha256": "57c6896bdfa1490d03afdfacf164c5e65e96b2d8eaba1a994697dd1da5b056ce"
+          },
+          "originalIdentitySha256": "efc904caf782cb08bacc933badd05ec02d1d38f823cbc753eabe41b21483b28c",
+          "provenance": "Legacy owner device-review:buy; paymentActionRequired with frozen original request, one retainedreviewtomato/37; installed review/emulator candidate. Read-only VM getString exactkey backup contains only review customer state.",
+          "inspectionCorrection": "Initial read helpers did not follow chained Futures; no reset/mutation occurred. Corrected read followed Future chain and preserved exact23430bytes; not evidence of missing state/persistence failure.",
+          "plannedChecks": "Before remove independently compare exactcurrentkey bytes/owner/key/frozenrequest/idempotency/37/readonlyproviderclass with live session; ensure zero pending writes. Then exactkey removal only and supported full Dart restart for fresh review; no app-wide clear/auth copy. Restore uses originalexactString throughsameSharedPreferencesAsync key thenrestarttohydrate, never submitting payment.",
+          "exclusions": "No live provider/backend/auth/newAPK/install; no originallivefinancialattempt erased. Fresh native proof separate from held originalbackup.",
+          "architect": "Facts-only conditionalpreservationreview; backup identity andrestore proof required.",
+          "reportedReproduction": "Held Shop/Wholesale/Orders/Offers Carttargets present; CartfromOffers removesCarttarget and stillOffersselected. Add disabled byexistingheldattempt. Fresh reproduction pending."
+        },
+        "t10FounderRegressionFindings20261003": {
+          "status": "listed_before_source_fixes",
+          "baseline": "c1122992",
+          "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+          "defects": [
+            {
+              "local": "a",
+              "finding": "T10 dimmed entire Add/quantity action and changed Cart quantity background; accepted BuyV2AddFace white44x32/radius10 itself unchanged.",
+              "fix": "Retain accepted geometry/palette; remove blanket action opacity change, keep disabled semantics/guards and visible rejection feedback."
+            },
+            {
+              "local": "b",
+              "finding": "Native Add disabled by retained original review37 payment; disabled pointer handler silently consumed tap. Fresh native Add not yet reproduced.",
+              "fix": "Preserve hold and originalattempt; isolatedfreshreviewbackup plus freshAddtest; held pointer surfaces existingguard explanation without product-card navigation."
+            },
+            {
+              "local": "c/e",
+              "finding": "Cart from Shop/Offers inherits source selectedtab; Carttarget disappears inCart, so no selectedCarttarget; origin shouldremainforBackonly.",
+              "fix": "Keep Carttarget whenitems exist across publicBuy views; selectedCart state inCart/Checkout, no Shop/Wholesale/Offers highlight; existingreturnorigins retained."
+            },
+            {
+              "local": "d",
+              "finding": "Held native Carttarget present onShop/Wholesale/Orders/Offers. Missingtarget claim unconfirmed in freshflow; incorrect initialOrders interpretation corrected becauseOrders usescatalogueview.",
+              "fix": "Freshstate actualjourney andregressioncoverage, preserve oneCarttarget/total/no keyboard overlap."
+            },
+            {
+              "local": "child-1",
+              "finding": "DisabledEmpty icon explicitred stilllooksactionable.",
+              "fix": "Use existingdisabledforeground whenblocked; correctnativevisualretake."
+            }
+          ],
+          "freshIsolation": "Exact review-only backup preserved; liveidentity/provider/roundtrip checks stillpending; noreset performed yet.",
+          "scope": "Sameparent/root292owners; no new globalIDs/provider/backend/auth/APK. Userrequestedfreshjourneythrough lastavailablefrontendstate; otherdefects registeredasfound, technicalproof separatefromfounderapproval.",
+          "architect": "Facts-onlyplanreview supportsfreshandheldclassification, preservingidentity, separatecurrentselectionfromorigin, acceptedstyling andlastfrontendstate."
+        },
+        "t10FreshReproduction20261003": {
+          "status": "registered_before_scoped_fixes",
+          "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+          "freshReviewIsolation": "exact review key only, restoration roundtrip and live identity verified; original37 preserved; full Dart restart closed exit0",
+          "gitAudit": "00:35–14:35 IST; four commit/reflog records; c1122992 exact remote; only2 admission metadata dirty; no orphan runtime/test source identified",
+          "findings": {
+            "a": "held blanket opacity alters approved Add appearance; fresh Add44x32white face preserved",
+            "b": "fresh tomato Add succeeds; held Add silently consumes taps with no reason; original attempt must remain guarded",
+            "c": "fresh Cart selects Shop and no Cart target",
+            "d": "held and fresh Shop Cart visible; fresh Wholesale/Offers/Orders still to repeat after correction",
+            "e": "Cart target restricted to product/catalogue; origin tab incorrectly marked selected",
+            "child": "fresh Cart capture opens at recommendations, hiding selected item; investigate before claiming root cause"
+          },
+          "owners": [
+            "buy_v2_screen.dart",
+            "buy_v2_catalogue.dart",
+            "buy_v2_views.dart",
+            "scoped_cart_checkout_dock_continuity_test",
+            "checkout_cart_return_continuity_test"
+          ],
+          "exclusions": [
+            "global navigation owner",
+            "backend/provider",
+            "APK/build/install",
+            "other worktrees",
+            "supplier policies in Cart",
+            "real payment"
+          ],
+          "acceptedStyle": "retain existing BuyV2AddFace colors/shape; no redesign",
+          "verification": "new meaningful fresh/held route assertions; existing selected regression gate; native fresh journey through last available frontend screen; preserve pending-payment identity"
+        },
+        "t10RegressionValidationChildren20261003": {
+          "status": "recorded_and_scoped_fixture_repairs_applied_not_yet_requalified",
+          "failedSource": "ca06ab4738f0023cc6fee5f0a3596011baa6eca74c4727fdf5fbe47020593df2",
+          "currentSource": "0783e9d3bde1ca7ffda2d0bc1d6ecd130957f7850a3af8468d54576de0818945",
+          "selectedBatch1": {
+            "exit": 1,
+            "passed": 359,
+            "failedCases": 7,
+            "layoutOrHitWarnings": 0
+          },
+          "children": [
+            "Two existing benefit cases omit scroll owner; new navigation horizontal Scrollable creates ambiguity. Explicit unique vertical Checkout/payment selector preserves all behavioral assertions.",
+            "Five prior Checkout golden images differ only within bottom100px dock; inspected each full image and diff bounding box. Old references unchanged; five exact versioned draft owners admitted, no tolerance/skips/assertion changes; founder acceptance pending.",
+            "Twenty generated failed golden images preserved byte-for-byte under ignored build evidence with manifest; no deletion.",
+            "Premature7futureartifactclaims deferred until actual closed proof files exist; gate semantics unchanged, root297 ownership gate passed."
+          ],
+          "newExactDraftOwnerManifest": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-draft-golden-owner-proposal.json",
+          "noBackendOrSharedRoutingChanges": true
+        },
+        "t10RegressionMixedPaintDefects20261003": {
+          "status": "registered_before_further_runtime_fix",
+          "source": "0783e9d3bde1ca7ffda2d0bc1d6ecd130957f7850a3af8468d54576de0818945",
+          "mixed": {
+            "actualCartTotal": 1197,
+            "cartItems": 3,
+            "dockAnnouncedTotal": 1160,
+            "dockItems": 2,
+            "finding": "Active mixed Cart target still uses Wholesale discovery scope; needs whole basket summary without changing discovery-scoped counts or payment guards"
+          },
+          "paint": {
+            "finding": "Native Cart target retains blue face but glyph/badge absent; Shop/Checkout glyph/badge visible, host Cart glyph/badge visible",
+            "status": "unresolved; one fresh-state-preserving full Dart restart diagnostic admitted after exact owner/no active attempt/no pending writer readback"
+          },
+          "selectedReplay": "own source-frozen selected run2 stopped after verifying exact process tree because new real runtime defect needs source edit; preserve partial logs, no qualified claim",
+          "sourceFixOwners": [
+            "buy_v2_screen.dart",
+            "buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+          ],
+          "noPaymentSubmission": true
+        },
+        "t10DraftReferencesPredatedFinalUiChange20261003": {
+          "status": "correction_under_verification",
+          "sourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+          "selectedRun3": {
+            "batch1Closed": true,
+            "passed": 361,
+            "failedCases": 5,
+            "layoutOrHitWarnings": 0,
+            "qualified": false
+          },
+          "cause": "All five failures are badge1 to4 only; mixed fixture basket4, Checkout selected1/37 unchanged. Draft images predated final aggregation change.",
+          "preservation": "Both draft generations and20new failurePNG retained; original founder references and thresholds unchanged.",
+          "next": "Critical7 actualclosed0 required before fresh full selected4. No partial run qualification.",
+          "native": {
+            "sourceBoundCaptures": 70,
+            "freshAndMixed": true,
+            "fullDartRestartCode": 0,
+            "fontRestored": true,
+            "noFinancialSubmission": true,
+            "glyph": "Did not recur after restart; original cause unproven",
+            "held": "Host guards; native held restoration not claimed"
+          },
+          "deferred": {
+            "backend": "deferred",
+            "workspace": "Codex after integration",
+            "google": "separate",
+            "marker": "Catalogue/Offers bluecorner provenance follow-up"
+          }
+        },
+        "t10ReferenceMigrationCompleted20261003": {
+          "status": "awaiting_final_verification",
+          "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+          "rootOwners": 299,
+          "draftImages": 7,
+          "earlyStagedDrafts": 7,
+          "sourceFingerprintIncludesDrafts": true,
+          "originalReferencesUnchanged": true,
+          "sourcePreservation": {
+            "generatedFailurePNGsPreserved": 20,
+            "originalTrackedFailurePNGsRestored": 8,
+            "reconstructedPriorFingerprint": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae"
+          },
+          "nativeMapping": {
+            "runtimeCodeAssetsAndroidPubspecUnchanged": true,
+            "otherTrackedRawInputsUnchanged": true,
+            "testReferenceReplacements": 2,
+            "newDraftImages": 7,
+            "nativeActivationFingerprint": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae"
+          },
+          "required": "Audit all selected golden assertions, critical14 actualclosed0, analysis7, focused10, selected1003/1063 actualclosed0 at final staged-inclusive fingerprint. No failed/partial qualification.",
+          "latestDeviceObservation": {
+            "verifiedComposerCancellation": "Cart1/37",
+            "subsequentCapture": "Checkout2/97",
+            "origin": "Awaiting founder clarification; actions stopped; no assumption of user action or app defect"
+          },
+          "backend": "deferred",
+          "workspace": "Codex after integration",
+          "google": "separate",
+          "founderApproval": false
+        },
+        "t10NavigationRegressionFrontendQualified20261003": {
+          "status": "verified_correction_scope_founder_and_integration_pending",
+          "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+          "rootOwners": 306,
+          "parentCases": 246,
+          "report": {
+            "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.json",
+            "sha256": "f3fbb36576cbd4df18cc17137dfa8ab302ea51471abca531c2d81ecbaf8e9f9c"
+          },
+          "archive": {
+            "sha256": "4b90e13b193027dc7af6d4a89de399c6702f98d3b008b04282a11f88b2bceeca",
+            "members": 788,
+            "memberHashesVerified": true,
+            "privateRawStateAndAttachExcluded": true
+          },
+          "tests": {
+            "analysisOwners": 7,
+            "focused": 10,
+            "critical": 12,
+            "activeSelectedGoldenCases": 10,
+            "selectedDistinct": 1003,
+            "selectedReferences": 1063,
+            "batches": [
+              366,
+              362,
+              275
+            ],
+            "actualClosedExitCodes": [
+              0,
+              0,
+              0
+            ],
+            "sourceUnchanged": true,
+            "failures": 0,
+            "warnings": 0,
+            "fullLegacySuiteQualified": false
+          },
+          "drafts": {
+            "count": 7,
+            "stagedBeforeTests": true,
+            "bytesStable": true,
+            "founderApproval": false,
+            "originalReferencesUnchanged": true
+          },
+          "native": {
+            "activationSourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+            "mapping": "Exact prior fingerprint reconstructed; only two test paths and seven new PNGs changed; runtime/assets/android/pubspec unchanged.",
+            "captures": 70,
+            "freshAddAndMixedNavigation": true,
+            "textScales": [
+              1,
+              2
+            ],
+            "composerClearOnly": true,
+            "noPaymentOrderSupportSubmission": true,
+            "heldNativeAndConditionalPolicyNotQualified": true
+          },
+          "latestDeviceObservation": {
+            "verifiedComposerCancellation": "Cart1/37",
+            "subsequentCapture": "Checkout2/97",
+            "origin": "Unresolved; actions stopped; no inferred user action or app defect. Power-back message does not establish cause."
+          },
+          "gitAudit": "00:35–14:35 IST3October: four commits retained, ancestry/readback verified, no forgotten runtime/test changes found; initial two admission metadata changes preserved.",
+          "children": "Unexplained Checkout2/97; intermittent glyph original cause; blue corner marker provenance; original held/native conditional policy fixtures; inherited25 Checkout failures/formal closure and raw-evidence portability; founder visual acceptance/integration.",
+          "backend": "deferred",
+          "workspace": "Codex after integration",
+          "google": "separate",
+          "checkpoint": "Actual staged-byte verification, memory/precommit, ordinary scoped commit/push and exact clean remote readback required; not preclaimed.",
+          "formalClosure": false,
+          "founderApproval": false
+        },
+        "t10PrecommitOwnerCorrection20261003": {
+          "firstMemoryExitCode": 0,
+          "firstPrecommitExitCode": 1,
+          "rejection": "Seven existing draft image paths absent from affected-route ledger; coordination ownership was already exact.",
+          "correction": "Added only seven existing PNG paths to existing Buy parent's owners. No gate logic, runtime/test/image bytes, cases or thresholds changed.",
+          "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+          "failedGateLogsPreserved": true,
+          "sourceUnchanged": true,
+          "required": "Restage only modified metadata/handoffs, verify all27 staged owners and14 byte-identical artifacts, rerun memory/precommit with new immutable log names. No commit until both actualclosed0.",
+          "founderApproval": false,
+          "formalClosure": false
+        }
       },
       "t05PaymentEligibilityAutonomous20261002": {
         "status": "frontend_locally_verified_integration_deferred_formal_handoff_blocked",

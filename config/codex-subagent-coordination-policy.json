@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "4A60CA880FACA1910926A1108CE0C92831735FE94C4F31273D07F5DB772BE801"
+    "sha256": "3FA0125B813058B72E749BD976DFBF9EEC5FECE049151649C500A928F9832D7B"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -325,7 +325,21 @@
         "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl",
         "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json",
         "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json",
-        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip"
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.json",
+        "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.zip"
       ]
     },
     {

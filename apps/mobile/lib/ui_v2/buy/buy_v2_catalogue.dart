@@ -12491,149 +12491,146 @@ class _FeaturedProductAction extends StatelessWidget {
         buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
       );
       final requiresOfferReview = offerDecision?.canAdd == false;
-      return Opacity(
-        opacity: session.cartChangesBlocked && !requiresOfferReview ? .38 : 1,
-        child: GestureDetector(
-          excludeFromSemantics: true,
-          behavior: HitTestBehavior.opaque,
-          onTap: session.cartChangesBlocked && !requiresOfferReview
-              ? () {}
-              : null,
-          child: Stack(
-            children: [
-              IgnorePointer(
-                ignoring: quantity > 0,
-                child: ExcludeSemantics(
-                  excluding: quantity > 0,
-                  child: AnimatedSwitcher(
-                    duration: BuyV2Motion.resolved(
-                      context,
-                      BuyV2Motion.stateChange,
+      return GestureDetector(
+        excludeFromSemantics: true,
+        behavior: HitTestBehavior.opaque,
+        onTap: session.cartChangesBlocked && !requiresOfferReview
+            ? () => session.addProduct(product.id)
+            : null,
+        child: Stack(
+          children: [
+            IgnorePointer(
+              ignoring: quantity > 0,
+              child: ExcludeSemantics(
+                excluding: quantity > 0,
+                child: AnimatedSwitcher(
+                  duration: BuyV2Motion.resolved(
+                    context,
+                    BuyV2Motion.stateChange,
+                  ),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(
+                        begin: .92,
+                        end: 1,
+                      ).animate(animation),
+                      child: child,
                     ),
-                    switchInCurve: Curves.easeOutBack,
-                    switchOutCurve: Curves.easeInCubic,
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: .92,
-                          end: 1,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    ),
-                    child: quantity > 0
-                        ? SizedBox(
-                            key: ValueKey(
-                              'buy-featured-quantity-shell-${product.id}',
-                            ),
-                            width: constraints.maxWidth,
-                            child: _QuantityStepper(
-                              key: ValueKey('buy-quantity-${product.id}'),
-                              quantity: quantity,
-                              stacked: stacked,
-                            ),
-                          )
-                        : Align(
-                            alignment: Alignment.centerRight,
-                            child: Semantics(
-                              container: true,
-                              label: requiresOfferReview
-                                  ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
+                  ),
+                  child: quantity > 0
+                      ? SizedBox(
+                          key: ValueKey(
+                            'buy-featured-quantity-shell-${product.id}',
+                          ),
+                          width: constraints.maxWidth,
+                          child: _QuantityStepper(
+                            key: ValueKey('buy-quantity-${product.id}'),
+                            quantity: quantity,
+                            stacked: stacked,
+                          ),
+                        )
+                      : Align(
+                          alignment: Alignment.centerRight,
+                          child: Semantics(
+                            container: true,
+                            label: requiresOfferReview
+                                ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
+                                : rxBlocked
+                                ? 'Use prescription for ${product.customerTitle}'
+                                : 'Add ${product.customerTitle} to cart',
+                            button: true,
+                            enabled:
+                                requiresOfferReview ||
+                                !session.cartChangesBlocked,
+                            child: Material(
+                              key: ValueKey(
+                                requiresOfferReview
+                                    ? 'buy-review-offer-${product.id}'
+                                    : 'buy-add-${product.id}',
+                              ),
+                              color: requiresOfferReview
+                                  ? BuyV2Colors.softOrange
                                   : rxBlocked
-                                  ? 'Use prescription for ${product.customerTitle}'
-                                  : 'Add ${product.customerTitle} to cart',
-                              button: true,
-                              enabled:
-                                  requiresOfferReview ||
-                                  !session.cartChangesBlocked,
-                              child: Material(
-                                key: ValueKey(
-                                  requiresOfferReview
-                                      ? 'buy-review-offer-${product.id}'
-                                      : 'buy-add-${product.id}',
-                                ),
-                                color: requiresOfferReview
-                                    ? BuyV2Colors.softOrange
-                                    : rxBlocked
-                                    ? BuyV2Colors.navy
-                                    : Colors.transparent,
-                                elevation: requiresOfferReview || rxBlocked
-                                    ? 3
-                                    : 0,
-                                shadowColor: const Color(0x33000040),
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  onTap:
-                                      session.cartChangesBlocked &&
-                                          !requiresOfferReview
-                                      ? null
-                                      : () {
-                                          HapticFeedback.selectionClick();
-                                          if (requiresOfferReview) {
-                                            session.openProduct(product.id);
-                                            return;
-                                          }
-                                          final added = session.addProduct(
-                                            product.id,
+                                  ? BuyV2Colors.navy
+                                  : Colors.transparent,
+                              elevation: requiresOfferReview || rxBlocked
+                                  ? 3
+                                  : 0,
+                              shadowColor: const Color(0x33000040),
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                onTap:
+                                    session.cartChangesBlocked &&
+                                        !requiresOfferReview
+                                    ? null
+                                    : () {
+                                        HapticFeedback.selectionClick();
+                                        if (requiresOfferReview) {
+                                          session.openProduct(product.id);
+                                          return;
+                                        }
+                                        final added = session.addProduct(
+                                          product.id,
+                                        );
+                                        if (!added &&
+                                            session.pendingPrescriptionProductId ==
+                                                product.id) {
+                                          showBuyV2PrescriptionSheet(
+                                            context,
+                                            session,
                                           );
-                                          if (!added &&
-                                              session.pendingPrescriptionProductId ==
-                                                  product.id) {
-                                            showBuyV2PrescriptionSheet(
-                                              context,
-                                              session,
-                                            );
-                                          }
-                                        },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: SizedBox(
-                                    width: 44,
-                                    height: BuyV2Metrics.minimumTap,
-                                    child: Center(
-                                      child: rxBlocked
-                                          ? const Text(
-                                              'Rx',
-                                              style: TextStyle(
-                                                color: Colors.transparent,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            )
-                                          : requiresOfferReview
-                                          ? const Icon(
-                                              Icons.info_outline_rounded,
-                                              color: BuyV2Colors.orange,
-                                              size: 23,
-                                            )
-                                          : const BuyV2AddFace(),
-                                    ),
+                                        }
+                                      },
+                                borderRadius: BorderRadius.circular(12),
+                                child: SizedBox(
+                                  width: 44,
+                                  height: BuyV2Metrics.minimumTap,
+                                  child: Center(
+                                    child: rxBlocked
+                                        ? const Text(
+                                            'Rx',
+                                            style: TextStyle(
+                                              color: Colors.transparent,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          )
+                                        : requiresOfferReview
+                                        ? const Icon(
+                                            Icons.info_outline_rounded,
+                                            color: BuyV2Colors.orange,
+                                            size: 23,
+                                          )
+                                        : const BuyV2AddFace(),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                  ),
+                        ),
                 ),
               ),
-              if (quantity > 0)
-                Positioned.fill(
-                  child: _QuantityStepperTargets(
-                    enabled: !session.cartChangesBlocked,
-                    stacked: stacked,
-                    productId: product.id,
-                    productTitle: product.customerTitle,
-                    quantity: quantity,
-                    minimumOrder: product.minimumOrder,
-                    quantityStep: product.quantityStep,
-                    onEdit: () =>
-                        showBuyV2QuantityEditor(context, session, product),
-                    onDecrease: () => session.decrease(product.id),
-                    onIncrease: () => session.increase(product.id),
-                  ),
+            ),
+            if (quantity > 0)
+              Positioned.fill(
+                child: _QuantityStepperTargets(
+                  enabled: !session.cartChangesBlocked,
+                  stacked: stacked,
+                  productId: product.id,
+                  productTitle: product.customerTitle,
+                  quantity: quantity,
+                  minimumOrder: product.minimumOrder,
+                  quantityStep: product.quantityStep,
+                  onEdit: () =>
+                      showBuyV2QuantityEditor(context, session, product),
+                  onDecrease: () => session.decrease(product.id),
+                  onIncrease: () => session.increase(product.id),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       );
     },
@@ -12911,130 +12908,128 @@ class BuyV2ProductCard extends StatelessWidget {
     final cartAction = GestureDetector(
       excludeFromSemantics: true,
       behavior: HitTestBehavior.opaque,
-      onTap: session.cartChangesBlocked && !requiresOfferReview ? () {} : null,
-      child: Opacity(
-        opacity: session.cartChangesBlocked && !requiresOfferReview ? .38 : 1,
-        child: IgnorePointer(
-          ignoring: quantity > 0,
-          child: ExcludeSemantics(
-            excluding: quantity > 0,
-            child: AnimatedSwitcher(
-              key: ValueKey('buy-product-action-motion-${product.id}'),
-              duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: ScaleTransition(
-                  scale: Tween<double>(begin: .97, end: 1).animate(animation),
-                  child: child,
-                ),
+      onTap: session.cartChangesBlocked && !requiresOfferReview
+          ? () => session.addProduct(product.id)
+          : null,
+      child: IgnorePointer(
+        ignoring: quantity > 0,
+        child: ExcludeSemantics(
+          excluding: quantity > 0,
+          child: AnimatedSwitcher(
+            key: ValueKey('buy-product-action-motion-${product.id}'),
+            duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: .97, end: 1).animate(animation),
+                child: child,
               ),
-              child: quantity > 0
-                  ? _QuantityStepper(
-                      key: ValueKey('buy-quantity-${product.id}'),
-                      quantity: quantity,
-                      stacked: compact ? false : stackedQuantity,
-                    )
-                  : SizedBox(
-                      key: ValueKey('buy-add-shell-${product.id}'),
-                      width: compact ? inlineActionWidth : 88,
-                      height: BuyV2Metrics.minimumTap,
-                      child: Semantics(
-                        container: true,
-                        label: requiresOfferReview
-                            ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
-                            : rxBlocked
-                            ? 'Use prescription for '
-                                  '${product.customerTitle}'
-                            : 'Add ${product.customerTitle} to cart',
-                        button: true,
-                        enabled:
-                            requiresOfferReview || !session.cartChangesBlocked,
-                        child: Material(
-                          key: ValueKey(
-                            requiresOfferReview
-                                ? 'buy-review-offer-${product.id}'
-                                : 'buy-add-${product.id}',
-                          ),
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap:
-                                session.cartChangesBlocked &&
-                                    !requiresOfferReview
-                                ? null
-                                : () async {
-                                    HapticFeedback.selectionClick();
-                                    if (requiresOfferReview) {
-                                      openProduct();
-                                      return;
-                                    }
-                                    final count =
-                                        initialAddQuantity ??
-                                        product.minimumOrder;
-                                    if (await beforeCartChange?.call(count) ==
-                                        false) {
-                                      return;
-                                    }
-                                    final added = session.addProduct(
-                                      product.id,
-                                      quantity: count,
+            ),
+            child: quantity > 0
+                ? _QuantityStepper(
+                    key: ValueKey('buy-quantity-${product.id}'),
+                    quantity: quantity,
+                    stacked: compact ? false : stackedQuantity,
+                  )
+                : SizedBox(
+                    key: ValueKey('buy-add-shell-${product.id}'),
+                    width: compact ? inlineActionWidth : 88,
+                    height: BuyV2Metrics.minimumTap,
+                    child: Semantics(
+                      container: true,
+                      label: requiresOfferReview
+                          ? 'Review ${product.customerTitle}. ${offerDecision!.statusLabel}'
+                          : rxBlocked
+                          ? 'Use prescription for '
+                                '${product.customerTitle}'
+                          : 'Add ${product.customerTitle} to cart',
+                      button: true,
+                      enabled:
+                          requiresOfferReview || !session.cartChangesBlocked,
+                      child: Material(
+                        key: ValueKey(
+                          requiresOfferReview
+                              ? 'buy-review-offer-${product.id}'
+                              : 'buy-add-${product.id}',
+                        ),
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap:
+                              session.cartChangesBlocked && !requiresOfferReview
+                              ? null
+                              : () async {
+                                  HapticFeedback.selectionClick();
+                                  if (requiresOfferReview) {
+                                    openProduct();
+                                    return;
+                                  }
+                                  final count =
+                                      initialAddQuantity ??
+                                      product.minimumOrder;
+                                  if (await beforeCartChange?.call(count) ==
+                                      false) {
+                                    return;
+                                  }
+                                  final added = session.addProduct(
+                                    product.id,
+                                    quantity: count,
+                                  );
+                                  if (!added &&
+                                      context.mounted &&
+                                      session.pendingPrescriptionProductId ==
+                                          product.id) {
+                                    showBuyV2PrescriptionSheet(
+                                      context,
+                                      session,
                                     );
-                                    if (!added &&
-                                        context.mounted &&
-                                        session.pendingPrescriptionProductId ==
-                                            product.id) {
-                                      showBuyV2PrescriptionSheet(
-                                        context,
-                                        session,
-                                      );
-                                    }
-                                  },
-                            borderRadius: BorderRadius.circular(11),
-                            child: Center(
-                              child: !requiresOfferReview && !rxBlocked
-                                  ? const BuyV2AddFace()
-                                  : Container(
-                                      height: 32,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
+                                  }
+                                },
+                          borderRadius: BorderRadius.circular(11),
+                          child: Center(
+                            child: !requiresOfferReview && !rxBlocked
+                                ? const BuyV2AddFace()
+                                : Container(
+                                    height: 32,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: requiresOfferReview
+                                          ? BuyV2Colors.softOrange
+                                          : BuyV2Colors.navy,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
                                         color: requiresOfferReview
-                                            ? BuyV2Colors.softOrange
+                                            ? BuyV2Colors.orange
                                             : BuyV2Colors.navy,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: requiresOfferReview
-                                              ? BuyV2Colors.orange
-                                              : BuyV2Colors.navy,
-                                        ),
                                       ),
-                                      child: requiresOfferReview
-                                          ? const Icon(
-                                              Icons.info_outline_rounded,
-                                              color: BuyV2Colors.orange,
-                                              size: 20,
-                                            )
-                                          : inlineIconOnly
-                                          ? const Icon(
-                                              Icons.medication_outlined,
-                                              color: Colors.white,
-                                              size: 18,
-                                            )
-                                          : const Text(
-                                              'Use Rx',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
                                     ),
-                            ),
+                                    child: requiresOfferReview
+                                        ? const Icon(
+                                            Icons.info_outline_rounded,
+                                            color: BuyV2Colors.orange,
+                                            size: 20,
+                                          )
+                                        : inlineIconOnly
+                                        ? const Icon(
+                                            Icons.medication_outlined,
+                                            color: Colors.white,
+                                            size: 18,
+                                          )
+                                        : const Text(
+                                            'Use Rx',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                  ),
                           ),
                         ),
                       ),
                     ),
-            ),
+                  ),
           ),
         ),
       ),
@@ -13707,7 +13702,7 @@ class _QuantityStepperTargets extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     excludeFromSemantics: true,
     behavior: HitTestBehavior.opaque,
-    onTap: enabled ? null : () {},
+    onTap: enabled ? null : onIncrease,
     child: LayoutBuilder(
       builder: (context, constraints) => Align(
         alignment: Alignment.centerRight,

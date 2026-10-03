@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
@@ -234,6 +235,190 @@ void main() {
         ),
       ),
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T10 fresh Add and Cart route selection text $scale', (
+      tester,
+    ) async {
+      const size = Size(360, 800);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(app(session, size: size, textScale: scale));
+        await tester.pumpAndSettle();
+        final add = find.byKey(const ValueKey('buy-add-s-tomato'));
+        await tester.scrollUntilVisible(
+          add,
+          120,
+          scrollable: find
+              .byWidgetPredicate(
+                (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        final face = find.descendant(
+          of: add,
+          matching: find.byType(BuyV2AddFace),
+        );
+        expect(face, findsOneWidget);
+        expect(tester.getSize(face), const Size(44, 32));
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 1);
+        final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        for (final key in [
+          'buy-local-tab-wholesale',
+          'buy-local-tab-orders',
+          'buy-local-tab-offers',
+          'moolsocial-family-root-buy',
+        ]) {
+          await tester.tap(find.byKey(ValueKey(key)));
+          await tester.pumpAndSettle();
+          expect(cart.hitTestable(), findsOneWidget, reason: key);
+          expect(session.quantityFor('s-tomato'), 1);
+          await tester.tap(cart);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(cart.hitTestable(), findsOneWidget);
+          expect(
+            tester
+                .widget<MoolDestinationNavigationV2>(
+                  find.byType(MoolDestinationNavigationV2),
+                )
+                .familyRootSelected,
+            isFalse,
+          );
+          expect(
+            tester
+                .widget<MoolLocalNavigationRail>(
+                  find.byKey(const ValueKey('buy-local-destination-tabs')),
+                )
+                .activeId,
+            'cart',
+          );
+          expect(
+            tester
+                .getSemantics(
+                  find.byKey(const ValueKey('buy-compact-cart-indicator')),
+                )
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected,
+            ui.Tristate.isTrue,
+          );
+          final scope = session.cartScope;
+          await tester.tap(cart);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.cartScope, scope);
+        }
+        await captureR66Visual(tester, 't10-fresh-cart-selected-$scale');
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('T10 mixed Cart target uses full basket text $scale', (
+      tester,
+    ) async {
+      const size = Size(360, 800);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-rice'), isTrue);
+      session.openDestination(BuyV2Destination.wholesale);
+      await tester.pumpWidget(app(session, size: size, textScale: scale));
+      await tester.pumpAndSettle();
+      final semantics = tester.ensureSemantics();
+      try {
+        final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        void expectFullBasket() {
+          final label = tester
+              .getSemantics(
+                find.byKey(const ValueKey('buy-compact-cart-indicator')),
+              )
+              .label;
+          expect(label, contains('${session.itemCount} items'));
+          expect(label, contains(buyV2Money(session.cartTotal)));
+        }
+
+        expectFullBasket();
+        expect(session.openCheckout(), isTrue);
+        await tester.pumpAndSettle();
+        expectFullBasket();
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expectFullBasket();
+        await captureR66Visual(tester, 't10-mixed-cart-target-$scale');
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
+
+    testWidgets('T10 Product Cart Back and Checkout target text $scale', (
+      tester,
+    ) async {
+      const size = Size(360, 800);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.rememberCartScrollOffset(BuyV2CartScope.all, 600);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.cartScrollOffsetFor(BuyV2CartScope.all), 0);
+      session.openProduct('s-tomato');
+      await tester.pumpWidget(app(session, size: size, textScale: scale));
+      await tester.pumpAndSettle();
+      final cart = find.byKey(const ValueKey('buy-cart-navigation-button'));
+      await tester.tap(cart);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      final scroll = find
+          .descendant(
+            of: find.byKey(
+              PageStorageKey('buy-cart-${session.cartScope.name}'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      expect(tester.state<ScrollableState>(scroll).position.pixels, 0);
+      await tester.tap(cart);
+      await tester.pumpAndSettle();
+      session.goBack();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product);
+      expect(session.selectedProductId, 's-tomato');
+      await tester.tap(cart);
+      await tester.pumpAndSettle();
+      final total = session.checkoutPayableTotal;
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpAndSettle();
+      expect(cart.hitTestable(), findsOneWidget);
+      await tester.tap(cart);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.checkoutPayableTotal, total);
+      expect(session.quantityFor('s-tomato'), 1);
+      await captureR66Visual(tester, 't10-product-checkout-cart-target-$scale');
+      expect(tester.takeException(), isNull);
+    });
   }
 
   test('Action fills retain readable enabled and disabled contrast', () {
@@ -4416,10 +4601,10 @@ void main() {
         // These checkout captures render the same draft T03 Checkout as the
         // Cart-return suite. Retain every historical reference unchanged.
         final reference = viewport.checkout
-            ? 'cursor-t03-20261001/'
+            ? 'cursor-t10-navigation-20261003/'
                   'buy-v2-t02-checkout-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
-            : 'cursor-cart-child-20260930/'
+            : 'cursor-t10-navigation-20261003/'
                   'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),
