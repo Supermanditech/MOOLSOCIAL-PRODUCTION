@@ -3781,3 +3781,39 @@ Read-only follow-up found no further blocker in that narrow correction.
 The visible receiving workflow, supplier payment/return/statement journeys and
 OPPO screenshot/correction cycle remain pending. The full goal stays active;
 this checkpoint is not founder review readiness or production acceptance.
+
+### 3 October receiving UI and physical correction cycle
+
+Existing Purchases now exposes Receive goods independently of a supplier bill.
+Reviewed arrival IDs/content are frozen before posting; uncertain status keeps
+recovery controls, supplier changes protect unsaved input, inherited item labels
+remain stable and accidentally added rows can be removed. Prior Stock linkage
+shows eligible original movement capacity across suppliers, not current on-hand.
+
+Latest affected widget reporter v8: 30 passed, zero failed, terminal0 and native
+done.success=true. Retained v6 lazy-viewport failure was corrected with ordinary
+gesture navigation, preserving assertions; v7 selected no tests and is not proof.
+Full atomic v1: 528 passed, 11 existing skips, zero failed. Host fixtures are not
+device accounting acceptance.
+
+OPPO current-source qualification required Dart hot restart, not r0-library
+reload. Actual Stock > Purchases > Receive goods > existing evaluation supplier
+> Sunflower oil was inspected without Save/Confirm. v3 PNG/XML evidence in task
+outputs/evidence covers register, selected form, lower fields and keyboard.
+Clipped quantity labels, oversized boxes, wasted partial-width reference/date
+and scrolling Purchases title were corrected. Damaged quantity remains visible
+above the keyboard; Back dismisses it. Saved bill revision9/2840, Stockoil3/rice97,
+Stockvalue27025 and receivables1786 remain unchanged; no goods/payment recorded.
+
+Open children: searchable product choice; human-friendly date/conversion labels;
+bill-context receiving; manual/partial/prior-stock confirmation, cancellation,
+restart and failed-save device journeys; physical enlarged-text/landscape;
+payment/advance, returns/refunds and reconciled supplier statements. Unknown
+opening10 remains unknown and blocks posting, never defaulted to zero. This is
+a receiving UI checkpoint only; the full end-to-end goal remains active.
+
+Architect checkpoint review adds two open correctness children: outer parent
+navigation must consult receiving's dirty/uncertain-save leave guard; and later
+partial arrivals must allow only the arriving subset of inherited lines while
+preserving stable history. Current UI tests do not qualify these paths. Do not
+call receiving ready or record a device receipt before resolving them.

@@ -4453,6 +4453,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(target.hitTestable(), findsOneWidget, reason: 'Opening record control must be reachable by touch.');
   }
+  Future<void> revealPurchaseAction(WidgetTester tester, Finder action) async {
+    final rail = find.byKey(const Key('work-purchase-actions'));
+    final register = find.byWidgetPredicate((w) => w is CustomScrollView &&
+      w.key is PageStorageKey<String> && (w.key! as PageStorageKey<String>).value.startsWith('work-purchases-'));
+    final vertical = find.descendant(of: register, matching: find.byWidgetPredicate((w) =>
+      w is Scrollable && w.axisDirection == AxisDirection.down)).first;
+    for (var attempt = 0; attempt < 12 && rail.hitTestable().evaluate().isEmpty; attempt++) {
+      await tester.drag(vertical, const Offset(0, 180));
+      await tester.pumpAndSettle();
+    }
+    expect(rail.hitTestable(), findsOneWidget, reason: 'Ordinary vertical gestures must expose the action rail.');
+    for (var attempt = 0; attempt < 12 && action.hitTestable().evaluate().isEmpty; attempt++) {
+      final target = tester.getCenter(action), bounds = tester.getRect(rail);
+      await tester.drag(rail, Offset(target.dx < bounds.left ? 180 : -180, 0));
+      await tester.pumpAndSettle();
+    }
+    expect(action.hitTestable(), findsOneWidget, reason: 'The exact action must be reachable by ordinary horizontal gestures.');
+  }
   Future<void> saveOpeningSupplier(WidgetTester tester, {String name = 'Evaluation opening supplier'}) async {
     await openPurchaseList(tester);
     await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
@@ -4466,7 +4484,7 @@ void main() {
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
     await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
+    await revealPurchaseAction(tester, find.byKey(const Key('work-purchase-opening')));
     await tester.tap(find.byKey(const Key('work-purchase-opening')));
     await tester.pumpAndSettle();
     await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
@@ -4491,6 +4509,104 @@ void main() {
       checkpointStore: checkpoint), isTrue);
     return work;
   }
+
+  for (final variant in ['portrait', 'landscape', 'large-text']) {
+    testWidgets('PURCHASERECEIVEUI saved review accessible without supplier bill $variant', (tester) async {
+      // Labelled host fixture only; no physical Store acceptance record.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore();
+      final checkpoint = _LedgerCheckpointFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.now().toUtc();
+      final supplier = WorkspaceSupplierProfile(id: 'receiving-ui-supplier', name: 'Evaluation delivery supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+      final receipt = WorkspaceSupplierGoodsReceipt(id: 'receiving-ui-arrival', expectedDeliveryId: 'receiving-ui-group',
+        reference: 'Delivery before bill', deliveredOn: DateTime.now().toIso8601String().substring(0, 10), recordedAt: at,
+        lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'receiving-ui-line', productId: product.id,
+          productLabel: product.title, purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
+          deliveredMilli: 3000, acceptedMilli: 2000, damagedMilli: 1000, shortMilli: 0, expectedMilli: 5000)]);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 2,
+        profiles: [supplier], goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 2, receipt: receipt)]);
+      final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: variant == 'landscape' ? const Size(800, 360) : const Size(360, 800),
+        textScale: variant == 'large-text' ? 2 : 1.4);
+      await openPurchaseList(tester);
+      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+      final supplierPicker = find.byKey(const Key('work-receive-supplier'));
+      await tester.ensureVisible(supplierPicker); await tester.tap(supplierPicker); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+      final status = find.byKey(const Key('work-receive-status'));
+      await tester.scrollUntilVisible(status, 120, scrollable: scroll); await tester.pumpAndSettle();
+      expect(find.text('Saved review · not yet received'), findsOneWidget);
+      expect(entry.value!.copies, isEmpty, reason: 'Goods-before-bill must not fabricate an invoice.');
+      expect(tester.widget<TextButton>(find.byKey(const Key('work-receive-confirm'))).onPressed, isNull,
+        reason: 'Unknown opening account must not be auto-confirmed to receive.');
+      final delivered = find.byKey(const Key('work-receive-delivered-0'));
+      await tester.ensureVisible(delivered); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(delivered).enabled, isFalse);
+      expect(tester.widget<TextField>(delivered).controller!.text, '3');
+      expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('PURCHASERECEIVEUI supplier switch protects input and accidental row can be removed', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final entry = _OpeningPostingFixtureStore();
+    final checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint);
+    final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+    final suppliers = [for (final id in ['first', 'second']) WorkspaceSupplierProfile(id: 'receiving-$id',
+      name: 'Evaluation $id delivery supplier', phone: '', address: '', gstin: '', createdAt: at, updatedAt: at)];
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 1, profiles: suppliers);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final action = find.byKey(const Key('work-purchase-receive-goods'));
+    await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+    final supplierPicker = find.byKey(const Key('work-receive-supplier'));
+    await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
+    expect(supplierPicker.hitTestable(), findsOneWidget);
+    await tester.tap(supplierPicker); await tester.pumpAndSettle();
+    await tester.tap(find.text(suppliers.first.name).last); await tester.pumpAndSettle();
+    final reference = find.byKey(const Key('work-receive-reference'));
+    final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(reference, 120, scrollable: scroll); await tester.pumpAndSettle();
+    expect(reference.hitTestable(), findsOneWidget);
+    await tester.enterText(reference, 'Delivery before bill');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(supplierPicker, -120, scrollable: scroll); await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
+    expect(supplierPicker.hitTestable(), findsOneWidget);
+    await tester.tap(supplierPicker); await tester.pumpAndSettle();
+    await tester.tap(find.text(suppliers.last.name).last); await tester.pumpAndSettle();
+    expect(find.text('Change supplier?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+    final form = find.descendant(of: supplierPicker, matching: find.byType(DropdownButtonFormField<String>));
+    expect(tester.state<FormFieldState<String>>(form).value, suppliers.first.id);
+    await tester.scrollUntilVisible(reference, 120, scrollable: scroll); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(reference).controller!.text, 'Delivery before bill');
+    final add = find.byKey(const Key('work-receive-add-line'));
+    await tester.scrollUntilVisible(add, 120, scrollable: scroll); await tester.pumpAndSettle();
+    await tester.tap(add); await tester.pumpAndSettle();
+    final remove = find.byKey(const Key('work-receive-remove-1'));
+    await tester.scrollUntilVisible(remove, 120, scrollable: scroll); await tester.pumpAndSettle();
+    expect(remove.hitTestable(), findsOneWidget);
+    await tester.tap(remove); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-receive-product-1')), findsNothing);
+    expect(entry.value!.goodsReceiptDrafts, isEmpty);
+    expect(checkpoint.saveAttempts, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   for (final mode in ['normal', 'unknown', 'included', 'historical-unlinked',
       'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape']) {
@@ -4785,6 +4901,7 @@ void main() {
       await tester.tap(find.text('Discard changes'));
       await tester.pumpAndSettle();
       expect(entry.value!.openingRecords.single.sourceNote, 'Evaluation source retained after failure');
+      await revealPurchaseAction(tester, find.byKey(const Key('work-purchase-opening')));
       expect(find.byKey(const Key('work-purchase-opening')), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

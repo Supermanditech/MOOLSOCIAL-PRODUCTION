@@ -4751,12 +4751,15 @@ void main() {
       expect(await session.confirmWorkspaceSupplierOpeningRecord(opening,
         scope: session.workspaceSupplierScope!, expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
       final receipt = sessionReceipt(session, prior: {session.workspaceStockMovements.single.id: 4});
+      expect(session.workspaceReceiptPriorStock(session.workspaceCatalogueItems.single.id).values.single, 10);
       final financial = session.workspaceFinance;
       Future<WorkspaceGoodsReceiptSaveResult> receive(WorkSession owner) => owner.confirmWorkspaceSupplierGoodsReceipt(
         receipt, supplierId: opening.supplierId, scope: owner.workspaceSupplierScope!,
         expectedPurchaseRevision: 3, expectedSupplierRevision: 1);
       expect(await receive(session), WorkspaceGoodsReceiptSaveResult.saved, reason: session.workspaceSupplierError);
       expect(session.workspaceCatalogueItems.single.stock, 12);
+      expect(session.workspaceReceiptPriorStock(session.workspaceCatalogueItems.single.id).values.single, 6,
+        reason: 'Remaining original evidence is10 minus4 linked, not current on-hand12.');
       expect(session.workspaceFinance, same(financial));
       final writes = storage.writes.length;
       expect(await receive(session), WorkspaceGoodsReceiptSaveResult.saved);
@@ -4764,6 +4767,7 @@ void main() {
       final restarted = await openingPostingSession(storage, inventory: true);
       expect(await restarted.recoverCustomerLedger(), isTrue);
       expect(restarted.workspaceCatalogueItems.single.stock, 12);
+      expect(restarted.workspaceReceiptPriorStock(restarted.workspaceCatalogueItems.single.id).values.single, 6);
       expect(restarted.workspaceSupplierLedger(opening.supplierId)!.goodsReceipts.length, 1);
       expect(await receive(restarted), WorkspaceGoodsReceiptSaveResult.saved);
       expect(storage.writes.length, writes);

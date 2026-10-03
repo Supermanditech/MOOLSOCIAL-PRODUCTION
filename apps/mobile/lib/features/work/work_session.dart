@@ -1537,6 +1537,35 @@ class WorkSession extends ChangeNotifier {
   bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
   Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
   bool get workspaceGoodsReceiptBusy => _storeData.inventoryReceiptBusy;
+  bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending;
+  bool get workspaceSupplierRecoveryRequired => _supplierKey != null && _supplierNeedsReload.contains(_supplierKey);
+  bool get workspaceGoodsReceiptCancellationAvailable => workspaceSupplierOpeningConfirmationAvailable &&
+      _supplierStorage is WorkPurchaseReceiptReviewAbandonment;
+  String newWorkspaceGoodsReceiptId() => _newCounterIdentity('supplier-arrival');
+  String newWorkspaceDeliveryGroupId() => _newCounterIdentity('supplier-delivery');
+  String newWorkspaceDeliveryLineId() => _newCounterIdentity('supplier-delivery-line');
+
+  /// Display-only capacity from original saved entry evidence, never on-hand.
+  /// The authoritative receipt checkpoint revalidates every allocation on save.
+  Map<WorkspaceStockMovement, int> workspaceReceiptPriorStock(String productId) {
+    if (!_storeData.ledgerRecovered || _storeData.inventoryReceiptRecoveryPending) return const {};
+    final allocated = <String, int>{};
+    for (final ledger in _supplierLedgerCheckpointEntries(_storeData).values) {
+      for (final receipt in ledger.goodsReceipts.values) {
+        for (final line in receipt.lines) {
+          for (final entry in line.priorStockUnits.entries) {
+            allocated.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
+          }
+        }
+      }
+    }
+    return {for (final movement in _storeData.workspaceStockMovements)
+      if (movement.productId == productId && movement.referenceKind == null &&
+          movement.referenceId == null &&
+          {WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.goodsReceived}.contains(movement.kind) &&
+          movement.quantityDelta > (allocated[movement.id] ?? 0))
+        movement: movement.quantityDelta - (allocated[movement.id] ?? 0)};
+  }
 
   bool _stockEditAvailable() {
     if (!_storeData.inventoryReceiptBusy && !_storeData.inventoryReceiptRecoveryPending) return true;
