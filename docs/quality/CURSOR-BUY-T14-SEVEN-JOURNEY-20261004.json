@@ -1,0 +1,177 @@
+{
+  "status": "bounded_host_technical_checkpoint_with_unresolved_children",
+  "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+  "focusedPassed": 136,
+  "selectedDistinct": 1096,
+  "selectedReferences": 1156,
+  "selectedFiles": 54,
+  "receipts": [
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-1.jsonl",
+      "sha256": "9be603bbcc2737ec529de4718848135227a11a2ae8f4d7ddac3a33650913c4d1",
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-2.jsonl",
+      "sha256": "df2152605f3fe4d176586e7dcf183077549ec9b797b066e26b88665f62ecc115",
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl",
+      "sha256": "b4fbc20b9111f521fd7b3619b5058e0fdbbb3a01d84830d450fc013b3efa62f2",
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl",
+      "sha256": "abdd8b81dbdb723aeed3c38be6c8faa7d72385364a1b506b9ff242cee777f60a",
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0"
+    }
+  ],
+  "selectedResults": [
+    {
+      "batch": 1,
+      "exitCode": 0,
+      "passed": 445,
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "9be603bbcc2737ec529de4718848135227a11a2ae8f4d7ddac3a33650913c4d1"
+    },
+    {
+      "batch": 2,
+      "exitCode": 0,
+      "passed": 376,
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "df2152605f3fe4d176586e7dcf183077549ec9b797b066e26b88665f62ecc115"
+    },
+    {
+      "batch": 3,
+      "exitCode": 0,
+      "passed": 275,
+      "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "b4fbc20b9111f521fd7b3619b5058e0fdbbb3a01d84830d450fc013b3efa62f2"
+    }
+  ],
+  "admissionPins": {
+    "config/codex-development-regression-registry.json": "1f4a8d7c8472096df61c71c11488fe2da1c0298d136e0b8bac91412884e788a1",
+    "config/codex-subagent-coordination-policy.json": "b6375c39b3647d586c27317df10359534f7d6b392efd77e78f0839e604881e1d",
+    "config/buy-founder-regression.json": "d137195994715c33f6ea27c8a73933db09e422b1d53c07bfa40c3f3b52b662a0"
+  },
+  "hostPreview": "14 seeded composition/navigation cases, seven origins at 1x/2x; not actual native Add origin",
+  "hostFulfilment": "14 isolated development fixture cases; confirm through Orders and provider refresh to Delivered; not real payment/native/provider acceptance",
+  "nativeCurrent": "c6da01c7 earlier warm runtime; r66.36 cold APK unchanged",
+  "nativeNewSourceAccepted": false,
+  "fullJourneyAccepted": false,
+  "formalClosure": false,
+  "founderApprovalPending": true,
+  "noBuildInstallResetRealPayment": true,
+  "children": [
+    {
+      "id": "T14-native-activation",
+      "status": "unresolved",
+      "detail": "New shortcut fix is not active on Redmi. Final read-only raw VM probe qualified false; stop retries without reset/install. Native screenshots reproduce pre-fix discrepancy only."
+    },
+    {
+      "id": "T14-seven-actual-origins",
+      "status": "unverified",
+      "detail": "Seven separate/mixed real-user Add-to-Checkout native journeys need the current source activated. Seeded host tests are distinct. Native Add-to-Delivered requires authoritative integration."
+    },
+    {
+      "id": "T14-empty-refresh-notice",
+      "status": "host_fixed_native_pending",
+      "detail": "Existing _BuyNotice now suppresses empty/whitespace messages. All14 fixture fulfilment cases assert blank live-notice absent and meaningful notice still announced; regenerated normal/200% Delivered captures inspected. Earlier passive blank pill overlapped Updated; it was not an information action. Current-source native activation remains pending."
+    },
+    {
+      "id": "T14-confirmation-capture",
+      "status": "corrected_host_evidence_only",
+      "detail": "Earlier confirmation-named frames showed catalogue because mount followed confirmOrder. Mount now precedes navigation; asserted confirmation view/key and regenerated frames. Historical run2 retained as diagnostic, never confirmation proof."
+    },
+    {
+      "id": "T14-cart-return-scroll",
+      "status": "observation_pending_reproduction",
+      "detail": "Native Checkout return preserved recommendation scroll offset; establish expected context and reproduce before code change."
+    },
+    {
+      "id": "T14-earlier-cart-checkout-discrepancy",
+      "status": "unresolved_carryover",
+      "detail": "Earlier Cart1/\u20b937 to Checkout2/\u20b997 remains unexplained. The new global preview may address a related projection cause, but no current-source native reproduction/retest proves this earlier case resolved."
+    },
+    {
+      "id": "T14-routing-hint",
+      "status": "host_corrected_native_pending",
+      "detail": "Personal cartLines are already mixed while Shop/Wholesale cartScope preserves return context. ForceAll was a real regression, corrected by preserving original routing and aggregating summary only. Original nested Store/provider/gallery scope assertions retained. Public context hints do not establish separate baskets; Store procurement and Medicine stay separate. Earlier obsolete-test diagnosis superseded by root evidence."
+    },
+    {
+      "id": "T14-polish-design",
+      "status": "registered_pending",
+      "detail": "Full Product/Add to Delivered cards, icons, gradients, solid colours, motion/reduced motion, UX, accessibility and wording audit remains scoped follow-up. Accepted Add appearance preserved; no blanket visual acceptance."
+    },
+    {
+      "id": "T14-payment-fields-intent-QR",
+      "status": "integration_deferred",
+      "detail": "Existing card choice and provider action/UPI intent/QR hooks retained. Card details belong to selected payment provider; no disconnected card/CVV fields, locally simulated payment or new charge for QR. Authoritative recipient, amount, reference, expiry and payment reconciliation acceptance required. Store receive-payment QR: workspace Codex after integration; backend deferred; Google dependencies separately listed."
+    },
+    {
+      "id": "T14-formal-handoff",
+      "status": "blocked_inherited",
+      "detail": "Non-atomic inherited 0e90a6ca74b81e212f118995f7c4fab0d3b78620 prevents formal handoff/closure. Preserve history; checkpoint is not production acceptance."
+    }
+  ],
+  "sourceLineEndingProvenance": {
+    "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "testedWorkingSha256": "4ea5d29f9cc1b899befb50b33f9e47458b0c1aa674974189c68b5a8e13ba3391",
+    "expectedGitCanonicalSha256": "d0dc9bd4b5d8b886d63171e3eb761b5e594a9df4554a94c52d62604e24e387f7",
+    "allowedTransformation": "CRLF to LF only; verify exact staged/committed canonical bytes separately",
+    "canonicalIndependentlyTested": false,
+    "freshCloneOrNativeAcceptance": false
+  },
+  "admissionSequencingVariance": {
+    "path": "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+    "existingClaimAndSelectedOwnerBeforeEdit": true,
+    "currentAssessmentPathRecordedAfterEarlierEdit": true,
+    "noRetroactiveAdmissionClaim": true,
+    "correctedAssessmentAndGatesBeforeFinalRootEdits": true
+  },
+  "testedSourceOwnerProvenance": [
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "testedWorkingSha256": "4ea5d29f9cc1b899befb50b33f9e47458b0c1aa674974189c68b5a8e13ba3391",
+      "expectedGitCanonicalSha256": "d0dc9bd4b5d8b886d63171e3eb761b5e594a9df4554a94c52d62604e24e387f7",
+      "canonicalIndependentlyTested": false
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+      "testedWorkingSha256": "159cb57470be9dd0a0c330b8f5a2c7880c24914b3275edf9c4ea98b35cbd34a6",
+      "expectedGitCanonicalSha256": "6147dae4ab85fd4b09edee2dc333f85c80baaa821284f7d9784df3244112bd6e",
+      "canonicalIndependentlyTested": false
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "testedWorkingSha256": "fda0fc60626df2d11d078185c58e294062aa96bd3c80c3d2eb3b4d7b3f0e8090",
+      "expectedGitCanonicalSha256": "fda0fc60626df2d11d078185c58e294062aa96bd3c80c3d2eb3b4d7b3f0e8090",
+      "canonicalIndependentlyTested": false
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+      "testedWorkingSha256": "807c9097410a037d87a131d77dfbf6d284bfa2b841e1fed4e93f67de5756ecf7",
+      "expectedGitCanonicalSha256": "807c9097410a037d87a131d77dfbf6d284bfa2b841e1fed4e93f67de5756ecf7",
+      "canonicalIndependentlyTested": false
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+      "testedWorkingSha256": "5e4d954e8ab7b232c85b74e3475a3a76297577d442c5154661a6939189542cff",
+      "expectedGitCanonicalSha256": "5e4d954e8ab7b232c85b74e3475a3a76297577d442c5154661a6939189542cff",
+      "canonicalIndependentlyTested": false
+    }
+  ]
+}

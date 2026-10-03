@@ -118,6 +118,89 @@ class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
       throw UnsupportedError(invocation.memberName.toString());
 }
 
+// Host-only connected journey fixture. Never supplied to native/live commerce.
+class _T14ConnectedJourneyCommerce extends _R669DeliveryCommerce {
+  _T14ConnectedJourneyCommerce() {
+    records = [];
+  }
+  String readyMessage = '';
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async {
+    final result = await super.refreshOrder(orderId: orderId);
+    return BuyV2OrderRefreshResult(
+      state: result.state,
+      order: result.order,
+      customerMessage: result.state == BuyV2CommerceLoadState.ready
+          ? readyMessage
+          : result.customerMessage,
+    );
+  }
+
+  void advanceConfirmed(BuyV2Order original, BuyV2OrderStatus next) {
+    records = [
+      for (final order in records)
+        if (order.id == original.id)
+          BuyV2Order(
+            id: original.id,
+            destination: original.destination,
+            title: original.title,
+            itemSummary: original.itemSummary,
+            total: original.total,
+            totalMinor: original.totalMinor,
+            partner: original.partner,
+            partnerType: original.partnerType,
+            promise: next == BuyV2OrderStatus.delivered
+                ? 'Delivered'
+                : original.promise,
+            destinationLabel: original.destinationLabel,
+            progress: next == BuyV2OrderStatus.delivered ? 1 : .85,
+            status: next,
+            collection: original.collection,
+            purchaseId: original.purchaseId,
+            promisedByLabel: original.promisedByLabel,
+            updatedDeliveryEstimate: original.updatedDeliveryEstimate,
+            productIds: original.productIds,
+            lines: original.lines,
+            paymentMethod: original.paymentMethod,
+            purchaseOrderReference: original.purchaseOrderReference,
+            recipient: original.recipient,
+            addressLine: original.addressLine,
+            deliveryInstruction: original.deliveryInstruction,
+            tip: original.tip,
+            discount: original.discount,
+            paymentTermLabel: original.paymentTermLabel,
+            amountPaidNow: original.amountPaidNow,
+            balanceDue: original.balanceDue,
+            balanceDueLabel: original.balanceDueLabel,
+            paymentStatusLabel: original.paymentStatusLabel,
+            buyerName: original.buyerName,
+            buyerType: original.buyerType,
+            tax: original.tax,
+            freight: original.freight,
+            deliveryFee: original.deliveryFee,
+            paymentCharge: original.paymentCharge,
+            dispatchPromise: original.dispatchPromise,
+            deliveryPartnerName: original.deliveryPartnerName,
+            deliveryPartnerType: original.deliveryPartnerType,
+            trackingReference: original.trackingReference,
+            deliveryServiceLevel: original.deliveryServiceLevel,
+            proofOfDeliveryStatus: original.proofOfDeliveryStatus,
+            taxInvoiceState: original.taxInvoiceState,
+            taxInvoiceDetails: original.taxInvoiceDetails,
+            platformTaxInvoiceDetails: original.platformTaxInvoiceDetails,
+            invoiceAvailable: original.invoiceAvailable,
+            receiptReference: original.receiptReference,
+            supplyProgress: original.supplyProgress,
+          )
+        else
+          order,
+    ];
+  }
+}
+
 class _TrackingEligibleCommerce extends _R669DeliveryCommerce {
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
@@ -1740,6 +1823,154 @@ void main() {
       debugDisableShadows = previousShadows;
       repaint(boundary);
       await tester.pump();
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final scenario in const {
+      'Shop': ['s-tomato'],
+      'Wholesale': ['w-notebook'],
+      'Offers': ['s-rice'],
+      'Shop+Wholesale': ['s-tomato', 'w-notebook'],
+      'Shop+Offers': ['s-tomato', 's-rice'],
+      'Wholesale+Offers': ['w-notebook', 's-rice'],
+      'Shop+Wholesale+Offers': ['s-tomato', 'w-notebook', 's-rice'],
+    }.entries) {
+      testWidgets('T14 isolated connected fulfilment ${scenario.key} at $scale', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(360, 800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final commerce = _T14ConnectedJourneyCommerce();
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: commerce,
+          reviewDataEnabled: true,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        for (final id in scenario.value) {
+          expect(session.addProduct(id), isTrue, reason: session.notice);
+        }
+        final total = session.cartTotal;
+        // Mount before navigation: screen initialization chooses its entry route.
+        await tester.pumpWidget(app(session, scale));
+        await tester.pumpAndSettle();
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(
+          session.continueCheckoutFromAddress(),
+          isTrue,
+          reason: session.notice,
+        );
+        expect(
+          session.continueCheckoutFromPayment(),
+          isTrue,
+          reason: session.notice,
+        );
+        // Explicit development confirmation fixture; no payment handoff/server call.
+        expect(session.confirmOrder(), isTrue, reason: session.notice);
+        final originals = List<BuyV2Order>.of(session.confirmedOrders);
+        expect(originals, isNotEmpty);
+        expect(
+          originals.fold<int>(0, (sum, order) => sum + order.total),
+          total,
+        );
+        expect(
+          originals.expand((order) => order.productIds).toSet(),
+          scenario.value.toSet(),
+        );
+        final purchase = originals.first.purchaseId;
+        expect(
+          originals.every((order) => order.purchaseId == purchase),
+          isTrue,
+        );
+        commerce.records = originals;
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.confirmation);
+        expect(find.byKey(const ValueKey('buy-confirmation')), findsOneWidget);
+        await capture(
+          tester,
+          't14-frontend-${scenario.key}-$scale-confirmation',
+        );
+        session.showOrdersTab(BuyV2OrdersTab.active);
+        await tester.pumpAndSettle();
+        final ids = originals.map((order) => order.id).toSet();
+        expect(
+          session.visibleOrders.map((order) => order.id).toSet(),
+          containsAll(ids),
+        );
+        await capture(tester, 't14-frontend-${scenario.key}-$scale-orders');
+        for (final original in originals) {
+          expect(session.openTracking(original.id), isTrue);
+          await tester.pumpAndSettle();
+          expect(session.selectedOrder.total, original.total);
+          expect(
+            session.selectedOrder.status,
+            isNot(BuyV2OrderStatus.delivered),
+          );
+          await capture(
+            tester,
+            't14-frontend-${scenario.key}-$scale-${originals.indexOf(original)}-${original.destination.name}-preparing',
+          );
+          for (final next in [
+            BuyV2OrderStatus.arriving,
+            BuyV2OrderStatus.delivered,
+          ]) {
+            commerce.advanceConfirmed(original, next);
+            expect(await session.refreshOrder(original.id), isTrue);
+            await tester.pumpAndSettle();
+            expect(session.selectedOrder.status, next);
+            expect(find.byKey(const ValueKey('buy-live-notice')), findsNothing);
+            expect(session.selectedOrder.total, original.total);
+            expect(session.selectedOrder.productIds, original.productIds);
+            expect(session.selectedOrder.purchaseId, purchase);
+            expect(
+              session.selectedOrder.lines.map((line) => line.quantity),
+              original.lines.map((line) => line.quantity),
+            );
+          }
+          await capture(
+            tester,
+            't14-frontend-${scenario.key}-$scale-${originals.indexOf(original)}-${original.destination.name}-delivered',
+          );
+          expect(tester.takeException(), isNull);
+        }
+        session.showOrdersTab(BuyV2OrdersTab.delivered);
+        await tester.pumpAndSettle();
+        expect(
+          session.visibleOrders.map((order) => order.id).toSet(),
+          containsAll(ids),
+        );
+        expect(
+          session.orders
+              .where((order) => ids.contains(order.id))
+              .fold<int>(0, (sum, order) => sum + order.total),
+          total,
+        );
+        await capture(
+          tester,
+          't14-frontend-${scenario.key}-$scale-delivered-history',
+        );
+        commerce.readyMessage = 'Order details updated.';
+        expect(await session.refreshOrder(originals.first.id), isTrue);
+        await tester.pumpAndSettle();
+        final notice = find.byKey(const ValueKey('buy-live-notice'));
+        expect(notice, findsOneWidget);
+        expect(
+          tester.widget<Semantics>(notice).properties.label,
+          commerce.readyMessage,
+        );
+        expect(
+          find.descendant(
+            of: notice,
+            matching: find.text(commerce.readyMessage),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      });
     }
   }
 

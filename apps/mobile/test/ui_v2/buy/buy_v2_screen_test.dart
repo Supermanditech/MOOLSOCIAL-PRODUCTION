@@ -5518,6 +5518,8 @@ void main() {
   testWidgets(
     'Cart stays destination-scoped in Shop and Wholesale and aggregate in Orders',
     (tester) async {
+      // Historical ledger name retained. Public discovery now previews the
+      // existing mixed Cart; Store procurement and Care remain scoped below.
       final session = BuyV2Session(core: BuySession());
       final shop = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.shop,
@@ -5539,11 +5541,7 @@ void main() {
 
       session.openDestination(BuyV2Destination.wholesale);
       await tester.pumpAndSettle();
-      expectCartSummary(
-        tester,
-        session.countForDestination(BuyV2Destination.wholesale),
-        session.totalForDestination(BuyV2Destination.wholesale),
-      );
+      expectCartSummary(tester, session.itemCount, session.cartTotal);
       expect(
         tester
             .getSemantics(
@@ -5551,8 +5549,8 @@ void main() {
             )
             .label,
         contains(
-          '${session.countForDestination(BuyV2Destination.wholesale)} '
-          '${session.countForDestination(BuyV2Destination.wholesale) == 1 ? 'item' : 'items'} ready',
+          '${session.itemCount} '
+          '${session.itemCount == 1 ? 'item' : 'items'} ready',
         ),
       );
       expect(
@@ -5561,16 +5559,14 @@ void main() {
               find.byKey(const ValueKey('buy-compact-cart-indicator')),
             )
             .label,
-        contains(
-          buyV2Money(session.totalForDestination(BuyV2Destination.wholesale)),
-        ),
+        contains(buyV2Money(session.cartTotal)),
       );
       await tester.tap(
         find.byKey(const ValueKey('buy-compact-cart-indicator')),
       );
       await tester.pumpAndSettle();
       expect(session.cartScope, BuyV2CartScope.wholesale);
-      expect(session.cartLines, hasLength(1));
+      expect(session.cartLines, hasLength(3));
 
       session.openDestination(BuyV2Destination.orders);
       await tester.pumpAndSettle();

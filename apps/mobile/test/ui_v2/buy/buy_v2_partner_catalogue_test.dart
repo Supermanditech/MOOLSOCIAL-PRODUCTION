@@ -4441,10 +4441,17 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expectNestedStatusContrast();
+        // The full personal basket retains its origin hint for return routing.
         expect(
           session.cartScope,
           shop ? BuyV2CartScope.shop : BuyV2CartScope.wholesale,
         );
+        expect(session.cartLines.map((line) => line.product.id).toSet(), {
+          id,
+          otherId,
+        });
+        expect(session.quantityFor(id), product.minimumOrder);
+        expect(session.quantityFor(otherId), otherQuantity);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);

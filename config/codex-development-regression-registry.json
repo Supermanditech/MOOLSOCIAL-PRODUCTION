@@ -111091,6 +111091,338 @@
           "prevention": "Reuse already completed unchanged mandatory reads; new reconstruction reads use independent bounded token-aware pages. Use exact subtree/heading projection for relevant planning, never truncated output as full-read proof.",
           "evidence": "Tool chunks 638240 and c818a0; branch/HEAD scalar unchanged; clean digest recorded.",
           "impact": "No product/source change; backlog request retained. Existing policy had been fully read in prior checkpoint."
+        },
+        "t14BoundedReviewEntryPathIncident20261004": {
+          "state": "registered_before_retry",
+          "observed": "rg exact apps/mobile/lib/main_buy_device_review.dart returned exit1 file missing",
+          "rootCause": "Assumed review entry filename without exact inventory",
+          "detection": "Tool chunk 076f14 explicit file-not-found",
+          "prevention": "Discover matching entry filename with rg --files restricted to apps/mobile/lib before reading; do not infer entry paths from app package label.",
+          "impact": "Read-only failure; no source/device/test mutation; remaining successful independent reads retained."
+        },
+        "t14BoundedSevenJourneyExecution20261004": {
+          "state": "assessed_before_runtime_edits_existing_Buy_parent",
+          "baselineCommit": "dd8d9080ff832b918b5ff380d651b206ae605eab",
+          "actor": "Personal Buyer",
+          "capability": "Public Buy connected Cart and order-fulfilment frontend validation",
+          "classification": "mvp_required",
+          "reason": "Counts, totals, payment ownership, navigation and truthful fulfilment are required for complete commerce.",
+          "customerOutcome": "Buyer sees a consistent single Cart and can follow every available frontend purchase/fulfilment state without misleading payment/delivery success.",
+          "reuse": "Existing native Buy catalogue/screen/views, session, commerce/content contracts and focused tests; no new screen/route/service/state owner/dependency.",
+          "exactRuntimeOwners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart"
+          ],
+          "testOwners": [
+            "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart"
+          ],
+          "smallestChange": "First reconcile public Shop/Wholesale mini-Cart count/total with existing mixed Cart scope and standardize single-Cart wording. Preserve Medicine and Store procurement scope. Fix only further reproduced bounded defects; inventory design polish and provider/card/intent/QR gaps.",
+          "matrix": [
+            "Shop",
+            "Wholesale",
+            "Offers origin",
+            "Shop+Wholesale",
+            "Shop+Offers",
+            "Wholesale+Offers",
+            "Shop+Wholesale+Offers"
+          ],
+          "nativeBoundary": "Existing isolated r66.36 warm review runtime only; no APK build/install or real financial action. Review adapter refreshOrder is unavailable, so native Add-to-Delivered completion remains integration-dependent.",
+          "frontendFulfilment": "Use isolated host-only existing commerce fixtures for Confirmation/Orders/Tracking/Delivered; source-bound screenshots and tests, never production/provider acceptance.",
+          "failureRecovery": "Preserve pending-payment holds, exact totals/idempotency and identity freshness. Check cancel/retry/Back, selection, quantity/removal, large text and missing capabilities.",
+          "acceptedBoundaries": [
+            "Accepted Add colours/shape retained",
+            "Supplier terms Product/Add only",
+            "Shared-address instructions and composer-only Clear",
+            "Immutable references and other worktrees preserved"
+          ],
+          "dependencies": {
+            "backend": "deferred",
+            "workspace": "Codex after integration",
+            "google": "separately listed",
+            "payment": "Card-field ownership/intent/QR capability inventory pending chosen provider; no disconnected card forms",
+            "storeReceiveQr": "deferred workspace dependency"
+          },
+          "sequence": [
+            "Scope/memory/MVP/Git gates",
+            "Native source proof and seven fresh origin flows to Checkout",
+            "Register defects and scoped fixes",
+            "Isolated frontend fulfilment matrices and design/payment gap inventory",
+            "Focused and selected regression qualification",
+            "Native reactivation and fresh replay",
+            "Record verified coverage or unresolved children",
+            "Safe scoped Git checkpoint and stop"
+          ],
+          "formalClosure": "Not claimed; inherited non-atomic history blocker unchanged",
+          "evidencePlan": "New uniquely named bounded evidence under existing parent; current host/native screenshots immutable; no hidden overwrites."
+        },
+        "t14BoundedShortcutContinuityReproduction20261004": {
+          "state": "reproduced_native_before_fix",
+          "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+          "reproduction": [
+            "Fresh normal Shop Add creates1/37",
+            "Wholesale shortcut shows All carts1/37 when destination empty",
+            "Wholesale Add creates destination-only shortcut2/1160",
+            "Tap opens mixed Cart3/1197"
+          ],
+          "rootCause": "Mini-Cart catalogue summary/target projects destination scope while public Cart presentation uses mixed selection. Existing scoped-summary tests encode the obsolete catalogue projection, so they did not assert preview-to-open continuity.",
+          "evidence": [
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native/bounded-before-wholesale-20261004.png",
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native/bounded-before-wholesale-add-20261004.xml",
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native/bounded-before-mixed-cart-20261004.xml"
+          ],
+          "smallestFix": "Use existing full basket projection/target for Personal Buyer public Shop/Wholesale; show one Cart wording. Preserve Store procurement and Medicine destination projection.",
+          "prevention": "Add seven real-origin count/amount/target continuity tests and native fresh matrices; update old assertions only where the intentional public mixed-Cart contract replaces destination-only projection. Keep Store/Care and payment guards intact.",
+          "relatedObservation": "Checkout-to-Cart initially retained recommendation scroll offset; record as UX observation pending reproducible expectation, not yet a confirmed source defect.",
+          "nativeStatePreservation": "Original owner-scoped unheld snapshot preserved privately with SHA fd0ef854c485d53ddb8a24c877a9363fe90509a783e041e6e3f990afb42fb6d5; no app-wide clearing or payment action.",
+          "dependencies": "Native delivery refresh unavailable; frontend fixtures must remain isolated. Review supplier labels are fixture data, not proof of live provider copy."
+        },
+        "t14BoundedTestOracleDeadBranches20261004": {
+          "state": "registered_before_retry",
+          "observed": "Focused runner61348 exited1 in analysis; three dead_code warnings in updated historical public Cart assertions; no test run started",
+          "rootCause": "Replacing public aggregate projection with consttrue left obsolete ternary destination-only branches in the historical test.",
+          "detection": "Analyzer original log t14-bounded-analysis-1.log SHA9bf0d37f546500754cd8e6f554f4e15bfe0a758903f2499653396adc90950a08",
+          "prevention": "Remove replaced scoped public test branches; directly assert globalcount/globaltotal/All target. Preserve separate Store/Medicine coverage and historical ledger test identity. No lint suppression or threshold changes.",
+          "impact": "Test-only oracle cleanup required; runtime3-source-owner scope unchanged; next run uses unique outputs and refreshed registry binding."
+        },
+        "t14BoundedSemanticsFixtureLifecycle20261004": {
+          "state": "registered_before_retry",
+          "observed": "Focused runner82660 terminal1: new T14 cases retain SemanticsHandle until addTearDown, later than Flutter end-of-test verification; original Store/Care targeted coverage passed",
+          "rootCause": "Used addTearDown for a SemanticsHandle instead of the existing try/finally disposal pattern required before test callback completes.",
+          "evidence": "t14-bounded-focused-2.log SHAeee650c1a8cbad771d126057626b5e90322d699543e2755ab5ede7cde3dbb885",
+          "prevention": "Dispose semantics in test-body finally on both success/failure before framework verifies. Keep every behavioral expectation and enable semantics; do not suppress verification.",
+          "impact": "Fixture lifecycle only; no runtime defect inferred from handle failure. Diagnose full exception inventory and rerun unique frozen output after correction."
+        },
+        "t14BoundedMachineEventParserIncident20261004": {
+          "state": "registered_before_retry",
+          "observed": "Read-only exception-inventory parser exit1 AttributeError list has no get",
+          "rootCause": "Original Flutter machine log contains list/array events as well as dict events; diagnostic comprehension assumed dict.",
+          "prevention": "Filter isinstance(event,dict) before event-type projection; retain original arrays/log bytes. Use guarded parser in bounded verification helpers.",
+          "evidence": "Tool chunk910983 and unchanged original t14-bounded-focused-2.log",
+          "impact": "Read-only diagnostic failure; no test rerun/source/device mutation. Historical raw machine-event preservation rule remains unchanged."
+        },
+        "t14BoundedFormattedPatchContextIncident20261004": {
+          "state": "registered_before_retry",
+          "observed": "apply_patch verification failed for semantics lifecycle correction; entire patch unapplied",
+          "rootCause": "Expected single-line capture call had been wrapped by dart format; patch used stale formatting context.",
+          "prevention": "Read the exact current local test span before the next patch. Use unique stable first/last anchors with current formatting; one owner and readback per operation.",
+          "impact": "No partial owner change and no following format/test command ran because exec stopped at thrown patch verification error.",
+          "evidence": "functions exec apply_patch verification error; targeted test source unchanged from failed-run2."
+        },
+        "t14BoundedNativeAttachConnectionTimeout20261004": {
+          "state": "registered_before_retry",
+          "observed": "Native restart helper33641 terminal1 attachExit1/readOnlyProbeCompletedfalse; private machine stream has app.start but no app.debugPort/app.started before110second bounded timeout.",
+          "rootCause": "Flutter attach service discovery did not connect; exact environmental cause unproven. No fullDartRestart command was reached and no source activation may be claimed.",
+          "evidence": "t14-bounded-native-restart-private-20261004.log retained ignored/private; tool chunk603c4f. Earlier read-only probe4160 passed exact three-library source and original2item snapshot backup.",
+          "prevention": "Diagnose exact existing review package PID/service before next bounded attach; no blind reload/restart loop, install, app-wide clear or inferred offline/payment defect. If service cannot be qualified, retain native activation/matrix child and complete independent host work.",
+          "impact": "Installed r66.36 and user review state preserved; new shortcut fix remains host-only until fresh verified activation. Original/failed logs remain immutable."
+        },
+        "t14BoundedFulfilmentCaptureCollision20261004": {
+          "state": "registered_before_retry",
+          "observed": "Host-only fulfilment runner70487 exited1 on immutable screenshot filename collisions when multiple order groups share Shop destination.",
+          "rootCause": "Capture names included scenario/scale/destination, but Shop+Offers may create multiple distinct Shop fulfilment orders. Destination is not an order identity.",
+          "prevention": "Name each per-order capture with its stable scenario-local original-order index plus destination; preserve all previous images/logs. Rerun in a new unique capture folder, keeping every correlation, amount, quantity, stage and unexpected-exception assertion.",
+          "evidence": "t14-bounded-fulfilment-focused-1.log SHA5c242aa19fe4999d15c170494f0dfdb9bc3315f81e8f65c977e0b1bf127c4d0a; t14-host-fulfilment-1 frames retained.",
+          "impact": "Test evidence collision; no fake delivery/payment inferred. Existing production state owner and backend remain unchanged."
+        },
+        "t14BoundedDirectServiceEvaluateUnavailable20261004": {
+          "state": "registered_before_retry",
+          "observed": "Read-only direct service probe found a running main VM and Buy screen class but evaluate RPC returned an error; no current-state backup or restart command reached.",
+          "rootCause": "Exact evaluation error not retained by inherited assert-only RPC wrapper; service/evaluation context cause unproven.",
+          "prevention": "Use a qualified service URI with official Flutter attach debug-url option to establish its evaluation/compiler context. Retain sanitized RPC error code/message on failure rather than only asserting method name. Verify exact review owner and three-library source before any current-code claim; no blind port probing or APK/data replacement.",
+          "evidence": "Tool chunk15552a, direct helper preserved, qualified endpoint derived from earlier successful same-review attach and existing device forward metadata; URI stays private.",
+          "impact": "No app-state or runtime source mutation. Native activation and seven journeys still pending."
+        },
+        "t14BoundedExplicitAttachTimeout20261004": {
+          "state": "registered_before_retry",
+          "observed": "Explicit known-debug-url/no-dds restart runner88944 terminal1 attachExit1/no completed probe; no app.started/restart evidence.",
+          "rootCause": "Service URI conversion or Flutter attachment context remains unqualified. URI conversion removed /ws including slash and may omit authenticated base trailing separator; exact failure requires sanitized existing stream readback before any changed retry.",
+          "prevention": "Keep canonical HTTP base by replacing ws scheme and removing only final ws segment, preserving its slash. Inspect sanitized SDK lifecycle/error inventory; no further blind restart. New output owners/backup/source proof required for a retry.",
+          "evidence": "t14-bounded-explicit-native-restart-private-20261004.log retained ignored/private; tool chunkf4f0e1.",
+          "impact": "No app restart reached or new source active claim; installed APK/state preserved. Host connected fulfilment runner6511 already terminal0 with14 passing scenarios."
+        },
+        "t14BoundedTerminalSessionPollIncident20261004": {
+          "state": "registered_before_retry",
+          "observed": "write_stdin6511 rejected Unknown process id after its terminal0 result had already been read in chunk31205a",
+          "rootCause": "Polled a completed handle while batching independent runtime waits.",
+          "prevention": "Maintain explicit session active/terminal map; never poll terminal handles. SDK88944 is terminal1; fulfilment6511 terminal0; no runtime/test process remains from those sessions.",
+          "impact": "No test rerun or source/device mutation; original successful host proof retained. Later independent calls did not execute after exec error."
+        },
+        "t14BoundedProperBaseAttachFailure20261004": {
+          "state": "registered_before_final_diagnostic",
+          "observed": "Corrected explicit debug-base runner56462 terminal1 attachExit1/probefalse; no new-source activation proof.",
+          "rootCause": "Restoring trailing separator did not qualify Flutter attach; existing DDS endpoint versus raw device VM remains unresolved. Do not attribute failure solely to the earlier slash conversion.",
+          "prevention": "One justified read-only known raw-VM source/identity diagnostic before any further SDK command. If no qualified raw service, record native child and stop device retries. Do not build/install/force-stop/data-clear to force a pass.",
+          "evidence": "t14-bounded-proper-base-native-restart-private-20261004.log retained private; tool chunk82e6d5.",
+          "impact": "No actual restart request reached; Redmi still runs prior warm checkpoint. Host fixture14 and Cart21 checks passed separately. Source fix must not be described as active on Redmi."
+        },
+        "t14BoundedNativeActivationChild20261004": {
+          "status": "unresolved_child",
+          "reason": "Final read-only raw VM qualification failed with WebSocketBadStatusException. Stop further attach/restart attempts within this bounded goal.",
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-bounded-raw-vm-probe-20261004.json",
+          "nativeCurrent": "Earlier c6da01c7 warm runtime; current T14 fix not activated or accepted on Redmi.",
+          "nativeSevenActualAddToCheckout": "unverified; seven host seeded composition tests are not actual Add origin/device acceptance",
+          "fulfilment": "Fourteen isolated host fixture paths pass at 1.0 and 2.0; live provider and native Delivered acceptance remain deferred.",
+          "dependencies": {
+            "backend": "deferred",
+            "workspace": "Codex after integration",
+            "google": "separately listed"
+          },
+          "boundedStop": "Complete host regression and evidence, unresolved children, safe checkpoint then stop; no reinstall/reset/new APK authority."
+        },
+        "t14BoundedVisualReview20261004": {
+          "observations": [
+            {
+              "status": "test_evidence_defect",
+              "detail": "Fourteen filenames marked confirmation show catalogue because the screen is first mounted after fixture confirmOrder; these PNGs are not confirmation-screen proof. Preserve run2 and mount existing screen before state transitions, assert stage before replacement run."
+            },
+            {
+              "status": "unresolved_design_child",
+              "detail": "At 200% text, Delivered detail toolbar status chip overlaps adjacent information button; recorded from all-three Wholesale Delivered screenshot. Broader toolbar polishing remains pending scoped child."
+            },
+            {
+              "status": "deferred_provider_copy",
+              "detail": "Delivered fixture shows original delivery estimate unavailable and payment status unavailable; fixture data does not qualify live provider copy or acceptance."
+            }
+          ],
+          "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002/t14-host-fulfilment-2",
+          "noNativeAcceptance": true
+        },
+        "t14BoundedOwnerAdmissionOrder20261004": {
+          "failure": "Temporary admission helper structural assertion assumed appended claims, while exact anchored insertion places new evidence owners before existing later owners. Assertion stopped before any tracked file write.",
+          "correction": "Expected structural clone inserts at the exact anchored index; preserve unrelated claim ordering and every existing owner.",
+          "noPartialTrackedWrite": true
+        },
+        "t14FinalAdmissionPreparation20261004": {
+          "failures": [
+            "PowerShell rejected nested python -c quote composition before the temporary runner was created. Replaced with literal script file.",
+            "Coordinator correctly rejected new claimed evidence owners before files existed. Created all seven explicit pending/nonaccepted artifacts."
+          ],
+          "preserved": "No application mutation or acceptance claims; original failure logs remain.",
+          "correction": "Exact literal temporary runner, concrete pending artifact readback, re-admit before tests."
+        },
+        "t14FinalOutputNameCollision20261004": {
+          "failure": "Focused runner refused to overwrite an earlier t14-final-analysis-3.log; no tests launched or evidence overwritten.",
+          "correction": "Use unique t14-seven-qualified-20261004-1 prefix and output directory, preserve older evidence.",
+          "sequence": "Coordinator final terminal success read back before retry; no source mutation while tests run."
+        },
+        "t14SevenFocusedQualified20261004": {
+          "status": "host_only_passed",
+          "focusedPassed": 100,
+          "analysisExitCode": 0,
+          "focusedLogSha256": "d20bd704673063f9a73bc64e5cbab45058a1074a770d74596be248852ce1c934",
+          "newCases": 28,
+          "confirmationCapture": "Corrected mount-before-navigation. Asserted confirmation view and buy-confirmation key; regenerated screenshots show Order placed, correct purchase and partition amounts.",
+          "visualInspection": "Representative all-three confirmation 1x/2x, Offers2x confirmation, Wholesale Delivered 1x/2x and Delivered history2x inspected. Toolbar UPDATED chip overlaps information button at both normal/enlarged scale; open visual/accessibility child.",
+          "acceptance": "No actual Add-origin/native activation/live payment/provider delivery or full-polish acceptance. Final frozen selected run still pending."
+        },
+        "t14SevenSupplierTargetConflict20261004": {
+          "status": "registered_before_correction",
+          "run": "t14-seven-selected-20261004-1",
+          "terminalExitCode": 1,
+          "passed": 437,
+          "failedCases": 8,
+          "diagnosticRecords": 16,
+          "warnings": 0,
+          "sourceUnchanged": true,
+          "logSha256": "48d151e158a69d2bb8f27314dfc9f9378d504919f91d7a336aab3bb0a7e924e2",
+          "root": "Existing supplier variant tests expect global Product Cart to open Shop/Wholesale scope. New personal single-Cart shortcut correctly opens all; these assertions conflict with admitted public UX.",
+          "correction": "Change only global Product Cart scope assertion to all; require exact variant+retainedother product/quantities. Preserve contextual supplier sheet Cart scope and Back/status contrast/Addminqty checks. Include8cases in focused rerun; finalsource generation changes.",
+          "child": "Supplier full-catalogue contextual Cart remains destination scoped. Register public contextual Cart count/wording/target reconciliation separately; do not claim every Cart control uniform.",
+          "proof": "Host seeded/fixture tests remain distinct from actual native Add/provider delivery. Never bind partial437 tofullselectedpass."
+        },
+        "t14SevenFocusedReplacementQualified20261004": {
+          "status": "host_only_passed",
+          "focusedPassed": 108,
+          "analysisExitCode": 0,
+          "focusedExitCode": 0,
+          "focusedLogSha256": "dd073dc8856d605db983e9e0f927c008df2e3964794c9d5b174f2d7c17e0e516",
+          "coverage": "Existing100 focus plus8supplier variant journeys. Global Product Cart scopeall with both exactproducts and quantities; contextual supplier sheetscope, AddMOQ, Back/statuscontrast retained.",
+          "previousRun": "437passed/8failed remainsdiagnostic only; finalfrozen full1096mustreplace, nocombinedpartialclaim.",
+          "nativeAndVisual": "CurrentRedmiactivation unresolved; statuschipoverlap visuallyunqualified; backenddeferred, workspaceCodexafterintegration, Googlelisted.",
+          "correctedEvidence": "Regenerated confirmation view/key assertions and current source screenshots; hostfixtures are not actual native Add origins or realprovider/payment proof."
+        },
+        "t14SevenRoutingHintRootCorrection20261004": {
+          "status": "registered_before_runtime_correction",
+          "sourceSha256": "a82216e807a89d08360ff2826a52494fabde77a1254ea5a47738fc225f68445c",
+          "failedRun": "t14-seven-selected-20261004-2",
+          "batch1": {
+            "passed": 445,
+            "exitCode": 0
+          },
+          "batch2": {
+            "passed": 348,
+            "failedCases": 28,
+            "diagnosticRecords": 56,
+            "exitCode": 1,
+            "warnings": 0,
+            "logSha256": "e5b5d74e61c072ad9f617265a62ed296395110320841a59b1dbb2de9524c37cc"
+          },
+          "root": "Personal mixed cartLines already selects all with cartScope Shop/Wholesale; cartScope preserves return-routing context. ForceAll was unnecessary and broke nested Store/provider returns. Earlier assumption that every global scope expectation was obsolete was incorrect.",
+          "correction": "Preserve original routing-hint scope. Aggregate personal Shop/Wholesale display count/amount/availability/acknowledgement only. Restoreoriginalpartner/screen scopeexpectations andretainstrongexactproduct/quantity assertions. New14casesverifyfullbasket andCheckoutAll butpreserveoriginhint.",
+          "gaps": "Supplier assessment owner addition was recordedaftertestedit althoughexistingclaimandselectedownerledgeralreadyadmittedpath; retainsequencingvariance. Informational READY search wastruncated; no implementation reliedonthatread. Correctedblankpassivenotice diagnosis—notinfoaction—remainsfrontendvisualchild.",
+          "sequence": "Bothfailedruns immutable. Currentrunnerterminal beforemetadatawrite. Re-admitcurrentassessment; focusedrootfailurecoverage thennewcomplete1096generation. No relabeling partial batches or weakening gates.",
+          "native": "Currentfixnotactive onRedmi; no newbuild/install/reset/payment."
+        },
+        "t14SevenEmptyNoticeAdmittedFix20261004": {
+          "status": "assessed_before_edit",
+          "actor": "personal Buyer reviewing refreshed Orders/Delivered",
+          "classification": "mvp_required",
+          "outcome": "No blank passive notice obscures refresh status; meaningful announcements retained.",
+          "root": "Ready provider customerMessage emptystring sets nonnullsession.notice; _BuyNotice rendersicon/live-region/box. This is not aninformationaction or touch-interception defect.",
+          "owners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart"
+          ],
+          "reuse": "Guard existing _BuyNotice only; extend existing14 isolated fulfilment cases to assertblankabsent thenmeaningfulnoticepresent. No new route/dependency/backend or provider logic.",
+          "checks": "Normal/200% existing host screenshots; original meaningfulnotice regressions; root-routingfailurefocus then full1096 frozen. Nativeactivation remains unresolved.",
+          "sequence": "Current selectedrunner terminal; applybeforefinalsourcefreeze to avoid a separate rerun forsameconfirmedvisualbug."
+        },
+        "t14SevenRootCorrectedFocusedQualified20261004": {
+          "status": "host_only_passed",
+          "focusedPassed": 136,
+          "analysisExitCode": 0,
+          "focusedExitCode": 0,
+          "focusedLogSha256": "abdd8b81dbdb723aeed3c38be6c8faa7d72385364a1b506b9ff242cee777f60a",
+          "observedFailuresRetested": 28,
+          "supplierVariants": 8,
+          "root": "Personal Cartcontentsalready mixed; originalnavigationreturnhint restored. Aggregatevisiblecount/total/pendingpriceonly; destinationacknowledgement, checkouteligibility, paymentactions, StoreMedicine scopes preserved.",
+          "blankNotice": "14 isolated fulfilment cases verify blank live-notice absent after refresh and meaningful message still announced. Fresh confirmation/Orders/WholesaleDelivered1x2x/history2x screenshots visuallyinspected; Updated chip unobscured.",
+          "previousAssumptions": "ForceAll was actualruntime regression, notmerelyobsoleteexpectations. Original28route/feedbackfailures andboth earlierselectedruns retained. Partneroriginalscopeexpectation restoredwith strongerline/quantityproof.",
+          "next": "Freezecomplete1096finalgeneration; no changes tosource/registry/policy/ledger/READY/MVPwhileactive.",
+          "acceptance": "Nativeactivationcurrent source unqualified; actualseven Add origins, liveprovider/payment, broaderpolish andformalhandoff remainpending."
+        },
+        "t14SevenFinalHostQualified20261004": {
+          "status": "bounded_host_qualification_with_unresolved_children",
+          "sourceSha256": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+          "focusedPassed": 136,
+          "selectedDistinctPassed": 1096,
+          "selectedReferences": 1156,
+          "selectedFiles": 54,
+          "selectedGenerations1And2": "failed diagnostic streams retained; never merged into acceptance",
+          "finalGeneration": 3,
+          "previewCapturePassed": 14,
+          "previewImages": 14,
+          "previewActuallyReviewed": [
+            "Shop-1.0",
+            "Wholesale-2.0",
+            "Shop+Wholesale+Offers-1.0",
+            "Shop+Wholesale+Offers-2.0"
+          ],
+          "previewCaptureScope": "ending Orders shortcut after seeded traversal; not all Cart frames or actual native Add",
+          "fulfilmentImages": 90,
+          "fulfilmentEvidence": "14 isolated fixture journeys; earlier confirmation mount corrected; representative six frames reviewed; no live/provider acceptance",
+          "rootFix": "Original routing/acknowledgement hints preserved; aggregateSummary only counts/totals; empty passive _BuyNotice suppressed; original nested context assertions retained",
+          "admissionVariance": "Partner test owned/selected before edit; exact assessment added after earlier edit; final root assessment and gates before corrections; earlier sequence not retroactively compliant",
+          "nativeCurrentSourceAccepted": false,
+          "fullJourneyAccepted": false,
+          "formalClosure": false,
+          "children": "native activation; seven actual native origins; earlier1/37→2/97 carryover; return scroll observation; broad polish; card/provider intent/QR; Store receive QR Codex after integration; backend deferred; Google separately; inherited non-atomic handoff blocker",
+          "evidenceArchiveMembers": 359,
+          "evidenceArchiveBytes": 32439002,
+          "evidenceReport": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json",
+          "checkpoint": "pending exact19 owners stage/gates/canonical-byte proof and normal push; no production acceptance",
+          "architect": "facts-only final review found no additional bounded blocker; enforce terminal selected result and clear native/sequence disclosures"
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

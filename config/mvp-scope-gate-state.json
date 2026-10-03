@@ -1673,9 +1673,9 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Buyer sees truthful Shop supply/refund and replacement review, can navigate back from Cart, and sees fresh Wholesale additions after clearing an old filtered basket without bypassing unresolved payment.",
+      "customerOutcome": "Personal Buyer has consistent public Cart summary/target and locally verified separate/mixed fixture states; native current-source activation and real-provider journeys remain unresolved.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
-      "manifestSha256": "52C685889AA17FE8810E77331D959265CA061ABFBF809C4EBBF9210449E5AB03",
+      "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -1692,12 +1692,15 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse existing Order/content/session/Tracking for supply and consent. Reuse addProduct/display filter and existing Back handler for reproduced Cart defects. No new route/service/state owner; final frozen qualification and native/source distinction required.",
+      "necessityProof": "Reuse Buy screens/session/tests. Public summary target corrected; 136 focused and 1096 distinct selected host cases passed. Original routing hints preserved; empty notices suppressed and meaningful announcements tested. No native current-source, provider, blanket polish or formal closure claim. Backend deferred; workspace Codex after integration; Google separately listed.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1706,7 +1709,11 @@
         "320px normal and 200 percent text",
         "fresh Shop-filter clear to Wholesale basket visibility",
         "visible Cart Back/product origin and catalogue return",
-        "held Cart preserves original payment; Cancel and explicit whole-Cart confirmation"
+        "held Cart preserves original payment; Cancel and explicit whole-Cart confirmation",
+        "seven fresh separate/mixed Add-to-Checkout native origins",
+        "public shortcut count amount and target agree; Store/Medicine scopes preserved",
+        "isolated frontend Confirmation Tracking Delivered evidence; live integration deferred",
+        "design/card/intent/QR gap inventory and reduced-motion large-text checks"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1737,7 +1744,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "qualified_existing_Buy_parent_T12_T14_host_and_scoped_native_full_journey_and_integration_pending",
+      "implementationState": "bounded_T14_host_qualified_native_activation_and_visual_children_unresolved",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

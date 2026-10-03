@@ -3803,7 +3803,15 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
             session.view == BuyV2View.checkout) &&
         destination != BuyV2Destination.medicine &&
         session.usesMixedCartSelection;
+    // Personal Cart contents are mixed even when its scope retains a return
+    // destination. Preview the full basket without changing that routing hint.
+    // Store procurement and Medicine retain their separate scoped journeys.
+    final publicMixedCart =
+        !session.isStoreProcurement &&
+        (destination == BuyV2Destination.shop ||
+            destination == BuyV2Destination.wholesale);
     final aggregate = widget.aggregate || otherBaskets || activeMixedCart;
+    final aggregateSummary = aggregate || publicMixedCart;
     final scope = aggregate
         ? BuyV2CartScope.all
         : switch (destination) {
@@ -3812,10 +3820,10 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
             BuyV2Destination.medicine => BuyV2CartScope.medicine,
             BuyV2Destination.orders => BuyV2CartScope.all,
           };
-    final itemCount = aggregate || destination == BuyV2Destination.orders
+    final itemCount = aggregateSummary || destination == BuyV2Destination.orders
         ? session.itemCount
         : session.countForDestination(destination);
-    final total = aggregate || destination == BuyV2Destination.orders
+    final total = aggregateSummary || destination == BuyV2Destination.orders
         ? session.cartTotal -
               BuyV2Destination.values.fold<int>(
                 0,
@@ -3826,9 +3834,11 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
               session.couponSavingForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final itemText = '$itemCount $itemLabel';
-    final summaryText = otherBaskets ? 'All carts' : itemText;
+    final summaryText = itemText;
     final priceUnavailable = session.procurementPricesUnavailableFor(
-      aggregate || destination == BuyV2Destination.orders ? null : destination,
+      aggregateSummary || destination == BuyV2Destination.orders
+          ? null
+          : destination,
     );
     final totalText = priceUnavailable ? 'Price pending' : buyV2Money(total);
     final acknowledgement = aggregate || destination == BuyV2Destination.orders
@@ -3860,8 +3870,7 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
       );
     }
 
-    final semanticsLabel =
-        '${otherBaskets ? 'All carts' : 'Cart'}, $cartMessage, $totalText. View cart';
+    final semanticsLabel = 'Cart, $cartMessage, $totalText. View cart';
     if (widget.compact) {
       return Semantics(
         key: const ValueKey('buy-compact-cart-indicator'),
@@ -4124,6 +4133,7 @@ class _BuyNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.trim().isEmpty) return const SizedBox.shrink();
     return Semantics(
       key: const ValueKey('buy-live-notice'),
       liveRegion: true,

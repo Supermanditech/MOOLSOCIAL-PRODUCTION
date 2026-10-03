@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "8CFDD4FC56271A860332D139975152DB7AA8EB7BF05C1B7166FEC1D3D0C10AA6"
+    "sha256": "88FCA00C13CF3F959A5B9C1C6EF52791D789944B2771876A90828B1F4E20746A"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -355,6 +355,13 @@
         "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-2.jsonl",
         "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-EVIDENCE.zip",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
       ]

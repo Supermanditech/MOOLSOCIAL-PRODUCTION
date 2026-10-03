@@ -238,6 +238,110 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    for (final scenario in const {
+      'Shop': ['s-tomato'],
+      'Wholesale': ['w-notebook'],
+      'Offers': ['s-rice'],
+      'Shop+Wholesale': ['s-tomato', 'w-notebook'],
+      'Shop+Offers': ['s-tomato', 's-rice'],
+      'Wholesale+Offers': ['w-notebook', 's-rice'],
+      'Shop+Wholesale+Offers': ['s-tomato', 'w-notebook', 's-rice'],
+    }.entries) {
+      testWidgets('T14 single Cart preview ${scenario.key} at $scale', (
+        tester,
+      ) async {
+        const size = Size(360, 800);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        for (final id in scenario.value) {
+          expect(session.addProduct(id), isTrue, reason: session.notice);
+        }
+        session.clearCartAcknowledgement();
+        final quantities = {
+          for (final id in scenario.value) id: session.quantityFor(id),
+        };
+        final count = session.itemCount;
+        final total = session.cartTotal;
+        final semantics = tester.ensureSemantics();
+        try {
+          await tester.pumpWidget(
+            app(
+              session,
+              size: size,
+              textScale: scale,
+              reducedMotion: scale == 2,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final indicator = find.byKey(
+            const ValueKey('buy-compact-cart-indicator'),
+          );
+          for (final route in [
+            'moolsocial-family-root-buy-tap',
+            'buy-local-tab-wholesale',
+            'buy-local-tab-offers',
+            'buy-local-tab-orders',
+          ]) {
+            await tester.tap(find.byKey(ValueKey(route)));
+            await tester.pumpAndSettle();
+            final preview = tester.getSemantics(indicator).label;
+            expect(preview, startsWith('Cart, '));
+            expect(preview, isNot(contains('All carts')));
+            expect(
+              preview,
+              contains('$count ${count == 1 ? 'item' : 'items'}'),
+            );
+            expect(preview, contains(buyV2Money(total)));
+            final originHint = switch (route) {
+              'moolsocial-family-root-buy-tap'
+                  when session.countForDestination(BuyV2Destination.shop) > 0 =>
+                BuyV2CartScope.shop,
+              'buy-local-tab-wholesale'
+                  when session.countForDestination(BuyV2Destination.wholesale) >
+                      0 =>
+                BuyV2CartScope.wholesale,
+              _ => BuyV2CartScope.all,
+            };
+            await tester.tap(indicator);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(session.cartScope, originHint);
+            expect(
+              session.cartLines.map((line) => line.product.id).toSet(),
+              scenario.value.toSet(),
+            );
+            expect(session.scopedPayableTotal, total);
+            expect(tester.getSemantics(indicator).label, preview);
+            await tester.tap(find.text('Checkout').hitTestable());
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.checkout);
+            expect(session.checkoutScope, BuyV2CartScope.all);
+            expect(session.scopedPayableTotal, total);
+            await tester.tap(indicator);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.cart);
+            expect(session.scopedPayableTotal, total);
+            await tester.tap(find.byKey(const ValueKey('buy-cart-back')));
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            for (final entry in quantities.entries) {
+              expect(session.quantityFor(entry.key), entry.value);
+            }
+            expect(tester.takeException(), isNull);
+          }
+          await captureR66Visual(
+            tester,
+            't14-single-cart-${scenario.key}-$scale',
+          );
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
     testWidgets('T10 fresh Add and Cart route selection text $scale', (
       tester,
     ) async {
@@ -2297,13 +2401,10 @@ void main() {
                   final fallback =
                       !step.aggregate &&
                       session.countForDestination(step.destination) == 0;
-                  final aggregate = step.aggregate || fallback;
-                  final expectedTotal = aggregate
-                      ? session.cartTotal
-                      : session.totalForDestination(step.destination);
-                  final expectedCount = aggregate
-                      ? session.itemCount
-                      : session.countForDestination(step.destination);
+                  // Public discovery opens the same mixed Cart from every tab.
+                  // Keep the historical case identity for regression ledgers.
+                  final expectedTotal = session.cartTotal;
+                  final expectedCount = session.itemCount;
                   final label = tester.getSemantics(indicator).label;
                   expect(label, contains(buyV2Money(expectedTotal)));
                   expect(
@@ -2314,12 +2415,15 @@ void main() {
                   );
                   expect(label, isNot(contains('Preparing')));
                   if (fallback) {
-                    expect(label, contains('All carts'));
+                    expect(label, startsWith('Cart, '));
+                    expect(label, isNot(contains('All carts')));
                     if (parked.evaluate().isEmpty) {
                       expect(
                         find.descendant(
                           of: indicator,
-                          matching: find.text('All carts'),
+                          matching: find.text(
+                            '$expectedCount ${expectedCount == 1 ? 'item' : 'items'}',
+                          ),
                         ),
                         findsOneWidget,
                       );
@@ -2344,14 +2448,7 @@ void main() {
                   await tester.tap(indicator);
                   await tester.pumpAndSettle();
                   expect(session.view, BuyV2View.cart);
-                  expect(
-                    session.cartScope,
-                    aggregate
-                        ? BuyV2CartScope.all
-                        : step.destination == BuyV2Destination.shop
-                        ? BuyV2CartScope.shop
-                        : BuyV2CartScope.wholesale,
-                  );
+                  expect(session.cartScope, BuyV2CartScope.all);
                   await tester.binding.handlePopRoute();
                   await tester.pumpAndSettle();
                   expect(session.view, BuyV2View.catalogue);
@@ -4117,9 +4214,9 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(primary);
           await tester.pumpAndSettle();
-          final count = session.countForDestination(destination);
+          final count = session.itemCount;
           final items = '$count ${count == 1 ? 'item' : 'items'}';
-          final total = session.totalForDestination(destination);
+          final total = session.cartTotal;
           final dock = find.byKey(const ValueKey('buy-compact-cart-indicator'));
           final semantics = tester.ensureSemantics();
           try {
@@ -4161,8 +4258,8 @@ void main() {
             await tester.pumpAndSettle();
             expect(session.view, BuyV2View.product);
             expect(session.selectedProductId, product.id);
-            expect(session.countForDestination(destination), count);
-            expect(session.totalForDestination(destination), total);
+            expect(session.itemCount, count);
+            expect(session.cartTotal, total);
             expect(session.quantityFor(retained.id), retainedQuantity);
             session.openDestination(other);
             await tester.pumpAndSettle();
