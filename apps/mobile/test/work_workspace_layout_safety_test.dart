@@ -4634,7 +4634,13 @@ void main() {
           await tester.ensureVisible(target); await tester.pumpAndSettle();
           expect(target.hitTestable(), findsOneWidget); await tester.tap(target); await tester.pumpAndSettle();
         }
+        tester.view.padding = const FakeViewPadding(top: 28, bottom: 44);
+        tester.view.viewPadding = const FakeViewPadding(top: 28, bottom: 44);
+        await tester.pumpAndSettle();
         await tapVisible(action);
+        expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, greaterThanOrEqualTo(28));
+        expect(find.text('Credit note date'), findsOneWidget);
+        expect(find.text('Amount credited (₹)'), findsOneWidget);
         Future<void> enter(String key, String value) async {
           final target = find.byKey(Key(key)); await tester.ensureVisible(target); await tester.pumpAndSettle();
           await tester.enterText(target, value); await tester.pumpAndSettle();
@@ -4650,6 +4656,23 @@ void main() {
         expect(tester.getSize(qty).width, 112);
         await tester.ensureVisible(qty); await tester.enterText(qty, '2'); await tester.pumpAndSettle();
         final submit = find.byKey(const Key('supplier-credit-submit'));
+        expect(find.text('Credited qty'), findsOneWidget);
+        final keyboardHeight = display.width > 500 ? 160.0 : 260.0;
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(qty); await tester.pumpAndSettle();
+        expect(tester.getRect(qty).bottom, lessThanOrEqualTo(display.height - keyboardHeight));
+        await tester.ensureVisible(submit); await tester.pumpAndSettle();
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(tester.getRect(submit).bottom, lessThanOrEqualTo(display.height - keyboardHeight));
+        final creditClose = find.byKey(const Key('supplier-credit-close'));
+        await tester.ensureVisible(creditClose); await tester.pumpAndSettle();
+        expect(creditClose.hitTestable(), findsOneWidget);
+        expect(tester.getRect(creditClose).top, greaterThanOrEqualTo(28));
+        expect(tester.widget<TextField>(qty).controller!.text, '2');
+        expect(tester.takeException(), isNull);
+        tester.view.viewInsets = FakeViewPadding.zero;
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
         await tapVisible(submit);
         expect(work.workspaceSupplierLedger(supplier.id)!.creditNotes, isEmpty);
         expect(tester.widget<TextField>(qty).enabled, isTrue, reason: 'Invalid quantity must remain correctable, not frozen.');
@@ -5836,7 +5859,11 @@ void main() {
       await revealOpening(tester, paymentAction, delta: -120);
       final heldRead = Completer<void>();
       moneyStore.nextRead = heldRead;
+      tester.view.padding = const FakeViewPadding(top: 28, bottom: 44);
+      tester.view.viewPadding = const FakeViewPadding(top: 28, bottom: 44);
+      await tester.pumpAndSettle();
       await tester.tap(paymentAction); await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, greaterThanOrEqualTo(28));
       expect(tester.widget<TextField>(find.byKey(const Key('supplier-payment-amount'))).enabled, isFalse);
       expect(tester.widget<TextButton>(find.byKey(const Key('supplier-money-close'))).onPressed, isNull,
         reason: 'Navigation stays locked while authoritative input recovery is in flight.');
@@ -5849,6 +5876,18 @@ void main() {
       await revealMoney(amount); await tester.enterText(amount, '1500');
       final reference = find.byKey(const Key('supplier-payment-reference'));
       await revealMoney(reference); await tester.enterText(reference, 'HOST-PAY-FULL');
+      final keyboardHeight = display.width > 500 ? 160.0 : 260.0;
+      tester.view.viewInsets = FakeViewPadding(bottom: keyboardHeight);
+      await tester.pumpAndSettle();
+      await revealMoney(reference);
+      expect(tester.getRect(reference).bottom, lessThanOrEqualTo(display.height - keyboardHeight));
+      final keyboardClose = find.byKey(const Key('supplier-money-close'));
+      await revealMoney(keyboardClose);
+      expect(tester.getRect(keyboardClose).top, greaterThanOrEqualTo(28));
+      expect(tester.widget<TextField>(amount).controller!.text, '1500');
+      expect(tester.widget<TextField>(reference).controller!.text, 'HOST-PAY-FULL');
+      expect(tester.takeException(), isNull);
+      tester.view.viewInsets = FakeViewPadding.zero;
       FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
       final excluded = find.byKey(const Key('supplier-money-opening-excluded'));
       await revealMoney(excluded); await tester.tap(excluded); await tester.pumpAndSettle();

@@ -11560,9 +11560,9 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       else { _uncertain = true; _error = session.workspaceSupplierError ?? 'Cancellation status needs recovery. Retry saved status.'; } });
   }
   Widget _field(String label, TextEditingController controller, String key, {bool locked = false}) =>
-    SizedBox(width: 112, child: TextField(key: Key(key), controller: controller,
+    _purchaseCompactLabeledField(label, width: 112, field: TextField(key: Key(key), controller: controller,
       enabled: _editable && !locked, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: label), onChanged: (_) => setState(() {})));
+      decoration: const InputDecoration(), onChanged: (_) => setState(() {})));
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -11670,6 +11670,16 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     ]);
   }
 }
+
+// Keep short numeric inputs compact without clipping their full field labels.
+// The visible caption is excluded from semantics: the input announces it once.
+Widget _purchaseCompactLabeledField(String label, {required double width, required Widget field}) =>
+  SizedBox(width: width, child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min, children: [
+      ExcludeSemantics(child: Text(label, style: const TextStyle(fontSize: 13, color: MoolColors.ink))),
+      const SizedBox(height: 4),
+      Semantics(label: label, child: field),
+    ]));
 
 class _PurchaseGoodsInput {
   _PurchaseGoodsInput([Map<String, String>? saved])
@@ -28389,7 +28399,7 @@ class _StoreSupplierMoneyTarget {
 
 Future<void> _showSupplierMoneyEntry(BuildContext context, WorkSession session,
     _StoreSupplierMoneyTarget target) => showModalBottomSheet<void>(context: context,
-      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
       builder: (_) => _StoreMoneyEntrySheet(session: session, supplierMoney: target));
 
 Future<void> _showSupplierGoodsReturn(BuildContext context, WorkSession session,
@@ -28838,7 +28848,7 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
 
 Future<void> _showSupplierCredit(BuildContext context, WorkSession session,
     WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
-      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
       builder: (_) => _StoreSupplierCreditSheet(session: session, copy: copy));
 
 class _StoreSupplierCreditSheet extends StatefulWidget {
@@ -29062,8 +29072,10 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
     }
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
       onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
-      child: SafeArea(top: false, child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(top: false, child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
             Text('Supplier credit note', style: Theme.of(context).textTheme.titleMedium),
@@ -29074,13 +29086,13 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
           TextField(key: const Key('supplier-credit-reference'), controller: reference, enabled: editable,
             decoration: const InputDecoration(labelText: 'Credit note No.'), onChanged: (_) => draft.save(fields)),
           Wrap(spacing: 12, runSpacing: 8, children: [
-            SizedBox(width: 170, child: TextField(key: const Key('supplier-credit-date'), controller: date,
+            _purchaseCompactLabeledField('Credit note date', width: 170, field: TextField(key: const Key('supplier-credit-date'), controller: date,
               enabled: editable, keyboardType: TextInputType.datetime,
-              decoration: const InputDecoration(labelText: 'Credit note date', hintText: 'DD/MM/YYYY'),
+              decoration: const InputDecoration(helperText: 'DD/MM/YYYY'),
               onChanged: (_) => draft.save(fields))),
-            SizedBox(width: 170, child: TextField(key: const Key('supplier-credit-amount'), controller: amount,
+            _purchaseCompactLabeledField('Amount credited (₹)', width: 170, field: TextField(key: const Key('supplier-credit-amount'), controller: amount,
               enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount credited (₹)'), onChanged: (_) => draft.save(fields))),
+              decoration: const InputDecoration(), onChanged: (_) => draft.save(fields))),
           ]),
           TextField(key: const Key('supplier-credit-reason'), controller: reason, enabled: editable,
             decoration: const InputDecoration(labelText: 'Reason on credit note'), onChanged: (_) => draft.save(fields)),
@@ -29101,9 +29113,9 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
                 draft.save(fields);
               } : null),
             if (selected[entry.key] case final value?) Align(alignment: Alignment.centerLeft,
-              child: SizedBox(width: 112, child: TextField(key: ValueKey('supplier-credit-qty-${entry.key}'),
+              child: _purchaseCompactLabeledField('Credited qty', width: 112, field: TextField(key: ValueKey('supplier-credit-qty-${entry.key}'),
                 controller: value.$2, enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Credited qty'), onChanged: (_) => draft.save(fields)))),
+                decoration: const InputDecoration(), onChanged: (_) => draft.save(fields)))),
           ],
           if (frozen != null) Text(confirmed ? 'Credit note recorded · ${_purchaseAmount(frozen!.amountMinor)}'
             : savedVerified ? 'Saved credit-note request · not confirmed. Recover before retrying.'
@@ -29116,7 +29128,7 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
               && (frozen != null || rows.isNotEmpty) ? submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Record another credit note'
               : frozen == null ? 'Save supplier credit note' : 'Retry same credit note')),
-        ]))));
+        ])))));
   }
 }
 
@@ -29656,12 +29668,14 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     },
     child: SafeArea(
       top: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: manualMoney ? MediaQuery.viewInsetsOf(context).bottom : 0),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           16,
           16,
           16,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
+          16 + (manualMoney ? 0 : MediaQuery.viewInsetsOf(context).bottom),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -29817,6 +29831,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
             ),
           ],
         ),
+      ),
       ),
     ),
   );
