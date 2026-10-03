@@ -1189,6 +1189,13 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json',
   'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json',
   'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip',
   # Exact founder-authorized artifact-retention maintenance, primary serialized.
   'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json',
   'scripts/check-codex-development-regression-memory.ps1',

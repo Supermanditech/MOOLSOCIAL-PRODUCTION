@@ -13386,7 +13386,15 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get cartChangesBlocked =>
+      (customerStateRecoveryPending &&
+          (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) ||
+      !procurementScopeCurrent ||
+      checkoutRequiresResolution ||
+      checkoutBusy;
+
   bool _holdCartForPaymentResolution() {
+    if (!cartChangesBlocked) return false;
     if (customerStateRecoveryPending &&
         (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) {
       notice =
@@ -13400,7 +13408,6 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-    if (!checkoutRequiresResolution && !checkoutBusy) return false;
     notice =
         'Check the current payment before changing your Cart or payment method.';
     notifyListeners();

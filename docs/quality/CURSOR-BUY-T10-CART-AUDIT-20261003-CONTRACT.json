@@ -1,0 +1,75 @@
+{
+  "id": "CURSOR-BUY-T10-CART-AUDIT-20261003",
+  "actor": "Buyer",
+  "classification": "mvp_required",
+  "parent": "BUY-ACTION-POLISH-20260926-01",
+  "baselineCommit": "30961fa92fd7f7f8ca619a6d8b27755cdad8335c",
+  "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+  "runtimeOwners": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart"
+  ],
+  "testOwner": "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+  "observableOutcome": "Cart hold reflects authoritative existing session guard in visible controls, semantics and pointer behavior; original payment preserved and Review payment uses existing Checkout. Fresh mixed Cart quantity, shared instructions and totals survive Checkout Back; Empty cancellation preserves Cart and confirmed Empty returns to browsing.",
+  "reuse": "Existing session/views/catalogue owners and standard widgets; no new screen/service/model/provider/storage",
+  "supplierPolicies": "Product/Add only, never Cart",
+  "deliveryInstructions": "One standard public instruction for shared delivery address; Clear only in composer",
+  "defects": [
+    {
+      "id": "T10-local-01",
+      "finding": "Cart quantity and Empty Cart looked enabled during payment hold",
+      "fix": "Shared existing mutation guard disables controls"
+    },
+    {
+      "id": "T10-local-02",
+      "finding": "Catalogue Add looked enabled but session rejected it",
+      "fix": "Featured/grid/product-sheet Add and quantity controls disabled and dimmed"
+    },
+    {
+      "id": "T10-local-03",
+      "finding": "Ordinary Cart Checkout hid saved payment recovery",
+      "fix": "Persistent reason and Review payment navigation to existing attempt"
+    },
+    {
+      "id": "T10-local-04",
+      "finding": "Instruction entry/presets looked editable despite hold",
+      "fix": "Guarded editing and saving disabled; Cancel remains available"
+    },
+    {
+      "id": "T10-local-05",
+      "finding": "Benefit/tip UI callbacks looked available despite mutation guard",
+      "fix": "Existing offer/tip actions use same hold, browsing remains available; technical/host boundary"
+    },
+    {
+      "id": "T10-local-06",
+      "finding": "Disabled catalogue actions passed pointer to surrounding card",
+      "fix": "Standard pointer interception with handler excluded from semantics; Add has no semantic tap and stays on catalogue"
+    }
+  ],
+  "acceptance": {
+    "focusedCases": 4,
+    "textScales": [
+      1,
+      2
+    ],
+    "selectedDistinct": 997,
+    "selectedReferences": 1057,
+    "native": "Unchanged installed r66.36 and original unavailable37 payment retained; new source NOT activated after cold and bounded warm zero-library reload. Fixed-source native normal/200percent/fresh journey unqualified.",
+    "liveAcceptance": false
+  },
+  "children": [
+    "Native source activation unresolved: cold and one bounded warm mtime-only reload each reported zero libraries; new Cart markers absent. Fixed-source native normal/200percent/fresh journey unqualified. Source bytes unchanged and mtimes restored. Stop retries; establish supported activation and authentic original-attempt persistence before any full restart or newly authorized candidate.",
+    "Backend/live-provider recovery deferred; workspace Codex after integration; Google separate.",
+    "Redmi retained original unresolved payment and one tomato/37 rupees. Native fresh/mixed/empty journey unqualified until authentic recovery; never clear attempt or inject fixtures to manufacture evidence.",
+    "New host fresh mixed journey covers Shop plus Wholesale. Existing selected cases cover other Cart/selection/offer/payment states. Host fixtures are not live payment or backend qualification.",
+    "Before live recovery enablement verify authoritative original attempt, account ownership/correlation, unknown/pending reconciliation and duplicate prevention, late callback/identity clearing, fresh quantity/price/availability and correct current terms.",
+    "Inherited25 legacy Checkout failures remain open; no full Checkout suite qualification claimed.",
+    "Existing undeclared protected-reference tag warnings retained; runner zero-warning claim is limited to layout/hit-test warnings, not all textual warnings.",
+    "Some host capture labels render as glyph rectangles; native screenshots/XML determine device visual evidence. No unsupported claim that all host rendering is production-identical.",
+    "Disabled Empty Cart has no callback, but its explicitly red delete icon remains a visual-polish follow-up; final held host captures obscure the header with an inherited notice. Verify disabled appearance on correctly activated native source before visual approval.",
+    "T08 live balance, T09 live refund/replacement and accepted request history, raw-evidence fresh-checkout conversion, historic0e90a6ca formal closure and founder visual approval remain open."
+  ],
+  "formalClosure": false,
+  "next": "Stop at safe scoped checkpoint; integration/provider work deferred."
+}

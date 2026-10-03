@@ -1176,6 +1176,8 @@ class BuyV2ProductView extends StatelessWidget {
                                                           'buy-product-inline-action-${product.id}',
                                                         ),
                                                         product: product,
+                                                        enabled: !session
+                                                            .cartChangesBlocked,
                                                         quantity: quantity,
                                                         showPurchaseFacts:
                                                             false,
@@ -1311,6 +1313,8 @@ class BuyV2ProductView extends StatelessWidget {
                                                       'buy-product-inline-action-${product.id}',
                                                     ),
                                                     product: product,
+                                                    enabled: !session
+                                                        .cartChangesBlocked,
                                                     quantity: quantity,
                                                     showPurchaseFacts: false,
                                                     deliveryDecision:
@@ -1444,6 +1448,7 @@ class BuyV2ProductView extends StatelessWidget {
                                       'buy-product-inline-action-${product.id}',
                                     ),
                                     product: product,
+                                    enabled: !session.cartChangesBlocked,
                                     quantity: quantity,
                                     showPurchaseFacts: false,
                                     deliveryDecision: buyerPromise,
@@ -5739,6 +5744,7 @@ class _ProductContinuationCard extends StatelessWidget {
       child: decision.canAdd
           ? _ProductOwnedActionPanel(
               product: product,
+              enabled: !session.cartChangesBlocked,
               quantity: quantity,
               showPurchaseFacts: false,
               rxBlocked:
@@ -9088,7 +9094,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                 tooltip: session.usesMixedCartSelection
                     ? 'Empty entire cart'
                     : 'Empty cart',
-                onPressed: session.itemCount == 0
+                onPressed: session.itemCount == 0 || session.cartChangesBlocked
                     ? null
                     : () => unawaited(_confirmBuyV2CartClear(context, session)),
                 icon: const Icon(
@@ -9100,6 +9106,17 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           ),
         ),
       ),
+      if (session.checkoutRequiresResolution || session.checkoutBusy)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+          child: Text(
+            session.checkoutBusy
+                ? 'Checking payment. Your Cart is kept unchanged.'
+                : 'Your Cart is kept unchanged while a payment needs review. Review the existing payment before editing or paying again.',
+            key: const ValueKey('buy-cart-payment-recovery-notice'),
+            style: context.buyBody,
+          ),
+        ),
       _CartScopeBar(session: session),
       const SizedBox(height: 7),
     ];
@@ -9423,7 +9440,11 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                 ),
               ),
               onPressed: openCheckout,
-              child: const Text('Checkout'),
+              child: Text(
+                session.checkoutRequiresResolution
+                    ? 'Review payment'
+                    : 'Checkout',
+              ),
             ),
           );
           final needsStack =
@@ -20886,6 +20907,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
     this.deliveryDecision,
     this.showPurchaseFacts = true,
     this.addSemanticLabel,
+    this.enabled = true,
     required this.rxBlocked,
     required this.onAdd,
     required this.onEdit,
@@ -20899,6 +20921,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   final bool showPurchaseFacts;
   final String? addSemanticLabel;
   final bool rxBlocked;
+  final bool enabled;
   final VoidCallback onAdd;
   final VoidCallback onEdit;
   final VoidCallback onDecrease;
@@ -20934,6 +20957,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                 quantity: quantity,
                 minimumOrder: product.minimumOrder,
                 quantityStep: product.quantityStep,
+                enabled: enabled,
                 onEdit: onEdit,
                 onDecrease: onDecrease,
                 onIncrease: onIncrease,
@@ -20949,16 +20973,20 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                       addSemanticLabel ??
                       'Add ${product.customerTitle} to cart',
                   button: true,
+                  enabled: enabled,
                   excludeSemantics: true,
-                  onTap: onAdd,
+                  onTap: enabled ? onAdd : null,
                   child: TextButton(
                     key: ValueKey('buy-product-primary-${product.id}'),
-                    onPressed: onAdd,
+                    onPressed: enabled ? onAdd : null,
                     style: TextButton.styleFrom(
                       minimumSize: const Size(44, 44),
                       padding: EdgeInsets.zero,
                     ),
-                    child: const BuyV2AddFace(),
+                    child: Opacity(
+                      opacity: enabled ? 1 : .38,
+                      child: const BuyV2AddFace(),
+                    ),
                   ),
                 ),
               )
@@ -20973,7 +21001,8 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                       : addSemanticLabel ??
                             'Add ${product.customerTitle} to cart',
                   button: true,
-                  onTap: onAdd,
+                  enabled: enabled,
+                  onTap: enabled ? onAdd : null,
                   excludeSemantics: true,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -20997,7 +21026,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                           ),
                         ),
-                        onPressed: onAdd,
+                        onPressed: enabled ? onAdd : null,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -21321,6 +21350,7 @@ class _CompactProductStepper extends StatelessWidget {
   const _CompactProductStepper({
     super.key,
     required this.quantity,
+    this.enabled = true,
     required this.minimumOrder,
     required this.quantityStep,
     required this.onEdit,
@@ -21329,6 +21359,7 @@ class _CompactProductStepper extends StatelessWidget {
   });
 
   final int quantity;
+  final bool enabled;
   final int minimumOrder;
   final int quantityStep;
   final VoidCallback onEdit;
@@ -21348,7 +21379,9 @@ class _CompactProductStepper extends StatelessWidget {
             child: DecoratedBox(
               key: const ValueKey('buy-compact-product-quantity-pill'),
               decoration: BoxDecoration(
-                color: BuyV2ActionStyle.primaryFill,
+                color: enabled
+                    ? BuyV2ActionStyle.primaryFill
+                    : BuyV2Colors.canvas,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0x28000080)),
               ),
@@ -21369,7 +21402,7 @@ class _CompactProductStepper extends StatelessWidget {
                     width: 44,
                     height: 44,
                   ),
-                  onPressed: onDecrease,
+                  onPressed: enabled ? onDecrease : null,
                   icon: const Icon(Icons.remove, size: 20),
                 ),
               ),
@@ -21380,7 +21413,7 @@ class _CompactProductStepper extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(44, 44),
                   ),
-                  onPressed: onEdit,
+                  onPressed: enabled ? onEdit : null,
                   child: Semantics(
                     label:
                         'Edit quantity, ${_packCountLabel(quantity)} in Cart',
@@ -21411,7 +21444,7 @@ class _CompactProductStepper extends StatelessWidget {
                     width: 44,
                     height: 44,
                   ),
-                  onPressed: onIncrease,
+                  onPressed: enabled ? onIncrease : null,
                   icon: const Icon(Icons.add, size: 20),
                 ),
               ),
@@ -21986,6 +22019,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
         : null;
     Widget cardFor(BuyV2CartBenefit benefit) => _CartBenefitCard(
       benefit: benefit,
+      enabled: !widget.session.cartChangesBlocked,
       scopeLabel: benefit.scope == BuyV2CartBenefitScope.platform
           ? null
           : widget.session.cartLines
@@ -22413,12 +22447,14 @@ class _CartBenefitCard extends StatelessWidget {
     required this.onSelect,
     required this.onRemove,
     this.paymentStatus,
+    this.enabled = true,
     this.scopeLabel,
   });
 
   final BuyV2CartBenefit benefit;
   final int colourIndex;
   final bool selected;
+  final bool enabled;
   final VoidCallback onSelect;
   final VoidCallback onRemove;
   final String? paymentStatus;
@@ -22460,15 +22496,16 @@ class _CartBenefitCard extends StatelessWidget {
         ),
         label: '${selected ? 'Remove' : 'Select'} ${benefit.title}',
         button: true,
+        enabled: enabled,
         selected: selected,
         container: true,
         excludeSemantics: true,
-        onTap: activate,
+        onTap: enabled ? activate : null,
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
-            onTap: activate,
+            onTap: enabled ? activate : null,
             borderRadius: BorderRadius.circular(12),
             child: AnimatedContainer(
               key: ValueKey('buy-cart-benefit-action-motion-${benefit.id}'),
@@ -23814,6 +23851,7 @@ class _CartDeliveryInstructionCardState
       textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
     );
     super.build(context);
+    final locked = session.cartChangesBlocked;
     final options = session.deliveryInstructionsFor(destination);
     final selected = session.selectedDeliveryInstructionFor(destination);
     final customNote = session.customDeliveryInstructionFor(destination);
@@ -23886,7 +23924,7 @@ class _CartDeliveryInstructionCardState
                   key: ValueKey(
                     'buy-cart-instruction-custom-$instructionScope',
                   ),
-                  onPressed: openEditor,
+                  onPressed: locked ? null : openEditor,
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: const Text('Add instructions'),
                 ),
@@ -23898,6 +23936,7 @@ class _CartDeliveryInstructionCardState
                       final label = option.label;
                       return Semantics(
                         checked: isSelected,
+                        enabled: locked ? false : null,
                         inMutuallyExclusiveGroup: true,
                         label: '$instructionOwner: $label',
                         child: Material(
@@ -23907,13 +23946,15 @@ class _CartDeliveryInstructionCardState
                               'buy-cart-instruction-$instructionScope-${option.id}',
                             ),
                             borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              session.chooseDeliveryInstruction(
-                                destination: destination,
-                                instructionId: option.id,
-                              );
-                            },
+                            onTap: locked
+                                ? null
+                                : () {
+                                    HapticFeedback.selectionClick();
+                                    session.chooseDeliveryInstruction(
+                                      destination: destination,
+                                      instructionId: option.id,
+                                    );
+                                  },
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(minHeight: 48),
                               child: Padding(
@@ -23975,6 +24016,7 @@ class _CartDeliveryInstructionCardState
                       'buy-cart-instruction-note-$instructionScope',
                     ),
                     controller: _noteController,
+                    enabled: !locked,
                     focusNode: _noteFocus,
                     onChanged: (_) => _revealEditor(),
                     autofocus: true,
@@ -24013,15 +24055,17 @@ class _CartDeliveryInstructionCardState
                         key: ValueKey(
                           'buy-cart-instruction-save-$instructionScope',
                         ),
-                        onPressed: () {
-                          if (session.setCustomDeliveryInstruction(
-                            destination: destination,
-                            text: _noteController.text,
-                          )) {
-                            FocusScope.of(context).unfocus();
-                            _closeEditor();
-                          }
-                        },
+                        onPressed: locked
+                            ? null
+                            : () {
+                                if (session.setCustomDeliveryInstruction(
+                                  destination: destination,
+                                  text: _noteController.text,
+                                )) {
+                                  FocusScope.of(context).unfocus();
+                                  _closeEditor();
+                                }
+                              },
                         child: const Text('Save'),
                       ),
                       TextButton(
@@ -24119,11 +24163,13 @@ class _CartTipCard extends StatelessWidget {
                 key: ValueKey('buy-cart-tip-${group.key}-0'),
                 label: const Text('No tip'),
                 selected: selected == 0,
-                onSelected: (_) => session.chooseTip(
-                  fulfilmentKey: group.key,
-                  destination: group.destination,
-                  amount: 0,
-                ),
+                onSelected: session.cartChangesBlocked
+                    ? null
+                    : (_) => session.chooseTip(
+                        fulfilmentKey: group.key,
+                        destination: group.destination,
+                        amount: 0,
+                      ),
               ),
               for (final option in options)
                 ChoiceChip(
@@ -24137,11 +24183,13 @@ class _CartTipCard extends StatelessWidget {
                   key: ValueKey('buy-cart-tip-${group.key}-${option.amount}'),
                   label: Text(buyV2Money(option.amount)),
                   selected: selected == option.amount,
-                  onSelected: (_) => session.chooseTip(
-                    fulfilmentKey: group.key,
-                    destination: group.destination,
-                    amount: option.amount,
-                  ),
+                  onSelected: session.cartChangesBlocked
+                      ? null
+                      : (_) => session.chooseTip(
+                          fulfilmentKey: group.key,
+                          destination: group.destination,
+                          amount: option.amount,
+                        ),
                 ),
             ],
           ),
@@ -24553,7 +24601,9 @@ class _CartLine extends StatelessWidget {
             child: DecoratedBox(
               key: ValueKey('buy-cart-quantity-pill-${product.id}'),
               decoration: BoxDecoration(
-                color: BuyV2ActionStyle.primaryFill,
+                color: session.cartChangesBlocked
+                    ? BuyV2Colors.canvas
+                    : BuyV2ActionStyle.primaryFill,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -24571,7 +24621,9 @@ class _CartLine extends StatelessWidget {
                           ? 'Remove ${product.customerTitle} from Cart'
                           : 'Remove one trade pack'
                     : 'Remove one',
-                onPressed: () => session.decrease(product.id),
+                onPressed: session.cartChangesBlocked
+                    ? null
+                    : () => session.decrease(product.id),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -24614,7 +24666,9 @@ class _CartLine extends StatelessWidget {
                     : wholesale
                     ? 'Add one trade pack'
                     : 'Add one',
-                onPressed: () => session.increase(product.id),
+                onPressed: session.cartChangesBlocked
+                    ? null
+                    : () => session.increase(product.id),
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
@@ -24641,7 +24695,7 @@ class _CartLine extends StatelessWidget {
                   value: session.cartProductSelected(product.id),
                   activeColor: BuyV2ActionStyle.primaryForeground,
                   semanticLabel: 'Include ${product.customerTitle} in checkout',
-                  onChanged: session.checkoutRequiresResolution
+                  onChanged: session.cartChangesBlocked
                       ? null
                       : (value) => session.selectCartProduct(
                           product.id,

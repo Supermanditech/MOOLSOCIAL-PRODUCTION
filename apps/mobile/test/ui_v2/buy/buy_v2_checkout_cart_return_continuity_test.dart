@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show ImageByteFormat, Tristate;
+import 'dart:ui' show ImageByteFormat, Tristate, SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -826,6 +826,296 @@ void main() {
         initialCartScope: session.cartScope,
         paymentHandoff: paymentHandoff,
       ),
+    );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T10 held Cart explains payment and disables edits text $scale',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: prepaidCommerceFixture(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.addProduct('s-tomato'), isTrue);
+          session.openCart(scope: BuyV2CartScope.shop);
+          expect(session.openCheckout(), isTrue);
+          expect(session.choosePayment('Card'), isTrue);
+          expect(await session.submitOrder(), isFalse);
+          expect(session.checkoutRequiresResolution, isTrue);
+          final attempt = session.legacyCheckoutAttempt;
+          final total = session.checkoutPayableTotal;
+          session.openCart(scope: BuyV2CartScope.shop);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          expect(session.cartChangesBlocked, isTrue);
+          expect(
+            find.byKey(const ValueKey('buy-cart-payment-recovery-notice')),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const ValueKey('buy-cart-empty')),
+                )
+                .onPressed,
+            isNull,
+          );
+          final line = find.byKey(const ValueKey('buy-cart-line-s-tomato'));
+          await tester.scrollUntilVisible(
+            line,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          final quantities = tester
+              .widgetList<IconButton>(
+                find.descendant(of: line, matching: find.byType(IconButton)),
+              )
+              .where(
+                (button) =>
+                    const ['Add one', 'Remove one'].contains(button.tooltip),
+              );
+          expect(quantities, hasLength(2));
+          expect(
+            quantities.every((button) => button.onPressed == null),
+            isTrue,
+          );
+          final instruction = find.byKey(
+            const ValueKey('buy-cart-instruction-custom-delivery'),
+          );
+          await tester.scrollUntilVisible(
+            instruction,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          expect(tester.widget<TextButton>(instruction).onPressed, isNull);
+          expect(session.addProduct('s-rice'), isFalse);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          final review = find.widgetWithText(FilledButton, 'Review payment');
+          await tester.ensureVisible(review);
+          await tester.pumpAndSettle();
+          await captureR66Visual(tester, 't10-held-cart-$scale');
+          await tester.tap(review);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          expect(session.checkoutPayableTotal, total);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          await captureR66Visual(tester, 't10-held-checkout-$scale');
+          session.openDestination(BuyV2Destination.shop);
+          await tester.pumpAndSettle();
+          final productControl = find.byKey(
+            const ValueKey('buy-grid-edit-quantity-s-tomato'),
+          );
+          await tester.scrollUntilVisible(
+            productControl,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          final cardQuantities = tester.widgetList<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton &&
+                  const [
+                    'Add one',
+                    'Remove from Cart',
+                  ].contains(widget.tooltip),
+            ),
+          );
+          expect(cardQuantities, hasLength(2));
+          expect(
+            cardQuantities.every((button) => button.onPressed == null),
+            isTrue,
+          );
+          expect(tester.widget<TextButton>(productControl).onPressed, isNull);
+          await tester.tap(productControl);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.quantityFor('s-tomato'), 1);
+          await captureR66Visual(tester, 't10-held-shop-$scale');
+          final add = find.byKey(const ValueKey('buy-add-s-rice'));
+          await tester.scrollUntilVisible(
+            add,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          expect(
+            tester
+                .widget<InkWell>(
+                  find.descendant(of: add, matching: find.byType(InkWell)),
+                )
+                .onTap,
+            isNull,
+          );
+          expect(
+            tester
+                .getSemantics(add)
+                .getSemanticsData()
+                .hasAction(SemanticsAction.tap),
+            isFalse,
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('s-rice'), 0);
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.notice, isNull);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          await captureR66Visual(tester, 't10-held-add-disabled-$scale');
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'T10 fresh mixed Cart retains edits and Checkout Back text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart(scope: BuyV2CartScope.all);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        expect(session.cartChangesBlocked, isFalse);
+        expect(find.text('Review payment'), findsNothing);
+        expect(
+          tester
+              .widget<IconButton>(find.byKey(const ValueKey('buy-cart-empty')))
+              .onPressed,
+          isNotNull,
+        );
+        final line = find.byKey(const ValueKey('buy-cart-line-s-tomato'));
+        await tester.scrollUntilVisible(
+          line,
+          180,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        final plus = find.descendant(
+          of: line,
+          matching: find.byTooltip('Add one'),
+        );
+        await tester.ensureVisible(plus);
+        await tester.tap(plus);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 2);
+        final instruction = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-delivery'),
+        );
+        await tester.scrollUntilVisible(
+          instruction,
+          180,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        await tester.tap(instruction);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-cart-instruction-note-delivery')),
+          'Use the side entrance for all items',
+        );
+        final save = find.byKey(
+          const ValueKey('buy-cart-instruction-save-delivery'),
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.publicDeliveryInstruction,
+          'Use the side entrance for all items',
+        );
+        expect(find.text('Supplier terms'), findsNothing);
+        final total = session.scopedPayableTotal;
+        final checkout = find.widgetWithText(FilledButton, 'Checkout');
+        await tester.ensureVisible(checkout);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 't10-fresh-mixed-cart-$scale');
+        await tester.tap(checkout);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        expect(session.checkoutPayableTotal, total);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-return-cart')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.quantityFor('s-tomato'), 2);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(session.scopedPayableTotal, total);
+        expect(
+          session.publicDeliveryInstruction,
+          'Use the side entrance for all items',
+        );
+        expect(session.checkoutRequiresResolution, isFalse);
+        final empty = find.byKey(const ValueKey('buy-cart-empty'));
+        await tester.ensureVisible(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-cart-clear-cancel')));
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 3);
+        expect(session.scopedPayableTotal, total);
+        await tester.tap(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-cart-clear-confirm')));
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 0);
+        expect(session.scopedPayableTotal, 0);
+        expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
+        await captureR66Visual(tester, 't10-fresh-empty-cart-$scale');
+        expect(tester.takeException(), isNull);
+      },
     );
   }
 

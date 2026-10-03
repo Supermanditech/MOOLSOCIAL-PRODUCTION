@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "F76044AF715D00EAFDEDB1DCDFF91D679446788E0FD271121694DEAAC87CE1C9"
+    "sha256": "4A60CA880FACA1910926A1108CE0C92831735FE94C4F31273D07F5DB772BE801"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -318,7 +318,14 @@
         "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-3.jsonl",
         "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json",
         "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json",
-        "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip"
+        "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json",
+        "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip"
       ]
     },
     {

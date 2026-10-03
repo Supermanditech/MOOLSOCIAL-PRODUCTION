@@ -107653,7 +107653,7 @@
         }
       },
       "cartT06T07Execution20261002": {
-        "status": "authorized_reconstruction_before_scope_admission",
+        "status": "host_qualified_native_activation_child_open_before_scoped_checkpoint",
         "authority": "Founder execute these authorizes T06 payment grouping, then T07 recovery including A09 as sequential frontend subworkflows of existing BUY-ACTION-POLISH-20260926-01 / UAW-CURSOR-BUY-READY-20260921. No formal ticket closure, new branch, backend/Google execution, new APK or live payment authority inferred.",
         "baseline": "e329d01a144ae5348a19d9e714a2c175eb62cca7",
         "branch": "work/cursor-ui/buy-ready-20260921",
@@ -109800,7 +109800,258 @@
           "preservation": "Both handoffs appended with verified original raw byte prefixes. Original failed attempts/skips included; session-specific refresh logs excluded.",
           "children": "Backend deferred; workspace Codex after integration; Google separate. Existing25 legacy failures, live balance hold, fresh-checkout evidence conversion, formalclose0e90 and T10 polish unchanged.",
           "checkpoint": "Fresh exact16-owner staging and7 raw Git-blob SHA proof plus memory/pre_commit then ordinary commit/push/clean remote readback. Not preclaimed; stop afterward."
-        }
+        },
+        "t10FreshCartAuditScope20261003": {
+          "authority": "Founder requests actual fresh Cart journey, list visual/technical/flow defects then implement; T10 frontend sweep inside same open Buy parent/lane",
+          "actor": "Buyer",
+          "classification": "mvp_required",
+          "reason": "Complete understandable reliable Cart-to-Checkout launch journey",
+          "baseline": "30961fa92fd7f7f8ca619a6d8b27755cdad8335c",
+          "reuseOwners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+          ],
+          "smallestScope": "Observe fresh empty-to-Add-to-Cart/Checkout/Back; register confirmed defects, repair bounded Buy UI/validation root causes; no new screen/service/model/provider",
+          "exclusions": [
+            "No backend/provider implementation; workspace Codex after integration",
+            "Google separate",
+            "No payment/order/support submission",
+            "No APK build/install or other worktree edits",
+            "Supplier policies Product/Add only never Cart",
+            "One standard delivery instruction for shared address; no redundant public Clear",
+            "No formal closure or promotion"
+          ],
+          "authorityAndRecovery": "Existing product/offer/order service contracts; UI-review data isolated; totals authoritative to existing preview, missing policy/payment capabilities fail closed; preserve quantity/address/instruction on Back",
+          "acceptance": [
+            "Redmi normal200percent+keyboard actual screen evidence",
+            "Technical callpath checks and meaningful behavior regressions",
+            "List defects before fix",
+            "Source-bound selected regression receipts, refresh/retest",
+            "Durable verified/child status and safe scoped checkpoint then stop"
+          ]
+        },
+        "t10ObservedDefects20261003": {
+          "sourceSha256": "9e75eb05f199f354e26ec99a12e1958e4b63c910bb5639c1145283048b330e8f",
+          "defects": [
+            {
+              "id": "T10-local-01",
+              "finding": "Cart quantity and Empty Cart appear enabled during unresolved payment although session rejects edits",
+              "evidence": "t10-audit-cart-20261003",
+              "fix": "Reuse existing mutation guard for disabled UI"
+            },
+            {
+              "id": "T10-local-02",
+              "finding": "Catalogue Add appears enabled but rice Add rejected while original Cart remains one tomato",
+              "evidence": "t10-audit-shop-two-20261003",
+              "fix": "Disable Add/edit/quantity actions using same existing session guard"
+            },
+            {
+              "id": "T10-local-03",
+              "finding": "Cart ordinary Checkout hides saved payment recovery context; Checkout only reveals unavailable original payment",
+              "evidence": "t10-audit-checkout-pending-20261003",
+              "fix": "Persistent Cart explanation and Review payment navigation; preserve original attempt"
+            }
+          ],
+          "nativeBoundary": "Saved original payment unresolved; no reset, financial submission or invented fresh native flow. Fresh/mixed journeys host isolated tests. Backend deferred, workspace Codex after integration, Google separate.",
+          "listShownBeforeFix": true
+        },
+        "t10InstructionLockDefect20261003": {
+          "finding": "Cart Add instructions and preset chips appear active while openEditor silently returns and session guards reject saving.",
+          "evidence": "t10-audit-cart-20261003; views openEditor and setCustomDeliveryInstruction/chooseDeliveryInstruction guard",
+          "listedBeforeFix": true,
+          "fix": "Disable guarded instruction edits; preserve readable saved instruction and Cancel"
+        },
+        "t10OfferTipLockDefect20261003": {
+          "finding": "Technical callpath: Cart benefit select/remove and tip chips have unconditional callbacks although session mutation guard rejects them during unresolved payment.",
+          "evidence": "views cardFor callbacks and CartTipCard; session chooseCartBenefit/removeCartBenefit/chooseTip use _holdCartForPaymentResolution",
+          "listedBeforeFix": true,
+          "fix": "Reuse cartChangesBlocked for disabled benefit action semantics/callbacks and tip callbacks; browsing remains available",
+          "nativeQualification": "No available native offers/tips in current retained Shop Cart; host contracts only"
+        },
+        "t10FirstHostFailure20261003": {
+          "closedExit": 1,
+          "passed": 0,
+          "raw": "apps/mobile/build/t06-t07-cart-20261002/t10-first-focused-20261003.jsonl",
+          "sha256": "8110baac7b5479224451442d8e8deb5706f83fd2a0006fefe8e7dae5ddb6ce87",
+          "cause": "New test harness guessed public instruction key; actual established scope is delivery. Four cases failed at missing finder. No claimed passing evidence.",
+          "correction": "Use existing delivery key; preserve failed reporter; add guards for observed benefit/tip controls before final freeze"
+        },
+        "t10CatalogueOwnerAdmission20261003": {
+          "actor": "Buyer",
+          "classification": "mvp_required",
+          "outcome": "Catalogue Add and quantity affordances reflect retained payment Cart hold",
+          "reason": "Actual native rice Add defect root callback is BuyV2ProductCard in catalogue, distinct from product view.",
+          "reuseOwners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+          ],
+          "scope": "Small existing card/stepper enablement changes; exact owner already in root claim285; no Store/backend/contracts/provider/model changes",
+          "boundaries": "Existing authoritative guard preserves payment attempt; browsing/offer review remain available; no financial submission or state reset",
+          "acceptance": "Host card semantics/buttons and fresh controls at1x/2x; native rice Add disabled; selected source-bound regression and fresh admission",
+          "hostFailure2": {
+            "exit": 1,
+            "passed": 0,
+            "raw": "t10-second-focused-20261003.jsonl",
+            "sha256": "0bdaa97377500f67464823d63bae3b27192dac415267079d64c26021499ca506",
+            "cause": "Guessed catalogue key was product-sheet key; Back control actual key buy-checkout-return-cart. Read exact source before correction."
+          }
+        },
+        "t10ThirdHostFailure20261003": {
+          "exit": 1,
+          "passed": 1,
+          "raw": "t10-third-focused-20261003.jsonl",
+          "sha256": "7f521af6d9f4690f3b15e34773f0d634649d2a0e59c99e4654d5b0c2ee047546",
+          "cause": "Host pending catalogue control is FeaturedProductAction, not BuyV2ProductCard ancestor. First Scrollable chose horizontal filter at200percent. Fresh1x actual edit/instruction/Checkout/Back passed.",
+          "correction": "Bound vertical Scrollable finder, assert actual shared quantity keys/buttons, guard actual featured Add as well as grid. Architect reviewed repeated selector approach; preserve all failed raw logs."
+        },
+        "t10SemanticsHandleFailure20261003": {
+          "exit": 1,
+          "passed": 2,
+          "raw": "t10-qualified-focused-20261003.jsonl",
+          "sha256": "df4ebec2a029c19e23a3c63ce174da32936d15aec05b9a2c10acb87115bc7bfa",
+          "cause": "All held behavior/Add accessibility assertions completed; semantics handle teardown ran after Flutter end-of-body verification. Two fresh mixed cases passed.",
+          "correction": "Dispose semantics handle in try/finally inside test body, preserve failed reporter and captures; no runtime workaround"
+        },
+        "t10DisabledTapThroughDefect20261003": {
+          "finding": "Disabled catalogue Add has no semantic tap but native pointer reaches surrounding product card and opens product sheet.",
+          "observed": "Host t10-qualified-focused-20261003-visual/t10-held-add-disabled-1.0.png shows rice product page after disabled Add pointer tap; fourth focused also demonstrates.",
+          "listedBeforeFix": true,
+          "fix": "Existing featured/grid action owners consume disabled pointer via standard GestureDetector excluded from semantics; leave remaining card browsing enabled. Test both Add and quantity disabled tap keeps catalogue, attempt and Cart unchanged.",
+          "previousFocused": "t10-qualified-focused-2-20261003 closed exit0 fourcases atsource e624d8e134e0bbc6b98f4e4533f86c682d04ea3032d00203369f63b6ede2d714; superseded by actual pointer regression fix before qualification",
+          "technicalBoundary": "No session/provider/payment changes required"
+        },
+        "t10SelectedSemanticsContractFailure20261003": {
+          "exit": 1,
+          "passed": 364,
+          "failedCases": 2,
+          "raw": "apps/mobile/build/t06-t07-cart-20261002/t10-qualified-selected-20261003/selected-1.jsonl",
+          "sha256": "f6fdfa12e626d5f815cec5031c8c9f89a62e8bc6b49ffc55b8abb137bf69af0a",
+          "source": "6b18b0cd3ea271498bd1c70a8f29beeeac1833d71ea521517b782683041d2337",
+          "cause": "Added enabled:!locked flags altered accepted ordinary editable delivery radio semantics in two exact existing assertions1x/2x; runtime edit callbacks correct.",
+          "correction": "Smallest one-line compatibility correction enabled:locked?false:null preserves existing editable radio semantics and explicitly exposes held disabled state. Keep regression assertions unchanged. Refreeze and rerun final focused/analysis/required selected.",
+          "notQualified": true
+        },
+        "t10FinalTestsClosed20261003": {
+          "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+          "analysisOwners": 4,
+          "analysisExit": 0,
+          "focused": {
+            "passed": 4,
+            "exit": 0,
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t10-final-focused-20261003.jsonl",
+            "sha256": "260c31cc2e6f2d4ae13add9ae136221e04aa53c71ed1dce74781f5a972594752"
+          },
+          "selected": {
+            "passed": 997,
+            "references": 1057,
+            "files": 53,
+            "batches": [
+              366,
+              356,
+              275
+            ],
+            "allActualExit0": true,
+            "reporterSuccess": true,
+            "sourceUnchanged": true,
+            "layoutHitWarnings": 0,
+            "root": "apps/mobile/build/t06-t07-cart-20261002/t10-qualified-selected-2-20261003"
+          },
+          "resolved": "Instruction unlocked semantics compatibility restored without changing existing assertions; selector/harness failures and disabled pointer discovery retained.",
+          "limits": "No full legacy Checkout suite qualification; inherited25 failures/tag warnings retained. Native next; live-provider recovery deferred/workspace Codex after integration/Google separate."
+        },
+        "t10NativeInitialSurfaceMismatch20261003": {
+          "exit": 1,
+          "capture": "t10-final-cart-normal",
+          "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+          "finding": "After closed successful hot reload initial capture is Shop, not assumed Cart. One tomato retained; catalogue controls currently look editable. No dependent action performed; font restored1.0.",
+          "status": "Investigate actual Cart/Checkout state and code activation before claiming native proof. Do not restore/inject/delete attempt to force test state. Preserve capture and invalid initial surface assumption.",
+          "rawAttachLogExcluded": true
+        },
+        "t10NativeCodeActivationRetry20261003": {
+          "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+          "diagnostic": "Actual cold attach response Reloaded0 libraries; native Cart lacks marker/Review payment; prior attach0 is no-op, not UI source activation.",
+          "evidence": [
+            "t10-final-cart-normal",
+            "t10-post-refresh-opened-cart-20261003"
+          ],
+          "attempt": "Existing original37 and oneTomato retained; checkbox pending guard remains disabled; no mutation/financial attempt reset.",
+          "scope": "One bounded warm attach first compile/reload, mtime-only invalidation of exactlythree admitted runtimeowners, second fullRestartfalse reload; source bytes/hashes frozen and original mtimes restored in finally; no fullrestart/prefs/install",
+          "architect": "Facts-only review: reasonable notguaranteed; require native notice/Reviewpayment/disabledcontrols and originalattempt proof. If no-op persists register blocker, no indefinite retries/unprovenrestart.",
+          "owners": [
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+          ]
+        },
+        "key": "t10QualifiedFrontendHandoff20261003",
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+        "actualResults": {
+          "firstColdReload": "Reloaded 0 libraries",
+          "warmFirstReload": "Reloaded 0 libraries",
+          "warmMtimeOnlyReload": "Reloaded 0 libraries",
+          "attachExit": 0,
+          "mtimesRestored": true,
+          "sourceBytesUnchanged": true,
+          "nativeNewMarkers": false,
+          "originalPaymentScreenAmount": 37,
+          "fontScale": 1,
+          "phoneLeft": "Existing held Cart"
+        },
+        "qualification": "997 distinct selected tests and 4 focused host cases pass; fixed-source native normal/200percent/fresh flow unqualified.",
+        "scope": "No full restart/reset/fixtures/build/install/payment/order/support; backend deferred, workspace Codex after integration, Google separate.",
+        "failedHarnessSelector": "Original total label and amount are separate XML nodes; corrected readback only, preserved original capture.",
+        "reviewer": "/root/retention_architect",
+        "reviewBasis": "Supplied facts only; no independent source/filesystem review",
+        "result": "Bounded checkpoint appropriate as host-qualified work with native verification blocked, not completed device acceptance.",
+        "requiredTruth": "Source6c35cbae NOT activated; unchanged APK hash does not identify running Dart code; six fixes host-verified only.",
+        "preservation": "192 ZIP members verified; raw closed logs authentic, source frozen, parent240, seven literal evidence owners, no gate logic change; handoff prefixes preserved",
+        "nextPrerequisite": "Prove safe activation or durable recovery of exact original attempt before restart.",
+        "additionalMaterialIssue": "None evident in supplied facts",
+        "formalClosure": false,
+        "actor": "Buyer",
+        "classification": "mvp_required",
+        "rootOwners": 292,
+        "evidence": {
+          "report": {
+            "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json",
+            "sha256": "fe89078b41743d9484d980544a64f86c74a569587d93d44102050b9f940d8a18"
+          },
+          "contract": {
+            "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json",
+            "sha256": "847be494b9cc24b65c4c90de89ff2e96c5142e5a1132632e59eb931c7488cae1"
+          },
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip",
+            "sha256": "1e8d2cfe2cb77ffc40690ec4a66647596260799c3b0debcb56b6ade072cbd47b",
+            "members": 192,
+            "memberHashesVerified": true
+          }
+        },
+        "tests": {
+          "analysisOwners": 4,
+          "analysisExit": 0,
+          "focusedCases": 4,
+          "selectedDistinct": 997,
+          "selectedReferences": 1057,
+          "selectedFiles": 53,
+          "allActualClosedExit0": true,
+          "fullLegacyCheckoutQualified": false
+        },
+        "native": {
+          "fixedSourceActivated": false,
+          "fixedSourceJourneyQualified": false,
+          "originalUnavailablePaymentReadback": 37,
+          "font": 1,
+          "installedAPKUnchanged": true,
+          "noResetFullRestartBuildInstallSubmission": true,
+          "retriesStopped": true
+        },
+        "remaining": "Native activation and disabled red Empty icon visual follow-up; host glyph artifacts; inherited25 legacy Checkout failures; backend/provider deferred; workspace Codex after integration; Google separate; founder review/formal closure pending",
+        "checkpoint": "Mandatory staged byte readback, memory/pre_commit actual0 then ordinary scoped17owner commit/push/clean origin equality; not preclaimed",
+        "stopAfterCheckpoint": true
       },
       "t05PaymentEligibilityAutonomous20261002": {
         "status": "frontend_locally_verified_integration_deferred_formal_handoff_blocked",
