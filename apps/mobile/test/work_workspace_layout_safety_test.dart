@@ -4599,6 +4599,11 @@ void main() {
         await tester.enterText(target, text); await tester.pumpAndSettle();
       }
       expect(find.text('Available to receive ₹100'), findsOneWidget);
+      final method = display.width > 500 ? 'UPI' : 'Cash';
+      if (method != 'Cash') {
+        await tap(find.byKey(const ValueKey('supplier-refund-method-Cash')));
+        await tester.tap(find.text(method).last); await tester.pumpAndSettle();
+      }
       await enter('supplier-refund-amount', '100'); await enter('supplier-refund-reference', 'HOST-REFUND-RECEIVED');
       tester.view.viewInsets = FakeViewPadding(bottom: display.width > 500 ? 160 : 240);
       await tester.pumpAndSettle();
@@ -4610,6 +4615,13 @@ void main() {
       final ledger = work.workspaceSupplierLedger(supplier.id)!;
       expect(ledger.refunds, hasLength(1)); expect(ledger.creditMinor, 0);
       expect(ledger.entries.single.kind, WorkspaceSupplierEntryKind.refund);
+      expect(ledger.entries.single.paymentMethod, method);
+      for (final key in ['supplier-refund-amount', 'supplier-refund-date', 'supplier-refund-reference']) {
+        final field = tester.widget<TextField>(find.byKey(Key(key)));
+        expect(field.enabled, isTrue); expect(field.readOnly, isTrue);
+        expect(field.onChanged, isNull);
+      }
+      expect(find.text('Received by · $method'), findsOneWidget);
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
       expect(find.text('Record another refund'), findsOneWidget);
       await tap(find.byKey(const Key('supplier-refund-recover')));
@@ -4623,6 +4635,13 @@ void main() {
       await revealOpening(tester, refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('supplier-refund-source-0'))); await tester.pumpAndSettle();
       expect(find.text('Record another refund'), findsOneWidget);
+      expect(work.workspaceSupplierLedger(supplier.id)!.refunds, hasLength(1));
+      expect(find.text('Received by · $method'), findsOneWidget);
+      await tap(find.byKey(const Key('supplier-refund-submit')));
+      final newAmount = tester.widget<TextField>(find.byKey(const Key('supplier-refund-amount')));
+      expect(newAmount.controller!.text, isEmpty); expect(newAmount.readOnly, isFalse);
+      expect(find.byKey(const ValueKey('supplier-refund-method-Cash')), findsOneWidget);
+      expect(find.text('Refund recorded · ₹100'), findsNothing);
       expect(work.workspaceSupplierLedger(supplier.id)!.refunds, hasLength(1));
       expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
     });

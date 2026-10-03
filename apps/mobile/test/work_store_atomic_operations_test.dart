@@ -4614,6 +4614,36 @@ void main() {
     expect(legacy.canFollow(posted), isFalse);
   });
 
+  test('PURCHASEREFUND statement uses received date and preserves recording date and legacy fallback', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 10000,
+      credit: true, bills: const []))!;
+    final intent = WorkspaceSupplierRefundIntent.fromJson({
+      ...refundIntentFixture(opening).toJson(), 'occurredOn': '2026-10-01',
+      'paymentMethod': 'Bank transfer', 'amountMinor': 4000,
+    });
+    final posted = opening.recordReviewedRefund(intent, expectedRevision: opening.revision,
+      recordedAt: DateTime.utc(2026, 10, 3))!;
+    final restored = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(posted.toJson())))!;
+    WorkspaceMoneyStatement statement(WorkspaceSupplierLedger owner, int day) =>
+      WorkspaceMoneyStatement.fromLedgers(finance: receiptFinanceFixture(),
+        suppliers: [owner], expenses: const [], start: DateTime(2026, 10, day),
+        end: DateTime(2026, 10, day + 1))!;
+    final received = statement(restored, 1);
+    expect(received.entries, hasLength(1));
+    expect(received.entries.single.label, 'Supplier refund');
+    expect(received.entries.single.reference, intent.reference);
+    expect(received.entries.single.method, 'Bank transfer');
+    expect(received.entries.single.occurredAt, DateTime(2026, 10, 1));
+    expect(received.recordedInMinor, 4000); expect(received.recordedOutMinor, 0);
+    expect(statement(restored, 3).entries, isEmpty);
+    expect(restored.entries.single.postedAt, DateTime.utc(2026, 10, 3));
+    expect(restored.creditMinor, 6000);
+    final legacy = WorkspaceSupplierLedger.fromJson({...posted.toJson(), 'refunds': {}})!;
+    expect(statement(legacy, 1).entries, isEmpty);
+    expect(statement(legacy, 3).recordedInMinor, 4000);
+    expect(legacy.entries.single.toJson(), posted.entries.single.toJson());
+  });
+
   test('PURCHASEREFUND allocation and refund share capacity in both commit orders', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 100000,
       credit: true, bills: const []))!;

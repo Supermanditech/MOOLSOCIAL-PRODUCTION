@@ -28620,6 +28620,7 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
   @override
   Widget build(BuildContext context) {
     final editable = draft.ready && recovered && current && !busy && frozen == null;
+    final retained = current && frozen != null;
     final available = capacity;
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null,
       onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
@@ -28635,22 +28636,29 @@ class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
               key: const Key('supplier-refund-available')),
             Wrap(spacing: 12, runSpacing: 8, children: [
               _purchaseCompactLabeledField('Amount received (₹)', width: 145, field: TextField(
-                key: const Key('supplier-refund-amount'), controller: amount, enabled: editable,
+                key: const Key('supplier-refund-amount'), controller: amount, enabled: editable || retained,
+                readOnly: retained,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                onChanged: (_) => draft.save(fields))),
+                onChanged: editable ? (_) => draft.save(fields) : null)),
               _purchaseCompactLabeledField('Received date', width: 145, field: TextField(
-                key: const Key('supplier-refund-date'), controller: date, enabled: editable,
-                decoration: const InputDecoration(helperText: 'DD/MM/YYYY'), keyboardType: TextInputType.datetime,
-                onChanged: (_) => draft.save(fields))),
+                key: const Key('supplier-refund-date'), controller: date, enabled: editable || retained,
+                readOnly: retained,
+                decoration: InputDecoration(helperText: retained ? null : 'DD/MM/YYYY'), keyboardType: TextInputType.datetime,
+                onChanged: editable ? (_) => draft.save(fields) : null)),
             ]),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(key: const Key('supplier-refund-method'), initialValue: channel,
+            if (retained) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Received by · $channel', key: const Key('supplier-refund-saved-method'),
+                style: Theme.of(context).textTheme.bodyLarge))
+            else DropdownButtonFormField<String>(key: ValueKey('supplier-refund-method-$channel'), initialValue: channel,
               isExpanded: true, decoration: const InputDecoration(labelText: 'Received by'),
               items: [for (final method in ['Cash', 'UPI', 'Bank transfer']) DropdownMenuItem(value: method, child: Text(method))],
               onChanged: editable ? (value) { setState(() => channel = value!); draft.save(fields); } : null),
-            TextField(key: const Key('supplier-refund-reference'), controller: reference, enabled: editable,
-              decoration: const InputDecoration(labelText: 'Refund reference', helperText: 'Receipt No. / UPI reference / bank reference'),
-              onChanged: (_) => draft.save(fields)),
+            TextField(key: const Key('supplier-refund-reference'), controller: reference, enabled: editable || retained,
+              readOnly: retained,
+              decoration: InputDecoration(labelText: 'Refund reference',
+                helperText: retained ? null : 'Receipt No. / UPI reference / bank reference'),
+              onChanged: editable ? (_) => draft.save(fields) : null),
             if (frozen != null) Text(confirmed ? 'Refund recorded · ${_purchaseAmount(frozen!.amountMinor)}'
               : statusVerified ? 'Saved request · not recorded' : 'Saved refund status unverified', key: const Key('supplier-refund-status')),
             if (confirmed && recovered && ledger?.creditMinor != null) Text('Credit remaining with supplier ${_purchaseAmount(ledger!.creditMinor!)}'),

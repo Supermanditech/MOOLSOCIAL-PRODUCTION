@@ -1646,7 +1646,9 @@ class WorkspaceMoneyStatement {
                 ? '${entry.reference} · ${supplier.purchaseBills[entry.billId]?.copy.draft.invoiceReference ?? entry.billId ?? entry.purchaseId}'
                 : entry.reference,
             method: entry.paymentMethod ?? 'Payment method unavailable',
-            occurredAt: entry.moneyReview == null ? entry.postedAt
+            occurredAt: supplier.refunds[entry.operationId] != null
+                ? DateTime.parse(supplier.refunds[entry.operationId]!.intent.occurredOn)
+                : entry.moneyReview == null ? entry.postedAt
                 : DateTime.parse(entry.moneyReview!.occurredOn),
             amountMinor: entry.amountMinor,
             incoming: entry.kind == WorkspaceSupplierEntryKind.refund,
