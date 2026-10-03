@@ -2362,6 +2362,16 @@ class WorkSession extends ChangeNotifier {
   String newWorkspaceSupplierCreditId() => _newCounterIdentity('supplier-credit');
   String newWorkspaceSupplierShortageId() => _newCounterIdentity('supplier-shortage');
   final Set<String> _supplierShortageSubmissions = {};
+  /// Recovery reads use the original copy namespace, not hydrated ledger state.
+  /// A new submission still requires the fresh accepted-bill checks below.
+  WorkspaceLedgerFormKey? supplierShortageRecoveryFormKey(WorkspacePurchaseSavedCopy copy) {
+    final scope = workspaceSupplierScope;
+    if (_disposed || scope == null || !copy.valid ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard) { return null; }
+    final key = (account: scope.$1, store: scope.$2, customer: copy.supplier.id,
+      invoice: copy.draft.id, order: 'shortage-copy:${copy.id}', kind: 'supplierShortage', ledgerRevision: copy.revision);
+    return _ledgerFormScopeCurrent(key) ? key : null;
+  }
   WorkspaceLedgerFormKey? supplierShortageFormKey(WorkspacePurchaseSavedCopy copy) {
     if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
         _ledgerFormStorage is! WorkSupplierShortageDraftGuard) { return null; }

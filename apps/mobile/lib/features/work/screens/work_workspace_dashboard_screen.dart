@@ -13470,6 +13470,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
           label: const Text('Link advance or account payment'))),
+      if (_copyVerified && session.supplierShortageRecoveryFormKey(copy) != null)
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
+            if (!await confirmLeave() || !mounted) return;
+            await _showSupplierShortage(context, session, copy);
+            if (mounted && _current) await _load(retry: true);
+          }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
+          label: const Text('Review short delivery'))),
       if (same && session.supplierCreditFormKey(copy) != null)
         Align(alignment: Alignment.centerLeft, child: TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
@@ -28595,6 +28603,235 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
                 : confirmed ? 'Verify returned Stock' : 'Confirm goods returned')),
             TextButton(key: const Key('supplier-return-recover'), onPressed: busy || draft.busy ? null : load,
               child: const Text('Recover saved return'))]),
+        ]))));
+  }
+}
+
+Future<void> _showSupplierShortage(BuildContext context, WorkSession session,
+    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreSupplierShortageSheet(session: session, copy: copy));
+
+class _StoreSupplierShortageSheet extends StatefulWidget {
+  const _StoreSupplierShortageSheet({required this.session, required this.copy});
+  final WorkSession session;
+  final WorkspacePurchaseSavedCopy copy;
+  @override
+  State<_StoreSupplierShortageSheet> createState() => _StoreSupplierShortageSheetState();
+}
+
+class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet> {
+  late final _LedgerFormAutosave draft;
+  final quantity = TextEditingController();
+  int? billLine;
+  String? deliveryId, sourceLine;
+  bool reviewed = false, busy = false, recovered = false, confirmed = false;
+  WorkspaceSupplierShortageIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  String? error;
+  bool get current => draft.key != null &&
+    widget.session.supplierShortageRecoveryFormKey(widget.copy) == draft.key;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
+  Map<String, String> get fields => {
+    'billLineIndex': billLine == null ? '' : '$billLine',
+    'deliveryId': deliveryId ?? '', 'lineId': sourceLine ?? '',
+    // Unfrozen text is retained verbatim, including an incomplete decimal.
+    'quantityMilli': frozen == null ? 'input:${quantity.text}' : '${frozen!.quantityMilli}',
+    'attributionReviewed': '$reviewed',
+    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
+  };
+  void refresh() { if (mounted) setState(() {}); }
+  void changed() { setState(() {}); draft.save(fields); }
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierShortageRecoveryFormKey(widget.copy))
+      ..addListener(refresh);
+    unawaited(load());
+  }
+  void restore(Map<String, String> saved) {
+    final attempt = saved['attempt'];
+    frozen = attempt == null || attempt.isEmpty ? null : WorkspaceSupplierShortageIntent.fromJson(jsonDecode(attempt));
+    billLine = frozen?.billLineIndex ?? int.tryParse(saved['billLineIndex'] ?? '');
+    deliveryId = frozen?.expectedDeliveryId ?? saved['deliveryId'];
+    sourceLine = frozen?.receiptLineId ?? saved['lineId'];
+    reviewed = frozen != null || saved['attributionReviewed'] == 'true';
+    final text = saved['quantityMilli'] ?? '';
+    quantity.text = frozen != null ? _ReceivingLineInput._quantity(frozen!.quantityMilli)
+      : text.startsWith('input:') ? text.substring(6)
+      : int.tryParse(text) == null ? text : _ReceivingLineInput._quantity(int.parse(text));
+  }
+  Future<void> verify() async {
+    confirmed = false;
+    if (frozen == null) return;
+    final proof = await widget.session.readWorkspaceSupplierShortageStatus(draft.key!, frozen!);
+    if (!mounted || !current) throw StateError('Original Store is unavailable');
+    confirmed = proof != null;
+  }
+  Future<void> load() async {
+    if (busy || draft.busy) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!current) throw StateError('Original Store is unavailable');
+      if (draft.pending != null) {
+        draft.save(fields);
+        if (!await draft.flush()) throw StateError('Input save is pending');
+      }
+      // Recover the persisted attempt before requiring account cache hydration.
+      final saved = await draft.load();
+      if (saved == null || !mounted || !current) throw StateError('Saved review is unavailable');
+      restore(saved);
+      await verify();
+      recovered = await widget.session.recoverCustomerLedger();
+      if (!mounted || !current) throw StateError('Original Store is unavailable');
+      if (!recovered) {
+        error = confirmed ? 'Shortage recorded. Supplier account refresh is pending.'
+          : 'Supplier account is unavailable. Your saved review is kept; retry before recording.';
+      }
+    } on Object {
+      recovered = false;
+      error = 'Status is unverified. Keep this review and retry; do not record another shortage.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  List<(int, WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)> get options {
+    final account = ledger;
+    if (!recovered || !current || account == null ||
+        widget.session.supplierShortageFormKey(widget.copy) != draft.key) { return const []; }
+    final result = <(int, WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)>[];
+    final seen = <(int, String, String)>{};
+    final now = DateTime.now().toUtc();
+    for (var index = 0; index < widget.copy.draft.goods.length; index++) {
+      for (final receipt in account.goodsReceipts.values) {
+        for (final line in receipt.lines) {
+          if (!seen.add((index, receipt.expectedDeliveryId, line.sourceLineId))) continue;
+          final probe = account.reviewShortageIntent(operationId: 'shortage-option-probe', billId: widget.copy.draft.id,
+            billLineIndex: index, deliveryId: receipt.expectedDeliveryId, lineId: line.sourceLineId,
+            quantityMilli: 1, attributionReviewed: true, requestedAt: now);
+          if (probe != null) result.add((index, receipt, line));
+        }
+      }
+    }
+    return result;
+  }
+  String optionId(int index, String delivery, String line) => jsonEncode([index, delivery, line]);
+  Future<void> submit() async {
+    if (busy || draft.busy || !current || !draft.ready) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await draft.flush()) throw StateError('Input is not saved');
+      if (!mounted || !current) throw StateError('Original Store is unavailable');
+      if (confirmed) {
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: const {});
+        if (!await widget.session.resetConfirmedWorkspaceSupplierShortageDraft(resetAttempt!,
+            expectedRevision: draft.revision!)) { throw StateError('Verified reset failed'); }
+        if (!mounted || !current) throw StateError('Original Store is unavailable');
+        draft.revision = resetAttempt!.revision;
+        restore(const {}); resetAttempt = null; confirmed = false;
+        recovered = await widget.session.recoverCustomerLedger();
+        return;
+      }
+      if (frozen == null) {
+        final amount = _ReceivingLineInput.milli(quantity.text.trim());
+        final account = ledger;
+        if (!recovered || widget.session.supplierShortageFormKey(widget.copy) != draft.key || account == null) {
+          throw StateError('Supplier account needs recovery');
+        }
+        final intent = amount == null || billLine == null || deliveryId == null || sourceLine == null ? null
+          : account.reviewShortageIntent(operationId: widget.session.newWorkspaceSupplierShortageId(),
+              billId: widget.copy.draft.id, billLineIndex: billLine!, deliveryId: deliveryId!, lineId: sourceLine!,
+              quantityMilli: amount, attributionReviewed: reviewed, requestedAt: DateTime.now().toUtc());
+        if (intent == null) {
+          error = 'Choose the matching bill item and delivery, confirm the match, and enter a valid missing quantity.';
+          return;
+        }
+        frozen = intent;
+        draft.save(fields);
+        if (!await draft.flush()) throw StateError('Review is not saved yet');
+        if (!mounted || !current) throw StateError('Original Store is unavailable');
+      }
+      await widget.session.recordWorkspaceSupplierShortageDraft(draft.key!, frozen!);
+      await verify();
+      recovered = await widget.session.recoverCustomerLedger();
+      if (!mounted || !current) throw StateError('Original Store is unavailable');
+      if (!confirmed) {
+        error = 'Not confirmed. The exact saved review is kept. Retry verification before recording again.';
+      } else if (!recovered) {
+        error = 'Shortage recorded. Supplier account refresh is pending.';
+      }
+    } on Object {
+      error = 'Status is unverified. Your review is kept. Retry to verify the same shortage.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<void> close() async {
+    if (busy || draft.busy) return;
+    if (await draft.flush() && mounted) Navigator.of(context).pop();
+  }
+  @override
+  void dispose() {
+    draft.removeListener(refresh); draft.dispose(); quantity.dispose(); super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final accountReady = recovered && current && widget.session.supplierShortageFormKey(widget.copy) == draft.key;
+    final editable = draft.ready && accountReady && !busy && frozen == null;
+    final choices = options;
+    final selected = billLine == null || deliveryId == null || sourceLine == null ? null
+      : optionId(billLine!, deliveryId!, sourceLine!);
+    final visibleSelection = choices.any((o) => optionId(o.$1, o.$2.expectedDeliveryId, o.$3.sourceLineId) == selected);
+    return PopScope(canPop: !busy && !draft.busy && draft.ready && draft.pending == null && draft.error == null,
+      child: SafeArea(child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Text('Review short delivery', style: Theme.of(context).textTheme.titleMedium),
+            TextButton(onPressed: busy || draft.busy ? null : close, child: const Text('Close')),
+          ]),
+          Text('${widget.copy.supplier.name} · Bill ${widget.copy.draft.invoiceReference}'),
+          const Text('Record goods still missing from this bill. This does not change Stock, reduce dues or issue a refund.'),
+          const SizedBox(height: 8),
+          if (frozen == null) ...[
+            if (choices.isNotEmpty) DropdownButtonFormField<String>(
+              key: ValueKey('supplier-shortage-source-$visibleSelection-$selected'), initialValue: visibleSelection ? selected : null,
+              isExpanded: true, decoration: const InputDecoration(labelText: 'Bill item · delivery'),
+              items: [for (final option in choices) DropdownMenuItem(
+                value: optionId(option.$1, option.$2.expectedDeliveryId, option.$3.sourceLineId),
+                child: Text('${option.$1 + 1}. ${widget.copy.draft.goods[option.$1]['name'] ?? option.$3.productLabel} · '
+                  '${option.$2.reference}', maxLines: 2, overflow: TextOverflow.ellipsis))],
+              onChanged: !editable ? null : (value) {
+                final choice = choices.firstWhere((o) => optionId(o.$1, o.$2.expectedDeliveryId, o.$3.sourceLineId) == value);
+                billLine = choice.$1; deliveryId = choice.$2.expectedDeliveryId; sourceLine = choice.$3.sourceLineId;
+                reviewed = false; changed();
+              }),
+            if (choices.isEmpty && accountReady) const Text('No eligible short delivery. Record the delivery with its expected quantity first, or check whether all goods arrived.'),
+            if (!accountReady && !busy) Text(recovered
+              ? 'Confirm the supplier’s starting balance and this bill in Purchases before reviewing missing goods.'
+              : 'Supplier account is unavailable. Your saved input is kept. Retry verification.'),
+            if (accountReady && choices.isNotEmpty) ...[
+              SizedBox(width: 140, child: TextField(key: const Key('supplier-shortage-quantity'), controller: quantity,
+              enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Missing qty'), onChanged: (_) => changed())),
+            CheckboxListTile(key: const Key('supplier-shortage-match'), contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading, value: reviewed,
+              title: const Text('This bill item and delivery refer to the same goods'),
+                onChanged: editable ? (value) { reviewed = value == true; changed(); } : null),
+            ],
+          ] else ...[
+            Text('${widget.copy.draft.goods[frozen!.billLineIndex]['name'] ?? 'Bill item ${frozen!.billLineIndex + 1}'} · '
+              'Missing ${_ReceivingLineInput._quantity(frozen!.quantityMilli)} ${frozen!.purchaseUnit}'),
+            Text(!current ? 'Return to the original Store to verify this review'
+              : confirmed ? 'Shortage recorded · no credit or refund applied'
+              : 'Saved review · recording not yet confirmed', key: const Key('supplier-shortage-status')),
+          ],
+          if (draft.error != null) Text(draft.error!),
+          if (error != null) Text(error!),
+          Wrap(spacing: 8, children: [
+            TextButton(key: const Key('supplier-shortage-retry'), onPressed: busy || draft.busy ? null : load,
+              child: const Text('Retry verification')),
+            if (frozen != null || (accountReady && choices.isNotEmpty)) FilledButton(key: const Key('supplier-shortage-submit'),
+              onPressed: busy || draft.busy || !draft.ready || !current ||
+                (!confirmed && frozen == null && !editable) ? null : submit,
+              child: Text(confirmed ? 'Review another shortage' : frozen == null ? 'Record shortage' : 'Retry saved shortage')),
+          ]),
         ]))));
   }
 }

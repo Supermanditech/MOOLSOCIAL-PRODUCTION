@@ -375,11 +375,11 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   String frozenAllocationFailure = 'none';
   @override
   Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
-    if (frozenAllocationFailure == 'draft-save' && (draft.supplierAllocationIntent != null || draft.supplierCreditIntent != null)) {
+    if (frozenAllocationFailure == 'draft-save' && (draft.supplierAllocationIntent != null || draft.supplierCreditIntent != null || draft.supplierShortageIntent != null)) {
       throw StateError('HOST frozen allocation draft save failed');
     }
     await super.save(draft, expectedRevision: expectedRevision);
-    if (frozenAllocationFailure == 'draft-lost-ack' && (draft.supplierAllocationIntent != null || draft.supplierCreditIntent != null)) {
+    if (frozenAllocationFailure == 'draft-lost-ack' && (draft.supplierAllocationIntent != null || draft.supplierCreditIntent != null || draft.supplierShortageIntent != null)) {
       throw StateError('HOST frozen allocation draft acknowledgement lost');
     }
   }
@@ -399,7 +399,8 @@ class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
   WorkspaceLedgerCheckpoint? value;
   @override
   Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async =>
-      value?.finance.accountScope == account &&
+      creditFailure == 'unavailable-read' ? throw StateError('HOST checkpoint read unavailable')
+      : value?.finance.accountScope == account &&
           value?.finance.workspaceId == store
       ? value
       : null;
@@ -4692,6 +4693,158 @@ void main() {
         await tapVisible(submit);
         expect(tester.widget<TextField>(find.byKey(const Key('supplier-credit-reference'))).controller!.text, '');
         expect(work.workspaceSupplierLedger(supplier.id)!.creditNotes, hasLength(1));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  for (final display in [const Size(320, 568), const Size(915, 412)]) {
+    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'unavailable-read', 'not-confirmed']) {
+      testWidgets('PURCHASESHORTAGEUI missing goods recovery $display failure=$failure', (tester) async {
+        // Host-only fixtures. Never injected into evaluation phone storage.
+        FlutterSecureStorage.setMockInitialValues({});
+        final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+        final inventory = _ReceivingProjectionFailureFixture(), form = _HeldSupplierMoneyDraftStore();
+        final work = postingOpeningFixture(entry, checkpoint, inventory: true, inventoryStore: inventory, moneyStore: form);
+        final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+        final day = at.toLocal().toIso8601String().substring(0, 10);
+        final supplier = WorkspaceSupplierProfile(id: 'short-ui-supplier', name: 'Evaluation shortage supplier',
+          phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+        final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock: product.stock + 1)), isTrue);
+        expect(await work.workspaceInventorySaved, isTrue);
+        final bill = WorkspacePurchaseEntryDraft(id: 'short-ui-bill', supplierId: supplier.id,
+          invoiceReference: 'HOST-SHORT-BILL', invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
+          createdAt: at, updatedAt: at, goods: [{'productId': product.id, 'name': product.title,
+            'pack': product.pack, 'quantity': '2', 'cost': '50'}], details: {'invoiceTotal': '100'});
+        final copy = WorkspacePurchaseSavedCopy(id: 'short-ui-copy', storeName: 'Evaluation Store', revision: 1,
+          savedAt: at, supplier: supplier, draft: bill, labels: const {});
+        final opening = WorkspaceSupplierOpeningRecord(id: 'short-ui-opening', basisId: 'short-ui-basis',
+          account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 2,
+          asOfDate: day, savedAt: at, amountMinor: 0, supplierCredit: false, sourceNote: 'HOST confirmed zero',
+          bills: [WorkspaceOpeningBillLink(copyId: copy.id, copyRevision: 1, draftId: bill.id,
+            inclusion: WorkspaceOpeningBillInclusion.excluded)]);
+        final receipt = WorkspaceSupplierGoodsReceipt(id: 'short-ui-receipt', expectedDeliveryId: 'short-ui-delivery',
+          reference: 'HOST partial delivery', deliveredOn: day, recordedAt: at,
+          lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'short-ui-line', productId: product.id,
+            productLabel: product.title, purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
+            deliveredMilli: 1000, acceptedMilli: 1000, damagedMilli: 0, shortMilli: 1000, expectedMilli: 2000)]);
+        entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 3,
+          profiles: [supplier], draft: bill, copies: [copy], openingRecords: [opening],
+          goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 3, receipt: receipt)]);
+        expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+        expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope, expectedRevision: 3,
+          confirmedAt: at), isTrue);
+        expect(await work.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: supplier.id, scope: scope,
+          expectedPurchaseRevision: 3, expectedSupplierRevision: 1, requireSavedReview: true),
+          WorkspaceGoodsReceiptSaveResult.saved);
+        if (failure != 'not-confirmed') {
+          expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope, expectedPurchaseRevision: 3,
+            expectedLedgerRevision: 2, openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at), isTrue);
+        }
+        final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+        final balance = work.workspaceSupplierLedger(supplier.id)!.balanceMinor;
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: display, textScale: display.width > 500 ? 2 : 1.4);
+        await openPurchaseList(tester);
+        final row = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
+        for (var i = 0; i < 8 && row.evaluate().isEmpty; i++) {
+          await tester.drag(find.byKey(const Key('work-purchase-search')), const Offset(0, -160));
+          await tester.pumpAndSettle();
+        }
+        Future<void> tapVisible(Finder target) async {
+          await tester.ensureVisible(target); await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          await tester.tap(target); await tester.pumpAndSettle();
+        }
+        await tapVisible(find.descendant(of: row, matching: find.textContaining('HOST-SHORT-BILL')).first);
+        final action = find.byKey(const Key('work-purchase-review-shortage'));
+        if (action.evaluate().isEmpty) {
+          final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(action, 120, scrollable: scroll); await tester.pumpAndSettle();
+        }
+        await tapVisible(action);
+        if (failure == 'not-confirmed') {
+          expect(find.text('Confirm the supplier’s starting balance and this bill in Purchases before reviewing missing goods.'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-shortage-quantity')), findsNothing);
+          expect(find.byKey(const Key('supplier-shortage-match')), findsNothing);
+          expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
+          expect(find.byKey(const Key('supplier-shortage-retry')), findsOneWidget);
+          expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
+          expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          await tapVisible(find.widgetWithText(TextButton, 'Close'));
+          expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
+        await tapVisible(find.byType(DropdownButtonFormField<String>).last);
+        await tapVisible(find.textContaining('HOST partial delivery').last);
+        final qty = find.byKey(const Key('supplier-shortage-quantity'));
+        await tester.ensureVisible(qty); await tester.enterText(qty, '0'); await tester.pumpAndSettle();
+        await tapVisible(find.byKey(const Key('supplier-shortage-match')));
+        await tapVisible(find.byKey(const Key('supplier-shortage-submit')));
+        expect(tester.widget<TextField>(qty).enabled, isTrue);
+        expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
+        await tester.ensureVisible(qty); await tester.enterText(qty, '0.'); await tester.pumpAndSettle();
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        await tapVisible(find.widgetWithText(TextButton, 'Close'));
+        await tapVisible(action);
+        expect(tester.widget<TextField>(qty).controller!.text, '0.');
+        expect(tester.widget<TextField>(qty).enabled, isTrue);
+        await tester.ensureVisible(qty); await tester.enterText(qty, '1'); await tester.pumpAndSettle();
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        checkpoint.creditFailure = failure;
+        form.frozenAllocationFailure = failure;
+        await tapVisible(find.byKey(const Key('supplier-shortage-submit')));
+        if (failure == 'unavailable-read') {
+          expect(find.text('Saved review · recording not yet confirmed'), findsOneWidget);
+          final saved = await form.read(work.supplierShortageRecoveryFormKey(copy)!);
+          expect(saved!.supplierShortageIntent, isNotNull);
+          expect(checkpoint.value!.supplierLedgers[supplier.id]!.shortageClaims, isEmpty);
+          await tapVisible(find.widgetWithText(TextButton, 'Close'));
+          checkpoint.creditFailure = 'none';
+          expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget,
+            reason: tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).join(' | '));
+          expect(work.supplierShortageRecoveryFormKey(copy), isNotNull);
+          if (action.evaluate().isEmpty) {
+            final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')),
+              matching: find.byType(Scrollable)).first;
+            for (var i = 0; i < 12 && action.evaluate().isEmpty; i++) {
+              await tester.drag(scroll, const Offset(0, 160));
+              await tester.pumpAndSettle();
+            }
+          }
+          expect(action, findsOneWidget,
+            reason: tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).join(' | '));
+          await tapVisible(action);
+          expect(find.text('Saved review · recording not yet confirmed'), findsOneWidget);
+        }
+        checkpoint.creditFailure = 'none'; form.frozenAllocationFailure = 'none';
+        await tapVisible(find.byKey(const Key('supplier-shortage-retry')));
+        if (work.workspaceSupplierLedger(supplier.id)!.shortageClaims.isEmpty) {
+          await tapVisible(find.byKey(const Key('supplier-shortage-submit')));
+        }
+        expect(find.text('Shortage recorded · no credit or refund applied'), findsOneWidget);
+        final proof = work.workspaceSupplierLedger(supplier.id)!.shortageClaims.values.single;
+        expect(proof.quantityMilli, 1000);
+        expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+        await tapVisible(find.widgetWithText(TextButton, 'Close'));
+        await tapVisible(action);
+        expect(find.text('Shortage recorded · no credit or refund applied'), findsOneWidget);
+        expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims.values.single.toJson(), proof.toJson());
+        await tapVisible(find.byKey(const Key('supplier-shortage-submit')));
+        expect((await form.read(work.supplierShortageRecoveryFormKey(copy)!))!.fields, isEmpty);
+        expect(qty, findsNothing);
+        expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
+        expect(find.textContaining('No eligible short delivery.'), findsOneWidget);
+        expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+        expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, hasLength(1));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });
