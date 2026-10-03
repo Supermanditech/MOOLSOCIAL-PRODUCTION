@@ -4718,6 +4718,19 @@ void main() {
         expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget,
           reason: tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).join(' | '));
         final action = find.byKey(const Key('work-purchase-record-credit'));
+        expect(find.byKey(const Key('work-purchase-adjustment-actions')), findsOneWidget);
+        expect(find.ancestor(of: action,
+          matching: find.byKey(const Key('work-purchase-adjustment-actions'))), findsOneWidget);
+        for (final key in ['work-purchase-allocate-money', 'work-purchase-review-shortage',
+          'work-purchase-record-credit', 'work-purchase-record-supplier-refund']) {
+          final button = find.byKey(Key(key));
+          if (button.evaluate().isEmpty) continue;
+          final bounds = tester.getRect(button);
+          expect(bounds.height, greaterThanOrEqualTo(48), reason: '$key retains its touch target');
+          expect(bounds.left, greaterThanOrEqualTo(0));
+          expect(bounds.right, lessThanOrEqualTo(display.width));
+        }
+        expect(tester.takeException(), isNull, reason: 'Adjustment actions must wrap without overflow');
         if (action.evaluate().isEmpty) {
           final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
           await tester.scrollUntilVisible(action, 120, scrollable: scroll); await tester.pumpAndSettle();
@@ -5822,11 +5835,17 @@ void main() {
           mode == 'other-revision' ? 1 : 0);
       } else {
         await tester.ensureVisible(confirm);
+        await tester.pumpAndSettle();
+        expect(confirm.hitTestable(), findsOneWidget,
+          reason: 'Confirmation must be reachable above the shared navigation');
         await tester.tap(confirm);
         await tester.pumpAndSettle();
         await tester.tap(find.text('Cancel').last);
         await tester.pumpAndSettle();
         final before = checkpoint.saveAttempts;
+        await tester.ensureVisible(confirm);
+        await tester.pumpAndSettle();
+        expect(confirm.hitTestable(), findsOneWidget);
         await tester.tap(confirm);
         await tester.pumpAndSettle();
         if (late) {
@@ -5850,7 +5869,8 @@ void main() {
           expect(checkpoint.saveAttempts, before);
           expect(find.text('Saved records changed. Reopen this bill before confirming.'), findsOneWidget);
         } else if (mode == 'failed-save' || mode == 'lost-ack') {
-          expect(find.text('Supplier account status unavailable'), findsOneWidget);
+          expect(tester.widget<Text>(find.byKey(const Key('work-purchase-bill-status'))).data,
+            'Supplier account status unavailable');
           checkpoint.creditFailure = 'none';
           await tester.ensureVisible(find.byKey(const Key('work-purchase-bill-recover')));
           await tester.tap(find.byKey(const Key('work-purchase-bill-recover')));

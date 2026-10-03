@@ -13485,33 +13485,34 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         ]),
         _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id),
       ],
+      Wrap(key: const Key('work-purchase-adjustment-actions'), spacing: 8, children: [
       if (same && session.workspaceSupplierAllocationInputAvailable)
-        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+        TextButton.icon(
           key: const Key('work-purchase-allocate-money'),
           onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierAllocation(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
-          label: const Text('Link advance or account payment'))),
+          label: const Text('Link advance / payment')),
       if (_copyVerified && session.supplierShortageRecoveryFormKey(copy) != null)
-        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+        TextButton.icon(
           key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierShortage(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
-          label: const Text('Review short delivery'))),
+          label: const Text('Short delivery')),
       if (same && session.supplierCreditFormKey(copy) != null)
-        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+        TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierCredit(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.receipt_long_outlined, size: 18),
-          label: const Text('Record supplier credit note'))),
+          label: const Text('Supplier credit note')),
       if (_copyVerified && session.workspaceSupplierOpeningRecord(copy.supplier.id) != null)
-        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+        TextButton.icon(
           key: const Key('work-purchase-record-supplier-refund'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierRefund(context, session, _StoreSupplierRefundTarget(
@@ -13520,7 +13521,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               opening: session.workspaceSupplierOpeningRecord(copy.supplier.id)!));
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.call_received_outlined, size: 18),
-          label: const Text('Record refund received'))),
+          label: const Text('Refund received')),
+      ]),
       if (same || (_billGoodsWasAccepted && !ready)) _StoreBillGoodsMatch(key: _billGoodsKey, session: session, copy: copy,
         onOpenCopy: (other) async {
           if (!await confirmLeave() || !mounted) return;
