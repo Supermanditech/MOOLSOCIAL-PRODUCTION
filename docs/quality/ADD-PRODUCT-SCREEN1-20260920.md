@@ -3927,3 +3927,55 @@ Initial sourceR3.410s and actual OPPO UI record proved Stock6 and receipt2/1/1,
 cumulative4of4pending0; final-header second physical check recorded separately in
 task outputs/purchase-completed-receiving-correction-20261003.md. No transaction,
 APK/backend/push or full-goal acceptance follows from this bounded correction.
+
+### Purchase accounting continuation — partial local checkpoint, 3 October
+
+This checkpoint preserves the current opening/payment/advance allocation,
+bill-to-goods review cancellation, supplier physical return and supplier credit
+foundations. These reuse the existing scoped encrypted purchase, Stock and native
+checkpoint owners. Frozen review identities and original money consumption remain
+immutable; lost replies recover exact proof rather than repeat Stock or liability.
+Actual money transfer, backend reuse and installed-APK qualification are excluded.
+
+Typed supplier credit notes now keep exact bill/copy/opening and return/damage or
+shortage-claim evidence with a separate financial credit entry. Chronological
+admission preserves original bill settlement; later credit cannot restore already
+consumed advance/payment capacity. Shortage claims derive shared delivery and bill
+limits from complete predecessor evidence, reserving claimed quantity even before
+credit. Later arrivals preserve historical claims; correction/cancellation still
+needs its own audited journey. Credit records never imply goods moved or cash paid.
+
+The saved accepted purchase bill now offers Record supplier credit note. The
+compact sheet records supplier credit-note number, Indian-format date, printed
+credited amount, reason and exact goods selections with fractional quantity.
+Unfinished editable input uses the existing encrypted form; confirmation freezes
+the exact request before native posting. Unknown status cannot become confirmed.
+Recovery, Close/reopen, exact retry and proven reset retain original identities.
+
+Current host evidence in task outputs:
+- purchase-credit-ui-analysis-20261003-v3.log: six source/test owners, no issues.
+- purchase-credit-ui-tests-20261003-v3.jsonl: ten actual passes, zero failures.
+  Portrait320x568 at1.4 and landscape915x412 at2 cover oversized quantity
+  correction, fractional quantity, trimmed reference/reason, double tap, failed
+  ledger save, lost ledger acknowledgement, failed frozen-draft save and lost
+  draft acknowledgement, Close/reopen and reset after exact committed proof.
+- purchase-credit-ui-atomic-20261003-v1.jsonl:614 actual passes,11 existing skips,
+  zero failures; terminal0 and done.success=true.
+- purchase-credit-ui-connected-20261003-v1.jsonl:14 selected connected passes,
+  zero failures; terminal0 and done.success=true. This is not all layout coverage.
+
+Initial brace analysis, missing persisted Stock in the host fixture and landscape
+row-center navigation failures are retained in REG4635, not erased or counted as
+passes. Exact invoice-reference navigation passes; whole-row hit behaviour is
+unqualified and requires an impacted child check. Architect reviewed supplied
+plans/evidence only and found no new scoped blocker, not independent source/device
+qualification. Host fixtures are not actual OPPO evaluation records.
+
+OPPO2b3e0f71 remains connected with retained r66.41 runtime, but latest foreground
+diagnostic shows YouTube/launcher. No hot reload or transaction is claimed for
+this credit sheet; return to Purchases is requested. Full goal remains active:
+shortage intent/UI and audited correction, credit reuse/refund consumption,
+reconciled statements, scope/concurrency and recovery variants, independent
+Catalogue/manual/CSV late-bill proof, actual OPPO flow/screenshots/correction and
+restart, and founder review remain pending. This is a local checkpoint, not
+ticket acceptance/closure, remote verification or permission to push.

@@ -818,7 +818,8 @@ class WorkSession extends ChangeNotifier {
       copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const [],
       goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const [],
       goodsReceiptCancellations: old?.goodsReceiptCancellations ?? const [],
-      billGoodsReviews: old?.billGoodsReviews ?? const []);
+      billGoodsReviews: old?.billGoodsReviews ?? const [],
+      billGoodsCancellations: old?.billGoodsCancellations ?? const []);
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -959,6 +960,7 @@ class WorkSession extends ChangeNotifier {
     required int expectedLedgerRevision,
     required WorkspaceOpeningBillInclusion openingTreatment,
     required DateTime confirmedAt,
+    WorkspaceSupplierBillOpeningReview? openingReview,
   }) async {
     final key = _supplierKey;
     final data = _storeData;
@@ -978,7 +980,8 @@ class WorkSession extends ChangeNotifier {
     }
     // Freeze nested document data before awaiting recovery or store queues.
     final bill = WorkspaceSupplierBillAcceptance(copy: copy,
-      acceptedAt: confirmedAt, openingTreatment: openingTreatment);
+      acceptedAt: confirmedAt, openingTreatment: openingTreatment,
+      openingReview: openingReview);
     if (!bill.valid) {
       return reject('Check the supplier invoice number, date, items and invoice total before confirming the bill.');
     }
@@ -1002,7 +1005,9 @@ class WorkSession extends ChangeNotifier {
       final accepted = ledger.purchaseBills[bill.billId];
       if (accepted != null) {
         return jsonEncode(accepted.copy.toJson()) == jsonEncode(bill.copy.toJson()) &&
-            accepted.openingTreatment == bill.openingTreatment
+            accepted.openingTreatment == bill.openingTreatment &&
+            jsonEncode(accepted.openingReview?.toJson()) ==
+              jsonEncode(bill.openingReview?.toJson())
             ? true : reject('This bill is already confirmed with different details. Its accounting record has been kept unchanged.');
       }
       if (ledger.revision != expectedLedgerRevision) {
@@ -1273,6 +1278,193 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  /// Low-level review checkpoint owner. Retailer actions must additionally use
+  /// the durable reviewed-return intent guard before calling this method.
+  Future<WorkspaceGoodsReceiptSaveResult> confirmWorkspaceSupplierGoodsReturned(
+    WorkspaceSupplierGoodsReturn returned, {
+    required (String, String, bool) scope,
+    required int expectedPurchaseRevision,
+    required int expectedSupplierRevision,
+  }) async {
+    final data = _storeData, key = _supplierKey;
+    if (key == null || key != scope || !returned.valid ||
+        returned.accountScope != key.$1 || returned.workspaceId != key.$2 ||
+        returned.recordedAt.isAfter(DateTime.now().toUtc()) ||
+        !workspaceSupplierOpeningConfirmationAvailable || !localInventoryEnabled ||
+        _inventoryStorage is! WorkInventoryReceiptProjectionGuard ||
+        workspaceSupplierSaving || !workspaceSuppliersLoaded || data.customerCollectionBusy ||
+        _supplierNeedsReload.contains(key)) {
+      return WorkspaceGoodsReceiptSaveResult.notPosted;
+    }
+    final frozen = WorkspaceSupplierGoodsReturn.fromJson(returned.toJson());
+    data.inventoryReceiptBusy = true;
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    final priorRecoveryPending = data.inventoryReceiptRecoveryPending;
+    var financeLease = false, complete = false, provenUncommitted = false, attemptedWrite = false;
+    WorkspaceLedgerCheckpoint? authoritative;
+    WorkspaceSavedInventory? projected;
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    WorkspaceGoodsReceiptSaveResult reject(String message) {
+      if (current()) _supplierValidationErrors[key] = message;
+      return authoritative != null ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending
+        : provenUncommitted && !attemptedWrite ? WorkspaceGoodsReceiptSaveResult.notPosted
+        : WorkspaceGoodsReceiptSaveResult.statusUnknown;
+    }
+    try {
+      // Recovery must read the checkpoint, not route committed retries from a
+      // cache that may predate another instance's post or a lost acknowledgement.
+      final pendingRecovery = data.ledgerRecovery;
+      if (pendingRecovery != null) await pendingRecovery;
+      if (!current()) return reject('Return status needs recovery in the original Store.');
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (!await data.inventoryWrites || !current() || !await loadWorkspaceInventory(retry: true) || !current() ||
+          !await recoverCustomerLedger() || !current() || data.finance == null || data.financeStale ||
+          data.customerCollectionBusy || data.pendingCustomerCollection != null ||
+          data.pendingCustomerReturn != null || data.pendingCustomerRefund != null) {
+        return reject('Recover saved Stock and the supplier account. The return details are kept.');
+      }
+      data.customerCollectionBusy = true;
+      financeLease = true;
+      final generation = data.inventoryMutations;
+      final existing = data.supplierLedgers[(key.$1, frozen.supplierId)]?.goodsReturns[frozen.operationId];
+      final projectionRevision = existing == null ? data.inventoryRevision
+        : (await _inventoryStorage.read(key.$1, key.$2, qa: key.$3))?.revision;
+      Future<bool> projectReturn() => (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
+        .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: projectionRevision, commit: (previous) async {
+          if (!current() || generation != data.inventoryMutations || previous == null) return null;
+          final store = data.ledgerCheckpointStore!, journal = await store.read(key.$1, key.$2);
+          if (!current() || journal == null || journal.revision != data.ledgerCheckpointRevision) return null;
+          final ledger = journal.supplierLedgers[frozen.supplierId];
+          if (ledger == null || ledger.openingRecord == null || journal.supplierLedgers.values.any((other) =>
+              other.supplierId != frozen.supplierId && other.goodsReturns.containsKey(frozen.operationId))) {
+            return null;
+          }
+          final existing = ledger.goodsReturns[frozen.operationId];
+          if (existing != null) {
+            if (jsonEncode(existing.toJson()) != jsonEncode(frozen.toJson())) return null;
+            authoritative = journal;
+          } else {
+            provenUncommitted = true;
+            if (ledger.revision != expectedSupplierRevision || previous.revision != data.inventoryRevision ||
+                jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) !=
+                  jsonEncode(data.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()) ||
+                !listEquals(previous.movements.map((m) => m.contentIdentity).toList(),
+                  data.workspaceStockMovements.map((m) => m.contentIdentity).toList())) {
+              return null;
+            }
+            for (final line in frozen.lines) {
+              final product = previous.products.where((p) => p.id == line.productId).singleOrNull;
+              if (product == null || product.stockMode != WorkspaceStockMode.exactQuantity || product.pack != line.stockUnit) return null;
+            }
+            final nextLedger = ledger.recordGoodsReturned(frozen, expectedRevision: expectedSupplierRevision);
+            final inventory = _captureLedgerInventory(data)?.post([
+              for (final line in frozen.lines) ?frozen.movementFor(line),
+            ], at: DateTime.now().toUtc());
+            if (nextLedger == null || inventory == null) return null;
+            final next = WorkspaceLedgerCheckpoint(revision: journal.revision + 1, finance: journal.finance,
+              inventory: inventory, billedOrders: journal.billedOrders, billedInvoices: journal.billedInvoices,
+              purchaseReceipts: journal.purchaseReceipts, supplierLedgers: {...journal.supplierLedgers, frozen.supplierId: nextLedger},
+              moneyRegisters: journal.moneyRegisters, expenses: journal.expenses);
+            if (!next.valid) return null;
+            attemptedWrite = true;
+            try {
+              await store.save(next, expectedRevision: journal.revision);
+              authoritative = next;
+            } on Object {
+              final recovered = await store.read(key.$1, key.$2);
+              final proof = recovered?.supplierLedgers[frozen.supplierId]?.goodsReturns[frozen.operationId];
+              if (proof == null || jsonEncode(proof.toJson()) != jsonEncode(frozen.toJson())) rethrow;
+              // Do not mark unrelated newer finance/supplier facts recovered
+              // while adopting only this operation. A fresh retry recovers all.
+              if (recovered!.revision != next.revision ||
+                  jsonEncode(recovered.toJson()) != jsonEncode(next.toJson())) {
+                rethrow;
+              }
+              authoritative = recovered;
+            }
+          }
+          if (!current()) return null;
+          final saved = authoritative!, inventory = saved.inventory, quantities = saved.inventory?.quantities;
+          if (inventory == null || quantities == null) return null;
+          final known = {for (final movement in inventory.movements) movement.id: movement};
+          final tails = <WorkspaceStockMovement>[];
+          for (final movement in previous.movements) {
+            final original = known[movement.id];
+            if (original != null && original.contentIdentity != movement.contentIdentity) return null;
+            if (original == null) {
+              if ({WorkspaceStockReferenceKind.manualSupplierReceipt, WorkspaceStockReferenceKind.manualSupplierReturn}
+                  .contains(movement.referenceKind)) {
+                return null;
+              }
+              tails.add(movement);
+            }
+          }
+          final products = <WorkspaceCatalogueItem>[];
+          for (final product in previous.products) {
+            final base = quantities[product.id];
+            if (product.stockMode == WorkspaceStockMode.exactQuantity && base != null) {
+              final quantity = base + tails.where((m) => m.productId == product.id).fold<int>(0, (sum, m) => sum + m.quantityDelta);
+              if (quantity < 0 || quantity > 2147483647) return null;
+              products.add(product.copyWith(stock: quantity, available: product.available && quantity > 0));
+            } else { products.add(product); }
+          }
+          if (frozen.lines.any((line) => !products.any((p) => p.id == line.productId))) return null;
+          final movements = [...tails, ...inventory.movements.reversed];
+          if (previous.manualReceiptCheckpointRevision == saved.revision &&
+              jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) ==
+                jsonEncode(products.map((p) => p.toInventoryJson()).toList()) &&
+              listEquals(previous.movements.map((m) => m.contentIdentity).toList(), movements.map((m) => m.contentIdentity).toList())) {
+            projected = previous;
+          } else {
+            projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
+              revision: previous.revision + 1, savedAt: DateTime.now().toUtc(), products: products,
+              movements: movements, manualReceiptCheckpointRevision: saved.revision);
+          }
+          return projected;
+        });
+      final saved = existing != null ? await projectReturn()
+        : await (_supplierStorage as WorkPurchaseEntryRevisionGuard).withReviewedBook(key.$1, key.$2, qa: key.$3,
+          expectedRevision: expectedPurchaseRevision, action: (book) async =>
+            current() && book.profiles.any((p) => p.id == frozen.supplierId) && await projectReturn());
+      if (!saved || projected == null || authoritative == null || !current()) {
+        return reject(authoritative == null ? 'Return status needs recovery. Keep and retry the same return.'
+          : 'Goods returned are recorded. Recover Stock before making another change.');
+      }
+      data.workspaceCatalogueItems..clear()..addAll(projected!.products);
+      data.workspaceStockMovements..clear()..addAll(projected!.movements);
+      data.inventoryRevision = projected!.revision;
+      data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
+      data.inventoryMutations++;
+      data.inventoryReceiptRecoveryPending = false;
+      data.inventoryError = null;
+      data.ledgerInventory = authoritative!.inventory;
+      data.ledgerCheckpointRevision = authoritative!.revision;
+      data.supplierLedgers[(key.$1, frozen.supplierId)] = authoritative!.supplierLedgers[frozen.supplierId]!;
+      data.ledgerRecovered = true;
+      complete = true;
+      _persistOperationalState('supplier-goods-returned');
+      return WorkspaceGoodsReceiptSaveResult.saved;
+    } on Object {
+      return reject('Return status is not verified. Keep the same details and recover before retrying.');
+    } finally {
+      if (!complete && (!provenUncommitted || attemptedWrite || authoritative != null)) {
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        data.inventoryReceiptRecoveryPending = true;
+        data.inventoryError = 'Goods return status needs recovery before changing Stock.';
+      } else if (!complete) {
+        data.inventoryReceiptRecoveryPending = priorRecoveryPending || data.inventoryReceiptRecoveryPending;
+      }
+      if (financeLease) data.customerCollectionBusy = false;
+      data.inventoryReceiptBusy = false;
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
+
   Future<bool> confirmWorkspaceSupplierBillGoodsAllocation(
     WorkspaceSupplierBillGoodsAllocation link, {
     required String supplierId,
@@ -1299,6 +1491,17 @@ class WorkSession extends ChangeNotifier {
       final freshBook = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
       if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
       final frozenReview = freshBook?.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+      if (freshBook != null && freshBook.billGoodsCancellations.isNotEmpty) {
+        final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+        if (!_billGoodsCancellationStateVerified(freshBook, journal) ||
+            _disposed || _supplierKey != key || !identical(data, _storeData)) {
+          throw StateError('Cancelled match and supplier account need recovery.');
+        }
+        if (freshBook.billGoodsCancellations.any((c) => c.operationId == link.operationId)) {
+          _supplierValidationErrors[key] = 'This matching review was cancelled. Prepare a new match; received goods and the bill are unchanged.';
+          return false;
+        }
+      }
       if ((requireSavedReview && frozenReview == null) || (frozenReview != null &&
           (frozenReview.supplierId != supplierId ||
             jsonEncode(frozenReview.allocation.toJson()) != jsonEncode(link.toJson())))) {
@@ -1328,6 +1531,14 @@ class WorkSession extends ChangeNotifier {
         return await reviewedGuard.withReviewedBook(key.$1, key.$2, qa: key.$3,
           expectedRevision: expectedPurchaseRevision ?? freshBook.revision, action: (book) async {
             final review = book.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+            final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+            if (!_billGoodsCancellationStateVerified(book, journal)) {
+              throw StateError('Supplier account status is unavailable or conflicts with cancelled matches.');
+            }
+            if (book.billGoodsCancellations.any((c) => c.operationId == link.operationId)) {
+              _supplierValidationErrors[key] = 'This matching review was cancelled. Prepare a new match.';
+              return false;
+            }
             if (_disposed || _supplierKey != key || (requireSavedReview && review == null) ||
                 (review != null && (review.supplierId != supplierId ||
                   jsonEncode(review.allocation.toJson()) != jsonEncode(link.toJson())))) {
@@ -1342,6 +1553,8 @@ class WorkSession extends ChangeNotifier {
       if (!_disposed && _supplierKey == key) {
         _supplierErrors[key] = 'Bill goods match status is unverified. Recover Purchases and the supplier account before retrying this exact match.';
       }
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
       return false;
     } finally {
       _supplierWrites.remove(key);
@@ -1399,6 +1612,7 @@ class WorkSession extends ChangeNotifier {
           goodsReceiptDrafts: old.goodsReceiptDrafts,
           goodsReceiptCancellations: old.goodsReceiptCancellations,
           billGoodsReviews: old.billGoodsReviews,
+          billGoodsCancellations: old.billGoodsCancellations,
         ).toJson(),
       );
     } on Object {
@@ -1519,7 +1733,8 @@ class WorkSession extends ChangeNotifier {
       profiles: old.profiles, draft: old.draft, copies: old.copies,
       openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review],
       goodsReceiptCancellations: old.goodsReceiptCancellations,
-      billGoodsReviews: old.billGoodsReviews).toJson());
+      billGoodsReviews: old.billGoodsReviews,
+      billGoodsCancellations: old.billGoodsCancellations).toJson());
     _supplierWrites.add(key);
     _supplierErrors.remove(key);
     _supplierValidationErrors.remove(key);
@@ -1574,7 +1789,67 @@ class WorkSession extends ChangeNotifier {
       _supplierDirectories[_supplierKey]?.latestReviewedCopies ?? const [];
   List<WorkspaceSupplierBillGoodsReview> get workspaceBillGoodsReviews =>
       _supplierDirectories[_supplierKey]?.billGoodsReviews ?? const [];
+  List<WorkspaceBillGoodsReviewCancellation> get workspaceBillGoodsCancellations =>
+      _supplierDirectories[_supplierKey]?.billGoodsCancellations ?? const [];
   String newWorkspaceBillGoodsLinkId() => _newCounterIdentity('supplier-bill-goods');
+
+  bool _billGoodsCancellationStateVerified(WorkspacePurchaseEntryBook book,
+      WorkspaceLedgerCheckpoint? journal) => journal != null && journal.valid &&
+    journal.finance.accountScope == book.account && journal.finance.workspaceId == book.store &&
+    !book.billGoodsCancellations.any((c) => journal.supplierLedgers.values
+      .any((ledger) => ledger.billGoodsAllocations.containsKey(c.operationId)));
+
+  Future<bool> abandonWorkspaceBillGoodsReview(String operationId, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision, required DateTime cancelledAt, required String reason,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || data.inventoryReceiptBusy ||
+        data.inventoryReceiptRecoveryPending || data.customerCollectionBusy ||
+        _supplierNeedsReload.contains(key) || _supplierStorage is! WorkPurchaseBillGoodsReviewAbandonment ||
+        data.ledgerCheckpointStore == null) { return false; }
+    final cancellation = WorkspaceBillGoodsReviewCancellation(operationId: operationId,
+      supplierId: supplierId, revision: expectedRevision + 1, cancelledAt: cancelledAt, reason: reason);
+    if (!cancellation.valid) return false;
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    try {
+      final next = await (_supplierStorage as WorkPurchaseBillGoodsReviewAbandonment)
+        .abandonReviewedBillGoods(key.$1, key.$2, qa: key.$3, expectedRevision: expectedRevision,
+          cancellation: cancellation, verifyUncommitted: (review) async {
+            final journal = await data.ledgerCheckpointStore!.read(key.$1, key.$2);
+            if (!current() || journal == null || !journal.valid ||
+                journal.finance.accountScope != key.$1 || journal.finance.workspaceId != key.$2 ||
+                journal.supplierLedgers[supplierId] == null || review.supplierId != supplierId) {
+              throw StateError('Supplier account status is not verified.');
+            }
+            return !journal.supplierLedgers.values.any((ledger) => ledger.billGoodsAllocations.containsKey(operationId));
+          });
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (next == null) {
+        _supplierValidationErrors[key] = 'Matching review changed or is already posted. Recover its saved status; cancellation cannot reverse a confirmed match.';
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        _supplierErrors[key] = 'Match cancellation status is unverified. Recover Purchases and the supplier account before replacing this review.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
 
   /// Saving the exact reviewed match changes neither goods nor money. All
   /// previous attempts must be recovered before another match can be prepared.
@@ -1583,17 +1858,14 @@ class WorkSession extends ChangeNotifier {
     required int expectedPurchaseRevision, required int expectedSupplierRevision,
   }) async {
     final key = _supplierKey;
+    final data = _storeData;
     final old = _supplierDirectories[key];
     if (key == null || key != scope || !workspaceSupplierOpeningConfirmationAvailable ||
         workspaceSupplierSaving || old == null || !link.valid ||
         _supplierStorage is! WorkPurchaseBillGoodsReviewGuard ||
         _supplierNeedsReload.contains(key)) { return false; }
     final previous = old.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
-    if (previous != null) {
-      return previous.supplierId == supplierId &&
-        jsonEncode(previous.allocation.toJson()) == jsonEncode(link.toJson());
-    }
-    if (old.revision != expectedPurchaseRevision || old.billGoodsReviews.length >= 1000) {
+    if (previous == null && (old.revision != expectedPurchaseRevision || old.billGoodsReviews.length >= 1000)) {
       _supplierValidationErrors[key] = 'Saved matches changed or storage is full. Recover Purchases; records are kept.';
       notifyListeners();
       return false;
@@ -1603,8 +1875,27 @@ class WorkSession extends ChangeNotifier {
     _supplierValidationErrors.remove(key);
     notifyListeners();
     try {
+      if (previous != null) {
+        final fresh = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        final guard = _supplierStorage;
+        if (fresh == null || guard is! WorkPurchaseEntryRevisionGuard) return false;
+        return await (guard as WorkPurchaseEntryRevisionGuard).withReviewedBook(key.$1, key.$2,
+          qa: key.$3, expectedRevision: fresh.revision, action: (book) async {
+            final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+            if (!_billGoodsCancellationStateVerified(book, journal)) {
+              throw StateError('Cancelled review conflicts with supplier account status.');
+            }
+            final exact = book.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+            final valid = !_disposed && _supplierKey == key && identical(data, _storeData) &&
+              !book.billGoodsCancellations.any((c) => c.operationId == link.operationId) &&
+              exact?.supplierId == supplierId &&
+              jsonEncode(exact?.allocation.toJson()) == jsonEncode(link.toJson());
+            if (!valid) _supplierValidationErrors[key] = 'This saved match changed or was cancelled. Recover Purchases before preparing another.';
+            return valid;
+          });
+      }
       if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
-          !identical(old, _supplierDirectories[key]) || _storeData.inventoryReceiptRecoveryPending) {
+          !identical(data, _storeData) || !identical(old, _supplierDirectories[key]) || data.inventoryReceiptRecoveryPending) {
         return false;
       }
       final ledger = workspaceSupplierLedger(supplierId);
@@ -1613,7 +1904,13 @@ class WorkSession extends ChangeNotifier {
         _supplierValidationErrors[key] = 'Check the saved bill, delivery quantities and unit conversion before saving this match.';
         return false;
       }
-      if (old.billGoodsReviews.where((r) => r.supplierId == supplierId).any((review) =>
+      final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+      if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
+      if (!_billGoodsCancellationStateVerified(old, journal)) {
+        throw StateError('Cancelled review conflicts with supplier account status.');
+      }
+      if (old.billGoodsReviews.where((r) => r.supplierId == supplierId &&
+          !old.billGoodsCancellations.any((c) => c.operationId == r.allocation.operationId)).any((review) =>
           jsonEncode(ledger.billGoodsAllocations[review.allocation.operationId]?.toJson()) !=
             jsonEncode(review.allocation.toJson()))) {
         _supplierValidationErrors[key] = 'Resume this supplier’s saved bill goods match before preparing another.';
@@ -1626,35 +1923,42 @@ class WorkSession extends ChangeNotifier {
         profiles: old.profiles, draft: old.draft, copies: old.copies,
         openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
         goodsReceiptCancellations: old.goodsReceiptCancellations,
-        billGoodsReviews: [...old.billGoodsReviews, review]).toJson());
+        billGoodsReviews: [...old.billGoodsReviews, review],
+        billGoodsCancellations: old.billGoodsCancellations).toJson());
       final guard = _supplierStorage as WorkPurchaseBillGoodsReviewGuard;
       final saved = await guard.saveReviewedBillGoods(next, expectedRevision: old.revision,
         verifyCurrent: () async {
           // Cached recovery can be stale while another instance commits. Read
           // the authoritative checkpoint inside the purchase queue instead.
-          final checkpoint = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+          final checkpoint = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
           if (_disposed || _supplierKey != key ||
-              !identical(old, _supplierDirectories[key]) || _storeData.inventoryReceiptRecoveryPending) {
+              !identical(data, _storeData) || !identical(old, _supplierDirectories[key]) || data.inventoryReceiptRecoveryPending) {
             return false;
           }
           final currentLedger = checkpoint?.supplierLedgers[supplierId];
+          if (!_billGoodsCancellationStateVerified(old, checkpoint)) {
+            throw StateError('Supplier account status is unavailable or conflicts with cancelled matches.');
+          }
           return currentLedger != null &&
             !checkpoint!.supplierLedgers.values.any((entry) => entry.billGoodsAllocations.containsKey(link.operationId)) &&
             currentLedger.allocateBillGoods(link, expectedRevision: expectedSupplierRevision) != null &&
-            !old.billGoodsReviews.where((r) => r.supplierId == supplierId).any((review) =>
+            !old.billGoodsReviews.where((r) => r.supplierId == supplierId &&
+              !old.billGoodsCancellations.any((c) => c.operationId == r.allocation.operationId)).any((review) =>
               jsonEncode(currentLedger.billGoodsAllocations[review.allocation.operationId]?.toJson()) !=
                 jsonEncode(review.allocation.toJson()));
         });
       if (!saved) {
-        _storeData.ledgerRecovered = false;
-        _storeData.ledgerRecovery = null;
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
         _supplierValidationErrors[key] = 'The supplier account changed. Recover the saved bill goods match before preparing another.';
         return false;
       }
-      if (_disposed || _supplierKey != key) { _supplierNeedsReload.add(key); return false; }
+      if (_disposed || _supplierKey != key || !identical(data, _storeData)) { _supplierNeedsReload.add(key); return false; }
       _supplierDirectories[key] = next;
       return true;
     } on Object {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
       _supplierNeedsReload.add(key);
       if (!_disposed && _supplierKey == key) {
         _supplierErrors[key] = 'Bill goods review save status is unverified. Recover Purchases and resume its exact saved match.';
@@ -2052,6 +2356,79 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
+  String newWorkspaceSupplierMoneyOperationId() => _newCounterIdentity('supplier-money');
+  String newWorkspaceSupplierMoneyAllocationId() => _newCounterIdentity('supplier-money-allocation');
+  String newWorkspaceSupplierGoodsReturnId() => _newCounterIdentity('supplier-goods-return');
+  String newWorkspaceSupplierCreditId() => _newCounterIdentity('supplier-credit');
+  WorkspaceLedgerFormKey? supplierCreditFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
+        _ledgerFormStorage is! WorkSupplierCreditDraftGuard) { return null; }
+    final ledger = workspaceSupplierLedger(copy.supplier.id), accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'credit-copy:${copy.id}', kind: 'supplierCredit', ledgerRevision: copy.revision);
+  }
+  WorkspaceLedgerFormKey? supplierGoodsReturnFormKey(String supplierId, String receiptId) {
+    if (!workspaceSupplierOpeningConfirmationAvailable ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || !workspaceSuppliersLoaded) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(supplierId), receipt = ledger?.goodsReceipts[receiptId];
+    if (ledger == null || receipt == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id) {
+      return null;
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: supplierId,
+      invoice: receiptId, order: 'return-receipt:$receiptId', kind: 'supplierGoodsReturn', ledgerRevision: 1);
+  }
+  bool get workspaceSupplierMoneyInputAvailable =>
+      workspaceSupplierOpeningConfirmationAvailable &&
+      _ledgerFormStorage is WorkSupplierMoneyDraftGuard;
+  bool get workspaceSupplierAllocationInputAvailable =>
+      workspaceSupplierMoneyInputAvailable && _ledgerFormStorage is WorkSupplierAllocationDraftGuard;
+
+  WorkspaceLedgerFormKey? supplierAllocationFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierAllocationInputAvailable || !workspaceSuppliersLoaded) return null;
+    final ledger = workspaceSupplierLedger(copy.supplier.id);
+    final accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) {
+      return null;
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'allocation-copy:${copy.id}', kind: 'supplierAllocation', ledgerRevision: copy.revision);
+  }
+
+  WorkspaceLedgerFormKey? supplierMoneyFormKey(String supplierId, {
+    WorkspacePurchaseSavedCopy? copy, bool advance = false,
+  }) {
+    if (!workspaceSupplierMoneyInputAvailable || !workspaceSuppliersLoaded ||
+        (copy != null && advance)) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(supplierId);
+    final opening = ledger?.openingRecord;
+    if (ledger == null || opening == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id) {
+      return null;
+    }
+    if (copy != null) {
+      final bill = ledger.purchaseBills[copy.draft.id];
+      if (copy.supplier.id != supplierId || bill == null ||
+          jsonEncode(bill.copy.toJson()) != jsonEncode(copy.toJson())) {
+        return null;
+      }
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId,
+      customer: supplierId, invoice: copy?.draft.id ?? opening.id,
+      order: copy != null ? 'manual-copy:${copy.id}'
+          : '${advance ? 'account-advance' : 'account-payment'}:${opening.id}',
+      kind: 'supplierMoney', ledgerRevision: copy?.revision ?? opening.revision);
+  }
+
   bool _ledgerFormScopeCurrent(WorkspaceLedgerFormKey key) {
     if (_disposed ||
         key.account != _contactAccountScope ||
@@ -2070,6 +2447,28 @@ class WorkSession extends ChangeNotifier {
                 entry.billId == key.invoice &&
                 entry.orderId == key.order,
           );
+    }
+    if (key.kind == 'supplierAllocation') {
+      final copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
+      return copy != null && supplierAllocationFormKey(copy) == key;
+    }
+    if (key.kind == 'supplierCredit') {
+      // Stable accepted-copy namespace; native read/submit independently checks
+      // its exact bill and supplier even before cache hydration after restart.
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid;
+    }
+    if (key.kind == 'supplierGoodsReturn') {
+      // A receipt namespace survives ledger revisions and restart before cache
+      // hydration. Native submit/reset independently verify its scoped receipt.
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid &&
+        key.ledgerRevision == 1 && key.order == 'return-receipt:${key.invoice}';
+    }
+    if (key.kind == 'supplierMoney') {
+      final ledger = workspaceSupplierLedger(key.customer);
+      final copy = key.order.startsWith('manual-copy:') ? ledger?.purchaseBills[key.invoice]?.copy : null;
+      if (key.order.startsWith('manual-copy:') && copy == null) return false;
+      return supplierMoneyFormKey(key.customer, copy: copy,
+        advance: key.order.startsWith('account-advance:')) == key;
     }
     return workspaceFinance?.customerLedgers
             .where((l) => l.customerId == key.customer)
@@ -5556,6 +5955,13 @@ class WorkSession extends ChangeNotifier {
     }
     final previous =
         data.supplierLedgers[(ledger.accountScope, ledger.supplierId)];
+    final previousCount = previous?.entries.length ?? 0;
+    if (ledger.entries.skip(previousCount).any((entry) =>
+        entry.origin != WorkspaceSupplierEntryOrigin.moolSocialOrder &&
+        (entry.kind == WorkspaceSupplierEntryKind.payment ||
+          entry.kind == WorkspaceSupplierEntryKind.advance) && entry.moneyReview == null)) {
+      return false;
+    }
     if (previous != null && !ledger.canFollow(previous)) {
       return false;
     }
@@ -5604,6 +6010,394 @@ class WorkSession extends ChangeNotifier {
       if (!_disposed && identical(data, _storeData)) {
         notifyListeners();
       }
+    }
+  }
+
+  /// Record reviewed manual money without manufacturing an order/shipment.
+  /// Caller retains the frozen entry across failed/lost replies. Recovery reads
+  /// the authoritative journal before an exact retry can succeed without a write.
+  Future<bool> recordWorkspaceSupplierMoney(String supplierId, {
+    required String accountScope,
+    required String workspaceId,
+    required WorkspaceSupplierLedgerEntry entry,
+    required int expectedRevision,
+  }) async {
+    final data = _storeData;
+    bool current() => !_disposed && identical(data, _storeData) &&
+        accountScope == _contactAccountScope && workspaceId == activeWorkspace?.id &&
+        workspaceSupplierOpeningConfirmationAvailable && workspaceSuppliersLoaded &&
+        !workspaceSupplierSaving && !data.inventoryReceiptBusy;
+    if (!current() || !entry.valid || expectedRevision <= 0 ||
+        data.customerCollectionBusy || data.inventoryReceiptRecoveryPending ||
+        !await recoverCustomerLedger() || !current()) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(supplierId);
+    if (ledger == null || ledger.accountScope != accountScope ||
+        ledger.workspaceId != workspaceId) {
+      return false;
+    }
+    final next = ledger.recordReviewedMoney(entry, expectedRevision: expectedRevision);
+    if (next == null) return false;
+    if (identical(next, ledger)) return true;
+    if (entry.postedAt.isAfter(DateTime.now())) return false;
+    return await saveWorkspaceSupplierLedger(next) && current();
+  }
+
+  /// The encrypted form lock retains the exact frozen attempt across journal
+  /// posting. A later account revision revalidates capacity; the money payload
+  /// and operation identity are never regenerated or silently edited.
+  Future<bool> recordWorkspaceSupplierMoneyDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(key) || !attempt.valid ||
+        _ledgerFormStorage is! WorkSupplierMoneyDraftGuard) {
+      return false;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierMoneyDraftGuard).withFrozenSupplierMoney(
+        key, jsonEncode(attempt.toJson()), () async {
+          if (!await recoverCustomerLedger() || !_ledgerFormScopeCurrent(key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final ledger = workspaceSupplierLedger(key.customer);
+          if (ledger == null || attempt.expectedRevision > ledger.revision) return false;
+          return recordWorkspaceSupplierMoney(key.customer, accountScope: key.account,
+            workspaceId: key.store, entry: attempt.entry, expectedRevision: ledger.revision);
+        });
+    } on Object {
+      showNotice('Payment status needs recovery. Reopen its saved attempt before retrying; do not record it again.');
+      return false;
+    }
+  }
+
+  /// Attribute an existing account money fact to an accepted bill. No new
+  /// payment, finance projection or Stock movement is generated by this link.
+  Future<bool> allocateWorkspaceSupplierMoney(WorkspaceSupplierBillMoneyAllocation link,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    bool current() => !_disposed && identical(data, _storeData) &&
+      link.accountScope == _contactAccountScope && link.workspaceId == activeWorkspace?.id &&
+      workspaceSupplierOpeningConfirmationAvailable && workspaceSuppliersLoaded &&
+      !workspaceSupplierSaving && !data.inventoryReceiptBusy;
+    if (!current() || !workspaceSupplierMoneyInputAvailable || !link.valid ||
+        data.customerCollectionBusy || data.inventoryReceiptRecoveryPending ||
+        !await recoverCustomerLedger() || !current()) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(link.supplierId);
+    if (ledger == null) return false;
+    final next = ledger.allocateRecordedMoney(link, expectedRevision: expectedRevision);
+    if (next == null) return false;
+    if (identical(next, ledger)) return true;
+    if (link.recordedAt.isAfter(DateTime.now())) return false;
+    return await saveWorkspaceSupplierLedger(next) && current();
+  }
+
+  Future<WorkspaceLedgerCheckpoint?> _freshSupplierAllocationCheckpoint(WorkspaceLedgerFormKey key) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData) &&
+      !workspaceSupplierSaving && !data.inventoryReceiptBusy && !data.inventoryReceiptRecoveryPending &&
+      !data.customerCollectionBusy;
+    if (!current() || data.ledgerCheckpointStore == null) return null;
+    final recovery = data.ledgerRecovery;
+    if (recovery != null && !await recovery) return null;
+    if (!current()) return null;
+    data.ledgerRecovered = false;
+    if (!await recoverCustomerLedger() || !current()) return null;
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!current() || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store ||
+        saved.revision != data.ledgerCheckpointRevision) {
+      return null;
+    }
+    return saved;
+  }
+
+  WorkspaceSupplierBillMoneyAllocation? _matchingSupplierAllocation(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierMoneyAllocationIntent intent) {
+    final found = saved.supplierLedgers.values.expand((ledger) => ledger.billMoneyAllocations.values)
+      .where((item) => item.operationId == intent.operationId).toList();
+    if (found.isEmpty) return null;
+    if (found.length != 1 || jsonEncode(found.single.intentToJson()) != jsonEncode(intent.intentToJson())) {
+      throw const WorkGatewayException('Saved allocation conflicts with this request. Keep both records for review.');
+    }
+    return found.single;
+  }
+
+  Future<bool> recoverWorkspaceSupplierAllocationStatus(WorkspaceLedgerFormKey key) async {
+    try { return await _freshSupplierAllocationCheckpoint(key) != null; }
+    on Object {
+      showNotice('Saved bill allocation is unavailable. Its request is kept; retry recovery before editing.');
+      return false;
+    }
+  }
+
+  Future<WorkspaceSupplierGoodsReturn?> readWorkspaceSupplierGoodsReturnStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierGoodsReturnIntent intent) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(key) || key.kind != 'supplierGoodsReturn' ||
+        data.ledgerCheckpointStore == null || intent.accountScope != key.account ||
+        intent.workspaceId != key.store || intent.supplierId != key.customer || intent.receiptId != key.invoice) {
+      throw const WorkGatewayException('Return to the original supplier receipt.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_ledgerFormScopeCurrent(key) || !identical(data, _storeData) || saved == null ||
+        !saved.valid || saved.supplierLedgers[key.customer]?.goodsReceipts[key.invoice] == null) {
+      throw const WorkGatewayException('Saved return status is unavailable. Keep the request and retry.');
+    }
+    final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+      .where((record) => record.operationId == intent.operationId).toList();
+    if (matches.isEmpty) return null;
+    if (matches.length != 1 || !intent.matches(matches.single)) {
+      throw const WorkGatewayException('Saved goods return differs. Keep both records for review.');
+    }
+    return matches.single;
+  }
+
+  WorkspaceSupplierCreditNote? _matchingWorkspaceSupplierCredit(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierCreditIntent intent) {
+    final notes = saved.supplierLedgers.values.expand((l) => l.creditNotes.values)
+      .where((n) => n.operationId == intent.operationId).toList();
+    final entries = saved.supplierLedgers.values.expand((l) => l.entries)
+      .where((e) => e.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) => l.goodsReturns.containsKey(intent.operationId) ||
+      l.shortageClaims.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId));
+    if (notes.isEmpty && entries.isEmpty && !other) return null;
+    if (other || notes.length != 1 || entries.length != 1 || !intent.matches(notes.single)) {
+      throw const WorkGatewayException('Saved supplier credit differs. Keep both records for review.');
+    }
+    return notes.single;
+  }
+
+  bool _supplierCreditIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) =>
+    _ledgerFormScopeCurrent(key) && key.kind == 'supplierCredit' && intent.valid &&
+    key.account == intent.accountScope && key.store == intent.workspaceId && key.customer == intent.supplierId &&
+    key.invoice == intent.billId && key.ledgerRevision == intent.copyRevision && key.order == 'credit-copy:${intent.copyId}';
+
+  Future<WorkspaceSupplierCreditNote?> readWorkspaceSupplierCreditStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) async {
+    final data = _storeData;
+    if (!_supplierCreditIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier bill.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierCreditIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid) {
+      throw const WorkGatewayException('Saved credit status is unavailable. Keep the request and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierCredit(saved, intent);
+    if (matched != null) return matched;
+    final bill = saved.supplierLedgers[key.customer]?.purchaseBills[key.invoice];
+    if (bill == null || bill.copy.id != intent.copyId || bill.copy.revision != intent.copyRevision) {
+      throw const WorkGatewayException('The original bill is unavailable. Keep the saved credit request.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierCreditDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierCreditIntentScope(key, intent);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierCreditDraftGuard || data.ledgerCheckpointStore == null) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).withFrozenSupplierCredit(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          // Exact committed retry precedes current capacity and book dependencies.
+          if (_matchingWorkspaceSupplierCredit(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null || now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          final next = ledger.recordSupplierCredit(intent.commit(revision: ledger.revision + 1, at: now),
+            expectedRevision: ledger.revision);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              _matchingWorkspaceSupplierCredit(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          return await recoverCustomerLedger() && current();
+        });
+    } on Object {
+      showNotice('Supplier credit status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierCreditDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierCreditDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).resetConfirmedSupplierCreditDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierCreditStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The supplier credit request is kept. Verify it before starting another.');
+      return false;
+    }
+  }
+
+  Future<bool> recordWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierGoodsReturnIntent intent) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData);
+    if (!current() || !intent.valid || intent.requestedAt.isAfter(DateTime.now()) ||
+        key.kind != 'supplierGoodsReturn' || key.ledgerRevision != 1 ||
+        intent.accountScope != key.account || intent.workspaceId != key.store ||
+        intent.supplierId != key.customer || intent.receiptId != key.invoice ||
+        key.order != 'return-receipt:${intent.receiptId}' ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    WorkspaceSupplierGoodsReturn? matching(WorkspaceLedgerCheckpoint saved) {
+      final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+        .where((record) => record.operationId == intent.operationId).toList();
+      if (matches.isEmpty) return null;
+      if (matches.length != 1 || !intent.matches(matches.single)) {
+        throw const WorkGatewayException('Saved goods return differs. Keep both records for review.');
+      }
+      return matches.single;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).withFrozenSupplierGoodsReturn(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || saved == null) return false;
+          final ledger = saved.supplierLedgers[key.customer];
+          if (ledger == null || !ledger.goodsReceipts.containsKey(intent.receiptId)) return false;
+          final existing = matching(saved), now = DateTime.now().toUtc();
+          final book = existing == null
+            ? await _supplierStorage.read(key.account, key.store, qa: !_productionSession) : null;
+          if (!current() || (existing == null && book == null)) return false;
+          if (existing == null && (now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt))) return false;
+          final record = existing ?? intent.commit(revision: ledger.revision + 1, at: now);
+          final result = await confirmWorkspaceSupplierGoodsReturned(record, scope: _supplierKey!,
+            expectedPurchaseRevision: book?.revision ?? 0, expectedSupplierRevision: ledger.revision);
+          if (result == WorkspaceGoodsReceiptSaveResult.saved) return current();
+          // Another instance may have committed after our read. Only retry its
+          // exact saved request and original commit metadata, never a new ID.
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null) return false;
+          final proof = matching(recovered);
+          if (proof == null) return false;
+          return await confirmWorkspaceSupplierGoodsReturned(proof, scope: _supplierKey!,
+            expectedPurchaseRevision: book?.revision ?? 0,
+            expectedSupplierRevision: recovered.supplierLedgers[key.customer]!.revision) ==
+              WorkspaceGoodsReceiptSaveResult.saved && current();
+        });
+    } on Object {
+      showNotice('Goods return status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    if (!current() || _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard ||
+        data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    try {
+      await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).resetConfirmedSupplierGoodsReturnDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          final saved = await data.ledgerCheckpointStore!.read(next.key.account, next.key.store);
+          if (!current() || saved == null) return false;
+          final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+            .where((record) => record.operationId == intent.operationId).toList();
+          return matches.length == 1 && intent.matches(matches.single);
+        });
+      return current();
+    } on Object {
+      showNotice('The goods return is kept. Verify its saved status before starting another.');
+      return false;
+    }
+  }
+
+  Future<bool> recordWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent) async {
+    if (!_ledgerFormScopeCurrent(key) || !intent.valid ||
+        intent.requestedAt.isAfter(DateTime.now()) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) {
+      return false;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierAllocationDraftGuard).withFrozenSupplierAllocation(
+        key, jsonEncode(intent.intentToJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null) return false;
+          if (_matchingSupplierAllocation(saved, intent) != null) return true;
+          final ledger = saved.supplierLedgers[key.customer];
+          if (ledger == null || intent.accountScope != key.account || intent.workspaceId != key.store ||
+              intent.supplierId != key.customer || intent.billId != key.invoice ||
+              intent.copyRevision != key.ledgerRevision || key.order != 'allocation-copy:${intent.copyId}') {
+            return false;
+          }
+          final now = DateTime.now().toUtc();
+          if (now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          return allocateWorkspaceSupplierMoney(intent.commit(revision: ledger.revision + 1, at: now),
+            expectedRevision: ledger.revision);
+        });
+    } on Object {
+      showNotice('Bill allocation is unverified. Recover this saved request before retrying; do not create another.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierAllocationDraftGuard).resetConfirmedSupplierAllocationDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          final saved = await _freshSupplierAllocationCheckpoint(next.key);
+          return saved != null && _matchingSupplierAllocation(saved, intent) != null;
+        });
+      return _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The recorded allocation is kept. Recover its saved status before starting another.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierMoneyDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierMoneyDraftGuard) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierMoneyDraftGuard).resetConfirmedSupplierMoneyDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (entry) async {
+          if (!await recoverCustomerLedger() || !_ledgerFormScopeCurrent(next.key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final saved = await data.ledgerCheckpointStore!.read(next.key.account, next.key.store);
+          if (saved == null || !_ledgerFormScopeCurrent(next.key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final authoritative = saved.supplierLedgers[next.key.customer];
+          if (authoritative == null || authoritative.accountScope != next.key.account ||
+              authoritative.workspaceId != next.key.store || !authoritative.valid) {
+            return false;
+          }
+          final matches = authoritative.entries
+            .where((item) => item.operationId == entry.operationId).toList();
+          return matches.length == 1 &&
+            jsonEncode(matches.single.toJson()) == jsonEncode(entry.toJson());
+        });
+      return _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    } on Object {
+      showNotice('The recorded payment is kept. Retry opening it before starting another payment.');
+      return false;
     }
   }
 

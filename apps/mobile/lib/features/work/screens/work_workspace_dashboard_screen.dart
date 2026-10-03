@@ -11358,6 +11358,319 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   }
 }
 
+/// Matches immutable supplier records; this surface never receives Stock or pays.
+class _StoreBillGoodsMatch extends StatefulWidget {
+  const _StoreBillGoodsMatch({super.key, required this.session, required this.copy,
+    required this.onOpenCopy});
+  final WorkSession session;
+  final WorkspacePurchaseSavedCopy copy;
+  final Future<void> Function(WorkspacePurchaseSavedCopy copy) onOpenCopy;
+  @override
+  State<_StoreBillGoodsMatch> createState() => _StoreBillGoodsMatchState();
+}
+
+class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
+    with AutomaticKeepAliveClientMixin<_StoreBillGoodsMatch> {
+  @override
+  bool get wantKeepAlive => true;
+  late final _scope = widget.session.workspaceSupplierScope;
+  final _quantity = TextEditingController(), _free = TextEditingController(text: '0');
+  final _accepted = TextEditingController(), _damaged = TextEditingController(text: '0');
+  final _numerator = TextEditingController(text: '1'), _denominator = TextEditingController(text: '1');
+  bool _opened = false, _busy = false, _loaded = false, _reviewVerified = false, _conversion = false;
+  bool _uncertain = false, _knownUnstored = false;
+  int? _item, _bookRevision;
+  (String, String)? _receiptKey;
+  WorkspaceSupplierBillGoodsAllocation? _frozen;
+  WorkspaceBillGoodsReviewCancellation? _cancelAttempt;
+  WorkspaceSupplierBillGoodsReview? _otherReview;
+  String? _error, _notice;
+  WorkSession get session => widget.session;
+  bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
+  WorkspaceSupplierLedger? get _ledger => session.workspaceInvoiceHistoryLoaded
+    ? session.workspaceSupplierLedger(widget.copy.supplier.id) : null;
+  bool get _committed => _frozen != null &&
+    jsonEncode(_ledger?.billGoodsAllocations[_frozen!.operationId]?.toJson()) == jsonEncode(_frozen!.toJson());
+  bool get _dirty => _frozen == null && (_item != null || _receiptKey != null ||
+    _quantity.text.isNotEmpty || _accepted.text.isNotEmpty);
+  bool get _editable => _current && _loaded && _ledger != null && !_busy && !_uncertain &&
+    !session.workspaceSupplierRecoveryRequired && _frozen == null && _otherReview == null;
+  List<(WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)> get _receipts {
+    if (_item == null || _ledger == null) return const [];
+    final product = widget.copy.draft.goods[_item!]['productId'];
+    return [for (final receipt in _ledger!.goodsReceipts.values)
+      if (session.workspaceGoodsReceiptDrafts.any((review) => review.supplierId == widget.copy.supplier.id &&
+          jsonEncode(review.receipt.toJson()) == jsonEncode(receipt.toJson())))
+        for (final line in receipt.lines) if (line.productId == product) (receipt, line)];
+  }
+  (WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)? get _receipt =>
+    _receipts.where((pair) => (pair.$1.id, pair.$2.sourceLineId) == _receiptKey).singleOrNull;
+  @override
+  void initState() { super.initState(); unawaited(_recover()); }
+  @override
+  void dispose() {
+    for (final c in [_quantity, _free, _accepted, _damaged, _numerator, _denominator]) { c.dispose(); }
+    super.dispose();
+  }
+  Future<bool> confirmLeave() async {
+    if (_busy) return false;
+    if (_frozen != null && !_reviewVerified && !_committed && !_knownUnstored) {
+      setState(() { _opened = true; _error = 'Review save status is unverified. Retry saved status before leaving.'; _uncertain = true; });
+      return false;
+    }
+    if (!_dirty && !_knownUnstored) return true; // Only a verified saved review survives leaving.
+    final leave = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Leave goods match?'),
+      content: const Text('These matching quantities are not saved. The supplier bill and received Stock stay unchanged.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard changes'))]));
+    if (mounted && leave == true) setState(_clear);
+    return mounted && leave == true;
+  }
+  Future<void> _recover() async {
+    if (!_current) return;
+    setState(() { _busy = true; _error = null; });
+    final ready = await session.loadWorkspaceSuppliers(retry: true) && await session.recoverCustomerLedger();
+    if (!_current) return;
+    final ledger = _ledger;
+    final exact = ledger != null && jsonEncode(ledger.purchaseBills[widget.copy.draft.id]?.copy.toJson()) ==
+      jsonEncode(widget.copy.toJson());
+    _bookRevision = session.workspacePurchaseEntryRevision;
+    _loaded = ready && exact && _bookRevision != null;
+    if (!_loaded) {
+      setState(() { _busy = false; _uncertain = true; _error = 'Saved bill or supplier account is unavailable. Retry without adding these goods again.'; });
+      return;
+    }
+    _uncertain = false;
+    for (final review in session.workspaceBillGoodsReviews.where((r) => r.supplierId == widget.copy.supplier.id)) {
+      final posted = ledger!.billGoodsAllocations[review.allocation.operationId];
+      final cancelled = session.workspaceBillGoodsCancellations.any((c) => c.operationId == review.allocation.operationId);
+      if (posted != null && (cancelled || jsonEncode(posted.toJson()) != jsonEncode(review.allocation.toJson()))) {
+        setState(() { _busy = false; _uncertain = true; _error = 'Saved goods matching needs recovery. Do not receive or match these goods again.'; });
+        return;
+      }
+    }
+    final pending = session.workspaceBillGoodsReviews.where((review) =>
+      review.supplierId == widget.copy.supplier.id &&
+      !session.workspaceBillGoodsCancellations.any((c) => c.operationId == review.allocation.operationId) &&
+      !ledger!.billGoodsAllocations.containsKey(review.allocation.operationId)).toList();
+    _otherReview = pending.where((r) => r.allocation.copyId != widget.copy.id ||
+      r.allocation.copyRevision != widget.copy.revision).firstOrNull;
+    if (pending.length > 1) { _uncertain = true; _error = 'More than one unfinished match needs recovery. Do not prepare another match.'; }
+    final own = pending.where((r) => r.allocation.copyId == widget.copy.id &&
+      r.allocation.copyRevision == widget.copy.revision).singleOrNull;
+    if (own != null) {
+      if (_frozen != null && jsonEncode(_frozen!.toJson()) != jsonEncode(own.allocation.toJson())) {
+        setState(() { _busy = false; _uncertain = true; _error = 'Another saved matching review was found. Keep this attempt and recover before continuing.'; });
+        return;
+      }
+      _frozen = own.allocation; _reviewVerified = true; _opened = true;
+    }
+    if (_frozen != null) {
+      final cancellation = session.workspaceBillGoodsCancellations.where((c) => c.operationId == _frozen!.operationId).singleOrNull;
+      final posted = ledger!.billGoodsAllocations[_frozen!.operationId];
+      final savedReview = session.workspaceBillGoodsReviews.where((r) => r.allocation.operationId == _frozen!.operationId).singleOrNull;
+      _reviewVerified = savedReview != null && savedReview.supplierId == widget.copy.supplier.id &&
+        jsonEncode(savedReview.allocation.toJson()) == jsonEncode(_frozen!.toJson());
+      _knownUnstored = savedReview == null && posted == null && cancellation == null;
+      if (cancellation != null && posted != null) {
+        _uncertain = true;
+        _error = 'Saved match and cancellation conflict. Recover the supplier account; do not replace this match.';
+      } else if (cancellation != null) {
+        _clear(); _notice = 'Matching review cancelled. Bill, Stock and payments are unchanged.';
+      } else if (posted != null && jsonEncode(posted.toJson()) != jsonEncode(_frozen!.toJson())) {
+        _uncertain = true;
+        _error = 'Saved matching details conflict. Recover before continuing.';
+      } else if ((savedReview != null && !_reviewVerified) || (posted != null && savedReview == null)) {
+        _uncertain = true; _error = 'Saved matching review is missing or changed. Recover before continuing.';
+      }
+    }
+    setState(() { _busy = false; });
+  }
+  void _clear() {
+    _knownUnstored = false; _uncertain = false; _error = null; _notice = null;
+    _frozen = null; _reviewVerified = false; _cancelAttempt = null; _item = null; _receiptKey = null;
+    _quantity.clear(); _accepted.clear(); _free.text = '0'; _damaged.text = '0'; _conversion = false;
+  }
+  void _chooseReceipt((String, String)? key) {
+    _receiptKey = key; _conversion = false;
+    final pair = _receipt;
+    if (pair == null || _item == null) return;
+    final unit = widget.copy.draft.goods[_item!]['pack']!.trim();
+    final previous = _ledger!.billGoodsAllocations.values.where((link) =>
+      link.billId == widget.copy.draft.id && link.billLineIndex == _item).firstOrNull;
+    _numerator.text = '${previous?.stockUnitsNumerator ?? (unit == pair.$2.stockUnit ? 1 :
+      unit == pair.$2.purchaseUnit ? pair.$2.unitsPerPack : 1)}';
+    _denominator.text = '${previous?.stockUnitsDenominator ?? 1}';
+  }
+  WorkspaceSupplierBillGoodsAllocation? _snapshot() {
+    final pair = _receipt;
+    if (_item == null || pair == null || !_conversion || _ledger == null) return null;
+    final qty = _ReceivingLineInput.milli(_quantity.text), free = _ReceivingLineInput.milli(_free.text);
+    final accepted = _ReceivingLineInput.milli(_accepted.text), damaged = _ReceivingLineInput.milli(_damaged.text);
+    final numerator = int.tryParse(_numerator.text), denominator = int.tryParse(_denominator.text);
+    if ([qty, free, accepted, damaged, numerator, denominator].any((v) => v == null)) return null;
+    final line = widget.copy.draft.goods[_item!];
+    return WorkspaceSupplierBillGoodsAllocation(operationId: session.newWorkspaceBillGoodsLinkId(),
+      receiptId: pair.$1.id, receiptLineId: pair.$2.sourceLineId, billId: widget.copy.draft.id,
+      copyId: widget.copy.id, copyRevision: widget.copy.revision, billLineIndex: _item!,
+      productId: pair.$2.productId, billUnit: line['pack']!.trim(), stockUnit: pair.$2.stockUnit,
+      stockUnitsNumerator: numerator!, stockUnitsDenominator: denominator!, billQuantityMilli: qty!,
+      freeBillQuantityMilli: free!, acceptedReceiptMilli: accepted!, damagedReceiptMilli: damaged!,
+      conversionReviewed: true, linkedAt: DateTime.now().toUtc());
+  }
+  Future<void> _saveReview() async {
+    if (!_current || !_loaded || _busy || _bookRevision == null || _ledger == null) return;
+    final link = _frozen ?? _snapshot();
+    if (link == null || _ledger!.allocateBillGoods(link, expectedRevision: _ledger!.revision) == null) {
+      setState(() => _error = 'Check remaining invoice/receipt quantities and the exact unit conversion. No goods or payment changed.');
+      return;
+    }
+    final supplierRevision = _ledger!.revision;
+    setState(() { _busy = true; _frozen = link; _knownUnstored = false; _error = null; });
+    final saved = await session.saveWorkspaceBillGoodsReview(link, supplierId: widget.copy.supplier.id,
+      scope: _scope!, expectedPurchaseRevision: _bookRevision!, expectedSupplierRevision: supplierRevision);
+    if (!_current) return;
+    setState(() { _busy = false; _reviewVerified = saved; _bookRevision = session.workspacePurchaseEntryRevision;
+      _uncertain = !saved;
+      if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Retry saved status before changing the match.'; });
+  }
+  Future<void> _confirm() async {
+    if (!_current || _busy || !_loaded || !_reviewVerified || _frozen == null || _bookRevision == null || _ledger == null) return;
+    setState(() { _busy = true; _error = null; });
+    final saved = await session.confirmWorkspaceSupplierBillGoodsAllocation(_frozen!, supplierId: widget.copy.supplier.id,
+      scope: _scope!, expectedSupplierRevision: _ledger!.revision, expectedPurchaseRevision: _bookRevision!, requireSavedReview: true);
+    if (!_current) return;
+    setState(() { _busy = false; _uncertain = !saved;
+      if (saved) { _notice = 'Goods matched. Stock, supplier balance and payments are unchanged.'; }
+      else { _error = session.workspaceSupplierError ?? 'Matching status is unverified. Retry saved status before preparing another match.'; } });
+  }
+  Future<void> _cancel() async {
+    if (!_current || _busy || !_reviewVerified || _frozen == null || _committed || _bookRevision == null) return;
+    _cancelAttempt ??= WorkspaceBillGoodsReviewCancellation(operationId: _frozen!.operationId,
+      supplierId: widget.copy.supplier.id, revision: _bookRevision! + 1, cancelledAt: DateTime.now().toUtc(),
+      reason: 'Retailer cancelled goods matching review to correct quantities');
+    setState(() { _busy = true; _error = null; });
+    final saved = await session.abandonWorkspaceBillGoodsReview(_frozen!.operationId, supplierId: widget.copy.supplier.id,
+      scope: _scope!, expectedRevision: _cancelAttempt!.revision - 1,
+      cancelledAt: _cancelAttempt!.cancelledAt, reason: _cancelAttempt!.reason);
+    if (!_current) return;
+    setState(() { _busy = false; if (saved) { _clear(); _bookRevision = session.workspacePurchaseEntryRevision;
+        _notice = 'Matching review cancelled. Bill, Stock and payments are unchanged.'; }
+      else { _uncertain = true; _error = session.workspaceSupplierError ?? 'Cancellation status needs recovery. Retry saved status.'; } });
+  }
+  Widget _field(String label, TextEditingController controller, String key, {bool locked = false}) =>
+    SizedBox(width: 112, child: TextField(key: Key(key), controller: controller,
+      enabled: _editable && !locked, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(labelText: label), onChanged: (_) => setState(() {})));
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final ledger = _ledger;
+    final pair = _receipt;
+    final links = ledger?.billGoodsAllocations.values ?? const <WorkspaceSupplierBillGoodsAllocation>[];
+    final billedLinks = links.where((link) => link.billId == widget.copy.draft.id && link.billLineIndex == _item);
+    final receiptLinks = pair == null ? const <WorkspaceSupplierBillGoodsAllocation>[] :
+      links.where((link) => link.receiptId == pair.$1.id && link.receiptLineId == pair.$2.sourceLineId);
+    final line = _item == null ? null : widget.copy.draft.goods[_item!];
+    final printedQuantity = line == null ? null : _ReceivingLineInput.milli(line['quantity'] ?? '');
+    final freeText = (line?['freeQuantity'] ?? '').trim();
+    final printedFree = line == null ? null : freeText.isEmpty ? 0 : _ReceivingLineInput.milli(freeText);
+    final printedQuantitiesKnown = printedQuantity != null && printedFree != null;
+    final priorMatches = links.where((link) => link.copyId == widget.copy.id && link.copyRevision == widget.copy.revision);
+    final hasOlderReceipt = line != null && ledger != null && ledger.goodsReceipts.values.any((receipt) =>
+      receipt.lines.any((item) => item.productId == line['productId']));
+    final conversionLocked = billedLinks.isNotEmpty || (pair != null &&
+      (line?['pack']?.trim() == pair.$2.stockUnit || line?['pack']?.trim() == pair.$2.purchaseUnit));
+    final pendingCopy = _otherReview == null ? null : session.workspacePurchaseCopies.where((copy) =>
+      copy.id == _otherReview!.allocation.copyId && copy.revision == _otherReview!.allocation.copyRevision).singleOrNull;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      TextButton.icon(key: const Key('work-bill-goods-open'), onPressed: _busy ? null : () async {
+        if (_opened && !await confirmLeave()) return;
+        if (_current) setState(() => _opened = !_opened);
+      }, icon: Icon(_opened ? Icons.expand_less : Icons.link, size: 18), label: const Text('Match received goods')),
+      if (_opened) ...[
+        const Text('Match this bill to saved goods. This does not add Stock or record a payment.',
+          style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        for (final match in priorMatches) Text('Matched: ${widget.copy.draft.goods[match.billLineIndex]['name']} · '
+          '${_ReceivingLineInput._quantity(match.billQuantityMilli)} invoiced + ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} free ${match.billUnit} · '
+          'Receipt ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId} · '
+          '${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} accepted / ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} damaged · '
+          '1 ${match.billUnit} = ${match.stockUnitsNumerator}/${match.stockUnitsDenominator} ${match.stockUnit}',
+          key: ValueKey(('work-bill-goods-saved-match', match.operationId))),
+        if (_error != null) Text(_error!, key: const Key('work-bill-goods-error'),
+          style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+        if (!_loaded || _uncertain || ledger == null || session.workspaceSupplierRecoveryRequired) TextButton(key: const Key('work-bill-goods-recover'),
+          onPressed: _busy ? null : _recover, child: const Text('Retry saved status')),
+        if (_otherReview != null) ...[
+          const Text('Finish the saved match for this supplier’s other bill first.'),
+          if (pendingCopy != null) TextButton(onPressed: _busy ? null : () => widget.onOpenCopy(pendingCopy),
+            child: Text('Open invoice ${pendingCopy.draft.invoiceReference}')),
+        ] else if (_frozen != null) ...[
+          Text('${widget.copy.draft.goods[_frozen!.billLineIndex]['name']} · '
+            '${_ReceivingLineInput._quantity(_frozen!.billQuantityMilli)} invoiced + '
+            '${_ReceivingLineInput._quantity(_frozen!.freeBillQuantityMilli)} free ${_frozen!.billUnit}'),
+          Text('Accepted ${_ReceivingLineInput._quantity(_frozen!.acceptedReceiptMilli)} · '
+            'Damaged ${_ReceivingLineInput._quantity(_frozen!.damagedReceiptMilli)} '
+            '${ledger?.goodsReceipts[_frozen!.receiptId]?.lines.where((l) => l.sourceLineId == _frozen!.receiptLineId).firstOrNull?.purchaseUnit ?? ''}'),
+          if (_committed) ...[
+            const Text('Match confirmed · no Stock or payment change'),
+            TextButton(key: const Key('work-bill-goods-next'),
+              onPressed: _busy || !_current || _uncertain || !_reviewVerified || session.workspaceSupplierRecoveryRequired
+                ? null : () => setState(_clear), child: const Text('Match another item')),
+          ] else if (_error == null) Wrap(spacing: 8, children: [
+            TextButton(key: const Key('work-bill-goods-confirm'), onPressed: _busy || !_reviewVerified ? null : _confirm,
+              child: const Text('Confirm match')),
+            if (!_reviewVerified) TextButton(onPressed: _busy ? null : _saveReview, child: const Text('Save review again')),
+            TextButton(key: const Key('work-bill-goods-cancel'), onPressed: _busy || !_reviewVerified ? null : _cancel,
+              child: const Text('Cancel matching review')),
+          ]),
+        ] else if (_loaded && !_uncertain) ...[
+          DropdownButtonFormField<int>(key: ValueKey(('work-bill-goods-item', _item)), initialValue: _item,
+            isExpanded: true, decoration: const InputDecoration(labelText: 'Item on supplier invoice'),
+            items: [for (final (index, item) in widget.copy.draft.goods.indexed)
+              if ((item['productId'] ?? '').isNotEmpty) DropdownMenuItem(value: index,
+                child: Text('${index + 1}. ${item['name']} · ${item['pack']}', maxLines: 2))],
+            onChanged: _editable ? (value) => setState(() { _item = value; _receiptKey = null; _conversion = false; }) : null),
+          if (widget.copy.draft.goods.every((item) => (item['productId'] ?? '').isEmpty))
+            const Text('This accepted bill has no saved product links. Do not guess matches by item name; review the product mapping first.'),
+          if (_item != null) ...[
+            if (printedQuantitiesKnown) Text('Remaining on bill: ${_ReceivingLineInput._quantity(printedQuantity - billedLinks.fold<int>(0, (s, l) => s + l.billQuantityMilli))} invoiced, '
+              '${_ReceivingLineInput._quantity(printedFree - billedLinks.fold<int>(0, (s, l) => s + l.freeBillQuantityMilli))} free ${line!['pack']}')
+            else const Text('Invoice quantity is unclear. Check the supplier bill before matching; it is not treated as zero.'),
+            DropdownButtonFormField<(String, String)>(key: ValueKey(('work-bill-goods-receipt', _receiptKey, _item)),
+              initialValue: _receiptKey, isExpanded: true, decoration: const InputDecoration(labelText: 'Saved goods receipt'),
+              items: [for (final received in _receipts) DropdownMenuItem(value: (received.$1.id, received.$2.sourceLineId),
+                child: Text('${received.$1.reference} · ${received.$1.deliveredOn} · ${received.$2.purchaseUnit}', maxLines: 2))],
+              onChanged: _editable ? (value) => setState(() => _chooseReceipt(value)) : null),
+            if (_receipts.isEmpty) Text(hasOlderReceipt
+              ? 'Goods are already recorded, but their saved review is unavailable for matching. Do not receive them again.'
+              : 'No saved goods receipt for this product. Check whether Stock was already added before recording receipt.'),
+            if (pair != null) ...[
+              Text('Remaining receipt: ${_ReceivingLineInput._quantity(pair.$2.acceptedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.acceptedReceiptMilli))} accepted, '
+                '${_ReceivingLineInput._quantity(pair.$2.damagedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.damagedReceiptMilli))} damaged ${pair.$2.purchaseUnit}'),
+              Wrap(spacing: 12, runSpacing: 8, children: [
+                _field('Invoiced qty', _quantity, 'work-bill-goods-quantity'), _field('Free qty', _free, 'work-bill-goods-free'),
+                _field('Accepted qty', _accepted, 'work-bill-goods-accepted'), _field('Damaged qty', _damaged, 'work-bill-goods-damaged'),
+              ]),
+              Text('1 ${line!['pack']} = numerator / denominator ${pair.$2.stockUnit}'),
+              Wrap(spacing: 12, children: [_field('Numerator', _numerator, 'work-bill-goods-numerator', locked: conversionLocked),
+                _field('Denominator', _denominator, 'work-bill-goods-denominator', locked: conversionLocked)]),
+              CheckboxListTile(key: const Key('work-bill-goods-conversion'), contentPadding: EdgeInsets.zero,
+                value: _conversion, onChanged: _editable ? (value) => setState(() => _conversion = value ?? false) : null,
+                title: Text('I checked quantities and units (${line['pack']} → ${pair.$2.stockUnit}).')),
+              const Text('Damaged quantity matching does not record a supplier credit or refund.'),
+              TextButton(key: const Key('work-bill-goods-save'), onPressed: _editable && printedQuantitiesKnown ? _saveReview : null,
+                child: const Text('Save matching review')),
+            ],
+          ],
+        ],
+        if (_notice != null) Text(_notice!, key: const Key('work-bill-goods-notice')),
+      ],
+    ]);
+  }
+}
+
 class _PurchaseGoodsInput {
   _PurchaseGoodsInput([Map<String, String>? saved])
       : productId = saved?['productId'] ?? '',
@@ -11407,6 +11720,8 @@ class _StoreRecordPurchaseSurface extends StatefulWidget {
 
 class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   final _openingKey = GlobalKey<_StoreSupplierOpeningState>();
+  final _billGoodsKey = GlobalKey<_StoreBillGoodsMatchState>();
+  bool _billGoodsWasAccepted = false;
   static const _paperInk = Color(0xff202124);
   static const _paperMuted = Color(0xff59616d);
   static const _paperRule = Color(0xff92958f);
@@ -11539,6 +11854,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       return await (_openingKey.currentState?.confirmLeave() ?? Future.value(true));
     }
     if (_busy || _leaving) return false;
+    if (!await (_billGoodsKey.currentState?.confirmLeave() ?? Future.value(true))) return false;
+    if (!mounted) return false;
     _leaving = true;
     FocusScope.of(context).unfocus();
     final discard = !_dirty || await showDialog<bool>(context: context, builder: (context) =>
@@ -13110,7 +13427,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final ledger = ready ? session.workspaceSupplierLedger(copy.supplier.id) : null;
     final accepted = ledger?.purchaseBills[copy.draft.id];
     final same = accepted != null && jsonEncode(accepted.copy.toJson()) == jsonEncode(copy.toJson());
+    if (ready) _billGoodsWasAccepted = same;
     final treatment = ledger == null ? null : _billTreatment(copy, ledger);
+    final canReviewOpening = ledger?.openingRecord != null &&
+      copy.draft.invoiceIssuedDay != null &&
+      !ledger!.openingRecord!.bills.any((link) => link.draftId == copy.draft.id);
     final latest = session.workspaceLatestPurchaseCopies.where((item) => item.draft.id == copy.draft.id).toList();
     final latestExact = latest.length == 1 && jsonEncode(latest.single.toJson()) == jsonEncode(copy.toJson());
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -13121,18 +13442,85 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
       if (same) const Text('Stock receipt and supplier payment are recorded separately.',
         style: TextStyle(fontSize: 11, color: _paperMuted)),
+      if (same && session.workspaceSupplierMoneyInputAvailable) ...[
+        Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
+            ? 'Individual bill due not yet verified'
+            : 'Bill due ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
+            key: const Key('work-purchase-payment-status')),
+          TextButton.icon(key: const Key('work-purchase-record-payment'),
+            onPressed: _busy ? null : () async {
+              if (!await confirmLeave() || !mounted) return;
+              await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(
+                supplierId: copy.supplier.id,
+                copy: ledger.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
+              if (mounted && _current) await _load(retry: true);
+            }, icon: const Icon(Icons.payments_outlined, size: 18),
+            label: Text((ledger.payableMinor ?? 0) <= 0 ? 'Payment records'
+              : ledger.manualBillRemainingMinor(copy.draft.id) == null ? 'Record account payment' : 'Record payment')),
+        ]),
+        _StoreSupplierLedgerSummary(ledger: ledger, billId: copy.draft.id),
+      ],
+      if (same && session.workspaceSupplierAllocationInputAvailable)
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: const Key('work-purchase-allocate-money'),
+          onPressed: _busy ? null : () async {
+            if (!await confirmLeave() || !mounted) return;
+            await _showSupplierAllocation(context, session, copy);
+            if (mounted && _current) await _load(retry: true);
+          }, icon: const Icon(Icons.link_outlined, size: 18),
+          label: const Text('Link advance or account payment'))),
+      if (same && session.supplierCreditFormKey(copy) != null)
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
+            if (!await confirmLeave() || !mounted) return;
+            await _showSupplierCredit(context, session, copy);
+            if (mounted && _current) await _load(retry: true);
+          }, icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          label: const Text('Record supplier credit note'))),
+      if (same || (_billGoodsWasAccepted && !ready)) _StoreBillGoodsMatch(key: _billGoodsKey, session: session, copy: copy,
+        onOpenCopy: (other) async {
+          if (!await confirmLeave() || !mounted) return;
+          final detailKey = GlobalKey<_StoreRecordPurchaseState>();
+          var leaving = false;
+          var allowPop = false;
+          await Navigator.of(context).push<void>(MaterialPageRoute(builder: (pageContext) =>
+            StatefulBuilder(builder: (routeContext, updateRoute) {
+              void finishPop() {
+                if (!routeContext.mounted || allowPop) return;
+                updateRoute(() => allowPop = true);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (routeContext.mounted) Navigator.of(routeContext).pop();
+                });
+              }
+              Future<void> requestPop() async {
+                if (leaving || allowPop) return;
+                leaving = true;
+                final approved = await (detailKey.currentState?.confirmLeave() ?? Future.value(false));
+                leaving = false;
+                if (approved) finishPop();
+              }
+              return PopScope(canPop: allowPop,
+                onPopInvokedWithResult: (didPop, result) { if (!didPop) unawaited(requestPop()); },
+                child: Scaffold(body: SafeArea(child: _StoreRecordPurchaseSurface(key: detailKey,
+                  session: session, savedCopy: other, onBack: finishPop))));
+            })));
+          if (mounted && _current) await _load(retry: true);
+        }),
       if (session.workspaceSupplierOpeningConfirmationAvailable && !ready)
         TextButton(key: const Key('work-purchase-bill-recover'),
           onPressed: _busy ? null : () => _load(retry: true), child: const Text('Retry supplier account')),
       if (ready && accepted == null && treatment == null)
         Text(ledger?.openingRecord == null
           ? 'Purchases → Opening dues: confirm this supplier’s starting balance. Confirm zero only if there are no earlier dues or advances.'
-          : 'This earlier bill is not linked to the confirmed starting balance. Confirmation is blocked until a separate accounting correction is reviewed; the saved bill is kept unchanged.',
+          : canReviewOpening
+            ? 'Check whether this whole bill was included in the starting balance before confirming it.'
+            : 'This bill conflicts with the saved starting-balance details. Review those details before confirming; the saved bill is kept unchanged.',
           style: const TextStyle(fontSize: 11, color: _paperMuted)),
       if (ready && accepted == null && !latestExact)
         const Text('Open the latest saved revision to confirm this bill.',
           style: TextStyle(fontSize: 11, color: _paperMuted)),
-      if (ready && accepted == null && treatment != null && latestExact &&
+      if (ready && accepted == null && (treatment != null || canReviewOpening) && latestExact &&
           session.workspaceSupplierOpeningConfirmationAvailable)
         TextButton.icon(key: const Key('work-purchase-bill-confirm'),
           onPressed: _busy || session.workspaceSupplierSaving ? null : () => _confirmSavedBill(copy),
@@ -13147,19 +13535,51 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final ledger = session.workspaceSupplierLedger(copy.supplier.id);
     if (_busy || !_current || scope == null ||
         !session.workspaceInvoiceHistoryLoaded || ledger == null) { return; }
-    final treatment = _billTreatment(copy, ledger);
-    if (treatment == null) return;
+    final invoiceTotal = WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal']);
+    if (invoiceTotal == null) {
+      setState(() => _notice = 'Enter the invoice total as shown on the supplier bill before confirming.');
+      return;
+    }
+    var treatment = _billTreatment(copy, ledger);
+    WorkspaceSupplierBillOpeningReview? openingReview;
+    if (treatment == null && (ledger.openingRecord == null ||
+        ledger.openingRecord!.bills.any((link) => link.draftId == copy.draft.id) ||
+        copy.draft.invoiceIssuedDay == null)) {
+      return;
+    }
     final bookRevision = session.workspacePurchaseEntryRevision;
     if (bookRevision == null) return;
     FocusScope.of(context).unfocus();
     setState(() => _busy = true);
-    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+    if (treatment == null) {
+      final opening = ledger.openingRecord!;
+      treatment = await showDialog<WorkspaceOpeningBillInclusion>(context: context,
+        builder: (context) => AlertDialog(scrollable: true, title: const Text('Was this bill included?'),
+          content: Text('${copy.supplier.name}\n'
+            'Starting balance: ${_purchaseAmount(opening.amountMinor!)} '
+            '${opening.supplierCredit ? 'advance / credit with supplier' : 'owed to supplier'}\n'
+            'Dated ${_registerDate(DateTime.parse(opening.asOfDate))}\n'
+            'Invoice total: ${_purchaseAmount(invoiceTotal)}\n'
+            'Choose only after checking the whole supplier invoice. If unsure or partly included, cancel and check with the supplier.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context, WorkspaceOpeningBillInclusion.included),
+              child: const Text('Whole bill already included')),
+            TextButton(onPressed: () => Navigator.pop(context, WorkspaceOpeningBillInclusion.excluded),
+              child: const Text('Not included — add bill amount')),
+          ]));
+      if (!mounted || !_current) return;
+      if (treatment == null) { setState(() => _busy = false); return; }
+      openingReview = WorkspaceSupplierBillOpeningReview(openingId: opening.id,
+        openingRevision: opening.revision, treatment: treatment);
+    }
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(scrollable: true,
       title: const Text('Confirm supplier bill?'),
       content: Text(treatment == WorkspaceOpeningBillInclusion.included
-        ? 'This bill is already included in the confirmed starting balance. Confirming it will not add the amount again. Stock and payments stay unchanged.'
+        ? 'Invoice total ${_purchaseAmount(invoiceTotal)} is already included in the confirmed starting balance. No amount is added again. Included does not mean paid. Stock and payments stay unchanged.'
         : WorkspacePurchaseEntryDraft.printedPaise(copy.draft.details['invoiceTotal']) == 0
           ? 'This zero-total bill will be recorded without adding an amount owed. Stock and payments stay unchanged.'
-          : 'This bill will be recorded in the supplier account. Its invoice total adds to the amount owed; Stock and payments stay unchanged.'),
+          : 'Invoice total ${_purchaseAmount(invoiceTotal)} will be added to the supplier account. No payment is recorded; any supplier advance is retained. Stock stays unchanged.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(key: const Key('work-purchase-bill-confirm-accept'),
           onPressed: () => Navigator.pop(context, true), child: const Text('Confirm bill'))]));
@@ -13174,7 +13594,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     setState(() { _busy = true; _notice = null; });
     final saved = await session.confirmWorkspacePurchaseBill(copy, scope: scope,
       expectedPurchaseRevision: bookRevision, expectedLedgerRevision: ledger.revision,
-      openingTreatment: treatment, confirmedAt: DateTime.now());
+      openingTreatment: treatment, openingReview: openingReview, confirmedAt: DateTime.now());
     if (!mounted || !_current) return;
     setState(() { _busy = false;
       _notice = saved ? 'Bill confirmed. No goods or payment recorded.'
@@ -13632,10 +14052,28 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
           ],
         ),
         Text(
-          _posted ? 'The confirmed starting balance is kept in the supplier account. Stock and payments are unchanged.' :
+          _posted ? 'The starting balance is kept. Record subsequent goods and payments separately.' :
           'Save the starting amount, check supporting bills, then confirm the balance in the supplier account. Saving alone does not change dues, Stock or payments.',
           style: const TextStyle(fontSize: 12, color: MoolColors.ink),
         ),
+        if (_posted && _supplierId != null && session.workspaceSupplierMoneyInputAvailable) ...[
+          Wrap(spacing: 8, children: [
+            TextButton.icon(key: const Key('work-opening-record-payment'),
+              onPressed: _busy || !_current
+                ? null : () async {
+                  await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!));
+                  if (mounted && _current) await _recoverPosting();
+                }, icon: const Icon(Icons.payments_outlined, size: 18), label: Text(
+                  (session.workspaceSupplierLedger(_supplierId!)?.payableMinor ?? 0) <= 0
+                    ? 'Payment records' : 'Record payment')),
+            TextButton.icon(key: const Key('work-opening-record-advance'),
+              onPressed: _busy || !_current ? null : () async {
+                await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: _supplierId!, advance: true));
+                if (mounted && _current) await _recoverPosting();
+              }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18), label: const Text('Record advance paid')),
+          ]),
+          _StoreSupplierLedgerSummary(ledger: session.workspaceSupplierLedger(_supplierId!)),
+        ],
         if (!_current)
           const Text(
             'Return to the Store where you started. Unsaved entries are kept.',
@@ -14232,6 +14670,14 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             if (_savedStatusResolved && _frozen != null && (_cancelled || (_committed && _hasPendingArrival)))
               TextButton(key: const Key('work-receive-next'), onPressed: _busy ? null : () => setState(() => _newArrival(previous: _frozen)),
                 child: Text(_cancelled ? 'Correct goods details' : 'Next arrival for this delivery')),
+            // A return recovery lock must not hide the route to its retained
+            // request. Posting still uses the scoped authoritative native guard.
+            if (_loaded && _reviewVerified && !_conflict && _committed)
+              TextButton.icon(key: const Key('work-receive-return-goods'),
+                onPressed: _busy || session.supplierGoodsReturnFormKey(_supplierId!, _frozen!.id) == null
+                  ? null : () => _showSupplierGoodsReturn(context, session, _supplierId!, _frozen!),
+                icon: const Icon(Icons.assignment_return_outlined, size: 18),
+                label: Text(session.workspaceGoodsReceiptRecoveryPending ? 'Recover goods return' : 'Return goods')),
             if (_savedStatusResolved && _committed)
               TextButton(key: const Key('work-receive-new-delivery'), onPressed: _busy ? null : () => setState(() => _newArrival()),
                 child: const Text('New delivery')),
@@ -14946,10 +15392,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 class _StoreSupplierLedgerSummary extends StatelessWidget {
   const _StoreSupplierLedgerSummary({
     required this.ledger,
-    required this.orderId,
+    this.orderId,
+    this.billId,
   });
   final WorkspaceSupplierLedger? ledger;
-  final String orderId;
+  final String? orderId, billId;
 
   @override
   Widget build(BuildContext context) {
@@ -14959,7 +15406,8 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     }
     final credit = current.creditMinor;
     final payable = current.payableMinor;
-    final entries = current.entries.where((entry) => entry.orderId == orderId);
+    final entries = current.entries.where((entry) => orderId != null
+      ? entry.orderId == orderId : billId != null ? entry.billId == billId : true);
     return ExpansionTile(
       key: PageStorageKey((
         'supplier-ledger-expansion',
@@ -14967,6 +15415,7 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
         current.workspaceId,
         current.supplierId,
         orderId,
+        billId,
       )),
       tilePadding: EdgeInsets.zero,
       title: const Text('Supplier account'),
@@ -14982,7 +15431,8 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
           const Text(
             'Showing available entries. Full account history is unavailable.',
           ),
-        const Text('Entries for this order'),
+        Text(orderId != null ? 'Entries for this order' : billId != null
+          ? 'Entries linked to this bill' : 'Supplier account entries'),
         if (entries.isEmpty)
           const Text('No confirmed financial entries available'),
         for (final entry in entries)
@@ -15003,6 +15453,18 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
             ),
             trailing: Text(_purchaseAmount(entry.amountMinor)),
           ),
+        if (orderId == null) ...[
+          for (final link in current.billMoneyAllocations.values.where(
+            (item) => billId == null || item.billId == billId))
+            ListTile(dense: true, contentPadding: EdgeInsets.zero,
+              title: const Text('Recorded money linked · not another payment'),
+              subtitle: Text('${current.purchaseBills[link.billId]?.copy.draft.invoiceReference ?? link.billId} · ${_registerDate(link.recordedAt)}'),
+              trailing: Text(_purchaseAmount(link.amountMinor))),
+          if (current.billMoneyAllocations.isNotEmpty && current.unassignedAccountBalanceMinor != null)
+            Text(current.unassignedAccountBalanceMinor! < 0
+              ? 'Other / unassigned credit ${_purchaseAmount(-current.unassignedAccountBalanceMinor!)}'
+              : 'Other / unassigned dues ${_purchaseAmount(current.unassignedAccountBalanceMinor!)}'),
+        ],
       ],
     );
   }
@@ -27909,17 +28371,727 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
   }
 }
 
+class _StoreSupplierMoneyTarget {
+  const _StoreSupplierMoneyTarget({required this.supplierId, this.copy, this.advance = false})
+    : assert(copy == null || !advance);
+  final String supplierId;
+  final WorkspacePurchaseSavedCopy? copy;
+  final bool advance;
+}
+
+Future<void> _showSupplierMoneyEntry(BuildContext context, WorkSession session,
+    _StoreSupplierMoneyTarget target) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreMoneyEntrySheet(session: session, supplierMoney: target));
+
+Future<void> _showSupplierGoodsReturn(BuildContext context, WorkSession session,
+    String supplierId, WorkspaceSupplierGoodsReceipt receipt) => showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreSupplierGoodsReturnSheet(session: session, supplierId: supplierId, receipt: receipt));
+
+class _StoreSupplierGoodsReturnSheet extends StatefulWidget {
+  const _StoreSupplierGoodsReturnSheet({required this.session, required this.supplierId, required this.receipt});
+  final WorkSession session;
+  final String supplierId;
+  final WorkspaceSupplierGoodsReceipt receipt;
+  @override
+  State<_StoreSupplierGoodsReturnSheet> createState() => _StoreSupplierGoodsReturnSheetState();
+}
+
+class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsReturnSheet> {
+  late final _LedgerFormAutosave draft;
+  final reference = TextEditingController(), reason = TextEditingController(), day = TextEditingController();
+  final accepted = <String, TextEditingController>{}, damaged = <String, TextEditingController>{};
+  WorkspaceSupplierGoodsReturnIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  bool busy = true, confirmed = false, complete = false, conflict = false, statusUnverified = false;
+  String? error;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.supplierId);
+  Map<String, String> get fields => {'reference': reference.text, 'reason': reason.text, 'returnedOn': day.text,
+    'items': frozen == null ? jsonEncode({for (final line in widget.receipt.lines)
+      line.sourceLineId: [accepted[line.sourceLineId]!.text, damaged[line.sourceLineId]!.text]})
+      : jsonEncode(frozen!.lines.map((line) => line.toJson()).toList()),
+    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson())};
+  @override
+  void initState() {
+    super.initState();
+    day.text = DateTime.now().toIso8601String().substring(0, 10);
+    for (final line in widget.receipt.lines) {
+      accepted[line.sourceLineId] = TextEditingController(text: '0');
+      damaged[line.sourceLineId] = TextEditingController(text: '0');
+    }
+    draft = _LedgerFormAutosave(widget.session,
+      widget.session.supplierGoodsReturnFormKey(widget.supplierId, widget.receipt.id));
+    draft.addListener(refresh);
+    unawaited(load(initial: true));
+  }
+  void refresh() { if (mounted) setState(() {}); }
+  Future<void> load({bool initial = false}) async {
+    if (!initial && (busy || draft.busy)) return;
+    setState(() => busy = true);
+    try {
+      if (draft.pending != null) { draft.save(fields); await draft.flush(); }
+      final retained = draft.pending;
+      final saved = await draft.load();
+      if (!mounted || saved == null) return;
+      if (retained != null && jsonEncode(retained.fields) != jsonEncode(saved)) {
+        conflict = true; error = 'Saved return differs from this input. Both are kept; do not replace either.';
+        return;
+      }
+      draft.pending = null; conflict = false; error = null; complete = false; resetAttempt = null; statusUnverified = false;
+      reference.text = saved['reference'] ?? ''; reason.text = saved['reason'] ?? '';
+      day.text = saved['returnedOn']?.isNotEmpty == true ? saved['returnedOn']! : DateTime.now().toIso8601String().substring(0, 10);
+      final attempt = saved['attempt'];
+      frozen = attempt == null || attempt.isEmpty ? null : WorkspaceSupplierGoodsReturnIntent.fromJson(jsonDecode(attempt));
+      for (final line in widget.receipt.lines) {
+        accepted[line.sourceLineId]!.text = '0'; damaged[line.sourceLineId]!.text = '0';
+      }
+      if (frozen != null) {
+        for (final line in frozen!.lines) {
+          if (!accepted.containsKey(line.receiptLineId)) throw const FormatException('Receipt item changed');
+          accepted[line.receiptLineId]!.text = _ReceivingLineInput._quantity(line.acceptedMilli);
+          damaged[line.receiptLineId]!.text = _ReceivingLineInput._quantity(line.damagedMilli);
+        }
+        confirmed = await widget.session.readWorkspaceSupplierGoodsReturnStatus(draft.key!, frozen!) != null;
+      } else {
+        confirmed = false;
+        final items = saved['items'];
+        if (items != null && items.isNotEmpty) {
+          final values = jsonDecode(items);
+          if (values is! Map || values.keys.any((id) => !accepted.containsKey(id))) throw const FormatException('Invalid saved items');
+          for (final entry in values.entries) {
+            if (entry.value is! List || (entry.value as List).length != 2 ||
+                !(entry.value as List).every((value) => value is String)) {
+              throw const FormatException('Invalid saved quantities');
+            }
+            accepted[entry.key]!.text = entry.value[0] as String; damaged[entry.key]!.text = entry.value[1] as String;
+          }
+        }
+      }
+    } on Object { conflict = true; statusUnverified = true;
+      error = 'Saved goods return could not be verified. Keep the request and retry recovery.'; }
+    finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<void> submit() async {
+    if (busy || conflict || !draft.ready || draft.key == null) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await draft.flush() || !mounted) return;
+      if (confirmed && complete) {
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: const {});
+        if (await widget.session.resetConfirmedWorkspaceSupplierGoodsReturnDraft(resetAttempt!, expectedRevision: draft.revision!)) {
+          draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+          frozen = null; confirmed = false; complete = false; resetAttempt = null;
+          reference.clear(); reason.clear();
+          for (final controller in [...accepted.values, ...damaged.values]) { controller.text = '0'; }
+        } else { error = 'Recorded return is kept. Verify its saved status before starting another.'; }
+        return;
+      }
+      if (frozen == null) {
+        final lines = <WorkspaceSupplierGoodsReturnLine>[];
+        for (final line in widget.receipt.lines) {
+          final good = _ReceivingLineInput.milli(accepted[line.sourceLineId]!.text);
+          final damage = _ReceivingLineInput.milli(damaged[line.sourceLineId]!.text);
+          if (good == null || damage == null || good < 0 || damage < 0) {
+            error = 'Enter a valid return quantity for each item.'; return;
+          }
+          if (good + damage == 0) continue;
+          final returned = ledger?.goodsReturns.values.where((record) => record.receiptId == widget.receipt.id)
+            .expand((record) => record.lines).where((item) => item.receiptLineId == line.sourceLineId).toList() ?? const [];
+          if (good > line.acceptedMilli - returned.fold<int>(0, (sum, item) => sum + item.acceptedMilli) ||
+              damage > line.damagedMilli - returned.fold<int>(0, (sum, item) => sum + item.damagedMilli)) {
+            error = 'Return quantity exceeds the remaining received goods.'; return;
+          }
+          lines.add(WorkspaceSupplierGoodsReturnLine(receiptLineId: line.sourceLineId, productId: line.productId,
+            productLabel: line.productLabel, purchaseUnit: line.purchaseUnit, stockUnit: line.stockUnit,
+            unitsPerPack: line.unitsPerPack, acceptedMilli: good, damagedMilli: damage));
+        }
+        final key = draft.key!;
+        final intent = WorkspaceSupplierGoodsReturnIntent(operationId: widget.session.newWorkspaceSupplierGoodsReturnId(),
+          accountScope: key.account, workspaceId: key.store, supplierId: key.customer, receiptId: key.invoice,
+          reference: reference.text.trim(), reason: reason.text.trim(), returnedOn: day.text.trim(),
+          requestedAt: DateTime.now().toUtc(), lines: lines);
+        if (!intent.valid) { error = 'Enter return reference, date, reason and at least one item quantity.'; return; }
+        reference.text = intent.reference; reason.text = intent.reason; day.text = intent.returnedOn;
+        frozen = intent; draft.save(fields);
+        if (!await draft.flush()) error = 'Return is not submitted. Retry saving this same review.';
+        return;
+      }
+      statusUnverified = true;
+      complete = await widget.session.recordWorkspaceSupplierGoodsReturnDraft(draft.key!, frozen!);
+      confirmed = await widget.session.readWorkspaceSupplierGoodsReturnStatus(draft.key!, frozen!) != null;
+      statusUnverified = false;
+      if (!complete) {
+        error = confirmed ? 'Return recorded; Stock recovery is pending. Retry this same return.'
+          : 'Return status needs checking. Keep and retry this saved request.';
+      }
+    } on Object { statusUnverified = true; error = 'Return status is unverified. Keep this request and retry recovery.'; }
+    finally { if (mounted) setState(() => busy = false); }
+  }
+  @override
+  void dispose() {
+    draft.removeListener(refresh); draft.dispose(); reference.dispose(); reason.dispose(); day.dispose();
+    for (final controller in [...accepted.values, ...damaged.values]) { controller.dispose(); }
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final newReturnBlocked = frozen == null && widget.session.workspaceGoodsReceiptRecoveryPending;
+    final editable = draft.ready && !busy && !conflict && frozen == null && !newReturnBlocked;
+    final impacts = <(String, String), int>{};
+    for (final line in frozen?.lines ?? <WorkspaceSupplierGoodsReturnLine>[]) {
+      impacts.update((line.productId, line.stockUnit), (units) => units + line.stockUnits,
+        ifAbsent: () => line.stockUnits);
+    }
+    String remaining(WorkspaceSupplierGoodsReceiptLine line) {
+      final returns = ledger?.goodsReturns.values.where((record) => record.receiptId == widget.receipt.id)
+        .expand((record) => record.lines).where((item) => item.receiptLineId == line.sourceLineId).toList() ?? const [];
+      return 'Remaining: ${_ReceivingLineInput._quantity(line.acceptedMilli - returns.fold<int>(0, (sum, item) => sum + item.acceptedMilli))} from Stock · '
+        '${_ReceivingLineInput._quantity(line.damagedMilli - returns.fold<int>(0, (sum, item) => sum + item.damagedMilli))} arrival damage ${line.purchaseUnit}';
+    }
+    Widget input(String label, TextEditingController controller, Key key, {bool quantity = false}) =>
+      SizedBox(width: quantity ? 108 : 220, child: TextField(key: key, controller: controller, enabled: editable,
+        keyboardType: quantity ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+        decoration: InputDecoration(labelText: label, floatingLabelBehavior: FloatingLabelBehavior.always),
+        onChanged: (_) => draft.save(fields)));
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
+      child: SafeArea(top: false, child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Text('Return goods to supplier', style: Theme.of(context).textTheme.titleMedium),
+            TextButton(key: const Key('supplier-return-close'), onPressed: busy || conflict || draft.busy ? null : () async {
+              setState(() => busy = true);
+              if (await draft.flush() && context.mounted) { Navigator.pop(context); }
+              else if (mounted) { setState(() => busy = false); }
+            }, child: const Text('Close'))]),
+          Text('${ledger?.supplierName ?? ''} · ${widget.receipt.reference}'),
+          const Text('Record goods handed back. Supplier credit and money received are recorded separately.'),
+          if (newReturnBlocked) const Text('Recover the saved return before recording another goods return.'),
+          Wrap(spacing: 12, runSpacing: 8, children: [input('Return reference', reference, const Key('supplier-return-reference')),
+            input('Returned date · YYYY-MM-DD', day, const Key('supplier-return-date'))]),
+          input('Reason for return', reason, const Key('supplier-return-reason')),
+          for (final line in widget.receipt.lines) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(line.productLabel, style: const TextStyle(fontSize: 14, color: MoolColors.navy, fontWeight: FontWeight.w600)),
+              Text('Accepted into Stock ${_ReceivingLineInput._quantity(line.acceptedMilli)} · Arrival damage (not stocked) ${_ReceivingLineInput._quantity(line.damagedMilli)} ${line.purchaseUnit}',
+                style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+              Text(remaining(line), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+              Wrap(spacing: 12, runSpacing: 8, children: [
+                input('From Stock', accepted[line.sourceLineId]!, ValueKey(('supplier-return-accepted', line.sourceLineId)), quantity: true),
+                if (line.damagedMilli > 0) input('Arrival damage', damaged[line.sourceLineId]!,
+                  ValueKey(('supplier-return-damaged', line.sourceLineId)), quantity: true)]),
+            ])),
+          if (frozen != null) Text(statusUnverified ? 'Return status unverified' : complete ? 'Goods returned · Stock updated' : confirmed ? 'Return recorded · verify Stock'
+            : draft.pending != null || draft.error != null ? 'Review save status unverified' : 'Review saved · confirm return',
+            key: const Key('supplier-return-status'), style: const TextStyle(color: MoolColors.navy, fontWeight: FontWeight.w600)),
+          for (final impact in impacts.entries) Text('${frozen!.lines.firstWhere((line) => line.productId == impact.key.$1 && line.stockUnit == impact.key.$2).productLabel} · '
+            'Stock to remove: ${impact.value} ${impact.key.$2}', key: ValueKey(('supplier-return-stock-impact', impact.key))),
+          if (error != null || draft.error != null) Text(error ?? draft.error!,
+            style: const TextStyle(color: Color(0xffa52a2a), fontSize: 12)),
+          Wrap(spacing: 8, children: [
+            TextButton(key: const Key('supplier-return-confirm'), onPressed: busy || conflict || !draft.ready || newReturnBlocked ? null : submit,
+              child: Text(confirmed && complete ? 'Start another return' : frozen == null ? 'Review & save return'
+                : confirmed ? 'Verify returned Stock' : 'Confirm goods returned')),
+            TextButton(key: const Key('supplier-return-recover'), onPressed: busy || draft.busy ? null : load,
+              child: const Text('Recover saved return'))]),
+        ]))));
+  }
+}
+
+Future<void> _showSupplierCredit(BuildContext context, WorkSession session,
+    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreSupplierCreditSheet(session: session, copy: copy));
+
+class _StoreSupplierCreditSheet extends StatefulWidget {
+  const _StoreSupplierCreditSheet({required this.session, required this.copy});
+  final WorkSession session;
+  final WorkspacePurchaseSavedCopy copy;
+  @override
+  State<_StoreSupplierCreditSheet> createState() => _StoreSupplierCreditSheetState();
+}
+
+class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
+  late final _LedgerFormAutosave draft;
+  final reference = TextEditingController(), amount = TextEditingController(),
+    reason = TextEditingController(), date = TextEditingController();
+  final selected = <String, (WorkspaceSupplierCreditSupport, TextEditingController)>{};
+  WorkspaceSupplierCreditIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  bool busy = false, recovered = false, confirmed = false, conflict = false;
+  String? error;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
+  bool get current => draft.key != null &&
+    widget.session.supplierCreditFormKey(widget.copy) == draft.key;
+  String identity(WorkspaceSupplierCreditSupport support) => jsonEncode([
+    support.kind.name, support.receiptId, support.receiptLineId, support.billLineIndex,
+    support.returnOperationId, support.shortageClaimId]);
+  String printedDate(String day) => day.length == 10
+    ? '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}' : day;
+  String? get occurredOn {
+    final match = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(date.text.trim());
+    if (match == null) return null;
+    final day = int.parse(match[1]!), month = int.parse(match[2]!), year = int.parse(match[3]!);
+    final value = DateTime(year, month, day);
+    if (value.year != year || value.month != month || value.day != day) return null;
+    return '${match[3]}-${match[2]}-${match[1]}';
+  }
+  Map<String, String> get fields => {
+    'reference': reference.text, 'amount': amount.text, 'reason': reason.text,
+    'occurredOn': frozen?.occurredOn ?? date.text,
+    'supports': frozen == null ? jsonEncode([for (final value in selected.values)
+      {'support': value.$1.toJson(), 'quantity': value.$2.text}])
+      : jsonEncode(frozen!.supports.map((s) => s.toJson()).toList()),
+    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
+  };
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierCreditFormKey(widget.copy));
+    draft.addListener(refresh);
+    unawaited(load());
+  }
+  void refresh() { if (mounted) setState(() {}); }
+  void clearSelections() {
+    for (final value in selected.values) { value.$2.dispose(); }
+    selected.clear();
+  }
+  void restore(Map<String, String> saved) {
+    final text = saved['attempt'];
+    final intent = text == null || text.isEmpty ? null : WorkspaceSupplierCreditIntent.fromJson(jsonDecode(text));
+    final restored = <String, (WorkspaceSupplierCreditSupport, TextEditingController)>{};
+    try {
+      if (intent != null) {
+        for (final support in intent.supports) {
+          restored[identity(support)] = (support, TextEditingController(text: _ReceivingLineInput._quantity(support.quantityMilli)));
+        }
+      } else {
+        final raw = jsonDecode(saved['supports']?.isNotEmpty == true ? saved['supports']! : '[]');
+        if (raw is! List || raw.length > 200) { throw const FormatException('Invalid saved credit selection'); }
+        for (final item in raw) {
+          if (item is! Map || item['quantity'] is! String) { throw const FormatException('Invalid saved credit quantity'); }
+          final support = WorkspaceSupplierCreditSupport.fromJson(item['support']);
+          if (support.billLineIndex >= widget.copy.draft.goods.length) { throw const FormatException('Saved credit item unavailable'); }
+          if (restored.containsKey(identity(support))) { throw const FormatException('Duplicate saved credit selection'); }
+          restored[identity(support)] = (support, TextEditingController(text: item['quantity'] as String));
+        }
+      }
+    } on Object {
+      for (final value in restored.values) { value.$2.dispose(); }
+      rethrow;
+    }
+    clearSelections(); selected.addAll(restored);
+    reference.text = saved['reference'] ?? '';
+    amount.text = saved['amount'] ?? '';
+    reason.text = saved['reason'] ?? '';
+    date.text = intent == null ? saved['occurredOn'] ?? '' : printedDate(intent.occurredOn);
+    frozen = intent;
+  }
+  Future<void> verifyStatus() async {
+    confirmed = false;
+    if (!current || !recovered) { throw StateError('Original supplier bill unavailable'); }
+    if (frozen != null) {
+      final proof = await widget.session.readWorkspaceSupplierCreditStatus(draft.key!, frozen!);
+      if (!current) { throw StateError('Store changed'); }
+      confirmed = proof != null;
+    }
+  }
+  Future<void> load() async {
+    if (busy || draft.busy) return;
+    setState(() { busy = true; recovered = false; confirmed = false; });
+    try {
+      if (draft.pending != null) {
+        draft.save(fields);
+        if (!await draft.flush()) {
+          error = 'Credit-note input is not saved yet. Retry saving; your entries are kept here.';
+          return;
+        }
+      }
+      if (!mounted || !current) { throw StateError('Original supplier bill unavailable'); }
+      recovered = await widget.session.recoverCustomerLedger();
+      if (!mounted || !current || !recovered) { throw StateError('Saved supplier account unavailable'); }
+      final saved = await draft.load();
+      if (!mounted || saved == null) { throw StateError('Saved input unavailable'); }
+      restore(saved);
+      conflict = false; error = null; resetAttempt = null;
+      await verifyStatus();
+    } on Object {
+      recovered = false; conflict = true;
+      error = 'Credit-note status could not be verified. Keep these details and retry recovery.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<void> submit() async {
+    if (busy || conflict || !recovered || !draft.ready || !current) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await draft.flush() || !mounted || !current) return;
+      if (confirmed) {
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
+          fields: const {'reference': '', 'amount': '', 'reason': '', 'occurredOn': '', 'supports': '[]'});
+        if (await widget.session.resetConfirmedWorkspaceSupplierCreditDraft(resetAttempt!, expectedRevision: draft.revision!)) {
+          draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+          reference.clear(); amount.clear(); reason.clear(); date.clear(); clearSelections();
+          frozen = null; confirmed = false; resetAttempt = null;
+        } else { error = 'Recorded credit note is kept. Retry recovery before starting another.'; }
+        return;
+      }
+      if (frozen == null) {
+        final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text), day = occurredOn;
+        final opening = ledger?.openingRecord;
+        final options = ledger?.availableCreditSupports(widget.copy.draft.id) ?? const [];
+        final supports = <WorkspaceSupplierCreditSupport>[];
+        for (final value in selected.values) {
+          final quantity = _ReceivingLineInput.milli(value.$2.text);
+          final option = options.where((o) => identity(o.$1) == identity(value.$1)).firstOrNull;
+          if (quantity == null || quantity <= 0 || option == null || quantity > option.$1.quantityMilli) {
+            error = 'Enter a credited quantity within the available goods shown for each selected item.';
+            return;
+          }
+          supports.add(WorkspaceSupplierCreditSupport.fromJson({...value.$1.toJson(), 'quantityMilli': quantity}));
+        }
+        if (minor == null || minor <= 0 || day == null || opening == null || supports.isEmpty) {
+          error = 'Enter the credit-note amount and date, and select the goods credited by your supplier.';
+          return;
+        }
+        final key = draft.key!;
+        final intent = WorkspaceSupplierCreditIntent(operationId: widget.session.newWorkspaceSupplierCreditId(),
+          accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+          billId: widget.copy.draft.id, copyId: widget.copy.id, copyRevision: widget.copy.revision,
+          openingId: opening.id, openingRevision: opening.revision, reference: reference.text.trim(),
+          occurredOn: day, reason: reason.text.trim(), amountMinor: minor, requestedAt: DateTime.now().toUtc(), supports: supports);
+        if (!intent.valid) {
+          error = 'Check the credit-note number, date and reason. Select each goods source only once.';
+          return;
+        }
+        // Frozen fields must exactly match the immutable request after trimming.
+        reference.text = intent.reference; reason.text = intent.reason;
+        amount.text = (minor / 100).toStringAsFixed(2);
+        frozen = intent;
+        draft.save(fields);
+        if (!await draft.flush() || !mounted || !current) {
+          error = 'Credit note is not submitted. Save and retry these same details.';
+          return;
+        }
+      }
+      final posted = await widget.session.recordWorkspaceSupplierCreditDraft(draft.key!, frozen!);
+      if (!mounted || !current) return;
+      recovered = await widget.session.recoverCustomerLedger();
+      await verifyStatus();
+      error = posted && confirmed ? null : confirmed ? null
+        : 'Credit note is not confirmed. Recover and retry this same request; do not enter it again.';
+    } on Object {
+      recovered = false;
+      error = 'Credit-note status is unverified. Keep the request and retry recovery.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  @override
+  void dispose() {
+    draft.removeListener(refresh); draft.dispose(); clearSelections();
+    reference.dispose(); amount.dispose(); reason.dispose(); date.dispose(); super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final options = ledger?.availableCreditSupports(widget.copy.draft.id) ?? const [];
+    final rows = <String, (WorkspaceSupplierCreditSupport, String, String)>{
+      for (final option in options) identity(option.$1): option,
+    };
+    for (final value in selected.values) {
+      rows.putIfAbsent(identity(value.$1), () => (value.$1,
+        value.$1.billLineIndex < widget.copy.draft.goods.length
+          ? widget.copy.draft.goods[value.$1.billLineIndex]['name'] ?? 'Credited item' : 'Credited item unavailable',
+        value.$1.billLineIndex < widget.copy.draft.goods.length
+          ? widget.copy.draft.goods[value.$1.billLineIndex]['pack'] ?? '' : ''));
+    }
+    final editable = draft.ready && recovered && current && !busy && !conflict && frozen == null;
+    final savedVerified = draft.pending == null && draft.error == null && draft.revision != null && !draft.busy;
+    Future<void> close() async {
+      if (!busy && !conflict && await draft.flush() && context.mounted) Navigator.pop(context);
+    }
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
+      onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
+      child: SafeArea(top: false, child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Text('Supplier credit note', style: Theme.of(context).textTheme.titleMedium),
+            TextButton(key: const Key('supplier-credit-close'), onPressed: busy || conflict ? null : close,
+              child: const Text('Close'))]),
+          Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
+          const Text('Enter the credit note received from your supplier. Reduces dues; no Stock change or refund.'),
+          TextField(key: const Key('supplier-credit-reference'), controller: reference, enabled: editable,
+            decoration: const InputDecoration(labelText: 'Credit note No.'), onChanged: (_) => draft.save(fields)),
+          Wrap(spacing: 12, runSpacing: 8, children: [
+            SizedBox(width: 170, child: TextField(key: const Key('supplier-credit-date'), controller: date,
+              enabled: editable, keyboardType: TextInputType.datetime,
+              decoration: const InputDecoration(labelText: 'Credit note date', hintText: 'DD/MM/YYYY'),
+              onChanged: (_) => draft.save(fields))),
+            SizedBox(width: 170, child: TextField(key: const Key('supplier-credit-amount'), controller: amount,
+              enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Amount credited (₹)'), onChanged: (_) => draft.save(fields))),
+          ]),
+          TextField(key: const Key('supplier-credit-reason'), controller: reason, enabled: editable,
+            decoration: const InputDecoration(labelText: 'Reason on credit note'), onChanged: (_) => draft.save(fields)),
+          const SizedBox(height: 12),
+          Text('Goods credited', style: Theme.of(context).textTheme.titleSmall),
+          if (rows.isEmpty) const Text('First link this bill to received goods or record goods returned. Short-delivery credit needs a reviewed shortage record.'),
+          for (final entry in rows.entries) ...[
+            CheckboxListTile(key: ValueKey('supplier-credit-select-${entry.key}'), contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading, value: selected.containsKey(entry.key),
+              title: Text(entry.value.$2), subtitle: frozen == null
+                ? Text('Available ${_ReceivingLineInput._quantity(entry.value.$1.quantityMilli)} ${entry.value.$3}') : null,
+              onChanged: editable ? (checked) {
+                setState(() {
+                  if (checked == true) {
+                    selected[entry.key] = (entry.value.$1, TextEditingController(text: _ReceivingLineInput._quantity(entry.value.$1.quantityMilli)));
+                  } else { selected.remove(entry.key)?.$2.dispose(); }
+                });
+                draft.save(fields);
+              } : null),
+            if (selected[entry.key] case final value?) Align(alignment: Alignment.centerLeft,
+              child: SizedBox(width: 112, child: TextField(key: ValueKey('supplier-credit-qty-${entry.key}'),
+                controller: value.$2, enabled: editable, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Credited qty'), onChanged: (_) => draft.save(fields)))),
+          ],
+          if (frozen != null) Text(confirmed ? 'Credit note recorded · ${_purchaseAmount(frozen!.amountMinor)}'
+            : savedVerified ? 'Saved credit-note request · not confirmed. Recover before retrying.'
+            : 'Saved status unverified · keep this request and retry saving.', key: const Key('supplier-credit-status')),
+          if (error != null || draft.error != null) Text(error ?? draft.error!),
+          TextButton(key: const Key('supplier-credit-recover'), onPressed: busy || draft.busy ? null : load,
+            child: const Text('Recover saved credit note')),
+          FilledButton(key: const Key('supplier-credit-submit'),
+            onPressed: draft.ready && recovered && current && !busy && !conflict && !draft.busy && draft.error == null
+              && (frozen != null || rows.isNotEmpty) ? submit : null,
+            child: Text(busy ? 'Recording…' : confirmed ? 'Record another credit note'
+              : frozen == null ? 'Save supplier credit note' : 'Retry same credit note')),
+        ]))));
+  }
+}
+
+Future<void> _showSupplierAllocation(BuildContext context, WorkSession session,
+    WorkspacePurchaseSavedCopy copy) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreSupplierAllocationSheet(session: session, copy: copy));
+
+class _StoreSupplierAllocationSheet extends StatefulWidget {
+  const _StoreSupplierAllocationSheet({required this.session, required this.copy});
+  final WorkSession session;
+  final WorkspacePurchaseSavedCopy copy;
+  @override
+  State<_StoreSupplierAllocationSheet> createState() => _StoreSupplierAllocationSheetState();
+}
+
+class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationSheet> {
+  late final _LedgerFormAutosave draft;
+  final amount = TextEditingController();
+  WorkspaceSupplierMoneySourceKind? sourceKind;
+  String sourceId = '';
+  WorkspaceSupplierMoneyAllocationIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  bool busy = false, recovered = false, confirmed = false, conflict = false;
+  String? error;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.copy.supplier.id);
+  List<(WorkspaceSupplierMoneySourceKind, String, String, int)> get sources {
+    final current = ledger;
+    if (current == null || !current.valid) return const [];
+    final list = <(WorkspaceSupplierMoneySourceKind, String, String, int)>[];
+    void add(WorkspaceSupplierMoneySourceKind kind, String id, String label) {
+      final remaining = current.unallocatedMoneyMinor(kind, id);
+      if (remaining != null) list.add((kind, id, label, remaining));
+    }
+    final opening = current.openingRecord;
+    if (opening?.supplierCredit == true) {
+      add(WorkspaceSupplierMoneySourceKind.openingAdvance, opening!.id, 'Starting advance / credit');
+    }
+    for (final entry in current.entries.where((e) => e.origin == WorkspaceSupplierEntryOrigin.supplierAccount &&
+      e.moneyReview != null && (e.kind == WorkspaceSupplierEntryKind.advance || e.kind == WorkspaceSupplierEntryKind.payment))) {
+      add(entry.kind == WorkspaceSupplierEntryKind.advance ? WorkspaceSupplierMoneySourceKind.accountAdvance
+        : WorkspaceSupplierMoneySourceKind.accountPayment, entry.operationId,
+        '${entry.kind == WorkspaceSupplierEntryKind.advance ? 'Advance' : 'Account payment'} · ${entry.reference}'
+        ' · ${entry.moneyReview!.occurredOn} · ${entry.paymentMethod ?? 'Method not recorded'}');
+    }
+    return [for (var index = 0; index < list.length; index++)
+      (list[index].$1, list[index].$2,
+        list.where((source) => source.$3 == list[index].$3).length > 1
+          ? '${list[index].$3} · Record ${index + 1}' : list[index].$3,
+        list[index].$4)];
+  }
+  String sourceValue(WorkspaceSupplierMoneySourceKind kind, String id) => jsonEncode([kind.name, id]);
+  Map<String, String> get fields => {'amount': amount.text, 'sourceKind': sourceKind?.name ?? '',
+    'sourceId': sourceId, if (frozen != null) 'attempt': jsonEncode(frozen!.intentToJson())};
+
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(widget.session, widget.session.supplierAllocationFormKey(widget.copy));
+    draft.addListener(refresh);
+    unawaited(load());
+  }
+  void refresh() { if (mounted) setState(() {}); }
+  void inspect() {
+    confirmed = false;
+    if (frozen == null || !recovered) return;
+    final saved = ledger?.billMoneyAllocations[frozen!.operationId];
+    if (saved != null) {
+      confirmed = jsonEncode(saved.intentToJson()) == jsonEncode(frozen!.intentToJson());
+      if (!confirmed) { conflict = true; error = 'Recorded allocation differs. Keep this request for review.'; }
+    }
+  }
+  Future<void> load() async {
+    if (busy || draft.busy) return;
+    setState(() => busy = true);
+    try {
+      var pendingConflict = false;
+      if (draft.pending != null) { draft.save(fields); pendingConflict = !await draft.flush(); }
+      if (!mounted || draft.key == null) return;
+      recovered = await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
+      final saved = await draft.load();
+      if (!mounted || saved == null) return;
+      amount.text = saved['amount'] ?? '';
+      sourceKind = WorkspaceSupplierMoneySourceKind.values.where((k) => k.name == saved['sourceKind']).firstOrNull;
+      sourceId = saved['sourceId'] ?? '';
+      final text = saved['attempt'];
+      frozen = text == null || text.isEmpty ? null : WorkspaceSupplierMoneyAllocationIntent.fromJson(jsonDecode(text));
+      conflict = false; error = null; resetAttempt = null;
+      if (pendingConflict && draft.pending != null) {
+        if (jsonEncode(draft.pending!.fields) == jsonEncode(saved)) {
+          draft.pending = null;
+        } else {
+          conflict = true;
+          draft.error = 'Saved allocation differs from this unsaved input. The unsaved input remains on this screen; do not replace either record.';
+          error = draft.error;
+        }
+      }
+      inspect();
+    } on Object {
+      if (mounted) setState(() { conflict = true; error = 'Saved allocation could not be read. Keep the request and retry recovery.'; });
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<void> submit() async {
+    if (busy || conflict || !recovered || !draft.ready || draft.key == null) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await draft.flush() || !mounted) return;
+      if (confirmed) {
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
+          fields: const {'amount': '', 'sourceKind': '', 'sourceId': ''});
+        if (await widget.session.resetConfirmedWorkspaceSupplierAllocationDraft(resetAttempt!, expectedRevision: draft.revision!)) {
+          draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+          amount.clear(); sourceKind = null; sourceId = ''; frozen = null; confirmed = false; resetAttempt = null;
+        } else { error = 'Recorded allocation is kept. Retry before starting another.'; }
+        return;
+      }
+      final current = ledger;
+      if (frozen == null) {
+        final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text);
+        final available = sourceKind == null ? null : current?.unallocatedMoneyMinor(sourceKind!, sourceId);
+        final billDue = current?.manualBillRemainingMinor(widget.copy.draft.id);
+        if (minor == null || minor <= 0 || available == null || billDue == null ||
+            minor > available || minor > billDue || current?.openingRecord == null) {
+          error = 'Choose recorded money and an amount within its unassigned balance and this bill’s due.';
+          return;
+        }
+        final key = draft.key!;
+        frozen = WorkspaceSupplierMoneyAllocationIntent(operationId: widget.session.newWorkspaceSupplierMoneyAllocationId(),
+          accountScope: key.account, workspaceId: key.store, supplierId: key.customer,
+          sourceKind: sourceKind!, sourceId: sourceId, openingId: current!.openingRecord!.id,
+          openingRevision: current.openingRecord!.revision, billId: widget.copy.draft.id,
+          copyId: widget.copy.id, copyRevision: widget.copy.revision, amountMinor: minor,
+          requestedAt: DateTime.now().toUtc());
+        draft.save(fields);
+        if (!await draft.flush() || !mounted) { error = 'Request is not submitted. Save and retry this same request.'; return; }
+      }
+      final saved = await widget.session.recordWorkspaceSupplierAllocationDraft(draft.key!, frozen!);
+      if (!mounted) return;
+      recovered = await widget.session.recoverWorkspaceSupplierAllocationStatus(draft.key!);
+      inspect();
+      final remainingSource = ledger?.unallocatedMoneyMinor(frozen!.sourceKind, frozen!.sourceId);
+      final remainingBill = ledger?.manualBillRemainingMinor(widget.copy.draft.id);
+      final capacityChanged = recovered && !confirmed && remainingSource != null && remainingBill != null &&
+        (remainingSource < frozen!.amountMinor || remainingBill < frozen!.amountMinor);
+      error = saved && confirmed ? null : capacityChanged
+        ? 'This request cannot be linked: the available money or bill due has changed. The request is retained for review.'
+        : 'Allocation status needs recovery. Keep and retry this request, not a new one.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  @override
+  void dispose() { draft.removeListener(refresh); draft.dispose(); amount.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final list = sources;
+    final selected = sourceKind == null ? null : sourceValue(sourceKind!, sourceId);
+    final selectionKnown = list.any((s) => sourceValue(s.$1, s.$2) == selected);
+    final selectedSource = list.where((s) => sourceValue(s.$1, s.$2) == selected).firstOrNull;
+    final savedVerified = draft.pending == null && draft.error == null && draft.revision != null && !draft.busy;
+    final editable = draft.ready && recovered && !busy && !conflict && frozen == null;
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop && !busy && !conflict && await draft.flush() && context.mounted) Navigator.pop(context);
+      }, child: SafeArea(top: false, child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            Text('Link recorded money to bill', style: Theme.of(context).textTheme.titleMedium),
+            TextButton(key: const Key('supplier-allocation-close'), onPressed: busy || conflict ? null : () async {
+              if (await draft.flush() && context.mounted) Navigator.pop(context);
+            }, child: const Text('Close'))]),
+          Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
+          const Text('Uses money already recorded. No new payment or Stock change.'),
+          Text(ledger?.manualBillRemainingMinor(widget.copy.draft.id) == null ? 'Bill due unavailable'
+            : 'Bill due ${_purchaseAmount(ledger!.manualBillRemainingMinor(widget.copy.draft.id)!)}'),
+          if (list.isEmpty) const Text('No verified advance or account payment is available. Record it in Opening dues first.'),
+          DropdownButtonFormField<String>(key: ValueKey(('supplier-allocation-source', selected)),
+            initialValue: selectionKnown ? selected : null, isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Recorded advance / account payment'),
+            items: [for (final s in list) DropdownMenuItem(value: sourceValue(s.$1, s.$2),
+              child: Text('${s.$3} · Unassigned ${_purchaseAmount(s.$4)}', overflow: TextOverflow.ellipsis))],
+            onChanged: editable ? (value) {
+              if (value == null) return;
+              final source = list.singleWhere((s) => sourceValue(s.$1, s.$2) == value);
+              setState(() { sourceKind = source.$1; sourceId = source.$2; }); draft.save(fields);
+            } : null),
+          if (selectedSource != null) Text('${selectedSource.$3} · Unassigned ${_purchaseAmount(selectedSource.$4)}',
+            key: const Key('supplier-allocation-selected-source')),
+          Align(alignment: Alignment.centerLeft, child: SizedBox(width: 180, child: TextField(
+            key: const Key('supplier-allocation-amount'), controller: amount, enabled: editable,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Amount to link (₹)'), onChanged: (_) => draft.save(fields)))),
+          if (frozen != null) Text(confirmed ? 'Allocation recorded · ${_purchaseAmount(frozen!.amountMinor)}'
+            : savedVerified ? 'Saved allocation request · recover and retry the same details.'
+            : 'Saved status unverified · keep this request and retry saving.', key: const Key('supplier-allocation-status')),
+          if (error != null || draft.error != null) Text(error ?? draft.error!),
+          TextButton(key: const Key('supplier-allocation-recover'), onPressed: busy || draft.busy ? null : load,
+            child: const Text('Recover saved allocation')),
+          FilledButton(key: const Key('supplier-allocation-submit'),
+            onPressed: draft.ready && recovered && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
+            child: Text(busy ? 'Recording…' : confirmed ? 'Link another amount'
+              : frozen == null ? 'Link recorded money' : 'Retry same allocation')),
+        ]))));
+  }
+}
+
 class _StoreMoneyEntrySheet extends StatefulWidget {
-  const _StoreMoneyEntrySheet({required this.session, this.purchase});
+  const _StoreMoneyEntrySheet({required this.session, this.purchase, this.supplierMoney})
+    : assert(purchase == null || supplierMoney == null);
   final WorkSession session;
   final WorkspacePurchaseRecord? purchase;
+  final _StoreSupplierMoneyTarget? supplierMoney;
   @override
   State<_StoreMoneyEntrySheet> createState() => _StoreMoneyEntrySheetState();
 }
 
 class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
-  bool get expense => widget.purchase == null;
+  bool get expense => widget.purchase == null && widget.supplierMoney == null;
+  bool get manualMoney => widget.supplierMoney != null;
+  WorkspaceSupplierLedger? get moneyLedger => widget.session.workspaceSupplierLedger(widget.supplierMoney?.supplierId ?? '');
+  String get title => manualMoney ? widget.supplierMoney!.advance
+      ? 'Record supplier advance' : 'Record supplier payment'
+      : expense ? 'Record test expense' : 'Record test payment';
   int? get billBalance {
+    if (manualMoney) {
+      final copy = widget.supplierMoney!.copy;
+      return copy == null ? moneyLedger?.payableMinor : moneyLedger?.manualBillRemainingMinor(copy.draft.id);
+    }
     final ledger = widget.session.workspaceSupplierLedger(
       widget.purchase?.supplierId ?? '',
     );
@@ -27936,6 +29108,10 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   String category = 'Shop expense';
   String method = 'Bank transfer';
   bool saving = false;
+  bool moneyRecovered = false, excludedFromOpening = false, confirmed = false, conflict = false;
+  String occurredOn = DateTime.now().toIso8601String().substring(0, 10);
+  WorkspaceSupplierMoneyAttempt? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
   String? error;
   late final _LedgerFormAutosave draft;
   Map<String, String> get fields => {
@@ -27944,13 +29120,18 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     'channel': method,
     if (expense) 'category': category,
     if (expense) 'note': note.text,
+    if (manualMoney) 'occurredOn': occurredOn,
+    if (manualMoney) 'notIncludedInOpening': '$excludedFromOpening',
+    if (manualMoney && frozen != null) 'attempt': jsonEncode(frozen!.toJson()),
   };
   @override
   void initState() {
     super.initState();
     draft = _LedgerFormAutosave(
       widget.session,
-      expense
+      manualMoney ? widget.session.supplierMoneyFormKey(widget.supplierMoney!.supplierId,
+        copy: widget.supplierMoney!.copy, advance: widget.supplierMoney!.advance)
+      : expense
           ? widget.session.expenseFormKey()
           : widget.session.supplierPaymentFormKey(widget.purchase!),
     );
@@ -27965,6 +29146,23 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   }
 
   Future<void> load() async {
+    if (saving || draft.busy) return;
+    setState(() => saving = true);
+    try {
+      await _loadMoneyInputLocked();
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _loadMoneyInputLocked() async {
+    var pendingConflict = false;
+    if (manualMoney && draft.pending != null) {
+      draft.save(fields);
+      pendingConflict = !await draft.flush();
+      if (!mounted) return;
+    }
+    if (manualMoney) moneyRecovered = await widget.session.recoverCustomerLedger();
     final saved = await draft.load();
     if (!mounted || saved == null) {
       return;
@@ -27974,10 +29172,150 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     method = saved['channel'] ?? (expense ? 'Cash' : 'Bank transfer');
     category = saved['category'] ?? 'Shop expense';
     note.text = saved['note'] ?? '';
+    if (manualMoney) {
+      occurredOn = saved['occurredOn'] ?? occurredOn;
+      excludedFromOpening = saved['notIncludedInOpening'] == 'true';
+      final text = saved['attempt'];
+      try {
+        frozen = text == null || text.isEmpty ? null
+          : WorkspaceSupplierMoneyAttempt.fromJson(jsonDecode(text));
+      } on FormatException {
+        setState(() { conflict = true; error = 'Saved payment attempt could not be read. Its data is kept; do not replace it.'; });
+        return;
+      }
+      resetAttempt = null;
+      _inspectSavedMoney();
+      if (pendingConflict) {
+        // Preserve the losing local payload; authoritative recovery must not
+        // be blocked forever by retrying a stale write before every read.
+        final pending = draft.pending;
+        if (pending != null && jsonEncode(pending.fields) == jsonEncode(saved)) {
+          draft.pending = null;
+        } else {
+          conflict = true;
+          draft.error = 'Saved payment details differ from this unsaved input. The unsaved input remains on this screen; do not submit or replace either record.';
+          error = draft.error;
+        }
+      }
+    }
     setState(() {});
   }
 
+  void _inspectSavedMoney() {
+    confirmed = false;
+    conflict = false;
+    if (frozen == null || !moneyRecovered) return;
+    final found = moneyLedger?.entries.where((entry) => entry.operationId == frozen!.entry.operationId).toList();
+    if (found?.length == 1) {
+      confirmed = jsonEncode(found!.single.toJson()) == jsonEncode(frozen!.entry.toJson());
+      conflict = !confirmed;
+      if (conflict) error = 'Saved payment details conflict. Keep this attempt and recover the supplier account.';
+    }
+  }
+
+  Future<void> submitManualMoney() async {
+    if (saving || confirmed || conflict || !moneyRecovered) return;
+    setState(() => saving = true);
+    try {
+      await _submitManualMoneyLocked();
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _submitManualMoneyLocked() async {
+    if (!await draft.flush() || !mounted) return;
+    final ledger = moneyLedger;
+    final opening = ledger?.openingRecord;
+    final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text);
+    if (frozen == null) {
+      if (ledger == null || opening == null || minor == null || minor <= 0 ||
+          reference.text.trim().isEmpty || !excludedFromOpening) {
+        setState(() => error = 'Enter the amount, payment reference and date. Confirm it is not already included in the starting balance.');
+        return;
+      }
+      final target = widget.supplierMoney!;
+      final payable = ledger.payableMinor;
+      if (!target.advance && (billBalance == null || payable == null || minor > billBalance! || minor > payable)) {
+        setState(() => error = 'Amount exceeds the verified dues. Record extra money separately as an advance.');
+        return;
+      }
+      final review = WorkspaceSupplierMoneyReview(occurredOn: occurredOn,
+        openingId: opening.id, openingRevision: opening.revision, notIncludedInOpening: true);
+      final entry = WorkspaceSupplierLedgerEntry(operationId: widget.session.newWorkspaceSupplierMoneyOperationId(),
+        reference: reference.text.trim(), origin: target.copy == null
+          ? WorkspaceSupplierEntryOrigin.supplierAccount : WorkspaceSupplierEntryOrigin.manualPurchase,
+        purchaseId: target.copy?.id, billId: target.copy?.draft.id,
+        kind: target.advance ? WorkspaceSupplierEntryKind.advance : WorkspaceSupplierEntryKind.payment,
+        amountMinor: minor, paymentMethod: method, postedAt: DateTime.now().toUtc(), moneyReview: review);
+      final attempt = WorkspaceSupplierMoneyAttempt(entry: entry, expectedRevision: ledger.revision);
+      if (!attempt.valid) { setState(() => error = 'Check the payment date and details.'); return; }
+      setState(() { frozen = attempt; saving = true; error = null; });
+      // Earlier editable snapshots have been flushed. Persist the immutable
+      // attempt first; a failed/lost draft reply cannot create another payment.
+      draft.save(fields);
+      if (!await draft.flush() || !mounted) {
+        if (mounted) setState(() { saving = false; error = 'Payment has not been submitted. Retry saving this same attempt first.'; });
+        return;
+      }
+    } else {
+      setState(() { saving = true; error = null; });
+    }
+    final saved = await widget.session.recordWorkspaceSupplierMoneyDraft(draft.key!, frozen!);
+    if (!mounted) return;
+    moneyRecovered = await widget.session.recoverCustomerLedger();
+    if (!mounted) return;
+    _inspectSavedMoney();
+    setState(() {
+      saving = false;
+      error = saved && confirmed ? null : 'Payment status needs checking. This saved attempt is retained; recover and retry it, not a new payment.';
+    });
+  }
+
+  Future<void> recordAnother() async {
+    if (saving || !confirmed || draft.revision == null) return;
+    setState(() => saving = true);
+    try {
+      await _recordAnotherLocked();
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _recordAnotherLocked() async {
+    if (!await draft.flush() || !mounted) return;
+    resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
+      fields: {'amount': '', 'reference': '', 'channel': method,
+        'occurredOn': DateTime.now().toIso8601String().substring(0, 10), 'notIncludedInOpening': 'false'});
+    setState(() { saving = true; error = null; });
+    final reset = await widget.session.resetConfirmedWorkspaceSupplierMoneyDraft(resetAttempt!, expectedRevision: draft.revision!);
+    if (!mounted) return;
+    if (reset) {
+      draft.revision = resetAttempt!.revision;
+      draft.pending = null;
+      draft.error = null;
+      amount.clear(); reference.clear();
+      occurredOn = resetAttempt!.fields['occurredOn']!;
+      excludedFromOpening = false; frozen = null; confirmed = false; conflict = false; resetAttempt = null;
+    }
+    setState(() { saving = false; error = reset ? null : 'The recorded payment is kept. Retry starting another payment.'; });
+  }
+
+  Future<void> choosePaymentDate() async {
+    if (saving || conflict || frozen != null || !draft.ready) return;
+    final now = DateTime.now();
+    final parsed = DateTime.tryParse(occurredOn);
+    final initial = parsed == null || parsed.isAfter(now) || parsed.isBefore(DateTime(2000)) ? now : parsed;
+    final chosen = await showDatePicker(context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000), lastDate: now);
+    if (!mounted || chosen == null || frozen != null) return;
+    setState(() => occurredOn = chosen.toIso8601String().substring(0, 10));
+    draft.save(fields);
+  }
+
   Future<void> submit() async {
+    if (manualMoney) { await submitManualMoney(); return; }
     if (saving || !await draft.flush() || !mounted) {
       return;
     }
@@ -28048,6 +29386,14 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     super.dispose();
   }
 
+  Widget _paidAmountField() => TextField(
+    key: Key(expense ? 'store-expense-amount' : 'supplier-payment-amount'),
+    controller: amount,
+    enabled: draft.ready && !saving && (!manualMoney || (frozen == null && !conflict)),
+    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    decoration: const InputDecoration(labelText: 'Paid (₹)'),
+    onChanged: (_) => draft.save(fields));
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !saving && !draft.busy && draft.error == null,
@@ -28069,34 +29415,32 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (manualMoney) Wrap(alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                TextButton(key: const Key('supplier-money-close'),
+                  onPressed: saving ? null : () async {
+                    if (await draft.flush() && context.mounted) Navigator.pop(context);
+                  }, child: const Text('Close')),
+              ])
+            else Text(title, style: Theme.of(context).textTheme.titleLarge),
             Text(
-              expense ? 'Record test expense' : 'Record test payment',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Text(
-              expense
+              manualMoney ? '${moneyLedger?.supplierName ?? 'Supplier'}${widget.supplierMoney!.copy == null ? '' : ' · ${widget.supplierMoney!.copy!.draft.invoiceReference}'}'
+              : expense
                   ? 'Business expense not already recorded elsewhere.'
                   : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
             ),
-            const Text('Test record only. No money is transferred.'),
+            Text(manualMoney ? 'Evaluation record · no money is transferred.' : 'Test record only. No money is transferred.'),
             if (!expense)
               Text(
-                billBalance == null
+                manualMoney && widget.supplierMoney!.advance
+                    ? 'Advance paid before or after delivery. Stock stays unchanged.'
+                : billBalance == null
                     ? 'Bill balance unavailable'
-                    : 'Bill balance ${_purchaseAmount(billBalance!)}',
+                    : '${manualMoney && widget.supplierMoney!.copy == null ? 'Supplier dues' : 'Bill balance'} ${_purchaseAmount(billBalance!)}',
               ),
-            TextField(
-              key: Key(
-                expense ? 'store-expense-amount' : 'supplier-payment-amount',
-              ),
-              controller: amount,
-              enabled: draft.ready && !saving,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(labelText: 'Paid (₹)'),
-              onChanged: (_) => draft.save(fields),
-            ),
+            if (manualMoney) Align(alignment: Alignment.centerLeft,
+              child: SizedBox(width: 180, child: _paidAmountField())) else _paidAmountField(),
             DropdownButtonFormField<String>(
               key: ValueKey('supplier-payment-method-$method'),
               initialValue: method,
@@ -28114,7 +29458,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 })
                   DropdownMenuItem(value: value, child: Text(value)),
               ],
-              onChanged: !draft.ready || saving
+              onChanged: !draft.ready || saving || (manualMoney && (frozen != null || conflict))
                   ? null
                   : (value) {
                       if (value != null) {
@@ -28130,10 +29474,31 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                     : 'supplier-payment-reference',
               ),
               controller: reference,
-              enabled: draft.ready && !saving,
-              decoration: const InputDecoration(labelText: 'Payment reference'),
+              enabled: draft.ready && !saving && (!manualMoney || (frozen == null && !conflict)),
+              decoration: InputDecoration(labelText: 'Payment reference',
+                hintText: manualMoney ? 'UPI/bank reference or cash note' : null),
               onChanged: (_) => draft.save(fields),
             ),
+            if (manualMoney) ...[
+              TextButton.icon(key: const Key('supplier-money-date'),
+                onPressed: !draft.ready || saving || conflict || frozen != null ? null : choosePaymentDate,
+                icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                label: Text('Payment date · ${occurredOn.split('-').reversed.join('/')}')),
+              CheckboxListTile(key: const Key('supplier-money-opening-excluded'),
+                contentPadding: EdgeInsets.zero, dense: true, value: excludedFromOpening,
+                title: const Text('Not already included in the starting balance'),
+                onChanged: !draft.ready || saving || conflict || frozen != null ? null : (value) {
+                  setState(() => excludedFromOpening = value == true); draft.save(fields);
+                }),
+              if (frozen != null) Text(confirmed ? 'Payment recorded · ${_purchaseAmount(frozen!.entry.amountMinor)} · ${frozen!.entry.paymentMethod}'
+                  : draft.pending == null && draft.error == null && draft.revision != null && !draft.busy
+                    ? 'Saved payment attempt · recover and retry these same details.'
+                    : 'Saved status unverified · keep this payment request and retry saving.',
+                key: const Key('supplier-money-attempt-status')),
+              if (!moneyRecovered || (frozen != null && !confirmed))
+                TextButton(key: const Key('supplier-money-recover'),
+                  onPressed: saving || draft.busy ? null : load, child: const Text('Recover saved payment')),
+            ],
             if (expense) ...[
               DropdownButtonFormField<String>(
                 key: ValueKey('store-expense-category-$category'),
@@ -28179,17 +29544,20 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
               ),
             if (draft.error != null && draft.ready)
               TextButton(
-                onPressed: () => draft.save(fields),
+                onPressed: saving || (manualMoney && conflict) ? null : () => draft.save(fields),
                 child: const Text('Retry saving input'),
               ),
             FilledButton(
               onPressed:
-                  draft.ready && !saving && !draft.busy && draft.error == null
-                  ? submit
+                  draft.ready && !saving && !draft.busy && draft.error == null &&
+                    (!manualMoney || (moneyRecovered && !conflict))
+                  ? manualMoney && confirmed ? recordAnother : submit
                   : null,
               child: Text(
                 saving
                     ? 'Recording…'
+                    : manualMoney ? confirmed ? 'Record another payment'
+                        : frozen != null ? 'Retry same payment' : widget.supplierMoney!.advance ? 'Record advance paid' : 'Record payment'
                     : expense
                     ? 'Record test expense'
                     : 'Record test payment',

@@ -883,8 +883,46 @@ abstract interface class WorkLedgerFormDraftStore {
   });
 }
 
+/// Serializes frozen manual money attempts against draft edits and reset.
+abstract interface class WorkSupplierMoneyDraftGuard {
+  Future<bool> withFrozenSupplierMoney(WorkspaceLedgerFormKey key, String attempt,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierMoneyDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierLedgerEntry entry) verifyCommitted,
+  });
+}
+
 /// Uses the existing encrypted draft storage approach; never financial authority.
-class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore {
+abstract interface class WorkSupplierAllocationDraftGuard {
+  Future<bool> withFrozenSupplierAllocation(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierAllocationDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierMoneyAllocationIntent intent) verifyCommitted,
+  });
+}
+
+abstract interface class WorkSupplierGoodsReturnDraftGuard {
+  Future<bool> withFrozenSupplierGoodsReturn(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierGoodsReturnIntent intent) verifyCommitted,
+  });
+}
+
+abstract interface class WorkSupplierCreditDraftGuard {
+  Future<bool> withFrozenSupplierCredit(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierCreditDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierCreditIntent intent) verifyCommitted,
+  });
+}
+
+class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSupplierMoneyDraftGuard,
+    WorkSupplierAllocationDraftGuard, WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard {
   SecureWorkLedgerFormDraftStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -967,8 +1005,150 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore {
         'Saved invoice input changed. Reopen it first.',
       );
     }
+    if ((previous?.supplierMoneyAttempt != null || previous?.supplierAllocationIntent != null ||
+        previous?.supplierGoodsReturnIntent != null || previous?.supplierCreditIntent != null) &&
+        jsonEncode(previous!.fields) != jsonEncode(draft.fields)) {
+      throw const WorkGatewayException('This payment attempt is retained. Verify its saved status before recording another.');
+    }
     await _storage.write(key: _key(draft.key), value: encoded);
     _check(draft.key);
+  });
+
+  @override
+  Future<bool> withFrozenSupplierCredit(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierCredit' || draft?.supplierCreditIntent == null || draft!.fields['attempt'] != intent) {
+      throw const WorkGatewayException('Reopen the saved supplier credit request before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierCreditDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierCreditIntent intent) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierCredit' || !next.valid || next.supplierCreditIntent != null ||
+        next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved supplier credit request cannot be reset.');
+    }
+    final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierCreditIntent == null ||
+        !await verifyCommitted(previous!.supplierCreditIntent!)) {
+      throw const WorkGatewayException('Verify this exact supplier credit before starting another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
+  });
+
+  @override
+  Future<bool> withFrozenSupplierMoney(WorkspaceLedgerFormKey key, String attempt,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierMoney' || draft?.supplierMoneyAttempt == null ||
+        draft!.fields['attempt'] != attempt) {
+      throw const WorkGatewayException('Reopen the saved payment attempt before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierMoneyDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierLedgerEntry entry) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierMoney' || !next.valid ||
+        next.supplierMoneyAttempt != null || next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved payment input cannot be reset.');
+    }
+    final previous = await _read(next.key);
+    final encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierMoneyAttempt == null ||
+        !await verifyCommitted(previous!.supplierMoneyAttempt!.entry)) {
+      throw const WorkGatewayException('Verify this exact recorded payment before starting another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
+  });
+
+  @override
+  Future<bool> withFrozenSupplierAllocation(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierAllocation' || draft?.supplierAllocationIntent == null ||
+        draft!.fields['attempt'] != intent) {
+      throw const WorkGatewayException('Reopen the saved bill allocation before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<bool> withFrozenSupplierGoodsReturn(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierGoodsReturn' || draft?.supplierGoodsReturnIntent == null ||
+        draft!.fields['attempt'] != intent) {
+      throw const WorkGatewayException('Reopen the saved goods return before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierGoodsReturnIntent intent) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierGoodsReturn' || !next.valid ||
+        next.supplierGoodsReturnIntent != null || next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved goods return cannot be reset.');
+    }
+    final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierGoodsReturnIntent == null ||
+        !await verifyCommitted(previous!.supplierGoodsReturnIntent!)) {
+      throw const WorkGatewayException('Verify this exact goods return before starting another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierAllocationDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierMoneyAllocationIntent intent) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierAllocation' || !next.valid ||
+        next.supplierAllocationIntent != null || next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved bill allocation cannot be reset.');
+    }
+    final previous = await _read(next.key);
+    final encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierAllocationIntent == null ||
+        !await verifyCommitted(previous!.supplierAllocationIntent!)) {
+      throw const WorkGatewayException('Verify this exact bill allocation before starting another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
   });
 }
 
@@ -1365,6 +1545,14 @@ abstract interface class WorkPurchaseReceiptReviewAbandonment {
     required bool qa, required int expectedRevision,
     required WorkspaceGoodsReceiptReviewCancellation cancellation,
     required Future<bool> Function(WorkspaceSupplierGoodsReceiptDraft review) verifyUncommitted,
+  });
+}
+
+abstract interface class WorkPurchaseBillGoodsReviewAbandonment {
+  Future<WorkspacePurchaseEntryBook?> abandonReviewedBillGoods(String account, String store, {
+    required bool qa, required int expectedRevision,
+    required WorkspaceBillGoodsReviewCancellation cancellation,
+    required Future<bool> Function(WorkspaceSupplierBillGoodsReview review) verifyUncommitted,
   });
 }
 
@@ -1765,7 +1953,7 @@ class WorkPurchaseInvoiceSuggestions {
 /// Contacts never share an inventory or financial-journal key.
 class SecureWorkPurchaseEntryStore
     implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
-      WorkPurchaseBillGoodsReviewGuard {
+      WorkPurchaseBillGoodsReviewGuard, WorkPurchaseBillGoodsReviewAbandonment {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -1846,6 +2034,11 @@ class SecureWorkPurchaseEntryStore
         }
       }
       final retainedOpeningIds = <String>{};
+      if (frozen.billGoodsCancellations.length != (previous?.billGoodsCancellations.length ?? 0) ||
+          (previous?.billGoodsCancellations ?? const <WorkspaceBillGoodsReviewCancellation>[]).any((c) =>
+            !frozen.billGoodsCancellations.any((r) => jsonEncode(r.toJson()) == jsonEncode(c.toJson())))) {
+        throw const WorkGatewayException('Bill goods cancellations require verified status. Keep their history unchanged.');
+      }
       if (frozen.goodsReceiptCancellations.length != (previous?.goodsReceiptCancellations.length ?? 0) ||
           (previous?.goodsReceiptCancellations ?? const <WorkspaceGoodsReceiptReviewCancellation>[]).any((c) =>
             !frozen.goodsReceiptCancellations.any((r) => jsonEncode(r.toJson()) == jsonEncode(c.toJson())))) {
@@ -1923,6 +2116,48 @@ class SecureWorkPurchaseEntryStore
     required Future<bool> Function(WorkspaceSupplierGoodsReceiptDraft review) verifyUncommitted,
   }) => _abandonReviewedReceipt(account, store, qa: qa, expectedRevision: expectedRevision,
     cancellation: cancellation, verifyUncommitted: verifyUncommitted);
+  @override
+  Future<WorkspacePurchaseEntryBook?> abandonReviewedBillGoods(String account, String store, {
+    required bool qa, required int expectedRevision,
+    required WorkspaceBillGoodsReviewCancellation cancellation,
+    required Future<bool> Function(WorkspaceSupplierBillGoodsReview review) verifyUncommitted,
+  }) => _serial(_key(account, store, qa), () async {
+    final old = await _read(account, store, qa);
+    if (old == null || !cancellation.valid) return null;
+    final review = old.billGoodsReviews.where((r) => r.allocation.operationId == cancellation.operationId).singleOrNull;
+    if (review == null || review.supplierId != cancellation.supplierId) return null;
+    final previous = old.billGoodsCancellations.where((c) => c.operationId == cancellation.operationId).singleOrNull;
+    if (previous != null) {
+      if (jsonEncode(previous.toJson()) != jsonEncode(cancellation.toJson())) return null;
+      if (!await verifyUncommitted(review)) {
+        throw const WorkGatewayException('Cancelled match conflicts with supplier account status. Recover its saved records.');
+      }
+      _check(account, store);
+      return old;
+    }
+    if (old.revision != expectedRevision || cancellation.revision != old.revision + 1 ||
+        cancellation.cancelledAt.isBefore(review.allocation.linkedAt) ||
+        old.billGoodsCancellations.length >= 1000 || !await verifyUncommitted(review)) { return null; }
+    _check(account, store);
+    final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+      account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
+      profiles: old.profiles, draft: old.draft, copies: old.copies,
+      openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
+      goodsReceiptCancellations: old.goodsReceiptCancellations, billGoodsReviews: old.billGoodsReviews,
+      billGoodsCancellations: [...old.billGoodsCancellations, cancellation]).toJson());
+    final bytes = jsonEncode(next.toJson());
+    if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
+      throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
+    }
+    final key = _key(account, store, qa);
+    try { await _storage.write(key: key, value: bytes); }
+    on Object {
+      _check(account, store);
+      if (await _storage.read(key: key) != bytes) rethrow;
+    }
+    _check(account, store);
+    return next;
+  });
 }
 
 // The implementation is below the secure purchase store to keep this mutation
@@ -1954,7 +2189,8 @@ extension _PurchaseReviewCancellation on SecureWorkPurchaseEntryStore {
       profiles: old.profiles, draft: old.draft, copies: old.copies,
       openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
       goodsReceiptCancellations: [...old.goodsReceiptCancellations, cancellation],
-      billGoodsReviews: old.billGoodsReviews).toJson());
+      billGoodsReviews: old.billGoodsReviews,
+      billGoodsCancellations: old.billGoodsCancellations).toJson());
     final bytes = jsonEncode(next.toJson());
     if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
       throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');
@@ -2135,7 +2371,8 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
         }
         final receiptProducts = {
           for (final movement in [...previous.movements, ...frozen.movements])
-            if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt)
+            if (movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt ||
+                movement.referenceKind == WorkspaceStockReferenceKind.manualSupplierReturn)
               movement.productId,
         };
         if (receiptProducts.isNotEmpty || previous.manualReceiptCheckpointRevision != null ||
@@ -4419,6 +4656,16 @@ class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
         throw const WorkGatewayException(
           'Saved ledger changed. Recover it before continuing.',
         );
+      }
+      for (final supplier in checkpoint.supplierLedgers.entries) {
+        final previous = current?.supplierLedgers[supplier.key];
+        for (final returned in supplier.value.goodsReturns.values) {
+          if (previous?.goodsReturns.containsKey(returned.operationId) == true) continue;
+          if (previous == null || !previous.goodsReceipts.containsKey(returned.receiptId) ||
+              returned.recordedAt.isAfter(DateTime.now().toUtc())) {
+            throw const WorkGatewayException('Recover the saved delivery before recording goods returned.');
+          }
+        }
       }
       if (current != null) {
         final previous = current.finance;
