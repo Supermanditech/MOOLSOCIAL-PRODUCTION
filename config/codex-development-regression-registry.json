@@ -110999,6 +110999,98 @@
           "native": "Current isolated Redmi review: restored exact quantities, three named VM libraries, Back/Checkout return, cancel and confirmed entire-Cart delete under Shop filter, fresh Shop/Wholesale Add and mixed Cart 3/1197. No new APK/install or real payment/order.",
           "remaining": "Seven complete native matrices; catalogue shortcut count/total and accessibility copy audit; earlier 37→97 finding; live integration/backend deferred/workspace Codex after integration/Google separate; founder draft approval and inherited formal history gate.",
           "status": "Bounded technical qualification only; ordinary scoped Git checkpoint pending, formal closure and production acceptance not claimed."
+        },
+        "founderFullJourneyDesignPaymentBacklog20261004": {
+          "state": "queued_within_existing_open_Buy_parent_not_selected_for_execution",
+          "founderRequest": "Add full enhancement and polish of design, icons, gradients, solid colours, motion visuals and UX from Add product through Delivered; inspect missing card-detail fields and payment integration ownership; include intent and QR code to receive payment.",
+          "parent": "BUY-ACTION-POLISH-20260926-01",
+          "actor": "Personal Buyer using public Buy",
+          "capability": "Complete and understandable connected purchase and fulfilment journey",
+          "outcome": "Consistent accessible design and verified interactions from Product/Add to Delivered with truthful payment states and clear integration ownership.",
+          "classification": {
+            "functionalContinuity": "mvp_required",
+            "visualConsistencyAndAccessibility": "mvp_supporting",
+            "decorativeEnhancement": "founder_requested_optional_polish_prioritize_after_functional_correctness"
+          },
+          "sequence": [
+            "T14 seven separate/mixed origin functional and copy audit",
+            "Concrete design defect inventory and scoped founder-review drafts",
+            "Focused polish fixes and end-to-end regression validation",
+            "Integration-dependent payment/workspace acceptance after integration"
+          ],
+          "reuseAssessment": {
+            "state": "planning_reuse_inventory_execution_assessment_required_before_edits",
+            "approach": "reuse",
+            "owners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/lib/features/buy/buy_v2_session.dart",
+              "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+              "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+              "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart"
+            ],
+            "newScreenRouteServiceDependency": "none_proposed"
+          },
+          "designScope": [
+            "Card hierarchy, spacing and details",
+            "Consistent icon weights and meanings",
+            "Purposeful existing-palette gradients and solid colours, contrast and disabled/error states",
+            "Motion continuity and reduced-motion accessibility",
+            "Finished labels, hints and semantics",
+            "Back navigation and reachable Cart/Checkout actions",
+            "Product/Add, Cart, Checkout, payment recovery, Confirmation, Orders, Tracking, Delivered, receipt and relevant help/refund states"
+          ],
+          "preserve": [
+            "Founder-approved Add colours and shape unless separately reviewed amendment",
+            "Supplier policy only Product/Add never Cart",
+            "One shared-address instruction composer; Clear only within composer",
+            "Existing truthful payment holds and duplicate-payment protections",
+            "Store and other-lane source and immutable accepted references"
+          ],
+          "paymentFieldReview": {
+            "status": "pending_exact_provider_and_source_inventory",
+            "cardDetails": "Determine whether the selected provider collects fields in its SDK/hosted flow or an explicitly qualified native integration. Do not create disconnected card forms or persist card number/CVV in Buy state, logs or evidence.",
+            "intent": "Buyer payment launch, return, cancellation, pending/unknown status and retry correlation; provider verification determines payment outcome.",
+            "qr": "Determine supported buyer payment QR display/scan flow, recipient identity, authoritative amount/currency/reference and expiry, safe cancellation and reconciliation. QR display/scan or intent return alone never marks payment paid.",
+            "storeReceivePaymentQr": {
+              "actor": "Retailer/Grocery Store payment recipient",
+              "state": "deferred_workspace_dependency_Codex_after_integration",
+              "outcome": "Provider-backed receive-payment intent/QR correlated with the correct Store and payment obligation; exact workspace contract and provider selection pending",
+              "buyerLane": "contract/handoff only; no Store implementation here"
+            },
+            "interpretation": "Intent and receive-payment QR both recorded; exact provider UX and recipient ownership remain integration decisions."
+          },
+          "dependencies": {
+            "backend": "deferred",
+            "workspace": "Codex after integration",
+            "google": "separately listed",
+            "provider": "selection, SDK/QR support, verification and reconciliation pending",
+            "build": "no new APK authority",
+            "formalClosure": "existing inherited non-atomic history blocker unchanged"
+          },
+          "acceptance": [
+            "All seven Shop/Wholesale/Offers separate and mixed matrices through last frontend fulfilment state",
+            "Actual settled native screenshots and tap/Back/return replay",
+            "Normal and enlarged text, small/large viewport, contrast, touch targets and reduced motion",
+            "Empty/loading/unavailable/error/pending/cancelled/retry and restored states",
+            "Amounts/counts/order/payment ownership remain consistent",
+            "Focused tests plus affected selected regressions",
+            "Re-hot-reload/restart, verified source activation and retest",
+            "Defects recorded before fixes; unresolved integration children retained",
+            "Founder visual review and safe scoped Git checkpoint"
+          ],
+          "authority": "Backlog recording only. Current ticket/selection pins remain unchanged; scoped execution assessment and machine gates required before design or payment implementation."
+        },
+        "buyPolishPlanningOutputTruncation20261004": {
+          "state": "registered_before_mutation",
+          "observed": "Full coordination-policy read and 100-line READY tail exceeded output budgets during planning; no runtime/test/device action occurred.",
+          "rootCause": "Token output budgets did not account for large nested policy and dense long Markdown lines.",
+          "detection": "Tool explicit truncation warnings",
+          "prevention": "Reuse already completed unchanged mandatory reads; new reconstruction reads use independent bounded token-aware pages. Use exact subtree/heading projection for relevant planning, never truncated output as full-read proof.",
+          "evidence": "Tool chunks 638240 and c818a0; branch/HEAD scalar unchanged; clean digest recorded.",
+          "impact": "No product/source change; backlog request retained. Existing policy had been fully read in prior checkpoint."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
