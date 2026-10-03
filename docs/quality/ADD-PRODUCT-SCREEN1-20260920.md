@@ -3852,3 +3852,43 @@ No goods/payment/Stock record was saved; both debug attaches detached cleanly.
 Physical partial delivery posting/restart/failure/accessibility, product search,
 date/conversion guidance, bill-context receiving, payment/advance allocations,
 supplier returns/refunds and statements remain open. Full goal remains active.
+
+### Durable bill-to-goods review and actual receiving qualification
+
+The existing encrypted purchase book now keeps immutable reviewed bill-to-goods
+operations before their ledger commit. Supplier, exact saved copy, receipt/line,
+product, paid/free/accepted/damaged quantities, conversion, timestamp and operation
+identity survive recovery. Ordinary purchase/opening/receiving/cancellation writers
+retain this history; native CAS rejects removal, rewrite and multiple new reviews.
+The account API always checks an existing frozen review, reconciles exact committed
+proof before unrelated newer-book revision gates, and bounds read failures with
+explicit recovery. This changes neither Stock nor supplier liability by linking.
+
+Four labelled host recovery tests plus three prior session-link tests pass. Full
+atomic owner: 534 passed, 11 existing skips, zero failures, terminal0 and native
+done.success=true; reporter purchase-bill-goods-review-full-20261003-v3.jsonl SHA
+BE92A5D59E2BEA0797ACFD54660603839021AE94FB870567B2999DA28D2A3560.
+Initial guard name/type-promotion compile failures and a brace lint are retained
+in REG4635. Architect's additional three findings were corrected and tested.
+Further held-write two-instance tests cover both concurrent review/post orderings.
+They reproduced a cached-ledger admission race; fresh authoritative ledger checks
+inside the purchase queue now prevent it. All new posts share this queue, even
+optional-review callers; ordinary native saves cannot add unverified reviews.
+Already committed operations cannot acquire manufactured postfacto review history.
+Both concurrent orderings now also reopen a fresh session and recover the saved
+winner, unchanged Stock and unchanged supplier balance. Final narrow architect
+review found no further race blocker; this is not whole-goal acceptance.
+
+Actual OPPO UI: new evaluation supplier Marwar Wholesale Evaluation03Oct, known
+zero opening confirmedv12, oil expected4 delivered2+2 damaged0+1 accepted2+1.
+Stock3→5→6, pending0. Exact identities and PNG/XML evidence are in task record
+purchase-real-receiving-20261003-v2.md. No previous Stock entry was falsely linked;
+its origin remains unverified. Debug restart and real Work→Workspace→Stock6,
+reopened completed delivery prove debug continuity, not native APK/backend reuse.
+Older unknownopening10/billr9/rice97/basmatirice3 remain unchanged; no payment.
+
+Open prerequisites: visible inline saved-bill allocation action, safely abandoning
+an uncommitted allocation review, legacy receipt review evidence, actual late-bill
+and prior Catalogue/manual/CSV links, payment/advance allocations, supplier
+returns/credits/refunds and statement reconciliation. The full goal stays active;
+this foundation checkpoint is not founder acceptance or completion.

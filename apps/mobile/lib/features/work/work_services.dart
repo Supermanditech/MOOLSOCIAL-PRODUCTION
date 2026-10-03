@@ -1351,6 +1351,14 @@ abstract interface class WorkPurchaseEntryRevisionGuard {
   });
 }
 
+/// Validate separate authoritative ledger state while holding the purchase queue,
+/// then append the immutable allocation review without queue re-entry.
+abstract interface class WorkPurchaseBillGoodsReviewGuard {
+  Future<bool> saveReviewedBillGoods(WorkspacePurchaseEntryBook book, {
+    required int expectedRevision, required Future<bool> Function() verifyCurrent,
+  });
+}
+
 /// App-private originals. No public upload, product-photo identity or accounting effect.
 abstract interface class WorkPurchaseReceiptReviewAbandonment {
   Future<WorkspacePurchaseEntryBook?> abandonReviewedReceipt(String account, String store, {
@@ -1756,7 +1764,8 @@ class WorkPurchaseInvoiceSuggestions {
 /// Uses the existing encrypted, serialized, revision-checked checkpoint pattern.
 /// Contacts never share an inventory or financial-journal key.
 class SecureWorkPurchaseEntryStore
-    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment {
+    implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
+      WorkPurchaseBillGoodsReviewGuard {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -1811,13 +1820,22 @@ class SecureWorkPurchaseEntryStore
   });
   @override
   Future<void> save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision}) async {
+    await _save(directory, expectedRevision: expectedRevision);
+  }
+  @override
+  Future<bool> saveReviewedBillGoods(WorkspacePurchaseEntryBook book, {
+    required int expectedRevision, required Future<bool> Function() verifyCurrent,
+  }) => _save(book, expectedRevision: expectedRevision, verifyCurrent: verifyCurrent);
+
+  Future<bool> _save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision,
+      Future<bool> Function()? verifyCurrent}) async {
     final bytes = jsonEncode(directory.toJson());
     final frozen = WorkspacePurchaseEntryBook.fromJson(jsonDecode(bytes));
     final key = _key(frozen.account, frozen.store, frozen.qa);
-    await _serial(key, () async {
+    return _serial(key, () async {
       _check(frozen.account, frozen.store);
       final previous = await _read(frozen.account, frozen.store, frozen.qa);
-      if (previous != null && jsonEncode(previous.toJson()) == bytes) return;
+      if (previous != null && jsonEncode(previous.toJson()) == bytes) return true;
       if (previous?.revision != expectedRevision || frozen.revision != (expectedRevision ?? 0) + 1) {
         throw const WorkGatewayException('Your purchase draft changed. Reopen Purchases before saving again.');
       }
@@ -1845,6 +1863,21 @@ class SecureWorkPurchaseEntryStore
       if (receiptAdditions.length > 1 || receiptAdditions.any((r) => r.revision != frozen.revision)) {
         throw const WorkGatewayException('Save one reviewed delivery at a time. Reopen Purchases.');
       }
+      final retainedAllocationIds = <String>{};
+      for (final review in previous?.billGoodsReviews ?? const <WorkspaceSupplierBillGoodsReview>[]) {
+        final retained = frozen.billGoodsReviews.where((r) => r.allocation.operationId == review.allocation.operationId).singleOrNull;
+        if (retained == null || jsonEncode(retained.toJson()) != jsonEncode(review.toJson())) {
+          throw const WorkGatewayException('Earlier bill goods reviews must be kept unchanged. Reopen Purchases.');
+        }
+        retainedAllocationIds.add(review.allocation.operationId);
+      }
+      final allocationAdditions = frozen.billGoodsReviews.where((r) => !retainedAllocationIds.contains(r.allocation.operationId));
+      if (allocationAdditions.length > 1 || allocationAdditions.any((r) => r.revision != frozen.revision)) {
+        throw const WorkGatewayException('Save one reviewed bill goods match at a time. Reopen Purchases.');
+      }
+      if (allocationAdditions.isNotEmpty && verifyCurrent == null) {
+        throw const WorkGatewayException('A new bill goods review requires verified supplier account status.');
+      }
       for (final record
           in previous?.openingRecords ??
               const <WorkspaceSupplierOpeningRecord>[]) {
@@ -1871,6 +1904,8 @@ class SecureWorkPurchaseEntryStore
       if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
         throw const WorkGatewayException('Purchase storage is full. Your saved records are kept; do not clear app data.');
       }
+      if (verifyCurrent != null && !await verifyCurrent()) return false;
+      _check(frozen.account, frozen.store);
       try {
         await _storage.write(key: key, value: bytes);
       } on Object {
@@ -1878,6 +1913,7 @@ class SecureWorkPurchaseEntryStore
         if (await _storage.read(key: key) != bytes) rethrow;
       }
       _check(frozen.account, frozen.store);
+      return true;
     });
   }
   @override
@@ -1917,7 +1953,8 @@ extension _PurchaseReviewCancellation on SecureWorkPurchaseEntryStore {
       account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
       profiles: old.profiles, draft: old.draft, copies: old.copies,
       openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
-      goodsReceiptCancellations: [...old.goodsReceiptCancellations, cancellation]).toJson());
+      goodsReceiptCancellations: [...old.goodsReceiptCancellations, cancellation],
+      billGoodsReviews: old.billGoodsReviews).toJson());
     final bytes = jsonEncode(next.toJson());
     if (utf8.encode(bytes).length > 10 * 1024 * 1024) {
       throw const WorkGatewayException('Purchase storage is full. Saved records are kept.');

@@ -7123,6 +7123,31 @@ class WorkspaceGoodsReceiptReviewCancellation {
   }
 }
 
+/// Immutable review of a bill-to-delivery match, saved before account posting.
+/// Its operation identity and quantities survive editor/process interruption.
+class WorkspaceSupplierBillGoodsReview {
+  const WorkspaceSupplierBillGoodsReview({required this.supplierId,
+    required this.revision, required this.allocation});
+  final String supplierId;
+  final int revision;
+  final WorkspaceSupplierBillGoodsAllocation allocation;
+  bool get valid => supplierId.trim().isNotEmpty && supplierId.length <= 240 &&
+      revision > 0 && allocation.valid;
+  Map<String, Object?> toJson() => {'supplierId': supplierId,
+    'revision': revision, 'allocation': allocation.toJson()};
+  static WorkspaceSupplierBillGoodsReview fromJson(Object? raw) {
+    const keys = {'supplierId', 'revision', 'allocation'};
+    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains)) {
+      throw const FormatException('Invalid bill goods review');
+    }
+    final result = WorkspaceSupplierBillGoodsReview(supplierId: raw['supplierId'] as String,
+      revision: raw['revision'] as int,
+      allocation: WorkspaceSupplierBillGoodsAllocation.fromJson(raw['allocation']));
+    if (!result.valid) throw const FormatException('Invalid bill goods review');
+    return result;
+  }
+}
+
 class WorkspacePurchaseEntryBook {
   WorkspacePurchaseEntryBook({
     required this.account,
@@ -7135,11 +7160,13 @@ class WorkspacePurchaseEntryBook {
     List<WorkspaceSupplierOpeningRecord> openingRecords = const [],
     List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts = const [],
     List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations = const [],
+    List<WorkspaceSupplierBillGoodsReview> billGoodsReviews = const [],
   }) : profiles = List.unmodifiable(profiles),
        copies = List.unmodifiable(copies),
        openingRecords = List.unmodifiable(openingRecords),
        goodsReceiptDrafts = List.unmodifiable(goodsReceiptDrafts),
-       goodsReceiptCancellations = List.unmodifiable(goodsReceiptCancellations);
+       goodsReceiptCancellations = List.unmodifiable(goodsReceiptCancellations),
+       billGoodsReviews = List.unmodifiable(billGoodsReviews);
   final String account, store;
   final bool qa;
   final int revision;
@@ -7149,6 +7176,7 @@ class WorkspacePurchaseEntryBook {
   final List<WorkspaceSupplierOpeningRecord> openingRecords;
   final List<WorkspaceSupplierGoodsReceiptDraft> goodsReceiptDrafts;
   final List<WorkspaceGoodsReceiptReviewCancellation> goodsReceiptCancellations;
+  final List<WorkspaceSupplierBillGoodsReview> billGoodsReviews;
   WorkspaceSupplierOpeningRecord? openingRecordFor(String supplierId) =>
       openingRecords.where((r) => r.supplierId == supplierId).lastOrNull;
 
@@ -7208,6 +7236,8 @@ class WorkspacePurchaseEntryBook {
       'goodsReceiptDrafts': goodsReceiptDrafts.map((r) => r.toJson()).toList(),
     if (goodsReceiptCancellations.isNotEmpty)
       'goodsReceiptCancellations': goodsReceiptCancellations.map((r) => r.toJson()).toList(),
+    if (billGoodsReviews.isNotEmpty)
+      'billGoodsReviews': billGoodsReviews.map((r) => r.toJson()).toList(),
   };
   static WorkspacePurchaseEntryBook fromJson(Object? raw) {
     const keys = {
@@ -7222,11 +7252,12 @@ class WorkspacePurchaseEntryBook {
       'openingRecords',
       'goodsReceiptDrafts',
       'goodsReceiptCancellations',
+      'billGoodsReviews',
     };
     try {
       if (raw is! Map ||
           !keys
-              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts', 'goodsReceiptCancellations'})
+              .difference({'copies', 'openingRecords', 'goodsReceiptDrafts', 'goodsReceiptCancellations', 'billGoodsReviews'})
               .every(raw.containsKey) ||
           !raw.keys.every(keys.contains) ||
           raw['version'] != 1 ||
@@ -7243,7 +7274,10 @@ class WorkspacePurchaseEntryBook {
               (raw['goodsReceiptDrafts'] as List).length > 1000)) ||
           (raw.containsKey('goodsReceiptCancellations') &&
             (raw['goodsReceiptCancellations'] is! List ||
-              (raw['goodsReceiptCancellations'] as List).length > 1000))) {
+              (raw['goodsReceiptCancellations'] as List).length > 1000)) ||
+          (raw.containsKey('billGoodsReviews') &&
+            (raw['billGoodsReviews'] is! List ||
+              (raw['billGoodsReviews'] as List).length > 1000))) {
         throw const FormatException('Invalid supplier directory');
       }
       final result = WorkspacePurchaseEntryBook(
@@ -7270,6 +7304,8 @@ class WorkspacePurchaseEntryBook {
           WorkspaceSupplierGoodsReceiptDraft.fromJson(r)],
         goodsReceiptCancellations: [for (final r in (raw['goodsReceiptCancellations'] as List? ?? const []))
           WorkspaceGoodsReceiptReviewCancellation.fromJson(r)],
+        billGoodsReviews: [for (final r in (raw['billGoodsReviews'] as List? ?? const []))
+          WorkspaceSupplierBillGoodsReview.fromJson(r)],
       );
       final ids = <String>{};
       final copyIds = <String>{};
@@ -7348,6 +7384,26 @@ class WorkspacePurchaseEntryBook {
           throw const FormatException('Invalid receiving review relationship');
         }
         receiptRevision = review.revision;
+      }
+      final allocationIds = <String>{};
+      var allocationRevision = 0;
+      for (final review in result.billGoodsReviews) {
+        final link = review.allocation;
+        final copy = result.copies.where((c) => c.id == link.copyId).singleOrNull;
+        final receiptReview = result.goodsReceiptDrafts.where((r) => r.receipt.id == link.receiptId).singleOrNull;
+        final line = receiptReview?.receipt.lines.where((l) => l.sourceLineId == link.receiptLineId).singleOrNull;
+        if (!review.valid || !allocationIds.add(link.operationId) || !ids.contains(review.supplierId) ||
+            review.revision <= allocationRevision || review.revision > result.revision ||
+            copy == null || copy.supplier.id != review.supplierId || copy.draft.id != link.billId ||
+            copy.revision != link.copyRevision || copy.revision >= review.revision ||
+            link.billLineIndex >= copy.draft.goods.length ||
+            copy.draft.goods[link.billLineIndex]['productId'] != link.productId ||
+            receiptReview == null || receiptReview.supplierId != review.supplierId ||
+            receiptReview.revision >= review.revision || line == null || line.productId != link.productId ||
+            link.linkedAt.isBefore(receiptReview.receipt.recordedAt)) {
+          throw const FormatException('Invalid bill goods review relationship');
+        }
+        allocationRevision = review.revision;
       }
       final cancelledIds = <String>{};
       var cancellationRevision = 0;

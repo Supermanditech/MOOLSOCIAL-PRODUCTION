@@ -5063,6 +5063,143 @@ void main() {
     });
   }
 
+  for (final failure in ['none', 'before-review', 'lost-review', 'lost-post', 'race-review-first', 'race-post-first']) {
+    test('PURCHASELINKREVIEW $failure retains exact operation through restart without Stock or money changes', () async {
+      // Host-only storage fixture, never runtime acceptance records.
+      final storage = _OrderJournalStorage();
+      final opening = openingFixture(amount: 0);
+      final owner = await openingPostingSession(storage, initialRecord: opening, inventory: true);
+      final scope = owner.workspaceSupplierScope!;
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final receipt = sessionReceipt(owner);
+      expect(await owner.saveWorkspaceGoodsReceiptDraft(receipt, supplierId: opening.supplierId,
+        scope: scope, expectedRevision: 3), isTrue);
+      expect(await owner.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+        scope: scope, expectedPurchaseRevision: 4, expectedSupplierRevision: 1,
+        requireSavedReview: true), WorkspaceGoodsReceiptSaveResult.saved);
+      final product = owner.workspaceCatalogueItems.single;
+      final base = allocatedBillFixture(product: product.id, unit: product.pack);
+      final bill = WorkspaceSupplierBillAcceptance(copy: base.copy,
+        acceptedAt: DateTime.now().toUtc(), openingTreatment: base.openingTreatment);
+      final books = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+      final old = (await books.read('account-A', 'store-A', qa: true))!;
+      await books.save(WorkspacePurchaseEntryBook.fromJson({...old.toJson(), 'revision': 5,
+        'copies': [...old.copies.map((c) => c.toJson()), bill.copy.toJson()]}), expectedRevision: 4);
+      expect(await owner.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(await owner.confirmWorkspacePurchaseBill(bill.copy, scope: scope,
+        expectedPurchaseRevision: 5, expectedLedgerRevision: 2,
+        openingTreatment: bill.openingTreatment, confirmedAt: bill.acceptedAt), isTrue);
+      final link = WorkspaceSupplierBillGoodsAllocation.fromJson({...billGoodsLink(bill).toJson(),
+        'receiptId': receipt.id, 'receiptLineId': receipt.lines.single.sourceLineId,
+        'productId': product.id, 'stockUnit': product.pack, 'acceptedReceiptMilli': 6000,
+        'damagedReceiptMilli': 0, 'linkedAt': DateTime.now().toUtc().toIso8601String()});
+      final stock = owner.workspaceCatalogueItems.single.stock;
+      final balance = owner.workspaceSupplierLedger(opening.supplierId)!.balanceMinor;
+      expect(await owner.confirmWorkspaceSupplierBillGoodsAllocation(link,
+        supplierId: opening.supplierId, scope: scope, expectedSupplierRevision: 3,
+        requireSavedReview: true, expectedPurchaseRevision: 5), isFalse,
+        reason: 'Unreviewed operation may not post through the frontend lane.');
+      if (failure.startsWith('race-')) {
+        final other = await openingPostingSession(storage, inventory: true);
+        expect(await other.recoverCustomerLedger(), isTrue);
+        final conflicting = WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+          'acceptedReceiptMilli': 3000, 'billQuantityMilli': 3000});
+        final held = Completer<void>();
+        storage.holdWrite = held;
+        final beforeWrites = storage.writes.length;
+        Future<bool> review() => owner.saveWorkspaceBillGoodsReview(link, supplierId: opening.supplierId,
+          scope: scope, expectedPurchaseRevision: 5, expectedSupplierRevision: 3);
+        Future<bool> post() => other.confirmWorkspaceSupplierBillGoodsAllocation(conflicting,
+          supplierId: opening.supplierId, scope: other.workspaceSupplierScope!, expectedSupplierRevision: 3);
+        final first = failure == 'race-review-first' ? review() : post();
+        for (var attempt = 0; attempt < 100 && storage.writes.length == beforeWrites; attempt++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(storage.writes.length, beforeWrites + 1, reason: 'First operation is live inside its guarded write.');
+        final second = failure == 'race-review-first' ? post() : review();
+        await Future<void>.delayed(Duration.zero);
+        held.complete();
+        expect(await first, isTrue);
+        expect(await second, isFalse, reason: 'Conflicting review and posting cannot both become durable.');
+        storage.holdWrite = null;
+        expect(await owner.loadWorkspaceSuppliers(retry: true), isTrue);
+        expect(await owner.recoverCustomerLedger(), isTrue);
+        expect(owner.workspaceBillGoodsReviews.length, failure == 'race-review-first' ? 1 : 0);
+        expect(owner.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations.length,
+          failure == 'race-post-first' ? 1 : 0);
+        expect(owner.workspaceCatalogueItems.single.stock, stock);
+        expect(owner.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, balance);
+        final restarted = await openingPostingSession(storage, inventory: true);
+        expect(await restarted.recoverCustomerLedger(), isTrue);
+        expect(restarted.workspaceBillGoodsReviews.length, failure == 'race-review-first' ? 1 : 0);
+        expect(restarted.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations.length,
+          failure == 'race-post-first' ? 1 : 0);
+        expect(restarted.workspaceCatalogueItems.single.stock, stock);
+        expect(restarted.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, balance);
+        return;
+      }
+      storage.failWrite = failure == 'before-review';
+      storage.loseWriteResponseOnce = failure == 'lost-review';
+      final saved = await owner.saveWorkspaceBillGoodsReview(link, supplierId: opening.supplierId,
+        scope: scope, expectedPurchaseRevision: 5, expectedSupplierRevision: 3);
+      expect(saved, failure != 'before-review',
+        reason: 'The secure store verifies identical saved bytes after a lost review-save reply.');
+      storage.failWrite = false;
+      final reopened = await openingPostingSession(storage, inventory: true);
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      if (failure == 'before-review') {
+        expect(reopened.workspaceBillGoodsReviews, isEmpty);
+        expect(await reopened.saveWorkspaceBillGoodsReview(link, supplierId: opening.supplierId,
+          scope: reopened.workspaceSupplierScope!, expectedPurchaseRevision: 5, expectedSupplierRevision: 3), isTrue);
+      }
+      expect(reopened.workspaceBillGoodsReviews.single.allocation.toJson(), link.toJson());
+      expect(reopened.workspaceSupplierLedger(opening.supplierId)!.billGoodsAllocations, isEmpty);
+      final changed = WorkspaceSupplierBillGoodsAllocation.fromJson({...link.toJson(),
+        'acceptedReceiptMilli': 3000, 'billQuantityMilli': 3000});
+      expect(await reopened.confirmWorkspaceSupplierBillGoodsAllocation(changed,
+        supplierId: opening.supplierId, scope: reopened.workspaceSupplierScope!,
+        expectedSupplierRevision: 3), isFalse,
+        reason: 'Optional review mode must not bypass an existing frozen operation.');
+      final bookKey = storage.values.keys.singleWhere((key) =>
+        storage.values[key]!.contains('billGoodsReviews'));
+      storage.failReadKey = bookKey;
+      expect(await reopened.confirmWorkspaceSupplierBillGoodsAllocation(link,
+        supplierId: opening.supplierId, scope: reopened.workspaceSupplierScope!,
+        expectedSupplierRevision: 3, requireSavedReview: true, expectedPurchaseRevision: 6), isFalse);
+      expect(reopened.workspaceSupplierRecoveryRequired, isTrue);
+      storage.failReadKey = null;
+      expect(await reopened.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      storage.loseWriteResponseOnce = failure == 'lost-post';
+      final posted = await reopened.confirmWorkspaceSupplierBillGoodsAllocation(link,
+        supplierId: opening.supplierId, scope: reopened.workspaceSupplierScope!,
+        expectedSupplierRevision: 3, requireSavedReview: true, expectedPurchaseRevision: 6);
+      expect(posted, failure != 'lost-post');
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      final writes = storage.writes.length;
+      expect(await reopened.confirmWorkspaceSupplierBillGoodsAllocation(link,
+        supplierId: opening.supplierId, scope: reopened.workspaceSupplierScope!,
+        expectedSupplierRevision: 3, requireSavedReview: true, expectedPurchaseRevision: 6), isTrue);
+      expect(storage.writes.length, writes);
+      expect(reopened.workspaceCatalogueItems.single.stock, stock);
+      expect(reopened.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, balance);
+      final persisted = (await books.read('account-A', 'store-A', qa: true))!;
+      expect(() => WorkspacePurchaseEntryBook.fromJson({...persisted.toJson(),
+        'billGoodsReviews': [{...persisted.billGoodsReviews.single.toJson(), 'supplierId': 'other-supplier'}]}), throwsFormatException);
+      await expectLater(books.save(WorkspacePurchaseEntryBook.fromJson({...persisted.toJson(),
+        'revision': 7, 'billGoodsReviews': <Object?>[]}), expectedRevision: 6), throwsA(isA<WorkGatewayException>()));
+      await books.save(WorkspacePurchaseEntryBook.fromJson({...persisted.toJson(), 'revision': 7}), expectedRevision: 6);
+      expect(await reopened.loadWorkspaceSuppliers(retry: true), isTrue);
+      final laterWrites = storage.writes.length;
+      expect(await reopened.confirmWorkspaceSupplierBillGoodsAllocation(link,
+        supplierId: opening.supplierId, scope: reopened.workspaceSupplierScope!,
+        expectedSupplierRevision: 3, requireSavedReview: true, expectedPurchaseRevision: 6), isTrue,
+        reason: 'Exact committed proof survives unrelated later book revision.');
+      expect(storage.writes.length, laterWrites);
+    });
+  }
+
   test('PURCHASELINK cumulative accepted damaged and invoiced caps reject duplicates', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
     final bill = allocatedBillFixture();
