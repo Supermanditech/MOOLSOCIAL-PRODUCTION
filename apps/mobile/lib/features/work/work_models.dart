@@ -3149,7 +3149,8 @@ class WorkspaceSupplierShortageClaim {
     required this.outstandingMilli, required this.priorClaimedMilli,
     required this.recordedAt, required this.committedRevision,
     required List<String> receiptIds, required List<String> priorClaimIds,
-    required List<String> billAllocationIds})
+    required List<String> billAllocationIds, this.requestedAt,
+    this.openingId, this.openingRevision})
     : receiptIds = List.unmodifiable(receiptIds), priorClaimIds = List.unmodifiable(priorClaimIds),
       billAllocationIds = List.unmodifiable(billAllocationIds);
   final String operationId, accountScope, workspaceId, supplierId, billId, copyId,
@@ -3157,6 +3158,9 @@ class WorkspaceSupplierShortageClaim {
   final int copyRevision, billLineIndex, quantityMilli, outstandingMilli,
     priorClaimedMilli, committedRevision;
   final DateTime recordedAt;
+  final DateTime? requestedAt;
+  final String? openingId;
+  final int? openingRevision;
   final List<String> receiptIds, priorClaimIds, billAllocationIds;
   Object get deliverySource => (expectedDeliveryId, receiptLineId);
   bool get valid => [operationId, accountScope, workspaceId, supplierId, billId,
@@ -3171,7 +3175,11 @@ class WorkspaceSupplierShortageClaim {
     priorClaimIds.toSet().length == priorClaimIds.length && !priorClaimIds.contains(operationId) &&
     billAllocationIds.toSet().length == billAllocationIds.length &&
     [...receiptIds, ...priorClaimIds, ...billAllocationIds].every((v) =>
-      v.trim().isNotEmpty && v == v.trim() && v.length <= 512);
+      v.trim().isNotEmpty && v == v.trim() && v.length <= 512) &&
+    (requestedAt == null ? openingId == null && openingRevision == null
+      : openingId != null && openingId!.trim().isNotEmpty && openingId == openingId!.trim() &&
+        openingId!.length <= 512 && openingRevision != null && openingRevision! > 0 &&
+        !requestedAt!.isAfter(recordedAt));
   Map<String, Object?> toJson() => {'operationId': operationId, 'accountScope': accountScope,
     'workspaceId': workspaceId, 'supplierId': supplierId, 'billId': billId,
     'copyId': copyId, 'copyRevision': copyRevision, 'billLineIndex': billLineIndex,
@@ -3179,13 +3187,24 @@ class WorkspaceSupplierShortageClaim {
     'productId': productId, 'purchaseUnit': purchaseUnit, 'quantityMilli': quantityMilli,
     'outstandingMilli': outstandingMilli, 'priorClaimedMilli': priorClaimedMilli,
     'recordedAt': recordedAt.toUtc().toIso8601String(), 'committedRevision': committedRevision,
-    'receiptIds': receiptIds, 'priorClaimIds': priorClaimIds, 'billAllocationIds': billAllocationIds};
+    'receiptIds': receiptIds, 'priorClaimIds': priorClaimIds, 'billAllocationIds': billAllocationIds,
+    if (requestedAt != null) 'requestedAt': requestedAt!.toUtc().toIso8601String(),
+    if (openingId != null) 'openingId': openingId,
+    if (openingRevision != null) 'openingRevision': openingRevision};
+  Map<String, Object?> intentToJson() => {...toJson()
+    ..remove('recordedAt')..remove('committedRevision'),
+    'receiptIds': receiptIds.toList()..sort(),
+    'priorClaimIds': priorClaimIds.toList()..sort(),
+    'billAllocationIds': billAllocationIds.toList()..sort()};
   static WorkspaceSupplierShortageClaim fromJson(Object? raw) {
     const keys = {'operationId', 'accountScope', 'workspaceId', 'supplierId', 'billId',
       'copyId', 'copyRevision', 'billLineIndex', 'expectedDeliveryId', 'receiptLineId',
       'productId', 'purchaseUnit', 'quantityMilli', 'outstandingMilli', 'priorClaimedMilli',
       'recordedAt', 'committedRevision', 'receiptIds', 'priorClaimIds', 'billAllocationIds'};
-    if (raw is! Map || raw.length != keys.length || !raw.keys.every(keys.contains) ||
+    const optional = {'requestedAt', 'openingId', 'openingRevision'};
+    if (raw is! Map || !keys.every(raw.containsKey) ||
+        !raw.keys.every((key) => keys.contains(key) || optional.contains(key)) ||
+        (raw.keys.any(optional.contains) && !optional.every(raw.containsKey)) ||
         raw['receiptIds'] is! List || (raw['receiptIds'] as List).length > 1000 ||
         raw['priorClaimIds'] is! List || (raw['priorClaimIds'] as List).length > 10000 ||
         raw['billAllocationIds'] is! List || (raw['billAllocationIds'] as List).length > 10000) {
@@ -3201,9 +3220,55 @@ class WorkspaceSupplierShortageClaim {
       outstandingMilli: raw['outstandingMilli'] as int, priorClaimedMilli: raw['priorClaimedMilli'] as int,
       recordedAt: DateTime.parse(raw['recordedAt'] as String), committedRevision: raw['committedRevision'] as int,
       receiptIds: (raw['receiptIds'] as List).cast<String>(), priorClaimIds: (raw['priorClaimIds'] as List).cast<String>(),
-      billAllocationIds: (raw['billAllocationIds'] as List).cast<String>());
+      billAllocationIds: (raw['billAllocationIds'] as List).cast<String>(),
+      requestedAt: raw.containsKey('requestedAt') ? DateTime.parse(raw['requestedAt'] as String) : null,
+      openingId: raw['openingId'] as String?, openingRevision: raw['openingRevision'] as int?);
     if (!claim.valid) throw const FormatException('Invalid supplier shortage claim');
     return claim;
+  }
+}
+
+/// Frozen shortage review, distinct from the native commit and supplier credit.
+class WorkspaceSupplierShortageIntent {
+  WorkspaceSupplierShortageIntent._(this._review);
+  final WorkspaceSupplierShortageClaim _review;
+  String get operationId => _review.operationId;
+  String get accountScope => _review.accountScope;
+  String get workspaceId => _review.workspaceId;
+  String get supplierId => _review.supplierId;
+  String get billId => _review.billId;
+  String get copyId => _review.copyId;
+  int get copyRevision => _review.copyRevision;
+  int get billLineIndex => _review.billLineIndex;
+  String get expectedDeliveryId => _review.expectedDeliveryId;
+  String get receiptLineId => _review.receiptLineId;
+  String get productId => _review.productId;
+  String get purchaseUnit => _review.purchaseUnit;
+  int get quantityMilli => _review.quantityMilli;
+  int get outstandingMilli => _review.outstandingMilli;
+  int get priorClaimedMilli => _review.priorClaimedMilli;
+  String get openingId => _review.openingId!;
+  int get openingRevision => _review.openingRevision!;
+  DateTime get requestedAt => _review.requestedAt!;
+  List<String> get receiptIds => _review.receiptIds;
+  List<String> get priorClaimIds => _review.priorClaimIds;
+  List<String> get billAllocationIds => _review.billAllocationIds;
+  bool get valid => _review.valid && _review.requestedAt != null && _review.openingId != null;
+  Map<String, Object?> toJson() => _review.intentToJson();
+  bool matches(WorkspaceSupplierShortageClaim claim) => valid && claim.valid &&
+    claim.requestedAt != null && jsonEncode(toJson()) == jsonEncode(claim.intentToJson());
+  static WorkspaceSupplierShortageIntent fromReview(WorkspaceSupplierShortageClaim review) {
+    final intent = WorkspaceSupplierShortageIntent._(review);
+    if (!intent.valid) { throw const FormatException('Invalid shortage review'); }
+    return intent;
+  }
+  static WorkspaceSupplierShortageIntent fromJson(Object? raw) {
+    if (raw is! Map || raw.containsKey('recordedAt') || raw.containsKey('committedRevision') ||
+        !raw.containsKey('requestedAt') || !raw.containsKey('openingId') || !raw.containsKey('openingRevision')) {
+      throw const FormatException('Invalid shortage review');
+    }
+    return fromReview(WorkspaceSupplierShortageClaim.fromJson({...raw,
+      'recordedAt': raw['requestedAt'], 'committedRevision': 2}));
   }
 }
 
@@ -4122,11 +4187,12 @@ class WorkspaceSupplierLedger {
       required String billId, required int billLineIndex, required String deliveryId,
       required String lineId, required int quantityMilli, required DateTime recordedAt,
       required int committedRevision, List<String>? receiptSnapshot,
-      List<String>? allocationSnapshot}) {
+      List<String>? allocationSnapshot, DateTime? requestedAt}) {
     final bill = purchaseBills[billId];
     if (bill == null || bill.openingTreatment != WorkspaceOpeningBillInclusion.excluded ||
         billLineIndex < 0 || billLineIndex >= bill.copy.draft.goods.length ||
-        recordedAt.isBefore(bill.acceptedAt)) { return null; }
+        recordedAt.isBefore(bill.acceptedAt) || (requestedAt != null &&
+          (openingRecord == null || requestedAt.isAfter(recordedAt) || requestedAt.isBefore(bill.acceptedAt)))) { return null; }
     final group = goodsReceipts.values.where((r) => r.expectedDeliveryId == deliveryId &&
       r.lines.any((l) => l.sourceLineId == lineId)).toList();
     final receiptIds = receiptSnapshot ?? group.map((r) => r.id).toList();
@@ -4135,7 +4201,8 @@ class WorkspaceSupplierLedger {
     if (receiptSnapshot != null && group.any((r) =>
         r.recordedAt.isBefore(recordedAt) && !receiptIds.contains(r.id))) { return null; }
     final receipts = receiptIds.map((id) => goodsReceipts[id]!).toList();
-    if (receipts.any((r) => r.recordedAt.isAfter(recordedAt))) return null;
+    if (receipts.any((r) => r.recordedAt.isAfter(recordedAt) ||
+        (requestedAt != null && r.recordedAt.isAfter(requestedAt)))) { return null; }
     final lines = receipts.map((r) => r.lines.singleWhere((l) => l.sourceLineId == lineId)).toList();
     final source = lines.first, printed = bill.copy.draft.goods[billLineIndex];
     if (source.expectedMilli == null || lines.any((l) => l.mappingIdentity != source.mappingIdentity) ||
@@ -4144,8 +4211,10 @@ class WorkspaceSupplierLedger {
     final previousClaims = shortageClaims.values.where((c) => c.committedRevision < committedRevision).toList();
     final priorGroup = previousClaims.where((c) => c.deliverySource == (deliveryId, lineId)).toList();
     final priorTotal = priorGroup.fold<int>(0, (sum, c) => sum + c.quantityMilli);
-    final priorBill = previousClaims.where((c) => c.billId == billId && c.billLineIndex == billLineIndex)
-      .fold<int>(0, (sum, c) => sum + c.quantityMilli);
+    final priorBillClaims = previousClaims.where((c) => c.billId == billId && c.billLineIndex == billLineIndex).toList();
+    final priorBill = priorBillClaims.fold<int>(0, (sum, c) => sum + c.quantityMilli);
+    final relevantClaims = requestedAt == null ? priorGroup : [...priorGroup, ...priorBillClaims];
+    if (requestedAt != null && relevantClaims.any((c) => c.recordedAt.isAfter(requestedAt))) return null;
     final allocations = billGoodsAllocations.values.where((a) => a.billId == billId && a.billLineIndex == billLineIndex).toList();
     final allocationIds = allocationSnapshot ?? allocations.map((a) => a.operationId).toList();
     if (allocationIds.toSet().length != allocationIds.length ||
@@ -4153,14 +4222,15 @@ class WorkspaceSupplierLedger {
     if (allocationSnapshot != null && allocations.any((a) =>
         a.linkedAt.isBefore(recordedAt) && !allocationIds.contains(a.operationId))) { return null; }
     final allocated = allocationIds.map((id) => billGoodsAllocations[id]!).toList();
-    if (allocated.any((a) => a.linkedAt.isAfter(recordedAt))) return null;
+    if (allocated.any((a) => a.linkedAt.isAfter(recordedAt) ||
+        (requestedAt != null && a.linkedAt.isAfter(requestedAt)))) { return null; }
     final billQuantity = _claimInvoiceQuantity(printed['quantity'] ?? '');
     final free = _claimInvoiceQuantity((printed['freeQuantity'] ?? '').trim().isEmpty ? '0' : printed['freeQuantity']!);
     if (billQuantity == null || free == null || quantityMilli <= 0 ||
         quantityMilli + priorTotal > outstanding || quantityMilli + priorBill +
           allocated.fold<int>(0, (sum, a) => sum + a.billQuantityMilli + a.freeBillQuantityMilli) > billQuantity + free) { return null; }
     final sortedReceipts = receiptIds.toList()..sort();
-    final sortedPrior = priorGroup.map((c) => c.operationId).toList()..sort();
+    final sortedPrior = relevantClaims.map((c) => c.operationId).toSet().toList()..sort();
     final sortedAllocations = allocationIds.toList()..sort();
     final claim = WorkspaceSupplierShortageClaim(operationId: operationId, accountScope: accountScope,
       workspaceId: workspaceId, supplierId: supplierId, billId: billId, copyId: bill.copy.id,
@@ -4168,7 +4238,9 @@ class WorkspaceSupplierLedger {
       receiptLineId: lineId, productId: source.productId, purchaseUnit: source.purchaseUnit,
       quantityMilli: quantityMilli, outstandingMilli: outstanding, priorClaimedMilli: priorTotal,
       recordedAt: recordedAt, committedRevision: committedRevision, receiptIds: sortedReceipts,
-      priorClaimIds: sortedPrior, billAllocationIds: sortedAllocations);
+      priorClaimIds: sortedPrior, billAllocationIds: sortedAllocations,
+      requestedAt: requestedAt, openingId: requestedAt == null ? null : openingRecord!.id,
+      openingRevision: requestedAt == null ? null : openingRecord!.revision);
     return claim.valid ? claim : null;
   }
 
@@ -4178,14 +4250,14 @@ class WorkspaceSupplierLedger {
       final claim = pair.value;
       if (pair.key != claim.operationId || !claim.valid || claim.committedRevision > revision || claim.recordedAt.isAfter(asOf) ||
           entries.any((e) => e.operationId == claim.operationId) || goodsReturns.containsKey(claim.operationId) ||
-          billMoneyAllocations.containsKey(claim.operationId) ||
+          billMoneyAllocations.containsKey(claim.operationId) || billGoodsAllocations.containsKey(claim.operationId) ||
           creditNotes.values.any((n) => n.committedRevision == claim.committedRevision) ||
           goodsReturns.values.any((r) => r.committedRevision == claim.committedRevision) ||
           billMoneyAllocations.values.any((a) => a.committedRevision == claim.committedRevision)) { return false; }
       final reconstructed = _deriveShortageClaim(operationId: claim.operationId, billId: claim.billId,
         billLineIndex: claim.billLineIndex, deliveryId: claim.expectedDeliveryId, lineId: claim.receiptLineId,
         quantityMilli: claim.quantityMilli, recordedAt: claim.recordedAt, committedRevision: claim.committedRevision,
-        receiptSnapshot: claim.receiptIds, allocationSnapshot: claim.billAllocationIds);
+        receiptSnapshot: claim.receiptIds, allocationSnapshot: claim.billAllocationIds, requestedAt: claim.requestedAt);
       if (jsonEncode(reconstructed?.toJson()) != jsonEncode(claim.toJson())) return false;
     }
     return true;
@@ -4196,17 +4268,18 @@ class WorkspaceSupplierLedger {
   WorkspaceSupplierLedger? recordShortageClaim({required String operationId,
       required String billId, required int billLineIndex, required String deliveryId,
       required String lineId, required int quantityMilli, required bool attributionReviewed,
-      required DateTime recordedAt, required int expectedRevision}) {
+      required DateTime recordedAt, required int expectedRevision, DateTime? requestedAt}) {
     if (!valid || !attributionReviewed || expectedRevision <= 0 || expectedRevision > revision) return null;
     final old = shortageClaims[operationId];
     if (old != null) {
       return old.billId == billId && old.billLineIndex == billLineIndex && old.expectedDeliveryId == deliveryId &&
-        old.receiptLineId == lineId && old.quantityMilli == quantityMilli && old.recordedAt == recordedAt ? this : null;
+        old.receiptLineId == lineId && old.quantityMilli == quantityMilli && old.recordedAt == recordedAt &&
+        old.requestedAt == requestedAt ? this : null;
     }
     if (expectedRevision != revision || recordedAt.isBefore(asOf)) return null;
     final claim = _deriveShortageClaim(operationId: operationId, billId: billId,
       billLineIndex: billLineIndex, deliveryId: deliveryId, lineId: lineId, quantityMilli: quantityMilli,
-      recordedAt: recordedAt, committedRevision: revision + 1);
+      recordedAt: recordedAt, committedRevision: revision + 1, requestedAt: requestedAt);
     if (claim == null) return null;
     final next = WorkspaceSupplierLedger(accountScope: accountScope, workspaceId: workspaceId,
       supplierId: supplierId, supplierName: supplierName, revision: revision + 1, asOf: recordedAt,
@@ -4216,6 +4289,34 @@ class WorkspaceSupplierLedger {
       goodsReturns: goodsReturns, creditNotes: creditNotes,
       shortageClaims: {...shortageClaims, operationId: claim});
     return next.valid && next.canFollow(this) ? next : null;
+  }
+
+  WorkspaceSupplierShortageIntent? reviewShortageIntent({required String operationId,
+      required String billId, required int billLineIndex, required String deliveryId,
+      required String lineId, required int quantityMilli, required bool attributionReviewed,
+      required DateTime requestedAt}) {
+    if (shortageClaims.containsKey(operationId)) return null;
+    final probe = recordShortageClaim(operationId: operationId, billId: billId,
+      billLineIndex: billLineIndex, deliveryId: deliveryId, lineId: lineId, quantityMilli: quantityMilli,
+      attributionReviewed: attributionReviewed, recordedAt: requestedAt,
+      requestedAt: requestedAt, expectedRevision: revision);
+    final claim = probe?.shortageClaims[operationId];
+    return claim == null ? null : WorkspaceSupplierShortageIntent.fromReview(claim);
+  }
+
+  WorkspaceSupplierLedger? recordReviewedShortage(WorkspaceSupplierShortageIntent intent,
+      {required DateTime recordedAt, required int expectedRevision, required bool attributionReviewed}) {
+    if (!valid || !intent.valid || !attributionReviewed || expectedRevision <= 0 || expectedRevision > revision ||
+        intent.accountScope != accountScope || intent.workspaceId != workspaceId || intent.supplierId != supplierId ||
+        intent.openingId != openingRecord?.id || intent.openingRevision != openingRecord?.revision) { return null; }
+    final old = shortageClaims[intent.operationId];
+    if (old != null) return intent.matches(old) ? this : null;
+    final next = recordShortageClaim(operationId: intent.operationId, billId: intent.billId,
+      billLineIndex: intent.billLineIndex, deliveryId: intent.expectedDeliveryId, lineId: intent.receiptLineId,
+      quantityMilli: intent.quantityMilli, attributionReviewed: attributionReviewed, recordedAt: recordedAt,
+      requestedAt: intent.requestedAt, expectedRevision: expectedRevision);
+    final proof = next?.shortageClaims[intent.operationId];
+    return proof != null && intent.matches(proof) ? next : null;
   }
 
   bool get _creditNotesValid {
@@ -4715,7 +4816,8 @@ class WorkspaceSupplierLedger {
       if (claim.committedRevision != revision || claim.recordedAt.isBefore(previous.asOf)) return false;
       final derived = previous._deriveShortageClaim(operationId: claim.operationId, billId: claim.billId,
         billLineIndex: claim.billLineIndex, deliveryId: claim.expectedDeliveryId, lineId: claim.receiptLineId,
-        quantityMilli: claim.quantityMilli, recordedAt: claim.recordedAt, committedRevision: revision);
+        quantityMilli: claim.quantityMilli, recordedAt: claim.recordedAt, committedRevision: revision,
+        requestedAt: claim.requestedAt);
       if (jsonEncode(derived?.toJson()) != jsonEncode(claim.toJson())) return false;
     }
     final addedCredits = creditNotes.values.where((n) => !previous.creditNotes.containsKey(n.operationId)).toList();
@@ -6446,6 +6548,7 @@ class WorkspaceLedgerFormDraft {
         'supplierAllocation',
         'supplierGoodsReturn',
         'supplierCredit',
+        'supplierShortage',
         'expense',
       ].contains(key.kind) &&
       fields.keys.every(
@@ -6466,6 +6569,8 @@ class WorkspaceLedgerFormDraft {
                     ? const ['reference', 'reason', 'returnedOn', 'items', 'attempt']
                     : key.kind == 'supplierCredit'
                     ? const ['amount', 'reference', 'reason', 'occurredOn', 'supports', 'attempt']
+                    : key.kind == 'supplierShortage'
+                    ? const ['billLineIndex', 'deliveryId', 'lineId', 'quantityMilli', 'attributionReviewed', 'attempt']
                     : key.kind == 'return'
                     ? const ['product', 'quantity', 'sellable', 'reason', 'reasonCode', 'items']
                     : key.kind == 'refund'
@@ -6484,6 +6589,8 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144 && _validSupplierGoodsReturnIntent(entry.value)
               : entry.key == 'attempt' && key.kind == 'supplierCredit'
               ? entry.value.length <= 262144 && _validSupplierCreditIntent(entry.value)
+              : entry.key == 'attempt' && key.kind == 'supplierShortage'
+              ? entry.value.length <= 262144 && _validSupplierShortageIntent(entry.value)
               : entry.key == 'supports' && key.kind == 'supplierCredit'
               ? entry.value.length <= 262144
               : entry.key == 'reason' && key.kind == 'supplierCredit'
@@ -6493,10 +6600,28 @@ class WorkspaceLedgerFormDraft {
               : entry.value.length <= 512) &&
       (key.kind != 'supplierMoney' || _supplierMoneyNamespaceValid) &&
       (key.kind != 'supplierCredit' || (key.order.startsWith('credit-copy:') && key.order.length > 12)) &&
+      (key.kind != 'supplierShortage' || (key.order.startsWith('shortage-copy:') && key.order.length > 14)) &&
       (key.kind != 'supplierGoodsReturn' ||
         (key.ledgerRevision == 1 && key.order == 'return-receipt:${key.invoice}')) &&
       (key.kind != 'supplierAllocation' ||
         (key.order.startsWith('allocation-copy:') && key.order.length > 16));
+
+  WorkspaceSupplierShortageIntent? get supplierShortageIntent {
+    final text = fields['attempt'];
+    if (key.kind != 'supplierShortage' || text == null || text.isEmpty || text.length > 262144) { return null; }
+    try { return WorkspaceSupplierShortageIntent.fromJson(jsonDecode(text)); }
+    on Object { return null; }
+  }
+  bool _validSupplierShortageIntent(String text) {
+    if (text.isEmpty) return true;
+    final intent = supplierShortageIntent;
+    return intent != null && intent.accountScope == key.account && intent.workspaceId == key.store &&
+      intent.supplierId == key.customer && intent.billId == key.invoice &&
+      intent.copyRevision == key.ledgerRevision && key.order == 'shortage-copy:${intent.copyId}' &&
+      '${intent.billLineIndex}' == fields['billLineIndex'] && intent.expectedDeliveryId == fields['deliveryId'] &&
+      intent.receiptLineId == fields['lineId'] && '${intent.quantityMilli}' == fields['quantityMilli'] &&
+      fields['attributionReviewed'] == 'true';
+  }
 
   WorkspaceSupplierCreditIntent? get supplierCreditIntent {
     final text = fields['attempt'];

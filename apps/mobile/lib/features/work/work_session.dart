@@ -2360,6 +2360,18 @@ class WorkSession extends ChangeNotifier {
   String newWorkspaceSupplierMoneyAllocationId() => _newCounterIdentity('supplier-money-allocation');
   String newWorkspaceSupplierGoodsReturnId() => _newCounterIdentity('supplier-goods-return');
   String newWorkspaceSupplierCreditId() => _newCounterIdentity('supplier-credit');
+  String newWorkspaceSupplierShortageId() => _newCounterIdentity('supplier-shortage');
+  final Set<String> _supplierShortageSubmissions = {};
+  WorkspaceLedgerFormKey? supplierShortageFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard) { return null; }
+    final ledger = workspaceSupplierLedger(copy.supplier.id), accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'shortage-copy:${copy.id}', kind: 'supplierShortage', ledgerRevision: copy.revision);
+  }
   WorkspaceLedgerFormKey? supplierCreditFormKey(WorkspacePurchaseSavedCopy copy) {
     if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
         _ledgerFormStorage is! WorkSupplierCreditDraftGuard) { return null; }
@@ -2452,7 +2464,7 @@ class WorkSession extends ChangeNotifier {
       final copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
       return copy != null && supplierAllocationFormKey(copy) == key;
     }
-    if (key.kind == 'supplierCredit') {
+    if (key.kind == 'supplierCredit' || key.kind == 'supplierShortage') {
       // Stable accepted-copy namespace; native read/submit independently checks
       // its exact bill and supplier even before cache hydration after restart.
       return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid;
@@ -6169,6 +6181,101 @@ class WorkSession extends ChangeNotifier {
       throw const WorkGatewayException('Saved supplier credit differs. Keep both records for review.');
     }
     return notes.single;
+  }
+
+  bool _supplierShortageIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierShortageIntent intent) =>
+    _ledgerFormScopeCurrent(key) && key.kind == 'supplierShortage' && intent.valid &&
+    key.account == intent.accountScope && key.store == intent.workspaceId && key.customer == intent.supplierId &&
+    key.invoice == intent.billId && key.ledgerRevision == intent.copyRevision && key.order == 'shortage-copy:${intent.copyId}';
+
+  WorkspaceSupplierShortageClaim? _matchingWorkspaceSupplierShortage(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierShortageIntent intent) {
+    final claims = saved.supplierLedgers.values.expand((l) => l.shortageClaims.values)
+      .where((c) => c.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) =>
+      l.entries.any((e) => e.operationId == intent.operationId) || l.creditNotes.containsKey(intent.operationId) ||
+      l.goodsReturns.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId) ||
+      l.billGoodsAllocations.containsKey(intent.operationId));
+    if (claims.isEmpty && !other) return null;
+    if (other || claims.length != 1 || !intent.matches(claims.single)) {
+      throw const WorkGatewayException('Saved shortage differs. Keep this review and recover the supplier account.');
+    }
+    return claims.single;
+  }
+
+  Future<WorkspaceSupplierShortageClaim?> readWorkspaceSupplierShortageStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierShortageIntent intent) async {
+    final data = _storeData;
+    if (!_supplierShortageIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier bill.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierShortageIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store) {
+      throw const WorkGatewayException('Saved shortage status is unavailable. Keep the review and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierShortage(saved, intent);
+    if (matched != null) return matched;
+    final ledger = saved.supplierLedgers[key.customer], bill = ledger?.purchaseBills[key.invoice];
+    if (bill == null || bill.copy.id != intent.copyId || bill.copy.revision != intent.copyRevision ||
+        ledger?.openingRecord?.id != intent.openingId || ledger?.openingRecord?.revision != intent.openingRevision) {
+      throw const WorkGatewayException('The original bill or opening balance is unavailable. Keep the shortage review.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierShortageDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierShortageIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierShortageIntentScope(key, intent);
+    final token = jsonEncode([key.account, key.store, intent.operationId]);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard || data.ledgerCheckpointStore == null ||
+        !_supplierShortageSubmissions.add(token)) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierShortageDraftGuard).withFrozenSupplierShortage(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          if (_matchingWorkspaceSupplierShortage(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null || now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          final next = ledger.recordReviewedShortage(intent, recordedAt: now,
+            expectedRevision: ledger.revision, attributionReviewed: true);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              recovered.finance.accountScope != key.account || recovered.finance.workspaceId != key.store ||
+              _matchingWorkspaceSupplierShortage(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          return await recoverCustomerLedger() && current();
+        });
+    } on Object {
+      showNotice('Shortage status is unverified. Keep the saved review and recover the supplier account.');
+      return false;
+    } finally {
+      _supplierShortageSubmissions.remove(token);
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierShortageDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierShortageDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierShortageDraftGuard).resetConfirmedSupplierShortageDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierShortageStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The shortage review is kept. Verify its saved status before starting another.');
+      return false;
+    }
   }
 
   bool _supplierCreditIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) =>

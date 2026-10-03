@@ -5737,6 +5737,160 @@ void main() {
     });
   }
 
+  for (final fault in ['ordinary', 'lost-shortage-reply', 'failed-shortage-save', 'unavailable-read']) {
+    test('PURCHASESHORTAGESESSION $fault preserves exact review and commits once', () async {
+      // Host-only storage journey, not an OPPO evaluation record.
+      final storage = _OrderJournalStorage();
+      final formStore = SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+      final opening = openingFixture(amount: 0);
+      var owner = await openingPostingSession(storage, initialRecord: opening, inventory: true, moneyStore: formStore);
+      final scope = owner.workspaceSupplierScope!;
+      expect(await owner.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final original = sessionReceipt(owner);
+      final receipt = WorkspaceSupplierGoodsReceipt.fromJson({...original.toJson(),
+        'lines': [{...original.lines.single.toJson(), 'shortMilli': 6000}]});
+      expect(await owner.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+        scope: scope, expectedPurchaseRevision: 3, expectedSupplierRevision: 1), WorkspaceGoodsReceiptSaveResult.saved);
+      final product = owner.workspaceCatalogueItems.single;
+      final base = allocatedBillFixture(product: product.id, unit: product.pack);
+      final bill = WorkspaceSupplierBillAcceptance(copy: base.copy, acceptedAt: DateTime.now().toUtc(),
+        openingTreatment: base.openingTreatment);
+      final books = SecureWorkPurchaseEntryStore(accountScope: () => 'account-A', storage: storage);
+      final oldBook = (await books.read('account-A', 'store-A', qa: true))!;
+      await books.save(WorkspacePurchaseEntryBook.fromJson({...oldBook.toJson(), 'revision': 4,
+        'copies': [...oldBook.copies.map((c) => c.toJson()), bill.copy.toJson()]}), expectedRevision: 3);
+      expect(await owner.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(await owner.confirmWorkspacePurchaseBill(bill.copy, scope: scope, expectedPurchaseRevision: 4,
+        expectedLedgerRevision: 2, openingTreatment: bill.openingTreatment, confirmedAt: bill.acceptedAt), isTrue);
+      final ledger = owner.workspaceSupplierLedger(opening.supplierId)!;
+      final intent = ledger.reviewShortageIntent(operationId: 'host-session-shortage', billId: bill.billId,
+        billLineIndex: 0, deliveryId: receipt.expectedDeliveryId, lineId: receipt.lines.single.sourceLineId,
+        quantityMilli: 1000, attributionReviewed: true, requestedAt: DateTime.now().toUtc())!;
+      final key = owner.supplierShortageFormKey(bill.copy)!;
+      final draft = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+        'billLineIndex': '${intent.billLineIndex}', 'deliveryId': intent.expectedDeliveryId,
+        'lineId': intent.receiptLineId, 'quantityMilli': '${intent.quantityMilli}',
+        'attributionReviewed': 'true', 'attempt': jsonEncode(intent.toJson())});
+      await owner.saveLedgerForm(draft, expectedRevision: null);
+      final stock = owner.workspaceCatalogueItems.single.stock, balance = ledger.balanceMinor;
+      expect(await owner.readWorkspaceSupplierShortageStatus(key, intent), isNull);
+      if (fault == 'lost-shortage-reply') storage.loseWriteResponseOnce = true;
+      if (fault == 'failed-shortage-save') storage.failWrite = true;
+      if (fault == 'unavailable-read') storage.failRead = true;
+      expect(await owner.recordWorkspaceSupplierShortageDraft(key, intent),
+        fault != 'failed-shortage-save' && fault != 'unavailable-read');
+      storage.failWrite = false;
+      storage.failRead = false;
+      expect((await formStore.read(key))!.supplierShortageIntent!.toJson(), intent.toJson());
+      owner = await openingPostingSession(storage, inventory: true, moneyStore: formStore);
+      expect(await owner.recordWorkspaceSupplierShortageDraft(key, intent), isTrue);
+      final proof = (await owner.readWorkspaceSupplierShortageStatus(key, intent))!;
+      expect(intent.matches(proof), isTrue);
+      expect(owner.workspaceSupplierLedger(opening.supplierId)!.shortageClaims.length, 1);
+      expect(owner.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, balance);
+      expect(owner.workspaceCatalogueItems.single.stock, stock);
+      final writes = storage.writes.length;
+      expect(await owner.recordWorkspaceSupplierShortageDraft(key, intent), isTrue);
+      expect(storage.writes.length, writes);
+      final changed = WorkspaceSupplierShortageIntent.fromJson({...intent.toJson(), 'quantityMilli': 1001});
+      expect(await owner.recordWorkspaceSupplierShortageDraft(key, changed), isFalse);
+      expect(storage.writes.length, writes);
+      expect(await owner.resetConfirmedWorkspaceSupplierShortageDraft(
+        WorkspaceLedgerFormDraft(key: key, revision: 2, fields: const {}), expectedRevision: 1), isTrue);
+      expect((await formStore.read(key))!.supplierShortageIntent, isNull);
+    });
+  }
+
+  test('PURCHASESHORTAGE frozen review survives money but rejects changed arrivals', () async {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final bill = allocatedBillFixture(quantity: '10', total: '100');
+    var ledger = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    WorkspaceSupplierGoodsReceipt arrival(String id, int delivered, int short) =>
+      WorkspaceSupplierGoodsReceipt(id: id, expectedDeliveryId: 'delivery', reference: id,
+        deliveredOn: '2026-10-03', recordedAt: ledger.asOf.add(const Duration(minutes: 1)),
+        lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'line-A', productId: 'saved-product-A',
+          productLabel: 'Host shortage goods', purchaseUnit: '1 kg', stockUnit: '1 kg', unitsPerPack: 1,
+          expectedMilli: 10000, deliveredMilli: delivered, acceptedMilli: delivered,
+          damagedMilli: 0, shortMilli: short)]);
+    ledger = ledger.receiveGoods(arrival('intent-arrival-1', 4000, 6000), expectedRevision: ledger.revision)!;
+    ledger = ledger.receiveGoods(arrival('intent-arrival-2', 2000, 4000), expectedRevision: ledger.revision)!;
+    final intent = ledger.reviewShortageIntent(operationId: 'reviewed-shortage', billId: bill.billId,
+      billLineIndex: 0, deliveryId: 'delivery', lineId: 'line-A', quantityMilli: 1000,
+      attributionReviewed: true, requestedAt: ledger.asOf)!;
+    final encoded = intent.toJson();
+    expect(encoded.containsKey('recordedAt'), isFalse);
+    expect(encoded.containsKey('committedRevision'), isFalse);
+    expect(intent.openingId, ledger.openingRecord!.id);
+    expect(() => WorkspaceSupplierShortageIntent.fromJson({...encoded, 'recordedAt': encoded['requestedAt']}),
+      throwsFormatException);
+    expect(() => WorkspaceSupplierShortageIntent.fromJson({...encoded}..remove('openingRevision')),
+      throwsFormatException);
+    final reordered = WorkspaceSupplierShortageIntent.fromJson({...encoded,
+      'receiptIds': intent.receiptIds.reversed.toList()});
+    final originalRevision = ledger.revision;
+    final paymentTime = ledger.asOf.add(const Duration(minutes: 1));
+    ledger = ledger.recordReviewedMoney(WorkspaceSupplierLedgerEntry(
+      operationId: 'unrelated-shortage-advance', reference: 'HOST-ADVANCE',
+      origin: WorkspaceSupplierEntryOrigin.supplierAccount, kind: WorkspaceSupplierEntryKind.advance,
+      amountMinor: 100, postedAt: paymentTime, paymentMethod: 'Cash',
+      moneyReview: WorkspaceSupplierMoneyReview(occurredOn: '2026-10-03',
+        openingId: ledger.openingRecord!.id, openingRevision: ledger.openingRecord!.revision,
+        notIncludedInOpening: true)), expectedRevision: ledger.revision)!;
+    final before = ledger;
+    final committedAt = ledger.asOf.add(const Duration(minutes: 1));
+    ledger = ledger.recordReviewedShortage(reordered, recordedAt: committedAt,
+      expectedRevision: ledger.revision, attributionReviewed: true)!;
+    final proof = ledger.shortageClaims[intent.operationId]!;
+    expect(intent.matches(proof), isTrue);
+    expect(proof.requestedAt, intent.requestedAt);
+    expect(proof.recordedAt, committedAt);
+    expect(ledger.entries.map((e) => e.toJson()).toList(), before.entries.map((e) => e.toJson()).toList());
+    expect(ledger.balanceMinor, before.balanceMinor);
+    final restored = WorkspaceSupplierLedger.fromJson(jsonDecode(jsonEncode(ledger.toJson())))!;
+    expect(restored.recordReviewedShortage(intent, recordedAt: committedAt.add(const Duration(minutes: 1)),
+      expectedRevision: originalRevision, attributionReviewed: true), same(restored));
+    final changed = before.receiveGoods(arrival('intent-later-arrival', 1000, 3000),
+      expectedRevision: before.revision)!;
+    expect(changed.recordReviewedShortage(intent, recordedAt: changed.asOf,
+      expectedRevision: changed.revision, attributionReviewed: true), isNull,
+      reason: 'Later arrival must invalidate the frozen evidence, not silently recalculate it.');
+    final key = (account: intent.accountScope, store: intent.workspaceId, customer: intent.supplierId,
+      invoice: intent.billId, order: 'shortage-copy:${intent.copyId}', kind: 'supplierShortage',
+      ledgerRevision: intent.copyRevision);
+    final draft = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: {
+      'billLineIndex': '${intent.billLineIndex}', 'deliveryId': intent.expectedDeliveryId,
+      'lineId': intent.receiptLineId, 'quantityMilli': '${intent.quantityMilli}',
+      'attributionReviewed': 'true', 'attempt': jsonEncode(intent.toJson())});
+    expect(draft.valid, isTrue);
+    expect(WorkspaceLedgerFormDraft(key: key, revision: 1,
+      fields: {...draft.fields, 'quantityMilli': '999'}).valid, isFalse);
+    final storage = _OrderJournalStorage();
+    final formStore = SecureWorkLedgerFormDraftStore(accountScope: () => key.account, storage: storage);
+    await formStore.save(draft, expectedRevision: null);
+    final reopened = SecureWorkLedgerFormDraftStore(accountScope: () => key.account, storage: storage);
+    expect((await reopened.read(key))!.supplierShortageIntent!.toJson(), intent.toJson());
+    final empty = WorkspaceLedgerFormDraft(key: key, revision: 2, fields: const {});
+    await expectLater(reopened.save(empty, expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+    var submitted = 0;
+    expect(await reopened.withFrozenSupplierShortage(key, jsonEncode(intent.toJson()), () async {
+      submitted++;
+      return true;
+    }), isTrue);
+    expect(submitted, 1);
+    await expectLater(reopened.withFrozenSupplierShortage(key, '${jsonEncode(reordered.toJson())} ', () async {
+      submitted++;
+      return true;
+    }), throwsA(isA<WorkGatewayException>()));
+    expect(submitted, 1);
+    await expectLater(reopened.resetConfirmedSupplierShortageDraft(empty, expectedRevision: 1,
+      verifyCommitted: (_) async => false), throwsA(isA<WorkGatewayException>()));
+    expect((await reopened.read(key))!.supplierShortageIntent, isNotNull);
+    await reopened.resetConfirmedSupplierShortageDraft(empty, expectedRevision: 1,
+      verifyCommitted: (savedIntent) async => savedIntent.matches(proof));
+    expect((await reopened.read(key))!.supplierShortageIntent, isNull);
+  });
+
   test('PURCHASESHORTAGE shared delivery budget survives later goods and credit replay', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
     final bill = allocatedBillFixture(quantity: '10', total: '100');

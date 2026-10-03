@@ -921,8 +921,18 @@ abstract interface class WorkSupplierCreditDraftGuard {
   });
 }
 
+abstract interface class WorkSupplierShortageDraftGuard {
+  Future<bool> withFrozenSupplierShortage(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action);
+  Future<void> resetConfirmedSupplierShortageDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierShortageIntent intent) verifyCommitted,
+  });
+}
+
 class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSupplierMoneyDraftGuard,
-    WorkSupplierAllocationDraftGuard, WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard {
+    WorkSupplierAllocationDraftGuard, WorkSupplierGoodsReturnDraftGuard, WorkSupplierCreditDraftGuard,
+    WorkSupplierShortageDraftGuard {
   SecureWorkLedgerFormDraftStore({
     required this.accountScope,
     FlutterSecureStorage? storage,
@@ -1006,12 +1016,46 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
       );
     }
     if ((previous?.supplierMoneyAttempt != null || previous?.supplierAllocationIntent != null ||
-        previous?.supplierGoodsReturnIntent != null || previous?.supplierCreditIntent != null) &&
+        previous?.supplierGoodsReturnIntent != null || previous?.supplierCreditIntent != null ||
+        previous?.supplierShortageIntent != null) &&
         jsonEncode(previous!.fields) != jsonEncode(draft.fields)) {
       throw const WorkGatewayException('This payment attempt is retained. Verify its saved status before recording another.');
     }
     await _storage.write(key: _key(draft.key), value: encoded);
     _check(draft.key);
+  });
+
+  @override
+  Future<bool> withFrozenSupplierShortage(WorkspaceLedgerFormKey key, String intent,
+      Future<bool> Function() action) => _serial(_key(key), () async {
+    final draft = await _read(key);
+    if (key.kind != 'supplierShortage' || draft?.supplierShortageIntent == null || draft!.fields['attempt'] != intent) {
+      throw const WorkGatewayException('Reopen the saved short-delivery review before retrying.');
+    }
+    final result = await action();
+    _check(key);
+    return result;
+  });
+
+  @override
+  Future<void> resetConfirmedSupplierShortageDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required Future<bool> Function(WorkspaceSupplierShortageIntent intent) verifyCommitted,
+  }) => _serial(_key(next.key), () async {
+    _check(next.key);
+    if (next.key.kind != 'supplierShortage' || !next.valid || next.supplierShortageIntent != null ||
+        next.revision != expectedRevision + 1) {
+      throw const WorkGatewayException('Saved short-delivery review cannot be reset.');
+    }
+    final previous = await _read(next.key), encoded = jsonEncode(next.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) return;
+    if (previous?.revision != expectedRevision || previous?.supplierShortageIntent == null ||
+        !await verifyCommitted(previous!.supplierShortageIntent!)) {
+      throw const WorkGatewayException('Verify this exact shortage record before starting another.');
+    }
+    _check(next.key);
+    await _storage.write(key: _key(next.key), value: encoded);
+    _check(next.key);
   });
 
   @override
