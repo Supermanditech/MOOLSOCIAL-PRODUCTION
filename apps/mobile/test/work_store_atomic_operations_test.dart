@@ -4478,6 +4478,101 @@ void main() {
     });
   }
 
+  WorkspaceSupplierRefundIntent refundIntentFixture(WorkspaceSupplierLedger ledger, {
+    WorkspaceSupplierRefundSourceKind kind = WorkspaceSupplierRefundSourceKind.openingAdvance,
+    String? source, WorkspaceSupplierBillAcceptance? bill,
+  }) => WorkspaceSupplierRefundIntent(operationId: 'refund-reviewed',
+    accountScope: ledger.accountScope, workspaceId: ledger.workspaceId,
+    supplierId: ledger.supplierId, qa: ledger.openingRecord!.qa,
+    sourceKind: kind, sourceId: source ?? ledger.openingRecord!.id,
+    openingId: ledger.openingRecord!.id, openingRevision: ledger.openingRecord!.revision,
+    reference: 'HOST-REFUND-1', occurredOn: '2026-10-03', paymentMethod: 'Cash',
+    amountMinor: 1000, requestedAt: ledger.asOf,
+    copyId: bill?.copy.id, copyRevision: bill?.copy.revision);
+
+  test('PURCHASEREFUND frozen review binds source scope date and no commit proof', () {
+    final ledger = confirmedOpeningFixture(openingFixture(amount: 50000, credit: true))!;
+    final intent = refundIntentFixture(ledger);
+    expect(intent.valid, isTrue);
+    expect(WorkspaceSupplierRefundIntent.fromJson(jsonDecode(jsonEncode(intent.toJson()))).toJson(),
+      intent.toJson());
+    for (final mutation in <Map<String, Object?>>[
+      {'operationId': ''}, {'reference': ' padded'}, {'amountMinor': 0},
+      {'occurredOn': '2026-02-30'}, {'occurredOn': '2026-10-04'},
+      {'openingRevision': 0}, {'paymentMethod': 'unknown'}, {'copyId': 'unrelated'},
+      {'sourceKind': 'manualBillSurplus'}, {'committedRevision': 2}, {'recordedAt': '2026-10-03'},
+    ]) {
+      expect(() => WorkspaceSupplierRefundIntent.fromJson({...intent.toJson(), ...mutation}),
+        throwsA(anything));
+    }
+    final missing = {...intent.toJson()}..remove('qa');
+    expect(() => WorkspaceSupplierRefundIntent.fromJson(missing), throwsFormatException);
+  });
+
+  test('PURCHASEREFUND opening capacity is shared with bill allocations without mutation', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 50000,
+      credit: true, bills: const []))!;
+    expect(opening.reviewedRefundCapacity(refundIntentFixture(opening)), 50000);
+    final bill = acceptanceFixture(id: 'refund-copy', draftId: 'refund-bill',
+      date: '2026-10-02', treatment: WorkspaceOpeningBillInclusion.excluded);
+    final billed = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    // The unassigned advance still exists, but net dues consume aggregate credit.
+    expect(billed.reviewedRefundCapacity(refundIntentFixture(billed)), 0);
+    final linked = billed.allocateRecordedMoney(moneyAllocationFixture(billed, bill,
+      amount: 50000), expectedRevision: billed.revision)!;
+    expect(linked.reviewedRefundCapacity(refundIntentFixture(linked)), 0);
+    expect(linked.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+      opening.openingRecord!.id), 0);
+    final before = jsonEncode(linked.toJson());
+    linked.reviewedRefundCapacity(refundIntentFixture(linked));
+    expect(jsonEncode(linked.toJson()), before);
+    for (final mutation in <Map<String, Object?>>[
+      {'accountScope': 'another'}, {'workspaceId': 'another'}, {'supplierId': 'another'},
+      {'qa': !opening.openingRecord!.qa}, {'openingId': 'another'},
+      {'openingRevision': 99}, {'sourceId': 'missing'},
+      {'requestedAt': opening.asOf.subtract(const Duration(days: 1)).toIso8601String(),
+        'occurredOn': '2026-10-02'},
+    ]) {
+      expect(linked.reviewedRefundCapacity(WorkspaceSupplierRefundIntent.fromJson(
+        {...refundIntentFixture(linked).toJson(), ...mutation})), isNull);
+    }
+  });
+
+  test('PURCHASEREFUND reviewed advance is exact source not a platform order or payment', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final advance = WorkspaceSupplierLedgerEntry(operationId: 'refund-advance', reference: 'ADV-R',
+      origin: WorkspaceSupplierEntryOrigin.supplierAccount, paymentMethod: 'UPI',
+      kind: WorkspaceSupplierEntryKind.advance, amountMinor: 10000,
+      postedAt: DateTime.utc(2026, 10, 3, 12),
+      moneyReview: WorkspaceSupplierMoneyReview(occurredOn: '2026-10-03',
+        openingId: opening.openingRecord!.id, openingRevision: opening.openingRecord!.revision,
+        notIncludedInOpening: true));
+    final ledger = opening.recordReviewedMoney(advance, expectedRevision: opening.revision)!;
+    final intent = refundIntentFixture(ledger,
+      kind: WorkspaceSupplierRefundSourceKind.accountAdvance, source: advance.operationId);
+    expect(ledger.reviewedRefundCapacity(intent), 10000);
+    expect(ledger.reviewedRefundCapacity(WorkspaceSupplierRefundIntent.fromJson(
+      {...intent.toJson(), 'occurredOn': '2026-10-02'})), isNull,
+      reason: 'Refund date cannot precede the actual funding advance.');
+    expect(WorkspaceSupplierLedger.fromJson(ledger.toJson())!.reviewedRefundCapacity(intent), 10000);
+    expect(ledger.reviewedRefundCapacity(refundIntentFixture(ledger,
+      kind: WorkspaceSupplierRefundSourceKind.accountAdvance, source: 'unverified')), isNull);
+    expect(ledger.goodsReceipts, isEmpty);
+    expect(ledger.entries, hasLength(1));
+  });
+
+  test('PURCHASEREFUND unpaid accepted bill has no refundable money', () {
+    final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
+    final bill = acceptanceFixture(id: 'refund-copy', draftId: 'refund-bill',
+      date: '2026-10-02', treatment: WorkspaceOpeningBillInclusion.excluded);
+    final ledger = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    final intent = refundIntentFixture(ledger,
+      kind: WorkspaceSupplierRefundSourceKind.manualBillSurplus, source: bill.billId, bill: bill);
+    expect(ledger.reviewedRefundCapacity(intent), 0);
+    expect(ledger.reviewedRefundCapacity(WorkspaceSupplierRefundIntent.fromJson(
+      {...intent.toJson(), 'copyRevision': bill.copy.revision + 1})), isNull);
+  });
+
   test('PURCHASECREDIT support and reviewed document retain exact immutable identities', () {
     const returned = WorkspaceSupplierCreditSupport(
       kind: WorkspaceSupplierCreditSupportKind.goodsReturned,
@@ -6019,6 +6114,15 @@ void main() {
     expect(ledger.manualBillRemainingMinor(bill.billId), -2000);
     expect(ledger.balanceMinor, -2000);
     expect(ledger.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance, 'advance'), 0);
+    expect(ledger.reviewedRefundCapacity(refundIntentFixture(ledger,
+      kind: WorkspaceSupplierRefundSourceKind.accountAdvance, source: 'advance')), 0,
+      reason: 'A later credit must not restore the advance already assigned to this bill.');
+    expect(ledger.reviewedRefundCapacity(refundIntentFixture(ledger,
+      kind: WorkspaceSupplierRefundSourceKind.manualBillSurplus, source: bill.billId, bill: bill)), 2000);
+    expect(ledger.reviewedRefundCapacity(WorkspaceSupplierRefundIntent.fromJson(
+      {...refundIntentFixture(ledger, kind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
+        source: bill.billId, bill: bill).toJson(), 'occurredOn': '2026-10-02'})), isNull,
+      reason: 'A refund cannot precede the credit that made the paid bill refundable.');
     expect(ledger.recordSupplierCredit(note, expectedRevision: note.committedRevision - 1), same(ledger));
     expect(ledger.recordReviewedMoney(payment('extra', 1), expectedRevision: ledger.revision), isNull);
     expect(ledger.allocateRecordedMoney(moneyAllocationFixture(ledger, bill, amount: 1,

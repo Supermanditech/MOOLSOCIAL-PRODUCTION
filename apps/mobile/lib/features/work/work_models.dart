@@ -2861,6 +2861,78 @@ class WorkspaceSupplierMoneyAttempt {
   }
 }
 
+/// Explicit money provenance, never inferred from a credit-note amount alone.
+enum WorkspaceSupplierRefundSourceKind {
+  openingAdvance, accountAdvance, manualBillSurplus,
+}
+
+/// Frozen retailer review, not proof that a refund has been received/posted.
+/// A bill surplus does not restore the capacity of its original funding advance.
+class WorkspaceSupplierRefundIntent {
+  const WorkspaceSupplierRefundIntent({required this.operationId,
+    required this.accountScope, required this.workspaceId, required this.supplierId,
+    required this.qa, required this.sourceKind, required this.sourceId,
+    required this.openingId, required this.openingRevision,
+    required this.reference, required this.occurredOn, required this.paymentMethod,
+    required this.amountMinor, required this.requestedAt,
+    this.copyId, this.copyRevision});
+
+  final String operationId, accountScope, workspaceId, supplierId, sourceId,
+    openingId, reference, occurredOn, paymentMethod;
+  final bool qa;
+  final WorkspaceSupplierRefundSourceKind sourceKind;
+  final int openingRevision, amountMinor;
+  final String? copyId;
+  final int? copyRevision;
+  final DateTime requestedAt;
+
+  bool get valid {
+    final review = WorkspaceSupplierMoneyReview(occurredOn: occurredOn,
+      openingId: openingId, openingRevision: openingRevision,
+      notIncludedInOpening: true);
+    final requested = requestedAt.toLocal();
+    return [operationId, accountScope, workspaceId, supplierId, sourceId,
+      openingId, reference].every((v) => v.isNotEmpty && v == v.trim() && v.length <= 512) &&
+      review.valid && !review.day!.isAfter(DateTime.utc(requested.year,
+        requested.month, requested.day)) &&
+      const ['Cash', 'UPI', 'Bank transfer'].contains(paymentMethod) &&
+      amountMinor > 0 && _financeAmountValid(amountMinor) &&
+      (sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus
+        ? copyId != null && copyId!.isNotEmpty && copyId == copyId!.trim() &&
+          copyId!.length <= 512 && (copyRevision ?? 0) > 0
+        : copyId == null && copyRevision == null);
+  }
+
+  Map<String, Object?> toJson() => {'operationId': operationId,
+    'accountScope': accountScope, 'workspaceId': workspaceId,
+    'supplierId': supplierId, 'qa': qa, 'sourceKind': sourceKind.name,
+    'sourceId': sourceId, 'openingId': openingId,
+    'openingRevision': openingRevision, 'reference': reference,
+    'occurredOn': occurredOn, 'paymentMethod': paymentMethod,
+    'amountMinor': amountMinor, 'requestedAt': requestedAt.toUtc().toIso8601String(),
+    'copyId': copyId, 'copyRevision': copyRevision};
+
+  static WorkspaceSupplierRefundIntent fromJson(Object? raw) {
+    const keys = {'operationId', 'accountScope', 'workspaceId', 'supplierId',
+      'qa', 'sourceKind', 'sourceId', 'openingId', 'openingRevision', 'reference',
+      'occurredOn', 'paymentMethod', 'amountMinor', 'requestedAt', 'copyId', 'copyRevision'};
+    if (raw is! Map || raw.length != keys.length || !keys.every(raw.containsKey)) {
+      throw const FormatException('Invalid supplier refund review');
+    }
+    final intent = WorkspaceSupplierRefundIntent(operationId: raw['operationId'] as String,
+      accountScope: raw['accountScope'] as String, workspaceId: raw['workspaceId'] as String,
+      supplierId: raw['supplierId'] as String, qa: raw['qa'] as bool,
+      sourceKind: WorkspaceSupplierRefundSourceKind.values.byName(raw['sourceKind'] as String),
+      sourceId: raw['sourceId'] as String, openingId: raw['openingId'] as String,
+      openingRevision: raw['openingRevision'] as int, reference: raw['reference'] as String,
+      occurredOn: raw['occurredOn'] as String, paymentMethod: raw['paymentMethod'] as String,
+      amountMinor: raw['amountMinor'] as int, requestedAt: DateTime.parse(raw['requestedAt'] as String),
+      copyId: raw['copyId'] as String?, copyRevision: raw['copyRevision'] as int?);
+    if (!intent.valid) throw const FormatException('Invalid supplier refund review');
+    return intent;
+  }
+}
+
 /// Immutable bill acceptance, independent of receipt and payment. The supplier
 /// document is frozen here; editing a saved copy cannot rewrite posted books.
 /// Explicit whole-invoice classification against an immutable confirmed opening.
@@ -4490,6 +4562,59 @@ class WorkspaceSupplierLedger {
   int? get creditMinor {
     final balance = balanceMinor;
     return balance == null ? null : (balance < 0 ? -balance : 0);
+  }
+
+  /// Read-only preflight. Posting must atomically consume this exact source
+  /// together with the ledger entry; a positive result is not posting authority.
+  /// Conservative policy requires both source capacity and net supplier credit.
+  int? reviewedRefundCapacity(WorkspaceSupplierRefundIntent intent) {
+    final opening = openingRecord;
+    if (!valid || !intent.valid || !historyComplete || opening == null ||
+        intent.accountScope != accountScope || intent.workspaceId != workspaceId ||
+        intent.supplierId != supplierId || intent.qa != opening.qa ||
+        intent.openingId != opening.id || intent.openingRevision != opening.revision ||
+        intent.requestedAt.isBefore(asOf) ||
+        intent.occurredOn.compareTo(opening.asOfDate) < 0) {
+      return null;
+    }
+    final credit = creditMinor;
+    if (credit == null) return null;
+    int? capacity;
+    switch (intent.sourceKind) {
+      case WorkspaceSupplierRefundSourceKind.openingAdvance:
+        capacity = unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+          intent.sourceId);
+      case WorkspaceSupplierRefundSourceKind.accountAdvance:
+        final source = entries.where((entry) => entry.operationId == intent.sourceId).toList();
+        if (source.length != 1 || source.single.moneyReview == null ||
+            intent.occurredOn.compareTo(source.single.moneyReview!.occurredOn) < 0) {
+          return null;
+        }
+        capacity = unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance,
+          intent.sourceId);
+      case WorkspaceSupplierRefundSourceKind.manualBillSurplus:
+        final bill = purchaseBills[intent.sourceId];
+        if (bill == null || bill.copy.id != intent.copyId ||
+            bill.copy.revision != intent.copyRevision) {
+          return null;
+        }
+        final refundDay = DateTime.parse('${intent.occurredOn}T00:00:00Z');
+        final invoiceDay = bill.copy.draft.invoiceIssuedDay;
+        if (invoiceDay == null || refundDay.isBefore(invoiceDay) ||
+            creditNotes.values.any((note) => note.billId == bill.billId &&
+              intent.occurredOn.compareTo(note.occurredOn) < 0) ||
+            entries.any((entry) => entry.billId == bill.billId &&
+              entry.kind == WorkspaceSupplierEntryKind.payment &&
+              (entry.moneyReview == null ||
+                intent.occurredOn.compareTo(entry.moneyReview!.occurredOn) < 0))) {
+          return null;
+        }
+        final remaining = manualBillRemainingMinor(bill.billId);
+        if (remaining == null) return null;
+        capacity = remaining < 0 ? -remaining : 0;
+    }
+    if (capacity == null || capacity < 0) return null;
+    return capacity < credit ? capacity : credit;
   }
 
   /// An opening-included invoice has no independently reviewed remaining due.
