@@ -329,6 +329,21 @@ class _InventoryWriteFailureFixture implements WorkInventoryStore {
   }
 }
 
+// Host-only projection failure after the authoritative receipt commit.
+class _ReceivingProjectionFailureFixture extends SecureWorkInventoryStore {
+  _ReceivingProjectionFailureFixture() : super(accountScope: () => 'review-draft-account');
+  bool failProjection = false;
+  @override
+  Future<bool> projectReceipt(String account, String store, {required bool qa,
+    required int? expectedRevision,
+    required Future<WorkspaceSavedInventory?> Function(WorkspaceSavedInventory? previous) commit,
+  }) => super.projectReceipt(account, store, qa: qa, expectedRevision: expectedRevision,
+    commit: (previous) async {
+      final result = await commit(previous);
+      return failProjection ? null : result;
+    });
+}
+
 class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
   bool failWrite = false;
   final drafts = <WorkspaceLedgerFormKey, WorkspaceLedgerFormDraft>{};
@@ -4496,10 +4511,10 @@ void main() {
     await tester.pumpAndSettle();
   }
   WorkSession postingOpeningFixture(_OpeningPostingFixtureStore entry,
-      _LedgerCheckpointFixtureStore checkpoint, {bool inventory = false}) {
+      _LedgerCheckpointFixtureStore checkpoint, {bool inventory = false, WorkInventoryStore? inventoryStore}) {
     final account = _ContactDraftFixtureStore();
     final work = inventory ? storeViewFixture(null, account, null, null, null, null, null, null, null, entry, null,
-      SecureWorkInventoryStore(accountScope: () => account.accountScope, storage: const FlutterSecureStorage()))
+      inventoryStore ?? SecureWorkInventoryStore(accountScope: () => account.accountScope, storage: const FlutterSecureStorage()))
       : manualPurchaseFixture(entry);
     final scope = work.workspaceSupplierScope!;
     final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1,
@@ -4698,11 +4713,13 @@ void main() {
     });
   }
 
-  testWidgets('PURCHASERECEIVEUI partial arrival retains all group lines but records arriving subset', (tester) async {
+  for (final variant in ['portrait', 'large-landscape', 'unknown-expected', 'projection-failed', 'unavailable-records']) {
+  testWidgets('PURCHASERECEIVEUI partial arrival retains all group lines but records arriving subset $variant', (tester) async {
     // Automated session/UI fixture only, not physical posting qualification.
     FlutterSecureStorage.setMockInitialValues({});
     final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
-    final work = postingOpeningFixture(entry, checkpoint, inventory: true);
+    final inventory = _ReceivingProjectionFailureFixture();
+    final work = postingOpeningFixture(entry, checkpoint, inventory: true, inventoryStore: inventory);
     final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
     final supplier = WorkspaceSupplierProfile(id: 'partial-ui', name: 'Evaluation partial supplier', phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
     final opening = WorkspaceSupplierOpeningRecord(id: 'partial-opening', basisId: 'partial-basis', account: scope.$1,
@@ -4729,7 +4746,7 @@ void main() {
       deliveredOn: '2026-10-03', recordedAt: at, lines: [for (final (index, product) in products.indexed)
         WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'partial-line-$index', productId: product.id, productLabel: product.title,
           purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1, deliveredMilli: 1000, acceptedMilli: 1000,
-          damagedMilli: 0, shortMilli: 0, expectedMilli: index == 0 ? 1000 : 3000)]);
+          damagedMilli: 0, shortMilli: 0, expectedMilli: index == 0 ? 1000 : variant == 'unknown-expected' ? null : 3000)]);
     entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1,
       profiles: [supplier], openingRecords: [opening], goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 1, receipt: first)]);
     expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
@@ -4738,7 +4755,9 @@ void main() {
     expect(await work.confirmWorkspaceSupplierGoodsReceipt(first, supplierId: supplier.id, scope: scope,
       expectedPurchaseRevision: 1, expectedSupplierRevision: ledger.revision, requireSavedReview: true),
       WorkspaceGoodsReceiptSaveResult.saved, reason: work.workspaceSupplierError);
-    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: variant == 'large-landscape' ? const Size(800, 360) : const Size(360, 800),
+      textScale: variant == 'large-landscape' ? 2 : 1.4);
     await openPurchaseList(tester);
     final action = find.byKey(const Key('work-purchase-receive-goods'));
     await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
@@ -4773,9 +4792,72 @@ void main() {
     await reveal('work-receive-arrives-1');
     expect(tester.widget<CheckboxListTile>(find.byKey(const Key('work-receive-arrives-1'))).value, isTrue);
     expect(entry.value!.goodsReceiptDrafts.length, 2, reason: 'Starting another editor cannot post or save it.');
+    await reveal('work-receive-delivered-1'); await tester.enterText(find.byKey(const Key('work-receive-delivered-1')), '1');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await reveal('work-receive-review'); await tester.tap(find.byKey(const Key('work-receive-review'))); await tester.pumpAndSettle();
+    inventory.failProjection = variant == 'projection-failed';
+    await reveal('work-receive-confirm'); await tester.tap(find.byKey(const Key('work-receive-confirm'))); await tester.pumpAndSettle();
+    if (variant == 'projection-failed') {
+      // Before authoritative readback, the frozen editor must not claim success.
+      expect(find.byKey(const Key('work-receive-new-delivery')), findsNothing);
+      final recover = find.text('Recover saved status');
+      await tester.scrollUntilVisible(recover, 120, scrollable: scroll); await tester.pumpAndSettle();
+      await tester.tap(recover); await tester.pumpAndSettle();
+    }
+    final summary = find.byKey(const Key('work-receive-total-1'));
+    await tester.scrollUntilVisible(summary, -120, scrollable: scroll); await tester.pumpAndSettle();
+    expect(find.text(variant == 'unknown-expected' ? 'Total delivered 3 · expected quantity not entered' : 'Total delivered 3 of 3 · pending 0'), findsOneWidget);
+    expect(find.byKey(const Key('work-receive-delivered-0')), findsNothing,
+      reason: 'Confirmed receipt is a compact read-only record, not a disabled editor.');
+    await reveal('work-receive-saved-supplier', delta: -120);
+    expect(find.text('Goods received'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const Key('work-receive-saved-supplier'))).style!.color, MoolColors.ink);
+    expect(find.byKey(const Key('work-receive-reference')), findsNothing);
+    expect(find.byKey(const Key('work-receive-date')), findsNothing);
+    expect(find.text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.'), findsNothing);
+    if (variant == 'projection-failed') {
+      expect(work.workspaceGoodsReceiptRecoveryPending, isTrue);
+      expect(find.text('Awaiting Stock recovery · ${products.last.pack}'), findsOneWidget);
+      await reveal('work-receive-confirm');
+      expect(find.byKey(const Key('work-receive-next')), findsNothing);
+      expect(find.byKey(const Key('work-receive-new-delivery')), findsNothing);
+      final receiptCount = work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.length;
+      inventory.failProjection = false;
+      await tester.tap(find.byKey(const Key('work-receive-confirm'))); await tester.pumpAndSettle();
+      expect(work.workspaceGoodsReceiptRecoveryPending, isFalse);
+      expect(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.length, receiptCount);
+    }
+    if (variant == 'unavailable-records') {
+      entry.failRead = true;
+      expect(await work.loadWorkspaceSuppliers(retry: true), isFalse);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-receive-next')), findsNothing);
+      expect(find.byKey(const Key('work-receive-new-delivery')), findsNothing);
+      entry.failRead = false;
+      final recover = find.text('Recover saved status');
+      await tester.scrollUntilVisible(recover, 120, scrollable: scroll); await tester.pumpAndSettle();
+      await tester.tap(recover); await tester.pumpAndSettle();
+      expect(work.workspaceSupplierRecoveryError, isNull);
+    }
+    await reveal('work-receive-new-delivery');
+    if (variant == 'unknown-expected') {
+      expect(find.byKey(const Key('work-receive-next')), findsOneWidget);
+    } else {
+      expect(find.byKey(const Key('work-receive-next')), findsNothing,
+        reason: 'Every known expected line is fully delivered, including earlier omitted lines.');
+    }
+    expect(find.byKey(const Key('work-receive-confirm')), findsNothing);
+    expect(find.text('Recover saved status'), findsNothing);
+    final ledgerAfter = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+    final stockAfter = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+    await tester.tap(find.byKey(const Key('work-receive-new-delivery'))); await tester.pumpAndSettle();
+    expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), ledgerAfter);
+    expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stockAfter,
+      reason: 'Starting a new delivery must not change Stock or supplier books.');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  }
 
   for (final mode in ['normal', 'unknown', 'included', 'historical-unlinked',
       'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape']) {

@@ -13972,6 +13972,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   bool get _committed => _frozen != null && _ledger?.goodsReceipts.containsKey(_frozen!.id) == true;
   bool get _cancelled => _frozen != null && session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == _frozen!.id);
   bool get _conflict => _committed && _cancelled;
+  bool get _savedStatusResolved => _loaded && _reviewVerified && !_conflict &&
+    session.workspaceSupplierRecoveryError == null && !session.workspaceSupplierRecoveryRequired && !session.workspaceGoodsReceiptRecoveryPending &&
+    _postResult != WorkspaceGoodsReceiptSaveResult.statusUnknown;
+  bool get _hasPendingArrival {
+    final group = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId).toList() ?? [];
+    final expected = <String, int?>{for (final receipt in group) for (final line in receipt.lines) line.sourceLineId: line.expectedMilli};
+    return expected.isNotEmpty && expected.entries.any((entry) => entry.value == null ||
+      group.expand((r) => r.lines).where((line) => line.sourceLineId == entry.key)
+        .fold<int>(0, (total, line) => total + line.deliveredMilli) < entry.value!);
+  }
   String get _input => jsonEncode([_reference.text, _day.text, for (final line in _lines)
     [line.id, line.productId, line.arrives, line.unit.text, line.factor.text, line.expected.text,
       line.delivered.text, line.damaged.text, line.short.text,
@@ -14167,15 +14177,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final editable = !_busy && _frozen == null;
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        Row(children: [const Expanded(child: Text('Receive goods', style: TextStyle(fontSize: 16,
+        Row(children: [Expanded(child: Text(_committed && !_conflict ? 'Goods received' : 'Receive goods', style: const TextStyle(fontSize: 16,
           fontWeight: FontWeight.w700, color: MoolColors.navy))),
           TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
-        const Text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.',
+        if (!_committed || _conflict) const Text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.',
           style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         if (!_loaded) TextButton(onPressed: _busy ? null : _recover, child: const Text('Retry saved records')),
         if (_loaded && session.workspaceSuppliers.isEmpty)
           const Text('First save the supplier through Record purchase → Supplier → Save draft. A bill is not required.'),
-        if (_loaded) KeyedSubtree(key: const Key('work-receive-supplier'), child: DropdownButtonFormField<String>(key: _supplierPicker, initialValue: _supplierId,
+        if (_loaded && (!_committed || _conflict)) KeyedSubtree(key: const Key('work-receive-supplier'), child: DropdownButtonFormField<String>(key: _supplierPicker, initialValue: _supplierId,
           isExpanded: true, style: const TextStyle(fontSize: 13, color: MoolColors.ink),
           decoration: const InputDecoration(labelText: 'Supplier', filled: false,
             floatingLabelBehavior: FloatingLabelBehavior.always, labelStyle: TextStyle(fontSize: 12, color: MoolColors.ink),
@@ -14184,7 +14194,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           items: [for (final p in session.workspaceSuppliers) DropdownMenuItem(value: p.id, child: Text(p.name))],
           onChanged: editable ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
         if (_supplierId != null) ...[
-          Wrap(spacing: 12, runSpacing: 12, children: [
+          if (_committed && !_conflict) ...[
+            Text(session.workspaceSuppliers.where((p) => p.id == _supplierId).singleOrNull?.name ?? _ledger!.supplierName,
+              key: const Key('work-receive-saved-supplier'),
+              style: const TextStyle(fontSize: 14, color: MoolColors.ink, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text('Delivery ${_frozen!.reference}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+            Text('Received ${_registerDate(DateTime.parse(_frozen!.deliveredOn))}',
+              style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+          ] else Wrap(spacing: 12, runSpacing: 12, children: [
             _field('Delivery reference', _reference, 'work-receive-reference', number: false),
             _field('Received date · YYYY-MM-DD', _day, 'work-receive-date', number: false)]),
           if (_ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
@@ -14203,16 +14221,18 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             if (_frozen == null) TextButton(key: const Key('work-receive-review'), onPressed: editable ? _review : null, child: const Text('Review & save goods details')),
             if (_frozen != null && !_reviewVerified && !_cancelled) TextButton(key: const Key('work-receive-retry-review'),
               onPressed: _busy ? null : _review, child: const Text('Retry this exact review save')),
-            if (_frozen != null && !_cancelled && _reviewVerified) TextButton(key: const Key('work-receive-confirm'),
+            if (_frozen != null && !_cancelled && _reviewVerified &&
+                (!_committed || session.workspaceGoodsReceiptRecoveryPending || _error != null)) TextButton(key: const Key('work-receive-confirm'),
               onPressed: _busy || !_loaded || !session.workspaceSupplierOpeningConfirmationAvailable || _ledger?.openingRecord == null ? null : _post,
               child: Text(_committed ? 'Verify / recover Stock' : 'Confirm goods received')),
             if (_frozen != null && !_committed && !_cancelled && _reviewVerified && session.workspaceGoodsReceiptCancellationAvailable) TextButton(key: const Key('work-receive-cancel'),
               onPressed: _busy ? null : _cancel, child: const Text('Cancel review to correct')),
-            if (_frozen != null) TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
-            if (_loaded && _frozen != null && !_conflict && (_cancelled || (_committed && !session.workspaceGoodsReceiptRecoveryPending)))
+            if (_frozen != null && (!_committed || !_savedStatusResolved))
+              TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
+            if (_savedStatusResolved && _frozen != null && (_cancelled || (_committed && _hasPendingArrival)))
               TextButton(key: const Key('work-receive-next'), onPressed: _busy ? null : () => setState(() => _newArrival(previous: _frozen)),
                 child: Text(_cancelled ? 'Correct goods details' : 'Next arrival for this delivery')),
-            if (_loaded && _committed && !_conflict && !session.workspaceGoodsReceiptRecoveryPending)
+            if (_savedStatusResolved && _committed)
               TextButton(key: const Key('work-receive-new-delivery'), onPressed: _busy ? null : () => setState(() => _newArrival()),
                 child: const Text('New delivery')),
           ]),
@@ -14234,6 +14254,31 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     final expected = _ReceivingLineInput.milli(line.expected.text);
     final earlier = _ledger?.goodsReceipts.values.where((r) => r.expectedDeliveryId == _groupId)
       .expand((r) => r.lines).where((l) => l.sourceLineId == line.id).fold<int>(0, (sum, l) => sum + l.deliveredMilli) ?? 0;
+    final saved = _committed ? _frozen!.lines.where((l) => l.sourceLineId == line.id).singleOrNull : null;
+    if (saved != null && !_conflict) {
+      Widget figure(String label, String value) => Row(children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: MoolColors.ink))),
+        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+      ]);
+      String qty(int value) => _ReceivingLineInput._quantity(value);
+      return Padding(key: ValueKey(('receiving-line', line.id)), padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('${index + 1}. ${saved.productLabel}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+          Text('This arrival · ${saved.purchaseUnit}', style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+          const SizedBox(height: 6),
+          figure('Delivered', qty(saved.deliveredMilli)),
+          figure('Accepted', qty(saved.acceptedMilli)),
+          if (saved.damagedMilli > 0) figure('Damaged · not added to Stock', qty(saved.damagedMilli)),
+          if (saved.shortMilli > 0) figure('Short in this arrival', qty(saved.shortMilli)),
+          if (saved.linkedStockUnits > 0) figure('Already in Stock · linked', '${saved.linkedStockUnits}'),
+          figure('${session.workspaceGoodsReceiptRecoveryPending ? 'Awaiting Stock recovery' : 'Added to Stock'} · ${saved.stockUnit}', '${saved.newStockUnits}'),
+          const SizedBox(height: 6),
+          Text(expected == null ? 'Total delivered ${qty(earlier)} · expected quantity not entered'
+            : 'Total delivered ${qty(earlier)} of ${qty(expected)} · pending ${qty(expected - earlier)}',
+            key: ValueKey('work-receive-total-$index'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+          const Divider(height: 16),
+        ]));
+    }
     return Padding(key: ValueKey(('receiving-line', line.id)), padding: const EdgeInsets.symmetric(vertical: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [Expanded(child: Text('Item ${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy))),
         if (!_busy && _frozen == null && !inherited && _lines.length > 1) TextButton(key: ValueKey('work-receive-remove-$index'),

@@ -82,7 +82,7 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer completes opening supplier position, bill/receipt linkage, payment/advance and supplier return reconciliation without duplicate stock or debt.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "EF6A3BB73C4257DE86D9FC061B175766A38ACEC5E19136216DDFF32AA0A5A38D",
+      "manifestSha256": "BB387F3ED71F64A82A9107EA2FDDFF328C81E69BBF795AF535D2D0E3D66ECE3E",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],

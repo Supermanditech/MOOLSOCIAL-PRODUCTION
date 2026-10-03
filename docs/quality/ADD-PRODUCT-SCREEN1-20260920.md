@@ -3892,3 +3892,38 @@ an uncommitted allocation review, legacy receipt review evidence, actual late-bi
 and prior Catalogue/manual/CSV links, payment/advance allocations, supplier
 returns/credits/refunds and statement reconciliation. The full goal stays active;
 this foundation checkpoint is not founder acceptance or completion.
+
+### Completed receiving record correction — 3 October 2026
+
+Reuse the existing Receive goods surface. A confirmed arrival is a compact
+read-only quantity summary, not a disabled editor. Show this arrival separately
+from cumulative delivery/pending quantities; damaged goods count as delivered
+but never accepted Stock. Hide Next arrival only when all known expected group
+lines are fully delivered; unknown expected quantities remain open. New delivery
+cannot clear unresolved review, supplier-read or Stock recovery status. Keep a
+visible recovery action, and label unverified inventory projection as awaiting
+Stock recovery rather than added. No saved receipt, supplier balance or Stock
+quantity is edited by this presentation change.
+
+Host-only qualification: focused receiving v4 native exit0/done.success true,
+15 passed, SHA E49FB33433696F41E2398F7BBD0E25B4ADC3407F24AC19B981947DEF35F40323.
+Connected opening/bill/receiving v1 native exit0/done.success true,27 passed,
+SHA 7D69957CF0F659899AF2519E669B6EC8FF9A0AAF82DD1973BFBF1F6DB0308915.
+Two changed source/test owners analyze clean (v1). Variants cover omitted group
+lines, unknown expected quantity, enlarged-text landscape, committed journal
+with failed inventory projection/recovery, unavailable purchase read/recovery,
+and starting another editor without changing books or Stock. Retain v1/v3
+failures and architect findings; these are not real-device failure injection.
+OPPO current-source screenshot assessment is separately required. Allocation
+review abandonment, same-day late bill inclusion, inline linkage and the full
+financial/statement chain remain open under the unchanged active goal.
+
+Header-polish correction: confirmed supplier is high-contrast text, delivery
+reference/date compact readonly metadata, and entry instructions are omitted.
+Final connected v2:27passed/nativeexit0/done.success true,
+SHA FFC10D71B93BF75D9E7885898B4B40169589A82959541188A66C451DE1D840FF;
+two-owner analysisv2 clean. Architect final narrow diff no blocking finding.
+Initial sourceR3.410s and actual OPPO UI record proved Stock6 and receipt2/1/1,
+cumulative4of4pending0; final-header second physical check recorded separately in
+task outputs/purchase-completed-receiving-correction-20261003.md. No transaction,
+APK/backend/push or full-goal acceptance follows from this bounded correction.
