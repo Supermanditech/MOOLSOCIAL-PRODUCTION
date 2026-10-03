@@ -4653,6 +4653,16 @@ void main() {
         expect(work.workspaceSupplierLedger(supplier.id)!.creditNotes, isEmpty);
         expect(tester.widget<TextField>(qty).enabled, isTrue, reason: 'Invalid quantity must remain correctable, not frozen.');
         await tester.ensureVisible(qty); await tester.enterText(qty, '0.5'); await tester.pumpAndSettle();
+        await enter('supplier-credit-amount', '101');
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        await tapVisible(submit);
+        expect(work.workspaceSupplierLedger(supplier.id)!.creditNotes, isEmpty);
+        expect(tester.widget<TextField>(qty).enabled, isTrue,
+          reason: 'A credit greater than this bill must be rejected before freezing the request.');
+        final editableDraft = await form.read(work.supplierCreditFormKey(copy)!);
+        expect(editableDraft!.supplierCreditIntent, isNull);
+        expect(editableDraft.fields['amount'], '101', reason: 'Keep incorrect input for retailer correction.');
+        await enter('supplier-credit-amount', '25');
         FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
         checkpoint.creditFailure = failure.startsWith('draft-') ? 'none' : failure;
         form.frozenAllocationFailure = failure.startsWith('draft-') ? failure : 'none';

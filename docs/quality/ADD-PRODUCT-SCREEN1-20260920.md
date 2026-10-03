@@ -3979,3 +3979,31 @@ reconciled statements, scope/concurrency and recovery variants, independent
 Catalogue/manual/CSV late-bill proof, actual OPPO flow/screenshots/correction and
 restart, and founder review remain pending. This is a local checkpoint, not
 ticket acceptance/closure, remote verification or permission to push.
+
+### Credit-note admission correction — 3 October
+
+The new failing-before test exposed a retailer recovery gap:101 credit against
+100 bill was rejected by native accounting but only after its UI request froze.
+Retain before-v1 failure evidence; no invalid credit or Stock effect was posted.
+Before a new request freezes, the sheet now uses the existing pure ledger credit
+admission to check combined goods/amount/bill evidence. Rejection retains editable
+input; unavailable/scoped/clock-invalid account state requests recovery instead.
+The tentative ledger is neither adopted nor saved. Native fresh CAS remains the
+posting authority, and exact frozen retries bypass the new-input probe.
+
+Two-owner analysis purchase-credit-ui-invalid-amount-analysis-20261003-v1.log
+is clean. After-v1 UI reporter:24 actual passed,0failed, shell0/done.success=true;
+10 credit cases cover101→25 correction without frozen invalid intent alongside
+all earlier failure/reopen variants, and14 existing allocation cases remain green.
+Atomic-v1 reporter:614 actual passed,11existing skips,0failed, shell0/success.
+Evidence is task outputs with exact reporter names:
+purchase-credit-ui-invalid-amount-before-20261003-v1.jsonl,
+purchase-credit-ui-invalid-amount-after-20261003-v1.jsonl and
+purchase-credit-ui-invalid-amount-atomic-20261003-v1.jsonl.
+These are not device acceptance. Scoped architect review supports reuse
+and clock/uncertainty distinctions; stale concurrent/combined-support variants
+and audited correction remain required, not inferred from this UI test.
+
+OPPO foreground is still YouTube/launcher; no interruption, hot reload or record
+change. Next shortage intent/review plan is saved separately in task outputs;
+it is not implemented UI. Full end-to-end purchase goal remains active/incomplete.

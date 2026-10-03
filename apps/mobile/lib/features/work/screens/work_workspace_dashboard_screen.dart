@@ -28764,6 +28764,21 @@ class _StoreSupplierCreditSheetState extends State<_StoreSupplierCreditSheet> {
           error = 'Check the credit-note number, date and reason. Select each goods source only once.';
           return;
         }
+        final reviewedLedger = ledger;
+        if (reviewedLedger == null || !reviewedLedger.valid || !reviewedLedger.historyComplete ||
+            reviewedLedger.accountScope != key.account || reviewedLedger.workspaceId != key.store ||
+            reviewedLedger.supplierId != key.customer || reviewedLedger.asOf.isAfter(intent.requestedAt)) {
+          recovered = false;
+          error = 'Recover the saved supplier account before confirming this credit note. Your entries are kept.';
+          return;
+        }
+        // Pure admission only: never adopt or persist this tentative ledger.
+        // Native posting still verifies a fresh predecessor after draft saving.
+        if (reviewedLedger.recordSupplierCredit(intent.commit(revision: reviewedLedger.revision + 1,
+              at: intent.requestedAt), expectedRevision: reviewedLedger.revision) == null) {
+          error = 'Check the credit-note amount and selected goods against this bill. No credit note was recorded.';
+          return;
+        }
         // Frozen fields must exactly match the immutable request after trimming.
         reference.text = intent.reference; reason.text = intent.reason;
         amount.text = (minor / 100).toStringAsFixed(2);
