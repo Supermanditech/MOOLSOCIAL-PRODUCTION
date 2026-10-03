@@ -13456,7 +13456,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           Text(ledger!.manualBillRemainingMinor(copy.draft.id) == null
             ? 'Individual bill due not yet verified'
-            : 'Bill due ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
+            : ledger.manualBillRemainingMinor(copy.draft.id)! < 0
+              ? 'Credit with supplier ${_purchaseAmount(-ledger.manualBillRemainingMinor(copy.draft.id)!)}'
+              : 'Bill due ${_purchaseAmount(ledger.manualBillRemainingMinor(copy.draft.id)!)}',
             key: const Key('work-purchase-payment-status')),
           TextButton.icon(key: const Key('work-purchase-record-payment'),
             onPressed: _busy ? null : () async {
@@ -13496,6 +13498,17 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.receipt_long_outlined, size: 18),
           label: const Text('Record supplier credit note'))),
+      if (_copyVerified && session.workspaceSupplierOpeningRecord(copy.supplier.id) != null)
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+          key: const Key('work-purchase-record-supplier-refund'), onPressed: _busy ? null : () async {
+            if (!await confirmLeave() || !mounted) return;
+            await _showSupplierRefund(context, session, _StoreSupplierRefundTarget(
+              supplierId: copy.supplier.id, sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
+              sourceId: copy.draft.id, label: 'Bill ${copy.draft.invoiceReference}', copy: copy,
+              opening: session.workspaceSupplierOpeningRecord(copy.supplier.id)!));
+            if (mounted && _current) await _load(retry: true);
+          }, icon: const Icon(Icons.call_received_outlined, size: 18),
+          label: const Text('Record refund received'))),
       if (same || (_billGoodsWasAccepted && !ready)) _StoreBillGoodsMatch(key: _billGoodsKey, session: session, copy: copy,
         onOpenCopy: (other) async {
           if (!await confirmLeave() || !mounted) return;
@@ -14092,6 +14105,13 @@ class _StoreSupplierOpeningState extends State<_StoreSupplierOpeningSurface> {
           ]),
           _StoreSupplierLedgerSummary(ledger: session.workspaceSupplierLedger(_supplierId!)),
         ],
+        if (_posted && _supplierId != null && session.workspaceSupplierOpeningRecord(_supplierId!) != null)
+          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+            key: const Key('work-opening-record-refund'), onPressed: _busy || !_current ? null : () async {
+              await _chooseSupplierRefund(context, session, _supplierId!);
+              if (mounted && _current) await _recoverPosting();
+            }, icon: const Icon(Icons.call_received_outlined, size: 18),
+            label: const Text('Refund received / saved requests'))),
         if (!_current)
           const Text(
             'Return to the Store where you started. Unsaved entries are kept.',
@@ -28386,6 +28406,263 @@ class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
         ],
       ],
     );
+  }
+}
+
+class _StoreSupplierRefundTarget {
+  const _StoreSupplierRefundTarget({required this.supplierId, required this.sourceKind,
+    required this.sourceId, required this.label, required this.opening, this.copy});
+  final String supplierId, sourceId, label;
+  final WorkspaceSupplierRefundSourceKind sourceKind;
+  final WorkspaceSupplierOpeningRecord opening;
+  final WorkspacePurchaseSavedCopy? copy;
+  WorkspaceLedgerFormKey? key(WorkSession session) => session.supplierRefundRecoveryFormKey(
+    supplierId: supplierId, sourceKind: sourceKind, sourceId: sourceId,
+    openingRevision: opening.revision, copyId: copy?.id, copyRevision: copy?.revision);
+}
+
+Future<void> _chooseSupplierRefund(BuildContext context, WorkSession session, String supplierId) async {
+  final opening = session.workspaceSupplierOpeningRecord(supplierId);
+  if (opening == null) return;
+  final ledger = session.workspaceSupplierLedger(supplierId);
+  final sources = <_StoreSupplierRefundTarget>[
+    if (opening.supplierCredit) _StoreSupplierRefundTarget(supplierId: supplierId,
+      sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id,
+      label: 'Starting advance · ${opening.asOfDate}', opening: opening),
+    for (final entry in ledger?.entries ?? <WorkspaceSupplierLedgerEntry>[])
+      if (entry.origin == WorkspaceSupplierEntryOrigin.supplierAccount && entry.kind == WorkspaceSupplierEntryKind.advance)
+        _StoreSupplierRefundTarget(supplierId: supplierId,
+          sourceKind: WorkspaceSupplierRefundSourceKind.accountAdvance, sourceId: entry.operationId,
+          label: 'Advance · ${entry.reference} · ${entry.moneyReview?.occurredOn ?? ''}', opening: opening),
+    for (final copy in session.workspaceLatestPurchaseCopies.where((c) => c.supplier.id == supplierId))
+      _StoreSupplierRefundTarget(supplierId: supplierId, sourceKind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
+        sourceId: copy.draft.id, label: 'Bill ${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
+        opening: opening, copy: copy),
+  ];
+  final target = await showModalBottomSheet<_StoreSupplierRefundTarget>(context: context, useSafeArea: true,
+    isScrollControlled: true, builder: (sheet) => SafeArea(top: false, child: ListView(shrinkWrap: true,
+      padding: const EdgeInsets.all(16), children: [
+        const Text('Refund received from supplier', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const Text('Choose the bill or advance. Saved requests remain available even when no credit remains.'),
+        if (sources.isEmpty) const Text('No saved bill or advance. Recover the supplier account or record the supporting bill first.'),
+        for (var i = 0; i < sources.length; i++) ListTile(contentPadding: EdgeInsets.zero,
+          key: ValueKey('supplier-refund-source-$i'), title: Text(sources[i].label),
+          trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(sheet, sources[i])),
+        TextButton(onPressed: () => Navigator.pop(sheet), child: const Text('Close')),
+      ])));
+  if (target != null && context.mounted) await _showSupplierRefund(context, session, target);
+}
+
+Future<void> _showSupplierRefund(BuildContext context, WorkSession session,
+    _StoreSupplierRefundTarget target) => showModalBottomSheet<void>(context: context,
+      isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
+      builder: (_) => _StoreSupplierRefundSheet(session: session, target: target));
+
+class _StoreSupplierRefundSheet extends StatefulWidget {
+  const _StoreSupplierRefundSheet({required this.session, required this.target});
+  final WorkSession session;
+  final _StoreSupplierRefundTarget target;
+  @override
+  State<_StoreSupplierRefundSheet> createState() => _StoreSupplierRefundSheetState();
+}
+
+class _StoreSupplierRefundSheetState extends State<_StoreSupplierRefundSheet> {
+  late final _LedgerFormAutosave draft;
+  final amount = TextEditingController(), reference = TextEditingController(), date = TextEditingController();
+  String channel = 'Cash';
+  WorkspaceSupplierRefundIntent? frozen;
+  WorkspaceLedgerFormDraft? resetAttempt;
+  bool busy = false, closing = false, recovered = false, statusVerified = false;
+  String? confirmedAttempt;
+  bool get confirmed => current && frozen != null &&
+    confirmedAttempt == jsonEncode(frozen!.toJson());
+  String? error;
+  WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.target.supplierId);
+  bool get current => draft.key != null && widget.target.key(widget.session) == draft.key;
+  String printedDate(String day) => '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}';
+  String? get occurredOn {
+    final m = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$').firstMatch(date.text.trim());
+    if (m == null) return null;
+    final parsed = DateTime(int.parse(m[3]!), int.parse(m[2]!), int.parse(m[1]!));
+    if (parsed.year != int.parse(m[3]!) || parsed.month != int.parse(m[2]!) || parsed.day != int.parse(m[1]!)) return null;
+    return '${m[3]}-${m[2]}-${m[1]}';
+  }
+  WorkspaceSupplierRefundIntent intent({required String id, required int minor}) => WorkspaceSupplierRefundIntent(
+    operationId: id, accountScope: draft.key!.account, workspaceId: draft.key!.store,
+    supplierId: widget.target.supplierId, qa: widget.target.opening.qa,
+    openingId: widget.target.opening.id, openingRevision: widget.target.opening.revision,
+    sourceKind: widget.target.sourceKind, sourceId: widget.target.sourceId,
+    copyId: widget.target.copy?.id, copyRevision: widget.target.copy?.revision,
+    amountMinor: minor, reference: reference.text.trim(), occurredOn: occurredOn ?? '',
+    paymentMethod: channel, requestedAt: DateTime.now().toUtc());
+  int? get capacity {
+    if (!recovered || !current) return null;
+    final probe = WorkspaceSupplierRefundIntent(operationId: 'refund-capacity-review',
+      accountScope: draft.key!.account, workspaceId: draft.key!.store, supplierId: widget.target.supplierId,
+      qa: widget.target.opening.qa, openingId: widget.target.opening.id,
+      openingRevision: widget.target.opening.revision, sourceKind: widget.target.sourceKind,
+      sourceId: widget.target.sourceId, copyId: widget.target.copy?.id, copyRevision: widget.target.copy?.revision,
+      amountMinor: 1, reference: 'Capacity review', occurredOn: DateTime.now().toUtc().toIso8601String().substring(0, 10),
+      paymentMethod: 'Cash', requestedAt: DateTime.now().toUtc());
+    return ledger?.reviewedRefundCapacity(probe);
+  }
+  Map<String, String> get fields => {'amount': amount.text, 'reference': reference.text,
+    'channel': channel, 'occurredOn': frozen?.occurredOn ?? date.text,
+    'sourceKind': widget.target.sourceKind.name, 'sourceId': widget.target.sourceId,
+    if (frozen != null) 'attempt': jsonEncode(frozen!.toJson())};
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(widget.session, widget.target.key(widget.session));
+    draft.addListener(refresh); unawaited(load());
+  }
+  void refresh() { if (mounted) setState(() {}); }
+  Future<void> verify() async {
+    statusVerified = false;
+    if (!current || frozen == null) return;
+    final reviewed = frozen!;
+    final proof = await widget.session.readWorkspaceSupplierRefundStatus(draft.key!, reviewed);
+    if (!mounted || !current || frozen == null ||
+        jsonEncode(frozen!.toJson()) != jsonEncode(reviewed.toJson())) {
+      throw StateError('Store or saved request changed');
+    }
+    confirmedAttempt = proof != null ? jsonEncode(reviewed.toJson()) : null;
+    statusVerified = true;
+  }
+  Future<void> load() async {
+    if (busy || draft.busy) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await flushPending() || !mounted || !current) return;
+      final saved = await draft.load();
+      if (!mounted || saved == null || !current) throw StateError('Saved request unavailable');
+      frozen = saved['attempt']?.isNotEmpty == true
+        ? WorkspaceSupplierRefundIntent.fromJson(jsonDecode(saved['attempt']!)) : null;
+      amount.text = saved['amount'] ?? ''; reference.text = saved['reference'] ?? '';
+      channel = saved['channel']?.isNotEmpty == true ? saved['channel']! : 'Cash';
+      date.text = frozen == null ? saved['occurredOn'] ?? printedDate(DateTime.now().toUtc().toIso8601String().substring(0, 10))
+        : printedDate(frozen!.occurredOn);
+      if (frozen != null) await verify();
+      recovered = await widget.session.recoverCustomerLedger();
+      if (!current) throw StateError('Store changed');
+      if (!recovered) error = confirmed ? 'Refund recorded; account refresh pending.' : 'Account unavailable. Keep the saved request and retry recovery.';
+    } on Object {
+      recovered = false;
+      error = confirmed ? 'Refund recorded; account refresh pending.' : 'Saved refund status is unverified. Keep these details and retry.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<bool> flushPending() async {
+    if (!draft.ready) return true;
+    if (draft.pending != null) draft.save(fields);
+    return await draft.flush();
+  }
+  Future<void> close() async {
+    if (busy || closing || draft.busy) return;
+    final route = ModalRoute.of(context);
+    setState(() { closing = true; busy = true; });
+    try {
+      if (await flushPending() && mounted && route?.isCurrent == true) {
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() { closing = false; busy = false; });
+    }
+  }
+  Future<void> submit() async {
+    if (busy || !current || !draft.ready || draft.busy) return;
+    setState(() { busy = true; error = null; });
+    try {
+      if (!await draft.flush() || !mounted || !current) return;
+      if (confirmed) {
+        if (!recovered) { error = 'Refresh the account before recording another refund.'; return; }
+        resetAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1, fields: const {});
+        if (!await widget.session.resetConfirmedWorkspaceSupplierRefundDraft(resetAttempt!, expectedRevision: draft.revision!)) {
+          error = 'Recorded refund is kept. Retry recovery before starting another.'; return;
+        }
+        if (!mounted || !current) return;
+        draft.revision = resetAttempt!.revision; draft.pending = null; draft.error = null;
+        frozen = null; resetAttempt = null; confirmedAttempt = null; statusVerified = false;
+        amount.clear(); reference.clear(); channel = 'Cash';
+        date.text = printedDate(DateTime.now().toUtc().toIso8601String().substring(0, 10));
+        return;
+      }
+      if (frozen == null) {
+        if (!recovered) { error = 'Recover the supplier account before recording money received.'; return; }
+        final minor = WorkspacePurchaseEntryDraft.printedPaise(amount.text);
+        if (minor == null || minor <= 0 || occurredOn == null) {
+          error = 'Enter the amount received and a valid date (DD/MM/YYYY).'; return;
+        }
+        final review = intent(id: widget.session.newWorkspaceSupplierRefundId(), minor: minor);
+        final available = ledger?.reviewedRefundCapacity(review);
+        if (!review.valid || available == null || minor > available) {
+          error = 'Check the reference, date and available credit. No refund was recorded.'; return;
+        }
+        reference.text = review.reference; amount.text = (minor / 100).toStringAsFixed(2);
+        frozen = review; draft.save(fields);
+        if (!await draft.flush() || !mounted || !current) return;
+      }
+      final posted = await widget.session.recordWorkspaceSupplierRefundDraft(draft.key!, frozen!);
+      if (!mounted || !current) return;
+      await verify();
+      recovered = await widget.session.recoverCustomerLedger();
+      if (!current) return;
+      error = confirmed ? recovered ? null : 'Refund recorded; account refresh pending.'
+        : posted ? 'Saved status needs verification. Retry recovery; do not enter this refund again.'
+        : 'Refund not confirmed. Keep and retry this same saved request.';
+    } on Object {
+      error = confirmed ? 'Refund recorded; account refresh pending.' : 'Refund status unverified. Keep and recover this saved request.';
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+  @override
+  void dispose() {
+    draft.removeListener(refresh); draft.dispose(); amount.dispose(); reference.dispose(); date.dispose(); super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final editable = draft.ready && recovered && current && !busy && frozen == null;
+    final available = capacity;
+    return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null,
+      onPopInvokedWithResult: (didPop, result) async { if (!didPop) await close(); },
+      child: SafeArea(top: false, child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              Text('Supplier refund received', style: Theme.of(context).textTheme.titleMedium),
+              TextButton(key: const Key('supplier-refund-close'), onPressed: busy || draft.busy ? null : close, child: const Text('Close'))]),
+            Text('${widget.session.workspaceSuppliers.where((s) => s.id == widget.target.supplierId).firstOrNull?.name ?? 'Supplier'} · ${widget.target.label}'),
+            const Text('Records money received; no transfer or Stock change.'),
+            Text(available == null ? 'Available credit needs verification' : 'Available to receive ${_purchaseAmount(available)}',
+              key: const Key('supplier-refund-available')),
+            Wrap(spacing: 12, runSpacing: 8, children: [
+              _purchaseCompactLabeledField('Amount received (₹)', width: 145, field: TextField(
+                key: const Key('supplier-refund-amount'), controller: amount, enabled: editable,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => draft.save(fields))),
+              _purchaseCompactLabeledField('Received date', width: 145, field: TextField(
+                key: const Key('supplier-refund-date'), controller: date, enabled: editable,
+                decoration: const InputDecoration(helperText: 'DD/MM/YYYY'), keyboardType: TextInputType.datetime,
+                onChanged: (_) => draft.save(fields))),
+            ]),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(key: const Key('supplier-refund-method'), initialValue: channel,
+              isExpanded: true, decoration: const InputDecoration(labelText: 'Received by'),
+              items: [for (final method in ['Cash', 'UPI', 'Bank transfer']) DropdownMenuItem(value: method, child: Text(method))],
+              onChanged: editable ? (value) { setState(() => channel = value!); draft.save(fields); } : null),
+            TextField(key: const Key('supplier-refund-reference'), controller: reference, enabled: editable,
+              decoration: const InputDecoration(labelText: 'Refund reference', helperText: 'Receipt No. / UPI reference / bank reference'),
+              onChanged: (_) => draft.save(fields)),
+            if (frozen != null) Text(confirmed ? 'Refund recorded · ${_purchaseAmount(frozen!.amountMinor)}'
+              : statusVerified ? 'Saved request · not recorded' : 'Saved refund status unverified', key: const Key('supplier-refund-status')),
+            if (confirmed && recovered && ledger?.creditMinor != null) Text('Credit remaining with supplier ${_purchaseAmount(ledger!.creditMinor!)}'),
+            if (error != null || draft.error != null) Text(error ?? draft.error!),
+            if (frozen != null || error != null || draft.error != null || !recovered)
+              TextButton(key: const Key('supplier-refund-recover'), onPressed: busy || draft.busy ? null : load,
+              child: const Text('Recover saved refund')),
+            FilledButton(key: const Key('supplier-refund-submit'), onPressed: !busy && !draft.busy && draft.ready && current && draft.error == null &&
+              (frozen != null || recovered && (available ?? 0) > 0) ? submit : null,
+              child: Text(busy ? 'Recording…' : confirmed ? 'Record another refund'
+                : frozen == null ? 'Record refund received' : 'Retry same refund')),
+          ])))));
   }
 }
 

@@ -4559,6 +4559,76 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
+    testWidgets('PURCHASEREFUNDUI opening advance saved request remains reachable $display', (tester) async {
+      // Automated UI fixtures only; never injected into phone acceptance storage.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      expect(scope.$1, 'review-draft-account');
+      final day = at.toIso8601String().substring(0, 10);
+      final supplier = WorkspaceSupplierProfile(id: 'refund-ui-supplier', name: 'Evaluation refund supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      final opening = WorkspaceSupplierOpeningRecord(id: 'refund-ui-opening', basisId: 'refund-ui-basis',
+        account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 2,
+        asOfDate: day, savedAt: at, amountMinor: 10000, supplierCredit: true, sourceNote: 'HOST advance confirmed', bills: const []);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 2, profiles: [supplier], openingRecords: [opening]);
+      expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
+        expectedRevision: 2, confirmedAt: at), isTrue);
+      final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display, textScale: display.width > 500 ? 2 : 1.4);
+      await openPurchaseList(tester);
+      final openingAction = find.byKey(const Key('work-purchase-opening'));
+      await revealPurchaseAction(tester, openingAction); await tester.tap(openingAction); await tester.pumpAndSettle();
+      final picker = find.byType(DropdownButtonFormField<String>);
+      await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final refundAction = find.byKey(const Key('work-opening-record-refund'));
+      await revealOpening(tester, refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('supplier-refund-source-0'))); await tester.pumpAndSettle();
+      Future<void> tap(Finder target) async {
+        await tester.ensureVisible(target); await tester.pumpAndSettle();
+        expect(target.hitTestable(), findsOneWidget); await tester.tap(target); await tester.pumpAndSettle();
+      }
+      Future<void> enter(String key, String text) async {
+        final target = find.byKey(Key(key)); await tester.ensureVisible(target); await tester.pumpAndSettle();
+        await tester.enterText(target, text); await tester.pumpAndSettle();
+      }
+      expect(find.text('Available to receive ₹100'), findsOneWidget);
+      await enter('supplier-refund-amount', '100'); await enter('supplier-refund-reference', 'HOST-REFUND-RECEIVED');
+      tester.view.viewInsets = FakeViewPadding(bottom: display.width > 500 ? 160 : 240);
+      await tester.pumpAndSettle();
+      final reference = find.byKey(const Key('supplier-refund-reference'));
+      await tester.ensureVisible(reference); await tester.pumpAndSettle();
+      expect(tester.getRect(reference).bottom, lessThanOrEqualTo(display.height - (display.width > 500 ? 160 : 240)));
+      tester.view.viewInsets = const FakeViewPadding(); await tester.pumpAndSettle();
+      await tap(find.byKey(const Key('supplier-refund-submit')));
+      final ledger = work.workspaceSupplierLedger(supplier.id)!;
+      expect(ledger.refunds, hasLength(1)); expect(ledger.creditMinor, 0);
+      expect(ledger.entries.single.kind, WorkspaceSupplierEntryKind.refund);
+      expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+      expect(find.text('Record another refund'), findsOneWidget);
+      await tap(find.byKey(const Key('supplier-refund-recover')));
+      expect(find.text('Refund recorded · ₹100'), findsOneWidget);
+      final close = find.byKey(const Key('supplier-refund-close'));
+      await tester.ensureVisible(close); await tester.pumpAndSettle();
+      // Two queued Close events must dismiss only this sheet, not its parent.
+      final closeCallback = tester.widget<TextButton>(close).onPressed!;
+      closeCallback(); closeCallback(); await tester.pumpAndSettle();
+      expect(refundAction, findsOneWidget);
+      await revealOpening(tester, refundAction); await tester.tap(refundAction); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('supplier-refund-source-0'))); await tester.pumpAndSettle();
+      expect(find.text('Record another refund'), findsOneWidget);
+      expect(work.workspaceSupplierLedger(supplier.id)!.refunds, hasLength(1));
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final display in [const Size(320, 568), const Size(915, 412)]) {
     for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack']) {
       testWidgets('PURCHASECREDITUI saved bill credit note recovery $display failure=$failure', (tester) async {
         // Host UI fixture only; no injected phone records or physical acceptance.
