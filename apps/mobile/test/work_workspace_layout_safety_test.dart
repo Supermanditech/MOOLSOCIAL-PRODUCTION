@@ -4969,7 +4969,9 @@ void main() {
         expect((await form.read(work.supplierShortageRecoveryFormKey(copy)!))!.fields, isEmpty);
         expect(qty, findsNothing);
         expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
-        expect(find.textContaining('No eligible short delivery.'), findsOneWidget);
+        expect(find.text('No further missing quantity is available to record for this bill.'), findsOneWidget);
+        expect(find.byKey(ValueKey(('supplier-shortage-history', proof.operationId))), findsOneWidget);
+        expect(find.text('These are missing-goods records, not credit notes or refunds.'), findsOneWidget);
         expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
         expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
         expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, hasLength(1));
@@ -4980,7 +4982,7 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
-    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'identical-sources', 'held-recovery']) {
+    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'identical-sources', 'held-recovery', 'no-sources']) {
       testWidgets('PURCHASEALLOCUI saved bill source selection and recovery $display failure=$failure', (tester) async {
         // Host UI fixture only. Actual OPPO acceptance remains separate.
         FlutterSecureStorage.setMockInitialValues({});
@@ -5017,8 +5019,10 @@ void main() {
           amountMinor: 10000, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
           moneyReview: WorkspaceSupplierMoneyReview(occurredOn: day, openingId: opening.id,
             openingRevision: opening.revision, notIncludedInOpening: true));
-        expect(await work.recordWorkspaceSupplierMoney(supplier.id, accountScope: scope.$1, workspaceId: scope.$2,
-          entry: advance, expectedRevision: 2), isTrue);
+        if (failure != 'no-sources') {
+          expect(await work.recordWorkspaceSupplierMoney(supplier.id, accountScope: scope.$1, workspaceId: scope.$2,
+            entry: advance, expectedRevision: 2), isTrue);
+        }
         if (failure == 'identical-sources') {
           final sameLabel = WorkspaceSupplierLedgerEntry(operationId: 'allocation-ui-second-source',
             reference: advance.reference, origin: advance.origin, kind: advance.kind, amountMinor: advance.amountMinor,
@@ -5063,6 +5067,23 @@ void main() {
           expect(control.hitTestable(), findsOneWidget);
         }
         await openCopy(); await openAllocation();
+        if (failure == 'no-sources') {
+          final ledgerBefore = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+          expect(find.textContaining('Record it in Opening dues'), findsNothing);
+          for (final kind in ['payment', 'advance']) {
+            final next = find.byKey(Key('supplier-allocation-record-$kind'));
+            await revealAllocation(next); await tester.tap(next); await tester.pumpAndSettle();
+            expect(find.text('Record supplier $kind'), findsWidgets);
+            final closeMoney = find.byKey(const Key('supplier-money-close'));
+            await revealAllocation(closeMoney); await tester.tap(closeMoney); await tester.pumpAndSettle();
+            expect(find.byKey(const Key('supplier-allocation-close')), findsOneWidget);
+            expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), ledgerBefore);
+            expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
         final source = find.byType(DropdownButtonFormField<String>).last;
         await revealAllocation(source); await tester.tap(source); await tester.pumpAndSettle();
         final advanceChoice = failure == 'identical-sources'
@@ -5125,6 +5146,14 @@ void main() {
           heldRead.complete(); await tester.pumpAndSettle();
           expect(find.text('Link another amount'), findsOneWidget);
           expect(work.workspaceSupplierLedger(supplier.id)!.billMoneyAllocations.length, 1);
+        }
+        if (failure == 'none') {
+          await revealAllocation(submit); await tester.tap(submit); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('supplier-allocation-settled')), findsOneWidget);
+          expect(find.byKey(const Key('supplier-allocation-amount')), findsNothing);
+          expect(find.byKey(const Key('supplier-allocation-submit')), findsNothing);
+          expect(work.workspaceSupplierLedger(supplier.id)!.billMoneyAllocations.length, 1);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
         }
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

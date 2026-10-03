@@ -13502,7 +13502,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             await _showSupplierShortage(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
-          label: const Text('Short delivery')),
+          label: Text(same && ledger!.shortageClaims.values.any((claim) =>
+            claim.copyId == copy.id && claim.copyRevision == copy.revision)
+              ? 'Shortages' : 'Short delivery')),
       if (same && session.supplierCreditFormKey(copy) != null)
         TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
@@ -29117,6 +29119,10 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     final accountReady = recovered && current && widget.session.supplierShortageFormKey(widget.copy) == draft.key;
     final editable = draft.ready && accountReady && !busy && frozen == null;
     final choices = options;
+    final history = accountReady ? ledger!.shortageClaims.values.where((claim) =>
+      claim.copyId == widget.copy.id && claim.copyRevision == widget.copy.revision).toList()
+      : const <WorkspaceSupplierShortageClaim>[];
+    final historyOnly = frozen == null && accountReady && choices.isEmpty && history.isNotEmpty;
     final selected = billLine == null || deliveryId == null || sourceLine == null ? null
       : optionId(billLine!, deliveryId!, sourceLine!);
     final visibleSelection = choices.any((o) => optionId(o.$1, o.$2.expectedDeliveryId, o.$3.sourceLineId) == selected);
@@ -29125,11 +29131,13 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
         padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
           Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Text('Review short delivery', style: Theme.of(context).textTheme.titleMedium),
+            Text(historyOnly ? 'Shortage history' : 'Review short delivery', style: Theme.of(context).textTheme.titleMedium),
             TextButton(onPressed: busy || draft.busy ? null : close, child: const Text('Close')),
           ]),
           Text('${widget.copy.supplier.name} · Bill ${widget.copy.draft.invoiceReference}'),
-          const Text('Record goods still missing from this bill. This does not change Stock, reduce dues or issue a refund.'),
+          Text(historyOnly
+            ? 'Missing quantities already recorded for this bill. Viewing them does not change Stock, dues or refunds.'
+            : 'Record goods still missing from this bill. This does not change Stock, reduce dues or issue a refund.'),
           const SizedBox(height: 8),
           if (frozen == null) ...[
             if (choices.isNotEmpty) DropdownButtonFormField<String>(
@@ -29144,7 +29152,17 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
                 billLine = choice.$1; deliveryId = choice.$2.expectedDeliveryId; sourceLine = choice.$3.sourceLineId;
                 reviewed = false; changed();
               }),
-            if (choices.isEmpty && accountReady) const Text('No eligible short delivery. Record the delivery with its expected quantity first, or check whether all goods arrived.'),
+            if (choices.isEmpty && accountReady) Text(history.isEmpty
+              ? 'No missing quantity is available to review. Check the saved delivery and its expected quantity.'
+              : 'No further missing quantity is available to record for this bill.'),
+            if (history.isNotEmpty) ...[
+              const Text('Recorded shortages', style: TextStyle(fontWeight: FontWeight.w600)),
+              for (final claim in history) Text(
+                '${widget.copy.draft.goods[claim.billLineIndex]['name'] ?? 'Bill item ${claim.billLineIndex + 1}'} · '
+                'Missing qty ${_ReceivingLineInput._quantity(claim.quantityMilli)} · Unit ${claim.purchaseUnit} · '
+                'Recorded ${_registerDate(claim.recordedAt)}', key: ValueKey(('supplier-shortage-history', claim.operationId))),
+              const Text('These are missing-goods records, not credit notes or refunds.'),
+            ],
             if (!accountReady && !busy) Text(recovered
               ? 'Confirm the supplier’s starting balance and this bill in Purchases before reviewing missing goods.'
               : 'Supplier account is unavailable. Your saved input is kept. Retry verification.'),
@@ -29493,7 +29511,9 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
     final list = <(WorkspaceSupplierMoneySourceKind, String, String, int)>[];
     void add(WorkspaceSupplierMoneySourceKind kind, String id, String label) {
       final remaining = current.unallocatedMoneyMinor(kind, id);
-      if (remaining != null) list.add((kind, id, label, remaining));
+      if (remaining != null && (remaining > 0 || frozen != null)) {
+        list.add((kind, id, label, remaining));
+      }
     }
     final opening = current.openingRecord;
     if (opening?.supplierCredit == true) {
@@ -29531,6 +29551,23 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
     if (saved != null) {
       confirmed = jsonEncode(saved.intentToJson()) == jsonEncode(frozen!.intentToJson());
       if (!confirmed) { conflict = true; error = 'Recorded allocation differs. Keep this request for review.'; }
+    }
+  }
+  Future<void> recordMoney(bool advance) async {
+    final session = widget.session;
+    if (busy || conflict || frozen != null || !draft.ready || !recovered ||
+        session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
+    setState(() => busy = true);
+    try {
+      if (!await draft.flush() || !mounted ||
+          session.supplierAllocationFormKey(widget.copy) != draft.key) { return; }
+      await _showSupplierMoneyEntry(context, session,
+        _StoreSupplierMoneyTarget(supplierId: widget.copy.supplier.id, advance: advance));
+    } finally { if (mounted) setState(() => busy = false); }
+    if (mounted && session.supplierAllocationFormKey(widget.copy) == draft.key) {
+      await load();
+    } else if (mounted) {
+      setState(() { conflict = true; error = 'Return to the original Store to recover this allocation.'; });
     }
   }
   Future<void> load() async {
@@ -29615,11 +29652,14 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
   @override
   Widget build(BuildContext context) {
     final list = sources;
+    final accountReady = recovered && widget.session.supplierAllocationFormKey(widget.copy) == draft.key;
+    final billDue = accountReady ? ledger?.manualBillRemainingMinor(widget.copy.draft.id) : null;
+    final settled = accountReady && billDue != null && billDue <= 0 && frozen == null;
     final selected = sourceKind == null ? null : sourceValue(sourceKind!, sourceId);
     final selectionKnown = list.any((s) => sourceValue(s.$1, s.$2) == selected);
     final selectedSource = list.where((s) => sourceValue(s.$1, s.$2) == selected).firstOrNull;
     final savedVerified = draft.pending == null && draft.error == null && draft.revision != null && !draft.busy;
-    final editable = draft.ready && recovered && !busy && !conflict && frozen == null;
+    final editable = draft.ready && accountReady && !busy && !conflict && frozen == null;
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop && !busy && !conflict && await draft.flush() && context.mounted) Navigator.pop(context);
@@ -29633,9 +29673,20 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
             }, child: const Text('Close'))]),
           Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
           const Text('Uses money already recorded. No new payment or Stock change.'),
-          Text(ledger?.manualBillRemainingMinor(widget.copy.draft.id) == null ? 'Bill due unavailable'
-            : 'Bill due ${_purchaseAmount(ledger!.manualBillRemainingMinor(widget.copy.draft.id)!)}'),
-          if (list.isEmpty) const Text('No verified advance or account payment is available. Record it in Opening dues first.'),
+          Text(billDue == null ? 'Bill due unavailable' : billDue < 0
+            ? 'Credit with supplier ${_purchaseAmount(-billDue)}' : 'Bill due ${_purchaseAmount(billDue)}'),
+          if (settled) const Text('No amount remains to link to this bill. Your recorded payments and allocations are kept.',
+            key: Key('supplier-allocation-settled')),
+          if (!settled && list.isEmpty && accountReady && frozen == null) ...[
+            const Text('No recorded advance or account payment is available to link. Record money already paid to this supplier, then return here to link it.'),
+            if (billDue != null && billDue > 0) Wrap(spacing: 8, children: [
+              TextButton(key: const Key('supplier-allocation-record-payment'),
+                onPressed: editable ? () => recordMoney(false) : null, child: const Text('Record supplier payment')),
+              TextButton(key: const Key('supplier-allocation-record-advance'),
+                onPressed: editable ? () => recordMoney(true) : null, child: const Text('Record supplier advance')),
+            ]),
+          ],
+          if (!settled) ...[
           DropdownButtonFormField<String>(key: ValueKey(('supplier-allocation-source', selected)),
             initialValue: selectionKnown ? selected : null, isExpanded: true,
             decoration: const InputDecoration(labelText: 'Recorded advance / account payment'),
@@ -29652,14 +29703,15 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
             key: const Key('supplier-allocation-amount'), controller: amount, enabled: editable,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Amount to link (₹)'), onChanged: (_) => draft.save(fields)))),
+          ],
           if (frozen != null) Text(confirmed ? 'Allocation recorded · ${_purchaseAmount(frozen!.amountMinor)}'
             : savedVerified ? 'Saved allocation request · recover and retry the same details.'
             : 'Saved status unverified · keep this request and retry saving.', key: const Key('supplier-allocation-status')),
           if (error != null || draft.error != null) Text(error ?? draft.error!),
           TextButton(key: const Key('supplier-allocation-recover'), onPressed: busy || draft.busy ? null : load,
             child: const Text('Recover saved allocation')),
-          FilledButton(key: const Key('supplier-allocation-submit'),
-            onPressed: draft.ready && recovered && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
+          if (!settled) FilledButton(key: const Key('supplier-allocation-submit'),
+            onPressed: draft.ready && accountReady && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Link another amount'
               : frozen == null ? 'Link recorded money' : 'Retry same allocation')),
         ]))));
