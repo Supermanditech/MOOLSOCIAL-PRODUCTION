@@ -355,7 +355,303 @@ BuyV2Order _r66Order(BuyV2OrderStatus status, BuyV2Destination destination) =>
           : null,
     );
 
+class _T11DeferredOrderRefreshCommerce extends _R669DeliveryCommerce {
+  final pending = <Completer<BuyV2OrderRefreshResult>>[];
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) {
+    final request = Completer<BuyV2OrderRefreshResult>();
+    pending.add(request);
+    return request.future;
+  }
+
+  void finish(int request, BuyV2Order order) => pending[request].complete(
+    BuyV2OrderRefreshResult(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: '',
+      order: order,
+    ),
+  );
+
+  BuyV2Order changed(BuyV2Order order, BuyV2OrderStatus status) => make(
+    order.id,
+    order.lines.single.product,
+    order.destinationLabel,
+    order.promise,
+    status: status,
+  );
+}
+
 void main() {
+  Future<
+    ({
+      BuyV2Session session,
+      _T11DeferredOrderRefreshCommerce commerce,
+      _R669TrackingOwnerStore store,
+      ValueNotifier<BuyV2CollectionIdentity?> identity,
+      VoidCallback dispose,
+    })
+  >
+  refreshFixture() async {
+    final core = BuySession();
+    final commerce = _T11DeferredOrderRefreshCommerce();
+    final store = _R669TrackingOwnerStore();
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(
+        accountId: 'buyer-a',
+        sessionId: 'session-a',
+      ),
+    );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      customerStateStore: store,
+      collectionIdentity: identity,
+      reviewDataEnabled: false,
+    );
+    var disposed = false;
+    void dispose() {
+      if (disposed) return;
+      disposed = true;
+      session.dispose();
+      identity.dispose();
+      core.dispose();
+    }
+
+    addTearDown(dispose);
+    await session.restoreCommerce();
+    return (
+      session: session,
+      commerce: commerce,
+      store: store,
+      identity: identity,
+      dispose: dispose,
+    );
+  }
+
+  test('T11 order refresh accepts current owner', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    expect(f.session.orderRefreshBusy(original.id), isTrue);
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isTrue);
+    expect(f.session.orders.first.status, BuyV2OrderStatus.dispatched);
+    expect(f.session.orderRefreshBusy(original.id), isFalse);
+    expect(
+      f.session.orderRefreshState(original.id),
+      BuyV2CommerceLoadState.ready,
+    );
+  });
+
+  test('T11 order refresh follows index shift', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    final other = f.commerce.records[1];
+    f.commerce.records = [other, original, ...f.commerce.records.skip(2)];
+    await f.session.restoreCommerce();
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isTrue);
+    expect(f.session.orders.map((o) => o.id).toSet().length, 4);
+    expect(f.session.orders.first, same(other));
+    expect(f.session.orders[1].id, original.id);
+    expect(f.session.orders[1].status, BuyV2OrderStatus.dispatched);
+  });
+
+  test('T11 order refresh retains superseding progress', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.commerce.advance(original.id, BuyV2OrderStatus.delivered);
+    await f.session.restoreCommerce();
+    f.commerce.finish(0, original);
+    expect(await flight, isFalse);
+    expect(f.session.orders.first.status, BuyV2OrderStatus.delivered);
+    expect(f.session.orderRefreshBusy(original.id), isFalse);
+    final retry = f.session.refreshOrder(original.id);
+    f.commerce.finish(1, f.session.orders.first);
+    expect(await retry, isTrue);
+  });
+
+  test('T11 order refresh rejects different order ID', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.commerce.finish(
+      0,
+      BuyV2Order(
+        id: 'different-order',
+        destination: original.destination,
+        title: original.title,
+        itemSummary: original.itemSummary,
+        total: original.total,
+        partner: original.partner,
+        partnerType: original.partnerType,
+        promise: original.promise,
+        destinationLabel: original.destinationLabel,
+        progress: original.progress,
+        status: original.status,
+        purchaseId: original.purchaseId,
+      ),
+    );
+    expect(await flight, isFalse);
+    expect(f.session.orders.first, same(original));
+    expect(f.session.orderRefreshBusy(original.id), isFalse);
+  });
+
+  test('T11 order refresh rejects removed order', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.commerce.records.removeAt(0);
+    await f.session.restoreCommerce();
+    final remaining = f.session.orders;
+    f.commerce.finish(0, original);
+    expect(await flight, isFalse);
+    expect(f.session.orders, remaining);
+    expect(f.session.orders.any((o) => o.id == original.id), isFalse);
+  });
+
+  test('T11 order refresh rejects mismatched purchase', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.commerce.finish(
+      0,
+      BuyV2Order(
+        id: original.id,
+        destination: original.destination,
+        title: original.title,
+        itemSummary: original.itemSummary,
+        total: original.total,
+        partner: original.partner,
+        partnerType: original.partnerType,
+        promise: original.promise,
+        destinationLabel: original.destinationLabel,
+        progress: original.progress,
+        status: original.status,
+        purchaseId: 'different-purchase',
+      ),
+    );
+    expect(await flight, isFalse);
+    expect(f.session.orders.first, same(original));
+  });
+
+  test('T11 order refresh rejects identity round trip', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final identity = f.identity.value;
+    final flight = f.session.refreshOrder(original.id);
+    f.identity.value = const BuyV2CollectionIdentity(
+      accountId: 'buyer-b',
+      sessionId: 'session-b',
+    );
+    f.identity.value = identity;
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isFalse);
+    expect(f.session.orders.first, same(original));
+    expect(f.session.orderRefreshState(original.id), isNull);
+  });
+
+  test('T11 order refresh rejects restored owner round trip', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.store.ownerScope = 'tracking-owner-b';
+    await f.session.restoreCustomerState();
+    f.store.ownerScope = 'tracking-owner-a';
+    await f.session.restoreCustomerState();
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isFalse);
+    expect(f.session.orders.first, same(original));
+    expect(f.session.orderRefreshState(original.id), isNull);
+  });
+
+  for (final throws in [false, true]) {
+    test(
+      throws
+          ? 'T11 order refresh ignores stale exception'
+          : 'T11 order refresh keeps newer request busy',
+      () async {
+        final f = await refreshFixture();
+        final original = f.session.orders.first;
+        final old = f.session.refreshOrder(original.id);
+        f.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-b',
+          sessionId: 'session-b',
+        );
+        f.store.ownerScope = 'tracking-owner-b';
+        final newer = f.session.refreshOrder(original.id);
+        final started = f.commerce.pending.length == 2;
+        if (throws) {
+          f.commerce.pending[0].completeError(StateError('Old request failed'));
+        } else {
+          f.commerce.finish(
+            0,
+            f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+          );
+        }
+        final oldAccepted = await old;
+        if (started) {
+          expect(oldAccepted, isFalse);
+          expect(f.session.orderRefreshBusy(original.id), isTrue);
+          expect(
+            f.session.orderRefreshState(original.id),
+            BuyV2CommerceLoadState.loading,
+          );
+          expect(f.session.orders.first, same(original));
+          f.commerce.finish(
+            1,
+            f.commerce.changed(original, BuyV2OrderStatus.confirmed),
+          );
+          expect(await newer, isTrue);
+          expect(f.session.orders.first.status, BuyV2OrderStatus.confirmed);
+        } else {
+          await newer;
+        }
+        expect(started, isTrue, reason: 'New owner must own a new request');
+      },
+    );
+  }
+
+  test('T11 order refresh rejects disposal', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    f.dispose();
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isFalse);
+    expect(f.session.orders.first, same(original));
+  });
+
+  test('T11 order refresh serializes same-account duplicate', () async {
+    final f = await refreshFixture();
+    final original = f.session.orders.first;
+    final flight = f.session.refreshOrder(original.id);
+    expect(await f.session.refreshOrder(original.id), isFalse);
+    expect(f.commerce.pending, hasLength(1));
+    f.commerce.finish(
+      0,
+      f.commerce.changed(original, BuyV2OrderStatus.dispatched),
+    );
+    expect(await flight, isTrue);
+  });
   test(
     'R669 rail tracking nested Cart return and stale owner rejection',
     () async {

@@ -3404,6 +3404,7 @@ class BuyV2Session extends ChangeNotifier {
 
   void _onProcurementIdentityChanged() {
     _procurementEpoch++;
+    _invalidateOrderRefreshes();
     _procurementBuyerGrant = null;
     commerceLoadState = BuyV2CommerceLoadState.unavailable;
     commerceMessage = procurementUnavailableMessage;
@@ -4484,6 +4485,7 @@ class BuyV2Session extends ChangeNotifier {
       _collectionCheckoutStoreId = null;
     }
     _collectionEpoch++;
+    _invalidateOrderRefreshes();
     if (_checkoutIdempotencyKey != null &&
         checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.paymentUnknown;
@@ -5944,7 +5946,9 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _reviewableProductIds = {};
   final Set<String> _productFeedbackBusyIds = {};
   bool _productReportsAvailable = false;
-  final Set<String> _orderRefreshBusyIds = {};
+  final Map<String, Object> _orderRefreshOperations = {};
+  int _orderRefreshGeneration = 0;
+  String? _orderRefreshOwnerScope;
   final Map<String, BuyV2CommerceLoadState> _orderRefreshStates = {};
   final Map<String, String> _orderRefreshMessages = {};
   final Map<String, BuyV2OrderResolutionSnapshot> _orderResolutionSnapshots =
@@ -6216,12 +6220,26 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Order> get orders => List.unmodifiable(_orders);
 
   bool orderRefreshBusy(String orderId) =>
-      _orderRefreshBusyIds.contains(orderId);
+      _orderRefreshOwnerScope == customerStateStore?.ownerScope &&
+      _orderRefreshOperations.containsKey(orderId);
 
   BuyV2CommerceLoadState? orderRefreshState(String orderId) =>
-      _orderRefreshStates[orderId];
+      _orderRefreshOwnerScope == customerStateStore?.ownerScope
+      ? _orderRefreshStates[orderId]
+      : null;
 
-  String? orderRefreshMessage(String orderId) => _orderRefreshMessages[orderId];
+  String? orderRefreshMessage(String orderId) =>
+      _orderRefreshOwnerScope == customerStateStore?.ownerScope
+      ? _orderRefreshMessages[orderId]
+      : null;
+
+  void _invalidateOrderRefreshes() {
+    _orderRefreshGeneration++;
+    _orderRefreshOwnerScope = customerStateStore?.ownerScope;
+    _orderRefreshOperations.clear();
+    _orderRefreshStates.clear();
+    _orderRefreshMessages.clear();
+  }
 
   Future<bool> refreshOrder(String orderId) async {
     if (_collectionDisposed) return false;
@@ -6234,20 +6252,42 @@ class BuyV2Session extends ChangeNotifier {
     if (_orders[index].collection != null) {
       return refreshCollectionOrder(orderId);
     }
-    if (!_orderRefreshBusyIds.add(orderId)) return false;
+    if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
+      _invalidateOrderRefreshes();
+    }
+    if (_orderRefreshOperations.containsKey(orderId)) return false;
+    final original = _orders[index];
+    final generation = _orderRefreshGeneration;
+    final ownerScope = customerStateStore?.ownerScope;
+    final procurementEpoch = _procurementEpoch;
+    final operation = Object();
+    _orderRefreshOperations[orderId] = operation;
+    bool currentRequest() =>
+        !_collectionDisposed &&
+        generation == _orderRefreshGeneration &&
+        ownerScope == customerStateStore?.ownerScope &&
+        procurementEpoch == _procurementEpoch &&
+        identical(_orderRefreshOperations[orderId], operation);
     _orderRefreshStates[orderId] = BuyV2CommerceLoadState.loading;
     _orderRefreshMessages.remove(orderId);
     notifyListeners();
     try {
       final result = await commerceAdapter.refreshOrder(orderId: orderId);
-      if (_collectionDisposed) return false;
+      if (!currentRequest()) return false;
+      final currentIndex = _orders.indexWhere((order) => order.id == orderId);
+      if (currentIndex < 0 || !identical(_orders[currentIndex], original)) {
+        _orderRefreshStates[orderId] = BuyV2CommerceLoadState.unavailable;
+        _orderRefreshMessages[orderId] =
+            'Current order details are still shown. Refresh again for an update.';
+        return false;
+      }
       final refreshed = result.order;
       final valid =
           result.state == BuyV2CommerceLoadState.ready &&
           refreshed != null &&
           refreshed.id == orderId &&
-          refreshed.purchaseId == _orders[index].purchaseId &&
-          refreshed.destination == _orders[index].destination &&
+          refreshed.purchaseId == original.purchaseId &&
+          refreshed.destination == original.destination &&
           refreshed.total >= 0 &&
           refreshed.progress >= 0 &&
           refreshed.progress <= 1 &&
@@ -6267,22 +6307,24 @@ class BuyV2Session extends ChangeNotifier {
         notice = null;
         return false;
       }
-      _orders[index] = refreshed;
+      _orders[currentIndex] = refreshed;
       if (!reviewDataEnabled) _currentDeliveryOrderIds.add(refreshed.id);
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
       _orderRefreshMessages[orderId] = result.customerMessage;
       notice = result.customerMessage;
       return true;
     } on Object {
-      if (_collectionDisposed) return false;
+      if (!currentRequest()) return false;
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.offline;
       _orderRefreshMessages[orderId] =
           'Order could not refresh. Check your connection and try again.';
       notice = null;
       return false;
     } finally {
-      _orderRefreshBusyIds.remove(orderId);
-      if (!_collectionDisposed) notifyListeners();
+      if (currentRequest()) {
+        _orderRefreshOperations.remove(orderId);
+        notifyListeners();
+      }
     }
   }
 
@@ -7538,6 +7580,7 @@ class BuyV2Session extends ChangeNotifier {
       return;
     }
     _customerStateOwnerScope = ownerScope;
+    _invalidateOrderRefreshes();
     final mutationRevision = _customerStateMutationRevision;
     final browseRevision = _procurementBrowseRevision;
     if (!isStoreProcurement) {
