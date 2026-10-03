@@ -17,6 +17,79 @@ export 'buy_v2_models.dart'
 
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
+/// Optional capability of the existing resolution adapter. A receipt confirms
+/// only the choice; commerce refresh supplies fulfilment and refund outcomes.
+abstract interface class BuyV2ReplacementConsentAdapter {
+  Future<BuyV2ReplacementConsentResult> decideReplacement(
+    BuyV2ReplacementConsentRequest request,
+  );
+}
+
+/// Includes contents as well as IDs, so a reused version cannot retain consent
+/// to a changed price, quantity, expiry or delivery promise.
+String buyV2ReplacementReviewKey(BuyV2OrderSupplyProgress progress) {
+  final offer = progress.replacementOffer!;
+  return sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            progress.orderId,
+            progress.purchaseId,
+            progress.sourceId,
+            offer.id,
+            offer.revision,
+            offer.customerTotalMinor,
+            offer.deliveryCommitment,
+            offer.expiresAt.toUtc().toIso8601String(),
+            for (final line in offer.lines)
+              [
+                line.originalProductId,
+                line.originalVariant,
+                line.originalPack,
+                line.originalQuantity,
+                line.productTitle,
+                line.pack,
+                line.quantity,
+                line.unitPriceMinor,
+              ],
+          ]),
+        ),
+      )
+      .toString();
+}
+
+String buyV2SupplyProgressKey(BuyV2OrderSupplyProgress progress) => sha256
+    .convert(
+      utf8.encode(
+        jsonEncode([
+          progress.orderId,
+          progress.purchaseId,
+          progress.sourceId,
+          progress.revision,
+          progress.state.name,
+          progress.currency,
+          progress.refundState?.name,
+          progress.refundAmountMinor,
+          progress.refundRoute,
+          progress.refundReference,
+          if (progress.replacementOffer != null)
+            buyV2ReplacementReviewKey(progress),
+          for (final line in progress.lines)
+            [
+              line.productId,
+              line.variant,
+              line.pack,
+              line.orderedQuantity,
+              line.availableQuantity,
+              line.unavailableQuantity,
+              line.supplierId,
+              line.supplierName,
+            ],
+        ]),
+      ),
+    )
+    .toString();
+
 /// Public listing identity only; never include an account or procurement draft.
 Uri buyV2SharedProductUri(BuyV2Product product) => Uri.https(
   'moolsocial.com',

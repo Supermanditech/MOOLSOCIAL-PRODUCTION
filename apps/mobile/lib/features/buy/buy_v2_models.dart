@@ -1018,6 +1018,254 @@ class BuyV2CollectionOrderReference {
   final String purchaserAccountId;
 }
 
+enum BuyV2SupplyState {
+  awaitingSupply,
+  partiallyAvailable,
+  replacementOffered,
+  ready,
+  unavailable,
+}
+
+enum BuyV2SupplyRefundState { pending, processing, refunded, failed }
+
+class BuyV2SupplyLine {
+  const BuyV2SupplyLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.availableQuantity,
+    required this.unavailableQuantity,
+    this.supplierId,
+    this.supplierName,
+  });
+  final String productId;
+  final String variant;
+  final String pack;
+  final int orderedQuantity;
+  final int availableQuantity;
+  final int unavailableQuantity;
+  final String? supplierId;
+  final String? supplierName;
+  int get awaitingQuantity =>
+      orderedQuantity - availableQuantity - unavailableQuantity;
+}
+
+class BuyV2ReplacementLine {
+  const BuyV2ReplacementLine({
+    required this.originalProductId,
+    required this.originalVariant,
+    required this.originalPack,
+    required this.originalQuantity,
+    required this.productTitle,
+    required this.pack,
+    required this.quantity,
+    required this.unitPriceMinor,
+  });
+  final String originalProductId;
+  final String originalVariant;
+  final String originalPack;
+  final int originalQuantity;
+  final String productTitle;
+  final String pack;
+  final int quantity;
+  final int unitPriceMinor;
+}
+
+class BuyV2ReplacementOffer {
+  BuyV2ReplacementOffer({
+    required this.id,
+    required this.revision,
+    required List<BuyV2ReplacementLine> lines,
+    required this.customerTotalMinor,
+    required this.deliveryCommitment,
+    required this.expiresAt,
+  }) : lines = List.unmodifiable(lines);
+  final String id;
+  final int revision;
+  final List<BuyV2ReplacementLine> lines;
+  final int customerTotalMinor;
+  final String deliveryCommitment;
+  final DateTime expiresAt;
+}
+
+/// Optional provider facts. Absence is unknown, never allocation or settlement.
+/// This Retail Shop delivery contract does not define wholesale/collection rules.
+class BuyV2OrderSupplyProgress {
+  BuyV2OrderSupplyProgress({
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.revision,
+    required this.state,
+    required List<BuyV2SupplyLine> lines,
+    this.replacementOffer,
+    this.refundState,
+    this.refundAmountMinor,
+    this.refundRoute,
+    this.refundReference,
+    this.currency = 'INR',
+  }) : lines = List.unmodifiable(lines);
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int revision;
+  final BuyV2SupplyState state;
+  final List<BuyV2SupplyLine> lines;
+  final BuyV2ReplacementOffer? replacementOffer;
+  final BuyV2SupplyRefundState? refundState;
+  final int? refundAmountMinor;
+  final String? refundRoute;
+  final String? refundReference;
+  final String currency;
+
+  bool matchesOrder(BuyV2Order order) {
+    if (order.destination != BuyV2Destination.shop ||
+        order.collection != null ||
+        orderId != order.id ||
+        purchaseId.trim().isEmpty ||
+        purchaseId != order.purchaseId ||
+        sourceId.trim().isEmpty ||
+        revision <= 0 ||
+        currency != 'INR' ||
+        lines.isEmpty ||
+        lines.length != order.lines.length) {
+      return false;
+    }
+    final matched = <int>{};
+    for (final line in lines) {
+      final index = order.lines.indexWhere(
+        (original) =>
+            original.product.id == line.productId &&
+            original.product.variant == line.variant &&
+            original.product.pack == line.pack &&
+            original.quantity == line.orderedQuantity,
+      );
+      if (index < 0 ||
+          !matched.add(index) ||
+          line.orderedQuantity <= 0 ||
+          line.availableQuantity < 0 ||
+          line.unavailableQuantity < 0 ||
+          line.awaitingQuantity < 0 ||
+          (line.availableQuantity > 0 &&
+              (line.supplierId?.trim().isNotEmpty != true ||
+                  line.supplierName?.trim().isNotEmpty != true))) {
+        return false;
+      }
+    }
+    final available = lines.fold<int>(
+      0,
+      (sum, line) => sum + line.availableQuantity,
+    );
+    final ordered = lines.fold<int>(
+      0,
+      (sum, line) => sum + line.orderedQuantity,
+    );
+    if (state == BuyV2SupplyState.ready && available != ordered) return false;
+    if (state == BuyV2SupplyState.awaitingSupply &&
+        lines.any(
+          (line) =>
+              line.availableQuantity != 0 || line.unavailableQuantity != 0,
+        )) {
+      return false;
+    }
+    if (state == BuyV2SupplyState.partiallyAvailable &&
+        (available <= 0 || available >= ordered)) {
+      return false;
+    }
+    if (state == BuyV2SupplyState.unavailable &&
+        lines.any((line) => line.unavailableQuantity != line.orderedQuantity)) {
+      return false;
+    }
+    final offer = replacementOffer;
+    if ((state == BuyV2SupplyState.replacementOffered) != (offer != null)) {
+      return false;
+    }
+    if (offer != null) {
+      if (offer.id.trim().isEmpty ||
+          offer.revision <= 0 ||
+          offer.lines.isEmpty ||
+          offer.deliveryCommitment.trim().isEmpty ||
+          offer.customerTotalMinor != (order.totalMinor ?? order.total * 100)) {
+        return false;
+      }
+      final replaced = <int>{};
+      for (final proposed in offer.lines) {
+        final index = lines.indexWhere(
+          (original) =>
+              original.productId == proposed.originalProductId &&
+              original.variant == proposed.originalVariant &&
+              original.pack == proposed.originalPack,
+        );
+        if (index < 0 ||
+            !replaced.add(index) ||
+            proposed.originalQuantity <= 0 ||
+            proposed.originalQuantity > lines[index].unavailableQuantity ||
+            proposed.productTitle.trim().isEmpty ||
+            proposed.pack.trim().isEmpty ||
+            proposed.quantity <= 0 ||
+            proposed.unitPriceMinor < 0) {
+          return false;
+        }
+      }
+    }
+    if (refundState != null) {
+      final amount = refundAmountMinor;
+      if (amount == null ||
+          amount <= 0 ||
+          amount > (order.totalMinor ?? order.total * 100) ||
+          refundRoute?.trim().isNotEmpty != true) {
+        return false;
+      }
+      if (refundState == BuyV2SupplyRefundState.refunded &&
+          (order.amountPaidNow == null ||
+              amount > order.amountPaidNow! * 100 ||
+              refundReference?.trim().isNotEmpty != true)) {
+        return false;
+      }
+    } else if (refundAmountMinor != null ||
+        refundRoute != null ||
+        refundReference != null) {
+      return false;
+    }
+    return true;
+  }
+}
+
+class BuyV2ReplacementConsentRequest {
+  const BuyV2ReplacementConsentRequest({
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.supplyRevision,
+    required this.offerId,
+    required this.offerRevision,
+    required this.reviewKey,
+    required this.accept,
+    required this.idempotencyKey,
+  });
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int supplyRevision;
+  final String offerId;
+  final int offerRevision;
+  final String reviewKey;
+  final bool accept;
+  final String idempotencyKey;
+}
+
+class BuyV2ReplacementConsentResult {
+  const BuyV2ReplacementConsentResult({
+    required this.request,
+    required this.recorded,
+    this.reference,
+  });
+  final BuyV2ReplacementConsentRequest request;
+  final bool recorded;
+  final String? reference;
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -1067,6 +1315,7 @@ class BuyV2Order {
     this.platformTaxInvoiceDetails,
     this.invoiceAvailable = true,
     this.receiptReference,
+    this.supplyProgress,
   });
 
   final String id;
@@ -1119,6 +1368,7 @@ class BuyV2Order {
   final BuyV2TaxInvoiceDetails? platformTaxInvoiceDetails;
   final bool invoiceAvailable;
   final String? receiptReference;
+  final BuyV2OrderSupplyProgress? supplyProgress;
 }
 
 class _BuyV2CommerceSeed {

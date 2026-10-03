@@ -1673,9 +1673,9 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Retain the submitted amount and original payment identity across exit, expiry, restart and uncertainty; preserve completed orders and permit another payment only after trusted financial retry authorization.",
-      "manifestPath": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json",
-      "manifestSha256": "C7F7F1D3C12E6755BAF4FFC9ABA7F0CF1F0C4078A5FC1D3857BC073DDE936D8A",
+      "customerOutcome": "Buyer sees truthful Shop supply/refund and replacement review, can navigate back from Cart, and sees fresh Wholesale additions after clearing an old filtered basket without bypassing unresolved payment.",
+      "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
+      "manifestSha256": "52C685889AA17FE8810E77331D959265CA061ABFBF809C4EBBF9210449E5AB03",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": [
@@ -1685,27 +1685,28 @@
         "new_necessary_work"
       ],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_models.dart",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
-        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Existing legacy recovery reconstructs mutable Cart amounts and clears identity on local cancel. Freeze original facts in the existing state owner and reconcile before retry; reuse group allocations and codec, with no new service, route or backend.",
+      "necessityProof": "Reuse existing Order/content/session/Tracking for supply and consent. Reuse addProduct/display filter and existing Back handler for reproduced Cart defects. No new route/service/state owner; final frozen qualification and native/source distinction required.",
       "robustnessCoverage": [
-        "A09 submitted32 remains32 after the current coupon expires; original request never changes",
-        "Storage failure stops placement before side effects; submitting restores unknown and original bank/request/allocation data survives cold restart",
-        "Local cancellation and handoff/network failure preserve original identity and prevent fresh submission",
-        "Generic failed/cancelled outcomes do not authorize retry; only a matching trusted financial authorization does, and failed closure storage keeps the hold",
-        "Recovery confirms only original products, quantities, suppliers, amounts and allocations; malformed/stale/other-owner results cannot mutate Cart or orders",
-        "Completed groups survive later failure; only never-submitted or durably financially closed obligations can return to review",
-        "Normal/200-percent text recovery states keep amount/status/help reachable without overflow or duplicate-pay actions",
-        "All required checks close against final source; native legacy evidence and isolated recovery evidence remain distinct from live integration"
+        "correlation/quantities/currency/refund reference",
+        "changed offer contents and expiry",
+        "duplicate/unknown retry identity",
+        "buyer change/disposal",
+        "320px normal and 200 percent text",
+        "fresh Shop-filter clear to Wholesale basket visibility",
+        "visible Cart Back/product origin and catalogue return",
+        "held Cart preserves original payment; Cancel and explicit whole-Cart confirmation"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1719,11 +1720,12 @@
         "Qualify focused and affected selected cases, screenshots and actual native legacy retest; record isolated versus integrated evidence and checkpoint safely"
       ],
       "explicitExclusions": [
-        "No new service, dependency, route, payment gateway or fabricated quote/group/provider authority",
-        "No backend, Store, Counter Sale, CSV, Google, authentication, release settings or screenbook edits",
-        "No APK build/install/uninstall/data clear, live payment or supplier contact",
-        "No T08-T10 implementation, T03 policy-popup change, automatic refund or integrated acceptance claim",
-        "No history rewrite, baseline advance, historical subject exception or formal ticket_close"
+        "backend/workspace Codex after integration",
+        "Google separately deferred",
+        "new APK/install or real transactions",
+        "Wholesale/collection replacement rules",
+        "refund entitlement/tax/settlement calculations",
+        "formal inherited ticket closure"
       ],
       "dependenciesAndApprovals": [
         "Existing root claims own the seven runtime/test owners; optional Buy-side result metadata requires workspace mapping after integration, no Store producer edit",
@@ -1735,8 +1737,8 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "assessed_before_T07_bounded_native_audit",
-      "evidencePath": "docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json"
+      "implementationState": "qualified_existing_Buy_parent_T12_T14_host_and_scoped_native_full_journey_and_integration_pending",
+      "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {
       "ticketId": "UAW-C34I-R60-73-AUTHENTICATION-PRIVACY-SAFE-PLAY-OPPO-ACCEPTANCE",

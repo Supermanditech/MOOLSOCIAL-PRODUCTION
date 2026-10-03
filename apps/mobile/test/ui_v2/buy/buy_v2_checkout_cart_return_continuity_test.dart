@@ -831,6 +831,107 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'T14 fresh basket reveals lines after old Shop filter text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.chooseCartDisplayFilter('shop');
+        session.clearCart();
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.addProduct('missing-product'), isFalse);
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart();
+        expect(session.cartDisplayFilter, 'all');
+        expect(session.visibleCartLines.single.product.id, 'w-notebook');
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        expect(find.text('No Shop products in Cart.'), findsNothing);
+        final wholesale = find.byKey(
+          const ValueKey('buy-cart-line-w-notebook'),
+        );
+        expect(wholesale, findsOneWidget);
+        session.chooseCartDisplayFilter('shop');
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.visibleCartLines.single.product.id, 's-tomato');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'T14 Cart visible Back preserves product and basket text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.openProduct('s-tomato');
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final back = find.byKey(const ValueKey('buy-cart-back'));
+        expect(back.hitTestable(), findsOneWidget);
+        expect(tester.getSize(back).height, greaterThanOrEqualTo(44));
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, 's-tomato');
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'T14 Shop filter whole Cart delete confirms scope text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart();
+        session.chooseCartDisplayFilter('shop');
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final bin = find.byKey(const ValueKey('buy-cart-empty'));
+        await tester.tap(bin);
+        await tester.pumpAndSettle();
+        expect(find.text('Empty entire Cart?'), findsOneWidget);
+        final cancel = find.byKey(const ValueKey('buy-cart-clear-cancel'));
+        await tester.ensureVisible(cancel);
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        await tester.tap(bin);
+        await tester.pumpAndSettle();
+        final confirm = find.byKey(const ValueKey('buy-cart-clear-confirm'));
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 0);
+        expect(session.view, BuyV2View.catalogue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'T10 held Cart explains payment and disables edits text $scale',
       (tester) async {
         final semantics = tester.ensureSemantics();

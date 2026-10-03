@@ -10,10 +10,12 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_order_resolution_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 class _R669TrackingOwnerStore implements BuyV2CustomerStateStore {
   @override
@@ -382,7 +384,979 @@ class _T11DeferredOrderRefreshCommerce extends _R669DeliveryCommerce {
   );
 }
 
+class _T12SupplyCommerce extends _R669DeliveryCommerce {
+  _T12SupplyCommerce() {
+    records = [orderWith(null)];
+  }
+  BuyV2OrderStatus status = BuyV2OrderStatus.preparing;
+  BuyV2Order orderWith(BuyV2OrderSupplyProgress? progress, {int total = 90}) {
+    final product = BuyV2Catalogue.products.firstWhere(
+      (p) => p.id == 's-tomato',
+    );
+    return BuyV2Order(
+      id: 'supply-1',
+      purchaseId: 'purchase-1',
+      destination: BuyV2Destination.shop,
+      title: product.customerTitle,
+      itemSummary: '1 product · 3 items',
+      total: total,
+      amountPaidNow: 90,
+      partner: 'Store A',
+      partnerType: 'Store',
+      promise: 'Delivery tomorrow',
+      destinationLabel: 'Home',
+      progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
+      status: status,
+      productIds: [product.id],
+      lines: [BuyV2CartLine(product: product, quantity: 3)],
+      supplyProgress: progress,
+    );
+  }
+
+  void supply(BuyV2OrderSupplyProgress? progress, {int total = 90}) {
+    records = [orderWith(progress, total: total)];
+  }
+}
+
+BuyV2OrderSupplyProgress _t12Progress({
+  String orderId = 'supply-1',
+  String purchaseId = 'purchase-1',
+  String source = 'store-service',
+  int revision = 1,
+  int available = 1,
+  int unavailable = 2,
+  int ordered = 3,
+  String? supplier = 'Store A',
+  String currency = 'INR',
+  BuyV2SupplyState state = BuyV2SupplyState.replacementOffered,
+  String title = 'Fresh replacement tomatoes',
+  int quantity = 2,
+  int price = 3000,
+  int originalQuantity = 2,
+  int total = 9000,
+  DateTime? expiresAt,
+  BuyV2SupplyRefundState? refund,
+  int? refundAmount,
+  String? route,
+  String? reference,
+}) {
+  final p = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+  return BuyV2OrderSupplyProgress(
+    orderId: orderId,
+    purchaseId: purchaseId,
+    sourceId: source,
+    revision: revision,
+    currency: currency,
+    state: state,
+    lines: [
+      BuyV2SupplyLine(
+        productId: p.id,
+        variant: p.variant,
+        pack: p.pack,
+        orderedQuantity: ordered,
+        availableQuantity: available,
+        unavailableQuantity: unavailable,
+        supplierId: 'store-a',
+        supplierName: supplier,
+      ),
+    ],
+    replacementOffer: state != BuyV2SupplyState.replacementOffered
+        ? null
+        : BuyV2ReplacementOffer(
+            id: 'offer-1',
+            revision: 1,
+            lines: [
+              BuyV2ReplacementLine(
+                originalProductId: p.id,
+                originalVariant: p.variant,
+                originalPack: p.pack,
+                originalQuantity: originalQuantity,
+                productTitle: title,
+                pack: '1 kg',
+                quantity: quantity,
+                unitPriceMinor: price,
+              ),
+            ],
+            customerTotalMinor: total,
+            deliveryCommitment: 'Delivery tomorrow by 6 pm',
+            expiresAt: expiresAt ?? DateTime.utc(2099),
+          ),
+    refundState: refund,
+    refundAmountMinor: refundAmount,
+    refundRoute: route,
+    refundReference: reference,
+  );
+}
+
+class _T12ConsentAdapter
+    implements BuyV2OrderResolutionAdapter, BuyV2ReplacementConsentAdapter {
+  final requests = <BuyV2ReplacementConsentRequest>[];
+  Future<BuyV2ReplacementConsentResult> Function(
+    BuyV2ReplacementConsentRequest,
+  )?
+  respond;
+  @override
+  Future<BuyV2ReplacementConsentResult> decideReplacement(
+    BuyV2ReplacementConsentRequest r,
+  ) async {
+    requests.add(r);
+    return respond == null
+        ? BuyV2ReplacementConsentResult(
+            request: r,
+            recorded: true,
+            reference: 'choice-1',
+          )
+        : await respond!(r);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError(invocation.memberName.toString());
+}
+
+final _t12CaptureRun = DateTime.now().microsecondsSinceEpoch;
+
+Future<void> _t12Capture(
+  WidgetTester tester,
+  String name,
+  String boundaryKey,
+) async {
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(ValueKey(boundaryKey)),
+  );
+  await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: 1);
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    final file = File(
+      'build/t06-t07-cart-20261002/t12-visual-$_t12CaptureRun/$name.png',
+    );
+    await file.parent.create(recursive: true);
+    expect(await file.exists(), isFalse);
+    await file.writeAsBytes(png!.buffer.asUint8List());
+  });
+}
+
+void _t12SupplyCases() {
+  Future<
+    ({
+      BuyV2Session session,
+      _T12SupplyCommerce commerce,
+      _T12ConsentAdapter adapter,
+      _R669TrackingOwnerStore store,
+      ValueNotifier<BuyV2CollectionIdentity?> identity,
+      VoidCallback dispose,
+    })
+  >
+  fixture({bool capability = true}) async {
+    final core = BuySession();
+    final commerce = _T12SupplyCommerce();
+    final adapter = _T12ConsentAdapter();
+    final store = _R669TrackingOwnerStore();
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'a'),
+    );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      orderResolutionAdapter: capability
+          ? adapter
+          : const BuyV2UnavailableOrderResolutionAdapter(),
+      customerStateStore: store,
+      collectionIdentity: identity,
+      reviewDataEnabled: false,
+    );
+    var disposed = false;
+    void dispose() {
+      if (disposed) return;
+      disposed = true;
+      session.dispose();
+      identity.dispose();
+      core.dispose();
+    }
+
+    addTearDown(dispose);
+    await session.restoreCommerce();
+    commerce.supply(_t12Progress());
+    expect(await session.refreshOrder('supply-1'), isTrue);
+    return (
+      session: session,
+      commerce: commerce,
+      adapter: adapter,
+      store: store,
+      identity: identity,
+      dispose: dispose,
+    );
+  }
+
+  final invalid = <String, BuyV2OrderSupplyProgress>{
+    'wrong order': _t12Progress(orderId: 'other'),
+    'wrong purchase': _t12Progress(purchaseId: 'other'),
+    'missing source': _t12Progress(source: ''),
+    'invalid revision': _t12Progress(revision: 0),
+    'wrong currency': _t12Progress(currency: 'USD'),
+    'excess allocation': _t12Progress(available: 2, unavailable: 2),
+    'negative allocation': _t12Progress(available: -1),
+    'wrong ordered quantity': _t12Progress(ordered: 4),
+    'missing supplier': _t12Progress(supplier: null),
+    'replacement exceeds unavailable': _t12Progress(originalQuantity: 3),
+    'empty replacement': _t12Progress(title: ''),
+    'zero replacement quantity': _t12Progress(quantity: 0),
+    'negative replacement price': _t12Progress(price: -1),
+    'changed customer total': _t12Progress(total: 9500),
+    'incomplete ready': _t12Progress(state: BuyV2SupplyState.ready),
+    'false unavailable': _t12Progress(state: BuyV2SupplyState.unavailable),
+    'refund missing route': _t12Progress(
+      refund: BuyV2SupplyRefundState.processing,
+      refundAmount: 6000,
+    ),
+    'refund exceeds payment': _t12Progress(
+      refund: BuyV2SupplyRefundState.refunded,
+      refundAmount: 9500,
+      route: 'UPI',
+      reference: 'refund-1',
+    ),
+    'refund missing reference': _t12Progress(
+      refund: BuyV2SupplyRefundState.refunded,
+      refundAmount: 6000,
+      route: 'UPI',
+    ),
+  };
+  for (final entry in invalid.entries) {
+    test('T12 supply rejects ${entry.key}', () {
+      expect(
+        entry.value.matchesOrder(_T12SupplyCommerce().records.single),
+        isFalse,
+      );
+    });
+  }
+  test('T12 supply keeps unknown quantities pending and refund exact', () {
+    final order = _T12SupplyCommerce().records.single;
+    final partial = _t12Progress(
+      state: BuyV2SupplyState.partiallyAvailable,
+      available: 1,
+      unavailable: 1,
+      refund: BuyV2SupplyRefundState.processing,
+      refundAmount: 3000,
+      route: 'UPI',
+    );
+    expect(partial.matchesOrder(order), isTrue);
+    expect(partial.lines.single.awaitingQuantity, 1);
+    expect(() => partial.lines.clear(), throwsUnsupportedError);
+    expect(
+      _t12Progress(
+        refund: BuyV2SupplyRefundState.refunded,
+        refundAmount: 6000,
+        route: 'UPI',
+        reference: 'refund-1',
+      ).matchesOrder(order),
+      isTrue,
+    );
+  });
+  test(
+    'T12 replacement receipt preserves original order and prevents duplicates',
+    () async {
+      final f = await fixture();
+      final key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: true,
+        ),
+        isTrue,
+      );
+      final order = f.session.orders.single;
+      expect(order.total, 90);
+      expect(order.lines.single.product.id, 's-tomato');
+      expect(order.status, BuyV2OrderStatus.preparing);
+      expect(f.session.replacementConsentResult('supply-1')?.recorded, isTrue);
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: false,
+        ),
+        isFalse,
+      );
+      expect(f.adapter.requests, hasLength(1));
+    },
+  );
+  for (final changed in ['contents', 'expiry', 'total', 'capability']) {
+    test('T12 replacement rejects changed $changed', () async {
+      final f = await fixture(capability: changed != 'capability');
+      final key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      if (changed == 'contents') {
+        f.commerce.supply(_t12Progress(title: 'A different product'));
+      }
+      if (changed == 'expiry') {
+        f.commerce.supply(_t12Progress(expiresAt: DateTime.utc(2020)));
+      }
+      if (changed == 'total') {
+        f.commerce.supply(_t12Progress(total: 9500), total: 95);
+      }
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: true,
+        ),
+        isFalse,
+      );
+      expect(f.adapter.requests, isEmpty);
+    });
+  }
+  test('T12 replacement unknown retry reuses decision identity', () async {
+    final f = await fixture();
+    final key = buyV2ReplacementReviewKey(
+      f.session.orderSupplyProgressFor('supply-1')!,
+    );
+    f.adapter.respond = (_) async =>
+        throw StateError('Connection lost after request');
+    expect(
+      await f.session.decideOrderReplacement(
+        orderId: 'supply-1',
+        reviewedKey: key,
+        reviewedScopeKey: f.session.replacementReviewScopeKey,
+        accept: true,
+      ),
+      isFalse,
+    );
+    expect(
+      await f.session.decideOrderReplacement(
+        orderId: 'supply-1',
+        reviewedKey: key,
+        reviewedScopeKey: f.session.replacementReviewScopeKey,
+        accept: false,
+      ),
+      isFalse,
+    );
+    f.adapter.respond = (r) async => BuyV2ReplacementConsentResult(
+      request: r,
+      recorded: true,
+      reference: 'choice-1',
+    );
+    expect(
+      await f.session.decideOrderReplacement(
+        orderId: 'supply-1',
+        reviewedKey: key,
+        reviewedScopeKey: f.session.replacementReviewScopeKey,
+        accept: true,
+      ),
+      isTrue,
+    );
+    expect(f.adapter.requests, hasLength(2));
+    expect(
+      f.adapter.requests.first.idempotencyKey,
+      f.adapter.requests.last.idempotencyKey,
+    );
+  });
+  for (final stale in [
+    'buyer',
+    'disposal',
+    'new offer',
+    'mismatched receipt',
+  ]) {
+    test('T12 replacement ignores $stale response', () async {
+      final f = await fixture();
+      final pending = Completer<BuyV2ReplacementConsentResult>();
+      final key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      f.adapter.respond = (_) => pending.future;
+      final flight = f.session.decideOrderReplacement(
+        orderId: 'supply-1',
+        reviewedKey: key,
+        reviewedScopeKey: f.session.replacementReviewScopeKey,
+        accept: true,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(f.adapter.requests, hasLength(1));
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: true,
+        ),
+        isFalse,
+      );
+      if (stale == 'buyer') {
+        f.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-b',
+          sessionId: 'b',
+        );
+        f.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'a',
+        );
+      }
+      if (stale == 'disposal') f.dispose();
+      if (stale == 'new offer') {
+        f.commerce.supply(
+          _t12Progress(title: 'Updated replacement', revision: 2),
+        );
+        await f.session.refreshOrder('supply-1');
+      }
+      final r = f.adapter.requests.single;
+      pending.complete(
+        BuyV2ReplacementConsentResult(
+          request: r,
+          recorded: true,
+          reference: stale == 'mismatched receipt' ? '' : 'choice-1',
+        ),
+      );
+      expect(await flight, isFalse);
+      expect(f.session.replacementConsentResult('supply-1'), isNull);
+    });
+  }
+  for (final path in ['order', 'commerce']) {
+    for (final change in ['older revision', 'reused version']) {
+      test('T12 supply $path rejects $change', () async {
+        final f = await fixture();
+        f.commerce.supply(_t12Progress(revision: 2));
+        expect(await f.session.refreshOrder('supply-1'), isTrue);
+        f.commerce.supply(
+          change == 'older revision'
+              ? _t12Progress()
+              : _t12Progress(revision: 2, title: 'Changed without version'),
+        );
+        if (path == 'order') {
+          expect(await f.session.refreshOrder('supply-1'), isFalse);
+        } else {
+          await f.session.restoreCommerce();
+          expect(
+            f.session.commerceLoadState,
+            BuyV2CommerceLoadState.unavailable,
+          );
+        }
+        expect(f.session.orderSupplyProgressFor('supply-1')!.revision, 2);
+        expect(
+          f.session
+              .orderSupplyProgressFor('supply-1')!
+              .replacementOffer!
+              .lines
+              .single
+              .productTitle,
+          'Fresh replacement tomatoes',
+        );
+      });
+    }
+  }
+  test(
+    'T12 replacement later reviewed offer releases acknowledged choice',
+    () async {
+      final f = await fixture();
+      var key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: false,
+        ),
+        isTrue,
+      );
+      f.commerce.supply(
+        _t12Progress(revision: 2, title: 'A later replacement'),
+      );
+      expect(await f.session.refreshOrder('supply-1'), isTrue);
+      key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: true,
+        ),
+        isTrue,
+      );
+      expect(f.adapter.requests, hasLength(2));
+      expect(
+        f.adapter.requests.first.idempotencyKey,
+        isNot(f.adapter.requests.last.idempotencyKey),
+      );
+    },
+  );
+  test('T12 supply missing update retains highest revision guard', () async {
+    final f = await fixture();
+    f.commerce.supply(_t12Progress(revision: 2));
+    expect(await f.session.refreshOrder('supply-1'), isTrue);
+    f.commerce.supply(null);
+    expect(await f.session.refreshOrder('supply-1'), isTrue);
+    expect(f.session.orderSupplyProgressFor('supply-1'), isNull);
+    f.commerce.supply(_t12Progress());
+    expect(await f.session.refreshOrder('supply-1'), isFalse);
+    expect(f.session.orderSupplyProgressFor('supply-1'), isNull);
+    f.commerce.supply(_t12Progress(revision: 3));
+    expect(await f.session.refreshOrder('supply-1'), isTrue);
+    expect(f.session.orderSupplyProgressFor('supply-1')!.revision, 3);
+  });
+  for (final previous in ['recorded', 'uncertain']) {
+    test('T12 replacement $previous survives unrelated progress', () async {
+      final f = await fixture();
+      final key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      if (previous == 'uncertain') {
+        f.adapter.respond = (_) async => throw StateError('Lost response');
+      }
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: f.session.replacementReviewScopeKey,
+          accept: true,
+        ),
+        previous == 'recorded',
+      );
+      f.commerce.supply(
+        _t12Progress(
+          revision: 2,
+          refund: BuyV2SupplyRefundState.processing,
+          refundAmount: 3000,
+          route: 'UPI',
+        ),
+      );
+      expect(await f.session.refreshOrder('supply-1'), isTrue);
+      expect(
+        buyV2ReplacementReviewKey(
+          f.session.orderSupplyProgressFor('supply-1')!,
+        ),
+        key,
+      );
+      if (previous == 'recorded') {
+        expect(
+          f.session.replacementConsentResult('supply-1')?.recorded,
+          isTrue,
+        );
+        expect(
+          await f.session.decideOrderReplacement(
+            orderId: 'supply-1',
+            reviewedKey: key,
+            reviewedScopeKey: f.session.replacementReviewScopeKey,
+            accept: true,
+          ),
+          isFalse,
+        );
+        expect(f.adapter.requests, hasLength(1));
+      } else {
+        f.adapter.respond = (r) async => BuyV2ReplacementConsentResult(
+          request: r,
+          recorded: true,
+          reference: 'choice-1',
+        );
+        expect(
+          await f.session.decideOrderReplacement(
+            orderId: 'supply-1',
+            reviewedKey: key,
+            reviewedScopeKey: f.session.replacementReviewScopeKey,
+            accept: true,
+          ),
+          isTrue,
+        );
+        expect(f.adapter.requests, hasLength(2));
+        expect(
+          f.adapter.requests.first.idempotencyKey,
+          f.adapter.requests.last.idempotencyKey,
+        );
+        expect(f.adapter.requests.last.supplyRevision, 1);
+      }
+    });
+  }
+  for (final change in ['buyer', 'round trip', 'owner scope']) {
+    test('T12 replacement old review rejects $change callback', () async {
+      final f = await fixture();
+      final key = buyV2ReplacementReviewKey(
+        f.session.orderSupplyProgressFor('supply-1')!,
+      );
+      final scopeKey = f.session.replacementReviewScopeKey;
+      if (change == 'owner scope') {
+        f.store.ownerScope = 'tracking-owner-b';
+      } else {
+        f.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-b',
+          sessionId: 'b',
+        );
+        if (change == 'round trip') {
+          f.identity.value = const BuyV2CollectionIdentity(
+            accountId: 'buyer-a',
+            sessionId: 'a',
+          );
+        }
+      }
+      expect(
+        await f.session.decideOrderReplacement(
+          orderId: 'supply-1',
+          reviewedKey: key,
+          reviewedScopeKey: scopeKey,
+          accept: true,
+        ),
+        isFalse,
+      );
+      expect(f.adapter.requests, isEmpty);
+    });
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T12 replacement review at ${scale.toInt()}x text', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final f = await fixture();
+      late BuildContext sheetContext;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => RepaintBoundary(
+            key: const ValueKey('t12-review-capture'),
+            child: MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+          ),
+          home: Builder(
+            builder: (context) {
+              sheetContext = context;
+              return const Scaffold(body: Text('Order'));
+            },
+          ),
+        ),
+      );
+      unawaited(
+        showBuyV2ReplacementReviewSheet(
+          sheetContext,
+          session: f.session,
+          orderId: 'supply-1',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Fresh replacement tomatoes'), findsOneWidget);
+      expect(find.text('Order total ₹90.00'), findsOneWidget);
+      await _t12Capture(
+        tester,
+        'review-top-${scale.toInt()}x',
+        't12-review-capture',
+      );
+      await tester.ensureVisible(find.text('Close'));
+      await tester.pumpAndSettle();
+      for (final key in ['buy-accept-replacement', 'buy-decline-replacement']) {
+        final rect = tester.getRect(find.byKey(ValueKey(key)));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(700));
+        expect(rect.height, greaterThanOrEqualTo(44));
+      }
+      await _t12Capture(
+        tester,
+        'review-controls-${scale.toInt()}x',
+        't12-review-capture',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('buy-accept-replacement')),
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-accept-replacement')));
+      await tester.pumpAndSettle();
+      expect(f.session.replacementConsentResult('supply-1')?.recorded, isTrue);
+      expect(
+        find.text('Choice received. Refresh this order for the next update.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await _t12Capture(
+        tester,
+        'choice-received-${scale.toInt()}x',
+        't12-review-capture',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+    testWidgets(
+      'T12 supply and refund public states at ${scale.toInt()}x text',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 700));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final f = await fixture();
+        f.session.openTracking('supply-1');
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => RepaintBoundary(
+              key: const ValueKey('t12-progress-capture'),
+              child: MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+            ),
+            home: Scaffold(
+              body: AnimatedBuilder(
+                animation: f.session,
+                builder: (context, _) => BuyV2TrackingView(
+                  session: f.session,
+                  onOpenOrderHelp: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        var revision = 2;
+        final stages = <String, BuyV2OrderSupplyProgress?>{
+          'awaiting': _t12Progress(
+            revision: revision++,
+            state: BuyV2SupplyState.awaitingSupply,
+            available: 0,
+            unavailable: 0,
+          ),
+          'partial': _t12Progress(
+            revision: revision++,
+            state: BuyV2SupplyState.partiallyAvailable,
+            available: 1,
+            unavailable: 1,
+          ),
+          'ready': _t12Progress(
+            revision: revision++,
+            state: BuyV2SupplyState.ready,
+            available: 3,
+            unavailable: 0,
+          ),
+          'unavailable': _t12Progress(
+            revision: revision++,
+            state: BuyV2SupplyState.unavailable,
+            available: 0,
+            unavailable: 3,
+          ),
+          'replacement': _t12Progress(revision: revision++),
+          for (final refund in BuyV2SupplyRefundState.values)
+            'refund-${refund.name}': _t12Progress(
+              revision: revision++,
+              refund: refund,
+              refundAmount: 6000,
+              route: 'UPI',
+              reference: refund == BuyV2SupplyRefundState.refunded
+                  ? 'refund-1'
+                  : null,
+            ),
+          'missing': null,
+        };
+        for (final entry in stages.entries) {
+          f.commerce.supply(entry.value);
+          expect(await f.session.refreshOrder('supply-1'), isTrue);
+          await tester.pumpAndSettle();
+          final scrollable = find
+              .descendant(
+                of: find.byType(BuyV2TrackingView),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.drag(
+            find.byType(BuyV2TrackingView),
+            const Offset(0, 5000),
+          );
+          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-tracking-next-step')),
+            250,
+            scrollable: scrollable,
+          );
+          final next = tester
+              .widget<Text>(
+                find.byKey(const ValueKey('buy-tracking-next-step')),
+              )
+              .data!;
+          if (entry.key == 'unavailable') {
+            expect(next, contains('These items are unavailable'));
+          }
+          if (entry.key == 'replacement') {
+            expect(next, contains('Review the replacement offer'));
+          }
+          if (entry.key == 'partial') {
+            expect(next, contains('remaining items'));
+          }
+          await _t12Capture(
+            tester,
+            'next-${entry.key}-${scale.toInt()}x',
+            't12-progress-capture',
+          );
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-order-supply-supply-1')),
+            250,
+            scrollable: find
+                .descendant(
+                  of: find.byType(BuyV2TrackingView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: entry.key);
+          if (entry.key == 'partial') {
+            expect(find.text('Awaiting confirmation: 1'), findsOneWidget);
+          }
+          if (entry.key == 'missing') {
+            expect(find.text('Supply updates unavailable'), findsOneWidget);
+          }
+          if (entry.key.startsWith('refund-')) {
+            expect(find.text('₹60.00 · UPI'), findsOneWidget);
+            expect(
+              find.text('Refund completed'),
+              entry.key == 'refund-refunded' ? findsOneWidget : findsNothing,
+            );
+          }
+          await _t12Capture(
+            tester,
+            '${entry.key}-${scale.toInt()}x',
+            't12-progress-capture',
+          );
+          expect(f.session.orders.single.status, BuyV2OrderStatus.preparing);
+          expect(f.session.orders.single.total, 90);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+}
+
+class _T13ReceiptAdapter implements BuyV2DeliveryExceptionAdapter {
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  }) async {
+    final product = BuyV2Catalogue.products.firstWhere(
+      (p) => p.id == 's-tomato',
+    );
+    return BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Check your received items.',
+      exceptionId: 'receipt-1',
+      kind: BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Delivery receipt',
+      detail: 'Received quantities are shown below.',
+      proofReference: 'receipt-proof-1',
+      itemisedReceipt: BuyV2ItemisedReceipt(
+        orderId: orderId,
+        purchaseId: 'purchase-1',
+        lines: [
+          BuyV2ReceiptLine(
+            productId: product.id,
+            variant: product.variant,
+            pack: product.pack,
+            orderedQuantity: 3,
+            receivedQuantity: 1,
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError(invocation.memberName.toString());
+}
+
+void _t13ReceiptCases() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T13 partial delivery receipt stays honest at ${scale.toInt()}x text',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 700));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final commerce = _T12SupplyCommerce();
+        commerce.status = BuyV2OrderStatus.delivered;
+        commerce.supply(null);
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: commerce,
+          deliveryExceptionAdapter: _T13ReceiptAdapter(),
+          reviewDataEnabled: false,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(await session.restoreDeliveryException('supply-1'), isTrue);
+        session.openTracking('supply-1');
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => RepaintBoundary(
+              key: const ValueKey('t13-receipt-capture'),
+              child: MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+            ),
+            home: Scaffold(
+              body: BuyV2TrackingView(
+                session: session,
+                onOpenOrderHelp: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final scrollable = find
+            .descendant(
+              of: find.byType(BuyV2TrackingView),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('buy-tracking-next-step')),
+          250,
+          scrollable: scrollable,
+        );
+        expect(
+          find.text(
+            'Delivery recorded with missing items. Review the receipt and get help with this order.',
+          ),
+          findsOneWidget,
+        );
+        await _t12Capture(
+          tester,
+          'partial-delivered-next-${scale.toInt()}x',
+          't13-receipt-capture',
+        );
+        await tester.scrollUntilVisible(
+          find.text('Received 1 of 3 · Missing 2'),
+          -250,
+          scrollable: scrollable,
+        );
+        expect(find.text('Received 1 of 3 · Missing 2'), findsOneWidget);
+        expect(find.text('Supply updates unavailable'), findsNothing);
+        await _t12Capture(
+          tester,
+          'partial-delivered-receipt-${scale.toInt()}x',
+          't13-receipt-capture',
+        );
+        expect(session.orderIsCompleted(session.orders.single), isTrue);
+        expect(session.orders.single.total, 90);
+        expect(session.orders.single.supplyProgress?.refundState, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+}
+
 void main() {
+  _t13ReceiptCases();
+  _t12SupplyCases();
   Future<
     ({
       BuyV2Session session,

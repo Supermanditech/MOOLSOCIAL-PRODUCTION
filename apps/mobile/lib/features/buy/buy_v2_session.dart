@@ -6239,6 +6239,216 @@ class BuyV2Session extends ChangeNotifier {
     _orderRefreshOperations.clear();
     _orderRefreshStates.clear();
     _orderRefreshMessages.clear();
+    _replacementOperations.clear();
+    _replacementRequests.clear();
+    _replacementResults.clear();
+    _replacementMessages.clear();
+    _lastSupplySnapshots.clear();
+  }
+
+  final Map<String, Object> _replacementOperations = {};
+  final Map<String, BuyV2ReplacementConsentRequest> _replacementRequests = {};
+  final Map<String, BuyV2ReplacementConsentResult> _replacementResults = {};
+  final Map<String, String> _replacementMessages = {};
+  final Map<String, BuyV2OrderSupplyProgress> _lastSupplySnapshots = {};
+
+  BuyV2OrderSupplyProgress? orderSupplyProgressFor(String orderId) {
+    if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) return null;
+    final order = _orders.where((order) => order.id == orderId).firstOrNull;
+    final progress = order?.supplyProgress;
+    return order != null && progress?.matchesOrder(order) == true
+        ? progress
+        : null;
+  }
+
+  bool replacementConsentBusy(String orderId) =>
+      _orderRefreshOwnerScope == customerStateStore?.ownerScope &&
+      _replacementOperations.containsKey(orderId);
+
+  String? replacementConsentMessage(String orderId) =>
+      _orderRefreshOwnerScope == customerStateStore?.ownerScope
+      ? _replacementMessages[orderId]
+      : null;
+
+  BuyV2ReplacementConsentResult? replacementConsentResult(String orderId) {
+    final progress = orderSupplyProgressFor(orderId);
+    final result = _replacementResults[orderId];
+    return progress?.replacementOffer != null &&
+            result?.request.reviewKey == buyV2ReplacementReviewKey(progress!)
+        ? result
+        : null;
+  }
+
+  bool get replacementConsentAvailable =>
+      orderResolutionAdapter is BuyV2ReplacementConsentAdapter;
+
+  String get replacementReviewScopeKey => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            customerStateStore?.ownerScope,
+            _orderRefreshGeneration,
+            _procurementEpoch,
+          ]),
+        ),
+      )
+      .toString();
+
+  bool _validSupplyUpdate(BuyV2Order incoming, BuyV2Order? original) {
+    final progress = incoming.supplyProgress;
+    if (progress == null) return true;
+    if (!progress.matchesOrder(incoming)) return false;
+    if (original != null &&
+        (!progress.matchesOrder(original) ||
+            (incoming.totalMinor ?? incoming.total * 100) !=
+                (original.totalMinor ?? original.total * 100))) {
+      return false;
+    }
+    final previous =
+        original?.supplyProgress ?? _lastSupplySnapshots[incoming.id];
+    if (previous == null) return true;
+    return progress.purchaseId == previous.purchaseId &&
+        progress.sourceId == previous.sourceId &&
+        progress.revision >= previous.revision &&
+        (progress.revision != previous.revision ||
+            buyV2SupplyProgressKey(progress) ==
+                buyV2SupplyProgressKey(previous));
+  }
+
+  Future<bool> decideOrderReplacement({
+    required String orderId,
+    required String reviewedKey,
+    required String reviewedScopeKey,
+    required bool accept,
+  }) async {
+    if (_collectionDisposed) return false;
+    if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
+      _invalidateOrderRefreshes();
+    }
+    if (reviewedScopeKey != replacementReviewScopeKey) return false;
+    if (replacementConsentBusy(orderId) ||
+        replacementConsentResult(orderId)?.recorded == true) {
+      return false;
+    }
+    if (!replacementConsentAvailable) {
+      _replacementMessages[orderId] =
+          'Replacement choices are unavailable. Try again later or contact support.';
+      notifyListeners();
+      return false;
+    }
+    final operation = Object();
+    final generation = _orderRefreshGeneration;
+    final ownerScope = customerStateStore?.ownerScope;
+    final procurementEpoch = _procurementEpoch;
+    _replacementOperations[orderId] = operation;
+    bool current() =>
+        !_collectionDisposed &&
+        generation == _orderRefreshGeneration &&
+        ownerScope == customerStateStore?.ownerScope &&
+        procurementEpoch == _procurementEpoch &&
+        identical(_replacementOperations[orderId], operation);
+    _replacementMessages.remove(orderId);
+    notifyListeners();
+    try {
+      if (!await refreshOrder(orderId) || !current()) {
+        if (current()) {
+          _replacementMessages[orderId] =
+              'Refresh this order before choosing a replacement.';
+        }
+        return false;
+      }
+      final progress = orderSupplyProgressFor(orderId);
+      final offer = progress?.replacementOffer;
+      if (progress == null ||
+          offer == null ||
+          reviewedKey != buyV2ReplacementReviewKey(progress) ||
+          !offer.expiresAt.isAfter(DateTime.now())) {
+        _replacementMessages[orderId] =
+            'This replacement changed or expired. Review the latest offer before choosing.';
+        return false;
+      }
+      if (_replacementResults[orderId]?.recorded == true &&
+          _replacementRequests[orderId]?.reviewKey != reviewedKey) {
+        _replacementResults.remove(orderId);
+        _replacementRequests.remove(orderId);
+      }
+      final pending = _replacementRequests[orderId];
+      if (pending != null &&
+          (pending.reviewKey != reviewedKey || pending.accept != accept)) {
+        _replacementMessages[orderId] =
+            'Your previous choice is awaiting confirmation. Retry that choice or contact support.';
+        return false;
+      }
+      final request =
+          pending ??
+          BuyV2ReplacementConsentRequest(
+            orderId: orderId,
+            purchaseId: progress.purchaseId,
+            sourceId: progress.sourceId,
+            supplyRevision: progress.revision,
+            offerId: offer.id,
+            offerRevision: offer.revision,
+            reviewKey: reviewedKey,
+            accept: accept,
+            idempotencyKey: sha256
+                .convert(
+                  utf8.encode(
+                    jsonEncode([
+                      ownerScope,
+                      orderId,
+                      progress.purchaseId,
+                      reviewedKey,
+                      accept,
+                    ]),
+                  ),
+                )
+                .toString(),
+          );
+      _replacementRequests[orderId] = request;
+      final result =
+          await (orderResolutionAdapter as BuyV2ReplacementConsentAdapter)
+              .decideReplacement(request);
+      if (!current()) return false;
+      final latest = orderSupplyProgressFor(orderId);
+      final echo = result.request;
+      if (latest?.replacementOffer == null ||
+          buyV2ReplacementReviewKey(latest!) != reviewedKey ||
+          echo.orderId != request.orderId ||
+          echo.purchaseId != request.purchaseId ||
+          echo.sourceId != request.sourceId ||
+          echo.supplyRevision != request.supplyRevision ||
+          echo.offerId != request.offerId ||
+          echo.offerRevision != request.offerRevision ||
+          echo.reviewKey != request.reviewKey ||
+          echo.accept != request.accept ||
+          echo.idempotencyKey != request.idempotencyKey ||
+          (result.recorded && result.reference?.trim().isNotEmpty != true)) {
+        _replacementMessages[orderId] =
+            'Your choice could not be confirmed. Retry the same choice or contact support.';
+        return false;
+      }
+      if (!result.recorded) {
+        _replacementRequests.remove(orderId);
+        _replacementMessages[orderId] =
+            'Your choice was not accepted. Refresh the offer and try again.';
+        return false;
+      }
+      _replacementResults[orderId] = result;
+      _replacementMessages[orderId] =
+          'Choice received. Refresh this order for the next update.';
+      return true;
+    } on Object {
+      if (current()) {
+        _replacementMessages[orderId] =
+            'Your choice could not be confirmed. Retry the same choice or contact support.';
+      }
+      return false;
+    } finally {
+      if (current()) {
+        _replacementOperations.remove(orderId);
+        notifyListeners();
+      }
+    }
   }
 
   Future<bool> refreshOrder(String orderId) async {
@@ -6293,6 +6503,7 @@ class BuyV2Session extends ChangeNotifier {
           refreshed.progress <= 1 &&
           refreshed.partner.trim().isNotEmpty &&
           refreshed.promise.trim().isNotEmpty &&
+          _validSupplyUpdate(refreshed, original) &&
           _validTaxInvoiceForOrder(refreshed);
       if (!valid) {
         final invalidSuccess =
@@ -6308,6 +6519,9 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       _orders[currentIndex] = refreshed;
+      if (refreshed.supplyProgress case final progress?) {
+        _lastSupplySnapshots[orderId] = progress;
+      }
       if (!reviewDataEnabled) _currentDeliveryOrderIds.add(refreshed.id);
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
       _orderRefreshMessages[orderId] = result.customerMessage;
@@ -6842,6 +7056,9 @@ class BuyV2Session extends ChangeNotifier {
   String? get selectedAddressId => _selectedAddressId;
 
   Future<void> restoreCommerce() async {
+    if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
+      _invalidateOrderRefreshes();
+    }
     final refreshSequence = ++_commerceRefreshSequence;
     if (!procurementScopeCurrent) {
       commerceLoadState = BuyV2CommerceLoadState.unavailable;
@@ -6885,6 +7102,19 @@ class BuyV2Session extends ChangeNotifier {
             ? grant
             : null;
       }
+      for (final incoming in snapshot.orders) {
+        final original =
+            _orderRefreshOwnerScope == customerStateStore?.ownerScope
+            ? _orders.where((order) => order.id == incoming.id).firstOrNull
+            : null;
+        if (!_validSupplyUpdate(incoming, original)) {
+          commerceLoadState = BuyV2CommerceLoadState.unavailable;
+          commerceMessage =
+              'Order updates could not be verified. Last known details are still shown.';
+          notifyListeners();
+          return;
+        }
+      }
       _catalogueProducts
         ..clear()
         ..addAll(snapshot.products);
@@ -6908,6 +7138,11 @@ class BuyV2Session extends ChangeNotifier {
           ..addAll(snapshot.orders);
       }
       _seedDeviceReviewReceipt();
+      for (final order in snapshot.orders) {
+        if (order.supplyProgress case final progress?) {
+          _lastSupplySnapshots[order.id] = progress;
+        }
+      }
       if (snapshot.state == BuyV2CommerceLoadState.ready) {
         if (!isStoreProcurement) _currentDeliveryOrderIds.clear();
         _currentDeliveryOrderIds.addAll(
@@ -13751,6 +13986,11 @@ class BuyV2Session extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+    }
+    if (_cart.isEmpty &&
+        !isStoreProcurement &&
+        item.destination != BuyV2Destination.medicine) {
+      cartDisplayFilter = 'all';
     }
     _cart[id] = BuyV2CartLine(
       product: pricedItem,

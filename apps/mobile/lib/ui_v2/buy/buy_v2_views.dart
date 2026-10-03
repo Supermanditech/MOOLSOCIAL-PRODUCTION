@@ -9043,17 +9043,16 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           decoration: buyV2CardDecoration(radius: 16),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.navy,
-                  borderRadius: BorderRadius.circular(12),
+              IconButton(
+                key: const ValueKey('buy-cart-back'),
+                tooltip: 'Back',
+                onPressed: session.goBack,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  padding: EdgeInsets.zero,
+                  foregroundColor: BuyV2Colors.ink,
                 ),
-                child: const Icon(
-                  Icons.shopping_cart_outlined,
-                  color: Colors.white,
-                ),
+                icon: const Icon(Icons.chevron_left_rounded),
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -14867,6 +14866,32 @@ String _trackingNextStep(BuyV2OrderStatus status) => switch (status) {
     'Delivery is complete. Reorder if you need the same products again.',
 };
 
+String _trackingNextStepForOrder(BuyV2Session session, BuyV2Order order) {
+  final receipt = session.deliveryExceptionFor(order.id)?.itemisedReceipt;
+  if (order.status == BuyV2OrderStatus.delivered &&
+      receipt?.lines.any((line) => line.missingQuantity > 0) == true) {
+    return 'Delivery recorded with missing items. Review the receipt and get help with this order.';
+  }
+  if (order.status != BuyV2OrderStatus.preparing &&
+      order.status != BuyV2OrderStatus.confirmed) {
+    return _trackingNextStep(order.status);
+  }
+  final supply = session.orderSupplyProgressFor(order.id);
+  return switch (supply?.state) {
+    BuyV2SupplyState.awaitingSupply =>
+      'Store availability is still being confirmed. Refresh for an update.',
+    BuyV2SupplyState.partiallyAvailable =>
+      'Some items are available. Refresh for confirmation of the remaining items.',
+    BuyV2SupplyState.replacementOffered =>
+      'Review the replacement offer and choose whether to accept it.',
+    BuyV2SupplyState.unavailable =>
+      'These items are unavailable. Refresh for the Store’s next update or use Manage order for help.',
+    BuyV2SupplyState.ready =>
+      'Awaiting dispatch. Refresh this order for the latest Store update.',
+    null => _trackingNextStep(order.status),
+  };
+}
+
 Future<void> _showBuyV2OrderDeliveryContextSheet(
   BuildContext context,
   BuyV2Session session,
@@ -16253,6 +16278,239 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
   }
 }
 
+String _supplyStatusLabel(BuyV2SupplyState state) => switch (state) {
+  BuyV2SupplyState.awaitingSupply => 'Awaiting Store confirmation',
+  BuyV2SupplyState.partiallyAvailable => 'Some items available',
+  BuyV2SupplyState.replacementOffered => 'Replacement offered',
+  BuyV2SupplyState.ready => 'Items available',
+  BuyV2SupplyState.unavailable => 'Items unavailable',
+};
+
+String _supplyRefundLabel(BuyV2SupplyRefundState state) => switch (state) {
+  BuyV2SupplyRefundState.pending => 'Refund pending',
+  BuyV2SupplyRefundState.processing => 'Refund processing',
+  BuyV2SupplyRefundState.refunded => 'Refund completed',
+  BuyV2SupplyRefundState.failed => 'Refund needs attention',
+};
+
+class _OrderSupplyProgress extends StatelessWidget {
+  const _OrderSupplyProgress({required this.session, required this.order});
+  final BuyV2Session session;
+  final BuyV2Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = session.orderSupplyProgressFor(order.id);
+    return Container(
+      key: ValueKey('buy-order-supply-${order.id}'),
+      padding: const EdgeInsets.all(12),
+      decoration: buyV2CardDecoration(radius: 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            progress == null
+                ? 'Supply updates unavailable'
+                : _supplyStatusLabel(progress.state),
+            style: context.buyTitle.copyWith(fontSize: 18),
+          ),
+          if (progress == null)
+            Text(
+              'Refresh this order for the latest Store update.',
+              style: context.buyMeta,
+            )
+          else ...[
+            for (final line in progress.lines) ...[
+              const SizedBox(height: 8),
+              Text(
+                order.lines
+                    .firstWhere(
+                      (original) =>
+                          original.product.id == line.productId &&
+                          original.product.variant == line.variant &&
+                          original.product.pack == line.pack,
+                    )
+                    .product
+                    .customerTitle,
+                style: context.buyBody,
+              ),
+              Text(
+                '${line.pack} · Ordered ${line.orderedQuantity} · Available ${line.availableQuantity}',
+                style: context.buyMeta,
+              ),
+              if (line.awaitingQuantity > 0)
+                Text(
+                  'Awaiting confirmation: ${line.awaitingQuantity}',
+                  style: context.buyMeta,
+                ),
+              if (line.unavailableQuantity > 0)
+                Text(
+                  'Unavailable: ${line.unavailableQuantity}',
+                  style: context.buyMeta,
+                ),
+              if (line.availableQuantity > 0)
+                Text('Store: ${line.supplierName}', style: context.buyMeta),
+            ],
+            if (progress.refundState case final state?) ...[
+              const SizedBox(height: 10),
+              Text(_supplyRefundLabel(state), style: context.buyBody),
+              Text(
+                '${_collectionMoney(progress.refundAmountMinor!)} · ${progress.refundRoute}',
+                style: context.buyMeta,
+              ),
+              if (progress.refundReference?.trim().isNotEmpty == true)
+                Text(
+                  'Reference: ${progress.refundReference}',
+                  style: context.buyMeta,
+                ),
+            ],
+            if (progress.replacementOffer != null)
+              TextButton(
+                key: ValueKey('buy-review-replacement-${order.id}'),
+                onPressed: () => showBuyV2ReplacementReviewSheet(
+                  context,
+                  session: session,
+                  orderId: order.id,
+                ),
+                child: const Text('Review replacement'),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> showBuyV2ReplacementReviewSheet(
+  BuildContext context, {
+  required BuyV2Session session,
+  required String orderId,
+}) async {
+  final reviewed = session.orderSupplyProgressFor(orderId);
+  final offer = reviewed?.replacementOffer;
+  if (reviewed == null || offer == null) return;
+  final reviewedKey = buyV2ReplacementReviewKey(reviewed);
+  final reviewedScopeKey = session.replacementReviewScopeKey;
+  final original = session.orders.firstWhere((order) => order.id == orderId);
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (context) => AnimatedBuilder(
+      animation: session,
+      builder: (context, _) {
+        final current = session.orderSupplyProgressFor(orderId);
+        final unchanged =
+            current?.replacementOffer != null &&
+            buyV2ReplacementReviewKey(current!) == reviewedKey &&
+            session.replacementReviewScopeKey == reviewedScopeKey;
+        final busy = session.replacementConsentBusy(orderId);
+        final result = session.replacementConsentResult(orderId);
+        final recorded = result?.recorded == true;
+        final eligible =
+            unchanged &&
+            offer.expiresAt.isAfter(DateTime.now()) &&
+            !busy &&
+            !recorded &&
+            session.replacementConsentAvailable;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Review replacement', style: context.buyTitle),
+              const SizedBox(height: 12),
+              for (final line in offer.lines) ...[
+                Text(line.productTitle, style: context.buyBody),
+                Text(
+                  '${line.pack} · Quantity ${line.quantity} · ${_collectionMoney(line.unitPriceMinor)} each',
+                  style: context.buyMeta,
+                ),
+                Text(
+                  'Replaces ${original.lines.firstWhere((item) => item.product.id == line.originalProductId && item.product.variant == line.originalVariant && item.product.pack == line.originalPack).product.customerTitle} · ${line.originalQuantity} × ${line.originalPack}',
+                  style: context.buyMeta,
+                ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                'Order total ${_collectionMoney(offer.customerTotalMinor)}',
+                style: context.buyBody,
+              ),
+              Text(offer.deliveryCommitment, style: context.buyBody),
+              Text(
+                'Available until ${MaterialLocalizations.of(context).formatFullDate(offer.expiresAt.toLocal())}, ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(offer.expiresAt.toLocal()))}',
+                style: context.buyMeta,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your choice is sent to the Store. Refresh this order for confirmation of supply and any refund.',
+                style: context.buyMeta,
+              ),
+              if (!unchanged)
+                Text(
+                  'This offer has changed. Close this sheet and review the latest replacement.',
+                  style: context.buyBody,
+                ),
+              if (!offer.expiresAt.isAfter(DateTime.now()))
+                Text(
+                  'This offer has expired. Refresh this order.',
+                  style: context.buyBody,
+                ),
+              if (!session.replacementConsentAvailable)
+                Text(
+                  'Replacement choices are unavailable. Try again later or contact support.',
+                  style: context.buyBody,
+                ),
+              if (session.replacementConsentMessage(orderId)
+                  case final message?)
+                Text(message, style: context.buyBody),
+              if (recorded)
+                Text('Reference: ${result!.reference}', style: context.buyMeta),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton(
+                    key: const ValueKey('buy-accept-replacement'),
+                    onPressed: eligible
+                        ? () => session.decideOrderReplacement(
+                            orderId: orderId,
+                            reviewedKey: reviewedKey,
+                            reviewedScopeKey: reviewedScopeKey,
+                            accept: true,
+                          )
+                        : null,
+                    child: Text(
+                      busy ? 'Checking choice…' : 'Accept replacement',
+                    ),
+                  ),
+                  OutlinedButton(
+                    key: const ValueKey('buy-decline-replacement'),
+                    onPressed: eligible
+                        ? () => session.decideOrderReplacement(
+                            orderId: orderId,
+                            reviewedKey: reviewedKey,
+                            reviewedScopeKey: reviewedScopeKey,
+                            accept: false,
+                          )
+                        : null,
+                    child: const Text('Decline replacement'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
 class BuyV2TrackingView extends StatelessWidget {
   const BuyV2TrackingView({
     super.key,
@@ -16727,7 +16985,8 @@ class BuyV2TrackingView extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _trackingNextStep(order.status),
+                      _trackingNextStepForOrder(session, order),
+                      key: const ValueKey('buy-tracking-next-step'),
                       style: context.buyMeta.copyWith(fontSize: 8),
                     ),
                   ],
@@ -16849,6 +17108,13 @@ class BuyV2TrackingView extends StatelessWidget {
         if (session.orderResolutionResultFor(order.id) case final result?
             when result.accepted) ...[
           _OrderResolutionReceipt(orderId: order.id, result: result),
+          const SizedBox(height: 6),
+        ],
+        if (order.destination == BuyV2Destination.shop &&
+            order.lines.isNotEmpty &&
+            (order.status != BuyV2OrderStatus.delivered ||
+                session.orderSupplyProgressFor(order.id) != null)) ...[
+          _OrderSupplyProgress(session: session, order: order),
           const SizedBox(height: 6),
         ],
         Wrap(
@@ -25391,6 +25657,19 @@ class _OrderCard extends StatelessWidget {
                     key: ValueKey('buy-order-payment-summary-${order.id}'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (session.orderSupplyProgressFor(order.id)
+                          case final supply?) ...[
+                        Text(
+                          _supplyStatusLabel(supply.state),
+                          key: ValueKey('buy-order-supply-summary-${order.id}'),
+                          style: context.buyBody,
+                        ),
+                        if (supply.refundState case final refund?)
+                          Text(
+                            _supplyRefundLabel(refund),
+                            style: context.buyMeta,
+                          ),
+                      ],
                       Text('Payment · $paymentStatus', style: context.buyBody),
                       if (remainingBalance > 0)
                         Text(
@@ -25837,7 +26116,7 @@ class _TrackingTimeline extends StatelessWidget {
       BuyV2OrderStatus.delivered => 5,
     };
     const steps = [
-      ('Confirmed', 'Seller accepted every product'),
+      ('Confirmed', 'Order confirmation recorded'),
       ('Packing', 'Items are being checked and packed'),
       ('Dispatched', 'Partner handed over the order'),
       ('Arriving', 'Delivery is travelling to the address'),

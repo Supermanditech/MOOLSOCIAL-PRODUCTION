@@ -4598,13 +4598,13 @@ void main() {
           tester.state<ScrollableState>(scroll).position.jumpTo(0);
           await tester.pumpAndSettle();
         }
-        // These checkout captures render the same draft T03 Checkout as the
-        // Cart-return suite. Retain every historical reference unchanged.
+        // Checkout retains its prior draft. Cart's requested visible Back has
+        // separate draft references; every historical image remains unchanged.
         final reference = viewport.checkout
             ? 'cursor-t10-navigation-20261003/'
                   'buy-v2-t02-checkout-'
                   '${viewport.label.replaceFirst('-checkout', '')}.png'
-            : 'cursor-t10-navigation-20261003/'
+            : 'cursor-t14-cart-back-20261003/'
                   'buy-v2-r58-8-7-c24f-${viewport.label}.png';
         await expectLater(
           find.byType(BuyV2Screen),

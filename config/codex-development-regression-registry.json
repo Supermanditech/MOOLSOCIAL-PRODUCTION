@@ -110481,6 +110481,524 @@
           "testBytesChanged": false,
           "completedTestsStillTerminal": true,
           "architectRequested": true
+        },
+        "t11FormalHandoffHistoryBlock20261003": {
+          "status": "formal_handoff_rejected_inherited_history",
+          "attemptSession": 83255,
+          "actualExit": 1,
+          "commit": "4758b5b6f7f522b7b7d3049df2694618d45455e9",
+          "remoteMatches": true,
+          "cleanAtCheckpoint": true,
+          "blockingCommit": "0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+          "reason": "production feature commit subject is not atomic",
+          "existingChild": "Historical formal0e90 closure remains open; no history rewrite, gate weakening, ticket closure, release or backend integration claimed.",
+          "continuation": "T12–T14 are document substeps of the existing open Buyer frontend parent, not new formal tickets. Continue only if current implementation/MVP/memory gates independently pass; formal handoff stays blocked.",
+          "tests": "Completed115 focused and frozen1015 cumulative remain source-bound evidence; no pending test during registry movement."
+        },
+        "t12ReconstructionMissingHelper20261003": {
+          "error": "Read guessed t11-checkpoint-gates.ps1; file does not exist; exit1. No mutation or dependent operation.",
+          "rootCause": "Summary named the JSON receipt, not a script; inferred an unverified filename.",
+          "prevention": "Discover literal helper filenames before reading; retain terminal exit checks.",
+          "status": "registered_before_retry"
+        },
+        "t12DiscoveryOutputLimit20261003": {
+          "error": "Ignored helper filename discovery produced287paths and output truncation; no incomplete output used for code or acceptance.",
+          "rootCause": "Broad globs included accumulated admission artifacts.",
+          "prevention": "Use only exact t11-checkpoint-gates.py, t12-frontend-assessment.py and admission.py names discovered in output; bounded reads.",
+          "status": "registered_before_next_action"
+        },
+        "t12AssessmentPinRejected20261003": {
+          "error": "MVP gate exit1 selected-ticket manifest hash does not match assessment after bounded T12 assessment update. No runtime edit.",
+          "rootCause": "Assessment manifest binding changed without complete existing checkpoint manifest binding reconciliation.",
+          "prevention": "Inspect exact lock validator fields and update only matching selected assessment/checkpoint pins, preserve all historical and protected state.",
+          "status": "registered_before_diagnostic_and_retry"
+        },
+        "t12FrontendExecutionAdmitted20261003": {
+          "actor": "Buyer Retail Shop delivery",
+          "capability": "Inspect provider-reported supply/refund and choose exact replacement proposal",
+          "parent": "BUY-ACTION-POLISH-20260926-01",
+          "assessment": "docs/quality/CURSOR-BUY-READY-20260921.md T12 execution boundary",
+          "manifestCanonicalSha256": "D15CC0FBE22B479F6F7BAFC1E00253EDF167BD3FA2A374BA615AE88717292300",
+          "gate": "MVP execution0; memory implementation0; current coordinator0; T11 remote4758 verified",
+          "assessmentPinCorrection": {
+            "verifiedRootCause": "Validator hashes canonical text; first assessment used raw mixed CRLF/LF SHA, not a missing secondary checkpoint field.",
+            "prevention": "Use validator-equivalent CRLF/CR to LF canonical digest without changing historical bytes.",
+            "runtimeEdited": false
+          },
+          "reuse": "Owned model/content companion/session/Tracking and existing tests; unclaimed resolution contracts untouched",
+          "dependencies": "Backend deferred; workspace Codex after integration; Google separate; no APK or real transaction",
+          "formalHandoff": "Inherited0e90 atomic subject blocker remains open"
+        },
+        "t12AnalysisBraces20261003": {
+          "error": "First scoped analysis exit1:16 curly_braces_in_flow_control_structures findings in added model/session/test code.",
+          "rootCause": "Draft compact guards omitted repository-required braces; formatter does not apply lint fixes.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t12-analysis-1.log",
+          "prevention": "Apply braces only to new guards and rerun scoped analysis; no baseline or lint configuration changes.",
+          "status": "registered_before_fix_and_retry"
+        },
+        "t12BraceParserStop20261003": {
+          "error": "Bounded lint helper exit1 assertion no matching diagnostics; stopped before any write, later owners were not attempted.",
+          "rootCause": "Log parser assumed UTF-8 text without checking native PowerShell redirect encoding.",
+          "prevention": "Verify BOM before parsing retained log; preserve raw evidence and use literal guards if parsing is unsuitable.",
+          "status": "registered_before_retry"
+        },
+        "t12ReviewFreshness20261003": {
+          "findings": [
+            "New snapshot validation does not yet reject revision rollback or equal-version changed contents across order or commerce refresh.",
+            "Known acknowledged choice remains in pending-request map and could block a genuinely later offer."
+          ],
+          "detection": "Architect review checks and primary source inspection; no final acceptance claimed.",
+          "rootCause": "Initial bounded draft validated shape/correlation but omitted prior-version comparison and acknowledged-request lifecycle.",
+          "prevention": "Validate snapshot monotonic identity/content at both existing refresh paths; release acknowledged previous choice only for a newly reviewed provider offer, preserve uncertain retry lock.",
+          "parserCorrection": "Brace helper failure actual verified root cause was greedy diagnostic regex capturing message+path; log verified UTF8 BOM-free, not encoding. Corrected filename-anchored regex applied10+3+3 guards, one owner at a time.",
+          "status": "registered_before_fix_and_test"
+        },
+        "t12ReviewAndCaptureStop20261003": {
+          "errors": [
+            "Independent T13 search guessed nonexistent buy_v2_live_delivery_contracts.dart; rg exit1, no missing-file contents used.",
+            "Focused diagnostic run reached35 passing visible cases then stalled in first screenshot widget at time5636; async image conversion outside tester.runAsync can stall fake clock."
+          ],
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t12-focused-1.jsonl; session69717 still open, diagnostic only",
+          "prevention": "Stop only exact T12 runner process tree, retain logs; run image capture in tester.runAsync; discover contract owner from existing imports instead of filenames.",
+          "architectFindings": [
+            "Separate offer content consent identity from unrelated supply snapshot revision; uncertain retry and recorded consent must survive unchanged offer progress.",
+            "Bind displayed review callback to owner/generation at review time, so callback after buyer switch cannot act for a new buyer."
+          ],
+          "status": "registered_before_fix/retry; no final qualification claimed"
+        },
+        "t12RepeatedTestGuardLint20261003": {
+          "error": "Scoped analysis3 exit1:2 newly added test guards missing braces; focused runner correctly did not start tests.",
+          "rootCause": "New test additions reintroduced compact multiline conditionals after initial brace correction.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t12-analysis-3.log",
+          "prevention": "Architect repeated-error review requested; use literal braced guards for all subsequent additions; analysis required before focused tests.",
+          "status": "registered_before_literal_fix"
+        },
+        "t12SummaryPatchContextStop20261003": {
+          "error": "Precise views patch rejected before write: formatted refund switch did not match proposed context.",
+          "rootCause": "Prepared patch against pre-format statement shape.",
+          "prevention": "Read current exact formatted refund block before retry; one owner readback; no acceptance from rejected patch.",
+          "status": "registered_before_retry"
+        },
+        "t12VisualCoverageAndVersionMemory20261003": {
+          "qualifiedDiagnostic": "42 focused tests terminal0, analysis4 zero issues; original normal/200percent images retained.",
+          "sourceFindings": [
+            "Order-list needs compact supply/refund prompt so replacement is discoverable before opening Tracking.",
+            "If provider temporarily omits optional supply data, comparing only current Order field loses highest valid revision and can admit older progress later."
+          ],
+          "prevention": "Reuse compact OrderCard summary and private owner-scoped last-valid snapshot comparison in existing session; missing data remains unavailable publicly. Add absent-then-older regression. All image captures unique ignored run folders, asynchronous conversion under runAsync, preserve original screenshots.",
+          "dependencies": "Full authoritative provider/cache relaunch ordering and settlement remain deferred; do not claim production/live acceptance",
+          "status": "registered_before_version-memory_fix/final-run"
+        },
+        "t12LazyPublicCardTestStop20261003": {
+          "error": "Analysis5 passed; focused3 terminal1. New public Tracking widget cases used ensureVisible on offscreen lazily built supply card; finder is not built yet. Wait output limit also truncated diagnostic tail; no truncated acceptance.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t12-focused-3.log",
+          "rootCause": "Fixture helper did not reproduce real scrolling through native ListView to create offscreen child.",
+          "prevention": "Use scrollUntilVisible scoped to Tracking Scrollable then ensureVisible; parse exact errors with bounded names/messages instead of log tail. Retain failed log and all unique images; full rerun after fix.",
+          "status": "registered_before_retry"
+        },
+        "t12T13VisualCopyDefects20261003": {
+          "defects": [
+            {
+              "id": "existing-parent/t12-large-text-heading",
+              "observed": "Replacement offered splits inside word at 320px/200percent.",
+              "evidence": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\\apps\\mobile\\build\\t06-t07-cart-20261002\\t12-visual-1791042332399233\\refund-refunded-2x.png",
+              "rootCause": "Card heading uses oversized base title style.",
+              "fix": "Use existing compact native card title size; assert no interior word split/overflow through capture."
+            },
+            {
+              "id": "existing-parent/t13-supply-status-copy",
+              "observed": "Existing Tracking Confirmed rail says Seller accepted every product and next message assumes packing while authoritative supply snapshot says unavailable.",
+              "evidence": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921\\apps\\mobile\\build\\t06-t07-cart-20261002\\t12-visual-1791042332399233\\unavailable-1x.png",
+              "rootCause": "Old status copy infers full supplier acceptance from coarse order stage.",
+              "fix": "Reuse existing rail/next-action owners with neutral order-confirmation copy and context-sensitive supply pending/unavailable/replacement next step; preserve actual delivery status, original payment and no inferred cancellation."
+            }
+          ],
+          "classification": "mvp_required connected Buyer delivery copy correctness; existing open Buy frontend parent T13 reuse, no business/state expansion",
+          "status": "registered_before_fix"
+        },
+        "t13TestPatchContextStop20261003": {
+          "error": "T13 test patch rejected at guessed formatted end of T12 helper; no test write. Separate preceding views owner conditional patch passed and readback.",
+          "rootCause": "Large heterogeneous hunks against formatter-modified nesting/tail instead of current literal anchors.",
+          "prevention": "Architect repeated-error review requested. Use current small snippets and unique void main sentinel for separate T13 test helper, readback after each owner mutation.",
+          "status": "registered_before_retry"
+        },
+        "t13ReceiptFixtureRunStop20261003": {
+          "error": "Analysis7 exit0; focused5 terminal1. All45 T12 cases passed on amended public copy, T13 fixture failure remains to diagnose; diagnostic tail is not failure-cause evidence.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t12-focused-5.log",
+          "rootCause": "pending bounded failure readback; current code places receipt above next-step card, so test scroll direction requires verification.",
+          "prevention": "Read exact T13 error before patch; preserve tests/captures; no qualification claimed.",
+          "status": "registered_before_diagnostic/retry"
+        },
+        "t14FounderCartDeleteBackReport20261003": {
+          "founderReports": [
+            {
+              "id": "existing-parent/t14/redmi-cart-delete",
+              "description": "Cart item does not delete on Redmi."
+            },
+            {
+              "id": "existing-parent/t14/redmi-cart-back",
+              "description": "Cart/connected screens have no Back navigation."
+            },
+            {
+              "id": "existing-parent/t14/shop-filter-bin",
+              "description": "With Shop selected, buyer taps delete bin and item remains; active Shop scope is unclear."
+            }
+          ],
+          "status": "reported_by_founder_not_yet_reproduced_on_current_phone",
+          "priority": "Reproduce native deletion/back/scope before final cumulative qualification; preserve T12/T13 work and source47 proof.",
+          "workingSourceSha256": "5ace8bb325150b84d4198d6c66d6229c165ba7c8c331e625c71ddbb711b7e719",
+          "T12T13": "47 focused cases terminal0, analysis8 zero;50 unique host captures inspected, no Redmi claim.",
+          "prevention": "Bind actual runtime/package/source and retained Cart/checkout state; register root causes before fixes; add real-behavior regressions for filtered/all Cart deletion and Back, preserve accepted Add style and Store/supplier policy boundaries.",
+          "authorization": "Existing open Buyer frontend parent and founder fresh journey reproduction; no new APK, external transaction or backend activation"
+        },
+        "t14WindowsGlobSearchError20261003": {
+          "incident": "Readonly rg search passed wildcard path arguments on Windows and exited 1 without searching.",
+          "rootCause": "Used positional glob paths instead of rg directory plus -g filename selection.",
+          "detection": "rg exit1 OS filename syntax errors; no result treated as evidence.",
+          "prevention": "Use literal directory and rg -g patterns; check terminal exit before using results.",
+          "evidence": "Retained command/tool error output; no source or device mutation.",
+          "status": "registered-before-corrected-search"
+        },
+        "t14HelperSearchTruncation20261003": {
+          "incident": "Readonly helper-content search exceeded output budget; result explicitly truncated.",
+          "rootCause": "Generic runtime pattern matched metadata scripts rather than exact native helper names.",
+          "detection": "Tool truncation banner; incomplete discovery not used for native action.",
+          "prevention": "Discover literal filenames before bounded complete helper reads. Do not treat truncated output as complete evidence.",
+          "status": "registered-before-followup"
+        },
+        "t14CartNativeObservations20261003": {
+          "reportedDefects": [
+            "Deletion on Redmi",
+            "Visible Back absent",
+            "Shop-filter bin does nothing"
+          ],
+          "verified": {
+            "initialState": "Cart 1/395, paymentActionRequired, checkoutRequiresResolution true, Shop filter bin disabled and no mutation; screenshots before/after retained.",
+            "runtime": "VM session and views source hashes differ from worktree; screen source exact. device-review:buy isolated adapter verified.",
+            "recovery": "Review payment opens Checkout. Initial footer Unavailable. Scroll reveals Leave payment; clicking offers Check payment. Status check returns pending; hold correctly retained.",
+            "back": "Cart visible Back absent; system Back and other route mapping still pending."
+          },
+          "correction": "Initial viewport observation did not establish absent recovery: scrolling found Leave payment. No whole-flow conclusion based on initial viewport.",
+          "incidentSearch": "Test-content search truncated178 lines. Not used as complete test inventory; next read bounded exact test ranges.",
+          "prevention": "Use complete settled captures including offscreen recovery; exact VM source readback; replay unheld deletion separately; narrow Back fix and behavior regressions.",
+          "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002",
+          "noResetInstallRealPayment": true,
+          "status": "reproduced-held-deletion-current-source-replay-pending"
+        },
+        "t14CartBackFixTestAdmission20261003": {
+          "change": "Reuse existing ReturnAffordance with session.goBack, key buy-cart-back, 44 minimum height. No new route or mutation behavior.",
+          "owners": [
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+          ],
+          "rootCause": "Cart header had no visible return action despite existing session Back handler; native screenshot confirmed.",
+          "prevention": "Four registered cases at normal/200% verify visible product-origin Back and Shop-filter mixed whole-Cart confirmation/cancel/removal. Existing held tests preserve legitimate payment guards.",
+          "ledgerCases": 309,
+          "priorT12Qualification": "Retained prior-source scoped evidence; view edit invalidates current combined qualification. Requalify T12/T13 and cumulative before acceptance.",
+          "status": "implementation-added-tests-pending",
+          "backend": "deferred; workspace Codex after integration; Google separate"
+        },
+        "t14HelperOneLineSyntaxError20261003": {
+          "incident": "Hot-reload helper preparation Python -c ended with literal backslash-n and failed syntax parsing.",
+          "rootCause": "Packed multiline transformation into shell command rather than a standalone helper.",
+          "detection": "Terminal exit1 SyntaxError before any write or native action.",
+          "prevention": "Use apply_patch standalone Python helper and compile before native execution; preserve original readonly helper.",
+          "status": "registered-before-retry",
+          "evidence": "Tool output retained; no source or phone mutation."
+        },
+        "t14HotReloadSourceMismatch20261003": {
+          "incident": "Flutter attach hot-reload response code0, terminal attach0, but VM source hashes for session/views remained old. Current-source activation NOT qualified.",
+          "rootCause": "Not yet established; successful tool response insufficient to prove loaded source. Read-only probe detected mismatch.",
+          "detection": "t14-native-hot-reload-proof-20261003.json source equality false for session/views; screen equality true.",
+          "prevention": "Require exact VM/source equality and visible new Back after every reload before native acceptance; inspect existing review attach target/debug configuration before retry.",
+          "status": "registered-activation-unresolved",
+          "preservation": "No install or full reset; review pending payment remains held. Preserve private attach log and all captures."
+        },
+        "t14RestartReadbackNotMounted20261003": {
+          "incident": "Full Dart restart response0; immediate post-restart VM probe found no unique mounted current Buy screen and exited1. Source/state activation remains unqualified.",
+          "rootCause": "Probe assumed Buy screen mounted immediately after restart; actual post-restart surface not yet observed.",
+          "detection": "Terminal8886 exit1 at active Buy screen assertion; original raw pending review snapshot saved before restart with SHA fb7fa83d588c67a6ac3b2baee49fd7671c5ff4604f2398422b7f37de8a4c1f31.",
+          "prevention": "Capture actual settled post-restart surface, bind VM root/script source independently of mounted Buy, navigate through existing review entry, then check state before any reset. Preserve after state uncertainty.",
+          "architectGap": "Before snapshot matched count/owner/adapter/idle but not exact live financial identity. Do not claim full financial restoration qualification. Next exact review-state verification must compare live key/frozen request/quantities and restoration before any isolated reset.",
+          "noInstallOrPreferenceMutation": true,
+          "status": "registered-post-restart-readback-unresolved"
+        },
+        "t14UiautomatorMissingDump20261003": {
+          "incident": "After Cart tap, UIAutomator dump command returned0 but requested remote XML was absent; cat exit1, capture helper exited1.",
+          "rootCause": "Capture helper assumed process exit0 proved semantic dump creation and discarded dump stdout/stderr. Exact device reason unknown.",
+          "detection": "Terminal capture exit1 missing unique XML; no screenshot/state claim accepted.",
+          "prevention": "Retain dump diagnostic output, verify actual remote file creation, capture screenshot separately on dump failure, retry only after registered incident/refreshed device admission and settled UI.",
+          "status": "registered-capture-retry-pending",
+          "preservation": "No screenshot/XML overwritten; current-source and payment restoration proof retained."
+        },
+        "t14UiautomatorNullRoot20261003": {
+          "incident": "After visible Back tap, capture screenshot SHA identical to before; UIAutomator exit0 reported null root node, XML absent, helper nonzero.",
+          "rootCause": "Not established. Possible inactive display/locked surface or unsettled accessibility; no Back failure/success claimed from ignored tap.",
+          "detection": "t14-native/current-held-cart-back-return-shop-dump.json preserved screenshot and exact semantic dump failure.",
+          "prevention": "Verify interactive display, keyguard and foreground before native inputs; wake only using ordinary device action, never enter private PIN. Require settled frame and actual route before accepting tap.",
+          "status": "registered-repeated-capture-diagnostic-pending",
+          "architectReview": "Requested facts-only repeated-error diagnostic review."
+        },
+        "t14HeldCurrentBackVerified20261003": {
+          "verified": "Settled VM source exact for session/views/screen. Frozen request/key/each quantity restored; hold true. Visible 44dp Cart Back enabled; settled tap returned Shop, Cart1/395 retained.",
+          "evidence": [
+            "t14-native-settled-source-state-proof-20261003.json",
+            "t14-native/current-held-cart-back.png",
+            "t14-native/current-held-cart-back.xml",
+            "t14-native/current-back-settled-result.png",
+            "t14-native/current-back-settled-result.xml"
+          ],
+          "captureCorrection": "Projected power Awake, keyguard false, expected review foreground. No sleep cause established. Early capture during route change inconclusive; settled later valid XML and Shop frame establish return. Helper now waits2seconds and retains raw dump diagnostics privately.",
+          "freshReviewIsolation": "Next step exact review-key only: preserve current complete snapshot, compare live frozen request/key/owner/adapter/idle/quantity, prove write/read restoration, remove isolated review preference only, full Dart restart. Existing original37 and current395 snapshots retained. No production buyer payment mutation or application-wide clear.",
+          "status": "held-source-back-verified-unheld-native-delete-pending",
+          "formalAcceptance": false
+        },
+        "t14StaleFilterFreshBasketDefect20261003": {
+          "defect": "After Shop-filter whole Cart clear, Wholesale Add2/1160 succeeds and Cart icon shows2/1160, but Cart opens stale Shop filter with0products/no Shop products and hidden Wholesale lines.",
+          "rootCause": "cartDisplayFilter retained across empty Cart into fresh basket; filter independent of cartScope.",
+          "reproduction": [
+            "Fresh Shop add37",
+            "Cart Shop filter",
+            "Whole Cart confirm clear",
+            "Wholesale Add MOQ2/1160",
+            "Open Cart shows Shop0 but total1160"
+          ],
+          "evidence": "t14-native/fresh-wholesale-cart-after-shop-clear.png/xml plus preceding isolated native captures.",
+          "fixPlan": "At first successful addition into empty mixed buyer basket reset display filter all; keep nonempty buyer-selected filter and all payment/procurement guards. Reuse existing addProduct owner and focused tests; no new state/service.",
+          "status": "reproduced-register-before-fix",
+          "priorNativeResults": "Fresh Shop Add, last-line removal, Shop-filter bin cancel/confirm and visible Back verified; current source2e47ed8305a6daba4141c4624f2468a9e4f00d97ea9162ac2ac2264a063e7867"
+        },
+        "t14FreshFilterFixAdmission20261003": {
+          "implementation": "addProduct resets cartDisplayFilter all only after all validation/consent guards and before first successful public non-Medicine addition into empty basket. Nonempty filter retained; Store/MED unaffected.",
+          "owners": [
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+          ],
+          "regressions": "Two new tests normal/200% replay oldShop clear→rejected Add retainsfilter→WholesaleAdd resetsAll visible→nonempty explicitShop and subsequentShopAdd retainsShop.",
+          "ledgerCases": 311,
+          "checks": "Analyze three affected owners, focused10 (T10 guards/continuity plus T14 Back/bin/freshfilter); native exact replay then T12/T13 and cumulative requalification.",
+          "previousQualification": "47 T12/T13 and8 initialCart prior-source evidence retained; combined/source qualification pending.",
+          "status": "fix-written-tests-pending"
+        },
+        "t14RestartRestoreReadbackRace20261003": {
+          "incident": "Filter-fix full Dart restart source readback passed exact3-owner equality, but immediate retained quantity count assertion failed; terminal85716 exit1. Native state preservation not yet qualified.",
+          "rootCause": "Mounted Buy frame is insufficient evidence that asynchronous customer-state restoration has completed. Actual settled count not yet observed.",
+          "detection": "after source equality assertion succeeded; count mismatch before writing after proof.",
+          "prevention": "Require settled restore flags and expected saved quantities before interpreting state; preserve snapshot and failure, no further reset or tap until settled readback.",
+          "evidence": "t14-wholesale-state-before-filter-restart-private-20261003.json SHA28bc7075ad6ffbeed9d24f92369b8d4e5b528b48f65522f5667b0aa6b71bfd7f; private restart log retained.",
+          "status": "registered-restore-settlement-diagnostic-pending"
+        },
+        "t14NativeCartFixesVerified20261003": {
+          "sourceSha256": "e8d227c80f072c0dc084bca0f05a1261412d328362ea4500b2f95c97134a74b6",
+          "scope": "Current isolated Redmi review runtime; no build/install/live payment; APK unchanged r66.36.",
+          "verified": [
+            "Exact latest session/views/screen VM sources and settled retained unheld quantities",
+            "Shop fresh Add1/37 and last-line removal",
+            "Shop-filter bin whole-Cart confirmation/cancel/confirm deletion",
+            "Stale Shop filter empty→WholesaleMOQ2/1160 reproduced, fixed, exact samecycle native replay All visible",
+            "Checkout Cart return preserves2/1160",
+            "Cart Back returns Wholesale, Orders, Offers with2/1160 retained",
+            "Offers Add creates mixed3/1197, Shop-filter bin confirms all3, cancel retains and confirm clears, Offers root retained"
+          ],
+          "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002/t14-native",
+          "reviewScreen": "current-founder-review-mixed-cart.png/xml",
+          "restoration": "Original37 and pending395 snapshots preserved; currentWholesale2 snapshot preserved. No real-payment hold bypass.",
+          "qualification": "10 focused host cases passed; final T12/T13+cumulative qualification pending; founder acceptance pending.",
+          "remaining": "Full seven Add-to-Delivered matrices and actual provider/workspace integration remain separate pending children; backend deferred, workspace Codex after integration, Google separate.",
+          "goldenImpact": "Visible Back changes2 existing draft responsive Cart captures. Create fresh T14 draft references only; preserve old T10/accepted images unchanged, do not claim founder visual acceptance."
+        },
+        "t14FinalEvidenceDraftOwnerAdmission20261003": {
+          "owners": [
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.md",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.json",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-EVIDENCE.zip",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-T12-T13.jsonl",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-CART.jsonl",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-1.jsonl",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-2.jsonl",
+            "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-3.jsonl",
+            "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+            "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png"
+          ],
+          "rootOwners": 323,
+          "change": "Exact literal evidence/draft owners added to primary claim and cursor_ui lane allowlist; LF rules only exact JSON/JSONL evidence. No broad permission/gate relaxation.",
+          "draftReferences": "Two fresh responsive Cart captures reflect founder-requested visible Back, prior T10 images unchanged; founder visual approval pending.",
+          "verification": "Latest native source e8d227c80f072c0dc084bca0f05a1261412d328362ea4500b2f95c97134a74b6, host10Cart cases passed. Scoped candidate references prepared before final immutable qualification.",
+          "status": "owners-admitted-qualification-pending"
+        },
+        "t14NewEvidenceOwnerBootstrapMissing20261003": {
+          "incident": "Coordinator rejected newly recorded evidence owners because pending files had not yet been created.",
+          "rootCause": "Owner registration omitted existing admission bootstrap requirement: root recorded owners must exist at first coordinator validation.",
+          "detection": "Terminal coordinator exit1 missing exact new.md; no SDK test started from failed admission.",
+          "prevention": "Create explicit qualificationPending placeholders for exact new admitted owners, with readback, before coordinator validation; draft initial images copied byte-for-byte from preserved prior drafts and labeled pending until targeted generation. No successful evidence preclaim.",
+          "status": "registered-primary-admission-recovery-required"
+        },
+        "t14DraftGenerationAdmission20261003": {
+          "recovery": "Exact10 pending admitted evidence owners created and verified; coordinator323 root claims passed. Initial2PNG are byte-for-byte copies of historicalT10 draft and not qualifiedT14 pixels.",
+          "change": "Existing scoped Cart/Checkout capture test maps only2 responsiveCart variants to newT14 draft directory; Checkout and all old images preserved. Exact2 PNGs added to selected parent's owner ledger.",
+          "next": "Generate only2 newBack responsive Cart drafts via exact case regex; preserve full historical images and all non-targetsource. Inspect new whole frames, then rerun immutable selected cohort. Draft comparison means technical repeatability, not founder visual approval.",
+          "status": "draft-generation-admitted"
+        },
+        "t14MvpAssessmentAnchorAmbiguity20261003": {
+          "incident": "Selected assessment pin helper stopped because global text anchor selectedTicketAssessment was not unique.",
+          "rootCause": "Repeated historical property names make global text anchoring ambiguous in append-only MVP state.",
+          "detection": "Assertion before writing MVP state. READY and integration note appended and retained; current manifest pin must be reconciled before MVP-dependent execution.",
+          "prevention": "Locate exact root preTicketSelectionCheckpoint via JSON-decoder top-level offsets, then exact direct child selectedTicketAssessment; structural readback must prove historical subtrees unchanged.",
+          "status": "registered-before-parser-retry",
+          "noMvpStateWrite": true
+        },
+        "t14MvpShallowCopyReadback20261003": {
+          "incident": "Structural selected assessment parser stopped at comparison with parsed current checkpoint before write.",
+          "rootCause": "dict(selectedAssessment) shallow-copied nested lists; append changed in-memory original data used for comparison. File unchanged.",
+          "detection": "Terminal helper exit1; no MVP state bytes written. Root/child offsets located, guard correctly rejected inconsistent in-memory expected object.",
+          "prevention": "Deep-copy only selected assessment before modifying nested lists; compare decoded spans against immutable original parsed data; assert whole final JSON equals original with exact selected subtree replaced.",
+          "status": "registered-repeated-metadata-error-before-retry"
+        },
+        "t14FinalFingerprintIndexAndDiagnostics20261003": {
+          "incident": "Final runner source inventory used git ls-files and omitted two untracked, newly claimed draft PNGs. Prospective committed fingerprint differs although runtime code unchanged. Optional broad filename discovery also truncated; optional log progress probe omitted UTF-8 and failed read-only.",
+          "detection": {
+            "testedSource": "2a131749891e00d2d3e08cd79f392337d1d438350a934c1444b278acedc88eca",
+            "prospectiveIndexedSource": "085b05c52da043a0de9bf25b0363294cd2cf609c3d31b8b6894b1d1be82b8ed7",
+            "runnerSession": 57083,
+            "runnerExitCode": 1,
+            "ownedRunnerStopped": 7144,
+            "ownedDartChildrenStopped": 1
+          },
+          "rootCause": "Assumed generated drafts were included in fingerprint before staging; ls-files includes tracked index entries only. Optional helpers used broad output and locale default.",
+          "prevention": "Index only exact new source/draft owners before final source freeze; verify source inventory covers all source owners and no other staging changes. Use explicit UTF-8 and bounded top-level discovery; do not report incomplete stopped runner as passing.",
+          "evidence": [
+            "apps/mobile/build/t06-t07-cart-20261002/t14-final-selected-1",
+            "apps/mobile/build/t06-t07-cart-20261002/t14-final-focused-qualified-1.json"
+          ],
+          "status": "Stopped qualification retained; no application/provider/device/history mutation. Refresh admission then rerun focused and full selected at committed inventory."
+        },
+        "t14FocusedRunnerGenerationQuoting20261003": {
+          "incident": "PowerShell python -c quoting failed while creating unique second focused runner; subsequent launch attempted missing helper. Both exited1; no checks ran, no source or receipts overwritten.",
+          "rootCause": "Nested quoting in one-line Python generator and dependent launch not conditioned on creation success.",
+          "prevention": "Use standalone bounded helper file via apply_patch, inspect every terminal result before dependent action; no inline nested quoting. Existing two exact draft owners staged successfully before failure.",
+          "status": "Stopped; require fresh coordinator before helper retry"
+        },
+        "t14SelectedCouponLargeTextFailure20261003": {
+          "incident": "Frozen cumulative batch1 produced an error in R669 coupon below minimum is unavailable at 2.0: StateError No element in scrollUntilVisible at buy_v2_benefit_selection_continuity_test.dart:462.",
+          "sourceSha256": "085b05c52da043a0de9bf25b0363294cd2cf609c3d31b8b6894b1d1be82b8ed7",
+          "runnerSession": 24596,
+          "runnerExitCode": 1,
+          "ownedRunnerStopped": 8204,
+          "ownedDartChildrenStopped": 1,
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-final-selected-2/selected-1.jsonl",
+          "rootCause": "Under investigation; no passing claim for stopped cumulative batch.",
+          "prevention": "Inspect exact test call path and altered Cart Back/layout; reproduce exact case before smallest scoped fix; preserve behavior assertions and accepted references.",
+          "status": "Final qualification blocked; focused57 remains scoped evidence only."
+        },
+        "t14SelectedCouponIsolatedReproduction20261003": {
+          "incident": "Exact R669 coupon minimum case at320x568/200% also fails isolated, terminal1 session79251.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-coupon-reproduction-1.jsonl",
+          "rootCause": "Still under investigation; now confirmed not dependent on cumulative suite ordering.",
+          "prevention": "Read-only temporary diagnostic copy will report actual scrollable bounds and session.view around existing failing gesture. Preserve all assertions and source; no layout edit based only on Noelement.",
+          "status": "Blocked final qualification until diagnosed and verified."
+        },
+        "t14CouponDiagnosticFontContext20261003": {
+          "incident": "Temporary diagnostic copy outside test/ passed, but it bypassed existing flutter_test_config.dart font loading. It is not equivalent reproduction/acceptance.",
+          "detection": "Diagnostic had49px Cart scroll region and no error; original isolated source still failed. Existing testExecutable loads Inter/Material/Cupertino fonts.",
+          "rootCause": "Diagnostic file located ignored build folder does not inherit test-directory configuration.",
+          "prevention": "Explicitly invoke unchanged testExecutable in temporary diagnostic; preserve fonts/surface/textscale and exact assertions before reasoning about layout.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-coupon-diagnostic-1.jsonl",
+          "status": "Retained diagnostic only; source unchanged; no qualification claimed."
+        },
+        "t14CouponHeaderViewportDiagnosis20261003": {
+          "rootCause": "Font-matched diagnostic confirmed route stays Cart and basket12; vertical body143px at320x568/200%, newly added Back occupies separate44px fixed row. Existing300px scroll gesture failed to expose coupon lazy target. No Back activation or eligibility defect established.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-coupon-diagnostic-2.jsonl",
+          "smallestFix": "Move Back into existing Cart summary leading44px native IconButton, replacing decorative cart icon. Remove separatefixed Backrow, preserve visibleCart title, independent bin, pendinghold and footer/Checkout.",
+          "acceptance": "Exact originalR669 320x568/200% with fonts and eligibilityassertions; existingT14 normal/enlargedBack deletion/filter; two fresh draft captures; final focused include existing couponminimum cases, then full selectedfrozen.",
+          "status": "Registered before scoped views edit; no testweakening."
+        },
+        "t14CompactCartHeaderCouponFixed20261003": {
+          "outcome": "Original R669 coupon below minimum at320x568/200% now passes unchanged, exact source test fonts/config, terminal0 session43709.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-coupon-reproduction-2.jsonl",
+          "fix": "Removed separate fixedBack row; reused Cart header leading44px native Back IconButton in place of decorative Cart icon. Carttitle/bin/footer andvalidation unchanged.",
+          "next": "Regenerate only2 new draftCart images retaining previousdraft bytes; finalfocused include original2 couponminimum cases (59total); newnativefinalheader verification before full frozenqualification.",
+          "status": "Focused reproduction fixed; cumulative still pending, no fullpassingclaim."
+        },
+        "t14CompactRestartEarlyRestoreReadback20261003": {
+          "incident": "FullDartrestart helper returnedcode0 but immediate after-readback failed retained itemCount assertion (session46679 terminal1). Private3item snapshot preserved before restart. VMsource equality assertion had passed first.",
+          "rootCause": "Checking restoreInFlight=false alone can precede scheduled saved-state restoration; cannot treat that moment as data loss or successful restoration.",
+          "prevention": "Settled read-only probe must wait for all expected saved quantities AND restoreInFlight=false and exact current VMsource; require terminal0. Do not change savedstate or restart again unnecessarily.",
+          "evidence": [
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native-compact-header-restart-before-20261003.json",
+            "apps/mobile/build/t06-t07-cart-20261002/t14-mixed-state-before-compact-header-restart-private-20261003.json"
+          ],
+          "status": "Nativefinal qualification pendingsettled readback; sourceactivation occurred, no install/preferencedeletion or livepayment."
+        },
+        "t14CrossDestinationCartEntryDefect20261004": {
+          "incident": "FreshShopAdd1/37 succeeded; switching actualnativeWholesale withonlyShopitem makesCartentry absent. Matches founder earliercarticon complaint; basketstillnonempty.",
+          "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+          "evidence": [
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native/compact-header-final-fresh-shop-add.xml",
+            "apps/mobile/build/t06-t07-cart-20261002/t14-native/compact-header-final-fresh-wholesale.xml"
+          ],
+          "rootCause": "Inspect destination-scoped Cart shortcut visibility; likely usescurrentdestination quantity ratherthan globalordinaryCart presence. No sourcecause claimedyet.",
+          "prevention": "RequireCartentry wheneverordinarypublicbasket nonempty fromShop/Wholesale/Offers/Orders regardlesscurrentdestination; route to sameCartselection withhonestglobalquantity/total andactiveCartstate. PreserveStoreprocurement/Medicine boundaries.",
+          "status": "Newchild registeredinexistingparent beforefix; finalcumulative notstarted."
+        },
+        "t14CrossDestinationCartEntryCorrection20261004": {
+          "correction": "Retained actualnativeWholesale screenshot shows blueCart icon withbadge1 whileShop-onlybasketpresent. EarlieroptionalXMLquery matchedstartswithCart and omitted existingAllcarts accessiblelabel; no visibilitydefect reproduced.",
+          "rootCause": "Incomplete semanticlabel matcher used before inspectingwholeframe. Existing _BuyMiniCartBar otherBaskets fallbackalreadyaggregate; _showsMiniCart usesglobalitemCount.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-native/compact-header-final-fresh-wholesale.png",
+          "prevention": "Inspect actualscreenshot andall Cart/Viewcart semanticvariants beforevisibility conclusions. Preservefalsefailureoriginal andcorrection. No source editfor falsefinding.",
+          "wordingChild": "Existing accessibility label All carts onotherdestination should be standardized with singleCart wording in fullsevenjourney copyaudit; registeredfollowup, no current visibilityblocker.",
+          "status": "Falsevisibilityfinding corrected; continue currentnativeAdd andfinalqualification."
+        },
+        "t14NativeCompactHeaderVerified20261004": {
+          "verifiedOn": "2026-10-04",
+          "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+          "runtime": "ExistingisolatedRedmi r66.36 review runtime, fullDartrestart; no APKbuild/install or realpayment/order.",
+          "sourceProof": "apps/mobile/build/t06-t07-cart-20261002/t14-native-compact-header-restart-after-20261003.json",
+          "verified": [
+            "Exact3 savedproductquantities stable in3 readbacks, buyerreviewscope/nohold and3namedVMlibraries matchlocal",
+            "CompactBack iconCart→Shop→same3item1197 mixedCart",
+            "Binexplicitall3 confirmation; KeepCart retains3/1197",
+            "Checkout→Cart visible return retains3/1197; no paymentattempt",
+            "Shopdisplayfilter→binexplicitall3→confirmeddeletion removesallandreturnsShop withCartshortcutabsent andAddavailable",
+            "FreshShopAdd1/37; WholesaleCartshortcutremainsvisiblebadge1 as screenshot/Allcarts accessibility; WholesaleAddMOQ2/1160; openingCartAll shows3/1197 withcorrectCartactive"
+          ],
+          "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002/t14-native",
+          "reviewScreen": "compact-header-final-fresh-mixed-cart-review.png/xml",
+          "remainingChildren": [
+            "Full7separate/mixed Add-to-Delivered native matrices",
+            "Scopedcatalogue shortcut usesWholesale2/1160 whileopeningmixedCart3/1197; reconcile count/total wording infullmatrix continuity audit, do not silentlyredesignpreviousscopedbehavior",
+            "AccessibilityAllcarts labelstandardization inpubliccopy audit",
+            "Prior37→97 unexplained, integration/Codexafterintegration/Google separatelypending",
+            "Formalhistorygate andfounderdraftacceptancepending"
+          ],
+          "qualification": "Final59 focusedpassed; frozenfullselectedpending. Nativeproof3librariesnotindependentwholeAPKasset/configurationacceptance."
+        },
+        "t14FinalHostAndScopedNativeQualified20261004": {
+          "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+          "qualification": {
+            "focusedPassed": 59,
+            "selectedDistinct": 1068,
+            "selectedReferences": 1128,
+            "selectedFiles": 54,
+            "selectedRunnerSession": 39177,
+            "selectedRunnerExitCode": 0,
+            "allThreeBatchesPassed": true,
+            "failures": 0,
+            "warnings": 0,
+            "sourceAndAdmissionFrozen": true,
+            "exactFileNamePairsVerified": true
+          },
+          "evidence": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.json",
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-EVIDENCE.zip",
+            "sha256": "279cadcab3a81601699ad58da7e3675e1ce5080ddde538018c59c069cf3f0b87",
+            "members": 286,
+            "memberHashesAndZipIntegrityVerified": true,
+            "privateSnapshotsAndAttachLogsExcluded": true
+          },
+          "ledger": "Updated only selected case.local receipts after exact 1,128 reference coverage. Original machine streams preserved; two named focused receipts explicitly denote the same combined 59-case execution.",
+          "native": "Current isolated Redmi review: restored exact quantities, three named VM libraries, Back/Checkout return, cancel and confirmed entire-Cart delete under Shop filter, fresh Shop/Wholesale Add and mixed Cart 3/1197. No new APK/install or real payment/order.",
+          "remaining": "Seven complete native matrices; catalogue shortcut count/total and accessibility copy audit; earlier 37→97 finding; live integration/backend deferred/workspace Codex after integration/Google separate; founder draft approval and inherited formal history gate.",
+          "status": "Bounded technical qualification only; ordinary scoped Git checkpoint pending, formal closure and production acceptance not claimed."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
