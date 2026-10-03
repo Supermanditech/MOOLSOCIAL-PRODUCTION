@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4606,
-    "sha256": "3232C772E5F6AEEDE455FDCC96CC2525673B32AA35B487C679290231E5522150"
+    "sha256": "79E503C96A038E9C2C84989D7A5319E5DDDBAEF15B39BD36D468180DEA7E73AF"
   },
   "mandatoryReads": [
     "../AGENTS.md",

@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:pdf/pdf.dart';
@@ -14,6 +17,21 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
 import 'commerce_downloads_test.dart' show pdfBytes;
 import 'work_invoice_pdf_test.dart' show request;
+
+class SupplierStatementPickerFixture extends FilePickerPlatform {
+  final calls = <String>[];
+  bool cancelled = false;
+  @override
+  Future<Uri?> saveFile({required String fileName, required Uint8List bytes,
+    required String mimeType, String? dialogTitle, String? initialDirectory,
+    Function(FilePickerStatus)? onFileSaving,
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions()}) async {
+    calls.add('$fileName|$mimeType|$dialogTitle');
+    return cancelled ? null : Uri.parse('content://host-evidence/$fileName');
+  }
+}
 
 class AccountStore implements WorkPendingProofStore {
   @override
@@ -101,6 +119,33 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('SUPPLIERSTATEMENTSAVER uses installed picker for strict PDF CSV and cancellation', () async {
+    final original = FilePickerPlatform.instance;
+    final picker = SupplierStatementPickerFixture();
+    FilePickerPlatform.instance = picker;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const native = MethodChannel('com.moolsocial.app/store_stock_download');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var nativeCalls = 0;
+    messenger.setMockMethodCallHandler(native, (call) async { nativeCalls++; return true; });
+    addTearDown(() {
+      FilePickerPlatform.instance = original; debugDefaultTargetPlatformOverride = null;
+      messenger.setMockMethodCallHandler(native, null);
+    });
+    for (final format in [StoreStockExportFormat.pdf, StoreStockExportFormat.csv]) {
+      final name = 'supplier-statement-0123456789abcdef.${format.extension}';
+      expect(await saveStoreStockFile(Uint8List.fromList([1, 2]), name, format), isTrue);
+      expect(picker.calls.last, '$name|${format.mimeType}|Save supplier statement');
+    }
+    picker.cancelled = true;
+    expect(await saveStoreStockFile(Uint8List(1), 'supplier-statement-0123456789abcdef.pdf', StoreStockExportFormat.pdf), isFalse);
+    expect(nativeCalls, 0);
+    for (final name in ['supplier-statement-invalid.pdf', 'supplier-statement-0123456789abcdef.csv']) {
+      await saveStoreStockFile(Uint8List(1), name, StoreStockExportFormat.pdf);
+    }
+    expect(nativeCalls, 2, reason: 'Unmatched/mismatched names do not bypass the native filename guard.');
+    expect(picker.calls, hasLength(3));
+  });
   StoreSupplierStatement supplierStatementFixture() {
     // Host-only report fixture, never inserted into OPPO evaluation records.
     final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening', basisId: 'HOST-basis',
