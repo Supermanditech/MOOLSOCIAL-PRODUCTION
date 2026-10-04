@@ -1625,6 +1625,15 @@ abstract interface class WorkPurchaseBillGoodsReviewGuard {
   });
 }
 
+/// Hold the purchase queue before checking Stock, matching receipt posting order.
+/// The supplied coordinator must call persist while it still owns the Stock queue.
+abstract interface class WorkPurchaseGoodsReceiptReviewGuard {
+  Future<bool> saveReviewedGoodsReceipt(WorkspacePurchaseEntryBook book, {
+    required int expectedRevision,
+    required Future<bool> Function(Future<bool> Function() persist) withVerifiedStock,
+  });
+}
+
 /// App-private originals. No public upload, product-photo identity or accounting effect.
 abstract interface class WorkPurchaseReceiptReviewAbandonment {
   Future<WorkspacePurchaseEntryBook?> abandonReviewedReceipt(String account, String store, {
@@ -2039,7 +2048,8 @@ class WorkPurchaseInvoiceSuggestions {
 /// Contacts never share an inventory or financial-journal key.
 class SecureWorkPurchaseEntryStore
     implements WorkPurchaseEntryStore, WorkPurchaseEntryRevisionGuard, WorkPurchaseReceiptReviewAbandonment,
-      WorkPurchaseBillGoodsReviewGuard, WorkPurchaseBillGoodsReviewAbandonment {
+      WorkPurchaseBillGoodsReviewGuard, WorkPurchaseBillGoodsReviewAbandonment,
+      WorkPurchaseGoodsReceiptReviewGuard {
   SecureWorkPurchaseEntryStore({required this.accountScope, FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
   final String? Function() accountScope;
@@ -2101,8 +2111,15 @@ class SecureWorkPurchaseEntryStore
     required int expectedRevision, required Future<bool> Function() verifyCurrent,
   }) => _save(book, expectedRevision: expectedRevision, verifyCurrent: verifyCurrent);
 
+  @override
+  Future<bool> saveReviewedGoodsReceipt(WorkspacePurchaseEntryBook book, {
+    required int expectedRevision,
+    required Future<bool> Function(Future<bool> Function() persist) withVerifiedStock,
+  }) => _save(book, expectedRevision: expectedRevision, guardedPersist: withVerifiedStock);
+
   Future<bool> _save(WorkspacePurchaseEntryBook directory, {required int? expectedRevision,
-      Future<bool> Function()? verifyCurrent}) async {
+      Future<bool> Function()? verifyCurrent,
+      Future<bool> Function(Future<bool> Function() persist)? guardedPersist}) async {
     final bytes = jsonEncode(directory.toJson());
     final frozen = WorkspacePurchaseEntryBook.fromJson(jsonDecode(bytes));
     final key = _key(frozen.account, frozen.store, frozen.qa);
@@ -2184,15 +2201,18 @@ class SecureWorkPurchaseEntryStore
         throw const WorkGatewayException('Purchase storage is full. Your saved records are kept; do not clear app data.');
       }
       if (verifyCurrent != null && !await verifyCurrent()) return false;
-      _check(frozen.account, frozen.store);
-      try {
-        await _storage.write(key: key, value: bytes);
-      } on Object {
+      Future<bool> persist() async {
         _check(frozen.account, frozen.store);
-        if (await _storage.read(key: key) != bytes) rethrow;
+        try {
+          await _storage.write(key: key, value: bytes);
+        } on Object {
+          _check(frozen.account, frozen.store);
+          if (await _storage.read(key: key) != bytes) rethrow;
+        }
+        _check(frozen.account, frozen.store);
+        return true;
       }
-      _check(frozen.account, frozen.store);
-      return true;
+      return guardedPersist == null ? persist() : guardedPersist(persist);
     });
   }
   @override

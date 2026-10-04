@@ -5399,7 +5399,8 @@ void main() {
     });
   }
 
-  for (final projection in ['saved', 'pending']) {
+  for (final projection in ['saved', 'pending', 'financial-only',
+      'missing-movement', 'wrong-quantity', 'future-marker', 'missing-product', 'orphan-receipt']) {
     test('PURCHASEREVIEW SESSION frozen commit and fresh projection admission $projection', () async {
       final storage = _OrderJournalStorage();
       final opening = openingFixture(amount: 0);
@@ -5425,9 +5426,55 @@ void main() {
       }
       expect(await post(receipt, 4), projection == 'pending'
         ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending : WorkspaceGoodsReceiptSaveResult.saved);
+      if (projection != 'saved' && projection != 'pending') {
+        // Host-only flow: a financial commit must not invalidate projected Stock.
+        final advance = WorkspaceSupplierLedgerEntry(operationId: 'next-arrival-advance',
+          reference: 'HOST-NEXT-ARRIVAL-ADV', origin: WorkspaceSupplierEntryOrigin.supplierAccount,
+          kind: WorkspaceSupplierEntryKind.advance, amountMinor: 10000,
+          paymentMethod: 'Cash', postedAt: DateTime.utc(2026, 10, 3),
+          moneyReview: WorkspaceSupplierMoneyReview(occurredOn: '2026-10-03',
+            openingId: opening.id, openingRevision: opening.revision, notIncludedInOpening: true));
+        expect(await owner.recordWorkspaceSupplierMoney(opening.supplierId,
+          accountScope: 'account-A', workspaceId: 'store-A', entry: advance, expectedRevision: 2), isTrue);
+        final savedStock = (await SecureWorkInventoryStore(accountScope: () => 'account-A', storage: storage)
+          .read('account-A', 'store-A', qa: true))!;
+        final journal = (await SecureWorkLedgerCheckpointStore(accountScope: () => 'account-A', storage: storage)
+          .read('account-A', 'store-A'))!;
+        expect(savedStock.manualReceiptCheckpointRevision, lessThan(journal.revision));
+        expect(savedStock.products.single.stock, 16);
+        final stockKey = storage.values.keys.singleWhere((key) => key.contains('workspace.inventory.'));
+        // Deliberately corrupt host fixtures only; never actual device data.
+        final raw = jsonDecode(storage.values[stockKey]!) as Map<String, dynamic>;
+        if (projection == 'missing-movement') raw['movements'] = [];
+        if (projection == 'wrong-quantity') {
+          raw['products'] = [{...savedStock.products.single.toInventoryJson(), 'stock': 15}];
+        }
+        if (projection == 'future-marker') raw['manualReceiptCheckpointRevision'] = journal.revision + 1;
+        if (projection == 'missing-product') raw['products'] = [];
+        if (projection == 'orphan-receipt') {
+          final savedMovements = raw['movements'] as List<dynamic>;
+          final receiptMovement = savedStock.movements.singleWhere((m) =>
+            m.referenceKind == WorkspaceStockReferenceKind.manualSupplierReceipt);
+          final receiptBytes = savedMovements.cast<Map<String, dynamic>>().singleWhere((m) =>
+            m['id'] == receiptMovement.id);
+          raw['movements'] = [...savedMovements,
+            {...receiptBytes, 'id': 'host-orphan-receipt-movement', 'quantityDelta': 1}];
+          raw['products'] = [{...savedStock.products.single.toInventoryJson(), 'stock': 17}];
+          expect(WorkspaceSavedInventory.fromJson(raw).products.single.stock, 17);
+        }
+        if (projection != 'financial-only') storage.values[stockKey] = jsonEncode(raw);
+      }
+      final stockKey = storage.values.keys.singleWhere((key) => key.contains('workspace.inventory.'));
+      final stockBytes = storage.values[stockKey];
       final next = WorkspaceSupplierGoodsReceipt.fromJson({...receipt.toJson(), 'id': 'next-arrival'});
+      final invalidProjection = ['missing-movement', 'wrong-quantity', 'future-marker', 'missing-product', 'orphan-receipt'].contains(projection);
       expect(await other.saveWorkspaceGoodsReceiptDraft(next, supplierId: opening.supplierId,
-        scope: other.workspaceSupplierScope!, expectedRevision: 4), projection == 'saved');
+        scope: other.workspaceSupplierScope!, expectedRevision: 4), projection != 'pending' && !invalidProjection);
+      expect(storage.values[stockKey], stockBytes, reason: 'Review admission never changes Stock bytes or marker.');
+      if (invalidProjection) {
+        expect(other.workspaceGoodsReceiptDrafts, hasLength(1));
+        return;
+      }
       if (projection == 'pending') {
         expect(other.workspaceSupplierError, contains('Stock recovery'));
         storage.failWriteKey = null;

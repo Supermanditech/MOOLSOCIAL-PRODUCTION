@@ -1756,21 +1756,56 @@ class WorkSession extends ChangeNotifier {
         }
       }
       if (previousReviews.isNotEmpty) {
-        final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
         final inventory = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);
         if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
-        final ledger = journal?.supplierLedgers[supplierId];
-        if (previousReviews.any((r) =>
-            jsonEncode(ledger?.goodsReceipts[r.receipt.id]?.toJson()) != jsonEncode(r.receipt.toJson()))) {
-          _supplierValidationErrors[key] = 'Resume this supplier’s saved delivery review before starting another arrival.';
-          return false;
-        }
-        if (journal == null || inventory?.manualReceiptCheckpointRevision != journal.revision) {
+        if (_supplierStorage is! WorkPurchaseGoodsReceiptReviewGuard ||
+            _inventoryStorage is! WorkInventoryReceiptProjectionGuard || inventory == null) {
           _supplierValidationErrors[key] = 'Verify the previous delivery’s saved Stock recovery before starting another arrival.';
           return false;
         }
+        // Purchase → inventory is the same order used by receipt posting. Keep
+        // the durable review write inside both queues; never re-enter either.
+        final savedReview = await (_supplierStorage as WorkPurchaseGoodsReceiptReviewGuard)
+          .saveReviewedGoodsReceipt(next, expectedRevision: old.revision,
+            withVerifiedStock: (persist) => (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
+              .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: inventory.revision,
+                commit: (savedStock) async {
+                  final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+                  if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return null;
+                  final ledger = journal?.supplierLedgers[supplierId];
+                  if (previousReviews.any((r) =>
+                      jsonEncode(ledger?.goodsReceipts[r.receipt.id]?.toJson()) != jsonEncode(r.receipt.toJson()))) {
+                    _supplierValidationErrors[key] = 'Resume this supplier’s saved delivery review before starting another arrival.';
+                    return null;
+                  }
+                  final authoritative = journal?.inventory;
+                  final quantities = authoritative?.quantities;
+                  final marker = savedStock?.manualReceiptCheckpointRevision;
+                  final products = {for (final p in savedStock?.products ?? const <WorkspaceCatalogueItem>[]) p.id: p};
+                  final movements = {for (final m in savedStock?.movements ?? const <WorkspaceStockMovement>[]) m.id: m};
+                  final known = authoritative?.movements.map((m) => m.id).toSet() ?? <String>{};
+                  final tails = savedStock?.movements.where((m) => !known.contains(m.id)).toList() ?? <WorkspaceStockMovement>[];
+                  // A money-only commit may advance journal revision without
+                  // changing Stock. Prove projection content, not revision equality.
+                  final matches = savedStock != null && journal != null && authoritative != null && quantities != null &&
+                    marker != null && marker > 0 && marker <= journal.revision &&
+                    products.length == savedStock.products.length && movements.length == savedStock.movements.length &&
+                    tails.every((m) => m.referenceKind != WorkspaceStockReferenceKind.manualSupplierReceipt &&
+                      m.referenceKind != WorkspaceStockReferenceKind.manualSupplierReturn) &&
+                    authoritative.movements.every((m) => movements[m.id]?.contentIdentity == m.contentIdentity) &&
+                    quantities.entries.every((e) => products[e.key]?.stock == e.value +
+                      tails.where((m) => m.productId == e.key).fold<int>(0, (sum, m) => sum + m.quantityDelta));
+                  if (!matches) {
+                    _supplierValidationErrors[key] = 'Verify the previous delivery’s saved Stock recovery before starting another arrival.';
+                    return null;
+                  }
+                  if (!await persist()) return null;
+                  return savedStock; // Exact bytes/marker retained, no Stock write.
+                }));
+        if (!savedReview) return false;
+      } else {
+        await _supplierStorage.save(next, expectedRevision: old.revision);
       }
-      await _supplierStorage.save(next, expectedRevision: old.revision);
       if (_disposed || _supplierKey != key) { _supplierNeedsReload.add(key); return false; }
       _supplierDirectories[key] = next;
       return true;
