@@ -111814,6 +111814,100 @@
             "unicodeStdout": "cp1252 failed formatting diagnostic; rerun utf8 passed; no device mutation",
             "fileSearchTruncation": "Broad scratch filename query truncated; narrowed t14-only helper query recovered required paths; not used as admission evidence"
           }
+        },
+        "t14FilteredDeleteContinuation20261004": {
+          "actor": "Personal Buyer",
+          "capability": "Clear personal Cart while Shop display filter is active",
+          "classification": "mvp_required",
+          "classificationReason": "Destructive Cart action must be reachable, explicit, cancellable and accurate independent of a display filter",
+          "existingParent": "BUY-ACTION-POLISH-20260926-01",
+          "formalTicket": "UAW-CURSOR-BUY-READY-20260921",
+          "reuseAssessment": "Existing selectedTicketAssessment explicitly covers fresh Shop-filter clear to Wholesale basket visibility, held Cart and wholeCart confirmation; existing session/views/native helper/focused tests reused",
+          "owners": [
+            "apps/mobile/lib/features/buy/buy_v2_session.dart",
+            "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+            "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+          ],
+          "minimumCompleteScope": "Reproduce current mixed Cart with Shop display filter; verify bin confirmation, Cancel preservation and confirm removes entire personal Cart; fix only reproducible root cause; technical regression plus existing debug hot refresh/retest if code changes; record exact result or child and safe checkpoint",
+          "explicitExclusions": [
+            "No design/Add styling changes",
+            "No backend/provider/Store/Google work",
+            "No APK/install/data clear/payment/order/support submission",
+            "No formal closure or new owner/gate changes"
+          ],
+          "authoritativeData": "Actual existing native review Cart quantities, visible confirmation and read-only VM source identity; never inferred from a host fixture alone",
+          "failureRecovery": "Retain Cart on Cancel and pending financial hold; do not retry a failed action blindly or bypass owner/admission checks",
+          "testPlan": [
+            "Current-source native screenshot and exact semantics before action",
+            "Shop-filter bin Cancel preserves four quantities/total",
+            "Shop-filter bin confirm empties personal Cart and valid origin return",
+            "Existing focused clear/held Cart tests if implementation changes"
+          ]
+        },
+        "t14FilteredDeleteResult20261004": {
+          "child": "T14-filtered-cart-delete",
+          "status": "current_source_tested_case_verified_failure_not_reproduced",
+          "nativeActions": 6,
+          "nativeFrames": 7,
+          "shopDisplayFilterSelected": true,
+          "binScope": "entire personal Cart",
+          "confirmationCount": 4,
+          "cancelVisibleCount": 4,
+          "cancelVisibleTotal": 1234,
+          "confirmedGlobalCartEmpty": true,
+          "returnedOrigin": "Offers",
+          "wholesaleAfterClear": "Add enabled; no stale Cart shortcut",
+          "finalReadOnly": {
+            "cartMapEmpty": true,
+            "addresses": 2,
+            "selectedPayment": "UPI",
+            "pendingCustomerWrites": 0,
+            "checkoutIdempotencyKey": null,
+            "currentThreeSourcesMatch": true
+          },
+          "sourceCodeChanged": false,
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "paymentOrOrderSubmitted": false,
+          "visualInspection": [
+            "Shop-filter wholeCart confirmation",
+            "Wholesale catalogue after empty"
+          ],
+          "localEvidence": {
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t14-filtered-delete-local-evidence-20261004.zip",
+            "sha256": "d66a119e37fd75e5cb8561fecef3022bbdbbdc8a0fcb8a22e3115f099a245ab0",
+            "bytes": 1837340,
+            "members": 31,
+            "durableAdmission": "pending",
+            "mandatoryPermanentDependency": false
+          },
+          "limits": [
+            "No independent saved-store readback",
+            "No cold-start or payment-hold deletion qualification",
+            "No every-filter/actor variant claim"
+          ],
+          "remainingChildren": [
+            "T14-offer-selector-singular-text",
+            "T14-wholesale-delivery-review",
+            "T14-native-evidence-admission"
+          ],
+          "report": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md",
+          "originalHostEvidenceUnchanged": true,
+          "finalDeviceScreen": "Wholesale with empty Cart"
+        },
+        "t14FilteredDeleteArchitectReview20261004": {
+          "reviewer": "retention_architect",
+          "reviewType": "facts-only; no independent native device verification",
+          "verdict": "No material blocker for narrow checkpoint",
+          "qualifiedScope": "Current-source unheld Shop-filter wholeCart clearing",
+          "limits": [
+            "Original failure root cause not established",
+            "Zero pending writes does not independently prove persisted deletion",
+            "Wholesale Add observed enabled, not exercised"
+          ],
+          "nativeArchiveAdmission": "pending",
+          "hostArchive": "preserved unchanged",
+          "requiredCompletion": "Exact-owner gates and remote checkpoint readback"
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
