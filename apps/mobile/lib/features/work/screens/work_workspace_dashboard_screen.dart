@@ -36,6 +36,34 @@ import 'store_add_product_sheet.dart';
 import '../work_services.dart';
 import '../work_session.dart';
 
+// Historical receiving exceptions are not proof of another required delivery,
+// outstanding adjustment, payment, or currently reusable credit.
+@visibleForTesting
+String workPurchaseNextStep({required ({int totalItems, int matchedItems,
+    bool hasMatches, bool damaged, bool shortage, bool returnedOnMatchedDelivery})? progress,
+    required int? remainingMinor}) {
+  if (progress == null) return 'Next: recover saved goods status before matching again.';
+  if (remainingMinor == null) return 'Next: verify this bill’s balance in the supplier account.';
+  final hasAdjustments = progress.damaged || progress.shortage || progress.returnedOnMatchedDelivery;
+  if (hasAdjustments && progress.matchedItems < progress.totalItems) {
+    final balance = remainingMinor == 0 ? 'No amount due on this bill.'
+      : remainingMinor > 0 ? 'Bill amount remains due.' : 'Bill credit recorded.';
+    return '$balance Check recorded goods adjustments; match existing receipts where applicable. '
+      'Record another delivery only when goods arrive.';
+  }
+  if (!hasAdjustments && progress.matchedItems < progress.totalItems) {
+    return 'Next: match saved goods below, or record a delivery.';
+  }
+  if (remainingMinor > 0) return 'Next: record payment or link available payment / credit.';
+  if (remainingMinor < 0) {
+    return hasAdjustments
+      ? 'Bill credit recorded. Check eligible credit/refund options below; goods adjustments remain in history.'
+      : 'Bill credit recorded. Check eligible credit/refund options below.';
+  }
+  return hasAdjustments ? 'No amount due on this bill. Goods adjustments remain in history.'
+    : 'Bill, goods matching and balance are up to date.';
+}
+
 String _formatStoreAmount(int value) {
   final negative = value < 0;
   final digits = value.abs().toString();
@@ -13521,14 +13549,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           Text([if (progress!.damaged) 'Damaged goods matched', if (progress.shortage) 'Bill shortage recorded',
             if (progress.returnedOnMatchedDelivery) 'Return on matched delivery'].join(' · '),
             key: const Key('work-purchase-goods-exceptions'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
-        Text(progress == null ? 'Next: recover saved goods status before matching again.'
-          : progress.matchedItems < progress.totalItems ? 'Next: match saved goods below, or record a delivery.'
-          : progress.damaged || progress.shortage || progress.returnedOnMatchedDelivery
-            ? 'Next: check the goods adjustments and supplier balance.'
-          : remaining == null ? 'Next: verify this bill’s balance in the supplier account.'
-          : remaining > 0 ? 'Next: record payment or link available payment / credit.'
-          : remaining < 0 ? 'Next: use the bill credit or record a supplier refund.'
-          : 'Bill, goods matching and balance are up to date.',
+        Text(workPurchaseNextStep(progress: progress, remainingMinor: remaining),
           key: const Key('work-purchase-next-step'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
         if (widget.onReceiveGoods != null && progress != null &&
             progress.matchedItems < progress.totalItems)

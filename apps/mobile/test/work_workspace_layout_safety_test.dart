@@ -960,6 +960,54 @@ void _expectHomeCategoryContrast(WidgetTester tester, String id) {
 }
 
 void main() {
+  // Presentation fixtures only: no runtime records or posting qualification.
+  for (final matched in [0, 1]) {
+    for (final exception in ['shortage', 'damage', 'return']) {
+      for (final due in <int?>[null, 0, 100, -100]) {
+        test('PURCHASEGUIDANCE historical $exception matched=$matched due=$due', () {
+          final progress = (totalItems: 1, matchedItems: matched, hasMatches: true,
+            damaged: exception == 'damage', shortage: exception == 'shortage',
+            returnedOnMatchedDelivery: exception == 'return');
+          final before = progress;
+          final text = workPurchaseNextStep(progress: progress, remainingMinor: due);
+          expect(progress, before);
+          expect(text, isNot(contains('balance settled')));
+          expect(text, isNot(contains('credit available')));
+          if (due == null) {
+            expect(text, 'Next: verify this bill’s balance in the supplier account.');
+          } else if (matched == 0) {
+            expect(text, startsWith(due == 0 ? 'No amount due on this bill.'
+              : due > 0 ? 'Bill amount remains due.' : 'Bill credit recorded.'));
+            expect(text, contains('match existing receipts where applicable'));
+            expect(text, endsWith('Record another delivery only when goods arrive.'));
+          } else if (due == 0) {
+            expect(text, 'No amount due on this bill. Goods adjustments remain in history.');
+            expect(text, isNot(contains('Next:')));
+          } else if (due < 0) {
+            expect(text, 'Bill credit recorded. Check eligible credit/refund options below; goods adjustments remain in history.');
+          } else {
+            expect(text, 'Next: record payment or link available payment / credit.');
+          }
+        });
+      }
+    }
+  }
+  test('PURCHASEGUIDANCE unknown progress and ordinary matching retain truthful prompts', () {
+    expect(workPurchaseNextStep(progress: null, remainingMinor: 0),
+      'Next: recover saved goods status before matching again.');
+    final partial = (totalItems: 1, matchedItems: 0, hasMatches: false,
+      damaged: false, shortage: false, returnedOnMatchedDelivery: false);
+    for (final due in [0, 100, -100]) {
+      expect(workPurchaseNextStep(progress: partial, remainingMinor: due),
+        'Next: match saved goods below, or record a delivery.');
+    }
+    final complete = (totalItems: 1, matchedItems: 1, hasMatches: true,
+      damaged: false, shortage: false, returnedOnMatchedDelivery: false);
+    expect(workPurchaseNextStep(progress: complete, remainingMinor: 0),
+      'Bill, goods matching and balance are up to date.');
+    expect(workPurchaseNextStep(progress: complete, remainingMinor: -100),
+      'Bill credit recorded. Check eligible credit/refund options below.');
+  });
   group('SETTLEMENTCOPY', () {
     WorkspacePaymentRecord payment({int paid = 23500, int due = 0, int refunded = 0,
         WorkspacePaymentState state = WorkspacePaymentState.creditApplied}) =>
