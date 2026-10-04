@@ -14819,13 +14819,16 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   Future<void> _close() async {
     if (await confirmLeave() && _current) widget.onBack();
   }
-  Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true}) =>
+  Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true, String? errorText}) =>
     SizedBox(width: number ? 116 : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
       enabled: !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null && enabled,
       onChanged: (_) { setState(() {}); _saveInput(); },
       keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       style: const TextStyle(fontSize: 13, color: MoolColors.ink),
       decoration: InputDecoration(labelText: label, isDense: true, filled: false,
+        errorText: errorText, errorMaxLines: 2,
+        errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffa52a2a))),
+        focusedErrorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffa52a2a))),
         floatingLabelBehavior: FloatingLabelBehavior.always,
         labelStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
         contentPadding: const EdgeInsets.symmetric(vertical: 10), constraints: const BoxConstraints(minHeight: 48),
@@ -14991,7 +14994,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       Wrap(spacing: 12, runSpacing: 12, children: [
         _field('Delivery unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited),
         _field('Stock units / unit', line.factor, 'work-receive-factor-$index', enabled: !inherited),
-        _field('Expected qty', line.expected, 'work-receive-expected-$index', enabled: !inherited),
+        _field('Expected qty', line.expected, 'work-receive-expected-$index', enabled: !inherited,
+          errorText: expected == null && line.expected.text.trim().isNotEmpty ? 'Enter a complete qty' : null),
         _field('Delivered qty', line.delivered, 'work-receive-delivered-$index'),
         _field('Damaged qty', line.damaged, 'work-receive-damaged-$index'),
         _field('Short this arrival', line.short, 'work-receive-short-$index'),
@@ -15002,9 +15006,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         _field('Link Stock units', line.prior[entry.key.id]!, 'work-receive-prior-$index-${entry.key.id}')]),
       Text(stock == null ? 'Check conversion: accepted goods must equal whole Stock units.' : 'Accepted Stock units $stock − earlier linked $linked = add ${stock - linked}',
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
-      Text(expected == null ? line.expected.text.trim().isEmpty
-        ? 'Pending qty: expected quantity not entered'
-        : 'Check Expected qty · enter a complete quantity before Review'
+      if (expected != null || line.expected.text.trim().isEmpty)
+      Text(expected == null ? 'Pending qty: expected quantity not entered'
         : 'Earlier delivered ${_ReceivingLineInput._quantity(earlier)} · pending before this arrival ${_ReceivingLineInput._quantity(expected - earlier)}', style: const TextStyle(fontSize: 12)),
       ],
       const Divider(height: 16),

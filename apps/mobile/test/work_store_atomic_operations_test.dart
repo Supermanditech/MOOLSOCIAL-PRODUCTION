@@ -7563,6 +7563,55 @@ void main() {
       quantity: 6000, numerator: 2), expectedRevision: 3), isNull);
   });
 
+  test('PURCHASEPROGRESS separates absent partial and full billed plus free matching', () {
+    final bill = allocatedBillFixture(quantity: '10', freeQuantity: '2');
+    final receipt = goodsReceiptFixture(delivered: 12000, accepted: 12000, expected: 12000);
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+    final absent = both.goodsProgressFor(bill.copy)!;
+    expect(absent.hasMatches, isFalse); expect(absent.matchedItems, 0);
+    final partial = both.allocateBillGoods(billGoodsLink(bill, accepted: 10000, damaged: 0,
+      quantity: 8000, freeQuantity: 2000), expectedRevision: 3)!;
+    final before = partial.toJson();
+    final progress = partial.goodsProgressFor(bill.copy)!;
+    expect(progress.hasMatches, isTrue); expect(progress.matchedItems, 0);
+    expect(progress.totalItems, 1); expect(progress.damaged, isFalse);
+    final full = partial.allocateBillGoods(billGoodsLink(bill, id: 'remaining-paid', accepted: 2000,
+      damaged: 0, quantity: 2000), expectedRevision: 4)!;
+    expect(full.goodsProgressFor(bill.copy)!.matchedItems, 1);
+    expect(WorkspaceSupplierLedger.fromJson(full.toJson())!.goodsProgressFor(bill.copy), full.goodsProgressFor(bill.copy));
+    expect(partial.toJson(), before); expect(full.balanceMinor, both.balanceMinor);
+    expect(full.goodsProgressFor(newBillFixture().copy), isNull);
+  });
+
+  test('PURCHASEPROGRESS matched damaged delivery keeps return indication and money unchanged', () {
+    final bill = allocatedBillFixture(quantity: '6');
+    final receipt = goodsReceiptFixture(accepted: 5000, damaged: 1000);
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!.receiveGoods(receipt, expectedRevision: 2)!;
+    final linked = both.allocateBillGoods(billGoodsLink(bill), expectedRevision: 3)!;
+    final matched = linked.goodsProgressFor(bill.copy)!;
+    expect(matched.matchedItems, 1); expect(matched.damaged, isTrue);
+    expect(matched.returnedOnMatchedDelivery, isFalse);
+    final returned = linked.recordGoodsReturned(goodsReturnFixture(linked), expectedRevision: 4)!;
+    final after = returned.goodsProgressFor(bill.copy)!;
+    expect(after.matchedItems, 1); expect(after.damaged, isTrue);
+    expect(after.returnedOnMatchedDelivery, isTrue);
+    expect(returned.balanceMinor, linked.balanceMinor); expect(returned.entries, linked.entries);
+    expect(returned.goodsReceipts['receipt-A']!.toJson(), receipt.toJson());
+  });
+
+  test('PURCHASEPROGRESS free-only bill is matched without payable creation', () {
+    final bill = allocatedBillFixture(quantity: '0', freeQuantity: '2', total: '0');
+    final both = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!
+      .acceptReviewedBill(bill, expectedRevision: 1)!
+      .receiveGoods(goodsReceiptFixture(delivered: 2000, accepted: 2000, expected: 2000), expectedRevision: 2)!;
+    final full = both.allocateBillGoods(billGoodsLink(bill, accepted: 2000, damaged: 0,
+      quantity: 0, freeQuantity: 2000), expectedRevision: 3)!;
+    expect(full.goodsProgressFor(bill.copy)!.matchedItems, 1);
+    expect(full.balanceMinor, 0); expect(full.entries, isEmpty);
+  });
+
   test('PURCHASELINK free goods have a separate cap and cannot inflate paid quantities', () {
     final bill = allocatedBillFixture(quantity: '10', freeQuantity: '2');
     final receipt = goodsReceiptFixture(delivered: 12000, accepted: 12000, expected: 12000);

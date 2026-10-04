@@ -5549,6 +5549,13 @@ void main() {
     await tester.scrollUntilVisible(reference, 120, scrollable: scroll); await tester.pumpAndSettle();
     expect(tester.widget<TextField>(reference).controller!.text, 'Delivery before bill');
     final draftKey = work.supplierReceivingInputFormKey(suppliers.first.id)!;
+    final expected = find.byKey(const Key('work-receive-expected-0'));
+    await Scrollable.ensureVisible(tester.element(expected), alignment: .5); await tester.pumpAndSettle();
+    await tester.enterText(expected, '2.');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(expected).decoration!.errorText, 'Enter a complete qty');
+    expect(tester.widget<TextField>(expected).decoration!.errorBorder, isA<UnderlineInputBorder>());
+    expect(find.text('Enter a complete qty'), findsOneWidget);
     final before = (await work.readLedgerForm(draftKey))!.fields;
     expect(before['arrivalId'], isNotEmpty); expect(before['groupId'], isNotEmpty);
     final add = find.byKey(const Key('work-receive-add-line'));
@@ -5571,6 +5578,8 @@ void main() {
     await tester.tap(supplierPicker); await tester.pumpAndSettle();
     await tester.tap(find.text(suppliers.first.name).last); await tester.pumpAndSettle();
     expect(tester.widget<TextField>(reference).controller!.text, 'Delivery before bill');
+    expect(tester.widget<TextField>(expected).controller!.text, '2.');
+    expect(tester.widget<TextField>(expected).decoration!.errorText, 'Enter a complete qty');
     expect((await work.readLedgerForm(work.supplierReceivingInputFormKey(suppliers.first.id)!))!.fields, before);
     expect(entry.value!.goodsReceiptDrafts, isEmpty); expect(checkpoint.saveAttempts, 0);
     expect(tester.takeException(), isNull);
