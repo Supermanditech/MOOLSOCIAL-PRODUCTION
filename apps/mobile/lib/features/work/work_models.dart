@@ -6990,6 +6990,7 @@ class WorkspaceLedgerFormDraft {
         'supplierMoney',
         'supplierAllocation',
         'supplierGoodsReturn',
+        'supplierReceivingInput',
         'supplierCredit',
         'supplierShortage',
         'supplierRefund',
@@ -7009,6 +7010,8 @@ class WorkspaceLedgerFormDraft {
                     ? const ['amount', 'channel', 'reference', 'occurredOn', 'notIncludedInOpening', 'attempt']
                     : key.kind == 'supplierAllocation'
                     ? const ['amount', 'sourceKind', 'sourceId', 'attempt']
+                    : key.kind == 'supplierReceivingInput'
+                    ? const ['arrivalId', 'groupId', 'input']
                     : key.kind == 'supplierGoodsReturn'
                     ? const ['reference', 'reason', 'returnedOn', 'items', 'attempt']
                     : key.kind == 'supplierCredit'
@@ -7025,7 +7028,9 @@ class WorkspaceLedgerFormDraft {
                 .contains(field),
       ) &&
       fields.entries.every((entry) =>
-          entry.key == 'items' && key.kind == 'return'
+          entry.key == 'input' && key.kind == 'supplierReceivingInput'
+              ? entry.value.length <= 262144 && _validReceivingInput(entry.value)
+              : entry.key == 'items' && key.kind == 'return'
               ? _validReturnItems(entry.value)
               : entry.key == 'attempt' && key.kind == 'supplierMoney'
               ? entry.value.length <= 8192 && _validSupplierMoneyAttempt(entry.value)
@@ -7047,6 +7052,12 @@ class WorkspaceLedgerFormDraft {
               ? entry.value.length <= 262144
               : entry.value.length <= 512) &&
       (key.kind != 'supplierMoney' || _supplierMoneyNamespaceValid) &&
+      (key.kind != 'supplierReceivingInput' ||
+        (key.ledgerRevision == 1 && key.invoice == 'receiving-input' &&
+          const ['receiving-input:qa', 'receiving-input:live'].contains(key.order) &&
+          (fields.isEmpty || (fields.length == 3 &&
+            fields['arrivalId']?.trim().isNotEmpty == true &&
+            fields['groupId']?.trim().isNotEmpty == true && fields.containsKey('input'))))) &&
       (key.kind != 'supplierRefund' || RegExp(
         r'^supplier-refund:(qa|live):(openingAdvance|accountAdvance|manualBillSurplus):.+$').hasMatch(key.order)) &&
       (key.kind != 'supplierCredit' || (key.order.startsWith('credit-copy:') && key.order.length > 12)) &&
@@ -7055,6 +7066,35 @@ class WorkspaceLedgerFormDraft {
         (key.ledgerRevision == 1 && key.order == 'return-receipt:${key.invoice}')) &&
       (key.kind != 'supplierAllocation' ||
         (key.order.startsWith('allocation-copy:') && key.order.length > 16));
+
+  // Editable input, not a goods receipt or an authority to post Stock. Keep
+  // incomplete quantities as text; validate their meaning only during Review.
+  static bool _validReceivingInput(String text) {
+    try {
+      final value = jsonDecode(text);
+      if (value is! List || value.length < 3 || value.length > 102 ||
+          value[0] is! String || value[1] is! String ||
+          (value[0] as String).length > 512 || (value[1] as String).length > 512) {
+        return false;
+      }
+      final ids = <String>{};
+      for (final line in value.skip(2)) {
+        if (line is! List || line.length != 10 || line[2] is! bool) return false;
+        for (final index in const [0, 1, 3, 4, 5, 6, 7, 8]) {
+          if (line[index] is! String || (line[index] as String).length > 512) return false;
+        }
+        if ((line[0] as String).trim().isEmpty || !ids.add(line[0] as String)) return false;
+        final prior = line[9];
+        if (prior is! Map || prior.length > 256 || prior.entries.any((entry) =>
+            entry.key is! String || (entry.key as String).trim().isEmpty ||
+            (entry.key as String).length > 512 || entry.value is! String ||
+            (entry.value as String).length > 512)) {
+          return false;
+        }
+      }
+      return true;
+    } on Object { return false; }
+  }
 
   WorkspaceSupplierRefundIntent? get supplierRefundIntent {
     final text = fields['attempt'];

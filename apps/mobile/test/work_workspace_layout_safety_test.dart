@@ -5443,11 +5443,12 @@ void main() {
     });
   }
 
-  testWidgets('PURCHASERECEIVEUI supplier switch protects input and accidental row can be removed', (tester) async {
+  testWidgets('PURCHASERECEIVEUI supplier input resumes after switching and fresh session', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final entry = _OpeningPostingFixtureStore();
     final checkpoint = _LedgerCheckpointFixtureStore();
-    final work = postingOpeningFixture(entry, checkpoint);
+    final forms = _LedgerFormFixtureStore();
+    var work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
     final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
     final suppliers = [for (final id in ['first', 'second']) WorkspaceSupplierProfile(id: 'receiving-$id',
       name: 'Evaluation $id delivery supplier', phone: '', address: '', gstin: '', createdAt: at, updatedAt: at)];
@@ -5473,12 +5474,17 @@ void main() {
     expect(supplierPicker.hitTestable(), findsOneWidget);
     await tester.tap(supplierPicker); await tester.pumpAndSettle();
     await tester.tap(find.text(suppliers.last.name).last); await tester.pumpAndSettle();
-    expect(find.text('Change supplier?'), findsOneWidget);
-    await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+    expect(find.text('Change supplier?'), findsNothing);
+    expect(tester.widget<TextField>(reference).controller!.text, isEmpty);
+    await tester.tap(supplierPicker); await tester.pumpAndSettle();
+    await tester.tap(find.text(suppliers.first.name).last); await tester.pumpAndSettle();
     final form = find.descendant(of: supplierPicker, matching: find.byType(DropdownButtonFormField<String>));
     expect(tester.state<FormFieldState<String>>(form).value, suppliers.first.id);
     await tester.scrollUntilVisible(reference, 120, scrollable: scroll); await tester.pumpAndSettle();
     expect(tester.widget<TextField>(reference).controller!.text, 'Delivery before bill');
+    final draftKey = work.supplierReceivingInputFormKey(suppliers.first.id)!;
+    final before = (await work.readLedgerForm(draftKey))!.fields;
+    expect(before['arrivalId'], isNotEmpty); expect(before['groupId'], isNotEmpty);
     final add = find.byKey(const Key('work-receive-add-line'));
     await tester.scrollUntilVisible(add, 120, scrollable: scroll); await tester.pumpAndSettle();
     await tester.tap(add); await tester.pumpAndSettle();
@@ -5491,6 +5497,18 @@ void main() {
     expect(checkpoint.saveAttempts, 0);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+    work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+    await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
+    await tester.tap(supplierPicker); await tester.pumpAndSettle();
+    await tester.tap(find.text(suppliers.first.name).last); await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(reference).controller!.text, 'Delivery before bill');
+    expect((await work.readLedgerForm(work.supplierReceivingInputFormKey(suppliers.first.id)!))!.fields, before);
+    expect(entry.value!.goodsReceiptDrafts, isEmpty); expect(checkpoint.saveAttempts, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   for (final (mode, destination) in [('dirty', 'stock'), ('unknown-save', 'stock'), ('dirty', 'workspace'), ('unknown-save', 'workspace'), ('dirty', 'external'), ('unknown-save', 'external')]) {
@@ -5498,7 +5516,8 @@ void main() {
       // Host fixture only: neither injected runtime data nor device acceptance.
       FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
-      final work = postingOpeningFixture(entry, checkpoint);
+      final forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
       final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
       work.otherWorkspaces.add(const WorkWorkspace(id: 'receiving-other-store', name: 'HOST other Store',
         profileLabel: 'Speciality Retail Shop', profileId: 'retailer-speciality', area: 'Jaipur', verified: true));
@@ -5518,6 +5537,7 @@ void main() {
       }
       await reveal('work-receive-supplier'); await tester.tap(find.byKey(const Key('work-receive-supplier'))); await tester.pumpAndSettle();
       await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      if (mode == 'dirty') forms.failWrite = true;
       await reveal('work-receive-reference'); await tester.enterText(find.byKey(const Key('work-receive-reference')), 'HOST delivery');
       FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
       if (mode == 'unknown-save') {
@@ -5532,14 +5552,14 @@ void main() {
       }
       await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
       if (mode == 'dirty') {
-        expect(find.text('Leave receiving?'), findsOneWidget, reason: 'System Back has exactly one leave-decision owner.');
-        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+        expect(find.text('Leave receiving?'), findsNothing);
+        expect(find.byKey(const Key('work-receive-retry-input')), findsOneWidget);
       }
       expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
       await tester.tap(find.byKey(const Key('work-operation-back'))); await tester.pumpAndSettle();
       if (mode == 'dirty') {
-        expect(find.text('Leave receiving?'), findsOneWidget);
-        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+        expect(find.text('Leave receiving?'), findsNothing);
+        expect(find.byKey(const Key('work-receive-retry-input')), findsOneWidget);
       } else {
         expect(find.text('Leave receiving?'), findsNothing);
         await reveal('work-receive-error');
@@ -5563,10 +5583,19 @@ void main() {
         await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
       }
       if (mode == 'dirty') {
-        expect(find.text('Leave receiving?'), findsOneWidget);
-        await tester.tap(find.text('Discard')); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
+        expect(work.workspaceSupplierScope, scope);
+        if (destination == 'workspace') {
+          await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-workspace-switcher-sheet')), findsNothing);
+        }
+        forms.failWrite = false;
+        await reveal('work-receive-retry-input', delta: -120);
+        await tester.tap(find.byKey(const Key('work-receive-retry-input'))); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-receive-retry-input')), findsNothing);
+        expect((await work.readLedgerForm(work.supplierReceivingInputFormKey(supplier.id)!))!.fields['input'], contains('HOST delivery'));
+        await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
         expect(find.byKey(const Key('work-goods-receiving')), findsNothing);
-        if (destination == 'workspace') expect(work.activeWorkspace!.id, 'receiving-other-store');
       } else {
         expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
         expect(entry.value!.goodsReceiptDrafts, isEmpty);
@@ -48386,8 +48415,20 @@ class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
 // Test-only guard double; real secure-store serialization has separate host tests.
 class _OpeningPostingFixtureStore extends _PurchaseEntryFixtureStore
     implements WorkPurchaseEntryRevisionGuard, WorkPurchaseBillGoodsReviewGuard,
-      WorkPurchaseBillGoodsReviewAbandonment {
+      WorkPurchaseBillGoodsReviewAbandonment, WorkPurchaseGoodsReceiptReviewGuard {
   final reviewOperations = <String>[];
+  @override
+  Future<bool> saveReviewedGoodsReceipt(WorkspacePurchaseEntryBook book, {
+    required int expectedRevision,
+    required Future<bool> Function(Future<bool> Function() persist) withVerifiedStock,
+  }) async {
+    if (value?.revision != expectedRevision) return false;
+    return withVerifiedStock(() async {
+      if (value?.revision != expectedRevision) return false;
+      await save(book, expectedRevision: expectedRevision);
+      return true;
+    });
+  }
   @override
   Future<WorkspacePurchaseEntryBook?> abandonReviewedBillGoods(String account, String store, {
     required bool qa, required int expectedRevision,

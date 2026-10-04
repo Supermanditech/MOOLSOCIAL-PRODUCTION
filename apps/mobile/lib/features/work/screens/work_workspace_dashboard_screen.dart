@@ -14459,7 +14459,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   WorkspaceSupplierGoodsReceipt? _frozen;
   WorkspaceGoodsReceiptReviewCancellation? _cancelAttempt;
   WorkspaceGoodsReceiptSaveResult? _postResult;
-  String _baseline = '';
+  _LedgerFormAutosave? _draft;
   final _supplierPicker = GlobalKey<FormFieldState<String>>();
   bool _busy = true, _loaded = false, _reviewVerified = false;
   Future<bool>? _leaveDecision;
@@ -14487,7 +14487,87 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   @override
   void initState() { super.initState(); unawaited(_recover()); }
   @override
-  void dispose() { _reference.dispose(); _day.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
+  void dispose() { _draft?.removeListener(_draftChanged); _draft?.dispose(); _reference.dispose(); _day.dispose(); for (final line in _lines) { line.dispose(); } super.dispose(); }
+  void _draftChanged() { if (_current) setState(() {}); }
+  Map<String, String> get _draftFields => {'arrivalId': _arrivalId, 'groupId': _groupId, 'input': _input};
+  void _saveInput() {
+    if (!_current || _frozen != null || _arrivalId.isEmpty || _draft?.key == null) return;
+    final fields = _draftFields;
+    if (!WorkspaceLedgerFormDraft(key: _draft!.key!, revision: 1, fields: fields).valid) {
+      _draft!.error = 'Delivery input is too long. Shorten the details before saving.';
+      _draft!.changed();
+      return;
+    }
+    _draft!.save(fields);
+  }
+  Future<bool> _flushInput() async {
+    if (_supplierId == null || _frozen != null) return true;
+    _saveInput();
+    final saved = await _draft?.flush() ?? false;
+    if (_current && !saved) setState(() { _error = 'Delivery input is not saved yet. Retry saving before leaving or reviewing.'; });
+    return saved && _current;
+  }
+  void _resumeSupplierInput(Map<String, String> fields) {
+    final reviews = session.workspaceGoodsReceiptDrafts.where((r) => r.supplierId == _supplierId &&
+      !session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)).toList();
+    final arrival = fields['arrivalId'];
+    final reviewed = reviews.where((r) => r.receipt.id == arrival).firstOrNull;
+    if (reviewed != null) { _restore(reviewed.receipt); return; }
+    if (fields.isNotEmpty && !session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == arrival)) {
+      if (_ledger?.goodsReceipts.containsKey(arrival) == true ||
+          reviews.any((r) => _ledger?.goodsReceipts.containsKey(r.receipt.id) != true)) {
+        throw StateError('Saved receipt review unavailable');
+      }
+      final values = jsonDecode(fields['input']!) as List;
+      final group = fields['groupId']!;
+      final originals = <String, WorkspaceSupplierGoodsReceiptLine>{
+        for (final receipt in _ledger?.goodsReceipts.values ?? const <WorkspaceSupplierGoodsReceipt>[])
+          if (receipt.expectedDeliveryId == group)
+            for (final line in receipt.lines) line.sourceLineId: line};
+      final restored = <_ReceivingLineInput>[];
+      for (final value in values.skip(2).cast<List>()) {
+        final original = originals[value[0]];
+        if (original != null && (value[1] != original.productId || value[3] != original.purchaseUnit ||
+            value[4] != '${original.unitsPerPack}' || value[5] !=
+              (original.expectedMilli == null ? '' : _ReceivingLineInput._quantity(original.expectedMilli!)))) {
+          throw StateError('Inherited delivery mapping changed');
+        }
+      }
+      for (final value in values.skip(2).cast<List>()) {
+        final line = _ReceivingLineInput(value[0] as String, saved: originals[value[0]]);
+        line.productId = value[1] as String; line.arrives = value[2] as bool;
+        for (final (index, controller) in [line.unit, line.factor, line.expected, line.delivered, line.damaged, line.short].indexed) {
+          controller.text = value[index + 3] as String;
+        }
+        for (final c in line.prior.values) { c.dispose(); }
+        line.prior.clear();
+        for (final entry in (value[9] as Map).entries) {
+          line.prior[entry.key as String] = TextEditingController(text: entry.value as String);
+        }
+        restored.add(line);
+      }
+      for (final line in _lines) { line.dispose(); }
+      _lines..clear()..addAll(restored);
+      _arrivalId = arrival!; _groupId = group;
+      _reference.text = values[0] as String; _day.text = values[1] as String;
+      _frozen = null; _reviewVerified = false; _cancelAttempt = null; _postResult = null;
+      _notice = 'Unfinished delivery restored · Stock has not changed.';
+    } else if (reviews.isNotEmpty) { _restore(reviews.last.receipt); }
+    else { _newArrival(); }
+  }
+  Future<void> _retryInput() async {
+    if (!_current || _busy || _draft == null) return;
+    setState(() { _busy = true; _error = null; });
+    if (!_draft!.ready) {
+      final fields = await _draft!.load();
+      if (!_current) return;
+      if (fields != null) {
+        try { _resumeSupplierInput(fields); }
+        on Object { _draft!.ready = false; _error = 'Saved delivery input needs recovery. Do not re-enter these goods.'; }
+      }
+    } else { await _flushInput(); }
+    if (_current) setState(() => _busy = false);
+  }
   Future<void> _recover() async {
     if (mounted) setState(() { _busy = true; _error = null; });
     final ready = await session.loadWorkspaceSuppliers(retry: true) &&
@@ -14512,25 +14592,26 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   Future<void> _chooseSupplier(String id) async {
     if (_supplierId == id) return;
-    if (_supplierId != null && _frozen == null && _input != _baseline) {
-      final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-        title: const Text('Change supplier?'), content: const Text('Unsaved goods details belong to the current supplier.'),
-        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
-        contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
-        titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16), actionsPadding: const EdgeInsets.all(8),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard & change'))]));
-      if (!_current) return;
-      if (discard != true) { _supplierPicker.currentState?.didChange(_supplierId); return; }
+    if (_busy) { _supplierPicker.currentState?.didChange(_supplierId); return; }
+    setState(() => _busy = true);
+    if (!await _flushInput()) {
+      if (_current) setState(() { _busy = false; _supplierPicker.currentState?.didChange(_supplierId); });
+      return;
     }
     if (!_current) return;
+    _draft?.removeListener(_draftChanged); _draft?.dispose();
     _supplierId = id;
-    final reviews = session.workspaceGoodsReceiptDrafts.where((r) => r.supplierId == id &&
-      !session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)).toList();
-    if (reviews.isNotEmpty) { _restore(reviews.last.receipt); }
-    else { _newArrival(); }
-    setState(() {});
+    _frozen = null; _reviewVerified = false; _error = null; _notice = null;
+    for (final line in _lines) { line.dispose(); } _lines.clear();
+    _reference.clear(); _day.clear(); _arrivalId = ''; _groupId = '';
+    _draft = _LedgerFormAutosave(session, session.supplierReceivingInputFormKey(id))..addListener(_draftChanged);
+    final fields = await _draft!.load();
+    if (!_current) return;
+    if (fields != null) {
+      try { _resumeSupplierInput(fields); }
+      on Object { _draft!.ready = false; _error = 'Saved delivery input needs recovery. Do not re-enter these goods.'; }
+    }
+    setState(() => _busy = false);
   }
   void _newArrival({WorkspaceSupplierGoodsReceipt? previous}) {
     for (final line in _lines) { line.dispose(); }
@@ -14559,7 +14640,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     _day.text = DateTime.now().toIso8601String().substring(0, 10);
     _frozen = null; _reviewVerified = false; _cancelAttempt = null; _postResult = null;
     _error = null; _notice = null;
-    _baseline = _input;
+    _saveInput();
   }
   WorkspaceSupplierGoodsReceipt? _snapshot() {
     final values = <WorkspaceSupplierGoodsReceiptLine>[];
@@ -14591,6 +14672,13 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     return receipt.valid ? receipt : null;
   }
   Future<void> _review() async {
+    if (_frozen == null) {
+      setState(() => _busy = true);
+      final saved = await _flushInput();
+      if (!_current) return;
+      setState(() => _busy = false);
+      if (!saved) return;
+    }
     final receipt = _frozen ?? _snapshot();
     if (!_current || _supplierId == null || receipt == null || _bookRevision == null) {
       setState(() { _error = 'Choose saved Stock items, enter a delivery reference/date and check quantities. Up to 3 decimal places; accepted goods must convert to whole Stock units.'; });
@@ -14642,16 +14730,12 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
       setState(() { _error = 'Review save is unverified. Recover saved status or retry this exact review before closing.'; });
       return false;
     }
-    if (_frozen == null && _supplierId != null && _input != _baseline) {
-      final discard = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-        title: const Text('Leave receiving?'), content: const Text('These unsaved goods details will not be kept.'),
-        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.navy),
-        contentTextStyle: const TextStyle(fontSize: 12, color: MoolColors.ink),
-        titlePadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16), actionsPadding: const EdgeInsets.all(8),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard'))]));
-      if (discard != true || !_current || _busy) return false;
+    if (_frozen == null && _supplierId != null) {
+      setState(() => _busy = true);
+      final saved = await _flushInput();
+      if (!_current) return false;
+      setState(() => _busy = false);
+      if (!saved) return false;
     }
     return _current;
   }
@@ -14660,7 +14744,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   }
   Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true}) =>
     SizedBox(width: number ? 116 : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
-      enabled: !_busy && _frozen == null && enabled, onChanged: (_) => setState(() {}),
+      enabled: !_busy && _draft?.ready == true && _frozen == null && enabled,
+      onChanged: (_) { setState(() {}); _saveInput(); },
       keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       style: const TextStyle(fontSize: 13, color: MoolColors.ink),
       decoration: InputDecoration(labelText: label, isDense: true, filled: false,
@@ -14672,7 +14757,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         disabledBorder: const UnderlineInputBorder())));
   @override
   Widget build(BuildContext context) {
-    final editable = !_busy && _frozen == null;
+    final editable = !_busy && _frozen == null && (_supplierId == null || _draft?.ready == true);
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
         Row(children: [Expanded(child: Text(_committed && !_conflict ? 'Goods received' : 'Receive goods', style: const TextStyle(fontSize: 16,
@@ -14692,6 +14777,15 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           items: [for (final p in session.workspaceSuppliers) DropdownMenuItem(value: p.id, child: Text(p.name))],
           onChanged: editable ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
         if (_supplierId != null) ...[
+          if (_frozen == null) ...[
+            Text(_draft?.error ?? (_draft?.busy == true ? 'Saving delivery input…'
+              : _draft?.ready == true && _draft?.revision != null
+                ? 'Delivery draft saved · goods not yet recorded' : 'Opening saved delivery input…'),
+              key: const Key('work-receive-input-status'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+            if (_draft?.error != null || _draft?.ready != true)
+              TextButton(key: const Key('work-receive-retry-input'), onPressed: _busy ? null : _retryInput,
+                child: const Text('Retry delivery draft')),
+          ],
           if (_committed && !_conflict) ...[
             Text(session.workspaceSuppliers.where((p) => p.id == _supplierId).singleOrNull?.name ?? _ledger!.supplierName,
               key: const Key('work-receive-saved-supplier'),
@@ -14706,8 +14800,8 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           if (_ledger?.openingRecord == null) const Text('Confirm this supplier’s Opening dues before recording goods. Choose zero only when there are no earlier dues or advances.',
             style: TextStyle(fontSize: 12, color: MoolColors.ink)),
           for (final (index, line) in _lines.indexed) _lineView(line, index),
-          if (editable) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: () => setState(() {
-            _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); }), icon: const Icon(Icons.add, size: 18), label: const Text('Add item')),
+          if (editable) TextButton.icon(key: const Key('work-receive-add-line'), onPressed: _lines.length >= 100 ? null : () => setState(() {
+            _lines.add(_ReceivingLineInput(session.newWorkspaceDeliveryLineId())); _saveInput(); }), icon: const Icon(Icons.add, size: 18), label: const Text('Add item')),
           if (_frozen != null) Text(_conflict ? 'Receipt and cancellation conflict · recover saved records'
             : _postResult == WorkspaceGoodsReceiptSaveResult.statusUnknown ? 'Receiving status unverified · recover before retrying'
             : _postResult == WorkspaceGoodsReceiptSaveResult.stockRecoveryPending ? 'Goods recorded · Stock recovery pending'
@@ -14788,11 +14882,11 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     return Padding(key: ValueKey(('receiving-line', line.id)), padding: const EdgeInsets.symmetric(vertical: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [Expanded(child: Text('Item ${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.navy))),
         if (!_busy && _frozen == null && !inherited && _lines.length > 1) TextButton(key: ValueKey('work-receive-remove-$index'),
-          onPressed: () => setState(() { _lines.remove(line); line.dispose(); }), child: const Text('Remove item'))]),
+          onPressed: () => setState(() { _lines.remove(line); line.dispose(); _saveInput(); }), child: const Text('Remove item'))]),
       if (inherited && _frozen == null) CheckboxListTile(key: ValueKey('work-receive-arrives-$index'),
         value: line.arrives, dense: true, contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
         title: const Text('Received in this delivery', style: TextStyle(fontSize: 12)),
-        onChanged: _busy ? null : (value) => setState(() => line.arrives = value ?? false)),
+        onChanged: _busy || _draft?.ready != true ? null : (value) => setState(() { line.arrives = value ?? false; _saveInput(); })),
       if (!line.arrives) Text('${line.original?.productLabel ?? product?.title ?? 'Saved item'} · not received this time. Earlier goods history is unchanged.',
         style: const TextStyle(fontSize: 12)),
       if (line.arrives) ...[
@@ -14806,10 +14900,11 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
           DropdownMenuItem(value: p.id, child: Text('${p.title} · ${p.pack}')),
           if (line.productId.isNotEmpty && (product == null || product.stockMode != WorkspaceStockMode.exactQuantity))
             DropdownMenuItem(value: line.productId, enabled: false, child: const Text('Saved product unavailable · recover Stock'))],
-        onChanged: !_busy && _frozen == null && !inherited ? (value) => setState(() {
+        onChanged: !_busy && _draft?.ready == true && _frozen == null && !inherited ? (value) => setState(() {
           line.productId = value ?? ''; for (final c in line.prior.values) { c.dispose(); } line.prior.clear();
           line.unit.text = session.workspaceCatalogueItems.where((p) => p.id == value).firstOrNull?.pack ?? '';
           line.factor.text = '1';
+          _saveInput();
         }) : null),
       Wrap(spacing: 12, runSpacing: 12, children: [
         _field('Delivery unit', line.unit, 'work-receive-unit-$index', number: false, enabled: !inherited),

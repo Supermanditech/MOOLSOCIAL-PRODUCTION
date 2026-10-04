@@ -5314,6 +5314,57 @@ void main() {
         damagedMilli: 0, shortMilli: 0, expectedMilli: 12000, priorStockUnits: prior)]);
   }
 
+  test('RECEIVINGINPUT bounded incomplete input is not posting authority', () {
+    const key = (account: 'account-A', store: 'store-A', customer: 'supplier-A',
+      invoice: 'receiving-input', order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);
+    final line = ['line-A', '', true, 'kg', '1', '2.', 'not checked', '0', '', {'prior-A': '1.'}];
+    final fields = {'arrivalId': 'arrival-A', 'groupId': 'group-A', 'input': jsonEncode(['Bill pending', '', line])};
+    final draft = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields);
+    expect(draft.valid, isTrue, reason: 'Host-only unsent input may be incomplete or numerically invalid.');
+    expect(WorkspaceLedgerFormDraft.fromJson(draft.toJson())!.fields, fields);
+    expect(draft.supplierGoodsReturnIntent, isNull);
+    for (final bad in [
+      {...fields, 'attempt': '{}'}, {...fields}..remove('groupId'),
+      {...fields, 'arrivalId': ''},
+      {...fields, 'input': jsonEncode(['ref', 'day', line, line])},
+      {...fields, 'input': jsonEncode(['ref', 'day', [...line.take(9), 'not a map']])},
+      {...fields, 'input': jsonEncode(['ref', 'day', [...line.take(2), 'true', ...line.skip(3)]])},
+      {...fields, 'input': jsonEncode(['x' * 513, 'day', line])},
+    ]) {
+      expect(WorkspaceLedgerFormDraft(key: key, revision: 1, fields: bad).valid, isFalse);
+    }
+    expect(WorkspaceLedgerFormDraft(key: (account: key.account, store: key.store, customer: key.customer,
+      invoice: key.invoice, order: 'receiving-input:unknown', kind: key.kind, ledgerRevision: 1),
+      revision: 1, fields: fields).valid, isFalse);
+  });
+
+  test('RECEIVINGINPUT encrypted restart conflict lost acknowledgement and isolation', () async {
+    // Host-only storage fixture; never supplies runtime Stock or transactions.
+    const key = (account: 'account-A', store: 'store-A', customer: 'supplier-A',
+      invoice: 'receiving-input', order: 'receiving-input:qa', kind: 'supplierReceivingInput', ledgerRevision: 1);
+    final fields = {'arrivalId': 'arrival-A', 'groupId': 'group-A',
+      'input': jsonEncode(['Goods before bill', '2026-10-04', ['line-A', 'product-A', true, 'kg', '1', '2.', '', '0', '0', <String, String>{}]])};
+    final storage = _OrderJournalStorage();
+    SecureWorkLedgerFormDraftStore owner() => SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+    final first = WorkspaceLedgerFormDraft(key: key, revision: 1, fields: fields);
+    await owner().save(first, expectedRevision: null);
+    expect((await owner().read(key))!.toJson(), first.toJson());
+    final second = WorkspaceLedgerFormDraft(key: key, revision: 2, fields: {...fields, 'arrivalId': 'arrival-B'});
+    storage.loseWriteResponseOnce = true;
+    await expectLater(owner().save(second, expectedRevision: 1), throwsA(isA<StateError>()));
+    expect((await owner().read(key))!.toJson(), second.toJson());
+    await owner().save(second, expectedRevision: 1);
+    await expectLater(owner().save(WorkspaceLedgerFormDraft(key: key, revision: 2,
+      fields: {...fields, 'arrivalId': 'competing-arrival'}), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+    for (final other in [
+      (account: key.account, store: 'store-B', customer: key.customer, invoice: key.invoice, order: key.order, kind: key.kind, ledgerRevision: 1),
+      (account: key.account, store: key.store, customer: 'supplier-B', invoice: key.invoice, order: key.order, kind: key.kind, ledgerRevision: 1),
+      (account: key.account, store: key.store, customer: key.customer, invoice: key.invoice, order: 'receiving-input:live', kind: key.kind, ledgerRevision: 1),
+    ]) { expect(await owner().read(other), isNull); }
+    expect(storage.values.length, 1);
+    expect(storage.values.keys.single, contains('ledger-form'));
+  });
+
   test('PURCHASEREVIEW codec preserves legacy bytes and rejects broken relationships', () {
     final old = entryFixture();
     expect(old.toJson().containsKey('goodsReceiptDrafts'), isFalse);

@@ -2443,6 +2443,18 @@ class WorkSession extends ChangeNotifier {
     return _ledgerFormScopeCurrent(key) ? key : null;
   }
 
+  WorkspaceLedgerFormKey? supplierReceivingInputFormKey(String supplierId) {
+    final scope = workspaceSupplierScope;
+    if (scope == null || !workspaceSuppliersLoaded ||
+        !workspaceSupplierOpeningConfirmationAvailable ||
+        !workspaceSuppliers.any((supplier) => supplier.id == supplierId)) {
+      return null;
+    }
+    return (account: scope.$1, store: scope.$2, customer: supplierId,
+      invoice: 'receiving-input', order: 'receiving-input:${!_productionSession ? 'qa' : 'live'}',
+      kind: 'supplierReceivingInput', ledgerRevision: 1);
+  }
+
   WorkspaceLedgerFormKey? supplierGoodsReturnFormKey(String supplierId, String receiptId) {
     if (!workspaceSupplierOpeningConfirmationAvailable ||
         _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || !workspaceSuppliersLoaded) {
@@ -2510,6 +2522,9 @@ class WorkSession extends ChangeNotifier {
     }
     if (key.kind == 'expense') {
       return key == expenseFormKey();
+    }
+    if (key.kind == 'supplierReceivingInput') {
+      return key == supplierReceivingInputFormKey(key.customer);
     }
     if (key.kind == 'supplierPayment') {
       final ledger = workspaceSupplierLedger(key.customer);
