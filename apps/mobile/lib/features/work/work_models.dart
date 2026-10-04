@@ -4330,6 +4330,38 @@ class WorkspaceSupplierLedger {
     return amount > BigInt.from(2147483647) ? null : amount.toInt();
   }
 
+  /// Matching is bill attribution, not proof that all goods are undamaged or
+  /// still held in Stock. Keep billed/free units and receiving exceptions apart.
+  ({int totalItems, int matchedItems, bool hasMatches, bool damaged,
+    bool shortage, bool returnedOnMatchedDelivery})? goodsProgressFor(WorkspacePurchaseSavedCopy copy) {
+    final accepted = purchaseBills[copy.draft.id];
+    if (!valid || !historyComplete || accepted == null ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson()) || copy.draft.goods.isEmpty) {
+      return null;
+    }
+    final links = billGoodsAllocations.values.where((link) => link.billId == copy.draft.id &&
+      link.copyId == copy.id && link.copyRevision == copy.revision).toList();
+    var matched = 0;
+    for (final (index, item) in copy.draft.goods.indexed) {
+      final invoiced = _claimInvoiceQuantity((item['quantity'] ?? '').trim());
+      final freeText = (item['freeQuantity'] ?? '').trim();
+      final free = freeText.isEmpty ? 0 : _claimInvoiceQuantity(freeText);
+      if (invoiced == null || free == null || invoiced + free <= 0) return null;
+      final itemLinks = links.where((link) => link.billLineIndex == index);
+      if (itemLinks.fold<int>(0, (sum, link) => sum + link.billQuantityMilli) == invoiced &&
+          itemLinks.fold<int>(0, (sum, link) => sum + link.freeBillQuantityMilli) == free) {
+        matched++;
+      }
+    }
+    return (totalItems: copy.draft.goods.length, matchedItems: matched,
+      hasMatches: links.isNotEmpty, damaged: links.any((link) => link.damagedReceiptMilli > 0),
+      shortage: shortageClaims.values.any((claim) => claim.billId == copy.draft.id &&
+        claim.copyId == copy.id && claim.copyRevision == copy.revision),
+      returnedOnMatchedDelivery: goodsReturns.values.any((returned) => links.any((link) =>
+        link.receiptId == returned.receiptId && returned.lines.any((line) =>
+          line.receiptLineId == link.receiptLineId && line.productId == link.productId))));
+  }
+
   WorkspaceSupplierShortageClaim? _deriveShortageClaim({required String operationId,
       required String billId, required int billLineIndex, required String deliveryId,
       required String lineId, required int quantityMilli, required DateTime recordedAt,

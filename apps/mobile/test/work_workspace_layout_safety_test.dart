@@ -5443,6 +5443,72 @@ void main() {
     });
   }
 
+  for (final failDiscard in [false, true]) {
+    testWidgets('PURCHASERECEIVEUI discard preserves history and recovers failed reset $failDiscard', (tester) async {
+      // Host-only evaluation fixtures; not device or backend acceptance.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final forms = _LedgerFormFixtureStore();
+      var work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      final supplier = WorkspaceSupplierProfile(id: 'discard-draft-supplier', name: 'Evaluation delivery supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier]);
+      final bookBefore = entry.value!.toJson();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      final picker = find.byKey(const Key('work-receive-supplier'));
+      await Scrollable.ensureVisible(tester.element(picker), alignment: .5); await tester.pumpAndSettle();
+      await tester.tap(picker); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      final reference = find.byKey(const Key('work-receive-reference'));
+      await Scrollable.ensureVisible(tester.element(reference), alignment: .5); await tester.pumpAndSettle();
+      await tester.enterText(reference, 'Unfinished delivery');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      final key = work.supplierReceivingInputFormKey(supplier.id)!;
+      final before = (await work.readLedgerForm(key))!.fields;
+      final discard = find.byKey(const Key('work-receive-discard-input'));
+      await Scrollable.ensureVisible(tester.element(discard), alignment: .5); await tester.pumpAndSettle();
+      expect(discard.hitTestable(), findsOneWidget);
+      await tester.tap(discard); await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep draft')); await tester.pumpAndSettle();
+      expect((await work.readLedgerForm(key))!.fields, before);
+      forms.failWrite = failDiscard;
+      await tester.tap(discard); await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard draft')); await tester.pumpAndSettle();
+      if (failDiscard) {
+        expect(find.textContaining('Draft discard is not verified.'), findsWidgets);
+        expect((await work.readLedgerForm(key))!.fields, before);
+        expect(tester.widget<TextField>(reference).controller!.text, 'Unfinished delivery');
+        expect(tester.widget<TextField>(reference).enabled, isFalse);
+        forms.failWrite = false;
+        await Scrollable.ensureVisible(tester.element(discard), alignment: .5); await tester.pumpAndSettle();
+        await tester.tap(discard); await tester.pumpAndSettle();
+      }
+      final after = (await work.readLedgerForm(key))!.fields;
+      expect(after['arrivalId'], isNot(before['arrivalId']));
+      expect(tester.widget<TextField>(reference).controller!.text, isEmpty);
+      expect(entry.value!.toJson(), bookBefore); expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(picker), alignment: .5); await tester.pumpAndSettle();
+      await tester.tap(picker); await tester.pumpAndSettle();
+      await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(reference).controller!.text, isEmpty);
+      expect((await work.readLedgerForm(work.supplierReceivingInputFormKey(supplier.id)!))!.fields['arrivalId'], after['arrivalId']);
+      expect(entry.value!.toJson(), bookBefore); expect(checkpoint.saveAttempts, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('PURCHASERECEIVEUI supplier input resumes after switching and fresh session', (tester) async {
     FlutterSecureStorage.setMockInitialValues({});
     final entry = _OpeningPostingFixtureStore();
