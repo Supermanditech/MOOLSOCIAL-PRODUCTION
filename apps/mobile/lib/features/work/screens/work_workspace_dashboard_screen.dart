@@ -11584,14 +11584,23 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       (line?['pack']?.trim() == pair.$2.stockUnit || line?['pack']?.trim() == pair.$2.purchaseUnit));
     final pendingCopy = _otherReview == null ? null : session.workspacePurchaseCopies.where((copy) =>
       copy.id == _otherReview!.allocation.copyId && copy.revision == _otherReview!.allocation.copyRevision).singleOrNull;
+    final matchingProgress = _current && _loaded && !_busy && !_uncertain &&
+      !session.workspaceSupplierRecoveryRequired && !session.workspaceGoodsReceiptRecoveryPending
+        ? ledger?.goodsProgressFor(widget.copy) : null;
+    final fullyMatched = matchingProgress != null && matchingProgress.totalItems > 0 &&
+      matchingProgress.matchedItems == matchingProgress.totalItems;
+    // Do not conceal unsaved input or a frozen/recovery attempt when progress changes.
+    final completedView = fullyMatched && !_dirty && _frozen == null && _otherReview == null;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextButton.icon(key: const Key('work-bill-goods-open'), onPressed: _busy ? null : () async {
         if (_opened && !await confirmLeave()) return;
         if (_current) setState(() => _opened = !_opened);
-      }, icon: Icon(_opened ? Icons.expand_less : Icons.link, size: 18), label: const Text('Match received goods')),
+      }, icon: Icon(_opened ? Icons.expand_less : Icons.link, size: 18),
+        label: Text(completedView ? 'View received goods' : 'Match received goods')),
       if (_opened) ...[
-        const Text('Match this bill to saved goods. This does not add Stock or record a payment.',
-          style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        Text(completedView ? 'Saved goods linked to this bill. No Stock or payment change.' :
+          'Match this bill to saved goods. This does not add Stock or record a payment.',
+          style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
         for (final match in priorMatches) Text('Matched: ${widget.copy.draft.goods[match.billLineIndex]['name']} · '
           '${_ReceivingLineInput._quantity(match.billQuantityMilli)} invoiced + ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} free ${match.billUnit} · '
           'Receipt ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId} · '
@@ -11615,7 +11624,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             '${ledger?.goodsReceipts[_frozen!.receiptId]?.lines.where((l) => l.sourceLineId == _frozen!.receiptLineId).firstOrNull?.purchaseUnit ?? ''}'),
           if (_committed) ...[
             const Text('Match confirmed · no Stock or payment change'),
-            TextButton(key: const Key('work-bill-goods-next'),
+            if (!fullyMatched) TextButton(key: const Key('work-bill-goods-next'),
               onPressed: _busy || !_current || _uncertain || !_reviewVerified || session.workspaceSupplierRecoveryRequired
                 ? null : () => setState(_clear), child: const Text('Match another item')),
           ] else if (_error == null) Wrap(spacing: 8, children: [
@@ -11625,6 +11634,9 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             TextButton(key: const Key('work-bill-goods-cancel'), onPressed: _busy || !_reviewVerified ? null : _cancel,
               child: const Text('Cancel matching review')),
           ]),
+        ] else if (completedView) ...[
+          const Text('All invoice quantities are matched. No further goods need linking to this bill.',
+            key: Key('work-bill-goods-complete')),
         ] else if (_loaded && !_uncertain) ...[
           DropdownButtonFormField<int>(key: ValueKey(('work-bill-goods-item', _item)), initialValue: _item,
             isExpanded: true, decoration: const InputDecoration(labelText: 'Item on supplier invoice'),

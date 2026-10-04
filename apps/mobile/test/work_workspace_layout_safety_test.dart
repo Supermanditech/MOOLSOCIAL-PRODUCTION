@@ -5831,7 +5831,7 @@ void main() {
   for (final (display, failedReview, freeText, cancelReview) in [(const Size(360, 800), false, '0', false),
       (const Size(915, 412), false, '0', false), (const Size(360, 800), true, '0', false),
       (const Size(360, 800), false, '   ', false), (const Size(360, 800), false, '-', false),
-      (const Size(360, 800), false, '0', true)]) {
+      (const Size(360, 800), false, '0', true), (const Size(360, 800), false, '1', false)]) {
     testWidgets('PURCHASEMATCHUI saved receipt match and reopen $display failedReview=$failedReview freeText="$freeText" cancel=$cancelReview', (tester) async {
       // Host UI fixture; production serialization is tested separately in atomic tests.
       FlutterSecureStorage.setMockInitialValues({});
@@ -5997,14 +5997,24 @@ void main() {
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations.keys, [operation]);
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
       expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+      expect(find.byKey(const Key('work-bill-goods-next')),
+        freeText == '1' ? findsOneWidget : findsNothing,
+        reason: 'Only outstanding quantities offer another match; frozen confirmation remains visible.');
       final close = find.byKey(const Key('work-purchase-copy-close'));
       await reveal(close); await tester.tap(close); await tester.pumpAndSettle();
       await openCopy();
       final summary = find.byKey(ValueKey(('work-bill-goods-saved-match', operation)));
       await reveal(summary); expect(summary, findsOneWidget);
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, hasLength(1));
-      expect(find.byKey(const Key('work-purchase-bill-receive-goods')), findsNothing,
-        reason: 'A fully matched bill must not invite another receipt; Purchases retains the main receiving action.');
+      expect(find.byKey(const Key('work-purchase-bill-receive-goods')),
+        freeText == '1' ? findsOneWidget : findsNothing,
+        reason: 'Outstanding free quantity still needs receiving; completed bills do not.');
+      expect(find.byKey(const Key('work-bill-goods-complete')),
+        freeText == '1' ? findsNothing : findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is DropdownButtonFormField<int>),
+        freeText == '1' ? findsOneWidget : findsNothing);
+      expect(find.byKey(const Key('work-bill-goods-save')), findsNothing);
+      expect(find.text('View received goods'), freeText == '1' ? findsNothing : findsOneWidget);
       expect(find.byKey(const Key('work-purchase-record-payment')), findsOneWidget,
         reason: 'Goods matching must not hide the unpaid bill payment action.');
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
