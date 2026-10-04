@@ -6267,7 +6267,7 @@ void main() {
     });
   }
 
-  for (final mode in ['normal', 'unknown', 'included', 'historical-unlinked',
+  for (final mode in ['normal', 'goods-existing', 'unknown', 'included', 'historical-unlinked',
       'late-included', 'late-landscape', 'late-same-day', 'late-changed-dialog', 'other-revision', 'latest-unposted', 'failed-save', 'lost-ack', 'changed-dialog', 'landscape', 'read-only', 'read-only-landscape']) {
     testWidgets('PURCHASEBILLUI saved bill confirmation $mode', (tester) async {
       // Labelled host fixture: not runtime or physical device acceptance data.
@@ -6275,7 +6275,9 @@ void main() {
       final entry = _OpeningPostingFixtureStore();
       final checkpoint = _LedgerCheckpointFixtureStore();
       final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'review-draft-account');
-      final work = postingOpeningFixture(entry, checkpoint, moneyStore: mode.startsWith('read-only') ? null : forms);
+      final work = postingOpeningFixture(entry, checkpoint, inventory: mode == 'goods-existing',
+        inventoryStore: mode == 'goods-existing' ? _ReceivingProjectionFailureFixture() : null,
+        moneyStore: mode.startsWith('read-only') ? null : forms);
       final scope = work.workspaceSupplierScope!;
       final at = DateTime.utc(2026, 9, 30);
       final supplier = WorkspaceSupplierProfile(id: 'bill-ui-supplier', name: 'Evaluation supplier',
@@ -6287,6 +6289,19 @@ void main() {
       final copy = WorkspacePurchaseSavedCopy(id: 'bill-ui-copy', storeName: 'Evaluation Store',
         revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
       expect(copy.valid, isTrue);
+      WorkspaceSupplierGoodsReceipt? earlierReceipt;
+      if (mode == 'goods-existing') {
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        final product = work.workspaceCatalogueItems.firstWhere((p) => p.stockMode == WorkspaceStockMode.exactQuantity);
+        expect(work.addOrUpdateWorkspaceProduct(product.copyWith(stock: product.stock + 1)), isTrue);
+        expect(await work.workspaceInventorySaved, isTrue);
+        earlierReceipt = WorkspaceSupplierGoodsReceipt(id: 'bill-ui-earlier-receipt',
+          expectedDeliveryId: 'bill-ui-earlier-delivery', reference: 'HOST earlier delivery',
+          deliveredOn: '2026-09-30', recordedAt: at,
+          lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'bill-ui-earlier-line', productId: product.id,
+            productLabel: product.title, purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
+            deliveredMilli: 1000, acceptedMilli: 1000, damagedMilli: 0, shortMilli: 0, expectedMilli: 1000)]);
+      }
       final late = mode == 'historical-unlinked' || mode.startsWith('late-');
       final historical = mode == 'included' || late;
       final opening = WorkspaceSupplierOpeningRecord(id: 'bill-ui-opening', basisId: 'bill-ui-basis',
@@ -6300,11 +6315,18 @@ void main() {
             ? WorkspaceOpeningBillInclusion.included : WorkspaceOpeningBillInclusion.excluded)]);
       entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
         revision: 1, profiles: [supplier], draft: draft,
-        copies: late ? const [] : [copy], openingRecords: [opening]);
+        copies: late ? const [] : [copy], openingRecords: [opening],
+        goodsReceiptDrafts: earlierReceipt == null ? const [] : [WorkspaceSupplierGoodsReceiptDraft(
+          supplierId: supplier.id, revision: 1, receipt: earlierReceipt)]);
       expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
       if (mode != 'unknown') {
         expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope,
           expectedRevision: 1, confirmedAt: DateTime.now()), isTrue, reason: work.workspaceSupplierError);
+      }
+      if (earlierReceipt != null) {
+        expect(await work.confirmWorkspaceSupplierGoodsReceipt(earlierReceipt, supplierId: supplier.id, scope: scope,
+          expectedPurchaseRevision: 1, expectedSupplierRevision: 1, requireSavedReview: true),
+          WorkspaceGoodsReceiptSaveResult.saved, reason: work.workspaceSupplierError);
       }
       if (late) {
         entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
@@ -6407,6 +6429,16 @@ void main() {
           expect(work.workspaceSupplierLedger(supplier.id)!.purchaseBills.length, 1,
             reason: '${work.workspaceSupplierError} / ${find.byKey(const Key('work-purchase-bill-notice')).evaluate().map((e) => (e.widget as Text).data).join()}');
           expect(find.text('Bill confirmed in supplier account'), findsOneWidget);
+          expect(tester.widget<Text>(find.byKey(const Key('work-purchase-bill-notice'))).data,
+            'Bill confirmed in supplier account. Confirming the bill does not change Stock or record a payment.',
+            reason: 'Confirmation describes its own effects, not whether goods have been recorded or matched.');
+          expect(find.text('Bill confirmed. No goods or payment recorded.'), findsNothing);
+          if (earlierReceipt != null) {
+            expect(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts[earlierReceipt.id]!.toJson(),
+              earlierReceipt.toJson(), reason: 'Bill confirmation preserves the already-recorded goods receipt.');
+            expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock,
+              reason: 'Already-received Stock must not be added again by bill confirmation.');
+          }
           if (mode.startsWith('read-only')) {
             expect(find.byKey(const Key('work-purchase-record-payment')), findsNothing);
             expect(find.byKey(const Key('work-purchase-allocate-money')), findsNothing);

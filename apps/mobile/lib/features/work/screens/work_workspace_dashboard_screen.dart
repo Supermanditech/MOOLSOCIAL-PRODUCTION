@@ -13725,7 +13725,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       openingTreatment: treatment, openingReview: openingReview, confirmedAt: DateTime.now());
     if (!mounted || !_current) return;
     setState(() { _busy = false;
-      _notice = saved ? 'Bill confirmed. No goods or payment recorded.'
+      _notice = saved ? 'Bill confirmed in supplier account. Confirming the bill does not change Stock or record a payment.'
         : session.workspaceSupplierError ?? 'Confirmation status needs recovery. Retry the supplier account before confirming again.'; });
   }
   Widget _goodsRow(int index) {
