@@ -11598,15 +11598,29 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
       }, icon: Icon(_opened ? Icons.expand_less : Icons.link, size: 18),
         label: Text(completedView ? 'View received goods' : 'Match received goods')),
       if (_opened) ...[
-        Text(completedView ? 'Saved goods linked to this bill. No Stock or payment change.' :
+        if (!completedView) Text(
           'Match this bill to saved goods. This does not add Stock or record a payment.',
           style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
-        for (final match in priorMatches) Text('Matched: ${widget.copy.draft.goods[match.billLineIndex]['name']} · '
-          '${_ReceivingLineInput._quantity(match.billQuantityMilli)} invoiced + ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} free ${match.billUnit} · '
-          'Receipt ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId} · '
-          '${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} accepted / ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} damaged · '
-          '1 ${match.billUnit} = ${match.stockUnitsNumerator}/${match.stockUnitsDenominator} ${match.stockUnit}',
-          key: ValueKey(('work-bill-goods-saved-match', match.operationId))),
+        for (final match in priorMatches) Padding(
+          key: ValueKey(('work-bill-goods-saved-match', match.operationId)),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: DefaultTextStyle.merge(
+            style: const TextStyle(fontSize: 12, color: MoolColors.ink),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${widget.copy.draft.goods[match.billLineIndex]['name']}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text('Invoiced: ${_ReceivingLineInput._quantity(match.billQuantityMilli)} ${match.billUnit} · '
+                'Free: ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)}'),
+              Text('Accepted: ${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} · '
+                'Damaged: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} '
+                '${ledger?.goodsReceipts[match.receiptId]?.lines.where((line) => line.sourceLineId == match.receiptLineId).firstOrNull?.purchaseUnit ?? match.stockUnit}'),
+              Text('Receipt: ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId}'),
+              if (match.billUnit != match.stockUnit || match.stockUnitsNumerator != match.stockUnitsDenominator)
+                Text('Unit conversion: ${match.stockUnitsDenominator} ${match.billUnit} = '
+                  '${match.stockUnitsNumerator} ${match.stockUnit}'),
+            ]),
+          ),
+        ),
         if (_error != null) Text(_error!, key: const Key('work-bill-goods-error'),
           style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
         if (!_loaded || _uncertain || ledger == null || session.workspaceSupplierRecoveryRequired) TextButton(key: const Key('work-bill-goods-recover'),
@@ -11635,8 +11649,8 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
               child: const Text('Cancel matching review')),
           ]),
         ] else if (completedView) ...[
-          const Text('All invoice quantities are matched. No further goods need linking to this bill.',
-            key: Key('work-bill-goods-complete')),
+          const Text('All invoice quantities matched', key: Key('work-bill-goods-complete'),
+            style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         ] else if (_loaded && !_uncertain) ...[
           DropdownButtonFormField<int>(key: ValueKey(('work-bill-goods-item', _item)), initialValue: _item,
             isExpanded: true, decoration: const InputDecoration(labelText: 'Item on supplier invoice'),

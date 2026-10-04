@@ -5839,6 +5839,7 @@ void main() {
       (const Size(360, 800), false, '0', true, 'normal'),
       (const Size(360, 800), false, '1', false, 'normal'),
       (const Size(360, 800), false, '0', false, 'completed-read-failure'),
+      (const Size(360, 800), false, '0', false, 'different-units'),
       (const Size(360, 800), false, '0', false, 'external-completion-dirty'),
       (const Size(360, 800), false, '0', false, 'settled-empty'),
       (const Size(360, 800), false, '0', false, 'settled-retained'),
@@ -5867,7 +5868,9 @@ void main() {
       final draft = WorkspacePurchaseEntryDraft(id: 'matching-ui-bill', supplierId: supplier.id,
         invoiceReference: 'HOST-MATCH-01', invoiceDate: '${day.substring(8)}/${day.substring(5, 7)}/${day.substring(0, 4)}',
         createdAt: at, updatedAt: at, goods: [{'productId': product.id, 'name': product.title,
-          'pack': product.pack, 'quantity': '2', 'freeQuantity': freeText, 'cost': '50'}], details: {'invoiceTotal': '100'});
+          'pack': recoveryCase == 'different-units' ? 'supplier pack' : product.pack,
+          'quantity': '2', 'freeQuantity': freeText, 'cost': '50'}], details: {'invoiceTotal': '100'});
+      final billPack = draft.goods.single['pack']!;
       final copy = WorkspacePurchaseSavedCopy(id: 'matching-ui-copy', storeName: 'Evaluation Store', revision: 1,
         savedAt: at, supplier: supplier, draft: draft, labels: const {});
       final opening = WorkspaceSupplierOpeningRecord(id: 'matching-ui-opening', basisId: 'matching-ui-basis',
@@ -5962,13 +5965,13 @@ void main() {
       }
       final item = find.byWidgetPredicate((w) => w is DropdownButtonFormField<int>).last;
       await reveal(item); await tester.tap(item); await tester.pumpAndSettle();
-      await tester.tap(find.text('1. ${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
+      await tester.tap(find.text('1. ${product.title} · $billPack').last); await tester.pumpAndSettle();
       final receiving = find.byWidgetPredicate((w) => w is DropdownButtonFormField<(String, String)>);
       await reveal(receiving); await tester.tap(receiving); await tester.pumpAndSettle();
       await tester.tap(find.text('HOST matching delivery · $day · ${product.pack}').last); await tester.pumpAndSettle();
       expect(find.text('Stock units'), findsOneWidget);
       expect(find.text('Bill units'), findsOneWidget);
-      expect(find.text('Unit conversion: 1 ${product.pack} = Stock units ÷ Bill units ${product.pack}.'), findsOneWidget);
+      expect(find.text('Unit conversion: 1 $billPack = Stock units ÷ Bill units ${product.pack}.'), findsOneWidget);
       expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-numerator'))).controller!.text, '1');
       expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-denominator'))).controller!.text, '1');
       if (freeText == '-') {
@@ -6100,6 +6103,12 @@ void main() {
       }
       final summary = find.byKey(ValueKey(('work-bill-goods-saved-match', operation)));
       await reveal(summary); expect(summary, findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Invoiced: 2 $billPack · Free: 0')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Accepted: 2 · Damaged: 0 ${product.pack}')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Receipt: HOST matching delivery')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Unit conversion: 1 $billPack = 1 ${product.pack}')),
+        recoveryCase == 'different-units' ? findsOneWidget : findsNothing,
+        reason: 'Equal units need no repeated 1:1 wording; different units retain the reviewed conversion.');
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, hasLength(1));
       expect(find.byKey(const Key('work-purchase-bill-receive-goods')),
         freeText == '1' ? findsOneWidget : findsNothing,
