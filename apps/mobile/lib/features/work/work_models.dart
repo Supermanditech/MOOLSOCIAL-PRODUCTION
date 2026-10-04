@@ -3250,7 +3250,7 @@ class WorkspaceSupplierBillGoodsAllocation {
   }
 }
 
-enum WorkspaceSupplierMoneySourceKind { openingAdvance, accountPayment, accountAdvance }
+enum WorkspaceSupplierMoneySourceKind { openingAdvance, accountPayment, accountAdvance, manualBillSurplus }
 
 /// Frozen reviewed bill/delivery attribution for missing goods. Receipt and
 /// prior-claim membership must be derived from the authoritative predecessor,
@@ -3551,26 +3551,39 @@ class WorkspaceSupplierMoneyAllocationIntent {
     required this.accountScope, required this.workspaceId, required this.supplierId,
     required this.sourceKind, required this.sourceId, required this.openingId,
     required this.openingRevision, required this.billId, required this.copyId,
-    required this.copyRevision, required this.amountMinor, required this.requestedAt});
+    required this.copyRevision, required this.amountMinor, required this.requestedAt,
+    this.sourceCopyId, this.sourceCopyRevision});
   final String operationId, accountScope, workspaceId, supplierId, sourceId,
     openingId, billId, copyId;
   final WorkspaceSupplierMoneySourceKind sourceKind;
   final int openingRevision, copyRevision, amountMinor;
   final DateTime requestedAt;
+  /// Exact accepted source copy reviewed for a bill surplus. The financial
+  /// prefix is derived at commit, not frozen in the retailer's request.
+  final String? sourceCopyId;
+  final int? sourceCopyRevision;
   bool get valid => [operationId, accountScope, workspaceId, supplierId, sourceId,
     openingId, billId, copyId].every((v) => v.trim().isNotEmpty && v.length <= 512) &&
     openingRevision > 0 && copyRevision > 0 &&
-    amountMinor > 0 && _financeAmountValid(amountMinor);
+    amountMinor > 0 && _financeAmountValid(amountMinor) &&
+    (sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+      ? sourceId != billId && sourceCopyId != null && sourceCopyId!.trim().isNotEmpty &&
+        sourceCopyId!.length <= 512 && (sourceCopyRevision ?? 0) > 0
+      : sourceCopyId == null && sourceCopyRevision == null);
   Map<String, Object?> intentToJson() => {'operationId': operationId, 'accountScope': accountScope,
     'workspaceId': workspaceId, 'supplierId': supplierId, 'sourceKind': sourceKind.name,
     'sourceId': sourceId, 'openingId': openingId, 'openingRevision': openingRevision,
     'billId': billId, 'copyId': copyId, 'copyRevision': copyRevision,
-    'amountMinor': amountMinor, 'requestedAt': requestedAt.toUtc().toIso8601String()};
+    'amountMinor': amountMinor, 'requestedAt': requestedAt.toUtc().toIso8601String(),
+    if (sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus) ...{
+      'sourceCopyId': sourceCopyId, 'sourceCopyRevision': sourceCopyRevision}};
   static WorkspaceSupplierMoneyAllocationIntent fromJson(Object? raw) {
     const keys = {'operationId', 'accountScope', 'workspaceId', 'supplierId', 'sourceKind',
       'sourceId', 'openingId', 'openingRevision', 'billId', 'copyId', 'copyRevision',
       'amountMinor', 'requestedAt'};
-    if (raw is! Map || raw.length != keys.length || !keys.every(raw.containsKey)) {
+    final expected = {...keys, if (raw is Map && raw['sourceKind'] == 'manualBillSurplus')
+      ...{'sourceCopyId', 'sourceCopyRevision'}};
+    if (raw is! Map || raw.length != expected.length || !expected.every(raw.containsKey)) {
       throw const FormatException('Invalid supplier money allocation');
     }
     final value = WorkspaceSupplierMoneyAllocationIntent(operationId: raw['operationId'] as String,
@@ -3579,17 +3592,19 @@ class WorkspaceSupplierMoneyAllocationIntent {
       sourceId: raw['sourceId'] as String, openingId: raw['openingId'] as String,
       openingRevision: raw['openingRevision'] as int, billId: raw['billId'] as String,
       copyId: raw['copyId'] as String, copyRevision: raw['copyRevision'] as int,
-      amountMinor: raw['amountMinor'] as int, requestedAt: DateTime.parse(raw['requestedAt'] as String));
+      amountMinor: raw['amountMinor'] as int, requestedAt: DateTime.parse(raw['requestedAt'] as String),
+      sourceCopyId: raw['sourceCopyId'] as String?, sourceCopyRevision: raw['sourceCopyRevision'] as int?);
     if (!value.valid) throw const FormatException('Invalid supplier money allocation');
     return value;
   }
 
-  WorkspaceSupplierBillMoneyAllocation commit({required int revision, required DateTime at}) =>
+  WorkspaceSupplierBillMoneyAllocation commit({required int revision, required DateTime at, int? sourceEntryCount}) =>
     WorkspaceSupplierBillMoneyAllocation(operationId: operationId, accountScope: accountScope,
       workspaceId: workspaceId, supplierId: supplierId, sourceKind: sourceKind, sourceId: sourceId,
       openingId: openingId, openingRevision: openingRevision, billId: billId, copyId: copyId,
       copyRevision: copyRevision, amountMinor: amountMinor, requestedAt: requestedAt,
-      committedRevision: revision, recordedAt: at);
+      committedRevision: revision, recordedAt: at, sourceCopyId: sourceCopyId,
+      sourceCopyRevision: sourceCopyRevision, sourceEntryCount: sourceEntryCount);
 }
 
 /// Committed attribution of existing money, not another payment or stock fact.
@@ -3599,22 +3614,29 @@ class WorkspaceSupplierBillMoneyAllocation extends WorkspaceSupplierMoneyAllocat
     required super.sourceKind, required super.sourceId, required super.openingId,
     required super.openingRevision, required super.billId, required super.copyId,
     required super.copyRevision, required super.amountMinor, required super.requestedAt,
-    required this.committedRevision, required this.recordedAt});
+    required this.committedRevision, required this.recordedAt,
+    super.sourceCopyId, super.sourceCopyRevision, this.sourceEntryCount});
   final int committedRevision;
+  final int? sourceEntryCount;
   final DateTime recordedAt;
   @override
-  bool get valid => super.valid && committedRevision > 1 && !recordedAt.isBefore(requestedAt);
+  bool get valid => super.valid && committedRevision > 1 && !recordedAt.isBefore(requestedAt) &&
+    (sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+      ? sourceEntryCount != null && sourceEntryCount! >= 0 && sourceEntryCount! <= 10000
+      : sourceEntryCount == null);
   Map<String, Object?> toJson() => {...intentToJson(), 'committedRevision': committedRevision,
-    'recordedAt': recordedAt.toUtc().toIso8601String()};
+    'recordedAt': recordedAt.toUtc().toIso8601String(),
+    if (sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus) 'sourceEntryCount': sourceEntryCount};
   static WorkspaceSupplierBillMoneyAllocation fromJson(Object? raw) {
     if (raw is! Map || !raw.containsKey('committedRevision') || !raw.containsKey('recordedAt')) {
       throw const FormatException('Invalid committed supplier money allocation');
     }
     final intent = WorkspaceSupplierMoneyAllocationIntent.fromJson({
       for (final entry in raw.entries)
-        if (entry.key != 'committedRevision' && entry.key != 'recordedAt') entry.key: entry.value});
+        if (entry.key != 'committedRevision' && entry.key != 'recordedAt' &&
+            !(raw['sourceKind'] == 'manualBillSurplus' && entry.key == 'sourceEntryCount')) entry.key: entry.value});
     final value = intent.commit(revision: raw['committedRevision'] as int,
-      at: DateTime.parse(raw['recordedAt'] as String));
+      at: DateTime.parse(raw['recordedAt'] as String), sourceEntryCount: raw['sourceEntryCount'] as int?);
     if (!value.valid) throw const FormatException('Invalid committed supplier money allocation');
     return value;
   }
@@ -4634,17 +4656,18 @@ class WorkspaceSupplierLedger {
     }
     final credit = creditMinor;
     if (credit == null) return null;
-    final capacity = _refundSourceCapacity(intent, entries.length, revision + 1);
+    final capacity = _refundSourceCapacity(intent, entries.length, revision + 1, at);
     if (capacity == null || capacity < 0) return null;
     return capacity < credit ? capacity : credit;
   }
 
   /// Re-derive capacity from facts preceding this refund, not its own proof or
   /// later credits. Allocation revisions provide order for non-money entries.
-  int? _refundSourceCapacity(WorkspaceSupplierRefundIntent intent, int entryLimit, int revisionLimit) {
+  int? _refundSourceCapacity(WorkspaceSupplierRefundIntent intent, int entryLimit, int revisionLimit, DateTime at) {
     final prior = entries.take(entryLimit).toList();
     final priorRefunds = refunds.values.where((r) => r.committedRevision < revisionLimit);
     final priorLinks = billMoneyAllocations.values.where((a) => a.committedRevision < revisionLimit);
+    if (priorLinks.any((link) => link.recordedAt.isAfter(at))) return null;
     int? capacity;
     switch (intent.sourceKind) {
       case WorkspaceSupplierRefundSourceKind.openingAdvance:
@@ -4667,9 +4690,12 @@ class WorkspaceSupplierLedger {
         final refundDay = DateTime.parse('${intent.occurredOn}T00:00:00Z');
         final invoiceDay = bill.copy.draft.invoiceIssuedDay;
         final fundingLinks = priorLinks.where((a) => a.billId == bill.billId).toList();
-        if (fundingLinks.any((link) => link.sourceKind != WorkspaceSupplierMoneySourceKind.openingAdvance &&
-            !prior.any((entry) => entry.operationId == link.sourceId && entry.moneyReview != null &&
-              intent.occurredOn.compareTo(entry.moneyReview!.occurredOn) >= 0))) {
+        if (fundingLinks.any((link) =>
+            link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+              ? intent.occurredOn.compareTo(link.recordedAt.toLocal().toIso8601String().substring(0, 10)) < 0
+              : link.sourceKind != WorkspaceSupplierMoneySourceKind.openingAdvance &&
+                !prior.any((entry) => entry.operationId == link.sourceId && entry.moneyReview != null &&
+                  intent.occurredOn.compareTo(entry.moneyReview!.occurredOn) >= 0))) {
           return null;
         }
         if (invoiceDay == null || refundDay.isBefore(invoiceDay) ||
@@ -4697,7 +4723,10 @@ class WorkspaceSupplierLedger {
         final returnedMoney = priorRefunds.where((r) =>
           r.intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus &&
           r.intent.sourceId == bill.billId).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
-        final remaining = bill.amountMinor! - paid - allocated - credited + returnedMoney;
+        final transferred = priorLinks.where((a) =>
+          a.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus && a.sourceId == bill.billId)
+          .fold<int>(0, (sum, a) => sum + a.amountMinor);
+        final remaining = bill.amountMinor! - paid - allocated - credited + returnedMoney + transferred;
         capacity = remaining < 0 ? -remaining : 0;
     }
     if (capacity == null) return null;
@@ -4726,7 +4755,7 @@ class WorkspaceSupplierLedger {
       final entry = entries[i], proof = refunds[entries[i].operationId];
       if (proof != null) {
         final intent = proof.intent;
-        final capacity = _refundSourceCapacity(intent, i, proof.committedRevision);
+        final capacity = _refundSourceCapacity(intent, i, proof.committedRevision, proof.recordedAt);
         if (!proof.valid || !intent.valid ||
             intent.accountScope != accountScope || intent.workspaceId != workspaceId ||
             intent.supplierId != supplierId || intent.qa != opening.qa ||
@@ -4826,7 +4855,47 @@ class WorkspaceSupplierLedger {
       .fold<int>(0, (total, note) => total + note.amountMinor);
     final refunded = refunds.values.where((r) => r.intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus &&
       r.intent.sourceId == billId).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
-    return bill.amountMinor! - paid - allocated - credited + refunded;
+    final transferred = billMoneyAllocations.values.where((a) =>
+      a.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus && a.sourceId == billId)
+      .fold<int>(0, (sum, a) => sum + a.amountMinor);
+    return bill.amountMinor! - paid - allocated - credited + refunded + transferred;
+  }
+
+  /// Replay only the entry prefix and typed revisions preceding an attribution.
+  /// Later payments/credits cannot retroactively fund an earlier transfer.
+  int? _billSurplusAt(String billId, int entryLimit, int revisionLimit, DateTime at) {
+    final bill = purchaseBills[billId];
+    if (bill == null || bill.openingTreatment != WorkspaceOpeningBillInclusion.excluded ||
+        entryLimit < 0 || entryLimit > entries.length || bill.acceptedAt.isAfter(at)) { return null; }
+    final prior = entries.take(entryLimit).toList();
+    bool inPrefix(String id) => prior.any((e) => e.operationId == id);
+    if (creditNotes.values.any((n) => (n.committedRevision < revisionLimit) != inPrefix(n.operationId)) ||
+        refunds.values.any((r) => (r.committedRevision < revisionLimit) != inPrefix(r.intent.operationId)) ||
+        billMoneyAllocations.values.any((a) => a.committedRevision < revisionLimit && a.recordedAt.isAfter(at))) {
+      return null;
+    }
+    if (!prior.any((e) => e.kind == WorkspaceSupplierEntryKind.bill && e.billId == billId) ||
+        prior.any((e) => e.postedAt.isAfter(at)) ||
+        prior.any((e) => e.billId == billId &&
+          ((e.kind == WorkspaceSupplierEntryKind.creditNote &&
+            (!creditNotes.containsKey(e.operationId) || creditNotes[e.operationId]!.committedRevision >= revisionLimit)) ||
+           (e.kind == WorkspaceSupplierEntryKind.refund &&
+            (!refunds.containsKey(e.operationId) || refunds[e.operationId]!.committedRevision >= revisionLimit)) ||
+           (e.kind == WorkspaceSupplierEntryKind.payment && e.moneyReview == null)))) { return null; }
+    final paid = prior.where((e) => e.billId == billId &&
+      e.origin == WorkspaceSupplierEntryOrigin.manualPurchase && e.kind == WorkspaceSupplierEntryKind.payment)
+      .fold<int>(0, (sum, e) => sum + e.amountMinor);
+    final links = billMoneyAllocations.values.where((a) => a.committedRevision < revisionLimit);
+    final incoming = links.where((a) => a.billId == billId).fold<int>(0, (sum, a) => sum + a.amountMinor);
+    final outgoing = links.where((a) => a.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus &&
+      a.sourceId == billId).fold<int>(0, (sum, a) => sum + a.amountMinor);
+    final credited = creditNotes.values.where((n) => n.billId == billId && n.committedRevision < revisionLimit &&
+      prior.any((e) => e.operationId == n.operationId)).fold<int>(0, (sum, n) => sum + n.amountMinor);
+    final refunded = refunds.values.where((r) => r.committedRevision < revisionLimit &&
+      r.intent.sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus && r.intent.sourceId == billId &&
+      prior.any((e) => e.operationId == r.intent.operationId)).fold<int>(0, (sum, r) => sum + r.intent.amountMinor);
+    final residual = bill.amountMinor! - paid - incoming - credited + outgoing + refunded;
+    return residual < 0 ? -residual : 0;
   }
 
   int? _moneySourceAmount(WorkspaceSupplierMoneySourceKind kind, String id) {
@@ -4840,6 +4909,9 @@ class WorkspaceSupplierLedger {
     }
     if (kind == WorkspaceSupplierMoneySourceKind.openingAdvance) {
       return opening.supplierCredit && opening.id == id ? opening.amountMinor : null;
+    }
+    if (kind == WorkspaceSupplierMoneySourceKind.manualBillSurplus) {
+      return _billSurplusAt(id, entries.length, revision + 1, asOf);
     }
     final found = entries.where((e) => e.operationId == id).toList();
     if (found.length != 1) return null;
@@ -4855,6 +4927,8 @@ class WorkspaceSupplierLedger {
     if (!valid) return null;
     final amount = _moneySourceAmount(kind, id);
     if (amount == null) return null;
+    // Surplus already includes both outgoing links and actual refunds.
+    if (kind == WorkspaceSupplierMoneySourceKind.manualBillSurplus) return amount;
     final refundKind = kind == WorkspaceSupplierMoneySourceKind.openingAdvance
       ? WorkspaceSupplierRefundSourceKind.openingAdvance : WorkspaceSupplierRefundSourceKind.accountAdvance;
     final refunded = kind == WorkspaceSupplierMoneySourceKind.accountPayment ? 0 :
@@ -4891,7 +4965,11 @@ class WorkspaceSupplierLedger {
     for (final pair in billMoneyAllocations.entries) {
       final link = pair.value;
       final bill = purchaseBills[link.billId];
-      final capacity = _moneySourceAmount(link.sourceKind, link.sourceId);
+      final surplus = link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus;
+      final sourceBill = surplus ? purchaseBills[link.sourceId] : null;
+      final capacity = surplus && link.sourceEntryCount != null
+        ? _billSurplusAt(link.sourceId, link.sourceEntryCount!, link.committedRevision, link.recordedAt)
+        : _moneySourceAmount(link.sourceKind, link.sourceId);
       if (pair.key != link.operationId || !link.valid || link.accountScope != accountScope ||
           link.workspaceId != workspaceId || link.supplierId != supplierId ||
           link.openingId != opening.id || link.openingRevision != opening.revision ||
@@ -4907,6 +4985,13 @@ class WorkspaceSupplierLedger {
             billMoneyAllocations.values.where((a) => a.billId == link.billId)
               .fold<int>(0, (sum, a) => sum + a.amountMinor) > bill.amountMinor!) {
         return false;
+      }
+      if (surplus) {
+        if (sourceBill == null || sourceBill.copy.id != link.sourceCopyId ||
+            sourceBill.copy.revision != link.sourceCopyRevision || capacity < link.amountMinor ||
+            !entries.take(link.sourceEntryCount!).any((e) =>
+              e.kind == WorkspaceSupplierEntryKind.bill && e.billId == link.billId)) { return false; }
+        continue;
       }
       if (link.sourceKind != WorkspaceSupplierMoneySourceKind.openingAdvance &&
           entries.singleWhere((e) => e.operationId == link.sourceId).postedAt.isAfter(link.recordedAt)) {
@@ -4926,6 +5011,9 @@ class WorkspaceSupplierLedger {
     if (old != null) return jsonEncode(old.toJson()) == jsonEncode(link.toJson()) ? this : null;
     if (expectedRevision != revision || link.committedRevision != revision + 1 ||
         (_manualBillRemainingMinor(link.billId) ?? -1) < link.amountMinor) { return null; }
+    if (link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus &&
+        (link.sourceEntryCount != entries.length ||
+          (_moneySourceAmount(link.sourceKind, link.sourceId) ?? -1) < link.amountMinor)) { return null; }
     final next = WorkspaceSupplierLedger(accountScope: accountScope, workspaceId: workspaceId,
       supplierId: supplierId, supplierName: supplierName, revision: revision + 1,
       asOf: link.recordedAt.isAfter(asOf) ? link.recordedAt : asOf, entries: entries,
@@ -5208,6 +5296,15 @@ class WorkspaceSupplierLedger {
           previous._moneySourceAmount(link.sourceKind, link.sourceId) == null) {
         return false;
       }
+      if (link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus &&
+          (revision != previous.revision + 1 || link.committedRevision != revision ||
+            link.sourceEntryCount != previous.entries.length || entries.length != previous.entries.length ||
+            purchaseBills.length != previous.purchaseBills.length || creditNotes.length != previous.creditNotes.length ||
+            refunds.length != previous.refunds.length || goodsReceipts.length != previous.goodsReceipts.length ||
+            goodsReturns.length != previous.goodsReturns.length || shortageClaims.length != previous.shortageClaims.length ||
+            billGoodsAllocations.length != previous.billGoodsAllocations.length ||
+            billMoneyAllocations.length != previous.billMoneyAllocations.length + 1 ||
+            (previous._moneySourceAmount(link.sourceKind, link.sourceId) ?? -1) < link.amountMinor)) { return false; }
     }
     return revision > previous.revision ||
         (entries.length == previous.entries.length &&

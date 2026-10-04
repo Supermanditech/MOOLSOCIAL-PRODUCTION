@@ -13496,7 +13496,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             await _showSupplierAllocation(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
-          label: const Text('Link advance / payment')),
+          label: const Text('Link payment / credit')),
       if (_copyVerified && session.supplierShortageRecoveryFormKey(copy) != null)
         TextButton.icon(
           key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
@@ -15561,10 +15561,14 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
           ),
         if (orderId == null) ...[
           for (final link in current.billMoneyAllocations.values.where(
-            (item) => billId == null || item.billId == billId))
+            (item) => billId == null || item.billId == billId ||
+              (item.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus && item.sourceId == billId)))
             ListTile(dense: true, contentPadding: EdgeInsets.zero,
-              title: const Text('Recorded money linked · not another payment'),
-              subtitle: Text('${current.purchaseBills[link.billId]?.copy.draft.invoiceReference ?? link.billId} · ${_registerDate(link.recordedAt)}'),
+              title: Text(link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+                ? 'Bill credit applied · not another payment' : 'Recorded money linked · not another payment'),
+              subtitle: Text('${link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+                ? '${current.purchaseBills[link.sourceId]?.copy.draft.invoiceReference ?? link.sourceId} → ' : ''}'
+                '${current.purchaseBills[link.billId]?.copy.draft.invoiceReference ?? link.billId} · ${_registerDate(link.recordedAt)}'),
               trailing: Text(_purchaseAmount(link.amountMinor))),
           if (current.billMoneyAllocations.isNotEmpty && current.unassignedAccountBalanceMinor != null)
             Text(current.unassignedAccountBalanceMinor! < 0
@@ -29545,6 +29549,10 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         '${entry.kind == WorkspaceSupplierEntryKind.advance ? 'Advance' : 'Account payment'} · ${entry.reference}'
         ' · ${entry.moneyReview!.occurredOn} · ${entry.paymentMethod ?? 'Method not recorded'}');
     }
+    for (final bill in current.purchaseBills.values.where((b) => b.billId != widget.copy.draft.id)) {
+      add(WorkspaceSupplierMoneySourceKind.manualBillSurplus, bill.billId,
+        'Bill credit · ${bill.copy.draft.invoiceReference} · ${bill.copy.draft.invoiceDate}');
+    }
     return [for (var index = 0; index < list.length; index++)
       (list[index].$1, list[index].$2,
         list.where((source) => source.$3 == list[index].$3).length > 1
@@ -29640,7 +29648,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         final billDue = current?.manualBillRemainingMinor(widget.copy.draft.id);
         if (minor == null || minor <= 0 || available == null || billDue == null ||
             minor > available || minor > billDue || current?.openingRecord == null) {
-          error = 'Choose recorded money and an amount within its unassigned balance and this bill’s due.';
+          error = 'Choose an advance, payment or bill credit and an amount within its available balance and this bill’s due.';
           return;
         }
         final key = draft.key!;
@@ -29649,7 +29657,11 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           sourceKind: sourceKind!, sourceId: sourceId, openingId: current!.openingRecord!.id,
           openingRevision: current.openingRecord!.revision, billId: widget.copy.draft.id,
           copyId: widget.copy.id, copyRevision: widget.copy.revision, amountMinor: minor,
-          requestedAt: DateTime.now().toUtc());
+          requestedAt: DateTime.now().toUtc(),
+          sourceCopyId: sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+            ? current.purchaseBills[sourceId]?.copy.id : null,
+          sourceCopyRevision: sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+            ? current.purchaseBills[sourceId]?.copy.revision : null);
         draft.save(fields);
         if (!await draft.flush() || !mounted) { error = 'Request is not submitted. Save and retry this same request.'; return; }
       }
@@ -29686,18 +29698,18 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
         padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Text('Link recorded money to bill', style: Theme.of(context).textTheme.titleMedium),
+            Text('Apply payment or credit to bill', style: Theme.of(context).textTheme.titleMedium),
             TextButton(key: const Key('supplier-allocation-close'), onPressed: busy || conflict ? null : () async {
               if (await draft.flush() && context.mounted) Navigator.pop(context);
             }, child: const Text('Close'))]),
           Text('${widget.copy.supplier.name} · ${widget.copy.draft.invoiceReference}'),
-          const Text('Uses money already recorded. No new payment or Stock change.'),
+          const Text('Uses an existing advance, payment or bill credit. No new payment or Stock change.'),
           Text(billDue == null ? 'Bill due unavailable' : billDue < 0
             ? 'Credit with supplier ${_purchaseAmount(-billDue)}' : 'Bill due ${_purchaseAmount(billDue)}'),
           if (settled) const Text('No amount remains to link to this bill. Your recorded payments and allocations are kept.',
             key: Key('supplier-allocation-settled')),
           if (!settled && list.isEmpty && accountReady && frozen == null) ...[
-            const Text('No recorded advance or account payment is available to link. Record money already paid to this supplier, then return here to link it.'),
+            const Text('No available advance, payment or bill credit. If you have already paid this supplier, record that payment or advance first.'),
             if (billDue != null && billDue > 0) Wrap(spacing: 8, children: [
               TextButton(key: const Key('supplier-allocation-record-payment'),
                 onPressed: editable ? () => recordMoney(false) : null, child: const Text('Record supplier payment')),
@@ -29708,7 +29720,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           if (!settled) ...[
           DropdownButtonFormField<String>(key: ValueKey(('supplier-allocation-source', selected)),
             initialValue: selectionKnown ? selected : null, isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Recorded advance / account payment'),
+            decoration: const InputDecoration(labelText: 'Advance, payment or bill credit'),
             items: [for (final s in list) DropdownMenuItem(value: sourceValue(s.$1, s.$2),
               child: Text('${s.$3} · Unassigned ${_purchaseAmount(s.$4)}', overflow: TextOverflow.ellipsis))],
             onChanged: editable ? (value) {
@@ -29732,7 +29744,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           if (!settled) FilledButton(key: const Key('supplier-allocation-submit'),
             onPressed: draft.ready && accountReady && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Link another amount'
-              : frozen == null ? 'Link recorded money' : 'Retry same allocation')),
+              : frozen == null ? 'Apply selected amount' : 'Retry same allocation')),
         ]))));
   }
 }

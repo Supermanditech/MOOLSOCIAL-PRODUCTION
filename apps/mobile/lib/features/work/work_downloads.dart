@@ -581,9 +581,13 @@ class StoreSupplierStatement {
         '${label(entry.kind)} · ${amount(entry.amountMinor)} · included in report opening, not counted again']);
     }
     for (final link in ledger.billMoneyAllocations.values.where((a) => inPeriod(day(a.recordedAt.toLocal())))) {
-      result.add([date(link.recordedAt.toLocal()), 'Recorded money linked',
+      final billCredit = link.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus;
+      final sourceReference = billCredit
+        ? ledger.purchaseBills[link.sourceId]?.copy.draft.invoiceReference ?? link.sourceId : null;
+      result.add([date(link.recordedAt.toLocal()), billCredit ? 'Bill credit applied' : 'Recorded money linked',
         ledger.purchaseBills[link.billId]?.copy.draft.invoiceReference ?? link.billId,
-        '', '', '', '${amount(link.amountMinor)} · not another payment; no account-balance change']);
+        '', '', '', '${sourceReference == null ? '' : 'From bill $sourceReference · '}'
+          '${amount(link.amountMinor)} · not another payment; no account-balance change']);
     }
     return result;
   }

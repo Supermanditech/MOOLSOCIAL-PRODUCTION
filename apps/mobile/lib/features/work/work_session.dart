@@ -6581,7 +6581,9 @@ class WorkSession extends ChangeNotifier {
           }
           final now = DateTime.now().toUtc();
           if (now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
-          return allocateWorkspaceSupplierMoney(intent.commit(revision: ledger.revision + 1, at: now),
+          return allocateWorkspaceSupplierMoney(intent.commit(revision: ledger.revision + 1, at: now,
+              sourceEntryCount: intent.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+                ? ledger.entries.length : null),
             expectedRevision: ledger.revision);
         });
     } on Object {

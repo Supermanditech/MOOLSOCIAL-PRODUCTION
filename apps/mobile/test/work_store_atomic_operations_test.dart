@@ -6389,7 +6389,87 @@ void main() {
       'copyRevision': secondBill.copy.revision, 'committedRevision': withOtherBill.revision + 1});
     expect(withOtherBill.recordSupplierCredit(wrongBill, expectedRevision: withOtherBill.revision), isNull,
       reason: 'Same product and unit on another bill do not prove receipt ownership.');
+    // Host-only cross-bill credit attribution; no runtime records injected.
+    final sourceCredit = WorkspaceSupplierCreditNote.fromJson({...note.toJson(),
+      'committedRevision': withOtherBill.revision + 1});
+    final funded = withOtherBill.recordSupplierCredit(sourceCredit, expectedRevision: withOtherBill.revision)!;
+    WorkspaceSupplierBillMoneyAllocation surplusLink(WorkspaceSupplierLedger current,
+        {int amount = 2000, String id = 'surplus-link'}) => WorkspaceSupplierBillMoneyAllocation(
+      operationId: id, accountScope: current.accountScope, workspaceId: current.workspaceId,
+      supplierId: current.supplierId, sourceKind: WorkspaceSupplierMoneySourceKind.manualBillSurplus,
+      sourceId: bill.billId, sourceCopyId: bill.copy.id, sourceCopyRevision: bill.copy.revision,
+      sourceEntryCount: current.entries.length, openingId: current.openingRecord!.id,
+      openingRevision: current.openingRecord!.revision, billId: secondBill.billId,
+      copyId: secondBill.copy.id, copyRevision: secondBill.copy.revision,
+      amountMinor: amount, requestedAt: current.asOf, recordedAt: current.asOf,
+      committedRevision: current.revision + 1);
+    expect(withOtherBill.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.manualBillSurplus, bill.billId), 0);
+    expect(withOtherBill.allocateRecordedMoney(surplusLink(withOtherBill), expectedRevision: withOtherBill.revision), isNull);
+    final moved = funded.allocateRecordedMoney(surplusLink(funded), expectedRevision: funded.revision)!;
+    expect(moved.manualBillRemainingMinor(bill.billId), 0);
+    expect(moved.manualBillRemainingMinor(secondBill.billId), 8000);
+    expect(moved.balanceMinor, funded.balanceMinor);
+    expect(moved.entries.map((e) => e.toJson()), funded.entries.map((e) => e.toJson()));
+    expect(moved.goodsReceipts, funded.goodsReceipts);
+    final statement = StoreSupplierStatement(source: moved, storeName: 'HOST ONLY',
+      from: DateTime(2026, 10, 1), until: DateTime(2026, 10, 4),
+      generatedAt: DateTime.utc(2026, 10, 4), reviewOnly: true);
+    final creditRow = statement.rows.singleWhere((r) => r[1] == 'Bill credit applied');
+    expect(creditRow[2], secondBill.copy.draft.invoiceReference);
+    expect(creditRow.sublist(3, 6), ['', '', '']);
+    expect(creditRow[6], contains('From bill ${bill.copy.draft.invoiceReference}'));
+    expect(statement.closing, moved.balanceMinor);
+    expect(moved.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.manualBillSurplus, bill.billId), 0);
+    expect(moved.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance, 'advance'), 0);
+    expect(WorkspaceSupplierLedger.fromJson(moved.toJson())!.toJson(), moved.toJson());
+    expect(moved.allocateRecordedMoney(surplusLink(funded), expectedRevision: funded.revision), same(moved));
+    expect(moved.allocateRecordedMoney(surplusLink(moved, amount: 1, id: 'overdraw'), expectedRevision: moved.revision), isNull);
+    for (final change in <Map<String, Object?>>[
+      {'sourceCopyRevision': bill.copy.revision + 1}, {'sourceCopyId': 'wrong-copy'},
+      {'sourceEntryCount': funded.entries.length - 1}, {'workspaceId': 'other-store'},
+      {'supplierId': 'other-supplier'}, {'amountMinor': 2001},
+    ]) {
+      final forged = WorkspaceSupplierBillMoneyAllocation.fromJson({...surplusLink(funded).toJson(), ...change});
+      expect(funded.allocateRecordedMoney(forged, expectedRevision: funded.revision), isNull);
+    }
+    final partial = funded.allocateRecordedMoney(surplusLink(funded, amount: 1000), expectedRevision: funded.revision)!;
+    final exhausted = partial.allocateRecordedMoney(surplusLink(partial, amount: 1000, id: 'surplus-link-two'),
+      expectedRevision: partial.revision)!;
+    expect(exhausted.manualBillRemainingMinor(bill.billId), 0);
+    expect(WorkspaceSupplierLedger.fromJson(exhausted.toJson())!.valid, isTrue);
+    final missingCreditPrefix = {...moved.toJson(), 'billMoneyAllocations': {
+      'surplus-link': {...moved.billMoneyAllocations['surplus-link']!.toJson(),
+        'sourceEntryCount': funded.entries.length - 1}}};
+    expect(WorkspaceSupplierLedger.fromJson(missingCreditPrefix), isNull);
+    final futureFunding = {...moved.toJson(),
+      'asOf': moved.asOf.add(const Duration(hours: 2)).toIso8601String(), 'billMoneyAllocations': {
+      for (final a in moved.billMoneyAllocations.values) a.operationId: {
+        ...a.toJson(), if (a.sourceKind == WorkspaceSupplierMoneySourceKind.accountAdvance)
+          'recordedAt': moved.asOf.add(const Duration(hours: 1)).toIso8601String()}}};
+    expect(WorkspaceSupplierLedger.fromJson(futureFunding), isNull);
+    final request = WorkspaceSupplierMoneyAllocationIntent.fromJson(surplusLink(funded).intentToJson());
+    expect(request.intentToJson().containsKey('sourceEntryCount'), isFalse);
+    expect(() => WorkspaceSupplierMoneyAllocationIntent.fromJson({
+      ...request.intentToJson(), 'sourceEntryCount': funded.entries.length}), throwsFormatException);
+    expect(request.commit(revision: funded.revision + 1, at: funded.asOf,
+      sourceEntryCount: funded.entries.length).toJson(), surplusLink(funded).toJson());
     ledger = ledger.recordSupplierCredit(note, expectedRevision: ledger.revision)!;
+    final partialRefundIntent = WorkspaceSupplierRefundIntent.fromJson({
+      ...refundIntentFixture(ledger, kind: WorkspaceSupplierRefundSourceKind.manualBillSurplus,
+        source: bill.billId, bill: bill).toJson(), 'amountMinor': 1000});
+    final refundFirst = ledger.recordReviewedRefund(partialRefundIntent, expectedRevision: ledger.revision,
+      recordedAt: ledger.asOf)!;
+    final refundThenTarget = refundFirst.acceptReviewedBill(secondBill, expectedRevision: refundFirst.revision)!;
+    final refundThenLink = refundThenTarget.allocateRecordedMoney(surplusLink(refundThenTarget, amount: 1000),
+      expectedRevision: refundThenTarget.revision)!;
+    expect(refundThenLink.manualBillRemainingMinor(bill.billId), 0);
+    expect(refundThenLink.manualBillRemainingMinor(secondBill.billId), 9000);
+    final omittedEarlierRefund = {...refundThenLink.toJson(), 'billMoneyAllocations': {
+      for (final a in refundThenLink.billMoneyAllocations.values) a.operationId: {
+        ...a.toJson(), if (a.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus) ...{
+          'sourceEntryCount': ledger.entries.length, 'amountMinor': 2000}}}};
+    expect(WorkspaceSupplierLedger.fromJson(omittedEarlierRefund), isNull);
+    expect(WorkspaceSupplierLedger.fromJson(refundThenLink.toJson())!.valid, isTrue);
     expect(ledger.manualBillRemainingMinor(bill.billId), -2000);
     expect(ledger.balanceMinor, -2000);
     expect(ledger.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance, 'advance'), 0);
@@ -6418,6 +6498,14 @@ void main() {
     final refunded = ledger.recordReviewedRefund(refundIntent, expectedRevision: ledger.revision,
       recordedAt: ledger.asOf)!;
     expect(refunded.balanceMinor, 0);
+    final fundingAfterRefund = {...refunded.toJson(),
+      'asOf': refunded.asOf.add(const Duration(hours: 2)).toIso8601String(),
+      'billMoneyAllocations': {
+        for (final a in refunded.billMoneyAllocations.values) a.operationId: {
+          ...a.toJson(), if (a.sourceKind == WorkspaceSupplierMoneySourceKind.accountAdvance)
+            'recordedAt': refunded.asOf.add(const Duration(hours: 1)).toIso8601String()}}};
+    expect(WorkspaceSupplierLedger.fromJson(fundingAfterRefund), isNull,
+      reason: 'An earlier revision cannot fund a refund using a transfer recorded afterwards.');
     expect(refunded.manualBillRemainingMinor(bill.billId), 0);
     expect(refunded.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.accountAdvance, 'advance'), 0);
     expect(refunded.billMoneyAllocations, ledger.billMoneyAllocations);
