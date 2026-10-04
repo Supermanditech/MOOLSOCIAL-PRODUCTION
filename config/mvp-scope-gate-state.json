@@ -1673,7 +1673,7 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Personal buyer sees authoritative Delivered completion as the main tracking message without an obsolete missing ETA; active delivery estimates and failure/recovery actions remain intact.",
+      "customerOutcome": "Personal Buyer Checkout tests verify accurate payment action amounts, truthful single/mixed order copy and preservation of original payment on unavailable handoff; qualify the25 retained failed cases without weakening payment guards.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
       "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
@@ -1685,23 +1685,14 @@
         "new_necessary_work"
       ],
       "sharedImplementationOwners": [
-        "apps/mobile/lib/features/buy/buy_v2_models.dart",
-        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
-        "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart"
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse existing BuyV2TrackingView status, existing order-progress fixtures and capture helper. Confirmed Delivered-header hierarchy defect requires only a conditional presentation change; no new screen, route, backend or data owner. Prior six-path evidence approval applies only to bounded-sweep historical evidence.",
+      "necessityProof": "Reuse existing unified Checkout UI, frozen legacy/grouped payment state, checkout-cart-return focused-test owner and existing host commerce/facts fixtures. Trace/reproduce retained25 failures at91c1f1b0 baseline. Repair stale copy/fixture/assertions only where confirmed; runtime change only for a demonstrated root defect. No new screen, route, state, backend or dependency. Historical receipts/archive immutable; fresh source evidence requires separate exact admission.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1724,7 +1715,11 @@
         "readable Wholesale freight summary without clipping Checkout",
         "native accessible fresh journey with unresolved live payment delivery children",
         "Delivered with absent or retained/revised ETA at100/200percent",
-        "Active valid missing stale ETA unchanged; refresh/support/details retained"
+        "Active valid missing stale ETA unchanged; refresh/support/details retained",
+        "Exact25 retained Checkout failures reproduced at clean91c1f1b0 baseline",
+        "Original payment identity and no duplicate handoff on leave/reconcile",
+        "Valid original amount fixture at320360430 normal/200percent",
+        "Mixed order CTA and authoritative dispatch details reachable"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1755,7 +1750,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "T14_delivered_header_host_approved_evidence_admitted_checkpoint_0a097bfb_complete_native_deferred",
+      "implementationState": "authorized_T14_checkout_test_qualification_in_progress",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

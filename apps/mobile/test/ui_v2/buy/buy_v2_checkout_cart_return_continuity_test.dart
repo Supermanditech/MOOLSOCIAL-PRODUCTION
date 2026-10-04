@@ -486,13 +486,17 @@ Future<void> _captureR66Checkout(
   });
 }
 
+// Supply one consistent catalogue price; exercise real basket/payment guards.
 class _R66CheckoutAmountFixture extends BuyV2Session {
-  _R66CheckoutAmountFixture(this.displayAmount, {required super.core});
-
-  final int displayAmount;
+  _R66CheckoutAmountFixture(this.amount, {required super.core})
+    : super(commerceAdapter: prepaidCommerceFixture());
+  final int amount;
 
   @override
-  int get checkoutAmountDueNow => displayAmount;
+  BuyV2Product? findProduct(String id) {
+    final item = super.findProduct(id);
+    return id == 'w-notebook' ? item?.copyWith(price: amount) : item;
+  }
 }
 
 // Isolated UI orchestration double: no payment/provider or order is created.
@@ -1246,15 +1250,14 @@ void main() {
       expect(session.quantityFor('s-tomato'), 1);
       expect(session.confirmedOrders, isEmpty);
       if (change != 'surface') {
-        expect(
-          find.text('Pay ${buyV2Money(session.checkoutAmountDueNow)}'),
-          findsOne,
-        );
+        // This double has no original request: never offer an unbound payment.
+        expect(session.checkoutRecoveryAmountKnown, isFalse);
+        expect(find.text('Check payment'), findsOne);
         await tester.tap(
           find.byKey(const ValueKey('buy-checkout-primary-address')),
         );
         await tester.pumpAndSettle();
-        expect(session.handoffs, 1);
+        expect(session.handoffs, 0);
       } else {
         expect(session.view, BuyV2View.cart);
       }
@@ -2120,7 +2123,7 @@ void main() {
           find.descendant(
             of: dock,
             matching: find.text(
-              'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place order',
+              'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place orders',
             ),
           ),
           findsOneWidget,
@@ -2187,6 +2190,7 @@ void main() {
           final session = BuyV2Session(
             core: core,
             cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+            catalogueNow: () => DateTime(2026, 9, 29),
           );
           addTearDown(core.dispose);
           addTearDown(session.dispose);
@@ -2361,10 +2365,16 @@ void main() {
             final session = _R66CheckoutAmountFixture(amount, core: core);
             addTearDown(session.dispose);
             addTearDown(core.dispose);
-            expect(session.addProduct('w-notebook'), isTrue);
+            expect(
+              session.addProduct('w-notebook'),
+              isTrue,
+              reason: 'Amount fixture: ${session.notice}; ${session.commerceLoadState}',
+            );
             session.openCart(scope: BuyV2CartScope.wholesale);
             expect(session.openCheckout(), isTrue);
             expect(session.choosePayment('UPI'), isTrue);
+            expect(session.scopedCartTotal, amount);
+            expect(session.checkoutAmountDueNow, amount);
             await tester.pumpWidget(
               app(
                 session,
@@ -2467,6 +2477,7 @@ void main() {
               BuyV2CheckoutSubmissionState.paymentActionRequired,
             );
             expectCompleteFooter('Pay ${buyV2Money(amount)}');
+            expect(session.checkoutPaymentActionAmount, amount);
             await _captureR66Checkout(tester, amount, width, scale, 'action');
             expect(session.confirmedOrders, isEmpty);
             expect(session.quantityFor('w-notebook'), 1);
@@ -2587,16 +2598,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         session.checkoutSubmissionState,
-        BuyV2CheckoutSubmissionState.cancelled,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
       );
+      expect(find.text('Check payment'), findsOneWidget);
       await tester.tap(
         find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
       await tester.pumpAndSettle();
       expect(
         session.checkoutSubmissionState,
-        BuyV2CheckoutSubmissionState.idle,
+        BuyV2CheckoutSubmissionState.paymentPending,
       );
+      expect(session.paymentReference, reference);
+      expect(session.checkoutIdempotencyKey, attempt);
+      expect(session.confirmedOrders, isEmpty);
       expect(session.quantityFor('w-notebook'), 1);
       expect(tester.takeException(), isNull);
     });
@@ -3713,9 +3728,9 @@ void main() {
       expect(session.openCheckout(), isTrue);
       advanceCheckoutToConfirm(session);
       await tester.pumpAndSettle();
-      expect(find.text('Dispatches'), findsOneWidget);
+      expect(find.text('Dispatch estimate'), findsOneWidget);
       expect(find.text('Dispatch within one business day'), findsOneWidget);
-      expect(find.text('Planned delivery'), findsOneWidget);
+      expect(find.text('Delivery estimate'), findsOneWidget);
       expect(find.text('Rajasthan Freight Network'), findsOneWidget);
       expect(tester.takeException(), isNull);
 

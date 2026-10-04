@@ -112559,6 +112559,169 @@
           "prevention": "One owner/result with bounded lines; allocate margin above anticipated output, avoid mixed long report searches.",
           "disposition": "Metadata-only follow-up; no repeated Flutter source qualification.",
           "mandatoryQualification": "Exact selected ledger is the pre_commit requirement. Extra broad453 run stays failed428/25; no app/full-suite acceptance or candidate promotion inferred."
+        },
+        "checkoutQualificationInventoryDiagnostic20261004": {
+          "mistake": "Inventory helper generated25-case JSON successfully but default cp1252 stdout could not print rupee character.",
+          "failure": "UnicodeEncodeError after immutable output was created; command exit1.",
+          "impact": "Read-only source inventory; no app/test owner edits or tests/device actions.",
+          "prevention": "Use python -X utf8 -B for Windows helpers; read already-created inventory without rerunning single-use writer.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-failed-inventory-20261004-1.json"
+        },
+        "checkoutQualificationBaseline20261004": {
+          "exactFailures": 25,
+          "sourceUnchanged": true,
+          "receipt": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-baseline-result-20261004-1.json",
+          "confirmedMixedInvoiceCause": "Empty Wholesale coupon list at test line 2217; investigate fixture eligibility before edit."
+        },
+        "checkoutQualificationPathDiagnostic20261004": {
+          "attemptedPath": "apps/mobile/lib/features/buy/buy_v2_cart_benefits.dart",
+          "result": "Nonexistent guessed path; rg read failed; no mutation.",
+          "correction": "Discover actual benefits owner with rg --files before reading."
+        },
+        "checkoutQualificationSearchPathDiagnostic20261004": {
+          "path": "apps/mobile/lib/models",
+          "result": "Read-only rg directory absent; relevant class discovered in existing buy_v2_cart_contracts.dart.",
+          "correction": "Use only observed existing owner paths."
+        },
+        "checkoutQualificationResultParserDiagnostic20261004": {
+          "runner": "t14-checkout-repaired-run-1.py",
+          "failure": "Result parser assumed every JSON line was an object; encountered JSON list after Flutter terminal stream. Run completed, log retained.",
+          "correction": "Read existing immutable log filtering dictionary rows; do not rerun Flutter to repair parser."
+        },
+        "checkoutQualificationFirstRepair20261004": {
+          "passedCases": 11,
+          "remainingCases": 14,
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-repaired-20261004-1.jsonl",
+          "causes": [
+            "Priced catalogue refresh did not change authoritative cart quote; actual subtotal3480.",
+            "Reconciliation of original pending attempt returns paymentPending, preserving unresolved hold."
+          ],
+          "diagnosticOutput": "Repeated failure output exceeded budget; next inspection deduplicates by cause.",
+          "next": "Inspect price/facts owner callpath and correct test fixtures only."
+        },
+        "checkoutQualificationTerminalPollDiagnostic20261004": {
+          "session": 79590,
+          "result": "Attempted poll of already completed coordinator session; tool rejected unknown process; no file mutation.",
+          "correction": "Use retained terminal0 result and proceed."
+        },
+        "checkoutQualificationSecondRepair20261004": {
+          "passedCases": 13,
+          "remainingCases": 12,
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-repaired-20261004-2.jsonl",
+          "cause": "Production-mode amount fixture reaches Wholesale business verification guard; snapshot did not publish verification. Supply explicit test-only verified business state, not runtime bypass.",
+          "parserCorrection": "Ignore suite loading record when matching exact25 inventory."
+        },
+        "checkoutQualificationThirdRepair20261004": {
+          "passedCases": 13,
+          "remainingCases": 12,
+          "exact25Executed": true,
+          "pinsUnchanged": true,
+          "cause": "Wholesale amount fixture still rejects addProduct even with verification; inspect exact rejection notice instead of assuming further prerequisites.",
+          "next": "One representative diagnostic case with state/notice assertion; facts-only architect re-review."
+        },
+        "checkoutQualificationAmountEligibility20261004": {
+          "representativeCase": "R66 checkout complete action INR1 at 320.0 text1.0",
+          "notice": "This product is unavailable right now.",
+          "loadState": "ready",
+          "rootCause": "Review harness ignores commerce refresh; disabling review requires published live eligibility absent in seeded facts.",
+          "correction": "Keep isolated review fixture and supply consistent product price via findProduct seam, retaining authentic prepaid frozen request and payment guards; remove unused proxy."
+        },
+        "checkoutQualificationFocusedPass20261004": {
+          "cases": 25,
+          "passed": 25,
+          "failed": 0,
+          "exactInventory": true,
+          "sourceAndAdmissionPinsUnchanged": true,
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-repaired-20261004-5.jsonl",
+          "productionCodeChanged": false,
+          "next": "Full affected Checkout owner and selected regression qualification; isolated visual captures are host evidence only."
+        },
+        "checkoutQualificationFullPass20261004": {
+          "passed": 156,
+          "failed": 0,
+          "analysisExitCode": 0,
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-full-20261004-1.jsonl",
+          "productionCodeChanged": false
+        },
+        "checkoutQualificationCaptureDiagnostic20261004": {
+          "result": "Expected new visual directory absent; runner used BUY_R664 directory but existing cart helper needs explicit BUY_R663_VISUAL_CAPTURE and BUY_R663_VISUAL_DIRECTORY; amount helper requires a separate opt-in.",
+          "correction": "Do not claim images produced. Test-only scope; existing native UI unchanged."
+        },
+        "checkoutQualificationCouponScopeCorrection20261004": {
+          "observedSubtotal": 3480,
+          "minimumSpend": 2500,
+          "cause": "Coupon expired; original one-pack fixture already qualifies spend.",
+          "correction": "Remove unnecessary extra quantity; retain pinned Sep29 clock and exact original basket."
+        },
+        "checkoutQualificationPreciseWriteDiagnostic20261004": {
+          "action": "Remove unnecessary extra coupon fixture quantity",
+          "result": "apply_patch could not write owner; verified file intact, writable and disk free189641506816 bytes.",
+          "correction": "Use exact anchored written helper after coordinator terminal; verify diff and run affected checks."
+        },
+        "checkoutQualificationFinalLocalPass20261004": {
+          "passed": 156,
+          "failed": 0,
+          "focusedInventoryAll25Contained": true,
+          "analysisExitCode": 0,
+          "finalTestOwnerSha256": "0a6420f9d7450d3237c72816b0948944632a4132e3d77236080baf7d5bd52bef",
+          "log": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-full-20261004-2.jsonl",
+          "couponOriginalQuantityRestored": true,
+          "runtimeSourceChanged": false,
+          "next": "Final required selected qualification and concrete exact evidence admission proposal."
+        },
+        "checkoutQualificationHelperListingDiagnostic20261004": {
+          "result": "Read-only helper filename listing exceeded output budget; no owner mutation.",
+          "correction": "Use exact discovered helper paths and bounded individual results."
+        },
+        "checkoutQualificationReviewReady20261004": {
+          "state": "local_verified_pending_exact_six_path_admission_and_git_checkpoint",
+          "reproducedFailures": 25,
+          "repairedFailures": 25,
+          "fullCheckoutPassed": 156,
+          "analysisExitCode": 0,
+          "selectedDistinctCases": 1096,
+          "selectedReferences": 1156,
+          "selectedFiles": 54,
+          "sourceSha256": "2dee0c458aa861cc74acf0e28af4207a9f344090a7ac484322eeb2f53f06e0d1",
+          "testOwnerSha256": "0a6420f9d7450d3237c72816b0948944632a4132e3d77236080baf7d5bd52bef",
+          "archivePath": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-review-package-20261004-1/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-EVIDENCE.zip",
+          "archiveSha256": "5e0f20ad1b0293df62f47d80f924128609355bfced432b9fc81375de950a9dd0",
+          "archiveBytes": 89377,
+          "architectReview": "Facts-only review accepted test-only correction subject to selected success, exact evidence admission and checkpoint gates.",
+          "runtimeChanged": false,
+          "newVisualCaptures": false,
+          "nativeQualification": false,
+          "backendProvider": "deferred",
+          "workspace": "Codex after integration",
+          "formalClosure": "Inherited Git-history blocker remains.",
+          "headAndRemote": "91c1f1b0f119a3bb46ec8e3938461dc2328a6055",
+          "next": "Founder exact six-path evidence exception, qualify receipts, required checkpoint gates, scoped commit/push/clean readback."
+        },
+        "checkoutQualificationFounderApproval20261004": {
+          "instruction": "approved",
+          "context": "Founder approved the explained six exact Checkout evidence paths and gated commit/push checkpoint.",
+          "approvedDiffSha256": "b41828632649d37cef9eca48f1e1789415aa262a79e6347888df19ffc659f93b",
+          "proposal": "apps/mobile/build/t06-t07-cart-20261002/t14-checkout-evidence-admission-20261004-2.json",
+          "scope": "Exact six evidence owners and matching checker allowlist/root claim extension only; validation logic unchanged.",
+          "nativeQualification": false,
+          "newApkAuthority": false,
+          "backendProvider": "deferred"
+        },
+        "checkoutQualificationApprovedQualified20261004": {
+          "state": "durably_qualified_checkpoint_gates_next",
+          "exactSixPathExceptionApproved": true,
+          "approvedDiffSha256": "b41828632649d37cef9eca48f1e1789415aa262a79e6347888df19ffc659f93b",
+          "sourceSha256": "2dee0c458aa861cc74acf0e28af4207a9f344090a7ac484322eeb2f53f06e0d1",
+          "checkoutPassed": 156,
+          "repairedCases": 25,
+          "selectedDistinct": 1096,
+          "ledgerReferences": 1156,
+          "approvedOwners": 13,
+          "archiveSha256": "5e0f20ad1b0293df62f47d80f924128609355bfced432b9fc81375de950a9dd0",
+          "architectReview": "Facts-only reviewer found no material omission; exact13 staged owners, original evidence, working/canonical hashes and remote clean equality required.",
+          "runtimeChanged": false,
+          "nativeAcceptance": false,
+          "formalParentClosure": false
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
