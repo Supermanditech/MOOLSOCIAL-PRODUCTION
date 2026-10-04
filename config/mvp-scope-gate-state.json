@@ -1673,7 +1673,7 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Personal Buyer has consistent public Cart summary/target and locally verified separate/mixed fixture states; native current-source activation and real-provider journeys remain unresolved.",
+      "customerOutcome": "Personal Buyer has consistent public Cart summary/target and locally verified separate/mixed fixture states; native current-source activation and real-provider journeys remain unresolved. Personal Buyer hears accurate singular/plural item and pack quantities in mixed Cart offer selectors.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
       "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
@@ -1695,12 +1695,13 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse Buy screens/session/tests. Public summary target corrected; 136 focused and 1096 distinct selected host cases passed. Original routing hints preserved; empty notices suppressed and meaningful announcements tested. No native current-source, provider, blanket polish or formal closure claim. Backend deferred; workspace Codex after integration; Google separately listed.",
+      "necessityProof": "Reuse existing selector and count formatters; no new route/state owner. Six exact evidence paths founder approved; existing full selected qualification retained and re-bound only after fresh tests.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1713,7 +1714,9 @@
         "seven fresh separate/mixed Add-to-Checkout native origins",
         "public shortcut count amount and target agree; Store/Medicine scopes preserved",
         "isolated frontend Confirmation Tracking Delivered evidence; live integration deferred",
-        "design/card/intent/QR gap inventory and reduced-motion large-text checks"
+        "design/card/intent/QR gap inventory and reduced-motion large-text checks",
+        "singular and plural item/pack selector semantics at normal and 200% text",
+        "selector taps preserve mixed basket quantities and total"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1744,7 +1747,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "bounded_T14_host_qualified_native_activation_and_visual_children_unresolved",
+      "implementationState": "T14_offer_count_copy_assessed_before_source_edit",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

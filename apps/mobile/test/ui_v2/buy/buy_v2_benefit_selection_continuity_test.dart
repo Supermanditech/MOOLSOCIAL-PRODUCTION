@@ -1058,6 +1058,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final quantity in [1, 2]) {
+      testWidgets('T14 offer selector quantity $quantity at $scale text', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(320, 780));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final semantics = tester.ensureSemantics();
+        try {
+        final session = BuyV2Session(
+          core: BuySession(),
+          cartBenefitsAdapter: const ActiveTestCartBenefits(),
+        );
+        for (var i = 0; i < quantity; i++) {
+          session.addProduct('s-tomato');
+          session.addProduct('w-notebook');
+        }
+        session.openCart();
+        await openBenefitsPage(tester, session, textScale: scale);
+        final total = session.cartTotal;
+        for (final destination in ['shop', 'wholesale']) {
+          final selector = find.byKey(
+            ValueKey('buy-cart-benefit-destination-$destination'),
+          );
+          await tester.ensureVisible(selector);
+          await tester.pumpAndSettle();
+          final label = tester.getSemantics(selector).label;
+          final unit = destination == 'wholesale' ? 'pack' : 'item';
+          expect(
+            label,
+            contains('1 product, $quantity $unit${quantity == 1 ? '' : 's'},'),
+          );
+          await tester.tap(selector);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('s-tomato'), quantity);
+          expect(session.quantityFor('w-notebook'), quantity);
+          expect(session.cartTotal, total);
+          expect(session.view, BuyV2View.cart);
+          expect(tester.takeException(), isNull);
+        }
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
+  }
+
   testWidgets('inline benefits follow basket switching without leaving Cart', (
     tester,
   ) async {

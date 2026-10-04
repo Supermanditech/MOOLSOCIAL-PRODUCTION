@@ -111908,6 +111908,129 @@
           "nativeArchiveAdmission": "pending",
           "hostArchive": "preserved unchanged",
           "requiredCompletion": "Exact-owner gates and remote checkpoint readback"
+        },
+        "offerCountReadTruncation20261004": {
+          "status": "registered_before_retry",
+          "rootCause": "Combined ignored helper discovery and source read exceeded output budget.",
+          "detection": "exec_command output explicitly truncated",
+          "prevention": "Read only exact named helper in bounded independent pages; omit broad helper inventory.",
+          "evidence": "Initial command result retained; no runtime or policy edits occurred.",
+          "approvedEvidenceAdmission": "Founder explicitly approved six exact offer-count evidence paths this turn."
+        },
+        "offerCountMemoryRoot20261004": {
+          "status": "registered_before_retry",
+          "rootCause": "Memory gate invocation omitted explicit RepositoryRoot and reported registry missing despite assigned worktree registry present.",
+          "detection": "Gate exit1 before runtime edit.",
+          "prevention": "Pass literal assigned RepositoryRoot to gate; do not change checker or bypass memory validation.",
+          "evidence": "Gate output retained in tool transcript; policy admission passed claims336.",
+          "next": "Retry same gate with explicit worktree root."
+        },
+        "offerCountMemoryQuoting20261004": {
+          "status": "registered_before_retry",
+          "rootCause": "Archive-root path containing spaces was unquoted in shell command; prior invocation bound split fragment as RepositoryRoot, retry rejected positional fragment.",
+          "detection": "Parameter-binding error; no runtime edits.",
+          "prevention": "Invoke gate via Python subprocess argument array with explicit literal RepositoryRoot and EvidenceArchiveRoot. No shell path interpolation.",
+          "evidence": "Both gate outputs preserved in transcript."
+        },
+        "offerCountFocusedFailed20261004": {
+          "status": "failed_registered_before_retry",
+          "rootCause": "New rendered semantic test run exited1; root not yet diagnosed. Failure-output helper also raised cp1252 UnicodeEncodeError.",
+          "detection": "Analyzerpassed; focused machine stream exit1 retained.",
+          "prevention": "Parse bounded structured error events as ASCII JSON; diagnose before source/test retry; keep original failed stream.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-focused-1.jsonl",
+          "next": "Inspect exact machine errors and revise only demonstrated test/runtime cause."
+        },
+        "offerCountSemanticsDisposal20261004": {
+          "status": "diagnosed_before_test_retry",
+          "rootCause": "Semantics handle disposal was registered with addTearDown, which runs after Flutter end-of-test semantics verification. All quantity assertions completed but final verification rejected live handle.",
+          "detection": "All four machine print errors explicitly cite active SemanticsHandle; no label/quantity assertion failure.",
+          "prevention": "Dispose handle in test-body try/finally, matching Flutter handle lifecycle; retain failed stream and use UTF8/ASCII helper output.",
+          "evidence": "t14-offer-count-focused-1.jsonl",
+          "scope": "Test cleanup only; runtime formatter unchanged."
+        },
+        "offerCountReloadAndProgress20261004": {
+          "status": "registered_before_device_retry_after_frozen_suite_terminal",
+          "founderAuthority": "Six exact T14 OFFER COUNT evidence paths explicitly approved; applied literal root/checker owners only.",
+          "hostQualification": {
+            "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f",
+            "selectedDistinct": 1096,
+            "selectedReferences": 1156,
+            "additionalFocused": 4,
+            "failures": 0,
+            "warnings": 0
+          },
+          "hotReloadFailure": {
+            "rootCause": "Correct owned SDK attach reported code0 Reloaded0libraries; actual views source remained previous warm version.",
+            "detection": "Three actual VM source hashes rejected activation; SDK PID/forward mapping verified.",
+            "prevention": "Treat code0 as insufficient; use single guarded full Dart restart, verify authenticated saved state plus all financial fields and actual source texts; detach client on every outcome.",
+            "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-hot-reload-20261004-1.json"
+          },
+          "progressProbeFailure": {
+            "rootCause": "Complex python -c double-quote escaping through PowerShell broke string literal.",
+            "detection": "SyntaxError; test process/source/pins unaffected.",
+            "prevention": "Use literal script files or simple native reads for diagnostics; no retry while selected generation frozen.",
+            "evidence": "Tool transcript retains failed diagnostic; it was not retried."
+          },
+          "serialization": "Both incidents retained until frozen cumulative runner terminated; no further device attempt or failed diagnostic retry preceded this record.",
+          "next": "Re-run current admission then one warm-source full Dart restart; no APK/install/data reset."
+        },
+        "offerCountActivationAndGateSequence20261004": {
+          "activation": {
+            "qualified": true,
+            "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f",
+            "threeActualSourcesEqual": true,
+            "pid": 17397,
+            "savedDomainsVerified": true,
+            "financialFieldsPreserved": true,
+            "newApkInstalled": false,
+            "dataCleared": false,
+            "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-hot-restart-20261004-2.json"
+          },
+          "sequenceVariance": {
+            "rootCause": "Standalone device memory gate passed before frozen test runner finished; registry recording of failed reload refreshed coordination admission, but standalone device-phase memory was not rerun between that registry movement and the guarded restart.",
+            "detection": "Primary audit of command ordering; SDK source/state verification genuinely passed independently.",
+            "prevention": "After any registry mutation, run device memory gate using explicit quoted roots before any next device action. Freeze registry through gate and action. Do not claim later gate retroactively admitted earlier restart.",
+            "noRetroactiveAdmissionClaim": true
+          },
+          "next": "Refresh device-phase memory now, then capture and test ordinary UI. No source or gate weakening."
+        },
+        "offerCountBoundedVerified20261004": {
+          "status": "bounded_frontend_technical_verified_founder_visual_pending",
+          "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f",
+          "selectedDistinct": 1096,
+          "selectedFiles": 54,
+          "selectedReferences": 1156,
+          "additionalFocused": 4,
+          "analyzerExit": 0,
+          "nativeActions": 8,
+          "nativeFrames": 9,
+          "nativeAccessibility": {
+            "shop": "1 product, 1 item",
+            "wholesale": "1 product, 2 packs",
+            "cartCount": 3,
+            "cartTotal": 1197,
+            "bothSelectorTapsPreserved": true
+          },
+          "sourceAndPersistence": "Three actual Buy VM sources match; authenticated saved domains and financial fields preserved during guarded restart; final runtime SKU quantities1/2,addresses2,writes0,keyNull.",
+          "evidence": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-CONTRACT.json",
+          "archive": {
+            "path": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-EVIDENCE.zip",
+            "sha256": "bcc17e4849d1fb831def59ec1f8c69db66f94c409aa1361df4e91e3c55d29a05",
+            "members": 45,
+            "privateFilesExcluded": true
+          },
+          "preservation": "Prior evidence retained byte-for-byte; no Add style/totals/navigation changes; no APK/install/reset/payment/order.",
+          "limits": "Host singular packs/plural items and 200% text distinct from normal native; warm runtime differs cold APK; founder visual approval pending; inherited formal parent closure blocked; backend deferred; workspace Codex after integration; Google separate.",
+          "next": "Fresh required final gates and exact14-owner Git checkpoint, then bounded stop."
+        },
+        "offerCountCheckpointGeneratorStop20261004": {
+          "status": "registered_before_retry",
+          "rootCause": "Ignored checkpoint generator relied on an exact blank-line separator absent in existing helper; ValueError prevented generation. Following invocation then found no generated file.",
+          "detection": "Both commands exit1 before staging/commit.",
+          "prevention": "Anchor unique named def git boundary rather than newline formatting; enforce successful preparation result before dependent execution. Retain failed generator; no production helper/checker change.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-prepare-checkpoint.py",
+          "sourceUnchanged": true,
+          "nativeResultsUnaffected": true
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

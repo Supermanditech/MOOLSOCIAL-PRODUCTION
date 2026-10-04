@@ -1,0 +1,205 @@
+{
+  "state": "bounded_frontend_copy_technically_verified_founder_visual_approval_pending",
+  "actor": "Personal Buyer",
+  "capability": "Read accurate quantities in mixed Cart offer selectors",
+  "classification": "mvp_required",
+  "reason": "Incorrect spoken singular quantities misrepresent the buyer basket.",
+  "smallestCompleteChange": "Reuse existing item/pack count formatters in current selector; rendered semantics tests at normal and enlarged text; no new screen or state owner.",
+  "sourceOwners": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart"
+  ],
+  "exclusions": [
+    "Add styling",
+    "totals",
+    "navigation",
+    "supplier terms",
+    "backend",
+    "payment",
+    "APK build/install"
+  ],
+  "acceptance": [
+    "Singular/plural item and pack semantic labels",
+    "Preserved quantities and totals after selector taps",
+    "Existing selected regression cases",
+    "Current-source Redmi affected selector"
+  ],
+  "founderEvidenceRegistrationApproved": true,
+  "priorEvidencePreserved": true,
+  "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f",
+  "selectedDistinct": 1096,
+  "selectedReferences": 1156,
+  "selectedFiles": 54,
+  "additionalFocusedPassed": 4,
+  "focusedCases": [
+    {
+      "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "testName": "T14 offer selector quantity 1 at 1.0 text"
+    },
+    {
+      "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "testName": "T14 offer selector quantity 1 at 2.0 text"
+    },
+    {
+      "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "testName": "T14 offer selector quantity 2 at 1.0 text"
+    },
+    {
+      "testFile": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "testName": "T14 offer selector quantity 2 at 2.0 text"
+    }
+  ],
+  "receipts": [
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-1.jsonl",
+      "sha256": "280e07c53f0e0f48432ff9913d37faeef3f4943a6717839652134234ffc3ec82",
+      "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-2.jsonl",
+      "sha256": "95d218fc1e80f75183c2badc420ccfff68f84c88433725ecf420ebed7badb002",
+      "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-3.jsonl",
+      "sha256": "8f6d303843789d319365c894f1d6fdaf8ca0ab0c4a4bb6461643588ccf3df178",
+      "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-FOCUSED.jsonl",
+      "sha256": "33eb757ff92ccbe179c6fb56571d3298cfea499f29a27832f3ff647551ca62ee",
+      "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f"
+    }
+  ],
+  "analysis": {
+    "check": "analysis",
+    "exitCode": 0,
+    "path": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-analysis-2.jsonl",
+    "sha256": "9d5686a11e697cba37751c59a8033c50f19b83e7bbc8820f7a5f825c5c194763"
+  },
+  "nativeState": "pending_guarded_restart_after_zero_library_reload",
+  "formalClosure": false,
+  "founderVisualAcceptance": false,
+  "nativeVerification": {
+    "qualified": true,
+    "actualNativeAdd": true,
+    "shopSingularItemVerified": true,
+    "wholesalePluralPacksVerified": true,
+    "selectorTapsPreserveGlobalCountAndTotal": true,
+    "count": 3,
+    "total": 1197,
+    "finalLabel": "t14-offer-count-0-07-select-shop-20261004",
+    "actions": 7,
+    "noPaymentOrderSubmission": true,
+    "singularPackAndPluralItemCoveredByHost": true
+  },
+  "nativeSourceAndPreservation": {
+    "package": "com.moolsocial.app.cursorreview",
+    "pid": 17397,
+    "qualified": true,
+    "stage": "verified",
+    "fullRestart": true,
+    "newApkInstalled": false,
+    "dataCleared": false,
+    "sdkMappingVerified": true,
+    "sdkHostPort": 52760,
+    "sdkDevicePort": 42325,
+    "preflightStep": "_customDeliveryInstructions",
+    "reloadResult": {
+      "code": 0,
+      "message": ""
+    },
+    "exactQuantitiesPreserved": true,
+    "existingPaymentFieldsPreserved": true,
+    "completeFinancialSnapshot": true,
+    "attachExit": 0,
+    "sdkClientTerminated": true,
+    "detachRequested": true
+  },
+  "nativeCurrentSourceCore": {
+    "readOnlyCoreVm": true,
+    "currentThreeSourcesMatch": true,
+    "rows": [
+      {
+        "storeClass": "BuyV2SharedPreferencesCustomerStateStore",
+        "storeFields": [
+          "_preferences",
+          "ownerScope"
+        ],
+        "storeMethods": [
+          "read",
+          "write",
+          "_encodeSnapshot",
+          "_decodeSnapshot",
+          "_encodeAddress"
+        ],
+        "addressClass": "_GrowableList",
+        "addressKeys": [
+          "type",
+          "_vmType",
+          "class",
+          "size",
+          "identityHashCode",
+          "id",
+          "fields",
+          "kind",
+          "length",
+          "elements"
+        ],
+        "addressFields": [],
+        "addressLength": 2,
+        "cartQuantities": {
+          "buy-catalogue-dev-v1-shop-store-000001-sku-0001": 1,
+          "buy-catalogue-dev-v1-wholesale-store-000001-sku-0001": 2
+        },
+        "selectedPayment": "UPI",
+        "writesPending": 0,
+        "checkoutIdempotencyNull": true
+      }
+    ],
+    "sources": [
+      {
+        "path": "features/buy/buy_v2_session.dart",
+        "equal": true
+      },
+      {
+        "path": "ui_v2/buy/buy_v2_views.dart",
+        "equal": true
+      },
+      {
+        "path": "ui_v2/buy/buy_v2_screen.dart",
+        "equal": true
+      }
+    ]
+  },
+  "visualFrame": "native/t14-offer-count-1-01-offers-visible-20261004.png",
+  "visualFrameInspected": true,
+  "deviceTextScale": "normal only; 200% tested on host",
+  "deviceActions": 8,
+  "deviceFrames": 9,
+  "sourceActivation": "Guarded full Dart restart; hot reload code0/zero libraries failed source verification",
+  "sequencingVariance": "Standalone device memory gate was not refreshed after registry movement before guarded restart. Recorded honestly; no retroactive admission claim. Current-generation device memory passed before all subsequent UI verification.",
+  "limitations": [
+    "Warm debug runtime only; installed r66.36 APK remains older source on cold launch",
+    "Singular packs and plural items verified by host; native verified singular items and plural packs",
+    "Review data isolated; no live provider, payment, order or delivery acceptance",
+    "Backend deferred; workspace Codex after integration; Google separately listed",
+    "Inherited 0e90a6ca74b81e212f118995f7c4fab0d3b78620 still blocks formal parent closure"
+  ],
+  "sourceProvenance": [
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "testedWorkingSha256": "0cb583c09e9414682cbe78f7fef9283e1059269fb6458b9c7ce7cd6c2a27cbfb",
+      "expectedGitCanonicalSha256": "0cb583c09e9414682cbe78f7fef9283e1059269fb6458b9c7ce7cd6c2a27cbfb",
+      "allowedTransformation": "CRLF to LF only",
+      "canonicalIndependentlyTested": false
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart",
+      "testedWorkingSha256": "b74a30ec948159d893de153879c42823f452b03959bf5f37060b98957e867f4c",
+      "expectedGitCanonicalSha256": "b74a30ec948159d893de153879c42823f452b03959bf5f37060b98957e867f4c",
+      "allowedTransformation": "CRLF to LF only",
+      "canonicalIndependentlyTested": false
+    }
+  ]
+}

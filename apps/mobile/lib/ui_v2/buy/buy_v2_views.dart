@@ -22444,7 +22444,7 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
             label:
                 '${_cartDestinationLabel(session, destination)} offers, '
                 '${_productCountLabel(session.cartLines.where((line) => line.product.destination == destination).length)}, '
-                '${session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.quantity)} ${destination == BuyV2Destination.wholesale ? 'packs' : 'items'}, '
+                '${(destination == BuyV2Destination.wholesale ? _packCountLabel : _itemCountLabel)(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.quantity))}, '
                 '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.total))}',
             child: Material(
               color: Colors.transparent,
