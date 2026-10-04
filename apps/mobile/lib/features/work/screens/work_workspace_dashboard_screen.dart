@@ -11384,6 +11384,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
   WorkspaceSupplierBillGoodsAllocation? _frozen;
   WorkspaceBillGoodsReviewCancellation? _cancelAttempt;
   WorkspaceSupplierBillGoodsReview? _otherReview;
+  final _savedReviewAnchor = GlobalKey();
   String? _error, _notice;
   WorkSession get session => widget.session;
   bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
@@ -11534,6 +11535,21 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
     setState(() { _busy = false; _reviewVerified = saved; _bookRevision = session.workspacePurchaseEntryRevision;
       _uncertain = !saved;
       if (!saved) _error = session.workspaceSupplierError ?? 'Review status needs recovery. Retry saved status before changing the match.'; });
+    if (saved && mounted) {
+      FocusScope.of(context).unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_current || !_opened || _busy || !_reviewVerified ||
+            _frozen?.operationId != link.operationId || _committed ||
+            ModalRoute.of(context)?.isCurrent != true) {
+          return;
+        }
+        final anchor = _savedReviewAnchor.currentContext;
+        if (anchor != null) {
+          unawaited(Scrollable.ensureVisible(anchor, alignment: 0.15,
+            duration: const Duration(milliseconds: 200)));
+        }
+      });
+    }
   }
   Future<void> _confirm() async {
     if (!_current || _busy || !_loaded || !_reviewVerified || _frozen == null || _bookRevision == null || _ledger == null) return;
@@ -11609,10 +11625,10 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${widget.copy.draft.goods[match.billLineIndex]['name']}',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text('Invoiced: ${_ReceivingLineInput._quantity(match.billQuantityMilli)} ${match.billUnit} · '
-                'Free: ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)}'),
+              Text('Invoiced: ${_ReceivingLineInput._quantity(match.billQuantityMilli)} · '
+                'Free: ${_ReceivingLineInput._quantity(match.freeBillQuantityMilli)} · Unit: ${match.billUnit}'),
               Text('Accepted: ${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} · '
-                'Damaged: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} '
+                'Damaged: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} · Unit: '
                 '${ledger?.goodsReceipts[match.receiptId]?.lines.where((line) => line.sourceLineId == match.receiptLineId).firstOrNull?.purchaseUnit ?? match.stockUnit}'),
               Text('Receipt: ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId}'),
               if (match.billUnit != match.stockUnit || match.stockUnitsNumerator != match.stockUnitsDenominator)
@@ -11630,11 +11646,11 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
           if (pendingCopy != null) TextButton(onPressed: _busy ? null : () => widget.onOpenCopy(pendingCopy),
             child: Text('Open invoice ${pendingCopy.draft.invoiceReference}')),
         ] else if (_frozen != null) ...[
-          Text('${widget.copy.draft.goods[_frozen!.billLineIndex]['name']} · '
+          Text(key: _savedReviewAnchor, '${widget.copy.draft.goods[_frozen!.billLineIndex]['name']} · '
             '${_ReceivingLineInput._quantity(_frozen!.billQuantityMilli)} invoiced + '
-            '${_ReceivingLineInput._quantity(_frozen!.freeBillQuantityMilli)} free ${_frozen!.billUnit}'),
+            '${_ReceivingLineInput._quantity(_frozen!.freeBillQuantityMilli)} free · Unit: ${_frozen!.billUnit}'),
           Text('Accepted ${_ReceivingLineInput._quantity(_frozen!.acceptedReceiptMilli)} · '
-            'Damaged ${_ReceivingLineInput._quantity(_frozen!.damagedReceiptMilli)} '
+            'Damaged ${_ReceivingLineInput._quantity(_frozen!.damagedReceiptMilli)} · Unit: '
             '${ledger?.goodsReceipts[_frozen!.receiptId]?.lines.where((l) => l.sourceLineId == _frozen!.receiptLineId).firstOrNull?.purchaseUnit ?? ''}'),
           if (_committed) ...[
             const Text('Match confirmed · no Stock or payment change'),
@@ -11662,24 +11678,26 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             const Text('This accepted bill has no saved product links. Do not guess matches by item name; review the product mapping first.'),
           if (_item != null) ...[
             if (printedQuantitiesKnown) Text('Remaining on bill: ${_ReceivingLineInput._quantity(printedQuantity - billedLinks.fold<int>(0, (s, l) => s + l.billQuantityMilli))} invoiced, '
-              '${_ReceivingLineInput._quantity(printedFree - billedLinks.fold<int>(0, (s, l) => s + l.freeBillQuantityMilli))} free ${line!['pack']}')
+              '${_ReceivingLineInput._quantity(printedFree - billedLinks.fold<int>(0, (s, l) => s + l.freeBillQuantityMilli))} free · Unit: ${line!['pack']}')
             else const Text('Invoice quantity is unclear. Check the supplier bill before matching; it is not treated as zero.'),
             DropdownButtonFormField<(String, String)>(key: ValueKey(('work-bill-goods-receipt', _receiptKey, _item)),
-              initialValue: _receiptKey, isExpanded: true, decoration: const InputDecoration(labelText: 'Saved goods receipt'),
+              initialValue: _receiptKey, isExpanded: true, isDense: false, itemHeight: null,
+              decoration: const InputDecoration(labelText: 'Saved goods receipt'),
               items: [for (final received in _receipts) DropdownMenuItem(value: (received.$1.id, received.$2.sourceLineId),
-                child: Text('${received.$1.reference} · ${received.$1.deliveredOn} · ${received.$2.purchaseUnit}', maxLines: 2))],
+                child: Text('${received.$1.reference} · ${received.$1.deliveredOn} · ${received.$2.purchaseUnit}'))],
               onChanged: _editable ? (value) => setState(() => _chooseReceipt(value)) : null),
             if (_receipts.isEmpty) Text(hasOlderReceipt
               ? 'Goods are already recorded, but their saved review is unavailable for matching. Do not receive them again.'
               : 'No saved goods receipt for this product. Check whether Stock was already added before recording receipt.'),
             if (pair != null) ...[
               Text('Remaining receipt: ${_ReceivingLineInput._quantity(pair.$2.acceptedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.acceptedReceiptMilli))} accepted, '
-                '${_ReceivingLineInput._quantity(pair.$2.damagedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.damagedReceiptMilli))} damaged ${pair.$2.purchaseUnit}'),
+                '${_ReceivingLineInput._quantity(pair.$2.damagedMilli - receiptLinks.fold<int>(0, (s, l) => s + l.damagedReceiptMilli))} damaged · Unit: ${pair.$2.purchaseUnit}'),
               Wrap(spacing: 12, runSpacing: 8, children: [
                 _field('Invoiced qty', _quantity, 'work-bill-goods-quantity'), _field('Free qty', _free, 'work-bill-goods-free'),
                 _field('Accepted qty', _accepted, 'work-bill-goods-accepted'), _field('Damaged qty', _damaged, 'work-bill-goods-damaged'),
               ]),
-              Text('Unit conversion: 1 ${line!['pack']} = Stock units ÷ Bill units ${pair.$2.stockUnit}.'),
+              Text('Bill unit: ${line!['pack']} · Stock unit: ${pair.$2.stockUnit}. '
+                'Conversion = Stock units ÷ Bill units.'),
               Wrap(spacing: 12, children: [_field('Stock units', _numerator, 'work-bill-goods-numerator', locked: conversionLocked),
                 _field('Bill units', _denominator, 'work-bill-goods-denominator', locked: conversionLocked)]),
               CheckboxListTile(key: const Key('work-bill-goods-conversion'), contentPadding: EdgeInsets.zero,

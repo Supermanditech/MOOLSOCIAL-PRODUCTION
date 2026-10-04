@@ -6012,7 +6012,7 @@ void main() {
       await tester.tap(find.text('HOST matching delivery · $day · ${product.pack}').last); await tester.pumpAndSettle();
       expect(find.text('Stock units'), findsOneWidget);
       expect(find.text('Bill units'), findsOneWidget);
-      expect(find.text('Unit conversion: 1 $billPack = Stock units ÷ Bill units ${product.pack}.'), findsOneWidget);
+      expect(find.text('Bill unit: $billPack · Stock unit: ${product.pack}. Conversion = Stock units ÷ Bill units.'), findsOneWidget);
       expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-numerator'))).controller!.text, '1');
       expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-denominator'))).controller!.text, '1');
       if (freeText == '-') {
@@ -6094,6 +6094,8 @@ void main() {
         '${find.byKey(const Key('work-bill-goods-error')).evaluate().map((e) => (e.widget as Text).data).join()}');
       final operation = work.workspaceBillGoodsReviews.single.allocation.operationId;
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, isEmpty);
+      expect(find.byKey(const Key('work-bill-goods-confirm')).hitTestable(), findsOneWidget,
+        reason: 'Saving the review reveals confirmation after the editable fields shrink; never auto-confirms.');
       final reviewed = work.workspaceBillGoodsReviews.single.allocation.toJson();
       final closeReviewed = find.byKey(const Key('work-purchase-copy-close'));
       await reveal(closeReviewed); await tester.tap(closeReviewed); await tester.pumpAndSettle();
@@ -6144,8 +6146,8 @@ void main() {
       }
       final summary = find.byKey(ValueKey(('work-bill-goods-saved-match', operation)));
       await reveal(summary); expect(summary, findsOneWidget);
-      expect(find.descendant(of: summary, matching: find.text('Invoiced: 2 $billPack · Free: 0')), findsOneWidget);
-      expect(find.descendant(of: summary, matching: find.text('Accepted: 2 · Damaged: 0 ${product.pack}')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Invoiced: 2 · Free: 0 · Unit: $billPack')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Accepted: 2 · Damaged: 0 · Unit: ${product.pack}')), findsOneWidget);
       expect(find.descendant(of: summary, matching: find.text('Receipt: HOST matching delivery')), findsOneWidget);
       expect(find.descendant(of: summary, matching: find.text('Unit conversion: 1 $billPack = 1 ${product.pack}')),
         recoveryCase == 'different-units' ? findsOneWidget : findsNothing,
