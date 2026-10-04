@@ -13558,6 +13558,22 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     return day.isAfter(DateTime.utc(date.year, date.month, date.day))
       ? WorkspaceOpeningBillInclusion.excluded : null;
   }
+  Widget _savedBillAdjustmentRail(List<Widget> actions) {
+    if (actions.isEmpty) return const SizedBox.shrink();
+    return LayoutBuilder(builder: (context, constraints) {
+      final actionWidth = constraints.maxWidth - (actions.length > 1 ? 26 : 0) - 8;
+      return Row(key: const Key('work-purchase-adjustment-actions'), children: [
+      Expanded(child: SingleChildScrollView(key: const Key('work-purchase-adjustment-scroll'),
+        scrollDirection: Axis.horizontal, child: Row(children: [
+          for (final action in actions) Padding(padding: const EdgeInsets.only(right: 8),
+            child: ConstrainedBox(constraints: BoxConstraints(maxWidth: actionWidth < 48 ? 48 : actionWidth), child: action)),
+        ]))),
+      if (actions.length > 1) const Tooltip(message: 'Swipe actions left or right',
+        child: SizedBox(width: 26, child: Icon(Icons.swap_horiz,
+          key: Key('work-purchase-adjustment-scroll-hint'), size: 18, color: MoolColors.navy))),
+      ]);
+    });
+  }
   Widget _savedBillActions(WorkspacePurchaseSavedCopy copy) {
     final session = widget.session;
     final ready = _current && session.workspaceInvoiceHistoryLoaded &&
@@ -13651,9 +13667,9 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
               label: const Text('Record advance paid')),
         ]),
-        _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id),
+        _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id, compact: true),
       ],
-      Wrap(key: const Key('work-purchase-adjustment-actions'), spacing: 8, children: [
+      _savedBillAdjustmentRail([
       if (same && session.workspaceSupplierAllocationInputAvailable)
         TextButton.icon(
           key: const Key('work-purchase-allocate-money'),
@@ -15890,10 +15906,12 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     required this.ledger,
     this.orderId,
     this.billId,
+    this.compact = false,
   });
   final WorkSession session;
   final WorkspaceSupplierLedger? ledger;
   final String? orderId, billId;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -15917,8 +15935,14 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
         billId,
       )),
       tilePadding: EdgeInsets.zero,
-      title: const Text('Supplier account'),
-      subtitle: Text(
+      minTileHeight: compact ? 48 : null,
+      title: compact ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Supplier account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(payable == null || credit == null ? 'Full balance unavailable'
+          : credit > 0 ? 'Credit with supplier ${_purchaseAmount(credit)}'
+          : 'Amount payable ${_purchaseAmount(payable)}', style: const TextStyle(fontSize: 11)),
+      ]) : const Text('Supplier account'),
+      subtitle: compact ? null : Text(
         payable == null || credit == null
             ? 'Full balance unavailable'
             : credit > 0

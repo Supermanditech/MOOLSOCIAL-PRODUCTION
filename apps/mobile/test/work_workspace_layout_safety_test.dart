@@ -4896,12 +4896,15 @@ void main() {
           'work-purchase-record-credit', 'work-purchase-record-supplier-refund']) {
           final button = find.byKey(Key(key));
           if (button.evaluate().isEmpty) continue;
+          await tester.ensureVisible(button); await tester.pumpAndSettle();
+          final viewport = tester.getRect(find.byKey(const Key('work-purchase-adjustment-scroll')));
           final bounds = tester.getRect(button);
           expect(bounds.height, greaterThanOrEqualTo(48), reason: '$key retains its touch target');
-          expect(bounds.left, greaterThanOrEqualTo(0));
-          expect(bounds.right, lessThanOrEqualTo(display.width));
+          expect(bounds.left, greaterThanOrEqualTo(viewport.left - .01));
+          expect(bounds.right, lessThanOrEqualTo(viewport.right + .01));
+          expect(button.hitTestable(), findsOneWidget);
         }
-        expect(tester.takeException(), isNull, reason: 'Adjustment actions must wrap without overflow');
+        expect(tester.takeException(), isNull, reason: 'Each adjustment action must be fully reachable without overflow');
         if (action.evaluate().isEmpty) {
           final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
           await tester.scrollUntilVisible(action, 120, scrollable: scroll); await tester.pumpAndSettle();
@@ -5079,6 +5082,26 @@ void main() {
         }
         await tapVisible(find.descendant(of: row, matching: find.textContaining('HOST-SHORT-BILL')).first);
         final action = find.byKey(const Key('work-purchase-review-shortage'));
+        if (failure == 'none') {
+          final rail = find.byKey(const Key('work-purchase-adjustment-scroll'));
+          expect(rail, findsOneWidget);
+          expect(tester.widget<SingleChildScrollView>(rail).scrollDirection, Axis.horizontal);
+          expect(find.byKey(const Key('work-purchase-adjustment-scroll-hint')), findsOneWidget);
+          await tester.ensureVisible(rail); await tester.pumpAndSettle();
+          await tester.drag(rail, const Offset(-1800, 0)); await tester.pumpAndSettle();
+          final lastAction = find.byKey(const Key('work-purchase-record-supplier-refund'));
+          expect(lastAction.hitTestable(), findsOneWidget);
+          expect(tester.getSize(lastAction).height, greaterThanOrEqualTo(48));
+          await tester.tap(lastAction); await tester.pumpAndSettle();
+          await tapVisible(find.byKey(const Key('supplier-refund-close')));
+          expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          await tester.ensureVisible(rail); await tester.pumpAndSettle();
+          await tester.drag(rail, const Offset(1800, 0)); await tester.pumpAndSettle();
+          final firstAction = find.byKey(const Key('work-purchase-allocate-money'));
+          expect(firstAction.hitTestable(), findsOneWidget);
+          expect(tester.getSize(firstAction).height, greaterThanOrEqualTo(48));
+        }
         if (failure == 'stale-absence-no-shortage') {
           expect(form.shortageSnapshotCaptured!.isCompleted, isTrue);
           // Host-only intervening draft write. No fixture enters OPPO storage.
@@ -5134,6 +5157,10 @@ void main() {
           await tester.scrollUntilVisible(action, 120, scrollable: scroll); await tester.pumpAndSettle();
         }
         await tapVisible(action);
+        if (failure == 'none') {
+          expect(tester.getSize(find.widgetWithText(TextButton, 'Close')).height,
+            greaterThanOrEqualTo(48));
+        }
         if (failure == 'retained-no-shortage' || failure == 'draft-read-unavailable') {
           expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
           expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
