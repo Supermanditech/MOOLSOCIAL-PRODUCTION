@@ -983,6 +983,14 @@ class WorkSession extends ChangeNotifier {
       acceptedAt: confirmedAt, openingTreatment: openingTreatment,
       openingReview: openingReview);
     if (!bill.valid) {
+      final missingPackIndex = bill.copy.draft.goods.indexWhere(
+        (line) => (line['pack'] ?? '').trim().isEmpty,
+      );
+      if (missingPackIndex >= 0) {
+        return reject('Item ${missingPackIndex + 1} is missing Pack / unit. '
+            'Edit purchase, enter the pack or unit shown on the supplier bill, '
+            'then save a new reviewed copy.');
+      }
       return reject('Check the supplier invoice number, date, items and invoice total before confirming the bill.');
     }
     _supplierWrites.add(key);

@@ -8202,6 +8202,37 @@ void main() {
     expect(saved.payableMinor, 294075);
   });
 
+  test('PURCHASEPOST missing pack identifies item without posting', () async {
+    // Host-only regression fixture, not physical-device acceptance data.
+    for (final unit in ['', '   ']) {
+      final storage = _OrderJournalStorage();
+      final bill = allocatedBillFixture(unit: unit);
+      expect(bill.valid, isFalse);
+      final session = await billPostingSession(storage, bill);
+      final writes = storage.writes.length;
+      final original = bill.copy.toJson();
+      expect(await confirmBill(session, bill), isFalse);
+      expect(session.workspaceSupplierError,
+          'Item 1 is missing Pack / unit. Edit purchase, enter the pack or unit '
+          'shown on the supplier bill, then save a new reviewed copy.');
+      expect(storage.writes.length, writes);
+      expect(session.workspaceSupplierLedger(bill.copy.supplier.id)!.purchaseBills, isEmpty);
+      expect(bill.copy.toJson(), original);
+      expect(session.workspaceStockMovements, isEmpty);
+    }
+  });
+
+  test('PURCHASEPOST supplier unit is not replaced by Stock unit', () async {
+    // Different bill units require later reviewed receipt conversion, not inference.
+    final storage = _OrderJournalStorage();
+    final bill = allocatedBillFixture(unit: 'carton of 12');
+    final session = await billPostingSession(storage, bill);
+    expect(await confirmBill(session, bill), isTrue);
+    final saved = session.workspaceSupplierLedger(bill.copy.supplier.id)!;
+    expect(saved.purchaseBills[bill.billId]!.copy.draft.goods.single['pack'], 'carton of 12');
+    expect(session.workspaceStockMovements, isEmpty);
+  });
+
   test('PURCHASEPOST stale bill book and wrong scope cannot confirm', () async {
     final storage = _OrderJournalStorage();
     final bill = newBillFixture();
