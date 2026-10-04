@@ -11653,9 +11653,9 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
                 _field('Invoiced qty', _quantity, 'work-bill-goods-quantity'), _field('Free qty', _free, 'work-bill-goods-free'),
                 _field('Accepted qty', _accepted, 'work-bill-goods-accepted'), _field('Damaged qty', _damaged, 'work-bill-goods-damaged'),
               ]),
-              Text('1 ${line!['pack']} = numerator / denominator ${pair.$2.stockUnit}'),
-              Wrap(spacing: 12, children: [_field('Numerator', _numerator, 'work-bill-goods-numerator', locked: conversionLocked),
-                _field('Denominator', _denominator, 'work-bill-goods-denominator', locked: conversionLocked)]),
+              Text('Unit conversion: 1 ${line!['pack']} = Stock units ÷ Bill units ${pair.$2.stockUnit}.'),
+              Wrap(spacing: 12, children: [_field('Stock units', _numerator, 'work-bill-goods-numerator', locked: conversionLocked),
+                _field('Bill units', _denominator, 'work-bill-goods-denominator', locked: conversionLocked)]),
               CheckboxListTile(key: const Key('work-bill-goods-conversion'), contentPadding: EdgeInsets.zero,
                 value: _conversion, onChanged: _editable ? (value) => setState(() => _conversion = value ?? false) : null,
                 title: Text('I checked quantities and units (${line['pack']} → ${pair.$2.stockUnit}).')),
@@ -13486,7 +13486,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           : remaining < 0 ? 'Next: use the bill credit or record a supplier refund.'
           : 'Bill, goods matching and balance are up to date.',
           key: const Key('work-purchase-next-step'), style: const TextStyle(fontSize: 11, color: _paperMuted)),
-        if (widget.onReceiveGoods != null && progress != null)
+        if (widget.onReceiveGoods != null && progress != null &&
+            progress.matchedItems < progress.totalItems)
           TextButton.icon(key: const Key('work-purchase-bill-receive-goods'),
             onPressed: _busy ? null : () async {
               if (!await confirmLeave() || !mounted || !_current) return;

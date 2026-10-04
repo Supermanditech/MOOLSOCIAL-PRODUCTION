@@ -5838,7 +5838,8 @@ void main() {
       final entry = _OpeningPostingFixtureStore();
       final checkpoint = _LedgerCheckpointFixtureStore();
       final inventory = _ReceivingProjectionFailureFixture();
-      final work = postingOpeningFixture(entry, checkpoint, inventory: true, inventoryStore: inventory);
+      final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'matching-ui-draft-account');
+      final work = postingOpeningFixture(entry, checkpoint, inventory: true, inventoryStore: inventory, moneyStore: forms);
       final scope = work.workspaceSupplierScope!;
       final at = DateTime.now().toUtc();
       final day = at.toIso8601String().substring(0, 10);
@@ -5912,12 +5913,24 @@ void main() {
         }
       }
       await openCopy();
+      expect(find.byKey(const Key('work-purchase-bill-receive-goods')),
+        freeText == '-' ? findsNothing : findsOneWidget,
+        reason: 'Only verified, incomplete progress offers another receipt.');
+      if (freeText == '-') {
+        expect(tester.widget<Text>(find.byKey(const Key('work-purchase-goods-status'))).data,
+          'Goods · matching status unavailable');
+      }
       final item = find.byWidgetPredicate((w) => w is DropdownButtonFormField<int>).last;
       await reveal(item); await tester.tap(item); await tester.pumpAndSettle();
       await tester.tap(find.text('1. ${product.title} · ${product.pack}').last); await tester.pumpAndSettle();
       final receiving = find.byWidgetPredicate((w) => w is DropdownButtonFormField<(String, String)>);
       await reveal(receiving); await tester.tap(receiving); await tester.pumpAndSettle();
       await tester.tap(find.text('HOST matching delivery · $day · ${product.pack}').last); await tester.pumpAndSettle();
+      expect(find.text('Stock units'), findsOneWidget);
+      expect(find.text('Bill units'), findsOneWidget);
+      expect(find.text('Unit conversion: 1 ${product.pack} = Stock units ÷ Bill units ${product.pack}.'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-numerator'))).controller!.text, '1');
+      expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-denominator'))).controller!.text, '1');
       if (freeText == '-') {
         final save = find.byKey(const Key('work-bill-goods-save'));
         await reveal(save);
@@ -5990,6 +6003,10 @@ void main() {
       final summary = find.byKey(ValueKey(('work-bill-goods-saved-match', operation)));
       await reveal(summary); expect(summary, findsOneWidget);
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, hasLength(1));
+      expect(find.byKey(const Key('work-purchase-bill-receive-goods')), findsNothing,
+        reason: 'A fully matched bill must not invite another receipt; Purchases retains the main receiving action.');
+      expect(find.byKey(const Key('work-purchase-record-payment')), findsOneWidget,
+        reason: 'Goods matching must not hide the unpaid bill payment action.');
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
       expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
       expect(tester.takeException(), isNull);
