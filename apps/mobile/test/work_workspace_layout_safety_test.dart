@@ -372,6 +372,8 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   _HeldSupplierMoneyDraftStore() : super(accountScope: () => 'review-draft-account',
     storage: const FlutterSecureStorage());
   Completer<void>? nextRead;
+  WorkspaceLedgerFormKey? shortageSnapshotKey;
+  Completer<void>? shortageSnapshotCaptured, shortageSnapshotRelease;
   bool failMoneyRead = false;
   bool failShortageRead = false;
   String frozenAllocationFailure = 'none';
@@ -389,6 +391,13 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
     if (failShortageRead && key.kind == 'supplierShortage') throw StateError('HOST shortage draft read unavailable');
     if (failMoneyRead && key.kind == 'supplierMoney') throw StateError('HOST supplier money draft read unavailable');
+    if (key == shortageSnapshotKey) {
+      shortageSnapshotKey = null; // Consume before awaiting; modal reads stay live.
+      final snapshot = await super.read(key);
+      shortageSnapshotCaptured!.complete();
+      await shortageSnapshotRelease!.future;
+      return snapshot; // Deliver the actual earlier snapshot, not a fresh read.
+    }
     final gate = nextRead;
     nextRead = null;
     if (gate != null) await gate.future;
@@ -4990,7 +4999,7 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
-    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'unavailable-read', 'not-confirmed', 'no-shortage', 'retained-no-shortage', 'draft-read-unavailable']) {
+    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'unavailable-read', 'not-confirmed', 'no-shortage', 'retained-no-shortage', 'stale-absence-no-shortage', 'draft-read-unavailable']) {
       testWidgets('PURCHASESHORTAGEUI missing goods recovery $display failure=$failure', (tester) async {
         // Host-only fixtures. Never injected into evaluation phone storage.
         FlutterSecureStorage.setMockInitialValues({});
@@ -5045,6 +5054,16 @@ void main() {
               'attributionReviewed': 'false'}), expectedRevision: null);
         }
         form.failShortageRead = failure == 'draft-read-unavailable';
+        if (failure == 'stale-absence-no-shortage') {
+          form.shortageSnapshotKey = work.supplierShortageRecoveryFormKey(copy)!;
+          form.shortageSnapshotCaptured = Completer<void>();
+          form.shortageSnapshotRelease = Completer<void>();
+          addTearDown(() {
+            if (!form.shortageSnapshotRelease!.isCompleted) {
+              form.shortageSnapshotRelease!.complete();
+            }
+          });
+        }
         await mount(tester, route: '/app/work/workspace/dashboard', work: work,
           viewport: display, textScale: display.width > 500 ? 2 : 1.4);
         await openPurchaseList(tester);
@@ -5060,6 +5079,43 @@ void main() {
         }
         await tapVisible(find.descendant(of: row, matching: find.textContaining('HOST-SHORT-BILL')).first);
         final action = find.byKey(const Key('work-purchase-review-shortage'));
+        if (failure == 'stale-absence-no-shortage') {
+          expect(form.shortageSnapshotCaptured!.isCompleted, isTrue);
+          // Host-only intervening draft write. No fixture enters OPPO storage.
+          final key = work.supplierShortageRecoveryFormKey(copy)!;
+          await form.save(WorkspaceLedgerFormDraft(key: key, revision: 1,
+            fields: {'billLineIndex': '0', 'deliveryId': receipt.expectedDeliveryId,
+              'lineId': receipt.lines.single.sourceLineId, 'quantityMilli': 'input:0.',
+              'attributionReviewed': 'false'}), expectedRevision: null);
+          final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')),
+            matching: find.byType(Scrollable)).first;
+          await tester.scrollUntilVisible(action, 120, scrollable: scroll);
+          await tester.pumpAndSettle();
+          expect(find.descendant(of: action, matching: find.text('Recover shortages')), findsOneWidget);
+          await tapVisible(action);
+          expect(find.text('Saved missing qty: 0.'), findsOneWidget);
+          expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
+          await tapVisible(find.widgetWithText(TextButton, 'Close'));
+          await tester.scrollUntilVisible(action, 120, scrollable: scroll);
+          await tester.pumpAndSettle();
+          expect(find.descendant(of: action, matching: find.text('Resume shortage review')), findsOneWidget);
+          final retained = (await form.read(key))!;
+          form.shortageSnapshotRelease!.complete();
+          await tester.pumpAndSettle();
+          expect(find.descendant(of: action, matching: find.text('Resume shortage review')), findsOneWidget);
+          await tapVisible(action);
+          expect(find.text('Saved missing qty: 0.'), findsOneWidget);
+          expect((await form.read(key))!.toJson(), retained.toJson());
+          expect(retained.fields['deliveryId'], receipt.expectedDeliveryId);
+          expect(retained.fields['lineId'], receipt.lines.single.sourceLineId);
+          expect(retained.fields['quantityMilli'], 'input:0.');
+          expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
+          expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
         if (failure == 'not-confirmed' || failure == 'no-shortage') {
           final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
           for (var i = 0; i < 10; i++) {
