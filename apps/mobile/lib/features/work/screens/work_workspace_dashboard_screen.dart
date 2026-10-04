@@ -11405,6 +11405,36 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   }
 }
 
+/// Presentation only: number ambiguous choices against the complete ledger,
+/// never the filtered picker. Recorded order is not physical arrival order.
+@visibleForTesting
+String storeBillGoodsReceiptLabel(
+  Iterable<WorkspaceSupplierGoodsReceipt> receipts,
+  WorkspaceSupplierGoodsReceipt receipt,
+  WorkspaceSupplierGoodsReceiptLine line,
+) {
+  final base = '${receipt.reference} · ${receipt.deliveredOn} · ${line.purchaseUnit}';
+  final group = [
+    for (final other in receipts)
+      if (other.reference == receipt.reference && other.deliveredOn == receipt.deliveredOn)
+        for (final item in other.lines)
+          if (item.productId == line.productId && item.purchaseUnit == line.purchaseUnit)
+            (other, item),
+  ]..sort((a, b) {
+      final time = a.$1.recordedAt.compareTo(b.$1.recordedAt);
+      if (time != 0) return time;
+      final identity = a.$1.id.compareTo(b.$1.id);
+      return identity != 0 ? identity : a.$2.sourceLineId.compareTo(b.$2.sourceLineId);
+    });
+  if (group.length < 2) return base;
+  final index = group.indexWhere((pair) =>
+    pair.$1.id == receipt.id && pair.$2.sourceLineId == line.sourceLineId);
+  if (index < 0) return base;
+  return '$base\nReceipt record ${index + 1} · Receipt line totals: '
+    'Accepted ${_ReceivingLineInput._quantity(line.acceptedMilli)} ${line.purchaseUnit} · '
+    'Damaged ${_ReceivingLineInput._quantity(line.damagedMilli)} ${line.purchaseUnit}';
+}
+
 /// Matches immutable supplier records; this surface never receives Stock or pays.
 class _StoreBillGoodsMatch extends StatefulWidget {
   const _StoreBillGoodsMatch({super.key, required this.session, required this.copy,
@@ -11453,6 +11483,14 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
   }
   (WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)? get _receipt =>
     _receipts.where((pair) => (pair.$1.id, pair.$2.sourceLineId) == _receiptKey).singleOrNull;
+  String _reviewReceiptLabel(String receiptId, String lineId) {
+    final receipt = _ledger?.goodsReceipts[receiptId];
+    final line = receipt?.lines.where((item) => item.sourceLineId == lineId).firstOrNull;
+    if (receipt == null || line == null) return receipt?.reference ?? receiptId;
+    final label = storeBillGoodsReceiptLabel(_ledger!.goodsReceipts.values, receipt, line);
+    // Keep the approved compact summary for an unambiguous receipt.
+    return label.contains('\n') ? label : receipt.reference;
+  }
   @override
   void initState() { super.initState(); unawaited(_recover()); }
   @override
@@ -11677,7 +11715,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
               Text('Accepted: ${_ReceivingLineInput._quantity(match.acceptedReceiptMilli)} · '
                 'Damaged: ${_ReceivingLineInput._quantity(match.damagedReceiptMilli)} · Unit: '
                 '${ledger?.goodsReceipts[match.receiptId]?.lines.where((line) => line.sourceLineId == match.receiptLineId).firstOrNull?.purchaseUnit ?? match.stockUnit}'),
-              Text('Receipt: ${ledger?.goodsReceipts[match.receiptId]?.reference ?? match.receiptId}'),
+              Text('Receipt: ${_reviewReceiptLabel(match.receiptId, match.receiptLineId)}'),
               if (match.billUnit != match.stockUnit || match.stockUnitsNumerator != match.stockUnitsDenominator)
                 Text('Unit conversion: ${match.stockUnitsDenominator} ${match.billUnit} = '
                   '${match.stockUnitsNumerator} ${match.stockUnit}'),
@@ -11693,6 +11731,7 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
           if (pendingCopy != null) TextButton(onPressed: _busy ? null : () => widget.onOpenCopy(pendingCopy),
             child: Text('Open invoice ${pendingCopy.draft.invoiceReference}')),
         ] else if (_frozen != null) ...[
+          Text('Receipt: ${_reviewReceiptLabel(_frozen!.receiptId, _frozen!.receiptLineId)}'),
           Text(key: _savedReviewAnchor, '${widget.copy.draft.goods[_frozen!.billLineIndex]['name']} · '
             '${_ReceivingLineInput._quantity(_frozen!.billQuantityMilli)} invoiced + '
             '${_ReceivingLineInput._quantity(_frozen!.freeBillQuantityMilli)} free · Unit: ${_frozen!.billUnit}'),
@@ -11730,8 +11769,12 @@ class _StoreBillGoodsMatchState extends State<_StoreBillGoodsMatch>
             DropdownButtonFormField<(String, String)>(key: ValueKey(('work-bill-goods-receipt', _receiptKey, _item)),
               initialValue: _receiptKey, isExpanded: true, isDense: false, itemHeight: null,
               decoration: const InputDecoration(labelText: 'Saved goods receipt'),
+              selectedItemBuilder: (context) => [for (final received in _receipts)
+                if (_receiptKey == (received.$1.id, received.$2.sourceLineId))
+                  Text(storeBillGoodsReceiptLabel(ledger!.goodsReceipts.values, received.$1, received.$2))
+                else const SizedBox.shrink()],
               items: [for (final received in _receipts) DropdownMenuItem(value: (received.$1.id, received.$2.sourceLineId),
-                child: Text('${received.$1.reference} · ${received.$1.deliveredOn} · ${received.$2.purchaseUnit}'))],
+                child: Text(storeBillGoodsReceiptLabel(ledger!.goodsReceipts.values, received.$1, received.$2)))],
               onChanged: _editable ? (value) => setState(() => _chooseReceipt(value)) : null),
             if (_receipts.isEmpty) Text(hasOlderReceipt
               ? 'Goods are already recorded, but their saved review is unavailable for matching. Do not receive them again.'

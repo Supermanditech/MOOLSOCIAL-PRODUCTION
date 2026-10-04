@@ -6034,6 +6034,8 @@ void main() {
       (const Size(360, 800), false, '1', false, 'normal'),
       (const Size(360, 800), false, '0', false, 'completed-read-failure'),
       (const Size(360, 800), false, '0', false, 'different-units'),
+      (const Size(360, 800), false, '0', false, 'identical-receipts'),
+      (const Size(915, 412), false, '0', false, 'identical-receipts'),
       (const Size(360, 800), false, '0', false, 'unfinished-receiving'),
       (const Size(360, 800), false, '0', false, 'external-completion-dirty'),
       (const Size(360, 800), false, '0', false, 'settled-empty'),
@@ -6078,18 +6080,29 @@ void main() {
         lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'matching-ui-line', productId: product.id,
           productLabel: product.title, purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
           deliveredMilli: 2000, acceptedMilli: 2000, damagedMilli: 0, shortMilli: 0, expectedMilli: 2000)]);
+      final duplicateReceipt = recoveryCase == 'identical-receipts'
+        ? WorkspaceSupplierGoodsReceipt(id: 'matching-ui-receipt-2', expectedDeliveryId: 'matching-ui-delivery-2',
+          reference: receipt.reference, deliveredOn: day, recordedAt: at,
+          lines: receipt.lines) : null;
+      final purchaseRevision = duplicateReceipt == null ? 3 : 4;
       entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
-        revision: 3, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [opening],
-        goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 3, receipt: receipt)]);
+        revision: purchaseRevision, profiles: [supplier], draft: draft, copies: [copy], openingRecords: [opening],
+        goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 3, receipt: receipt),
+          if (duplicateReceipt != null) WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 4, receipt: duplicateReceipt)]);
       entry.value = WorkspacePurchaseEntryBook.fromJson(entry.value!.toJson());
       expect(await work.loadWorkspaceSuppliers(retry: true), isTrue);
-      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope, expectedRevision: 3,
+      expect(await work.confirmWorkspaceSupplierOpeningRecord(opening, scope: scope, expectedRevision: purchaseRevision,
         confirmedAt: at), isTrue, reason: work.workspaceSupplierError);
       expect(await work.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: supplier.id, scope: scope,
-        expectedPurchaseRevision: 3, expectedSupplierRevision: 1, requireSavedReview: true),
+        expectedPurchaseRevision: purchaseRevision, expectedSupplierRevision: 1, requireSavedReview: true),
         WorkspaceGoodsReceiptSaveResult.saved, reason: work.workspaceSupplierError);
-      expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope, expectedPurchaseRevision: 3,
-        expectedLedgerRevision: 2, openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at),
+      if (duplicateReceipt != null) {
+        expect(await work.confirmWorkspaceSupplierGoodsReceipt(duplicateReceipt, supplierId: supplier.id, scope: scope,
+          expectedPurchaseRevision: purchaseRevision, expectedSupplierRevision: 2, requireSavedReview: true),
+          WorkspaceGoodsReceiptSaveResult.saved, reason: work.workspaceSupplierError);
+      }
+      expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope, expectedPurchaseRevision: purchaseRevision,
+        expectedLedgerRevision: duplicateReceipt == null ? 2 : 3, openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at),
         isTrue, reason: work.workspaceSupplierError);
       final settled = recoveryCase.startsWith('settled-');
       final absentMoneyDraft = recoveryCase == 'settled-empty' || recoveryCase == 'settled-delayed';
@@ -6202,8 +6215,46 @@ void main() {
       await reveal(item); await tester.tap(item); await tester.pumpAndSettle();
       await tester.tap(find.text('1. ${product.title} · $billPack').last); await tester.pumpAndSettle();
       final receiving = find.byWidgetPredicate((w) => w is DropdownButtonFormField<(String, String)>);
-      await reveal(receiving); await tester.tap(receiving); await tester.pumpAndSettle();
-      await tester.tap(find.text('HOST matching delivery · $day · ${product.pack}').last); await tester.pumpAndSettle();
+      await reveal(receiving);
+      if (duplicateReceipt != null) {
+        expect(tester.getSize(receiving).height, lessThan(100),
+          reason: 'No selection must not reserve space for the longest receipt description.');
+      }
+      await tester.tap(receiving); await tester.pumpAndSettle();
+      final receiptLabel = storeBillGoodsReceiptLabel(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.values,
+        receipt, receipt.lines.single);
+      if (duplicateReceipt != null) {
+        final duplicateLabel = storeBillGoodsReceiptLabel(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.values,
+          duplicateReceipt, duplicateReceipt.lines.single);
+        expect(receiptLabel, contains('Receipt record 1'));
+        expect(duplicateLabel, contains('Receipt record 2'));
+        expect(duplicateLabel, contains('Accepted 2 ${product.pack}'));
+        expect(duplicateLabel, contains('Damaged 0 ${product.pack}'));
+        expect(storeBillGoodsReceiptLabel([duplicateReceipt, receipt], duplicateReceipt, duplicateReceipt.lines.single), duplicateLabel,
+          reason: 'Complete-group numbering must not depend on picker order.');
+        final choices = tester.widget<DropdownButton<(String, String)>>(find.descendant(of: receiving,
+          matching: find.byWidgetPredicate((w) => w is DropdownButton<(String, String)>))).items!;
+        expect(choices.map((choice) => choice.value), [(receipt.id, receipt.lines.single.sourceLineId),
+          (duplicateReceipt.id, duplicateReceipt.lines.single.sourceLineId)]);
+        final duplicateOption = find.text(duplicateLabel).last;
+        await tester.ensureVisible(duplicateOption); await tester.pumpAndSettle();
+        expect(duplicateOption.hitTestable(), findsOneWidget);
+        expect(tester.getRect(duplicateOption).top, greaterThanOrEqualTo(0));
+        expect(tester.getRect(duplicateOption).bottom, lessThanOrEqualTo(display.height),
+          reason: 'The complete receipt discriminator and quantities must be readable after menu scrolling.');
+        await tester.tap(duplicateOption); await tester.pumpAndSettle();
+        expect(tester.widget<DropdownButtonFormField<(String, String)>>(receiving).initialValue,
+          (duplicateReceipt.id, duplicateReceipt.lines.single.sourceLineId));
+        expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, isEmpty);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+        await reveal(receiving); await tester.tap(receiving); await tester.pumpAndSettle();
+      }
+      final receiptOption = find.text(receiptLabel).last;
+      await tester.ensureVisible(receiptOption); await tester.pumpAndSettle();
+      expect(receiptOption.hitTestable(), findsOneWidget);
+      expect(tester.getRect(receiptOption).top, greaterThanOrEqualTo(0));
+      expect(tester.getRect(receiptOption).bottom, lessThanOrEqualTo(display.height));
+      await tester.tap(receiptOption); await tester.pumpAndSettle();
       expect(find.text('Stock units'), findsOneWidget);
       expect(find.text('Bill units'), findsOneWidget);
       expect(find.text('Bill unit: $billPack · Stock unit: ${product.pack}. Conversion = Stock units ÷ Bill units.'), findsOneWidget);
@@ -6342,7 +6393,13 @@ void main() {
       await reveal(summary); expect(summary, findsOneWidget);
       expect(find.descendant(of: summary, matching: find.text('Invoiced: 2 · Free: 0 · Unit: $billPack')), findsOneWidget);
       expect(find.descendant(of: summary, matching: find.text('Accepted: 2 · Damaged: 0 · Unit: ${product.pack}')), findsOneWidget);
-      expect(find.descendant(of: summary, matching: find.text('Receipt: HOST matching delivery')), findsOneWidget);
+      expect(find.descendant(of: summary, matching: find.text('Receipt: ${duplicateReceipt == null ? receipt.reference : receiptLabel}')), findsOneWidget);
+      if (duplicateReceipt != null) {
+        expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations.values.single.receiptId, receipt.id);
+        expect(storeBillGoodsReceiptLabel(work.workspaceSupplierLedger(supplier.id)!.goodsReceipts.values,
+          duplicateReceipt, duplicateReceipt.lines.single), contains('Receipt record 2'),
+          reason: 'Matching the first receipt must not renumber the complete-group second receipt.');
+      }
       expect(find.descendant(of: summary, matching: find.text('Unit conversion: 1 $billPack = 1 ${product.pack}')),
         recoveryCase == 'different-units' ? findsOneWidget : findsNothing,
         reason: 'Equal units need no repeated 1:1 wording; different units retain the reviewed conversion.');
