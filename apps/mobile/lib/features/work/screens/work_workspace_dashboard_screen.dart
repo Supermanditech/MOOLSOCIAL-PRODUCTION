@@ -13521,14 +13521,34 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           if (session.workspaceSupplierMoneyInputAvailable)
           TextButton.icon(key: const Key('work-purchase-record-payment'),
             onPressed: _busy ? null : () async {
-              if (!await confirmLeave() || !mounted) return;
+              if (!await confirmLeave() || !mounted || !_current) return;
+              final currentLedger = session.workspaceSupplierLedger(copy.supplier.id);
+              final currentBill = currentLedger?.purchaseBills[copy.draft.id];
+              if (currentBill == null || jsonEncode(currentBill.copy.toJson()) != jsonEncode(copy.toJson())) {
+                await _load(retry: true);
+                return;
+              }
               await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(
                 supplierId: copy.supplier.id,
-                copy: ledger.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
+                copy: currentLedger!.manualBillRemainingMinor(copy.draft.id) == null ? null : copy));
               if (mounted && _current) await _load(retry: true);
             }, icon: const Icon(Icons.payments_outlined, size: 18),
             label: Text(ledger.manualBillRemainingMinor(copy.draft.id) == null
-              ? 'Record account payment' : 'Record payment')),
+              ? 'Record account payment' : remaining! <= 0 ? 'Bill payment details' : 'Record payment')),
+          if (session.workspaceSupplierMoneyInputAvailable && remaining != null && remaining <= 0)
+            TextButton.icon(key: const Key('work-purchase-record-advance'),
+              onPressed: _busy ? null : () async {
+                if (!await confirmLeave() || !mounted || !_current) return;
+                final currentBill = session.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id];
+                if (currentBill == null || jsonEncode(currentBill.copy.toJson()) != jsonEncode(copy.toJson())) {
+                  await _load(retry: true);
+                  return;
+                }
+                await _showSupplierMoneyEntry(context, session,
+                  _StoreSupplierMoneyTarget(supplierId: copy.supplier.id, advance: true));
+                if (mounted && _current) await _load(retry: true);
+              }, icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+              label: const Text('Record advance paid')),
         ]),
         _StoreSupplierLedgerSummary(session: session, ledger: ledger, billId: copy.draft.id),
       ],
@@ -29973,7 +29993,10 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   bool get expense => widget.purchase == null && widget.supplierMoney == null;
   bool get manualMoney => widget.supplierMoney != null;
   WorkspaceSupplierLedger? get moneyLedger => widget.session.workspaceSupplierLedger(widget.supplierMoney?.supplierId ?? '');
-  String get title => manualMoney ? widget.supplierMoney!.advance
+  bool get _settledBillInput => manualMoney && widget.supplierMoney!.copy != null &&
+    moneyRecovered && draft.ready && !draft.busy && draft.error == null &&
+    frozen == null && billBalance != null && billBalance! <= 0;
+  String get title => _settledBillInput ? 'Bill payment details' : manualMoney ? widget.supplierMoney!.advance
       ? 'Record supplier advance' : 'Record supplier payment'
       : expense ? 'Record test expense' : 'Record test payment';
   int? get billBalance {
@@ -30278,7 +30301,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   Widget _paidAmountField() => TextField(
     key: Key(expense ? 'store-expense-amount' : 'supplier-payment-amount'),
     controller: amount,
-    enabled: draft.ready && !saving && (!manualMoney || (frozen == null && !conflict)),
+    enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
     decoration: const InputDecoration(labelText: 'Paid (₹)'),
     onChanged: (_) => draft.save(fields));
@@ -30322,6 +30345,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                   : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
             ),
             Text(manualMoney ? 'Evaluation record · no money is transferred.' : 'Test record only. No money is transferred.'),
+            if (_settledBillInput) const Text(
+              'No amount is due on this bill. To record extra money already paid to the supplier, close and choose Record advance paid.',
+              key: Key('supplier-money-no-bill-due')),
+            if (manualMoney && widget.supplierMoney!.advance) const Text(
+              'Record money already paid to the supplier as an advance. Link it to a bill separately.'),
             if (!expense)
               Text(
                 manualMoney && widget.supplierMoney!.advance
@@ -30349,7 +30377,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 })
                   DropdownMenuItem(value: value, child: Text(value)),
               ],
-              onChanged: !draft.ready || saving || (manualMoney && (frozen != null || conflict))
+              onChanged: !draft.ready || saving || _settledBillInput || (manualMoney && (frozen != null || conflict))
                   ? null
                   : (value) {
                       if (value != null) {
@@ -30365,23 +30393,23 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                     : 'supplier-payment-reference',
               ),
               controller: reference,
-              enabled: draft.ready && !saving && (!manualMoney || (frozen == null && !conflict)),
+              enabled: draft.ready && !saving && !_settledBillInput && (!manualMoney || (frozen == null && !conflict)),
               decoration: InputDecoration(labelText: 'Payment reference',
                 hintText: manualMoney ? 'UPI/bank reference or cash note' : null),
               onChanged: (_) => draft.save(fields),
             ),
             if (manualMoney) ...[
               TextButton.icon(key: const Key('supplier-money-date'),
-                onPressed: !draft.ready || saving || conflict || frozen != null ? null : choosePaymentDate,
+                onPressed: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : choosePaymentDate,
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
                 label: Text('Payment date · ${occurredOn.split('-').reversed.join('/')}')),
               CheckboxListTile(key: const Key('supplier-money-opening-excluded'),
                 contentPadding: EdgeInsets.zero, dense: true, value: excludedFromOpening,
                 title: const Text('Not already included in the starting balance'),
-                onChanged: !draft.ready || saving || conflict || frozen != null ? null : (value) {
+                onChanged: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : (value) {
                   setState(() => excludedFromOpening = value == true); draft.save(fields);
                 }),
-              if (frozen != null) Text(confirmed ? 'Payment recorded · ${_purchaseAmount(frozen!.entry.amountMinor)} · ${frozen!.entry.paymentMethod}'
+              if (frozen != null) Text(confirmed ? '${widget.supplierMoney!.advance ? 'Advance' : 'Payment'} recorded · ${_purchaseAmount(frozen!.entry.amountMinor)} · ${frozen!.entry.paymentMethod}'
                   : draft.pending == null && draft.error == null && draft.revision != null && !draft.busy
                     ? 'Saved payment attempt · recover and retry these same details.'
                     : 'Saved status unverified · keep this payment request and retry saving.',
@@ -30439,15 +30467,17 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 child: const Text('Retry saving input'),
               ),
             FilledButton(
+              key: manualMoney ? const Key('supplier-money-submit') : null,
               onPressed:
                   draft.ready && !saving && !draft.busy && draft.error == null &&
-                    (!manualMoney || (moneyRecovered && !conflict))
+                    !_settledBillInput && (!manualMoney || (moneyRecovered && !conflict))
                   ? manualMoney && confirmed ? recordAnother : submit
                   : null,
               child: Text(
                 saving
                     ? 'Recording…'
-                    : manualMoney ? confirmed ? 'Record another payment'
+                    : _settledBillInput ? 'No bill amount due'
+                    : manualMoney ? confirmed ? widget.supplierMoney!.advance ? 'Record another advance' : 'Record another payment'
                         : frozen != null ? 'Retry same payment' : widget.supplierMoney!.advance ? 'Record advance paid' : 'Record payment'
                     : expense
                     ? 'Record test expense'

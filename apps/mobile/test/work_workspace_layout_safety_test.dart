@@ -372,6 +372,7 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   _HeldSupplierMoneyDraftStore() : super(accountScope: () => 'review-draft-account',
     storage: const FlutterSecureStorage());
   Completer<void>? nextRead;
+  bool failMoneyRead = false;
   String frozenAllocationFailure = 'none';
   @override
   Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
@@ -385,6 +386,7 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   }
   @override
   Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    if (failMoneyRead && key.kind == 'supplierMoney') throw StateError('HOST supplier money draft read unavailable');
     final gate = nextRead;
     nextRead = null;
     if (gate != null) await gate.future;
@@ -5837,14 +5839,18 @@ void main() {
       (const Size(360, 800), false, '0', true, 'normal'),
       (const Size(360, 800), false, '1', false, 'normal'),
       (const Size(360, 800), false, '0', false, 'completed-read-failure'),
-      (const Size(360, 800), false, '0', false, 'external-completion-dirty')]) {
+      (const Size(360, 800), false, '0', false, 'external-completion-dirty'),
+      (const Size(360, 800), false, '0', false, 'settled-empty'),
+      (const Size(360, 800), false, '0', false, 'settled-retained'),
+      (const Size(915, 412), false, '0', false, 'settled-frozen'),
+      (const Size(360, 800), false, '0', false, 'settled-unavailable')]) {
     testWidgets('PURCHASEMATCHUI saved receipt match and reopen $display failedReview=$failedReview freeText="$freeText" cancel=$cancelReview recovery=$recoveryCase', (tester) async {
       // Host UI fixture; production serialization is tested separately in atomic tests.
       FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore();
       final checkpoint = _LedgerCheckpointFixtureStore();
       final inventory = _ReceivingProjectionFailureFixture();
-      final forms = SecureWorkLedgerFormDraftStore(accountScope: () => 'matching-ui-draft-account');
+      final forms = _HeldSupplierMoneyDraftStore();
       final work = postingOpeningFixture(entry, checkpoint, inventory: true, inventoryStore: inventory, moneyStore: forms);
       final scope = work.workspaceSupplierScope!;
       final at = DateTime.now().toUtc();
@@ -5884,6 +5890,29 @@ void main() {
       expect(await work.confirmWorkspacePurchaseBill(copy, scope: scope, expectedPurchaseRevision: 3,
         expectedLedgerRevision: 2, openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at),
         isTrue, reason: work.workspaceSupplierError);
+      final settled = recoveryCase.startsWith('settled-');
+      if (settled) {
+        final before = work.workspaceSupplierLedger(supplier.id)!.revision;
+        final payment = WorkspaceSupplierLedgerEntry(operationId: work.newWorkspaceSupplierMoneyOperationId(),
+          reference: 'HOST-SETTLED-01', origin: WorkspaceSupplierEntryOrigin.manualPurchase,
+          purchaseId: copy.id, billId: draft.id, kind: WorkspaceSupplierEntryKind.payment,
+          amountMinor: 10000, paymentMethod: 'Cash', postedAt: DateTime.now().toUtc(),
+          moneyReview: WorkspaceSupplierMoneyReview(occurredOn: day, openingId: opening.id,
+            openingRevision: opening.revision, notIncludedInOpening: true));
+        expect(await work.recordWorkspaceSupplierMoney(supplier.id, accountScope: scope.$1,
+          workspaceId: scope.$2, entry: payment, expectedRevision: before), isTrue);
+        expect(work.workspaceSupplierLedger(supplier.id)!.manualBillRemainingMinor(draft.id), 0);
+        if (recoveryCase != 'settled-empty') {
+          final billKey = work.supplierMoneyFormKey(supplier.id, copy: copy)!;
+          await forms.save(WorkspaceLedgerFormDraft(key: billKey, revision: 1, fields: {
+            'amount': recoveryCase == 'settled-frozen' ? '100' : '12',
+            'reference': recoveryCase == 'settled-frozen' ? payment.reference : 'HOST-unsent-input',
+            'channel': 'Cash', 'occurredOn': day, 'notIncludedInOpening': 'true',
+            if (recoveryCase == 'settled-frozen') 'attempt': jsonEncode(
+              WorkspaceSupplierMoneyAttempt(entry: payment, expectedRevision: before).toJson()),
+          }), expectedRevision: null);
+        }
+      }
       final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
       final balance = work.workspaceSupplierLedger(supplier.id)!.balanceMinor;
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
@@ -6078,6 +6107,60 @@ void main() {
       expect(find.text('View received goods'), freeText == '1' ? findsNothing : findsOneWidget);
       expect(find.byKey(const Key('work-purchase-record-payment')), findsOneWidget,
         reason: 'Goods matching must not hide the unpaid bill payment action.');
+      if (settled) {
+        final paymentAction = find.byKey(const Key('work-purchase-record-payment'));
+        expect(find.descendant(of: paymentAction, matching: find.text('Bill payment details')), findsOneWidget);
+        final advanceAction = find.byKey(const Key('work-purchase-record-advance'));
+        expect(advanceAction, findsOneWidget);
+        forms.failMoneyRead = recoveryCase == 'settled-unavailable';
+        await reveal(paymentAction); await tester.tap(paymentAction); await tester.pumpAndSettle();
+        Future<void> revealMoney(Finder target) async {
+          await tester.ensureVisible(target); await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+        }
+        final amount = find.byKey(const Key('supplier-payment-amount'));
+        final submit = find.byKey(const Key('supplier-money-submit'));
+        if (recoveryCase == 'settled-unavailable') {
+          expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing,
+            reason: 'Failed draft recovery must not masquerade as an empty settled form.');
+          expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+          final retry = find.text('Retry opening saved input');
+          await revealMoney(retry);
+          forms.failMoneyRead = false;
+          await tester.tap(retry); await tester.pumpAndSettle();
+        }
+        await revealMoney(amount);
+        expect(tester.widget<TextField>(amount).enabled, isFalse);
+        expect(tester.widget<TextField>(amount).controller!.text,
+          recoveryCase == 'settled-frozen' ? '100' : recoveryCase == 'settled-empty' ? '' : '12');
+        if (recoveryCase == 'settled-frozen') {
+          expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing);
+          expect(find.text('Payment recorded · ₹100 · Cash'), findsOneWidget);
+          expect(tester.widget<FilledButton>(submit).onPressed, isNotNull,
+            reason: 'A confirmed frozen record is still reachable; reset is separate from new posting.');
+        } else {
+          expect(find.byKey(const Key('supplier-money-no-bill-due')), findsOneWidget);
+          expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+        }
+        final closeMoney = find.byKey(const Key('supplier-money-close'));
+        await revealMoney(closeMoney); await tester.tap(closeMoney); await tester.pumpAndSettle();
+        await reveal(advanceAction); await tester.tap(advanceAction); await tester.pumpAndSettle();
+        expect(find.text('Record supplier advance'), findsOneWidget);
+        expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing);
+        expect(tester.widget<TextField>(amount).controller!.text, '', reason: 'Advance uses its own draft, not the bill payment input.');
+        expect(tester.widget<TextField>(amount).enabled, isTrue);
+        final billKey = work.supplierMoneyFormKey(supplier.id, copy: copy)!;
+        final advanceKey = work.supplierMoneyFormKey(supplier.id, advance: true)!;
+        expect(advanceKey, isNot(billKey));
+        await revealMoney(closeMoney); await tester.tap(closeMoney); await tester.pumpAndSettle();
+        expect(work.workspaceSupplierLedger(supplier.id)!.entries.where(
+          (e) => e.kind == WorkspaceSupplierEntryKind.payment), hasLength(1));
+        expect(work.workspaceSupplierLedger(supplier.id)!.entries.where(
+          (e) => e.kind == WorkspaceSupplierEntryKind.advance), isEmpty);
+      } else {
+        expect(find.byKey(const Key('work-purchase-record-advance')), findsNothing);
+        expect(find.text('Bill payment details'), findsNothing);
+      }
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
       expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
       expect(tester.takeException(), isNull);
