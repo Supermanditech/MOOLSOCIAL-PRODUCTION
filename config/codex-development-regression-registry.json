@@ -112082,6 +112082,339 @@
           },
           "remaining": "Historicalcauseunresolved; existingCartreturnscrollobservationseparate; provider/backenddeferred, workspaceCodexafterintegration, Googleseparate; warm source distinctcoldAPK/formalparentclosure.",
           "next": "Four metadata owners checkpoint aftercurrentgates; boundedstop."
+        },
+        "t14SweepDesignReadPathError20261004": {
+          "status": "observed_nonmutating_read_failure",
+          "command": "Read root APPLE-INSPIRED-PRODUCT-DESIGN-MEMORY.md remainder",
+          "exitCode": 1,
+          "reason": "Wrong literal path; file is not at worktree root. No source or policy changed; resolve tracked exact path before retry."
+        },
+        "t14SweepMeasuredScrollAndFreight20261004": {
+          "actor": "PersonalBuyer",
+          "status": "local_scroll_verified_polish_defect_registered_before_fix",
+          "scroll": {
+            "cases": 6,
+            "scopes": [
+              "Shop",
+              "Wholesale",
+              "All"
+            ],
+            "textScales": [
+              1,
+              2
+            ],
+            "actualPixelsBefore": 120,
+            "restoredTolerancePixels": 1,
+            "quantitiesAddressTotalsPreserved": true,
+            "receipt": "apps/mobile/build/t06-t07-cart-20261002/t14-sweep-scroll-probe-1.jsonl",
+            "sha256": "1fd3bf10c1b2ae2addc4529049704ffe00506b9f1bebfc9b5d162cba6ba3c0b3",
+            "runtimeFixNeeded": false,
+            "nativeMeasurementPending": true
+          },
+          "child": {
+            "key": "T14-polish-design-freight-readability",
+            "finding": "Wholesale Cart footer overrides freight summary to 7.5 logical pixels in both normal and stacked layouts",
+            "smallestFix": "Reuse standard buyMeta style; verify normal and 200% text no overflow and reachable Checkout",
+            "owners": [
+              "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+              "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+            ]
+          }
+        },
+        "t14SweepLocalPassAndOpenChildren20261004": {
+          "local": {
+            "analyzerExit": 0,
+            "focusedPassed": 148,
+            "focusedSha256": "2b3baba4ac38824f3a08eaf5c74e2ffce0244111f161f10946515ef91772c208",
+            "sevenPreviewCases": 14,
+            "sevenIsolatedFulfilmentCases": 14,
+            "actualViewportCases": 6,
+            "freightReadabilityCases": 2,
+            "liveIntegrationProven": false
+          },
+          "diagnostics": [
+            {
+              "status": "observed_nonmutating_read_failure",
+              "path": "apps/mobile/lib/features/buy/buy_v2_payment_contracts.dart",
+              "exitCode": 1,
+              "reason": "Guessed contract path does not exist; no source changed. Retained while current qualification pins frozen; record before retrying the read."
+            },
+            {
+              "status": "observed_output_truncation",
+              "owner": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md",
+              "command": "Read first90lines",
+              "reason": "Combined output exceeded4400tokens. No completeness claim; future report reads restricted to exact heading or shorter page. Register after current frozen focused runner terminates."
+            },
+            {
+              "status": "observed_file_inventory_output_truncation",
+              "owner": "t14-host-sweep-final-20261004-1",
+              "reason": "Filename inventory exceeded1700-token output. No archive completeness claim; verify members via machine manifest."
+            }
+          ],
+          "children": {
+            "deliveredCopyHierarchy": {
+              "key": "T14-polish-delivered-estimate-hierarchy",
+              "status": "registered_frontend_copy_review_pending",
+              "finding": "Host Delivered header presents missing historical delivery estimate more prominently than completed status. Historical provenance must remain truthful; no timestamp invention.",
+              "evidence": "t14-host-sweep-final-20261004-1/t14-frontend-Wholesale-2.0-0-wholesale-delivered.png"
+            },
+            "wholesaleDelivery": {
+              "key": "T14-wholesale-delivery-review",
+              "status": "backend_provider_deferred",
+              "hooks": "Existing promise, address, delivery eligibility adapters; check-delivery retry and unavailable states tested",
+              "workspaceOwner": "Codex after integration"
+            },
+            "paymentQR": {
+              "key": "T14-payment-fields-intent-QR",
+              "status": "provider_integration_deferred",
+              "hooks": "Existing hosted payment action, validated UPI intent and expiring QR; verification required before status confirmation",
+              "storeReceiveQr": "Codex after integration",
+              "googleDependencies": "separately listed"
+            },
+            "historicalMismatch": {
+              "key": "T14-earlier-cart-checkout-discrepancy",
+              "status": "original_cause_unresolved_prior_current_native_cases_not_reproduced"
+            },
+            "formalClosure": {
+              "key": "T14-formal-handoff",
+              "status": "inherited_history_blocker",
+              "commit": "0e90a6ca74b81e212f118995f7c4fab0d3b78620",
+              "rewriteAuthorized": false
+            },
+            "durableAdmission": {
+              "key": "T14-native-evidence-admission",
+              "status": "exact_six_sweep_paths_founder_approval_pending",
+              "diffSha256": "1857ce2ee89b663284e1ff4511fb36a2995965408befd3bfa2b5d40e539872fc"
+            }
+          }
+        },
+        "t14SweepActivationFinancialVariance20261004": {
+          "status": "source_restart_returned_zero_but_acceptance_guard_failed",
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-sweep-hot-restart-20261004-1.json",
+          "stage": "after_identity",
+          "reason": "Existing payment field changed: _checkoutPromiseSnapshot",
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "pid": 17397,
+          "action": "Stop native actions; inspect exact before/after field and saved-state provenance; do not weaken guard or repeat restart."
+        },
+        "t14SweepActivationCacheAssessment20261004": {
+          "status": "actual_source_activated_with_documented_idle_cache_variance_original_proof_remains_failed",
+          "reviewer": "retention_architect_facts_only",
+          "onlyChangedInspectedField": "_checkoutPromiseSnapshot",
+          "inspectedFields": 22,
+          "other21Equal": true,
+          "quantitiesEqual": true,
+          "savedDomainsVerified": true,
+          "sourceTrace": {
+            "initializedEmpty": "buy_v2_session.dart:6052",
+            "captureOnOpenCheckout": "buy_v2_session.dart:12133",
+            "captureCurrentFulfilmentGroups": "buy_v2_session.dart:9060",
+            "clearInvalidatesQuoteAndTerms": "buy_v2_session.dart:9068",
+            "beforeSubmissionRevalidatesCurrentFactsAndBlocksMissingOrChangedDelivery": "buy_v2_session.dart:14583-14637"
+          },
+          "interpretation": "One ephemeral idle delivery draft cache cleared at Dart process restoration to catalogue, with pending accepted-change cache null and no payment/order request. No complete financial snapshot equality claim. Independent current idle/source readback and ordinary UI replay allowed after refreshed admission; no additional restart.",
+          "strictProofQualified": false,
+          "scopeExpansion": false,
+          "backendIntegrationAccepted": false
+        },
+        "t14SweepSelectedPassNativeDiagnostics20261004": {
+          "status": "all_three_frozen_selected_batches_passed_before_registry_thaw",
+          "sourceSha256": "6a053281ec200af5259947fc5de9527f43300b3456c7487c5d91a904ce9b0160",
+          "selectedDistinct": 1096,
+          "selectedReferences": 1156,
+          "files": 54,
+          "batches": [
+            445,
+            376,
+            275
+          ],
+          "focusedPassed": 148,
+          "failures": 0,
+          "warnings": 0,
+          "receiptsFolder": "apps/mobile/build/t06-t07-cart-20261002/t14-sweep-selected-20261004-1",
+          "native": {
+            "sevenCasesPassed": true,
+            "steps": 115,
+            "totals": [
+              37,
+              1160,
+              37,
+              1197,
+              74,
+              1197,
+              1234
+            ],
+            "end": "Checkout review",
+            "sourceVerifiedAfterEveryCase": true,
+            "paymentOrderSubmitted": false
+          },
+          "heldDiagnosticsRegisteredBeforeRetries": [
+            {
+              "status": "native_probe_stopped_before_back_tap",
+              "proofBefore": "t14-sweep-native-scroll-before.json",
+              "pixelsBefore": 335.92040821285826,
+              "failedCapture": "t14-sweep-scroll-03-checkout-top-20261004",
+              "reason": "One upward-to-top gesture did not make header Cart control visible; exact semantic match count0. No tap occurred. Do not infer broken navigation; no retry until registered after frozen regression runner completes.",
+              "nextAction": "Inspect captured visible Checkout; if header offscreen, use measured bounded scroll to header, then actual return and compare pixels."
+            },
+            {
+              "status": "nonmutating_image_lookup_failure",
+              "path": "t14-host-sweep-final-20261004-1/t14-sweep-wholesale-freight-1.0.png",
+              "reason": "capture helper sanitizes filenames; do not guess and reread. Register after frozen qualification terminates."
+            },
+            {
+              "status": "nonmutating_read_failure",
+              "path": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-bootstrap.py",
+              "exitCode": 1,
+              "reason": "Guessed old bootstrap helper filename absent. No retry needed; preserve failure and use known admitted helper/contracts only. Source, device and policy unchanged."
+            }
+          ],
+          "correctiveExecution": "Current device memory before bounded measured header Back and Orders Cart replay; proper BUY_R663_VISUAL_CAPTURE opt-in and isolated directory for 2 freight screenshots; new provenance separate from initial focused run.",
+          "review": "retention_architect_facts_only_no_independent_source_admission",
+          "newPolicyExceptionApplied": false
+        },
+        "t14SweepFinalNativeAndDesignChildren20261004": {
+          "status": "bounded_frontend_tests_and_native_replay_verified_founder_and_exact_evidence_admission_pending",
+          "sourceSha256": "6a053281ec200af5259947fc5de9527f43300b3456c7487c5d91a904ce9b0160",
+          "nativeScroll": {
+            "beforePixels": 335.92040821285826,
+            "afterPixels": 335.92040821285826,
+            "actualPositionVerified": true,
+            "scope": "all",
+            "headerBackTapped": true,
+            "quantity": 4,
+            "total": 1234,
+            "initialFailedProbePreserved": true
+          },
+          "ordersCart": {
+            "actualNativeVerified": true,
+            "quantity": 4,
+            "total": 1234,
+            "selectedCorrectly": true
+          },
+          "freight": {
+            "standardStyleFontSize": 10,
+            "oldFontSize": 7.5,
+            "localFitCases": 2,
+            "nativeNormalVisuallyInspected": true,
+            "hostNormalAnd200PercentVisuallyInspected": true,
+            "visualReceiptSha256": "87bb175fbb7b0b0dcf87a295afa21da2218a2c6142f17080a5f4393cddb2c523"
+          },
+          "children": {
+            "hostInstructionCapture": {
+              "key": "T14-host-instruction-label-capture",
+              "state": "unresolved_capture_quality",
+              "finding": "New normal host freight image renders Add instructions as black glyph rectangles; actual native label is readable. Do not infer production defect or accept that image region."
+            },
+            "collapsedContext": {
+              "key": "T14-cart-collapse-context",
+              "state": "coverage_followup_not_confirmed_product_defect",
+              "finding": "Default expanded viewport verified; Cart benefits expansion state across remount and semantic viewport after collapse not measured. Existing view initializes benefitsExpanded=true."
+            },
+            "deliveredHierarchy": {
+              "key": "T14-polish-delivered-estimate-hierarchy",
+              "state": "registered_frontend_copy_review_pending"
+            },
+            "nativePaymentDelivered": {
+              "state": "provider_backend_integration_deferred",
+              "hostFixtures": "14 complete isolated fulfilment cases at normal/200%",
+              "liveProof": false
+            },
+            "nativeEvidenceAdmission": {
+              "state": "founder_exact_six_sweep_paths_approval_pending",
+              "applied": false
+            },
+            "formalHandoff": {
+              "state": "inherited_non_atomic_history_blocker_preserved"
+            }
+          },
+          "nativeFinal": {
+            "view": "cart",
+            "destination": "orders",
+            "quantity": 4,
+            "itemAmount": 1234,
+            "addresses": 2,
+            "writesPending": 0,
+            "checkoutIdempotencyNull": true,
+            "paymentReferenceNull": true,
+            "submission": "idle",
+            "sourceThreeMatches": true
+          },
+          "qualifiedCheckpoint": false,
+          "noPaymentOrderSubmitted": true,
+          "reviewer": "retention_architect_facts_only"
+        },
+        "t14SweepArchiveSizeBeforeFix20261004": {
+          "childKey": "T14-evidence-archive-size",
+          "status": "concrete_local_packaging_issue_registered_before_fix",
+          "archive": "apps/mobile/build/t06-t07-cart-20261002/t14-sweep-local-evidence-20261004-1.zip",
+          "bytes": 109493335,
+          "sha256": "ddd82395bbbc11165525d52745e8673c624f054e057adeb4e2d41f0d22db8e39",
+          "verifiedLogicalMembers": 750,
+          "githubRegularBlobLimitBytes": 104857600,
+          "primarySource": "https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github",
+          "exactDuplicateMembers": 171,
+          "compressedDuplicateBytes": 15797034,
+          "smallestFix": "Preserve full original archive; create standard-deflate ZIP of unique unchanged byte payloads with checksum/length/storedAs manifest for every logical path. Validate each alias reconstructs original bytes. No LFS/config change, no evidence deletion, no new admitted owner path.",
+          "durableExceptionPending": true
+        },
+        "t14SweepArchiveVerifiedReviewBoundary20261004": {
+          "childKey": "T14-evidence-archive-size",
+          "status": "resolved_local_packaging_durable_admission_still_pending",
+          "archive": "apps/mobile/build/t06-t07-cart-20261002/t14-sweep-local-evidence-20261004-2.zip",
+          "sha256": "52b605ea4bf2599df63fb83bd29d5ff368c5c1f885c460e0575b07a5c9eefa27",
+          "bytes": 93688290,
+          "zipMembers": 581,
+          "originalLogicalMembers": 750,
+          "exactLogicalPathManifest": "LOGICAL-PATHS.json",
+          "allOriginalBytesVerified": true,
+          "originalArchivePreserved": {
+            "sha256": "ddd82395bbbc11165525d52745e8673c624f054e057adeb4e2d41f0d22db8e39",
+            "bytes": 109493335
+          },
+          "standardDeflate": true,
+          "underGitHub100MiB": true,
+          "privateSDKAndSavedStateExcluded": true,
+          "sourceSha256": "6a053281ec200af5259947fc5de9527f43300b3456c7487c5d91a904ce9b0160",
+          "founderVisualApproval": false,
+          "exactSixOwnerApproval": false,
+          "policyExceptionUnapplied": true,
+          "qualifiedSourceCheckpoint": false,
+          "workflowState": "bounded_review_stop_after_final_readonly_gates_goal_remains_active_awaiting_exact_evidence_and_founder_visual_approval"
+        },
+        "t14SweepReviewAuditImmutableProof20261004": {
+          "status": "readback_verified_prior_to_protective_existing_proof_stop",
+          "reason": "Existing single-use final-preservation helper was mistakenly rerun. It verified branch, remote, exact six dirty owners and source fingerprint, then rejected rewriting the existing immutable proof. No proof/source/device/policy exception changed.",
+          "correction": "Use nonwriting readback only; verify preserved archive hashes and prior receipts. No repeating Flutter/device journey or bypassing pending exact evidence approval.",
+          "sourceSha256": "6a053281ec200af5259947fc5de9527f43300b3456c7487c5d91a904ce9b0160",
+          "head": "8ef144b77b74111991673c970c3094f838c6740a",
+          "gateSequencingVariance": "This turn's readback preceded the renewed coordination pass; no source/device/evidence mutation occurred. Renewed coordination passed before recording and further audit.",
+          "founderApprovalReceived": false
+        },
+        "t14SweepReviewAuditPowerShellQuoting20261004": {
+          "status": "read_only_audit_command_rejected_before_python_execution",
+          "reason": "Complex python -c quoting was truncated by PowerShell at nested string. No source, device, prior proof or policy exception changed.",
+          "correctiveAction": "Literal ignored Python file for read-only archive/hash and scope audit; never rerun the single-use writer or complex quoted command.",
+          "reviewer": "retention_architect_facts_only_requested_repeated_error",
+          "founderApprovalReceived": false
+        },
+        "boundedSweepFounderApproval20261004": {
+          "approval": "Founder annotated 'Approve the six-path evidence exception and the Redmi visuals; resume' and instructed 'go ahead'.",
+          "approvedDiffSha256": "1857ce2ee89b663284e1ff4511fb36a2995965408befd3bfa2b5d40e539872fc",
+          "redmiVisualsApproved": true,
+          "scope": "Exact six-path durable evidence exception and tested Redmi visuals; backend/provider/Google/APK/formal-history boundaries remain deferred."
+        },
+        "boundedSweepDurableQualification20261004": {
+          "sourceSha256": "6a053281ec200af5259947fc5de9527f43300b3456c7487c5d91a904ce9b0160",
+          "founderApprovalRecorded": true,
+          "qualifiedFocused": 148,
+          "qualifiedSelectedDistinct": 1096,
+          "qualifiedLedgerReferences": 1156,
+          "archiveSha256": "52b605ea4bf2599df63fb83bd29d5ff368c5c1f885c460e0575b07a5c9eefa27",
+          "nativeSevenJourneysVerified": true,
+          "childrenAndDeferredIntegration": "Preserved in bounded-sweep contract and T14 handoff. Formal parent ticket not closed; inherited history unchanged.",
+          "checkpoint": "Await required final gates and exact fourteen-owner commit/push."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {

@@ -9480,7 +9480,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                 if (session.cartScope == BuyV2CartScope.wholesale)
                   Text(
                     freightSummary,
-                    style: context.buyMeta.copyWith(fontSize: 7.5),
+                    style: context.buyMeta,
                   ),
                 const SizedBox(height: 7),
                 review,
@@ -9498,7 +9498,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                     if (session.cartScope == BuyV2CartScope.wholesale)
                       Text(
                         freightSummary,
-                        style: context.buyMeta.copyWith(fontSize: 7.5),
+                        style: context.buyMeta,
                       ),
                   ],
                 ),

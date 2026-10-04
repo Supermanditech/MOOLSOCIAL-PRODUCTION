@@ -2753,6 +2753,89 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final scope in [
+      BuyV2CartScope.shop,
+      BuyV2CartScope.wholesale,
+      BuyV2CartScope.all,
+    ]) {
+      testWidgets('T14 actual Cart viewport returns ${scope.name} text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.addProduct('s-tomato');
+        session.addProduct('w-notebook');
+        session.openCart(scope: scope);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final cartScrollable = find.descendant(
+          of: find.byKey(const ValueKey('buy-cart-scroll')),
+          matching: find.byType(Scrollable),
+        ).first;
+        var position = tester.state<ScrollableState>(cartScrollable).position;
+        expect(position.maxScrollExtent, greaterThan(120));
+        position.jumpTo(120);
+        await tester.pumpAndSettle();
+        final offset = position.pixels;
+        final total = session.scopedPayableTotal;
+        final address = session.selectedAddress.id;
+        await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        final returnCart = find.byKey(const ValueKey('buy-checkout-return-cart'));
+        await tester.ensureVisible(returnCart);
+        await tester.pumpAndSettle();
+        await tester.tap(returnCart);
+        await tester.pumpAndSettle();
+        position = tester.state<ScrollableState>(cartScrollable).position;
+        expect(position.pixels, closeTo(offset, 1));
+        expect(session.cartScope, scope);
+        expect(session.scopedPayableTotal, total);
+        expect(session.selectedAddress.id, address);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T14 Wholesale freight remains readable text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('w-notebook');
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final freight = find.textContaining('GST invoice at checkout');
+      expect(freight, findsOneWidget);
+      final text = tester.widget<Text>(freight);
+      expect(text.style!.fontSize, greaterThanOrEqualTo(10));
+      expect(text.maxLines, isNull);
+      final checkout = find.widgetWithText(FilledButton, 'Checkout');
+      expect(tester.getRect(checkout).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(freight).bottom, lessThanOrEqualTo(800));
+      await captureR66Visual(tester, 't14-sweep-wholesale-freight-$scale');
+      await tester.tap(checkout);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('visible Checkout return restores every exact Cart scope', (
     tester,
   ) async {

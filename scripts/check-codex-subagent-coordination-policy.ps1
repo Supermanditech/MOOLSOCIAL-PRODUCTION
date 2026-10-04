@@ -1218,6 +1218,13 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-2.jsonl',
   'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-3.jsonl',
   'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-EVIDENCE.zip',
+  # Exact durable evidence for the founder-selected bounded Cart sweep.
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-EVIDENCE.zip',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-EVIDENCE.zip',

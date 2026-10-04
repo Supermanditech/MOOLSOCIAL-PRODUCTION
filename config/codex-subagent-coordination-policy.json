@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "1BF8C666201619E0FCFE3FA8F7B90267ACC2E1BD8EB4393916A25D39206377F4"
+    "sha256": "FD3560A42226EBA87C1EB878A0C26D433F75133D11AC898BBB11083D22EC8C22"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -369,7 +369,13 @@
         "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-2.jsonl",
         "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-3.jsonl",
-        "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-EVIDENCE.zip"
+        "docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-EVIDENCE.zip",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-CONTRACT.json",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-FOCUSED.jsonl",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-1.jsonl",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-2.jsonl",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-3.jsonl",
+        "docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-EVIDENCE.zip"
       ]
     },
     {
