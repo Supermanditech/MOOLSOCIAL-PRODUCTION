@@ -5565,6 +5565,11 @@ void main() {
       }
       final qty = find.byKey(const ValueKey(('supplier-return-accepted', 'return-ui-line')));
       final damaged = find.byKey(const ValueKey(('supplier-return-damaged', 'return-ui-line')));
+      final returnDate = tester.widget<TextField>(find.byKey(const Key('supplier-return-date')));
+      expect(returnDate.decoration!.labelText, 'Date');
+      expect(returnDate.decoration!.hintText, 'YYYY-MM-DD');
+      expect(tester.widget<TextField>(qty).decoration!.labelText, 'Stock');
+      expect(tester.widget<TextField>(damaged).decoration!.labelText, 'Damage');
       await reveal(qty); expect(tester.getSize(qty).width, lessThanOrEqualTo(110));
       await tester.enterText(qty, '1'); await reveal(damaged); await tester.enterText(damaged, '1');
       FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();

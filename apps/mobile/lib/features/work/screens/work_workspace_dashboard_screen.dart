@@ -29385,11 +29385,14 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
       return 'Remaining: ${_ReceivingLineInput._quantity(line.acceptedMilli - returns.fold<int>(0, (sum, item) => sum + item.acceptedMilli))} from Stock · '
         '${_ReceivingLineInput._quantity(line.damagedMilli - returns.fold<int>(0, (sum, item) => sum + item.damagedMilli))} arrival damage ${line.purchaseUnit}';
     }
-    Widget input(String label, TextEditingController controller, Key key, {bool quantity = false}) =>
-      SizedBox(width: quantity ? 108 : 220, child: TextField(key: key, controller: controller, enabled: editable,
+    Widget input(String label, TextEditingController controller, Key key,
+        {bool quantity = false, String? hint, String? semantics}) =>
+      SizedBox(width: quantity ? 108 : 220, child: Semantics(label: semantics,
+        child: TextField(key: key, controller: controller, enabled: editable,
         keyboardType: quantity ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-        decoration: InputDecoration(labelText: label, floatingLabelBehavior: FloatingLabelBehavior.always),
-        onChanged: (_) => draft.save(fields)));
+        decoration: InputDecoration(labelText: label, hintText: hint,
+          floatingLabelBehavior: FloatingLabelBehavior.always),
+        onChanged: (_) => draft.save(fields))));
     return PopScope(canPop: !busy && !draft.busy && draft.pending == null && draft.error == null && !conflict,
       child: SafeArea(top: false, child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
@@ -29405,7 +29408,8 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
           const Text('Record goods handed back. Supplier credit and money received are recorded separately.'),
           if (newReturnBlocked) const Text('Recover the saved return before recording another goods return.'),
           Wrap(spacing: 12, runSpacing: 8, children: [input('Return reference', reference, const Key('supplier-return-reference')),
-            input('Returned date · YYYY-MM-DD', day, const Key('supplier-return-date'))]),
+            input('Date', day, const Key('supplier-return-date'), hint: 'YYYY-MM-DD',
+              semantics: 'Return date, YYYY-MM-DD')]),
           input('Reason for return', reason, const Key('supplier-return-reason')),
           for (final line in widget.receipt.lines) Padding(padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -29414,9 +29418,11 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
                 style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               Text(remaining(line), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
               Wrap(spacing: 12, runSpacing: 8, children: [
-                input('From Stock', accepted[line.sourceLineId]!, ValueKey(('supplier-return-accepted', line.sourceLineId)), quantity: true),
-                if (line.damagedMilli > 0) input('Arrival damage', damaged[line.sourceLineId]!,
-                  ValueKey(('supplier-return-damaged', line.sourceLineId)), quantity: true)]),
+                input('Stock', accepted[line.sourceLineId]!, ValueKey(('supplier-return-accepted', line.sourceLineId)),
+                  quantity: true, semantics: 'Return quantity from Stock'),
+                if (line.damagedMilli > 0) input('Damage', damaged[line.sourceLineId]!,
+                  ValueKey(('supplier-return-damaged', line.sourceLineId)), quantity: true,
+                  semantics: 'Return quantity from arrival damage')]),
             ])),
           if (frozen != null) Text(statusUnverified ? 'Return status unverified' : complete ? 'Goods returned · Stock updated' : confirmed ? 'Return recorded · verify Stock'
             : draft.pending != null || draft.error != null ? 'Review save status unverified' : 'Review saved · confirm return',
