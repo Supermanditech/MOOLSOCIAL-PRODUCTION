@@ -112532,6 +112532,33 @@
           "hotReloadThisChild": false,
           "productionAcceptance": false,
           "checkpoint": "Exact14owner gate-checked commit/push pending; preserve existing history and all deferred dependencies."
+        },
+        "deliveredHierarchyCheckpointFinalized20261004": {
+          "implementationCommit": "0a097bfb1c1a91a96eaf65a505e17d2b4a865e87",
+          "parentCommit": "df19ceb3847a060e04059fc83f78660a79a8177f",
+          "branch": "work/cursor-ui/buy-ready-20260921",
+          "sourceSha256": "9e9b9cdc24de748dfa45bac84018c3e9649bfe51db2e57fda01e46689010a7bf",
+          "approvedExactOwners": 14,
+          "mvpPassed": true,
+          "incrementalPassed": true,
+          "memoryPassed": true,
+          "preCommitPassed": true,
+          "remoteMatched": true,
+          "cleanReadbackBytes": 0,
+          "hostVisualApproval": true,
+          "broadFailuresRemain": 25,
+          "nativeDeliveredAccepted": false,
+          "hotReloadThisChild": false,
+          "productionAcceptance": false
+        },
+        "deliveredCheckpointReviewReadDiagnostic20261004": {
+          "kind": "Repeated output truncation",
+          "command": "rg bounded script/manifest review projected32 lines, original2065tokens exceeded2000token tool budget.",
+          "timing": "Checkpoint was already running with registry/source frozen. Preserved read as incomplete; no acceptance inferred from truncated text. Recorded immediately after checkpoint completion and before a new attempt.",
+          "impact": "No source/test/evidence corruption or change; all actual gate outputs were complete terminal0.",
+          "prevention": "One owner/result with bounded lines; allocate margin above anticipated output, avoid mixed long report searches.",
+          "disposition": "Metadata-only follow-up; no repeated Flutter source qualification.",
+          "mandatoryQualification": "Exact selected ledger is the pre_commit requirement. Extra broad453 run stays failed428/25; no app/full-suite acceptance or candidate promotion inferred."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
