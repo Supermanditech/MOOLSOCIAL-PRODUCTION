@@ -111423,6 +111423,44 @@
           "evidenceReport": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json",
           "checkpoint": "pending exact19 owners stage/gates/canonical-byte proof and normal push; no production acceptance",
           "architect": "facts-only final review found no additional bounded blocker; enforce terminal selected result and clear native/sequence disclosures"
+        },
+        "t14NativeResumeAuthorized20261004": {
+          "checkpoint": "c2f11428345af9ff830300600647ac5a831275bd",
+          "userAuthorization": "GO AHEA after proposed activate source on Redmi and seven real separate/mixed Cart flows",
+          "classification": "mvp_required existing Buy Cart verification",
+          "scope": "Hot reload current admitted Buy owners, verify exact active source, seven UI Add/Cart/delete/Back/Checkout flows, register bounded defects; no new APK/install/reset/real payment/integration",
+          "reuse": "Existing native/VM/admission helpers, existing READY and registered parent; no new screen/service",
+          "priorBlocker": "Earlier raw VM handshake unqualified. New authorization allows diagnosis from current process identity, not stale-endpoint blind retries",
+          "mistake": {
+            "type": "bounded_output_truncation",
+            "detection": "Combined AGENTS output exceeded tool outer budget; broad ignored-artifact rg list truncated",
+            "root": "Insufficient total output budget and unbounded artifact projection",
+            "prevention": "Independent bounded reads and exact script filename filters; no downstream device action before registered incident",
+            "recovery": "Production instruction missing ranges independently read; local relevant instructions recovered; reusable same-conversation required policy reads retained",
+            "deviceAttemptBeforeRegistration": false
+          },
+          "acceptance": "Only current-source identity plus fresh native screenshots and actual taps can qualify native; prior136/1096 host evidence unchanged; children remain if activation unavailable"
+        },
+        "t14NativeResumeDiscoveryBlocked20261004": {
+          "checkpoint": "c2f11428345af9ff830300600647ac5a831275bd",
+          "scope": "Local Android Flutter/Dart VM only; not Google Cloud VM",
+          "googleCloudAccess": false,
+          "device": "TG8HCYTGGQT885OF",
+          "package": "com.moolsocial.app.cursorreview",
+          "pid": 12433,
+          "gateResults": "memory-device,mvp,incremental,coordinator passed",
+          "readOnlyProbe": "apps/mobile/build/t06-t07-cart-20261002/t14-current-process-probe-20261004-1.json",
+          "qualified": false,
+          "discoveryFailure": "No process-bound Dart VM startup endpoint retained",
+          "root": "Current app still running but log buffer contains no process-lifetime VM startup endpoint; cannot bind auth path and service port to current process without fresh discovery",
+          "detection": "PID-bound epoch Flutter/DartVM log projection yielded no endpoint; no websocket connection/reload/state change performed",
+          "prevention": "Never combine old token with last ADB forward; verify app/VM PID lifetime and loaded source before reload",
+          "architect": "Fresh process-bound discovery preferred; stop if current identity cannot be established rather than retry stale variants",
+          "nativeCurrentSourceActive": false,
+          "sevenNativeJourneys": "not attempted on stale runtime; remain pending",
+          "noBuildInstallResetRealPayment": true,
+          "recovery": "Fresh uniquely versioned Redmi review candidate is alternative requiring explicit APK build/install authority and unchanged candidate gates; preserve installed/user state and existing evidence",
+          "founderClarification": "VM here is Dart execution runtime on Redmi, not a Google-hosted machine"
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
