@@ -1673,7 +1673,7 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Personal buyer retains actual Cart viewport, quantities, address and totals on Checkout return; readable accessible Add-to-Delivered screens expose truthful unavailable/recovery states while provider integration is deferred.",
+      "customerOutcome": "Personal buyer sees authoritative Delivered completion as the main tracking message without an obsolete missing ETA; active delivery estimates and failure/recovery actions remain intact.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
       "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
@@ -1701,7 +1701,7 @@
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse existing Cart ScrollController/session offsets, Checkout/Orders/Tracking and provider contracts. Measure actual restoration and test rendered freight text before precise fixes. Preserve accepted Add styling, product-only supplier consent, shared delivery composer, payment holds and all historical evidence. Exact sweep archive policy admission separately pending founder approval.",
+      "necessityProof": "Reuse existing BuyV2TrackingView status, existing order-progress fixtures and capture helper. Confirmed Delivered-header hierarchy defect requires only a conditional presentation change; no new screen, route, backend or data owner. Prior six-path evidence approval applies only to bounded-sweep historical evidence.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1722,7 +1722,9 @@
         "Historical composer Cancel sequence without instruction edits; no fake legacy root cause",
         "actual Cart viewport restoration for Shop Wholesale mixed at normal and enlarged text",
         "readable Wholesale freight summary without clipping Checkout",
-        "native accessible fresh journey with unresolved live payment delivery children"
+        "native accessible fresh journey with unresolved live payment delivery children",
+        "Delivered with absent or retained/revised ETA at100/200percent",
+        "Active valid missing stale ETA unchanged; refresh/support/details retained"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1753,7 +1755,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "authorized_bounded_T14_eight_group_sweep_in_progress",
+      "implementationState": "T14_delivered_header_host_approved_evidence_admitted_checkpoint_pending",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

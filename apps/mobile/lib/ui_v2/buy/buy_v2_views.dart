@@ -16758,9 +16758,16 @@ class BuyV2TrackingView extends StatelessWidget {
                   Expanded(
                     child: Text(
                       _trackingStatusLabel(order.status),
-                      style: const TextStyle(
-                        color: Color(0xFF855100),
-                        fontSize: 9,
+                      key: order.status == BuyV2OrderStatus.delivered
+                          ? ValueKey('buy-tracking-completion-${order.id}')
+                          : null,
+                      style: TextStyle(
+                        color: order.status == BuyV2OrderStatus.delivered
+                            ? BuyV2ActionStyle.foreground
+                            : const Color(0xFF855100),
+                        fontSize: order.status == BuyV2OrderStatus.delivered
+                            ? 13
+                            : 9,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -16775,17 +16782,20 @@ class BuyV2TrackingView extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                buyV2OrderArrivalSummary(session, order),
-                key: ValueKey('buy-tracking-estimate-${order.id}'),
-                style: const TextStyle(
-                  color: BuyV2ActionStyle.foreground,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+              if (order.status != BuyV2OrderStatus.delivered) ...[
+                const SizedBox(height: 3),
+                Text(
+                  buyV2OrderArrivalSummary(session, order),
+                  key: ValueKey('buy-tracking-estimate-${order.id}'),
+                  style: const TextStyle(
+                    color: BuyV2ActionStyle.foreground,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              if (order.updatedDeliveryEstimate != null) ...[
+              ],
+              if (order.status != BuyV2OrderStatus.delivered &&
+                  order.updatedDeliveryEstimate != null) ...[
                 const SizedBox(height: 2),
                 Text(
                   buyV2OrderArrivalSummary(session, order, revised: true),

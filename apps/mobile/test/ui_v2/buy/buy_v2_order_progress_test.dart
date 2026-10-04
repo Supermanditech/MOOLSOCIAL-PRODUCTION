@@ -1827,6 +1827,115 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    for (final status in [
+      BuyV2OrderStatus.delivered,
+      BuyV2OrderStatus.preparing,
+    ]) {
+      for (final estimate in ['missing', 'retained', 'revised']) {
+        testWidgets(
+          'T14 completion hierarchy ${status.name} $estimate at $scale',
+          (tester) async {
+            await tester.binding.setSurfaceSize(const Size(320, 800));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final adapter = _R669DeliveryCommerce();
+            final order = BuyV2Order(
+              id: 'completion-hierarchy',
+              destination: BuyV2Destination.shop,
+              title: 'Shop order',
+              itemSummary: '1 product',
+              total: 37,
+              partner: 'Neighbourhood Store',
+              partnerType: 'Retailer',
+              promise: estimate == 'missing' ? '' : 'Delivery in 15 min',
+              updatedDeliveryEstimate:
+                  estimate == 'revised' ? 'Delivery in 30 min' : null,
+              destinationLabel: 'Home',
+              progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
+              status: status,
+            );
+            adapter.records = [order];
+            final session = BuyV2Session(
+              core: core,
+              commerceAdapter: adapter,
+              reviewDataEnabled: false,
+            );
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            await session.restoreCommerce();
+            await tester.pumpWidget(app(session, scale));
+            expect(session.openTracking(order.id), isTrue);
+            await tester.pumpAndSettle();
+            final complete = status == BuyV2OrderStatus.delivered;
+            final heading = find.byKey(
+              ValueKey(
+                'buy-tracking-${complete ? 'completion' : 'estimate'}-${order.id}',
+              ),
+            );
+            expect(heading, findsOneWidget);
+            expect(
+              tester.widget<Text>(heading).data,
+              complete ? 'Delivered' : buyV2OrderArrivalSummary(session, order),
+            );
+            expect(
+              tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
+              isFalse,
+            );
+            expect(tester.widget<Text>(heading).style!.fontSize, 13);
+            final header = find.ancestor(
+              of: heading,
+              matching: find.byType(Container),
+            ).first;
+            if (complete) {
+              expect(
+                find.descendant(of: header, matching: find.text('Delivered')),
+                findsOneWidget,
+              );
+              expect(
+                find.descendant(
+                  of: header,
+                  matching: find.textContaining('estimate'),
+                ),
+                findsNothing,
+              );
+            } else {
+              adapter.state = BuyV2CommerceLoadState.offline;
+              expect(await session.refreshOrder(order.id), isFalse);
+              await tester.pumpAndSettle();
+              expect(
+                tester.widget<Text>(heading).data,
+                contains('update unavailable'),
+              );
+              if (estimate == 'revised') {
+                expect(
+                  find.descendant(
+                    of: header,
+                    matching: find.textContaining('Delivery in 30 min'),
+                  ),
+                  findsOneWidget,
+                );
+              }
+            }
+            expect(
+              find.byKey(ValueKey('buy-tracking-refresh-${order.id}')),
+              findsOneWidget,
+            );
+            expect(
+              find.byKey(const ValueKey('buy-tracking-return-orders')),
+              findsOneWidget,
+            );
+            expect(session.selectedOrderOrNull!.status, status);
+            expect(session.selectedOrderOrNull!.promise, order.promise);
+            await capture(tester, 't14-completion-${status.name}-$estimate-$scale');
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          },
+        );
+      }
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
     for (final scenario in const {
       'Shop': ['s-tomato'],
       'Wholesale': ['w-notebook'],

@@ -112415,6 +112415,123 @@
           "nativeSevenJourneysVerified": true,
           "childrenAndDeferredIntegration": "Preserved in bounded-sweep contract and T14 handoff. Formal parent ticket not closed; inherited history unchanged.",
           "checkpoint": "Await required final gates and exact fourteen-owner commit/push."
+        },
+        "deliveredChildPreparationDiagnostics20261004": {
+          "scope": "T14-polish-delivered-estimate-hierarchy under existing parent; no source changes",
+          "incidents": [
+            {
+              "kind": "Read-output truncation",
+              "cause": "Independent large instruction/claim outputs were combined above the tool output budget.",
+              "prevention": "Read exact owners independently in bounded non-overlapping pages; preserve prior full-read authority without claiming truncated output complete."
+            },
+            {
+              "kind": "Windows rg glob path rejection",
+              "cause": "Passed wildcard path arguments rather than rg file-selection options; command returned1 with os123.",
+              "prevention": "Discover with rg --files -g or use literal directory plus -g. Register before retry."
+            }
+          ],
+          "evidence": "Current tool exit/output; no mutation/tests/device attempted."
+        },
+        "deliveredTestOwnerReadDiagnostic20261004": {
+          "mistake": "Raw read of3770-line order-progress test truncated; mandatory STOP observed before edits/tests.",
+          "cause": "Assumed test owner fit output budget instead of checking length or bounded call-path reads.",
+          "correction": "Use rg line discovery then independent literal relevant ranges; architect review requested on repeated error.",
+          "evidence": "Tool original34625tokens returned truncation; no source/device mutation."
+        },
+        "deliveredHelperDiscoveryDiagnostic20261004": {
+          "mistake": "Attempted nonexistent t14-sweep-qualified-20261004-1.py helper; Get-Content returned1.",
+          "cause": "Inferred helper filename from similarly named receipt rather than file inventory.",
+          "prevention": "Use rg --files for actual filenames; direct known SDK/script commands only after identity checks.",
+          "impact": "Read-only failure; no source/test/device action."
+        },
+        "deliveredHeaderReviewFindings20261004": {
+          "visual": {
+            "issue": "Candidate repeats Delivered in small status and main heading.",
+            "correction": "Use one existing status Text as prominent completion heading; active ETA layout unchanged.",
+            "evidence": "t14-delivered-visual-20261004-1 delivered-missing1x and revised2x screenshots; initialpasses retained"
+          },
+          "broadTests": {
+            "passed": 428,
+            "failed": 25,
+            "receiptSha256": "6e4eb5e5275c08a367aa01bd7238f863e6e778629ae5853f468897557c8ebaef",
+            "finding": "Failures assert absent Pay labels or Dispatches in checkout before tracking; presentation-only change touches tracking header, not those paths. No baseline failure equivalence claimed.",
+            "disposition": "Register unresolved legacy checkout-test qualification child; retain original failure stream. Reuse exact selected ledger and verify all affected tracking tests. Do not label full broad suite passed."
+          }
+        },
+        "deliveredHierarchyHostReview20261004": {
+          "child": "T14-polish-delivered-estimate-hierarchy",
+          "actor": "Personal Buyer",
+          "classification": "mvp_supporting under existing mvp_required Buy parent",
+          "state": "host_verified_pending_visual_approval_and_exact_evidence_admission",
+          "sourceSha256": "9e9b9cdc24de748dfa45bac84018c3e9649bfe51db2e57fda01e46689010a7bf",
+          "analysisPassed": true,
+          "trackingPassed": 180,
+          "newRenderedCases": 12,
+          "selectedDistinctPassed": 1096,
+          "selectedReferences": 1156,
+          "selectedWarnings": 0,
+          "archive": {
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t14-delivered-local-evidence-20261004-1.zip",
+            "sha256": "92000f82379e315cd46fb1c21f2c1f680601b2ac6f338eb89360534e6171be2f",
+            "bytes": 21132414,
+            "members": 259,
+            "durableAdmission": false
+          },
+          "approvalDiffSha256": "716f6367def628be9bb8b445472de9f90b5dd1d01252d0598ffd67a2f132c644",
+          "nativeDeliveredAccepted": false,
+          "hotReloadThisChild": false,
+          "children": [
+            {
+              "key": "T14-checkout-test-qualification",
+              "actor": "Personal Buyer",
+              "classification": "mvp_required",
+              "status": "registered_unresolved_not_selected",
+              "outcome": "Checkout financial consent and dispatch copy have truthful current rendered assertions.",
+              "observedBroadRun": {
+                "passed": 428,
+                "failed": 25
+              },
+              "baselineEquivalenceProven": false,
+              "receiptSha256": "6e4eb5e5275c08a367aa01bd7238f863e6e778629ae5853f468897557c8ebaef",
+              "scope": "Failures before Tracking retained; no full broad-suite pass or fix claimed."
+            }
+          ],
+          "sequenceVariance": "Current-generation standalone memory was refreshed after header correction and before final tests; no retroactive pre-correction refresh claim.",
+          "deferred": [
+            "backend/provider",
+            "workspace Codex after integration",
+            "Google",
+            "native payment to Delivered",
+            "inherited formal parent closure"
+          ],
+          "git": "Source candidate preserved uncommitted at parent df19ceb3847a060e04059fc83f78660a79a8177f; no new policy owner applied or stale-ledger checkpoint."
+        },
+        "deliveredHierarchyFounderApproval20261004": {
+          "instruction": "approved",
+          "context": "Founder approved after explanation of host visual change and six exact child evidence paths, followed by admission, gates and scoped commit/push.",
+          "hostVisualsApproved": true,
+          "reviewedDiffSha256": "716f6367def628be9bb8b445472de9f90b5dd1d01252d0598ffd67a2f132c644",
+          "scope": "Delivered header host presentation and exact evidence admission only; 25 Checkout failures, native Delivered and provider/backend/Google/formal-close dependencies remain unresolved or deferred."
+        },
+        "deliveredHierarchyApprovedQualification20261004": {
+          "sourceSha256": "9e9b9cdc24de748dfa45bac84018c3e9649bfe51db2e57fda01e46689010a7bf",
+          "hostVisualApproved": true,
+          "exactSixPathAdmissionApplied": true,
+          "admissionDiffSha256": "716f6367def628be9bb8b445472de9f90b5dd1d01252d0598ffd67a2f132c644",
+          "analysisPassed": true,
+          "trackingPassed": 180,
+          "selectedDistinctPassed": 1096,
+          "ledgerReferences": 1156,
+          "archiveSha256": "92000f82379e315cd46fb1c21f2c1f680601b2ac6f338eb89360534e6171be2f",
+          "broadSuite": {
+            "passed": 428,
+            "failed": 25,
+            "state": "failed_retained_child_unresolved_no_baseline_equivalence_claim"
+          },
+          "nativeDeliveredAccepted": false,
+          "hotReloadThisChild": false,
+          "productionAcceptance": false,
+          "checkpoint": "Exact14owner gate-checked commit/push pending; preserve existing history and all deferred dependencies."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
