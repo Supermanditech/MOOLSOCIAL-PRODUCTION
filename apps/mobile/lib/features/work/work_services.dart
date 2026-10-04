@@ -906,6 +906,13 @@ abstract interface class WorkSupplierAllocationDraftGuard {
 abstract interface class WorkSupplierGoodsReturnDraftGuard {
   Future<bool> withFrozenSupplierGoodsReturn(WorkspaceLedgerFormKey key, String intent,
       Future<bool> Function() action);
+  Future<void> cancelUnpostedSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required WorkspaceSupplierGoodsReturnIntent intent,
+    required DateTime cancelledAt,
+    required bool Function() isCurrent,
+    required Future<bool> Function(WorkspaceSupplierGoodsReturnIntent intent) verifyUnposted,
+  });
   Future<void> resetConfirmedSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next, {
     required int expectedRevision,
     required Future<bool> Function(WorkspaceSupplierGoodsReturnIntent intent) verifyCommitted,
@@ -1005,6 +1012,34 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
   @override
   Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) =>
       _serial(_key(key), () => _read(key));
+
+  String _returnCancellationKey(WorkspaceLedgerFormKey key, String operation) =>
+      '${_key(key)}.cancelled-return.${Uri.encodeComponent(operation)}';
+
+  Future<Map<String, dynamic>?> _returnCancellation(WorkspaceLedgerFormKey key, String operation) async {
+    _check(key);
+    final raw = await _storage.read(key: _returnCancellationKey(key, operation));
+    _check(key);
+    if (raw == null) return null;
+    try {
+      final value = jsonDecode(raw);
+      if (value is! Map<String, dynamic> || value.length != 4 || value['schema'] != 1) {
+        throw const FormatException('Invalid cancellation');
+      }
+      final prior = WorkspaceLedgerFormDraft.fromJson(value['previous']);
+      final next = WorkspaceLedgerFormDraft.fromJson(value['next']);
+      final at = DateTime.tryParse(value['cancelledAt'] as String);
+      if (prior == null || next == null || prior.key != key || next.key != key ||
+          prior.supplierGoodsReturnIntent?.operationId != operation || next.supplierGoodsReturnIntent != null ||
+          next.revision != prior.revision + 1 || at == null || !at.isUtc ||
+          at.isBefore(prior.supplierGoodsReturnIntent!.requestedAt) || at.isAfter(DateTime.now().toUtc())) {
+        throw const FormatException('Invalid cancellation identity');
+      }
+      return value;
+    } on Object {
+      throw const WorkGatewayException('Saved return cancellation is unavailable. Keep the review and recover it.');
+    }
+  }
   @override
   Future<void> save(
     WorkspaceLedgerFormDraft draft, {
@@ -1013,6 +1048,10 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
     _check(draft.key);
     if (!draft.valid || draft.revision != (expectedRevision ?? 0) + 1) {
       throw const WorkGatewayException('Invoice input could not be saved.');
+    }
+    final returnIntent = draft.supplierGoodsReturnIntent;
+    if (returnIntent != null && await _returnCancellation(draft.key, returnIntent.operationId) != null) {
+      throw const WorkGatewayException('This return review was cancelled. Review corrected details as a new return.');
     }
     final previous = await _read(draft.key);
     final encoded = jsonEncode(draft.toJson());
@@ -1189,9 +1228,75 @@ class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore, WorkSu
         draft!.fields['attempt'] != intent) {
       throw const WorkGatewayException('Reopen the saved goods return before retrying.');
     }
+    if (await _returnCancellation(key, draft.supplierGoodsReturnIntent!.operationId) != null) {
+      throw const WorkGatewayException('This return review was cancelled. Recover its correction before continuing.');
+    }
     final result = await action();
     _check(key);
     return result;
+  });
+
+  @override
+  Future<void> cancelUnpostedSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next, {
+    required int expectedRevision,
+    required WorkspaceSupplierGoodsReturnIntent intent,
+    required DateTime cancelledAt,
+    required bool Function() isCurrent,
+    required Future<bool> Function(WorkspaceSupplierGoodsReturnIntent intent) verifyUnposted,
+  }) => _serial(_key(next.key), () async {
+    final key = next.key;
+    void checkScope() {
+      _check(key);
+      if (!isCurrent()) {
+        throw const WorkGatewayException('Return to the original Store to recover this review.');
+      }
+    }
+    checkScope();
+    if (key.kind != 'supplierGoodsReturn' || !next.valid || next.fields.containsKey('attempt') ||
+        next.revision != expectedRevision + 1 || !intent.valid || !cancelledAt.isUtc ||
+        cancelledAt.isBefore(intent.requestedAt) || cancelledAt.isAfter(DateTime.now().toUtc())) {
+      throw const WorkGatewayException('Return review cannot be corrected. Recover its saved status.');
+    }
+    final archive = await _returnCancellation(key, intent.operationId);
+    checkScope();
+    final previous = await _read(key), encoded = jsonEncode(next.toJson());
+    checkScope();
+    if (archive != null) {
+      final original = WorkspaceLedgerFormDraft.fromJson(archive['previous'])!;
+      if (original.revision != expectedRevision ||
+          jsonEncode(original.supplierGoodsReturnIntent!.toJson()) != jsonEncode(intent.toJson()) ||
+          jsonEncode(archive['next']) != encoded) {
+        throw const WorkGatewayException('Saved cancellation differs. Keep both reviews and recover.');
+      }
+      if (previous != null && jsonEncode(previous.toJson()) == encoded) {
+        if (!await verifyUnposted(intent)) {
+          throw const WorkGatewayException('Cancellation status is unverified. Recover the original supplier account.');
+        }
+        checkScope();
+        return;
+      }
+    }
+    if (previous?.revision != expectedRevision ||
+        jsonEncode(previous?.supplierGoodsReturnIntent?.toJson()) != jsonEncode(intent.toJson()) ||
+        !await verifyUnposted(intent)) {
+      throw const WorkGatewayException('Return is recorded or its status is unverified. Recover before correcting.');
+    }
+    checkScope();
+    if (archive == null) {
+      final cancellation = {'schema': 1, 'previous': previous!.toJson(), 'next': next.toJson(),
+        'cancelledAt': cancelledAt.toIso8601String()};
+      await _storage.write(key: _returnCancellationKey(key, intent.operationId), value: jsonEncode(cancellation));
+      checkScope();
+      final verified = await _returnCancellation(key, intent.operationId);
+      checkScope();
+      if (jsonEncode(verified) != jsonEncode(cancellation)) {
+        throw const WorkGatewayException('Cancellation save is unverified. Keep this review and retry correction.');
+      }
+    }
+    // Posting shares this form queue. The immutable archive blocks the old
+    // operation even if replacing the editable input loses its acknowledgment.
+    await _storage.write(key: _key(key), value: encoded);
+    checkScope();
   });
 
   @override

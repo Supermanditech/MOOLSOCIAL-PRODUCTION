@@ -29118,6 +29118,8 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
   final accepted = <String, TextEditingController>{}, damaged = <String, TextEditingController>{};
   WorkspaceSupplierGoodsReturnIntent? frozen;
   WorkspaceLedgerFormDraft? resetAttempt;
+  WorkspaceLedgerFormDraft? correctionAttempt;
+  DateTime? cancelledAt;
   bool busy = true, confirmed = false, complete = false, conflict = false, statusUnverified = false;
   String? error;
   WorkspaceSupplierLedger? get ledger => widget.session.workspaceSupplierLedger(widget.supplierId);
@@ -29153,6 +29155,7 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
         return;
       }
       draft.pending = null; conflict = false; error = null; complete = false; resetAttempt = null; statusUnverified = false;
+      correctionAttempt = null; cancelledAt = null;
       reference.text = saved['reference'] ?? ''; reason.text = saved['reason'] ?? '';
       day.text = saved['returnedOn']?.isNotEmpty == true ? saved['returnedOn']! : DateTime.now().toIso8601String().substring(0, 10);
       final attempt = saved['attempt'];
@@ -29242,6 +29245,32 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
     } on Object { statusUnverified = true; error = 'Return status is unverified. Keep this request and retry recovery.'; }
     finally { if (mounted) setState(() => busy = false); }
   }
+  Future<void> correctReview() async {
+    if (busy || conflict || draft.busy || draft.pending != null || draft.error != null ||
+        !draft.ready || draft.key == null || draft.revision == null || frozen == null || confirmed) {
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      correctionAttempt ??= WorkspaceLedgerFormDraft(key: draft.key!, revision: draft.revision! + 1,
+        fields: {'reference': reference.text, 'reason': reason.text, 'returnedOn': day.text,
+          'items': jsonEncode({for (final line in widget.receipt.lines)
+            line.sourceLineId: [accepted[line.sourceLineId]!.text, damaged[line.sourceLineId]!.text]})});
+      cancelledAt ??= DateTime.now().toUtc();
+      if (!await widget.session.cancelUnpostedWorkspaceSupplierGoodsReturnDraft(correctionAttempt!,
+          expectedRevision: draft.revision!, intent: frozen!, cancelledAt: cancelledAt!)) {
+        statusUnverified = true;
+        error = 'Correction status needs checking. Keep this review and retry correction or recover its saved status.';
+        return;
+      }
+      if (!mounted) return;
+      if (widget.session.supplierGoodsReturnFormKey(widget.supplierId, widget.receipt.id) != draft.key) return;
+      draft.revision = correctionAttempt!.revision;
+      draft.pending = null; draft.error = null;
+      frozen = null; confirmed = false; complete = false; statusUnverified = false; error = null;
+      correctionAttempt = null; cancelledAt = null;
+    } finally { if (mounted) setState(() => busy = false); }
+  }
   @override
   void dispose() {
     draft.removeListener(refresh); draft.dispose(); reference.dispose(); reason.dispose(); day.dispose();
@@ -29304,6 +29333,9 @@ class _StoreSupplierGoodsReturnSheetState extends State<_StoreSupplierGoodsRetur
           if (error != null || draft.error != null) Text(error ?? draft.error!,
             style: const TextStyle(color: Color(0xffa52a2a), fontSize: 12)),
           Wrap(spacing: 8, children: [
+            if (frozen != null && !confirmed) TextButton(key: const Key('supplier-return-correct'),
+              onPressed: busy || conflict || draft.busy || draft.pending != null || draft.error != null ? null : correctReview,
+              child: const Text('Cancel review to correct')),
             TextButton(key: const Key('supplier-return-confirm'), onPressed: busy || conflict || !draft.ready || newReturnBlocked ? null : submit,
               child: Text(confirmed && complete ? 'Start another return' : frozen == null ? 'Review & save return'
                 : confirmed ? 'Verify returned Stock' : 'Confirm goods returned')),

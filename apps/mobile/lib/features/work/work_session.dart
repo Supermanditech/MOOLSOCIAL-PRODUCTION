@@ -6595,6 +6595,43 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> cancelUnpostedWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision, required WorkspaceSupplierGoodsReturnIntent intent,
+      required DateTime cancelledAt}) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    final key = next.key;
+    if (!current() || key.kind != 'supplierGoodsReturn' || key.ledgerRevision != 1 ||
+        intent.accountScope != key.account || intent.workspaceId != key.store ||
+        intent.supplierId != key.customer || intent.receiptId != key.invoice ||
+        key.order != 'return-receipt:${intent.receiptId}' ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    // Fail closed even for an ID retained in another operation namespace.
+    bool containsOperation(Object? value) {
+      if (value is String) return value == intent.operationId;
+      if (value is List) return value.any(containsOperation);
+      if (value is Map) return value.keys.any(containsOperation) || value.values.any(containsOperation);
+      return false;
+    }
+    try {
+      await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).cancelUnpostedSupplierGoodsReturnDraft(
+        next, expectedRevision: expectedRevision, intent: intent, cancelledAt: cancelledAt, isCurrent: current,
+        verifyUnposted: (_) async {
+          // Called while the posting form queue is held, not from its cache.
+          final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          return current() && saved != null && saved.valid &&
+            saved.supplierLedgers[key.customer]?.goodsReceipts[key.invoice] != null &&
+            !containsOperation(saved.toJson());
+        });
+      return current();
+    } on Object {
+      showNotice('Return review is kept. Recover its saved status before correcting; recorded goods are not reversed.');
+      return false;
+    }
+  }
+
   Future<bool> resetConfirmedWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next,
       {required int expectedRevision}) async {
     final data = _storeData;

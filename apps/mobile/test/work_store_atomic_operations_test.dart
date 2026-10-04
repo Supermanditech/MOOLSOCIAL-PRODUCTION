@@ -91,6 +91,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   final writes = <String>[];
   bool failRead = false, failWrite = false;
   bool loseWriteResponseOnce = false;
+  String? loseWriteResponseKeyOnce;
   String? failWriteKey;
   String? failReadKey;
   Completer<void>? holdWrite;
@@ -123,8 +124,9 @@ class _OrderJournalStorage extends FlutterSecureStorage {
     await holdWrite?.future;
     if (failWrite || key == failWriteKey) throw StateError('test write failure');
     values[key] = value!;
-    if (loseWriteResponseOnce) {
+    if (loseWriteResponseOnce || key == loseWriteResponseKeyOnce) {
       loseWriteResponseOnce = false;
+      loseWriteResponseKeyOnce = null;
       throw StateError('Write completed but its response was lost');
     }
   }
@@ -6953,6 +6955,156 @@ void main() {
       expect((await drafts.read(key))!.supplierGoodsReturnIntent, isNull);
       expect(await restarted.recordWorkspaceSupplierGoodsReturnDraft(key, intent), isFalse);
       expect(restarted.workspaceCatalogueItems.single.stock, expectedStock);
+    });
+  }
+
+  for (final fault in ['ordinary', 'cancel-first', 'post-first', 'lost-archive-reply',
+    'lost-clear-reply', 'newer-after-lost-clear', 'missing-journal', 'corrupt-journal', 'failed-journal-read',
+    'held-store-switch', 'completed-retry-read-failure', 'completed-retry-contradiction',
+    'malformed-archive-date', 'changed-remaining-capacity']) {
+    test('PURCHASERETURNCANCEL $fault preserves original review and blocks cancelled operation', () async {
+      // Host secure-storage fixtures only; never device acceptance data.
+      final storage = _OrderJournalStorage();
+      final drafts = SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+      final opening = openingFixture(amount: 0);
+      final session = await openingPostingSession(storage, initialRecord: opening, inventory: true, moneyStore: drafts);
+      expect(await session.confirmWorkspaceSupplierOpeningRecord(opening, scope: session.workspaceSupplierScope!,
+        expectedRevision: 3, confirmedAt: DateTime.utc(2026, 10, 3)), isTrue);
+      final receipt = sessionReceipt(session);
+      expect(await session.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: opening.supplierId,
+        scope: session.workspaceSupplierScope!, expectedPurchaseRevision: 3, expectedSupplierRevision: 1),
+        WorkspaceGoodsReceiptSaveResult.saved);
+      final ledger = session.workspaceSupplierLedger(opening.supplierId)!, line = receipt.lines.single;
+      final intent = WorkspaceSupplierGoodsReturnIntent(operationId: 'cancel-reviewed-return-A',
+        accountScope: ledger.accountScope, workspaceId: ledger.workspaceId, supplierId: ledger.supplierId,
+        receiptId: receipt.id, reference: 'HOST-CORRECT-RETURN', reason: 'Packaging review', returnedOn: '2026-10-04',
+        requestedAt: DateTime.now().toUtc(), lines: [WorkspaceSupplierGoodsReturnLine(receiptLineId: line.sourceLineId,
+          productId: line.productId, productLabel: line.productLabel, purchaseUnit: line.purchaseUnit,
+          stockUnit: line.stockUnit, unitsPerPack: line.unitsPerPack, acceptedMilli: 2000, damagedMilli: 0)]);
+      final key = session.supplierGoodsReturnFormKey(opening.supplierId, receipt.id)!;
+      final original = frozenReturnDraft(key, intent);
+      await drafts.save(original, expectedRevision: null);
+      final activeKey = storage.values.keys.singleWhere((value) => value.contains('ledger-form.v1.') &&
+        !value.contains('.cancelled-return.'));
+      final next = WorkspaceLedgerFormDraft(key: key, revision: 2, fields: {
+        'reference': intent.reference, 'reason': intent.reason, 'returnedOn': intent.returnedOn,
+        'items': jsonEncode({line.sourceLineId: ['2', '0']})});
+      Future<bool> cancel() => session.cancelUnpostedWorkspaceSupplierGoodsReturnDraft(next,
+        expectedRevision: 1, intent: intent, cancelledAt: DateTime.now().toUtc());
+      Future<bool> post() => session.recordWorkspaceSupplierGoodsReturnDraft(key, intent);
+      final journalKey = storage.values.keys.singleWhere((value) => value.contains('workspace.ledger.v1.'));
+      final journalBefore = storage.values[journalKey]!;
+      if (fault == 'held-store-switch') {
+        var current = true;
+        storage.holdWrite = Completer<void>();
+        final cancelling = drafts.cancelUnpostedSupplierGoodsReturnDraft(next, expectedRevision: 1,
+          intent: intent, cancelledAt: DateTime.now().toUtc(), isCurrent: () => current,
+          verifyUnposted: (_) async => true);
+        final assertion = expectLater(cancelling, throwsA(isA<WorkGatewayException>()));
+        for (var tick = 0; tick < 30 && !storage.writes.last.contains('.cancelled-return.'); tick++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(storage.writes.last, contains('.cancelled-return.'));
+        current = false; storage.holdWrite!.complete(); await assertion; storage.holdWrite = null;
+        expect((await drafts.read(key))!.toJson(), original.toJson());
+        expect(await post(), isFalse, reason: 'Cancellation pending still blocks posting.');
+        current = true; expect(await cancel(), isTrue);
+      } else if (fault == 'changed-remaining-capacity') {
+        final other = WorkspaceSupplierGoodsReturn.fromJson({...intent.commit(
+          revision: ledger.revision + 1, at: DateTime.now().toUtc()).toJson(),
+          'operationId': 'independent-return-capacity', 'lines': [{...intent.lines.single.toJson(), 'acceptedMilli': 5000}]});
+        expect(await session.confirmWorkspaceSupplierGoodsReturned(other, scope: session.workspaceSupplierScope!,
+          expectedPurchaseRevision: 3, expectedSupplierRevision: ledger.revision), WorkspaceGoodsReceiptSaveResult.saved);
+        expect(await post(), isFalse, reason: 'Reviewed quantity is no longer available.');
+        expect(await cancel(), isTrue);
+        expect((await drafts.read(key))!.toJson(), next.toJson());
+        expect(session.workspaceCatalogueItems.single.stock, 11);
+        expect(session.workspaceSupplierLedger(opening.supplierId)!.goodsReturns.keys, ['independent-return-capacity']);
+        return;
+      } else {
+      if (fault == 'post-first') {
+        expect(await Future.wait([post(), cancel()]), [true, false]);
+        expect(storage.values.keys.where((value) => value.contains('.cancelled-return.')), isEmpty);
+        expect(session.workspaceCatalogueItems.single.stock, 14);
+        expect((await drafts.read(key))!.supplierGoodsReturnIntent!.operationId, intent.operationId);
+        return;
+      }
+      if (fault == 'cancel-first') {
+        expect(await Future.wait([cancel(), post()]), [true, false]);
+      } else {
+        if (fault == 'lost-archive-reply') storage.loseWriteResponseOnce = true;
+        if (fault == 'lost-clear-reply' || fault == 'newer-after-lost-clear') {
+          storage.loseWriteResponseKeyOnce = activeKey;
+        }
+        if (fault == 'missing-journal') storage.values.remove(journalKey);
+        if (fault == 'corrupt-journal') storage.values[journalKey] = '{unreadable';
+        if (fault == 'failed-journal-read') storage.failReadKey = journalKey;
+        expect(await cancel(), ['ordinary', 'completed-retry-read-failure', 'completed-retry-contradiction',
+          'malformed-archive-date'].contains(fault));
+        storage.failReadKey = null;
+        if (fault.contains('journal')) {
+          expect(storage.values.keys.where((value) => value.contains('.cancelled-return.')), isEmpty);
+          expect((await drafts.read(key))!.toJson(), original.toJson());
+          storage.values[journalKey] = journalBefore;
+        }
+        if (fault == 'newer-after-lost-clear') {
+          final newer = WorkspaceLedgerFormDraft(key: key, revision: 3, fields: {...next.fields, 'reason': 'Corrected reason'});
+          await drafts.save(newer, expectedRevision: 2);
+          expect(await cancel(), isFalse, reason: 'An old cancellation must not clear newer input.');
+          expect((await drafts.read(key))!.toJson(), newer.toJson());
+          expect(await post(), isFalse);
+          expect(session.workspaceCatalogueItems.single.stock, 16);
+          return;
+        }
+        if (fault == 'lost-archive-reply') {
+          expect((await drafts.read(key))!.toJson(), original.toJson());
+          expect(await post(), isFalse, reason: 'Archive blocks posting even before active input is cleared.');
+        }
+        expect(await cancel(), isTrue, reason: 'Exact cancellation must recover interrupted saves.');
+      }
+      }
+      expect(storage.values[journalKey], journalBefore);
+      expect(session.workspaceCatalogueItems.single.stock, 16);
+      expect(session.workspaceSupplierLedger(opening.supplierId)!.balanceMinor, ledger.balanceMinor);
+      final archiveKey = storage.values.keys.singleWhere((value) => value.contains('.cancelled-return.'));
+      final archiveBefore = storage.values[archiveKey]!;
+      if (fault == 'completed-retry-read-failure') {
+        storage.failReadKey = journalKey;
+        final beforeRetry = storage.writes.length;
+        expect(await cancel(), isFalse);
+        expect(storage.writes.length, beforeRetry);
+        storage.failReadKey = null;
+        expect(await cancel(), isTrue);
+      }
+      if (fault == 'completed-retry-contradiction') {
+        // Adversarial host-only low-level owner call, not a retailer path.
+        expect(await session.confirmWorkspaceSupplierGoodsReturned(intent.commit(
+          revision: ledger.revision + 1, at: DateTime.now().toUtc()), scope: session.workspaceSupplierScope!,
+          expectedPurchaseRevision: 3, expectedSupplierRevision: ledger.revision), WorkspaceGoodsReceiptSaveResult.saved);
+        final beforeRetry = storage.writes.length;
+        expect(await cancel(), isFalse);
+        expect(storage.writes.length, beforeRetry);
+        expect((await drafts.read(key))!.toJson(), next.toJson());
+        return;
+      }
+      if (fault == 'malformed-archive-date') {
+        final invalid = jsonDecode(archiveBefore) as Map<String, dynamic>;
+        invalid['cancelledAt'] = intent.requestedAt.subtract(const Duration(seconds: 1)).toIso8601String();
+        storage.values[archiveKey] = jsonEncode(invalid);
+        expect(await cancel(), isFalse); expect(await post(), isFalse);
+        expect((await drafts.read(key))!.toJson(), next.toJson());
+        storage.values[archiveKey] = archiveBefore;
+      }
+      final archive = jsonDecode(archiveBefore) as Map;
+      expect(archive['previous'], original.toJson()); expect(archive['next'], next.toJson());
+      final restartedDrafts = SecureWorkLedgerFormDraftStore(accountScope: () => 'account-A', storage: storage);
+      expect((await restartedDrafts.read(key))!.toJson(), next.toJson());
+      final restarted = await openingPostingSession(storage, inventory: true, moneyStore: restartedDrafts);
+      expect(await restarted.recordWorkspaceSupplierGoodsReturnDraft(key, intent), isFalse);
+      await expectLater(restartedDrafts.save(WorkspaceLedgerFormDraft(key: key, revision: 3, fields: original.fields),
+        expectedRevision: 2), throwsA(isA<WorkGatewayException>()), reason: 'Cancelled operations cannot be readmitted.');
+      expect(storage.values[archiveKey], archiveBefore);
+      expect(restarted.workspaceCatalogueItems.single.stock, 16);
     });
   }
 
