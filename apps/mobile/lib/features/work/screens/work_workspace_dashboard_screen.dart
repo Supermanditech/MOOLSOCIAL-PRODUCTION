@@ -64,6 +64,25 @@ String workPurchaseNextStep({required ({int totalItems, int matchedItems,
     : 'Bill, goods matching and balance are up to date.';
 }
 
+List<(int, WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)>
+    _supplierShortageOptions(WorkspacePurchaseSavedCopy copy, WorkspaceSupplierLedger account) {
+  final result = <(int, WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)>[];
+  final seen = <(int, String, String)>{};
+  final now = DateTime.now().toUtc();
+  for (var index = 0; index < copy.draft.goods.length; index++) {
+    for (final receipt in account.goodsReceipts.values) {
+      for (final line in receipt.lines) {
+        if (!seen.add((index, receipt.expectedDeliveryId, line.sourceLineId))) continue;
+        final probe = account.reviewShortageIntent(operationId: 'shortage-option-probe',
+          billId: copy.draft.id, billLineIndex: index, deliveryId: receipt.expectedDeliveryId,
+          lineId: line.sourceLineId, quantityMilli: 1, attributionReviewed: true, requestedAt: now);
+        if (probe != null) result.add((index, receipt, line));
+      }
+    }
+  }
+  return result;
+}
+
 String _formatStoreAmount(int value) {
   final negative = value < 0;
   final digits = value.abs().toString();
@@ -11846,6 +11865,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   WorkspacePurchaseEntryDraft? _original;
   WorkspacePurchaseSavedCopy? _copyAttempt;
   bool _copyVerified = false;
+  int _shortageReadGeneration = 0;
+  bool _shortageDraftKnown = false, _shortageDraftPresent = false;
   String? _copyAttemptInput;
   bool get _readOnly => widget.savedCopy != null;
   Map<String, String> get _exportLabels => {for (final e in _fieldLabels.entries)
@@ -11869,9 +11890,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   @override
   void initState() { super.initState(); unawaited(_load()); }
   Future<void> _load({bool retry = false}) async {
+    final generation = ++_shortageReadGeneration;
+    setState(() { _shortageDraftKnown = false; _shortageDraftPresent = false; });
     final session = widget.session;
     final opened = await session.loadWorkspaceSuppliers(retry: retry);
-    if (!mounted) return;
+    if (!mounted || generation != _shortageReadGeneration) return;
     if (!_current || !opened) {
       setState(() { _loading = false; _error = session.workspaceSupplierError ??
         'Your Store is unavailable. Reopen this Store to continue.'; });
@@ -11885,7 +11908,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     }
     if (copy != null) {
       await session.recoverCustomerLedger();
-      if (!mounted || !_current) return;
+      if (!mounted || !_current || generation != _shortageReadGeneration) return;
     }
     if (widget.startNew && copy == null && !session.workspacePurchaseDraftReviewed) {
       setState(() { _loading = false; _error = 'Finish and save the current purchase copy before starting another bill. Return to Purchases to resume it.'; });
@@ -11919,6 +11942,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _copyVerified = copy != null;
     if (_readOnly) _reviewFocused = true;
     setState(() { _loading = false; _error = null; });
+    if (copy != null) unawaited(_readShortageActionDraft(copy, generation));
+  }
+  Future<void> _readShortageActionDraft(WorkspacePurchaseSavedCopy copy, int generation) async {
+    final session = widget.session, key = widget.session.supplierShortageRecoveryFormKey(copy);
+    setState(() { _shortageDraftKnown = false; _shortageDraftPresent = false; });
+    if (key == null) return; // Unavailable namespace is not proof of absence.
+    try {
+      final saved = await session.readLedgerForm(key);
+      if (!mounted || !_current || generation != _shortageReadGeneration ||
+          session.supplierShortageRecoveryFormKey(copy) != key ||
+          !session.workspacePurchaseCopies.any((candidate) => candidate.id == copy.id &&
+            jsonEncode(candidate.toJson()) == jsonEncode(copy.toJson()))) { return; }
+      setState(() {
+        _shortageDraftKnown = true;
+        _shortageDraftPresent = saved != null && saved.fields.isNotEmpty;
+      });
+    } on Object {
+      // Keep recovery discoverable; failure is never an empty-draft result.
+    }
   }
   void _chooseSupplier(WorkspaceSupplierProfile p) {
     if (_supplierId != p.id) { _clearSupplierInstructions(); }
@@ -13532,6 +13574,12 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final latestExact = latest.length == 1 && jsonEncode(latest.single.toJson()) == jsonEncode(copy.toJson());
     final progress = same && !session.workspaceGoodsReceiptRecoveryPending ? ledger?.goodsProgressFor(copy) : null;
     final remaining = same ? ledger?.manualBillRemainingMinor(copy.draft.id) : null;
+    final shortageHistory = same && ledger!.shortageClaims.values.any((claim) =>
+      claim.copyId == copy.id && claim.copyRevision == copy.revision);
+    final shortageEligible = same && session.supplierShortageFormKey(copy) != null &&
+      _supplierShortageOptions(copy, ledger!).isNotEmpty;
+    final shortageUnverified = !ready || !_shortageDraftKnown;
+    final showShortage = shortageUnverified || _shortageDraftPresent || shortageHistory || shortageEligible;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(!ready ? 'Supplier account status unavailable'
         : same ? 'Bill confirmed in supplier account'
@@ -13615,16 +13663,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.link_outlined, size: 18),
           label: const Text('Link payment / credit')),
-      if (_copyVerified && session.supplierShortageRecoveryFormKey(copy) != null)
+      if (_copyVerified && showShortage && session.supplierShortageRecoveryFormKey(copy) != null)
         TextButton.icon(
           key: const Key('work-purchase-review-shortage'), onPressed: _busy ? null : () async {
             if (!await confirmLeave() || !mounted) return;
             await _showSupplierShortage(context, session, copy);
             if (mounted && _current) await _load(retry: true);
           }, icon: const Icon(Icons.inventory_2_outlined, size: 18),
-          label: Text(same && ledger!.shortageClaims.values.any((claim) =>
-            claim.copyId == copy.id && claim.copyRevision == copy.revision)
-              ? 'Shortages' : 'Short delivery')),
+          label: Text(shortageUnverified ? 'Recover shortages'
+            : _shortageDraftPresent ? 'Resume shortage review'
+            : shortageHistory ? 'Shortages' : 'Short delivery')),
       if (same && session.supplierCreditFormKey(copy) != null)
         TextButton.icon(
           key: const Key('work-purchase-record-credit'), onPressed: _busy ? null : () async {
@@ -29456,21 +29504,7 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
     final account = ledger;
     if (!recovered || !current || account == null ||
         widget.session.supplierShortageFormKey(widget.copy) != draft.key) { return const []; }
-    final result = <(int, WorkspaceSupplierGoodsReceipt, WorkspaceSupplierGoodsReceiptLine)>[];
-    final seen = <(int, String, String)>{};
-    final now = DateTime.now().toUtc();
-    for (var index = 0; index < widget.copy.draft.goods.length; index++) {
-      for (final receipt in account.goodsReceipts.values) {
-        for (final line in receipt.lines) {
-          if (!seen.add((index, receipt.expectedDeliveryId, line.sourceLineId))) continue;
-          final probe = account.reviewShortageIntent(operationId: 'shortage-option-probe', billId: widget.copy.draft.id,
-            billLineIndex: index, deliveryId: receipt.expectedDeliveryId, lineId: line.sourceLineId,
-            quantityMilli: 1, attributionReviewed: true, requestedAt: now);
-          if (probe != null) result.add((index, receipt, line));
-        }
-      }
-    }
-    return result;
+    return _supplierShortageOptions(widget.copy, account);
   }
   String optionId(int index, String delivery, String line) => jsonEncode([index, delivery, line]);
   Future<void> submit() async {
@@ -29570,6 +29604,10 @@ class _StoreSupplierShortageSheetState extends State<_StoreSupplierShortageSheet
             if (choices.isEmpty && accountReady) Text(history.isEmpty
               ? 'No missing quantity is available to review. Check the saved delivery and its expected quantity.'
               : 'No further missing quantity is available to record for this bill.'),
+            if (choices.isEmpty && quantity.text.isNotEmpty) ...[
+              Text('Saved missing qty: ${quantity.text}', key: const Key('supplier-shortage-retained-quantity')),
+              const Text('Your input is kept. Verify the saved bill and delivery before recording.'),
+            ],
             if (history.isNotEmpty) ...[
               const Text('Recorded shortages', style: TextStyle(fontWeight: FontWeight.w600)),
               for (final claim in history) Text(

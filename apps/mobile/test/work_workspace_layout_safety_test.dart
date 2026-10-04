@@ -373,6 +373,7 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
     storage: const FlutterSecureStorage());
   Completer<void>? nextRead;
   bool failMoneyRead = false;
+  bool failShortageRead = false;
   String frozenAllocationFailure = 'none';
   @override
   Future<void> save(WorkspaceLedgerFormDraft draft, {required int? expectedRevision}) async {
@@ -386,6 +387,7 @@ class _HeldSupplierMoneyDraftStore extends SecureWorkLedgerFormDraftStore {
   }
   @override
   Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async {
+    if (failShortageRead && key.kind == 'supplierShortage') throw StateError('HOST shortage draft read unavailable');
     if (failMoneyRead && key.kind == 'supplierMoney') throw StateError('HOST supplier money draft read unavailable');
     final gate = nextRead;
     nextRead = null;
@@ -4988,7 +4990,7 @@ void main() {
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {
-    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'unavailable-read', 'not-confirmed']) {
+    for (final failure in ['none', 'before-save', 'lost-ack', 'draft-save', 'draft-lost-ack', 'unavailable-read', 'not-confirmed', 'no-shortage', 'retained-no-shortage', 'draft-read-unavailable']) {
       testWidgets('PURCHASESHORTAGEUI missing goods recovery $display failure=$failure', (tester) async {
         // Host-only fixtures. Never injected into evaluation phone storage.
         FlutterSecureStorage.setMockInitialValues({});
@@ -5018,7 +5020,9 @@ void main() {
           reference: 'HOST partial delivery', deliveredOn: day, recordedAt: at,
           lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'short-ui-line', productId: product.id,
             productLabel: product.title, purchaseUnit: product.pack, stockUnit: product.pack, unitsPerPack: 1,
-            deliveredMilli: 1000, acceptedMilli: 1000, damagedMilli: 0, shortMilli: 1000, expectedMilli: 2000)]);
+            deliveredMilli: 1000, acceptedMilli: 1000, damagedMilli: 0,
+            shortMilli: failure.contains('no-shortage') || failure == 'draft-read-unavailable' ? 0 : 1000,
+            expectedMilli: failure.contains('no-shortage') || failure == 'draft-read-unavailable' ? 1000 : 2000)]);
         entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 3,
           profiles: [supplier], draft: bill, copies: [copy], openingRecords: [opening],
           goodsReceiptDrafts: [WorkspaceSupplierGoodsReceiptDraft(supplierId: supplier.id, revision: 3, receipt: receipt)]);
@@ -5034,6 +5038,13 @@ void main() {
         }
         final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
         final balance = work.workspaceSupplierLedger(supplier.id)!.balanceMinor;
+        if (failure == 'retained-no-shortage') {
+          await form.save(WorkspaceLedgerFormDraft(key: work.supplierShortageRecoveryFormKey(copy)!,
+            revision: 1, fields: {'billLineIndex': '0', 'deliveryId': receipt.expectedDeliveryId,
+              'lineId': receipt.lines.single.sourceLineId, 'quantityMilli': 'input:0.',
+              'attributionReviewed': 'false'}), expectedRevision: null);
+        }
+        form.failShortageRead = failure == 'draft-read-unavailable';
         await mount(tester, route: '/app/work/workspace/dashboard', work: work,
           viewport: display, textScale: display.width > 500 ? 2 : 1.4);
         await openPurchaseList(tester);
@@ -5049,11 +5060,43 @@ void main() {
         }
         await tapVisible(find.descendant(of: row, matching: find.textContaining('HOST-SHORT-BILL')).first);
         final action = find.byKey(const Key('work-purchase-review-shortage'));
+        if (failure == 'not-confirmed' || failure == 'no-shortage') {
+          final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
+          for (var i = 0; i < 10; i++) {
+            await tester.drag(scroll, const Offset(0, -160)); await tester.pumpAndSettle();
+            expect(action, findsNothing);
+          }
+          expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
+          expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
         if (action.evaluate().isEmpty) {
           final scroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')), matching: find.byType(Scrollable)).first;
           await tester.scrollUntilVisible(action, 120, scrollable: scroll); await tester.pumpAndSettle();
         }
         await tapVisible(action);
+        if (failure == 'retained-no-shortage' || failure == 'draft-read-unavailable') {
+          expect(find.byKey(const Key('supplier-shortage-submit')), findsNothing);
+          expect(work.workspaceSupplierLedger(supplier.id)!.shortageClaims, isEmpty);
+          expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+          expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList(), stock);
+          form.failShortageRead = false;
+          if (failure == 'retained-no-shortage') {
+            expect(find.text('Saved missing qty: 0.'), findsOneWidget);
+            final saved = await form.read(work.supplierShortageRecoveryFormKey(copy)!);
+            expect(saved!.fields['quantityMilli'], 'input:0.');
+            expect(saved.fields['deliveryId'], receipt.expectedDeliveryId);
+            await tapVisible(find.widgetWithText(TextButton, 'Close'));
+            await tapVisible(action);
+            expect(find.text('Saved missing qty: 0.'), findsOneWidget);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          return;
+        }
         if (failure == 'not-confirmed') {
           expect(find.text('Confirm the supplier’s starting balance and this bill in Purchases before reviewing missing goods.'), findsOneWidget);
           expect(find.byKey(const Key('supplier-shortage-quantity')), findsNothing);
