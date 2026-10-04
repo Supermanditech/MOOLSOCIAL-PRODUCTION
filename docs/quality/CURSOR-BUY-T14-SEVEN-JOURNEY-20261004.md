@@ -22,3 +22,27 @@ Redmi still runs the earlier warm source. Final read-only raw VM qualification f
 Bounded stop: qualified host results, explicit unresolved children, scoped safe Git checkpoint, then stop. Backend remains deferred; workspace work is Codex after integration; Google integration items remain separately listed.
 
 Git normalizes the changed screen and existing supplier-variant test from CRLF to LF. The working fingerprint above binds the actual tested bytes; both working and expected canonical hashes are recorded for every changed source owner. Exact canonical source equality is checked separately at staging/commit; canonical bytes are not claimed independently tested or native/fresh-clone accepted.
+
+## Native continuation — 4 October 2026
+
+This continuation supersedes the activation and actual-origin statuses above. The frozen host JSON, streams and archive remain unchanged. Existing r66.36-cursorreview APK identity was verified by checksum; the SDK connection was corrected to forward the device VM port rather than re-forward the host port. The authorized Dart restart activated all three current Buy source files. Final read-only VM checks again matched the worktree. No new APK, reinstall or data clear occurred. The installed APK remains the older cold-start build; this evidence qualifies the current warm source.
+
+Activation preserved the Cart, addresses and instruction data. The idle runtime payment preference changed from unsupported PhonePe to UPI; the saved original value was intact at activation. All other inspected financial fields matched. This is an explicit, source-supported idle fallback, not an assertion that every payment field was identical. Subsequent authorized Cart actions changed the basket and persisted current state. Final read-only state: 4 items, UPI selected, zero pending customer writes, no checkout idempotency key.
+
+Seven native Add-to-Checkout-review navigation scenarios passed with 115 captured action steps:
+
+| Origins | Items | Total |
+| --- | ---: | ---: |
+| Shop | 1 | ₹37 |
+| Wholesale | 2 | ₹1,160 |
+| Offers | 1 | ₹37 |
+| Shop + Wholesale | 3 | ₹1,197 |
+| Shop + Offers | 2 | ₹74 |
+| Wholesale + Offers | 3 | ₹1,197 |
+| Shop + Wholesale + Offers | 4 | ₹1,234 |
+
+Each scenario used ordinary whole-Cart clear confirmation, actual Add controls, shortcut count/total and selected-state checks, Product details → Cart → Back, Checkout scrolling → Cart → Product → originating tab, and final Cart reopening. Representative catalogue, Cart and Checkout screenshots were inspected. Supplier terms were absent from the tested Cart/Checkout screens. No payment, order or support action was submitted. These results do not close native payment-to-Delivered integration or every Product/Add consent variant.
+
+Remaining children: **T14-filtered-cart-delete** (the founder's deletion report while Shop filter is selected was not specifically exercised); **T14-offer-selector-singular-text** (confirmed accessibility label announces “1 items”, views line 22447); **T14-wholesale-delivery-review** (Wholesale Checkout shows unconfirmed delivery and Check delivery; provider/address qualification remains unresolved); **T14-native-evidence-admission** (new tracked archive owner rejected by the exact-owner gate; checker unchanged, only the rejected new claim removed). Earlier unexplained Cart/Checkout case remains historical carryover, not closed merely by these matrix results.
+
+Authentic native evidence is locally preserved at `apps/mobile/build/t06-t07-cart-20261002/t14-seven-native-20261004-evidence.zip`: 472 members, 41,556,816 bytes, SHA-256 `7bc4e2cc85a9d1505960af522478ba34eb998ea2018dfabfccf96ca79a714f4c`. It excludes private SDK logs, authentication endpoints and the saved-state backup. This ignored local archive is pending durable admission and is not a mandatory permanent regression dependency. The rejected placeholder is preserved separately and is not native evidence. The checkpoint publishes audit records, not this archive or native production acceptance. Backend remains deferred; workspace integration is Codex after integration; Google items remain separate. Formal closure is still blocked by inherited non-atomic history. No app code changed during this continuation.

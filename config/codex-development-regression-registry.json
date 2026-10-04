@@ -111461,6 +111461,359 @@
           "noBuildInstallResetRealPayment": true,
           "recovery": "Fresh uniquely versioned Redmi review candidate is alternative requiring explicit APK build/install authority and unchanged candidate gates; preserve installed/user state and existing evidence",
           "founderClarification": "VM here is Dart execution runtime on Redmi, not a Google-hosted machine"
+        },
+        "t14NativeReconnectRestartAuthorized20261004": {
+          "userInstruction": "NOW TRY - I CONNECTED REDME AGAIN AND DEBUG APK YOU START AGAIN AND THEN HOTRELAOD",
+          "newCondition": "Founder reconnected Redmi and explicitly requests existing debug APK restart then reload",
+          "scope": "Restart existing com.moolsocial.app.cursorreview process without clearing app data, rediscover fresh process-bound endpoint, attach/hot reload, verify current source and retained state, then actual seven Cart flows",
+          "exclusions": "No new APK build/install, no pm clear/uninstall, no real payment/order/provider/backend writes",
+          "checkpoint": "716f1efffcc03e289c68523a89aaf52ab450b9e8 source remains c2f11428 T14",
+          "sourceFingerprint": "2ce41d850e4817cf505efae3f79addf06774740e8c1fda25049c1c92d626a7b0",
+          "priorFailureRegistered": true,
+          "dependencyOrder": "Fresh device gates; current installed package/launch activity; explicit stop/start retaining app data; current VM lifetime/endpoint/PID/source identity; one reload owner; after reload exact source and retained state verification; screenshots and actual native journey",
+          "classification": "mvp_required existing Cart native verification",
+          "authoritativeData": "Existing installed review package/local saved buyer state; no simulated live payment or new transaction"
+        },
+        "t14ReconnectedPackageIdentityGuard20261004": {
+          "status": "stopped_before_restart",
+          "device": "TG8HCYTGGQT885OF",
+          "package": "com.moolsocial.app.cursorreview",
+          "incident": "Existing package identity assertion rejected dumpsys version projection before am force-stop/start",
+          "expected": "versionName1.0.0-r66.36 versionCode2026092701",
+          "root": "Exact native versionName was assumed from prior candidate label without fresh installed metadata projection",
+          "detection": "launch helper terminal1 AssertionError Unexpected installed package",
+          "preservation": "Only device state/package metadata read; no process stop, data clear, launch, reload, build/install or payment",
+          "prevention": "Read exact installed version and flags before authorizing existing-package restart; do not assume candidate label equals AndroidversionName or silently accept unrelated binary",
+          "nextAuthorizedDiagnostic": "Bounded actual package versionName/versionCode/debuggability and installed APK checksum readback against retained manifest; if known same review binary validate exact metadata then restart; else stop exact discrepancy",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-reconnected-app-launch-20261004-1.py",
+          "sourceUnchanged": true
+        },
+        "t14NativeInstalledIdentityAndHelperQuoting20261004": {
+          "installedVersionName": "1.0.0-r66.36-cursorreview",
+          "versionCode": "2026092701",
+          "debuggable": true,
+          "installedApkSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+          "matchesRetainedR6636": true,
+          "previousGuardRootConfirmed": "Missing -cursorreview suffix in expected versionName; installed APK itself unchanged and correct",
+          "helperIncident": "PowerShell python -c nested escaped double quotes caused SyntaxError while cloning ignored helper; no helper file or device mutation occurred",
+          "prevention": "Write helper using apply_patch; avoid nested shell quoting; preserve originalfailedscript",
+          "retryScope": "Correct literal installed label and exact APKchecksumguard, fresh gates, restart existing package retaining data, fresh PID endpoint and one reload owner",
+          "noApkBuildInstallAuthorized": true,
+          "sourceUnchanged": true
+        },
+        "t14FreshSdkAttachStopped20261004": {
+          "device": "TG8HCYTGGQT885OF",
+          "package": "com.moolsocial.app.cursorreview",
+          "freshPid": 17397,
+          "connection": "Direct process-bound raw Dart VM handshake and three library source readback succeeded on fresh startup; APK cold source differs current",
+          "attempt": "Fresh verified HTTPbase --debug-url --no-dds SDKattach with acceptedreviewdefines; no stale endpoint reuse",
+          "result": "SDKclient terminal1 before app.started; stageattach; no app.restart request sent; no hot reload success claim",
+          "sdkClientTerminated": true,
+          "detachRequested": false,
+          "reason": "SDK attach failure not yet diagnosed; complete private SDK log retained",
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-reload-20261004-1.json",
+          "privateLog": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-reload-private-20261004-1.log",
+          "appDataCleared": false,
+          "apkInstalled": false,
+          "currentSourceAccepted": false,
+          "secondaryIncident": {
+            "type": "live_log_summary_parser",
+            "root": "Comprehension attempted json.loads before line-prefix filter",
+            "detection": "JSONDecodeError in readonly summary command",
+            "prevention": "Use explicit safe per-line try/except parse loop; non-JSON Flutter text retained, URLs redacted; do not parse private log with brittle comprehensions",
+            "effect": "No source/device mutation"
+          },
+          "next": "Read sanitized SDK failure lines only after registration; fix demonstrated tool/root issue; fresh gate before any SDK retry",
+          "architect": "Independent facts-only reviewer approved freshendpoint plus state/source verification; requirement remains unsatisfied because SDK attach never started"
+        },
+        "t14SdkPortDiagnosticParserStop20261004": {
+          "status": "diagnostic_stopped_no_reload",
+          "observed": "Fresh rawVM works; SDKfailedURI keeps sameauthpath but changeslocalport; need verify actual ADBremote mapping",
+          "hypothesis": "--debug-url supplied host-forwarded port may be reforwarded as deviceport by SDKattach; not confirmed until exactforwardprojection",
+          "mistake": "ADBforward list diagnostic unconditionally unpacked blankrow, raisingValueError before emittingresult",
+          "prevention": "Filter emptyrows and requireexact3tokens beforeunpacking; stablemetadata parser examples useexplicitloops",
+          "sourceDeviceMutation": false,
+          "sdkClientStopped": true,
+          "next": "Bounded corrected mappingprojection afterregisteredfailure, independentarchitectreview demonstrated SDK/deviceport mismatch before newattempt"
+        },
+        "t14SdkAttachPortRootConfirmed20261004": {
+          "status": "root_confirmed_correction_before_retry",
+          "freshPid": 17397,
+          "correctMapping": "hosttcp50016->device42325, rawVM PID and three source libraries verified",
+          "wrongSdkMapping": "hosttcp59891->device50016",
+          "root": "Primary supplied a host-forwarded HTTPURL to Android Flutter attach --debug-url. SDK treated its port as deviceVMport and forwarded hostport50016 as remoteport instead of actual42325.",
+          "detection": "Private endpoint comparison authpath matched; SDKport changed; exactserial ADBforward projection confirmedwrongremoteport; SDK Connection closed before fullheader, no app.started or reload command",
+          "correction": "Compose device-side debugURL using current verified authpath with deviceport42325, --device-vmservice-port=42325, let SDK allocate owned hostforward; --no-dds. Verify generatedforward target and actualPID before hot reload.",
+          "prevention": "Track device and hostports as distinct named data; never use host-forwarded URL as device discovery input; require protocolidentity + actual SDKforward validation before app.restart",
+          "architectReview": "Requested independent correctionreview before actual SDK retry; no self-certified hot reload",
+          "sourceUnchanged": true,
+          "noApkBuildInstallClearPayment": true
+        },
+        "t14CorrectedHelperSyntaxPreflight20261004": {
+          "incident": "Ignored reload-helper generation compile caught literal '+' prefix embedded in replacement string",
+          "root": "Diffmarker accidentally included inside multiline string",
+          "detection": "SyntaxError before writing generatedhelper and before SDKlaunch; native/source state unchanged",
+          "correction": "Removed literal plusprefixes, keep compile() before helperwrite/deviceaction",
+          "prevention": "Readback generatedcode and syntaxpreflight mandatory; distinguishmetadatahelper incidents from appregressions; retain failedgeneratorhistory in durable incident",
+          "gates": "Previous full device gates terminal0; any SDKretry must have refreshed registrycoordinator and device memory after newincident",
+          "architect": "Independent before-reload review approved device42325 URL versus host50016 routing correction; actualprotocolmapping and allsource/stateequality remain mandatory"
+        },
+        "t14CorrectedSdkConnectedPreflightBlock20261004": {
+          "status": "SDK_connected_reload_not_sent",
+          "freshPid": 17397,
+          "sdkHostPort": 52187,
+          "sdkDevicePort": 42325,
+          "sdkMappingVerified": true,
+          "stage": "before_identity",
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-reload-20261004-2.json",
+          "assertion": "Existing payment hold blocks reload",
+          "interpretation": "Preflight boolean assertion failed; do not claim real payment hold until exact recorded facts projected. Cold APK may lack new getter API.",
+          "scope": "Corrected deviceport fixed SDKconnection; app.started and process/source/baseline inspection reached",
+          "sdkClientTerminated": true,
+          "detachRequested": true,
+          "reloadCommandSent": false,
+          "sourceCurrentAccepted": false,
+          "appDataCleared": false,
+          "newApkInstalled": false,
+          "prevention": "Separate getter-unavailable, true paymenthold and transport failure. Stop before reload, inspect exactbaseline recordedfacts, independentlyreview preservation criteria; no forcedclear/pay/seed.",
+          "nextDiagnostic": "Bounded publicfacts and fieldnames from recordedbefore snapshot; no new device action"
+        },
+        "t14ColdApiPreflightFalseHoldRoot20261004": {
+          "status": "SDKconnection_root_fixed_preflight_guard_corrected_before_reload",
+          "facts": {
+            "checkoutBusy": false,
+            "checkoutRequiresResolution": false,
+            "checkoutSubmissionState": "idle",
+            "owner": "device-review:buy",
+            "collectionCheckout": null,
+            "checkoutIdempotencyKey": null,
+            "consumerWritesPending": 0,
+            "globalSkuLines": 2,
+            "totalQuantity": 3
+          },
+          "root": "Primary preflight expected new cartChangesBlocked getter on oldr66.36 coldAPK. VMreturnedLanguageError, guard mislabeledAPIabsence as paymenthold. No actualpendinghold evidenced.",
+          "storedFinancialIdentity": "nullkey/ref/action/quote/pendingpromise; attemptsequence0; completeglobalCartquantitiescaptured",
+          "secondarySnapshotCorrection": "Earlier genericfinancialsnapshot ignored Mapassociations and capturedlookup/adaptor counters unrelated financialidentity. Newcompletebaseline must serializeMapassociations and preserveexactcore owner/key/request/hold/financialfields, failclosedontruncation/unreadablevalue, excludeonlytransportIDs and unrelated lookupcounters.",
+          "deviceMutation": "SDKattachedanddetached only; no app.restart sent; source remainscoldAPK",
+          "prevention": "Negotiateoldruntimegetteravailability explicitly; do not treatLanguageError as realhold; newAPIrequiredafteractivation, existingfinancialstateexactpreserved",
+          "review": "Independentarchitectreview requested for exactoldAPIadaptation; previousframes/logs diagnosticnotacceptance",
+          "next": "Prepare syntaxchecked ignoredhelper, refreshdevice memory/coordinator, onehotreload only ifcompletebaselineidle then postsource/states/screenshots"
+        },
+        "t14ZeroLibraryReloadNotActivation20261004": {
+          "status": "SDKreload0_libraries_diagnostic_only",
+          "pid": 17397,
+          "sdkMappingVerified": true,
+          "sdkHostPort": 49183,
+          "sdkDevicePort": 42325,
+          "result": {
+            "code": 0,
+            "message": "Reloaded 0 libraries"
+          },
+          "postSourceIdentity": "All three inspected source libraries still coldAPK hashes, not current working source; actualactivation false despite SDKcode0",
+          "preflight": "CompletefinancialMap/List/scalarbaseline passed, ownerreview idle no paymentkey/ref/quote, exactSKU quantities recorded; before/after proof retained",
+          "noApkBuildInstallClearPayment": true,
+          "sdkDetached": true,
+          "root": "Fresh attach incremental reload did not transmit current targetprogram; zero-libraries SDK acknowledgement is not sourceactivation",
+          "prevention": "Always matchVMsourcehashes, never acceptSDKcode0 alone. ColdAPKrestartloadsoldcode until compiledcurrentprogramactuallyreplacesisolate or uniqueAPKinstalled.",
+          "next": "Independentarchitectreview of full Dart hotrestart from currentcompiledprogram under founder existing restart authorization; before any restart require authentic reviewowner savedCart snapshot/privatebackup exact quantities, no pendingfinancialattempt; after requirecurrent3sources and exactsavedrestoration. No newAPKor appdataclear.",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-reload-20261004-3.json"
+        },
+        "t14SavedStateHotRestartAssessed20261004": {
+          "classification": "mvp_required existing sourceactivation recovery",
+          "authority": "Founder explicitly requested existing debugAPK startagain thenhotreload; Dart hotrestart uses existingdebugpackage and compiledcurrentsource, no newAPKor datareset",
+          "root": "SDKconnectionfixed but incrementaldelta reported0libraries and stayedcold. FullDartrestart needed to replaceisolateprogram; sourceactivation still unqualified",
+          "review": "Independentarchitect agreed smallestrecovery beforeAPK, requires exact authenticatedsavedCart/address/instructions/financialschema, restoreowner/adapters/settledstate and sourcechecks; no autoreplay/reset onmismatch",
+          "implementation": "Ignored syntaxchecked helper4; backup only knownreviewownerpreferencekey; readcompleteFutureString, no wholeprefenumeration. Domainaddressserialization via knownstorecodec, instructionsmap entries, quantityexact, idle/key/ref/requestchecks, privatebytesbackup SHA. Afterrestorestable, sameowner/reviewadapter/financialdomain/cart and3sourcehashes; detachclient everyoutcome.",
+          "exclusions": "No APKbuild/install/uninstall/pmclear; no prefswrites/reseed/replay; no payment/order/support submission; no backend/workspace/Googleimplementation",
+          "preservation": "OriginalfailedSDK/syntax/parser/privateevidence retained; allprior source proofsdiagnostic, currenthost136/1096unchanged. Await fullgates thenonehotrestart attempt",
+          "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-restart-20261004-4.py"
+        },
+        "t14HotRestartPreflightKeyError20261004": {
+          "status": "stopped_before_actual_Dart_restart",
+          "stage": "before_identity",
+          "errorType": "KeyError",
+          "pid": 17397,
+          "sdkMappingVerified": true,
+          "sdkHostPort": 49860,
+          "sdkDevicePort": 42325,
+          "SDKdetached": true,
+          "hotRestartSent": false,
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-restart-20261004-4.json",
+          "root": "Custom savedstate preflight assumed VM objectdictionary shape without explicit unwrap/fieldmetadata; exact missingkey not retained by catch handler",
+          "prevention": "Use nativeList.toList() forwrappercollections, validate VMtypes/requiredkeys, preserve exception key and stacklocation; retainrawsnapshot assoon as verifiedreadonlykey read ratherthan after redundantserialization",
+          "scope": "Onebounded readonly shapediagnostic then normalSDK hotrestart; stop adding diagnostic layers. Source/domain checks remain mandatory; SDKclientdetached no restart, data untouched",
+          "classification": "Toolverification failure, not appUI regression or actualpaymenthold",
+          "next": "Exact readonly VMAddressList shape + privateexceptiondiagnostic; correct knownAPIshape, syntaxcheck, fresh memory/ownership and one retainedstatehotrestart. No APKinstall/data clear orrealtransaction"
+        },
+        "t14ReadOnlyEvaluationContextFailure20261004": {
+          "incident": "Readonly shape probe called VM evaluate after SDKclient detached; RPCevaluate rejected before changing state",
+          "root": "Rawcore VMconnection/source inspection works, but expression evaluation is compiler-context-dependent; helper assumed availability outside attached SDK context",
+          "detection": "terminal1 AssertionError evaluate, no SDKhotrestart/sourceappchange",
+          "prevention": "Use core getObject/class source/field metadata for detachedreadonlydiagnostics; use evaluate only with ownedSDKclient/compiler attached and preserveRPCcodes",
+          "next": "Inspect exactcold storeprivatefield/source and collectionshape via core VMmetadata without expressioncompiler; reuseactualAPI fieldnames, oneSDKrestart withauthenticatedbackup andpostsource/stateverification; no additional diagnosticframework",
+          "pendingUserFastPath": "Primary to finish standardSDKactivation first; no new appcode/test expansion beforedevicecurrent"
+        },
+        "t14PublicStorePreflightFailure20261004": {
+          "qualified": false,
+          "stage": "before_identity",
+          "error": "KeyError elements while inspecting _customDeliveryInstructions",
+          "restartSent": false,
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "sdkMappingVerified": true,
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-restart-20261004-5.json",
+          "next": "Resolve exact old-runtime instruction API before any further restart attempt"
+        },
+        "t14ColdInstructionInspectorCorrection20261004": {
+          "rootCause": "Known cold BuySession source lacks customDeliveryInstructions; helper dereferenced LanguageError as List",
+          "readOnlySourceProof": "apps/mobile/build/t06-t07-cart-20261002/t14-cold-instruction-api-20261004-6.json",
+          "correction": "Before restart only: explicit LanguageError plus absent or valid empty saved custom Map; exact cold source hashes still required. Existing instruction IDs independently verified. After restart require actual List/Map contents, optional absent-empty schema normalization only.",
+          "architectReview": "retention_architect facts-only review accepted narrow correction; no independent device verification claim",
+          "helper": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-restart-20261004-6.py",
+          "restartSent": false
+        },
+        "t14RestartSourceActivationStateMismatch20261004": {
+          "restartCompleted": true,
+          "sdkCode": 0,
+          "currentThreeSourcesMatch": true,
+          "retainedQuantitiesEqual": true,
+          "authenticatedSavedDomainBeforeAndAfter": true,
+          "qualified": false,
+          "onlyFinancialDifference": {
+            "field": "selectedPayment",
+            "before": "PhonePe",
+            "after": "UPI"
+          },
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "paymentOrOrderSubmitted": false,
+          "proof": "apps/mobile/build/t06-t07-cart-20261002/t14-fresh-reconnected-hot-restart-20261004-6.json",
+          "next": "Inspect existing payment-label migration and preservation before native journey"
+        },
+        "t14SourceActivationQualifiedObservation20261004": {
+          "currentThreeSourcesMatch": true,
+          "cartAddressesInstructionsPreserved": true,
+          "idlePreferenceFallback": {
+            "before": "PhonePe",
+            "after": "UPI",
+            "savedOriginalStillPreserved": true,
+            "source": "buy_v2_session.dart paymentMethods UPI/Card; restore accepts only supported available preference",
+            "pendingOrCommittedAttempt": false
+          },
+          "strictComparisonProofRetained": true,
+          "allPaymentFieldsIdentical": false,
+          "otherFinancialFieldsIdentical": true,
+          "architectReview": "facts-only approved narrow idle fallback observation; no independent native verification",
+          "screenshot": "apps/mobile/build/t06-t07-cart-20261002/t14-native/t14-current-source-activated-20261004-6.png",
+          "nativeJourneyQualified": false,
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "next": "Seven actual native fresh Cart journeys; no payment/order submission"
+        },
+        "t14NativeEvidenceBootstrap20261004": {
+          "owner": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-NATIVE-EVIDENCE.zip",
+          "rootClaimAdded": true,
+          "pendingPlaceholder": true,
+          "originalHostEvidenceUnchanged": true,
+          "qualificationPending": true
+        },
+        "t14NativeEvidenceAdmissionRejected20261004": {
+          "gate": "Cursor claim must contain only its exact setup and selected storefront owners",
+          "onlyNewOwnerRemoved": true,
+          "placeholderPreserved": "apps/mobile/build/t06-t07-cart-20261002/t14-native-evidence-rejected-bootstrap-20261004.zip",
+          "originalHostEvidenceUnchanged": true,
+          "checkerUnchanged": true,
+          "child": "T14-native-evidence-admission",
+          "status": "Unresolved; locally retained native frames and ZIP hashes will be recorded in existing owned registry; no tracked native archive acceptance claim"
+        },
+        "t14NativeSevenResults20261004": {
+          "currentThreeSourceHashesMatch": true,
+          "nativeActualAddToCheckoutReviewCases": 7,
+          "nativeFrames": 115,
+          "totals": [
+            {
+              "origins": "Shop",
+              "items": 1,
+              "total": 37
+            },
+            {
+              "origins": "Wholesale",
+              "items": 2,
+              "total": 1160
+            },
+            {
+              "origins": "Offers",
+              "items": 1,
+              "total": 37
+            },
+            {
+              "origins": "Shop+Wholesale",
+              "items": 3,
+              "total": 1197
+            },
+            {
+              "origins": "Shop+Offers",
+              "items": 2,
+              "total": 74
+            },
+            {
+              "origins": "Wholesale+Offers",
+              "items": 3,
+              "total": 1197
+            },
+            {
+              "origins": "Shop+Wholesale+Offers",
+              "items": 4,
+              "total": 1234
+            }
+          ],
+          "finalReadOnlyProof": "apps/mobile/build/t06-t07-cart-20261002/t14-final-core-identity-20261004.json",
+          "nativeResultsLocallyVerified": true,
+          "fullPaymentToDeliveredAccepted": false,
+          "founderApproval": false,
+          "newApkInstalled": false,
+          "dataCleared": false,
+          "paymentOrderSupportSubmitted": false,
+          "sourceCodeChanged": false,
+          "localArchive": {
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t14-seven-native-20261004-evidence.zip",
+            "sha256": "7bc4e2cc85a9d1505960af522478ba34eb998ea2018dfabfccf96ca79a714f4c",
+            "bytes": 41556816,
+            "members": 472,
+            "durableAdmission": "pending",
+            "mandatoryPermanentDependency": false
+          },
+          "children": [
+            {
+              "id": "T14-filtered-cart-delete",
+              "status": "native_unverified",
+              "reason": "Only ordinary wholeCart clear exercised; founder Shop-filter deletion remains pending"
+            },
+            {
+              "id": "T14-offer-selector-singular-text",
+              "status": "confirmed_pending",
+              "reason": "Shop offer selector semantics says 1 items; existing views line22447"
+            },
+            {
+              "id": "T14-wholesale-delivery-review",
+              "status": "unresolved",
+              "reason": "Wholesale Checkout delivery unconfirmed; Check delivery; no provider/address acceptance"
+            },
+            {
+              "id": "T14-native-evidence-admission",
+              "status": "unresolved",
+              "reason": "Exact owner gate rejected separate native archive; checker preserved, rejected claim removed, evidence locally retained"
+            }
+          ],
+          "archiveAdmissionPublished": false,
+          "hostFrozenEvidenceUnchanged": true,
+          "report": "docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md",
+          "scopeEnd": "Record children, gates, safe metadata checkpoint, stop",
+          "verificationLimitations": "No native pay/provider delivery or blanket visual polish claim; current warm source only",
+          "toolObservations": {
+            "unicodeStdout": "cp1252 failed formatting diagnostic; rerun utf8 passed; no device mutation",
+            "fileSearchTruncation": "Broad scratch filename query truncated; narrowed t14-only helper query recovered required paths; not used as admission evidence"
+          }
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
