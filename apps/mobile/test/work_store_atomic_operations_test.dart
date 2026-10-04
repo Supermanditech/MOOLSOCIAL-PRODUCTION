@@ -6371,6 +6371,60 @@ void main() {
       expectedRevision: first.committedRevision - 1), same(restored));
   });
 
+  for (final conversion in [1, 2]) {
+    test('PURCHASECREDIT reviewed different-unit return conversion=$conversion', () {
+      // Host-only regression: never injected into evaluation runtime storage.
+      final opening = confirmedOpeningFixture(openingFixture(amount: 50000, credit: true, bills: const []))!;
+      final bill = allocatedBillFixture(unit: conversion == 1 ? '1kg' : 'Carton',
+        quantity: '1', total: '230');
+      var ledger = opening.acceptReviewedBill(bill, expectedRevision: opening.revision)!;
+      ledger = ledger.allocateRecordedMoney(moneyAllocationFixture(ledger, bill,
+        amount: 23000, kind: WorkspaceSupplierMoneySourceKind.openingAdvance,
+        source: ledger.openingRecord!.id), expectedRevision: ledger.revision)!;
+      final receipt = WorkspaceSupplierGoodsReceipt(id: 'receipt-A', expectedDeliveryId: 'delivery',
+        reference: 'HOST-DEL', deliveredOn: '2026-10-03', recordedAt: ledger.asOf,
+        lines: [WorkspaceSupplierGoodsReceiptLine(sourceLineId: 'line-A', productId: 'saved-product-A',
+          productLabel: 'Host goods', purchaseUnit: '1 kg', stockUnit: '1 kg', unitsPerPack: 1,
+          deliveredMilli: 1000 * conversion, acceptedMilli: 1000 * conversion,
+          damagedMilli: 0, shortMilli: 0)]);
+      ledger = ledger.receiveGoods(receipt, expectedRevision: ledger.revision)!;
+      final unmatched = ledger;
+      final link = WorkspaceSupplierBillGoodsAllocation.fromJson({
+        ...billGoodsLink(bill, accepted: 1000 * conversion, damaged: 0,
+          quantity: 1000, numerator: conversion).toJson(),
+        'linkedAt': ledger.asOf.toUtc().toIso8601String()});
+      ledger = ledger.allocateBillGoods(link, expectedRevision: ledger.revision)!;
+      final returned = goodsReturnFixture(ledger, accepted: 1000);
+      ledger = ledger.recordGoodsReturned(returned, expectedRevision: ledger.revision)!;
+      final support = ledger.availableCreditSupports(bill.billId).single.$1;
+      expect(support.quantityMilli, 1000);
+      final note = WorkspaceSupplierCreditNote(operationId: 'HOST-CN',
+        accountScope: ledger.accountScope, workspaceId: ledger.workspaceId, supplierId: ledger.supplierId,
+        billId: bill.billId, copyId: bill.copy.id, copyRevision: bill.copy.revision,
+        openingId: ledger.openingRecord!.id, openingRevision: ledger.openingRecord!.revision,
+        reference: 'HOST-CN', occurredOn: '2026-10-03', reason: 'Returned goods', amountMinor: 23000,
+        recordedAt: ledger.asOf, committedRevision: ledger.revision + 1, supports: [support]);
+      final credited = ledger.recordSupplierCredit(note, expectedRevision: ledger.revision);
+      expect(credited, isNotNull);
+      expect(credited!.manualBillRemainingMinor(bill.billId), -23000);
+      expect(credited.creditMinor, 50000);
+      expect(credited.unallocatedMoneyMinor(WorkspaceSupplierMoneySourceKind.openingAdvance,
+        ledger.openingRecord!.id), 27000);
+      expect(credited.goodsReceipts, ledger.goodsReceipts);
+      expect(credited.goodsReturns, ledger.goodsReturns);
+      expect(credited.billMoneyAllocations, ledger.billMoneyAllocations);
+      expect(WorkspaceSupplierLedger.fromJson(credited.toJson())!.valid, isTrue);
+      final unsupported = unmatched.recordGoodsReturned(goodsReturnFixture(unmatched, accepted: 1000),
+        expectedRevision: unmatched.revision)!;
+      final unsupportedNote = WorkspaceSupplierCreditNote.fromJson({...note.toJson(),
+        'committedRevision': unsupported.revision + 1});
+      expect(unsupported.recordSupplierCredit(unsupportedNote, expectedRevision: unsupported.revision), isNull);
+      final excess = WorkspaceSupplierCreditNote.fromJson({...note.toJson(), 'supports': [
+        {...support.toJson(), 'quantityMilli': 1001}]});
+      expect(ledger.recordSupplierCredit(excess, expectedRevision: ledger.revision), isNull);
+    });
+  }
+
   test('PURCHASECREDIT paid bill preserves settlement capacity and immutable damage support', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 0, bills: const []))!;
     final bill = allocatedBillFixture(quantity: '10', total: '100');

@@ -4504,9 +4504,11 @@ class WorkspaceSupplierLedger {
         if (receipt == null || line == null || support.billLineIndex >= bill.copy.draft.goods.length ||
             note.recordedAt.isBefore(receipt.recordedAt) || note.occurredOn.compareTo(receipt.deliveredOn) < 0) { return false; }
         final printed = bill.copy.draft.goods[support.billLineIndex];
-        // Exact reviewed product/unit binding; never infer from a display name.
-        if (printed['productId'] != line.productId || printed['pack']?.trim() != line.purchaseUnit) return false;
+        // Exact product identity; return/damage units are bound by the validated
+        // billGoodsAllocations below, including their reviewed conversion.
+        if (printed['productId'] != line.productId) return false;
         if (support.kind == WorkspaceSupplierCreditSupportKind.shortage) {
+          if (printed['pack']?.trim() != line.purchaseUnit) return false;
           final claim = shortageClaims[support.shortageClaimId];
           if (claim == null || claim.billId != note.billId || claim.billLineIndex != support.billLineIndex ||
               claim.copyId != note.copyId || claim.copyRevision != note.copyRevision ||
