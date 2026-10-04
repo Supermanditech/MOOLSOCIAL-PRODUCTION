@@ -1673,7 +1673,7 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Personal Buyer has consistent public Cart summary/target and locally verified separate/mixed fixture states; native current-source activation and real-provider journeys remain unresolved. Personal Buyer hears accurate singular/plural item and pack quantities in mixed Cart offer selectors.",
+      "customerOutcome": "Personal Buyer sees consistent selected quantities and item amounts from Cart through Checkout and Back; reproduce historical 1/37 to2/97 without confusing disclosed fees with item totals.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
       "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
@@ -1701,7 +1701,7 @@
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse existing selector and count formatters; no new route/state owner. Six exact evidence paths founder approved; existing full selected qualification retained and re-bound only after fresh tests.",
+      "necessityProof": "Test-only acceptance first; reuse current session/screen/views and existing Cart-return/scoped-continuity owners. No new screen/service/state/backend. Historical source evidence distinct from fresh current-source reproduction; no inferred user action. Source fix only after confirmed root cause.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1716,7 +1716,10 @@
         "isolated frontend Confirmation Tracking Delivered evidence; live integration deferred",
         "design/card/intent/QR gap inventory and reduced-motion large-text checks",
         "singular and plural item/pack selector semantics at normal and 200% text",
-        "selector taps preserve mixed basket quantities and total"
+        "selector taps preserve mixed basket quantities and total",
+        "Shop actual Add to Cart to Checkout to Back exact quantity and item subtotal",
+        "Product entry and mixed Cart continuity with disclosed fee distinction",
+        "Historical composer Cancel sequence without instruction edits; no fake legacy root cause"
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1747,7 +1750,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "T14_offer_count_copy_assessed_before_source_edit",
+      "implementationState": "T14_historical_cart_checkout_discrepancy_assessed_before_native_execution",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

@@ -112031,6 +112031,57 @@
           "evidence": "apps/mobile/build/t06-t07-cart-20261002/t14-offer-count-prepare-checkpoint.py",
           "sourceUnchanged": true,
           "nativeResultsUnaffected": true
+        },
+        "cartCheckoutDiscrepancyBounded20261004": {
+          "status": "current_conditions_not_reproduced_historical_root_cause_unresolved",
+          "actor": "Personal Buyer",
+          "classification": "mvp_required",
+          "reuse": "test_only_acceptance; existing session/screen/views/Cart-return/scoped-continuity owners, no source/test change",
+          "sourceSha256": "6174aace775634c1d33c2a58c34a68f1f9df62ba7412f8e293b9b0d5f5e0a07f",
+          "priorCountCopyFounderApproval": {
+            "approved": true,
+            "checkpoint": "22de4773d635273cf3d63481198ea86eff34688c",
+            "frozenArtifactsUnchanged": true,
+            "formalParentClosure": false
+          },
+          "historicalEvidence": {
+            "cartQuantity": 1,
+            "cartAmount": 37,
+            "checkoutQuantity": 2,
+            "checkoutAmount": 97,
+            "checkoutVisibleGroups": 2,
+            "transitionCause": "unobserved; no inferred user action or code defect",
+            "oldCaseRemainsUnresolved": true
+          },
+          "nativeCurrent": {
+            "actions": 19,
+            "frames": 20,
+            "readOnlySnapshots": 11,
+            "mixedQuantity": 3,
+            "mixedItemAmount": 1197,
+            "freshShopQuantity": 1,
+            "freshShopItemAmount": 37,
+            "composerCancelAndProductEntryAndCheckoutBack": true,
+            "allThreeSourcesMatch": true,
+            "underlyingSkusStable": true,
+            "writesPending": 0,
+            "checkoutKeyNull": true,
+            "submissionIdle": true,
+            "addresses": 2,
+            "finalScreen": "Cart 1 product/1 item/37"
+          },
+          "hostEvidence": "Reused unchanged-source1096selected/1156references plus4focused; no new test pass claimed.",
+          "localEvidence": {
+            "path": "apps/mobile/build/t06-t07-cart-20261002/t14-discrepancy-local-evidence-20261004-1.zip",
+            "sha256": "b72f541173b9291409e4e1f0fb174f94818eef4fffc45e1be420cde22182c122",
+            "members": 54,
+            "bytes": 5160825,
+            "durableAdmission": "pending",
+            "permanentGateDependency": false,
+            "privateFilesExcluded": true
+          },
+          "remaining": "Historicalcauseunresolved; existingCartreturnscrollobservationseparate; provider/backenddeferred, workspaceCodexafterintegration, Googleseparate; warm source distinctcoldAPK/formalparentclosure.",
+          "next": "Four metadata owners checkpoint aftercurrentgates; boundedstop."
         }
       },
       "t05PaymentEligibilityAutonomous20261002": {
