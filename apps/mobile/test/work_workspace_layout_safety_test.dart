@@ -5843,7 +5843,10 @@ void main() {
       (const Size(360, 800), false, '0', false, 'settled-empty'),
       (const Size(360, 800), false, '0', false, 'settled-retained'),
       (const Size(915, 412), false, '0', false, 'settled-frozen'),
-      (const Size(360, 800), false, '0', false, 'settled-unavailable')]) {
+      (const Size(360, 800), false, '0', false, 'settled-unavailable'),
+      (const Size(360, 800), false, '0', false, 'settled-stored-empty'),
+      (const Size(360, 800), false, '0', false, 'settled-delayed'),
+      (const Size(915, 412), false, '0', false, 'settled-empty')]) {
     testWidgets('PURCHASEMATCHUI saved receipt match and reopen $display failedReview=$failedReview freeText="$freeText" cancel=$cancelReview recovery=$recoveryCase', (tester) async {
       // Host UI fixture; production serialization is tested separately in atomic tests.
       FlutterSecureStorage.setMockInitialValues({});
@@ -5891,6 +5894,7 @@ void main() {
         expectedLedgerRevision: 2, openingTreatment: WorkspaceOpeningBillInclusion.excluded, confirmedAt: at),
         isTrue, reason: work.workspaceSupplierError);
       final settled = recoveryCase.startsWith('settled-');
+      final absentMoneyDraft = recoveryCase == 'settled-empty' || recoveryCase == 'settled-delayed';
       if (settled) {
         final before = work.workspaceSupplierLedger(supplier.id)!.revision;
         final payment = WorkspaceSupplierLedgerEntry(operationId: work.newWorkspaceSupplierMoneyOperationId(),
@@ -5902,11 +5906,12 @@ void main() {
         expect(await work.recordWorkspaceSupplierMoney(supplier.id, accountScope: scope.$1,
           workspaceId: scope.$2, entry: payment, expectedRevision: before), isTrue);
         expect(work.workspaceSupplierLedger(supplier.id)!.manualBillRemainingMinor(draft.id), 0);
-        if (recoveryCase != 'settled-empty') {
+        if (!absentMoneyDraft) {
           final billKey = work.supplierMoneyFormKey(supplier.id, copy: copy)!;
           await forms.save(WorkspaceLedgerFormDraft(key: billKey, revision: 1, fields: {
-            'amount': recoveryCase == 'settled-frozen' ? '100' : '12',
-            'reference': recoveryCase == 'settled-frozen' ? payment.reference : 'HOST-unsent-input',
+            'amount': recoveryCase == 'settled-frozen' ? '100' : recoveryCase == 'settled-stored-empty' ? '' : '12',
+            'reference': recoveryCase == 'settled-frozen' ? payment.reference
+              : recoveryCase == 'settled-stored-empty' ? '' : 'HOST-unsent-input',
             'channel': 'Cash', 'occurredOn': day, 'notIncludedInOpening': 'true',
             if (recoveryCase == 'settled-frozen') 'attempt': jsonEncode(
               WorkspaceSupplierMoneyAttempt(entry: payment, expectedRevision: before).toJson()),
@@ -6112,6 +6117,10 @@ void main() {
         expect(find.descendant(of: paymentAction, matching: find.text('Bill payment details')), findsOneWidget);
         final advanceAction = find.byKey(const Key('work-purchase-record-advance'));
         expect(advanceAction, findsOneWidget);
+        final billKey = work.supplierMoneyFormKey(supplier.id, copy: copy)!;
+        final savedInput = await forms.read(billKey);
+        final delayedRead = recoveryCase == 'settled-delayed' ? Completer<void>() : null;
+        forms.nextRead = delayedRead;
         forms.failMoneyRead = recoveryCase == 'settled-unavailable';
         await reveal(paymentAction); await tester.tap(paymentAction); await tester.pumpAndSettle();
         Future<void> revealMoney(Finder target) async {
@@ -6120,7 +6129,13 @@ void main() {
         }
         final amount = find.byKey(const Key('supplier-payment-amount'));
         final submit = find.byKey(const Key('supplier-money-submit'));
+        if (delayedRead != null) {
+          expect(find.byKey(const Key('supplier-money-compact-settled')), findsNothing);
+          expect(tester.widget<TextButton>(find.byKey(const Key('supplier-money-close'))).onPressed, isNull);
+          delayedRead.complete(); await tester.pumpAndSettle();
+        }
         if (recoveryCase == 'settled-unavailable') {
+          expect(find.byKey(const Key('supplier-money-compact-settled')), findsNothing);
           expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing,
             reason: 'Failed draft recovery must not masquerade as an empty settled form.');
           expect(tester.widget<FilledButton>(submit).onPressed, isNull);
@@ -6129,10 +6144,27 @@ void main() {
           forms.failMoneyRead = false;
           await tester.tap(retry); await tester.pumpAndSettle();
         }
-        await revealMoney(amount);
-        expect(tester.widget<TextField>(amount).enabled, isFalse);
-        expect(tester.widget<TextField>(amount).controller!.text,
-          recoveryCase == 'settled-frozen' ? '100' : recoveryCase == 'settled-empty' ? '' : '12');
+        if (absentMoneyDraft) {
+          expect(find.byKey(const Key('supplier-money-compact-settled')), findsOneWidget);
+          final compactBalance = find.byKey(const Key('supplier-money-compact-balance'));
+          expect(compactBalance, findsOneWidget);
+          expect(find.text('Bill balance ₹0'), findsOneWidget);
+          expect(tester.getRect(compactBalance).height, greaterThan(0));
+          expect(tester.getRect(compactBalance).bottom, lessThan(display.height));
+          expect(amount, findsNothing);
+          expect(submit, findsNothing);
+          expect(find.byKey(const Key('supplier-payment-reference')), findsNothing);
+          expect(find.byKey(const Key('supplier-money-date')), findsNothing);
+          expect(find.byKey(const Key('supplier-money-opening-excluded')), findsNothing);
+          expect(find.byWidgetPredicate((w) => w is DropdownButtonFormField<String> &&
+            w.key == const ValueKey('supplier-payment-method-Bank transfer')), findsNothing);
+        } else {
+          expect(find.byKey(const Key('supplier-money-compact-settled')), findsNothing);
+          await revealMoney(amount);
+          expect(tester.widget<TextField>(amount).enabled, isFalse);
+          expect(tester.widget<TextField>(amount).controller!.text,
+            recoveryCase == 'settled-frozen' ? '100' : recoveryCase == 'settled-stored-empty' ? '' : '12');
+        }
         if (recoveryCase == 'settled-frozen') {
           expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing);
           expect(find.text('Payment recorded · ₹100 · Cash'), findsOneWidget);
@@ -6140,16 +6172,18 @@ void main() {
             reason: 'A confirmed frozen record is still reachable; reset is separate from new posting.');
         } else {
           expect(find.byKey(const Key('supplier-money-no-bill-due')), findsOneWidget);
-          expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+          if (!absentMoneyDraft) expect(tester.widget<FilledButton>(submit).onPressed, isNull);
         }
         final closeMoney = find.byKey(const Key('supplier-money-close'));
         await revealMoney(closeMoney); await tester.tap(closeMoney); await tester.pumpAndSettle();
+        final afterClose = await forms.read(billKey);
+        expect(afterClose?.revision, savedInput?.revision, reason: 'Read-only open/Close must not create or update a draft.');
+        expect(afterClose?.fields, savedInput?.fields);
         await reveal(advanceAction); await tester.tap(advanceAction); await tester.pumpAndSettle();
         expect(find.text('Record supplier advance'), findsOneWidget);
         expect(find.byKey(const Key('supplier-money-no-bill-due')), findsNothing);
         expect(tester.widget<TextField>(amount).controller!.text, '', reason: 'Advance uses its own draft, not the bill payment input.');
         expect(tester.widget<TextField>(amount).enabled, isTrue);
-        final billKey = work.supplierMoneyFormKey(supplier.id, copy: copy)!;
         final advanceKey = work.supplierMoneyFormKey(supplier.id, advance: true)!;
         expect(advanceKey, isNot(billKey));
         await revealMoney(closeMoney); await tester.tap(closeMoney); await tester.pumpAndSettle();

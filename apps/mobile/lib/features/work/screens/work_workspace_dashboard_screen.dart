@@ -29996,6 +29996,10 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
   bool get _settledBillInput => manualMoney && widget.supplierMoney!.copy != null &&
     moneyRecovered && draft.ready && !draft.busy && draft.error == null &&
     frozen == null && billBalance != null && billBalance! <= 0;
+  // Absence must be recovered, not inferred from initially empty controllers.
+  // Every editable method/date/checkbox change uses the same autosave owner.
+  bool get _compactSettled => _settledBillInput && !saving && !conflict && error == null &&
+    draft.revision == null && draft.pending == null && amount.text.isEmpty && reference.text.isEmpty;
   String get title => _settledBillInput ? 'Bill payment details' : manualMoney ? widget.supplierMoney!.advance
       ? 'Record supplier advance' : 'Record supplier payment'
       : expense ? 'Record test expense' : 'Record test payment';
@@ -30326,6 +30330,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
           16 + (manualMoney ? 0 : MediaQuery.viewInsetsOf(context).bottom),
         ),
         child: Column(
+          key: _compactSettled ? const Key('supplier-money-compact-settled') : null,
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -30344,13 +30349,16 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                   ? 'Business expense not already recorded elsewhere.'
                   : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
             ),
+            if (_compactSettled) Text('Bill balance ${_purchaseAmount(billBalance!)}',
+              key: const Key('supplier-money-compact-balance'),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             Text(manualMoney ? 'Evaluation record · no money is transferred.' : 'Test record only. No money is transferred.'),
             if (_settledBillInput) const Text(
               'No amount is due on this bill. To record extra money already paid to the supplier, close and choose Record advance paid.',
               key: Key('supplier-money-no-bill-due')),
             if (manualMoney && widget.supplierMoney!.advance) const Text(
               'Record money already paid to the supplier as an advance. Link it to a bill separately.'),
-            if (!expense)
+            if (!expense && !_compactSettled)
               Text(
                 manualMoney && widget.supplierMoney!.advance
                     ? 'Advance paid before or after delivery. Stock stays unchanged.'
@@ -30358,9 +30366,9 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                     ? 'Bill balance unavailable'
                     : '${manualMoney && widget.supplierMoney!.copy == null ? 'Supplier dues' : 'Bill balance'} ${_purchaseAmount(billBalance!)}',
               ),
-            if (manualMoney) Align(alignment: Alignment.centerLeft,
+            if (!_compactSettled) if (manualMoney) Align(alignment: Alignment.centerLeft,
               child: SizedBox(width: 180, child: _paidAmountField())) else _paidAmountField(),
-            DropdownButtonFormField<String>(
+            if (!_compactSettled) DropdownButtonFormField<String>(
               key: ValueKey('supplier-payment-method-$method'),
               initialValue: method,
               isExpanded: true,
@@ -30386,7 +30394,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                       }
                     },
             ),
-            TextField(
+            if (!_compactSettled) TextField(
               key: Key(
                 expense
                     ? 'store-expense-reference'
@@ -30399,11 +30407,11 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
               onChanged: (_) => draft.save(fields),
             ),
             if (manualMoney) ...[
-              TextButton.icon(key: const Key('supplier-money-date'),
+              if (!_compactSettled) TextButton.icon(key: const Key('supplier-money-date'),
                 onPressed: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : choosePaymentDate,
                 icon: const Icon(Icons.calendar_today_outlined, size: 16),
                 label: Text('Payment date · ${occurredOn.split('-').reversed.join('/')}')),
-              CheckboxListTile(key: const Key('supplier-money-opening-excluded'),
+              if (!_compactSettled) CheckboxListTile(key: const Key('supplier-money-opening-excluded'),
                 contentPadding: EdgeInsets.zero, dense: true, value: excludedFromOpening,
                 title: const Text('Not already included in the starting balance'),
                 onChanged: !draft.ready || saving || _settledBillInput || conflict || frozen != null ? null : (value) {
@@ -30466,7 +30474,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                 onPressed: saving || (manualMoney && conflict) ? null : () => draft.save(fields),
                 child: const Text('Retry saving input'),
               ),
-            FilledButton(
+            if (!_compactSettled) FilledButton(
               key: manualMoney ? const Key('supplier-money-submit') : null,
               onPressed:
                   draft.ready && !saving && !draft.busy && draft.error == null &&
