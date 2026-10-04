@@ -5317,7 +5317,7 @@ class WorkspaceSupplierLedger {
             shortageClaims.length == previous.shortageClaims.length &&
             refunds.length == previous.refunds.length &&
             historyComplete == previous.historyComplete &&
-            asOf == previous.asOf &&
+            asOf.isAtSameMomentAs(previous.asOf) &&
             supplierName == previous.supplierName);
   }
 }

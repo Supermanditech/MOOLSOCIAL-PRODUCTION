@@ -4364,6 +4364,36 @@ void main() {
     requestedAt: DateTime.utc(2026, 10, 3),
     recordedAt: DateTime.utc(2026, 10, 3));
 
+  test('PURCHASEALLOC local bill timestamp survives UTC checkpoint recovery', () {
+    // Host-only regression: never creates phone evaluation records.
+    final opening = confirmedOpeningFixture(openingFixture(
+      amount: 50000, credit: true, bills: const []))!;
+    final base = acceptanceFixture(total: '230', date: '2026-10-02',
+      treatment: WorkspaceOpeningBillInclusion.excluded);
+    final bill = WorkspaceSupplierBillAcceptance(copy: base.copy,
+      acceptedAt: base.acceptedAt.add(const Duration(hours: 1)).toLocal(),
+      openingTreatment: base.openingTreatment);
+    final live = opening.acceptReviewedBill(bill, expectedRevision: 1)!;
+    final checkpoint = WorkspaceLedgerCheckpoint(revision: 1,
+      finance: receiptFinanceFixture(), supplierLedgers: {live.supplierId: live});
+    final saved = WorkspaceLedgerCheckpoint.fromJson(
+      jsonDecode(jsonEncode(checkpoint.toJson())))!.supplierLedgers[live.supplierId]!;
+    expect(live.asOf.isUtc, isFalse);
+    expect(saved.asOf.isUtc, isTrue);
+    expect(saved.canFollow(live), isTrue);
+    expect(live.canFollow(saved), isTrue);
+    expect(saved.manualBillRemainingMinor(bill.billId), 23000);
+    expect(saved.creditMinor, 27000);
+    expect(saved.entries.length, live.entries.length);
+    expect(saved.goodsReceipts, isEmpty);
+    final changedTime = WorkspaceSupplierLedger.fromJson({...saved.toJson(),
+      'asOf': saved.asOf.add(const Duration(microseconds: 1)).toIso8601String()})!;
+    expect(changedTime.canFollow(live), isFalse);
+    final changedName = WorkspaceSupplierLedger.fromJson({...saved.toJson(),
+      'supplierName': 'Different supplier name'})!;
+    expect(changedName.canFollow(live), isFalse);
+  });
+
   test('PURCHASEALLOC opening advance with zero net credit links without another money fact', () {
     final opening = confirmedOpeningFixture(openingFixture(amount: 50000, credit: true, bills: const []))!;
     final bill = acceptanceFixture(id: 'allocated-copy', draftId: 'allocated-bill',
