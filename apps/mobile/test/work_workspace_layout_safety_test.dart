@@ -5828,11 +5828,17 @@ void main() {
   });
   }
 
-  for (final (display, failedReview, freeText, cancelReview) in [(const Size(360, 800), false, '0', false),
-      (const Size(915, 412), false, '0', false), (const Size(360, 800), true, '0', false),
-      (const Size(360, 800), false, '   ', false), (const Size(360, 800), false, '-', false),
-      (const Size(360, 800), false, '0', true), (const Size(360, 800), false, '1', false)]) {
-    testWidgets('PURCHASEMATCHUI saved receipt match and reopen $display failedReview=$failedReview freeText="$freeText" cancel=$cancelReview', (tester) async {
+  for (final (display, failedReview, freeText, cancelReview, recoveryCase) in [
+      (const Size(360, 800), false, '0', false, 'normal'),
+      (const Size(915, 412), false, '0', false, 'normal'),
+      (const Size(360, 800), true, '0', false, 'normal'),
+      (const Size(360, 800), false, '   ', false, 'normal'),
+      (const Size(360, 800), false, '-', false, 'normal'),
+      (const Size(360, 800), false, '0', true, 'normal'),
+      (const Size(360, 800), false, '1', false, 'normal'),
+      (const Size(360, 800), false, '0', false, 'completed-read-failure'),
+      (const Size(360, 800), false, '0', false, 'external-completion-dirty')]) {
+    testWidgets('PURCHASEMATCHUI saved receipt match and reopen $display failedReview=$failedReview freeText="$freeText" cancel=$cancelReview recovery=$recoveryCase', (tester) async {
       // Host UI fixture; production serialization is tested separately in atomic tests.
       FlutterSecureStorage.setMockInitialValues({});
       final entry = _OpeningPostingFixtureStore();
@@ -5951,6 +5957,46 @@ void main() {
       final conversion = find.byKey(const Key('work-bill-goods-conversion'));
       await reveal(conversion); await tester.tap(conversion); await tester.pumpAndSettle();
       expect(tester.widget<CheckboxListTile>(conversion).value, isTrue);
+      if (recoveryCase == 'external-completion-dirty') {
+        // A separate task posts through the public owner APIs while this UI has
+        // only unsaved input. This is host UI-update proof, not a device race.
+        final external = WorkspaceSupplierBillGoodsAllocation(operationId: work.newWorkspaceBillGoodsLinkId(),
+          receiptId: receipt.id, receiptLineId: receipt.lines.single.sourceLineId,
+          billId: draft.id, copyId: copy.id, copyRevision: copy.revision, billLineIndex: 0,
+          productId: product.id, billUnit: product.pack, stockUnit: product.pack,
+          stockUnitsNumerator: 1, stockUnitsDenominator: 1, billQuantityMilli: 2000,
+          freeBillQuantityMilli: 0, acceptedReceiptMilli: 2000, damagedReceiptMilli: 0,
+          conversionReviewed: true, linkedAt: DateTime.now().toUtc());
+        expect(await work.saveWorkspaceBillGoodsReview(external, supplierId: supplier.id, scope: scope,
+          expectedPurchaseRevision: work.workspacePurchaseEntryRevision!,
+          expectedSupplierRevision: work.workspaceSupplierLedger(supplier.id)!.revision), isTrue);
+        expect(await work.confirmWorkspaceSupplierBillGoodsAllocation(external, supplierId: supplier.id,
+          scope: scope, expectedPurchaseRevision: work.workspacePurchaseEntryRevision!,
+          expectedSupplierRevision: work.workspaceSupplierLedger(supplier.id)!.revision,
+          requireSavedReview: true), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-bill-goods-complete')), findsNothing,
+          reason: 'An authoritative completed update must not conceal local unsaved quantities.');
+        expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-quantity'))).controller!.text, '2');
+        expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-accepted'))).controller!.text, '2');
+        final close = find.byKey(const Key('work-purchase-copy-close'));
+        await reveal(close); await tester.tap(close); await tester.pumpAndSettle();
+        expect(find.text('Leave goods match?'), findsOneWidget);
+        await tester.tap(find.text('Keep editing')); await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(find.byKey(const Key('work-bill-goods-quantity'))).controller!.text, '2');
+        await reveal(close); await tester.tap(close); await tester.pumpAndSettle();
+        await tester.tap(find.text('Discard changes')); await tester.pumpAndSettle();
+        await openCopy();
+        expect(find.byKey(const Key('work-bill-goods-complete')), findsOneWidget);
+        expect(find.byKey(const Key('work-bill-goods-quantity')), findsNothing);
+        expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations.keys, [external.operationId]);
+        expect(work.workspaceBillGoodsReviews, hasLength(1));
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+        expect(work.workspaceSupplierLedger(supplier.id)!.balanceMinor, balance);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        return;
+      }
       final save = find.byKey(const Key('work-bill-goods-save'));
       expect(tester.widget<TextButton>(save).onPressed, isNotNull);
       entry.failSave = failedReview;
@@ -6002,7 +6048,22 @@ void main() {
         reason: 'Only outstanding quantities offer another match; frozen confirmation remains visible.');
       final close = find.byKey(const Key('work-purchase-copy-close'));
       await reveal(close); await tester.tap(close); await tester.pumpAndSettle();
+      entry.failRead = recoveryCase == 'completed-read-failure';
       await openCopy();
+      if (recoveryCase == 'completed-read-failure') {
+        expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations.keys, [operation]);
+        expect(find.byKey(const Key('work-bill-goods-complete')), findsNothing,
+          reason: 'Cached fully matched ledger does not prove that review status loaded.');
+        expect(find.text('View received goods'), findsNothing);
+        expect(find.byKey(const Key('work-bill-goods-confirm')), findsNothing);
+        expect(find.byKey(const Key('work-bill-goods-save')), findsNothing);
+        final retry = find.byKey(const Key('work-bill-goods-recover'));
+        await reveal(retry);
+        entry.failRead = false;
+        await tester.tap(retry); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-bill-goods-recover')), findsNothing);
+        expect(work.workspaceBillGoodsReviews.single.allocation.toJson(), reviewed);
+      }
       final summary = find.byKey(ValueKey(('work-bill-goods-saved-match', operation)));
       await reveal(summary); expect(summary, findsOneWidget);
       expect(work.workspaceSupplierLedger(supplier.id)!.billGoodsAllocations, hasLength(1));
