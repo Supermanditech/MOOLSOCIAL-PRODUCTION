@@ -5202,7 +5202,11 @@ void main() {
         await tester.tap(advanceChoice);
         await tester.pumpAndSettle();
         final amount = find.byKey(const Key('supplier-allocation-amount'));
-        await revealAllocation(amount); await tester.enterText(amount, '100');
+        await revealAllocation(amount);
+        expect(tester.widget<TextField>(amount).decoration!.labelText, 'Amount (₹)');
+        expect(tester.getSize(amount).width, 180,
+          reason: 'Keep the numeric field compact in portrait and enlarged landscape.');
+        await tester.enterText(amount, '100');
         FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
         final submit = find.byKey(const Key('supplier-allocation-submit'));
         await revealAllocation(submit);

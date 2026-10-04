@@ -29733,7 +29733,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           Align(alignment: Alignment.centerLeft, child: SizedBox(width: 180, child: TextField(
             key: const Key('supplier-allocation-amount'), controller: amount, enabled: editable,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Amount to link (₹)'), onChanged: (_) => draft.save(fields)))),
+            decoration: const InputDecoration(labelText: 'Amount (₹)'), onChanged: (_) => draft.save(fields)))),
           ],
           if (frozen != null) Text(confirmed ? 'Allocation recorded · ${_purchaseAmount(frozen!.amountMinor)}'
             : savedVerified ? 'Saved allocation request · recover and retry the same details.'
