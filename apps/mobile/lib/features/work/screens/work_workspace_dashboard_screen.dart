@@ -14521,10 +14521,12 @@ class _ReceivingLineInput {
 /// Receiving is independent of entering a supplier bill. Persist the reviewed
 /// operation before posting and always resume its exact immutable snapshot.
 class _StoreReceiveGoodsSurface extends StatefulWidget {
-  const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack, this.initialSupplierId});
+  const _StoreReceiveGoodsSurface({super.key, required this.session, required this.onBack,
+    this.initialSupplierId, this.initialBill});
   final WorkSession session;
   final VoidCallback onBack;
   final String? initialSupplierId;
+  final WorkspacePurchaseSavedCopy? initialBill;
   @override
   State<_StoreReceiveGoodsSurface> createState() => _StoreReceiveGoodsState();
 }
@@ -14543,12 +14545,17 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   final _supplierPicker = GlobalKey<FormFieldState<String>>();
   bool _busy = true, _loaded = false, _reviewVerified = false;
   bool _discarding = false;
+  bool _billReceiptChosen = false;
   Future<bool>? _leaveDecision;
   String? _error, _notice;
   WorkSession get session => widget.session;
   bool get _current => mounted && _scope != null && _scope == session.workspaceSupplierScope;
   WorkspaceSupplierLedger? get _ledger => _supplierId == null ? null : session.workspaceSupplierLedger(_supplierId!);
   bool get _committed => _frozen != null && _ledger?.goodsReceipts.containsKey(_frozen!.id) == true;
+  bool get _billContextValid => widget.initialBill == null ||
+    (_supplierId == widget.initialBill!.supplier.id && session.workspacePurchaseCopies.any((copy) =>
+      copy.id == widget.initialBill!.id && copy.revision == widget.initialBill!.revision &&
+      copy.draft.id == widget.initialBill!.draft.id && copy.supplier.id == _supplierId));
   bool get _cancelled => _frozen != null && session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == _frozen!.id);
   bool get _conflict => _committed && _cancelled;
   bool get _savedStatusResolved => _loaded && _reviewVerified && !_conflict &&
@@ -14738,6 +14745,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     setState(() => _busy = false);
   }
   void _newArrival({WorkspaceSupplierGoodsReceipt? previous}) {
+    _billReceiptChosen = true;
     for (final line in _lines) { line.dispose(); }
     _lines.clear();
     if (previous != null) {
@@ -14885,11 +14893,79 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   @override
   Widget build(BuildContext context) {
     final editable = !_busy && _loaded && !_discarding && _frozen == null && (_supplierId == null || _draft?.ready == true);
+    final bill = widget.initialBill;
+    final linkedReceiptIds = bill == null ? const <String>{} : _ledger?.billGoodsAllocations.values
+      .where((link) => link.billId == bill.draft.id && link.copyId == bill.id && link.copyRevision == bill.revision)
+      .map((link) => link.receiptId).toSet() ?? const <String>{};
+    final linkedReceipts = _ledger?.goodsReceipts.values.where((receipt) => linkedReceiptIds.contains(receipt.id))
+      .toList() ?? const <WorkspaceSupplierGoodsReceipt>[];
+    if (bill != null && _loaded && !_busy && !_billContextValid) {
+      return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+        Text('Supplier bill ${bill.draft.invoiceReference}'),
+        const Text('This saved bill is unavailable. Return to Purchases and reopen it before receiving goods.'),
+        TextButton(onPressed: _close, child: const Text('Close')),
+      ]);
+    }
+    if (bill != null && _billContextValid && _savedStatusResolved && _committed && !_billReceiptChosen) {
+      // A supplier-wide draft is not evidence that its delivery belongs to this
+      // bill. Preserve it until the retailer explicitly chooses a verified link
+      // or starts another delivery under the existing receiving guards.
+      if (linkedReceiptIds.length != linkedReceipts.length) {
+        return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+          Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context')),
+          const Text('A linked delivery is unavailable. Recover saved records before receiving these goods again.'),
+          TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
+          TextButton(onPressed: _busy ? null : _close, child: const Text('Close')),
+        ]);
+      }
+      return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
+        Row(children: [const Expanded(child: Text('Receive goods', style: TextStyle(fontSize: 16,
+          fontWeight: FontWeight.w700, color: MoolColors.navy))),
+          TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
+        Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+        Text(linkedReceipts.isEmpty ? 'No received goods linked to this bill.' : 'Deliveries linked to this bill',
+          key: const Key('work-receive-bill-linked-status'), style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+        for (final receipt in linkedReceipts) TextButton(
+          key: ValueKey(('work-receive-bill-linked-receipt', receipt.id)),
+          onPressed: _busy ? null : () {
+            if (!_current || !_billContextValid || !_savedStatusResolved) return;
+            final verified = session.workspaceGoodsReceiptDrafts.any((review) => review.supplierId == _supplierId &&
+              jsonEncode(review.receipt.toJson()) == jsonEncode(receipt.toJson()));
+            if (!verified) { setState(() => _error = 'Saved delivery review is unavailable. Recover saved status before opening it.'); return; }
+            setState(() { _restore(receipt); _billReceiptChosen = true; _error = null; });
+          }, child: Text('View delivery ${receipt.reference}')),
+        if (!linkedReceiptIds.contains(_frozen!.id)) ...[
+          const Text('Earlier supplier delivery · not linked to this bill',
+            style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+          TextButton(key: const Key('work-receive-bill-other-receipt'), onPressed: _busy ? null : () {
+            if (_current && _billContextValid && _savedStatusResolved) setState(() => _billReceiptChosen = true);
+          }, child: Text('View delivery ${_frozen!.reference}')),
+        ],
+        TextButton(key: const Key('work-receive-bill-new-delivery'), onPressed: _busy ? null : () {
+          if (_current && _billContextValid && _savedStatusResolved) setState(() => _newArrival());
+        }, child: const Text('Record another delivery')),
+        const Text('Already in Stock? Link the earlier Stock entry when recording goods. Do not add it again.',
+          style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        if (_error != null) Text(_error!, style: const TextStyle(fontSize: 12, color: MoolColors.ink)),
+        if (_error != null) TextButton(onPressed: _busy ? null : _recover, child: const Text('Recover saved status')),
+      ]);
+    }
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
         Row(children: [Expanded(child: Text(_committed && !_conflict ? 'Goods received' : 'Receive goods', style: const TextStyle(fontSize: 16,
           fontWeight: FontWeight.w700, color: MoolColors.navy))),
           TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
+        if (bill != null) ...[
+          Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+          if (_frozen != null && !linkedReceiptIds.contains(_frozen!.id))
+            const Text('This supplier delivery is not linked to the bill. Match received goods from the bill after recording it.',
+              style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+          if (_frozen == null)
+            const Text('Complete this supplier delivery, then match it to the bill. Existing delivery input is kept.',
+              style: TextStyle(fontSize: 12, color: MoolColors.ink)),
+        ],
         if (!_committed || _conflict) const Text('Record goods with or without a supplier bill. Link earlier Stock entries instead of adding them again.',
           style: TextStyle(fontSize: 12, color: MoolColors.ink)),
         if (!_loaded) TextButton(onPressed: _busy ? null : _recover, child: const Text('Retry saved records')),
@@ -14902,7 +14978,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
             contentPadding: EdgeInsets.symmetric(vertical: 8), enabledBorder: UnderlineInputBorder(),
             focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy))),
           items: [for (final p in session.workspaceSuppliers) DropdownMenuItem(value: p.id, child: Text(p.name))],
-          onChanged: editable ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
+          onChanged: editable && bill == null ? (value) { if (value != null) unawaited(_chooseSupplier(value)); } : null)),
         if (_supplierId != null) ...[
           if (_frozen == null) ...[
             Text(_draft?.error ?? (_draft?.busy == true ? 'Saving delivery input…'
@@ -15157,6 +15233,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     if (_receiveGoods && !statement) {
       final scope = session.workspaceSupplierScope;
       return _StoreReceiveGoodsSurface(key: widget.receivingKey, session: session, initialSupplierId: _receivingSupplierId,
+        initialBill: _returnReceivingCopy,
         onBack: () {
           if (!mounted || scope != session.workspaceSupplierScope) return;
           setState(() { _receiveGoods = false; _receivingSupplierId = null;

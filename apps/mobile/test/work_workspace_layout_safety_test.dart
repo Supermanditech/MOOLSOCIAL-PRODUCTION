@@ -5840,6 +5840,7 @@ void main() {
       (const Size(360, 800), false, '1', false, 'normal'),
       (const Size(360, 800), false, '0', false, 'completed-read-failure'),
       (const Size(360, 800), false, '0', false, 'different-units'),
+      (const Size(360, 800), false, '0', false, 'unfinished-receiving'),
       (const Size(360, 800), false, '0', false, 'external-completion-dirty'),
       (const Size(360, 800), false, '0', false, 'settled-empty'),
       (const Size(360, 800), false, '0', false, 'settled-retained'),
@@ -5923,6 +5924,13 @@ void main() {
       }
       final stock = work.workspaceCatalogueItems.map((p) => (p.id, p.stock)).toList();
       final balance = work.workspaceSupplierLedger(supplier.id)!.balanceMinor;
+      if (recoveryCase == 'unfinished-receiving') {
+        await forms.save(WorkspaceLedgerFormDraft(key: work.supplierReceivingInputFormKey(supplier.id)!,
+          revision: 1, fields: {'arrivalId': 'HOST-pending-arrival', 'groupId': 'HOST-pending-group',
+            'input': jsonEncode(['HOST unfinished delivery', day,
+              ['HOST-pending-line', product.id, true, product.pack, '1', '2', '1', '0', '0', <String, String>{}]])}),
+          expectedRevision: null);
+      }
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: display, textScale: display.width > 500 ? 2 : 1.4);
       await openPurchaseList(tester);
@@ -5956,6 +5964,39 @@ void main() {
         }
       }
       await openCopy();
+      if ((recoveryCase == 'normal' || recoveryCase == 'unfinished-receiving') &&
+          display.width == 360 && freeText == '0' && !failedReview && !cancelReview) {
+        final ledgerBeforeRoute = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+        final bookBeforeRoute = work.workspacePurchaseEntryRevision;
+        final receiveFromBill = find.byKey(const Key('work-purchase-bill-receive-goods'));
+        await reveal(receiveFromBill); await tester.tap(receiveFromBill); await tester.pumpAndSettle();
+        expect(find.text('Supplier bill HOST-MATCH-01'), findsOneWidget);
+        if (recoveryCase == 'unfinished-receiving') {
+          expect(find.byKey(const Key('work-receive-bill-new-delivery')), findsNothing);
+          expect(tester.widget<TextField>(find.byKey(const ValueKey('work-receive-reference'))).controller!.text,
+            'HOST unfinished delivery');
+          expect(tester.widget<TextField>(find.byKey(const ValueKey('work-receive-delivered-0'))).controller!.text, '1');
+          final picker = tester.widget<DropdownButtonFormField<String>>(find.descendant(
+            of: find.byKey(const Key('work-receive-supplier')), matching: find.byType(DropdownButtonFormField<String>)));
+          expect(picker.onChanged, isNull, reason: 'The initiating bill must retain its supplier.');
+        } else {
+        expect(find.text('No received goods linked to this bill.'), findsOneWidget);
+        expect(find.text('Delivery HOST matching delivery'), findsNothing,
+          reason: 'The latest supplier receipt must not masquerade as this bill’s delivery.');
+        expect(find.byKey(const Key('work-receive-reference')), findsNothing);
+        final earlier = find.byKey(const Key('work-receive-bill-other-receipt'));
+        await tester.ensureVisible(earlier); await tester.tap(earlier); await tester.pumpAndSettle();
+        expect(find.text('Delivery HOST matching delivery'), findsOneWidget);
+        expect(find.text('This supplier delivery is not linked to the bill. Match received goods from the bill after recording it.'), findsOneWidget);
+        }
+        await tester.tap(find.text('Close')); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), ledgerBeforeRoute);
+        expect(work.workspacePurchaseEntryRevision, bookBeforeRoute);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+        final reopenedMatch = find.byKey(const Key('work-bill-goods-open'));
+        await reveal(reopenedMatch); await tester.tap(reopenedMatch); await tester.pumpAndSettle();
+      }
       expect(find.byKey(const Key('work-purchase-bill-receive-goods')),
         freeText == '-' ? findsNothing : findsOneWidget,
         reason: 'Only verified, incomplete progress offers another receipt.');
@@ -6121,6 +6162,21 @@ void main() {
       expect(find.text('View received goods'), freeText == '1' ? findsNothing : findsOneWidget);
       expect(find.byKey(const Key('work-purchase-record-payment')), findsOneWidget,
         reason: 'Goods matching must not hide the unpaid bill payment action.');
+      if (freeText == '1') {
+        final linkedLedger = jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson());
+        final receiveFromBill = find.byKey(const Key('work-purchase-bill-receive-goods'));
+        await reveal(receiveFromBill); await tester.tap(receiveFromBill); await tester.pumpAndSettle();
+        expect(find.text('Deliveries linked to this bill'), findsOneWidget);
+        expect(find.byKey(const Key('work-receive-bill-other-receipt')), findsNothing);
+        final linkedReceipt = find.byKey(ValueKey(('work-receive-bill-linked-receipt', receipt.id)));
+        await tester.ensureVisible(linkedReceipt); await tester.tap(linkedReceipt); await tester.pumpAndSettle();
+        expect(find.text('Delivery HOST matching delivery'), findsOneWidget);
+        expect(find.text('This supplier delivery is not linked to the bill. Match received goods from the bill after recording it.'), findsNothing);
+        await tester.tap(find.text('Close')); await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+        expect(jsonEncode(work.workspaceSupplierLedger(supplier.id)!.toJson()), linkedLedger);
+        expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
+      }
       if (settled) {
         final paymentAction = find.byKey(const Key('work-purchase-record-payment'));
         expect(find.descendant(of: paymentAction, matching: find.text('Bill payment details')), findsOneWidget);
