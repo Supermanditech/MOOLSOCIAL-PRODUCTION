@@ -3513,6 +3513,110 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('P01-AC01 action centre exposes purpose-specific routes without posting', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 806), textScale: 1);
+    await openPurchaseList(tester);
+    final before = entry.value == null ? null : jsonEncode(entry.value!.toJson());
+    final centre = find.byKey(const Key('work-purchase-action-centre-open'));
+    expect(centre, findsOneWidget);
+    await tester.tap(centre);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-action-centre')), findsOneWidget);
+    expect(find.text('Supplier bills'), findsOneWidget);
+    expect(find.text('Have a supplier invoice? Enter it here—even if goods arrive later.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('purchase-action-record-bill')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+    expect(entry.value == null ? null : jsonEncode(entry.value!.toJson()), before);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R11-PREVIEW-FS01 fills safe display and preserves unfinished input on Close', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 806), textScale: 1);
+    await openPurchaseList(tester);
+    await openPurchaseEntryFromList(tester);
+    await expandPurchasePrimarySections(tester);
+    final name = find.byKey(const Key('work-purchase-supplier-name'));
+    await revealPurchaseInput(tester, name);
+    await tester.enterText(name, 'Unfinished invoice review');
+    await usePurchaseControl(tester, 'work-purchase-preview');
+    await usePurchaseControl(tester, 'purchase-preview-full-screen');
+    final preview = find.byKey(const Key('purchase-full-screen-preview'));
+    expect(preview, findsOneWidget);
+    expect(tester.getSize(preview).width, 360);
+    expect(tester.getSize(preview).height, greaterThan(740));
+    final closePreview = tester.widget<TextButton>(find.byKey(const Key('purchase-full-screen-close'))).onPressed!;
+    closePreview();
+    closePreview();
+    await tester.pumpAndSettle();
+    expect(preview, findsNothing);
+    expect(tester.widget<TextField>(name).controller!.text, 'Unfinished invoice review');
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R11-PREVIEW-FS01 editor replacement removes owned preview safely', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 806), textScale: 1);
+    await openPurchaseList(tester);
+    await openPurchaseEntryFromList(tester);
+    await usePurchaseControl(tester, 'work-purchase-preview');
+    await usePurchaseControl(tester, 'purchase-preview-full-screen');
+    expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('purchase-full-screen-preview')), findsNothing);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final geometry in [(const Size(320, 568), 2.0), (const Size(806, 360), 1.6)]) {
+    testWidgets('P01-AC01 categories and full-screen Back retain draft $geometry', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+      await tester.pumpAndSettle();
+      for (final category in ['Supplier bills', 'Goods received & returns', 'Money paid, credit & refunds',
+          'Starting records', 'Supplier accounts & documents']) {
+        expect(find.text(category), findsOneWidget);
+      }
+      expect(find.byKey(const Key('purchase-action-continue-bill')), findsNothing);
+      final last = find.byKey(const Key('purchase-action-documents'));
+      await Scrollable.ensureVisible(tester.element(last));
+      await tester.pumpAndSettle();
+      expect(last.hitTestable(), findsOneWidget);
+      expect(tester.getSize(last).height, greaterThanOrEqualTo(48));
+      await tester.tap(find.byTooltip('Close purchase actions'));
+      await tester.pumpAndSettle();
+      await openPurchaseEntryFromList(tester);
+      await expandPurchasePrimarySections(tester);
+      final name = find.byKey(const Key('work-purchase-supplier-name'));
+      await revealPurchaseInput(tester, name);
+      await tester.enterText(name, 'Keep this review input');
+      await usePurchaseControl(tester, 'work-purchase-preview');
+      await usePurchaseControl(tester, 'purchase-preview-full-screen');
+      expect(tester.getSize(find.byKey(const Key('purchase-full-screen-preview'))).width, geometry.$1.width);
+      expect(find.byKey(const Key('purchase-full-screen-close')).hitTestable(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-full-screen-preview')), findsNothing);
+      expect(tester.widget<TextField>(name).controller!.text, 'Keep this review input');
+      expect(entry.value, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('P05-R12 save reviewed copy and reopen read-only without changing draft', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -4711,6 +4815,35 @@ void main() {
       storeId: scope.$2, adapter: StoreReviewCustomerCollectionGateway(finance),
       checkpointStore: checkpoint), isTrue);
     return work;
+  }
+
+  for (final hasReference in [false, true]) {
+    testWidgets('P01-AC01 receiving continuation ignores automatic date $hasReference', (tester) async {
+      // Host-only fixtures; no device acceptance or backend evidence.
+      FlutterSecureStorage.setMockInitialValues({});
+      final entry = _OpeningPostingFixtureStore(), checkpoint = _LedgerCheckpointFixtureStore();
+      final forms = _LedgerFormFixtureStore();
+      final work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
+      final scope = work.workspaceSupplierScope!, at = DateTime.now().toUtc();
+      final supplier = WorkspaceSupplierProfile(id: 'ac01-resume-supplier', name: 'Evaluation delivery supplier',
+        phone: '', address: '', gstin: '', createdAt: at, updatedAt: at);
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 1, profiles: [supplier]);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openPurchaseList(tester);
+      await forms.save(WorkspaceLedgerFormDraft(key: work.supplierReceivingInputFormKey(supplier.id)!,
+        revision: 1, fields: {'arrivalId': 'HOST-ac01-arrival', 'groupId': 'HOST-ac01-group',
+          'input': jsonEncode([hasReference ? 'Unfinished delivery' : '', '2026-10-05',
+            ['HOST-empty-line', '', true, '', '1', '', '', '', '', <String, String>{}]])}),
+        expectedRevision: null);
+      final before = jsonEncode(entry.value!.toJson());
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-action-continue-receive')),
+        hasReference ? findsOneWidget : findsNothing);
+      expect(jsonEncode(entry.value!.toJson()), before);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final display in [const Size(320, 568), const Size(915, 412)]) {

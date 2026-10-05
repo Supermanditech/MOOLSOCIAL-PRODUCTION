@@ -11900,13 +11900,69 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   final _reviewAnchor = GlobalKey();
   final _saveErrorAnchor = GlobalKey();
   final _itemsAnchor = GlobalKey();
-  final _sourceViewport = GlobalKey();
-  final _documentPage = GlobalKey();
+  final _inlineSourceViewport = GlobalKey(), _fullscreenSourceViewport = GlobalKey();
+  final _inlineDocumentPage = GlobalKey(), _fullscreenDocumentPage = GlobalKey();
+  GlobalKey get _sourceViewport => _fullScreenPreview ? _fullscreenSourceViewport : _inlineSourceViewport;
+  GlobalKey get _documentPage => _fullScreenPreview ? _fullscreenDocumentPage : _inlineDocumentPage;
   final _previewZoom = TransformationController();
   final _recordedItemScroll = ScrollController(keepScrollOffset: false);
   final _recordedTaxScroll = ScrollController(keepScrollOffset: false);
   final _readingPointers = <int>{};
   bool _reviewFocused = false;
+  bool _fullScreenPreview = false;
+  DialogRoute<void>? _previewRoute;
+  bool _previewClosing = false;
+  final _previewChanges = ValueNotifier<int>(0);
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    if (_fullScreenPreview) _previewChanges.value++;
+  }
+
+  Future<void> _openFullScreenPreview() async {
+    if (_fullScreenPreview || !_current || _busy) return;
+    FocusScope.of(context).unfocus();
+    _previewClosing = false;
+    setState(() => _fullScreenPreview = true);
+    // There must be only one mounted invoice viewer for these keys/controllers.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_current) {
+      if (mounted) setState(() => _fullScreenPreview = false);
+      return;
+    }
+    try {
+      final route = DialogRoute<void>(context: context, useSafeArea: true, barrierDismissible: false,
+        builder: (previewContext) => Dialog.fullscreen(child: SafeArea(
+          child: AnimatedBuilder(animation: Listenable.merge([_previewChanges, widget.session]),
+            builder: (_, _) => LayoutBuilder(builder: (context, constraints) => Column(
+              key: const Key('purchase-full-screen-preview'), children: [
+                Row(children: [const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('Invoice preview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)))),
+                  TextButton(key: const Key('purchase-full-screen-close'),
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    onPressed: _closeFullScreenPreview, child: const Text('Close'))]),
+                Expanded(child: !_current ? const Center(child: Text('This purchase is no longer available. Close the preview.'))
+                  : SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 8),
+                    physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _sourceAttachment == null ? _reviewPurchase(constraints.maxHeight - 48)
+                        : _reviewOriginal(constraints.maxHeight - 48)))),
+              ]))))));
+      _previewRoute = route;
+      await Navigator.of(context, rootNavigator: true).push(route);
+      await route.completed;
+    } finally {
+      _previewRoute = null;
+      if (mounted) setState(() { _fullScreenPreview = false; _readingPointers.clear(); });
+    }
+  }
+  void _closeFullScreenPreview() {
+    final route = _previewRoute;
+    if (_previewClosing || route == null || !route.isCurrent) return;
+    _previewClosing = true;
+    route.navigator?.pop();
+  }
   WorkspacePurchaseInvoiceAttachment? _lastOriginal;
   int _lastOriginalPage = 0;
   WorkspacePurchaseInvoiceAttachment? _sourceAttachment;
@@ -11948,7 +12004,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   bool _loading = true, _busy = false, _leaving = false;
   String? _error, _notice;
   final _expandedSections = <String>{};
-  bool get _current => _scope != null && _scope == widget.session.workspaceSupplierScope;
+  bool get _current => mounted && _scope != null && _scope == widget.session.workspaceSupplierScope;
   String get _input => jsonEncode([_name.text, _phone.text, _address.text, _gstin.text,
     _reference.text, _date.text, _goods.map((line) => line.fields).toList(), _supplierId,
     {for (final e in _details.entries) if (e.value.text.isNotEmpty) e.key: e.value.text},
@@ -12235,11 +12291,25 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     for (final c in [_name, _phone, _address, _gstin, _reference, _date]) { c.dispose(); }
     for (final c in _details.values) { c.dispose(); }
     _supplierFocus.dispose();
-    _previewZoom.dispose();
-    _recordedItemScroll.dispose();
-    _recordedTaxScroll.dispose();
     _sourceEpoch++;
-    _sourcePdf.dispose();
+    final route = _previewRoute;
+    void releasePreview() {
+      _previewZoom.dispose();
+      _previewChanges.dispose();
+      _recordedItemScroll.dispose();
+      _recordedTaxScroll.dispose();
+      _sourcePdf.dispose();
+    }
+    if (route == null) {
+      releasePreview();
+    } else {
+      // The root overlay must stop using this editor's resources before release.
+      route.completed.then((_) => releasePreview());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final navigator = route.navigator;
+        if (navigator != null && navigator.mounted && route.isActive) navigator.removeRoute(route);
+      });
+    }
     for (final line in _goods) { line.dispose(); }
     for (final field in _additional) { field.dispose(); }
     for (final row in _taxRows) { for (final c in row.values) { c.dispose(); } }
@@ -12660,7 +12730,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     final original = _sourceAttachment != null;
     final attachment = _attachments.where((a) => a.digest == _lastOriginal?.digest).firstOrNull
         ?? _attachments.firstOrNull;
-    return Wrap(key: const Key('purchase-review-toolbar'), crossAxisAlignment: WrapCrossAlignment.center, children: [
+    return SingleChildScrollView(scrollDirection: Axis.horizontal,
+      child: Row(key: const Key('purchase-review-toolbar'), children: [
+      if (!_fullScreenPreview) IconButton(key: const Key('purchase-preview-full-screen'),
+        tooltip: 'View invoice full screen', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        onPressed: _openFullScreenPreview, icon: const Icon(Icons.open_in_full, size: 20, color: MoolColors.navy)),
       if (attachment != null) Semantics(selected: original, child: TextButton(
         key: const Key('purchase-review-original'),
         style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
@@ -12686,7 +12760,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         onPressed: _recordedSaving ? null : _downloadRecorded,
         icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
       _invoiceTools(original: original),
-    ]);
+    ]));
   }
   void _zoomInvoice() {
     final box = _sourceViewport.currentContext?.findRenderObject();
@@ -12715,7 +12789,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     LayoutBuilder(builder: (context, constraints) => SizedBox(key: _sourceViewport,
       // Reserve space for comparison controls and the fixed draft actions.
       // The page starts at readable width; its remaining height pans inside.
-      height: (viewportHeight * .55).clamp(160.0, 650.0),
+      height: _fullScreenPreview ? (viewportHeight - 160).clamp(80.0, 1600.0)
+        : (viewportHeight * .55).clamp(160.0, 650.0),
       child: Listener(onPointerDown: (e) => _readingPointer(e, true),
         onPointerUp: (e) => _readingPointer(e, false), onPointerCancel: (e) => _readingPointer(e, false),
         child: ClipRect(child: ColoredBox(color: const Color(0xffe8ebef),
@@ -12799,6 +12874,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _positionReview();
   }
   void _positionReview() {
+    if (_fullScreenPreview) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final target = _reviewAnchor.currentContext;
       if (mounted && target != null) {
@@ -12820,6 +12896,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       : key.startsWith('bank') || key.startsWith('upi') || paymentKeys.contains(key) ? 'payment' : 'tax';
   }
   void _reviewItemAmounts() {
+    if (_fullScreenPreview) Navigator.of(context, rootNavigator: true).pop();
     setState(() {
       _reviewFocused = false;
       _expandedSections.remove('work-purchase-review-section');
@@ -13561,7 +13638,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                 _extraFields('payment')]),
               ]),
               _purchaseSection('Preview & review purchase', 'work-purchase-review-section',
-                _sourceAttachment == null ? _reviewPurchase(constraints.maxHeight) : _reviewOriginal(constraints.maxHeight),
+                _fullScreenPreview ? <Widget>[] : _sourceAttachment == null
+                  ? _reviewPurchase(constraints.maxHeight) : _reviewOriginal(constraints.maxHeight),
                 number: 8, summary: _reviewFocused
                   ? _sourceAttachment == null ? 'Entered bill details' : 'Supplier copy'
                   : 'Check bill details before saving'),
@@ -13609,7 +13687,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         Text('Saved ${_registerDate(copy.savedAt)} · Revision ${copy.revision}',
           style: const TextStyle(fontSize: 11, color: _paperMuted)),
         _savedBillActions(copy),
-        ...(_sourceAttachment == null ? _reviewPurchase(height) : _reviewOriginal(height)),
+        if (!_fullScreenPreview) ...(_sourceAttachment == null ? _reviewPurchase(height) : _reviewOriginal(height)),
       ]);
   }
   WorkspaceOpeningBillInclusion? _billTreatment(WorkspacePurchaseSavedCopy copy,
@@ -15341,9 +15419,11 @@ class _StorePurchasesSurface extends StatefulWidget {
     this.onPurchaseBack,
     this.purchaseEntryKey,
     this.receivingKey,
+    this.onOpenStock,
   });
   final WorkSession session;
   final bool statement;
+  final VoidCallback? onOpenStock;
   final ValueChanged<String>? onTrackPurchase;
   final VoidCallback? onPurchaseBack;
   final GlobalKey<_StoreRecordPurchaseState>? purchaseEntryKey;
@@ -15364,6 +15444,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   List<String>? _purchaseHistory;
   String _purchaseFilter = 'All';
   bool _recordPurchase = false, _openingOnly = false;
+  bool _actionCentreOpen = false;
+  final _receivingResumeIds = <String>{};
+  bool _receivingResumeUnknown = false;
   bool _receiveGoods = false;
   String? _receivingSupplierId;
   WorkspacePurchaseSavedCopy? _returnReceivingCopy;
@@ -15411,6 +15494,273 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         'Received' => record.receiptState == WorkspaceReceiptState.confirmed,
         _ => true,
       };
+
+  String _actionReceiptSummary(WorkspaceSupplierGoodsReceipt receipt) {
+    final quantity = receipt.lines.fold<int>(0, (sum, line) => sum + line.deliveredMilli);
+    final code = receipt.id.length > 12 ? receipt.id.substring(receipt.id.length - 12) : receipt.id;
+    return '${receipt.deliveredOn} · ${receipt.lines.length} items · Qty ${_ReceivingLineInput._quantity(quantity)}\n'
+      'Recorded ${receipt.recordedAt.toLocal().toIso8601String()} · Delivery $code';
+  }
+
+  String _actionReceiptStock(WorkspaceSupplierGoodsReceiptLine line,
+      WorkspaceSupplierGoodsReceipt receipt, bool verified) {
+    final expected = receipt.movementFor(line);
+    if (!verified || session.workspaceGoodsReceiptRecoveryPending ||
+        (expected != null && !session.workspaceStockMovements.any((movement) =>
+          movement.contentIdentity == expected.contentIdentity))) {
+      return 'Stock update not verified · Qty to add ${line.newStockUnits}';
+    }
+    return 'Stock added ${line.newStockUnits}';
+  }
+
+  Future<T?> _chooseActionRecord<T>(String title, List<(T, String, String)> rows) =>
+    showDialog<T>(context: context, useSafeArea: true, builder: (dialogContext) => Dialog.fullscreen(
+      child: SafeArea(child: Column(children: [
+        ListTile(title: Text(title), trailing: IconButton(tooltip: 'Close',
+          onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
+        Expanded(child: ListView(children: [
+          if (rows.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text(
+            'No eligible saved record is available. Return to Purchases to record or recover it.')),
+          for (final row in rows) ListTile(title: Text(row.$2), subtitle: Text(row.$3),
+            trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(dialogContext, row.$1)),
+        ])),
+      ]))));
+
+  Future<void> _purchaseAction(String action) async {
+    _purchaseSearchFocus.unfocus();
+    final scope = session.workspaceSupplierScope;
+    bool current() => mounted && scope != null && scope == session.workspaceSupplierScope;
+    if (!current() || !session.workspaceSuppliersLoaded) return;
+    if (action == 'record-bill' || action == 'continue-bill') {
+      if (action == 'record-bill' && session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Continue your unfinished bill before starting another.')));
+        return;
+      }
+      setState(() { _openingOnly = false; _savedCopy = null;
+        _newPurchase = action == 'record-bill' && session.workspacePurchaseDraftReviewed;
+        _recordPurchase = true; });
+      return;
+    }
+    if (action == 'recorded' || action == 'documents') {
+      setState(() { _purchaseFilter = 'All'; _purchaseSearch.clear(); });
+      return;
+    }
+    if (action == 'opening' || action == 'review-opening') {
+      setState(() { _openingOnly = true; _newPurchase = false; _savedCopy = null; _recordPurchase = true; });
+      return;
+    }
+    if (action == 'stock') { widget.onOpenStock?.call(); return; }
+    if (action == 'receive') { setState(() => _receiveGoods = true); return; }
+    if (action == 'continue-receive' || action == 'prior-stock') {
+      final supplier = await _chooseActionRecord<WorkspaceSupplierProfile>('Choose supplier', [
+        for (final supplier in session.workspaceSuppliers)
+          if (action != 'continue-receive' || _receivingResumeIds.contains(supplier.id))
+            (supplier, supplier.name, supplier.phone),
+      ]);
+      if (!current() || supplier == null || !session.workspaceSuppliers.any((p) => p.id == supplier.id)) return;
+      setState(() { _receivingSupplierId = supplier.id; _receiveGoods = true; });
+      return;
+    }
+    final recovered = await session.recoverCustomerLedger();
+    if (!mounted || !current()) return;
+    if (action == 'goods-history') {
+      final review = await _chooseActionRecord<WorkspaceSupplierGoodsReceiptDraft>('Choose received goods', [
+        for (final review in session.workspaceGoodsReceiptDrafts)
+          if (!session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == review.receipt.id))
+            (review, review.receipt.reference, '${session.workspaceSuppliers.where((s) => s.id == review.supplierId).firstOrNull?.name ?? 'Supplier unavailable'} · ${_actionReceiptSummary(review.receipt)}'),
+      ]);
+      if (!mounted || !current() || review == null || !session.workspaceGoodsReceiptDrafts.any((r) => jsonEncode(r.toJson()) == jsonEncode(review.toJson()))) return;
+      final receipt = review.receipt;
+      final supplier = session.workspaceSuppliers.where((s) => s.id == review.supplierId).firstOrNull;
+      final ledger = session.workspaceSupplierLedger(review.supplierId);
+      final verified = jsonEncode(ledger?.goodsReceipts[receipt.id]?.toJson()) == jsonEncode(receipt.toJson());
+      await showDialog<void>(context: context, builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
+        child: Column(children: [ListTile(title: Text(receipt.reference), subtitle: Text('${supplier?.name ?? 'Supplier unavailable'} · ${receipt.deliveredOn}'),
+          trailing: IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
+          Expanded(child: ListView(padding: const EdgeInsets.all(16), children: [
+            Text(verified ? 'Goods received · saved record' : 'Delivery review · receipt posting not verified'),
+            for (final line in receipt.lines) ListTile(title: Text(line.productLabel), subtitle: Text(
+              'Received ${_ReceivingLineInput._quantity(line.deliveredMilli)} ${line.purchaseUnit} · Accepted ${_ReceivingLineInput._quantity(line.acceptedMilli)}\n'
+              'Damaged ${_ReceivingLineInput._quantity(line.damagedMilli)} · Short ${_ReceivingLineInput._quantity(line.shortMilli)}\n'
+              'Earlier Stock linked ${line.linkedStockUnits} · ${_actionReceiptStock(line, receipt, recovered && verified)}')),
+            for (final returned in ledger?.goodsReturns.values ?? <WorkspaceSupplierGoodsReturn>[])
+              if (returned.receiptId == receipt.id) ListTile(title: Text('Return ${returned.reference}'),
+                subtitle: Text('${returned.returnedOn} · ${returned.reason}\n${returned.lines.map((l) => '${l.productLabel}: ${l.stockUnits}').join(', ')}')),
+          ])),
+        ]))));
+      return;
+    }
+    if (action == 'accounts' || action == 'statement' || action == 'money-history' || action == 'money' || action == 'refund' || action == 'return') {
+      final supplier = await _chooseActionRecord<WorkspaceSupplierProfile>('Choose supplier', [
+        for (final supplier in session.workspaceSuppliers) (supplier, supplier.name, supplier.phone),
+      ]);
+      if (!mounted || !current() || supplier == null || !session.workspaceSuppliers.any((p) => p.id == supplier.id)) return;
+      final ledger = session.workspaceSupplierLedger(supplier.id);
+      if (action == 'money') {
+        final purpose = await _chooseActionRecord<String>('What was this money paid for?', const [
+          ('bill', 'Payment against a bill', 'Choose the supplier bill you paid.'),
+          ('advance', 'Advance before the bill', 'Money paid ahead of a supplier bill.'),
+          ('account', 'Supplier account payment', 'Money paid against the supplier account.'),
+        ]);
+        if (!mounted || !current() || purpose == null) return;
+        if (purpose != 'bill') {
+          await _showSupplierMoneyEntry(context, session,
+            _StoreSupplierMoneyTarget(supplierId: supplier.id, advance: purpose == 'advance'));
+          return;
+        }
+        final copy = await _chooseActionBill('Choose the bill paid', supplierId: supplier.id, acceptedOnly: true);
+        if (!mounted || !current() || copy == null) return;
+        await _showSupplierMoneyEntry(context, session, _StoreSupplierMoneyTarget(supplierId: supplier.id, copy: copy));
+      } else if (action == 'refund') {
+        await _chooseSupplierRefund(context, session, supplier.id);
+      } else if (action == 'return') {
+        final receipt = await _chooseActionRecord<WorkspaceSupplierGoodsReceipt>('Choose received goods to return', [
+          for (final receipt in ledger?.goodsReceipts.values ?? <WorkspaceSupplierGoodsReceipt>[])
+            (receipt, receipt.reference, '${supplier.name} · ${_actionReceiptSummary(receipt)}'),
+        ]);
+        if (!mounted || !current() || receipt == null ||
+            jsonEncode(session.workspaceSupplierLedger(supplier.id)?.goodsReceipts[receipt.id]?.toJson()) != jsonEncode(receipt.toJson())) { return; }
+        await _showSupplierGoodsReturn(context, session, supplier.id, receipt);
+      } else if (ledger != null) {
+        await _showSupplierStatement(context, session, ledger);
+      } else {
+        await _chooseActionRecord<String>('Supplier account unavailable', const []);
+      }
+      return;
+    }
+    final copy = await _chooseActionBill(action == 'edit' ? 'Choose saved bill entry to edit' : 'Choose supplier bill',
+      editableOnly: action == 'edit', acceptedOnly: action == 'allocate' || action == 'credit' || action == 'match');
+    if (!mounted || !current() || copy == null) return;
+    if (action == 'allocate') {
+      await _showSupplierAllocation(context, session, copy);
+    } else if (action == 'credit') {
+      await _showSupplierCredit(context, session, copy);
+    } else if (action == 'shortage') {
+      await _showSupplierShortage(context, session, copy);
+    } else if (action == 'edit') {
+      if (session.workspacePurchaseEntryDraft?.id != copy.draft.id ||
+          jsonEncode(session.workspacePurchaseEntryDraft?.toJson()) != jsonEncode(copy.draft.toJson())) {
+        await _chooseActionRecord<String>('This historical copy is read-only', const []);
+        return;
+      }
+      setState(() { _savedCopy = null; _openingOnly = false; _newPurchase = false; _recordPurchase = true; });
+    } else {
+      setState(() => _savedCopy = copy);
+    }
+  }
+
+  Future<WorkspacePurchaseSavedCopy?> _chooseActionBill(String title, {String? supplierId, bool acceptedOnly = false, bool editableOnly = false}) async {
+    final scope = session.workspaceSupplierScope;
+    final copy = await _chooseActionRecord<WorkspacePurchaseSavedCopy>(title, [
+      for (final copy in session.workspaceLatestPurchaseCopies)
+        if ((supplierId == null || copy.supplier.id == supplierId) && (!editableOnly ||
+          jsonEncode(session.workspacePurchaseEntryDraft?.toJson()) == jsonEncode(copy.draft.toJson())) && (!acceptedOnly ||
+          jsonEncode(session.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id]?.copy.toJson()) == jsonEncode(copy.toJson())))
+          (copy, '${copy.supplier.name} · ${copy.draft.invoiceReference}', '${copy.draft.invoiceDate} · Revision ${copy.revision}'),
+    ]);
+    if (!mounted || scope != session.workspaceSupplierScope || copy == null ||
+        !session.workspacePurchaseCopies.any((c) => jsonEncode(c.toJson()) == jsonEncode(copy.toJson()))) { return null; }
+    if (acceptedOnly && jsonEncode(session.workspaceSupplierLedger(copy.supplier.id)?.purchaseBills[copy.draft.id]?.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+    return copy;
+  }
+
+  Future<void> _openActionCentre() async {
+    if (_actionCentreOpen) return;
+    _actionCentreOpen = true;
+    try {
+    final scope = session.workspaceSupplierScope;
+    _receivingResumeIds.clear(); _receivingResumeUnknown = false;
+    _receivingResumeUnknown = !await session.recoverCustomerLedger();
+    if (!mounted || scope != session.workspaceSupplierScope) return;
+    for (final supplier in session.workspaceSuppliers) {
+      final key = session.supplierReceivingInputFormKey(supplier.id);
+      if (key == null) continue;
+      try {
+        final draft = await session.readLedgerForm(key);
+        if (!mounted || scope != session.workspaceSupplierScope) return;
+        final fields = draft?.fields;
+        if (fields == null || fields.isEmpty) continue;
+        final arrival = fields['arrivalId'];
+        if (!session.workspaceInvoiceHistoryLoaded) { _receivingResumeUnknown = true; continue; }
+        if (session.workspaceSupplierLedger(supplier.id)?.goodsReceipts.containsKey(arrival) == true) continue;
+        if (session.workspaceGoodsReceiptCancellations.any((c) => c.receiptId == arrival)) continue;
+        final input = fields['input'] == null ? null : jsonDecode(fields['input']!);
+        if (input is List && ((input.isNotEmpty && input.first is String && (input.first as String).trim().isNotEmpty) ||
+            input.skip(2).any((v) => v is List && v.length > 1 && v[1] is String && (v[1] as String).isNotEmpty))) {
+          _receivingResumeIds.add(supplier.id);
+        }
+      } on Object { _receivingResumeUnknown = true; }
+    }
+    if (!mounted || scope != session.workspaceSupplierScope) return;
+    final action = await showDialog<String>(context: context, useSafeArea: true,
+      builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
+        child: Column(key: const Key('work-purchase-action-centre'), children: [
+          ListTile(title: const Text('Purchases'), trailing: IconButton(tooltip: 'Close purchase actions',
+            onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
+          Expanded(child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (_receivingResumeUnknown) const Padding(padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Saved delivery status needs checking. Open Receive goods to recover it.',
+                style: TextStyle(fontSize: 12, color: MoolColors.ink))),
+            for (final category in _purchaseActions) ...[
+              Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text(category.$1,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              for (final item in category.$2)
+                if ((item.$1 != 'continue-bill' || (session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed)) &&
+                    (item.$1 != 'continue-receive' || _receivingResumeIds.isNotEmpty))
+                ListTile(key: Key('purchase-action-${item.$1}'), title: Text(item.$2,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: MoolColors.ink)),
+                  subtitle: Text(item.$3, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: session.workspaceSuppliersLoaded && (item.$1 != 'stock' || widget.onOpenStock != null) &&
+                    (item.$1 != 'record-bill' || session.workspacePurchaseEntryDraft == null || session.workspacePurchaseDraftReviewed)
+                    ? () => Navigator.pop(dialogContext, item.$1) : null),
+            ],
+          ]))),
+        ]))));
+    if (!mounted || scope != session.workspaceSupplierScope || action == null) return;
+    await _purchaseAction(action);
+    } finally { _actionCentreOpen = false; }
+  }
+
+  Widget _actionCentreButton() => IconButton(
+    key: const Key('work-purchase-action-centre-open'), onPressed: _openActionCentre,
+    tooltip: 'Purchase actions', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+    icon: const Icon(Icons.grid_view_outlined, size: 22, color: MoolColors.navy));
+
+  static const _purchaseActions = [
+    ('Supplier bills', [
+      ('record-bill', 'Record supplier bill', 'Have a supplier invoice? Enter it here—even if goods arrive later.'),
+      ('continue-bill', 'Continue unfinished bill', 'Pick up the entry you saved but haven’t completed.'),
+      ('recorded', 'Recorded purchases', 'Open a bill to check goods received, payments and remaining dues.'),
+      ('edit', 'Edit saved bill entry', 'Correct details in an existing entry—not another purchase.'),
+    ]),
+    ('Goods received & returns', [
+      ('receive', 'Receive goods', 'Goods arrived? Record quantities received, missing or damaged—even without the bill.'),
+      ('continue-receive', 'Continue receiving entry', 'Finish the delivery details you saved earlier.'),
+      ('match', 'Match goods with a bill', 'Link received goods to their supplier bill without adding Stock again.'),
+      ('prior-stock', 'Link goods already in Stock', 'The bill came later? Link goods previously entered through Catalogue, manual entry or CSV.'),
+      ('shortage', 'Review short delivery', 'Record billed quantities that the supplier did not deliver.'),
+      ('return', 'Return goods to supplier', 'Record goods sent back and the quantities leaving Stock.'),
+      ('goods-history', 'Received goods & returns', 'Check earlier deliveries, damaged quantities and supplier returns.'),
+    ]),
+    ('Money paid, credit & refunds', [
+      ('money', 'Record money paid', 'Already paid the supplier? Record the amount, date and method.'),
+      ('allocate', 'Use existing payment or credit', 'Apply a recorded payment, advance or supplier credit to a bill.'),
+      ('credit', 'Record supplier credit note', 'Enter a credit issued for a return, shortage or bill adjustment.'),
+      ('refund', 'Record refund received', 'Record money the supplier has actually returned to you.'),
+      ('money-history', 'Payments, advances & credits', 'Check previous money entries and which bills they were applied to.'),
+    ]),
+    ('Starting records', [
+      ('opening', 'Enter starting dues / advance', 'Enter the supplier balance carried forward when you started MoolSocial.'),
+      ('review-opening', 'Review starting balances', 'Check or correct saved starting dues, advances and supporting bill links.'),
+      ('stock', 'Bring current Stock', 'Import your product CSV in Stock, or add products manually.'),
+    ]),
+    ('Supplier accounts & documents', [
+      ('accounts', 'Supplier accounts', 'Check what you owe each supplier or what credit they hold for you.'),
+      ('statement', 'Supplier statement', 'Review dated bills, payments, credits, refunds and running balance.'),
+      ('documents', 'View or download bills', 'Open the attached supplier bill or your recorded purchase copy.'),
+    ]),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -15748,7 +16098,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 label: const Text('New purchase', style: TextStyle(fontSize: 12))),
               TextButton.icon(key: const Key('work-purchase-record'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48),
-                  foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  foregroundColor: MoolColors.navy, padding: const EdgeInsets.symmetric(horizontal: 6)),
                 onPressed: () { _purchaseSearchFocus.unfocus();
                   setState(() { _openingOnly = false; _newPurchase = false; _recordPurchase = true; }); },
                 icon: Icon(session.workspacePurchaseDraftReviewed ? Icons.edit_outlined : Icons.add_rounded,
@@ -15790,7 +16140,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                         ),
                       ),
             ]))),
-              const Tooltip(message: 'Swipe actions left or right', child: Icon(Icons.chevron_right, size: 18, color: MoolColors.navy)),
+              _actionCentreButton(),
             ]),
               ]);
             }),
@@ -17480,6 +17830,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
           session: session,
           purchaseEntryKey: purchaseEntryKey,
           receivingKey: receivingKey,
+          onOpenStock: () => onOpenOperation(_WorkspaceOperation.catalogue),
           onTrackPurchase: onTrackPurchase,
           onPurchaseBack: onPurchaseBack,
         ),
@@ -30258,6 +30609,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
     final accountReady = recovered && widget.session.supplierAllocationFormKey(widget.copy) == draft.key;
     final billDue = accountReady ? ledger?.manualBillRemainingMinor(widget.copy.draft.id) : null;
     final settled = accountReady && billDue != null && billDue <= 0 && frozen == null;
+    final emptySources = accountReady && list.isEmpty && frozen == null;
     final selected = sourceKind == null ? null : sourceValue(sourceKind!, sourceId);
     final selectionKnown = list.any((s) => sourceValue(s.$1, s.$2) == selected);
     final selectedSource = list.where((s) => sourceValue(s.$1, s.$2) == selected).firstOrNull;
@@ -30289,7 +30641,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
                 onPressed: editable ? () => recordMoney(true) : null, child: const Text('Record supplier advance')),
             ]),
           ],
-          if (!settled) ...[
+          if (!settled && !emptySources) ...[
           DropdownButtonFormField<String>(key: ValueKey(('supplier-allocation-source', selected)),
             initialValue: selectionKnown ? selected : null, isExpanded: true,
             decoration: const InputDecoration(labelText: 'Advance, payment or bill credit'),
@@ -30313,7 +30665,7 @@ class _StoreSupplierAllocationSheetState extends State<_StoreSupplierAllocationS
           if (error != null || draft.error != null) Text(error ?? draft.error!),
           TextButton(key: const Key('supplier-allocation-recover'), onPressed: busy || draft.busy ? null : load,
             child: const Text('Recover saved allocation')),
-          if (!settled) FilledButton(key: const Key('supplier-allocation-submit'),
+          if (!settled && !emptySources) FilledButton(key: const Key('supplier-allocation-submit'),
             onPressed: draft.ready && accountReady && !busy && !conflict && !draft.busy && draft.error == null ? submit : null,
             child: Text(busy ? 'Recording…' : confirmed ? 'Link another amount'
               : frozen == null ? 'Apply selected amount' : 'Retry same allocation')),
