@@ -15701,9 +15701,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             if (_receivingResumeUnknown) const Padding(padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Saved delivery status needs checking. Open Receive goods to recover it.',
                 style: TextStyle(fontSize: 12, color: MoolColors.ink))),
-            for (final category in _purchaseActions) ...[
-              Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text(category.$1,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+            for (final category in _purchaseActions)
+              ExpansionTile(key: Key('purchase-category-${category.$1}'),
+                title: Text(category.$1,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                iconColor: MoolColors.navy, collapsedIconColor: MoolColors.navy,
+                children: [
               for (final item in category.$2)
                 if ((item.$1 != 'continue-bill' || (session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed)) &&
                     (item.$1 != 'continue-receive' || _receivingResumeIds.isNotEmpty))
@@ -15714,7 +15717,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   onTap: session.workspaceSuppliersLoaded && (item.$1 != 'stock' || widget.onOpenStock != null) &&
                     (item.$1 != 'record-bill' || session.workspacePurchaseEntryDraft == null || session.workspacePurchaseDraftReviewed)
                     ? () => Navigator.pop(dialogContext, item.$1) : null),
-            ],
+              ]),
           ]))),
         ]))));
     if (!mounted || scope != session.workspaceSupplierScope || action == null) return;
@@ -15722,10 +15725,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     } finally { _actionCentreOpen = false; }
   }
 
-  Widget _actionCentreButton() => IconButton(
+  Widget _actionCentreButton() => TextButton(
     key: const Key('work-purchase-action-centre-open'), onPressed: _openActionCentre,
-    tooltip: 'Purchase actions', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-    icon: const Icon(Icons.grid_view_outlined, size: 22, color: MoolColors.navy));
+    style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8), foregroundColor: MoolColors.navy),
+    child: const Text('Manage purchases', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)));
 
   static const _purchaseActions = [
     ('Supplier bills', [
@@ -16078,9 +16082,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             LayoutBuilder(builder: (context, constraints) {
-              final stacked = constraints.maxWidth < MediaQuery.textScalerOf(context).scale(260);
-              const heading = Text('Purchases', style: TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w800, color: MoolColors.navy));
+              final stacked = constraints.maxWidth < MediaQuery.textScalerOf(context).scale(380);
+              final heading = _actionCentreButton();
               return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 if (stacked) heading,
                 Row(children: [
@@ -16140,7 +16143,6 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                         ),
                       ),
             ]))),
-              _actionCentreButton(),
             ]),
               ]);
             }),

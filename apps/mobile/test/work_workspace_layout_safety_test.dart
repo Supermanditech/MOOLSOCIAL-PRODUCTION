@@ -3513,6 +3513,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> expandPurchaseActionCategory(WidgetTester tester, String category) async {
+    final heading = find.text(category);
+    await Scrollable.ensureVisible(tester.element(heading));
+    await tester.pumpAndSettle();
+    await tester.tap(heading);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('P01-AC01 action centre exposes purpose-specific routes without posting', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -3526,11 +3534,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-action-centre')), findsOneWidget);
     expect(find.text('Supplier bills'), findsOneWidget);
+    await expandPurchaseActionCategory(tester, 'Supplier bills');
     expect(find.text('Have a supplier invoice? Enter it here—even if goods arrive later.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('purchase-action-record-bill')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
     expect(entry.value == null ? null : jsonEncode(entry.value!.toJson()), before);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('P01-AC01 approved entry opens collapsed categories and toggles in one tap', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 806), textScale: 1);
+    await openPurchaseList(tester);
+    final button = find.byKey(const Key('work-purchase-action-centre-open'));
+    expect(find.descendant(of: button, matching: find.text('Manage purchases')), findsOneWidget);
+    expect(button.hitTestable(), findsOneWidget);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('purchase-action-record-bill')), findsNothing);
+    for (final action in ['receive', 'money', 'opening', 'accounts']) {
+      expect(find.byKey(Key('purchase-action-$action')), findsNothing);
+    }
+    final category = find.byKey(const Key('purchase-category-Supplier bills'));
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('purchase-action-record-bill')).hitTestable(), findsOneWidget);
+    expect(find.text('Have a supplier invoice? Enter it here—even if goods arrive later.'), findsOneWidget);
+    await tester.tap(find.text('Supplier bills'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('purchase-action-record-bill')), findsNothing);
+    for (final item in [('Goods received & returns', 'receive'),
+        ('Money paid, credit & refunds', 'money'), ('Starting records', 'opening'),
+        ('Supplier accounts & documents', 'accounts')]) {
+      await expandPurchaseActionCategory(tester, item.$1);
+      expect(find.byKey(Key('purchase-action-${item.$2}')), findsOneWidget);
+      await expandPurchaseActionCategory(tester, item.$1);
+      expect(find.byKey(Key('purchase-action-${item.$2}')), findsNothing);
+    }
+    await tester.tap(find.byTooltip('Close purchase actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    for (final action in ['record-bill', 'receive', 'money', 'opening', 'accounts']) {
+      expect(find.byKey(Key('purchase-action-$action')), findsNothing);
+    }
+    expect(entry.value, isNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -3591,7 +3642,9 @@ void main() {
           'Starting records', 'Supplier accounts & documents']) {
         expect(find.text(category), findsOneWidget);
       }
+      await expandPurchaseActionCategory(tester, 'Supplier bills');
       expect(find.byKey(const Key('purchase-action-continue-bill')), findsNothing);
+      await expandPurchaseActionCategory(tester, 'Supplier accounts & documents');
       final last = find.byKey(const Key('purchase-action-documents'));
       await Scrollable.ensureVisible(tester.element(last));
       await tester.pumpAndSettle();
@@ -4839,6 +4892,7 @@ void main() {
       final before = jsonEncode(entry.value!.toJson());
       await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
       await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester, 'Goods received & returns');
       expect(find.byKey(const Key('purchase-action-continue-receive')),
         hasReference ? findsOneWidget : findsNothing);
       expect(jsonEncode(entry.value!.toJson()), before);
