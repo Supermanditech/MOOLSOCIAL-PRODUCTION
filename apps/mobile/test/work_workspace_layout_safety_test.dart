@@ -409,14 +409,17 @@ class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
   _LedgerCheckpointFixtureStore({this.creditFailure = 'none'});
   String creditFailure;
   int saveAttempts = 0;
+  Completer<void>? holdRead;
   WorkspaceLedgerCheckpoint? value;
   @override
-  Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async =>
-      creditFailure == 'unavailable-read' ? throw StateError('HOST checkpoint read unavailable')
+  Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async {
+    await holdRead?.future;
+    return creditFailure == 'unavailable-read' ? throw StateError('HOST checkpoint read unavailable')
       : value?.finance.accountScope == account &&
           value?.finance.workspaceId == store
       ? value
       : null;
+  }
   @override
   Future<void> save(
     WorkspaceLedgerCheckpoint checkpoint, {
@@ -3315,13 +3318,39 @@ void main() {
 
   Future<void> revealPurchaseAction(WidgetTester tester, Finder action) async {
     final viewport = find.byKey(const Key('purchase-action-category-scroll'));
+    double obstructionTop(Rect bounds) {
+      final group = find.ancestor(of: action, matching: find.byType(SliverMainAxisGroup)).first;
+      final persistent = tester.widget<SliverPersistentHeader>(find.descendant(of: group,
+        matching: find.byType(SliverPersistentHeader, skipOffstage: false), skipOffstage: false).first);
+      if (!persistent.pinned) return bounds.top;
+      final header = find.descendant(of: group, matching: find.byWidgetPredicate((w) =>
+        w is Semantics && w.key is ValueKey<String> &&
+        (w.key! as ValueKey<String>).value.startsWith('purchase-category-state-'),
+        skipOffstage: false), skipOffstage: false).first;
+      return tester.getRect(header).bottom.clamp(bounds.top, bounds.bottom);
+    }
     await tester.scrollUntilVisible(action, 80,
       scrollable: find.descendant(of: viewport, matching: find.byType(Scrollable)).first);
     await tester.ensureVisible(action);
     await tester.pumpAndSettle();
+    // Sliver ensureVisible does not account for an expanded category's pinned header.
+    // Correct that host-only reveal offset without tiny drag gestures becoming action taps.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final bounds = tester.getRect(viewport), target = tester.getRect(action);
+      final top = obstructionTop(bounds);
+      final delta = target.bottom > bounds.bottom ? bounds.bottom - target.bottom - 2
+        : target.top < top ? top - target.top + 2 : 0.0;
+      if (delta.abs() < .1) break;
+      final scroll = tester.state<ScrollableState>(find.descendant(of: viewport,
+        matching: find.byType(Scrollable)).first).position;
+      scroll.jumpTo((scroll.pixels - delta).clamp(scroll.minScrollExtent, scroll.maxScrollExtent));
+      await tester.pumpAndSettle();
+    }
     expect(action.hitTestable(), findsOneWidget);
     expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
     final bounds = tester.getRect(viewport), target = tester.getRect(action);
+    expect(target.top, greaterThanOrEqualTo(obstructionTop(bounds) - .1),
+      reason: 'The entire action must be unobscured by its pinned category heading.');
     expect(target.left, greaterThanOrEqualTo(bounds.left - .1));
     expect(target.right, lessThanOrEqualTo(bounds.right + .1));
     expect(target.top, greaterThanOrEqualTo(bounds.top - .1));
@@ -3368,8 +3397,8 @@ void main() {
     await Scrollable.ensureVisible(tester.element(group));
     await tester.pumpAndSettle();
     final tile = find.byKey(ValueKey('purchase-category-$category'));
-    if (!tester.widget<ExpansionTile>(tile).initiallyExpanded) {
-      await tester.tap(find.text(category));
+    if (tester.widget<Semantics>(find.byKey(Key('purchase-category-state-$category'))).properties.expanded != true) {
+      await tester.tap(tile);
       await tester.pumpAndSettle();
     }
     final target = find.byKey(Key('purchase-action-$action'));
@@ -3567,7 +3596,7 @@ void main() {
   }
 
   Future<void> expandPurchaseActionCategory(WidgetTester tester, String category) async {
-    final heading = find.text(category);
+    final heading = find.byKey(Key('purchase-category-$category'));
     final group = find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false);
     await Scrollable.ensureVisible(tester.element(group));
     await tester.pumpAndSettle();
@@ -3588,7 +3617,10 @@ void main() {
     await tester.tap(centre);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-action-centre')), findsOneWidget);
-    expect(find.text('Supplier bills'), findsOneWidget);
+    expect(find.text('Purchase invoices'), findsOneWidget);
+    expect(find.text('Purchase entry, saved invoices and corrections.'), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byKey(const Key('work-operation-back')).hitTestable(), findsOneWidget);
     await expandPurchaseActionCategory(tester, 'Supplier bills');
     expect(find.text('Have a supplier invoice? Enter it here—even if goods arrive later.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('purchase-action-record-bill')));
@@ -3600,7 +3632,7 @@ void main() {
 
   testWidgets('P01-AC01 V01 management entry has a visible button affordance', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
-    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry), textScale: 1);
     await openPurchaseList(tester);
     final button = find.byKey(const Key('work-purchase-action-centre-open'));
     expect(tester.widget(button), isA<OutlinedButton>());
@@ -3614,6 +3646,10 @@ void main() {
     expect(find.descendant(of: button, matching: find.byIcon(Icons.chevron_right)), findsOneWidget);
     expect(button.hitTestable(), findsOneWidget);
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(button).width, lessThanOrEqualTo(145),
+      reason: 'Keep the solid entry compact without shrinking its label or tap height.');
+    expect(tester.widget<Text>(find.descendant(of: button,
+      matching: find.text('Manage purchases'))).style!.fontSize, 12);
     for (final oldKey in ['work-purchase-actions', 'work-purchase-record',
         'work-purchase-new', 'work-purchase-receive-goods', 'work-purchase-opening']) {
       expect(find.byKey(Key(oldKey)), findsNothing,
@@ -3671,7 +3707,11 @@ void main() {
         await revealPurchaseInput(tester, cancel);
         await tester.tap(cancel);
         await tester.pumpAndSettle();
-        expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
+        await tester.scrollUntilVisible(find.byKey(const Key('work-purchase-action-centre-open')), -120,
+          scrollable: find.descendant(of: find.byKey(const Key('purchase-action-category-scroll')),
+            matching: find.byType(Scrollable)).first);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-purchase-action-centre-open')).hitTestable(), findsOneWidget);
         final retry = find.text('Retry saved purchases');
         await tester.ensureVisible(retry);
         await tester.pumpAndSettle();
@@ -3732,20 +3772,53 @@ void main() {
         matching: find.byType(Scrollable)).first;
       await tester.scrollUntilVisible(lastGoods, 100, scrollable: scrollable);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('purchase-category-Goods received & returns')).hitTestable(), findsOneWidget);
-      expect(find.byTooltip('Close purchase actions').hitTestable(), findsOneWidget);
+      final goodsGroup = find.byKey(const ValueKey('purchase-category-group-Goods received & returns'), skipOffstage: false);
+      final goodsHeader = tester.widget<SliverPersistentHeader>(find.descendant(of: goodsGroup,
+        matching: find.byType(SliverPersistentHeader, skipOffstage: false), skipOffstage: false).first);
+      if (goodsHeader.pinned) {
+        expect(find.byKey(const Key('purchase-category-Goods received & returns')).hitTestable(), findsOneWidget);
+      }
+      expect(lastGoods.hitTestable(), findsOneWidget);
+      expect(find.byKey(const Key('work-operation-back')).hitTestable(), findsOneWidget);
       final money = find.byKey(const Key('purchase-action-money'));
       await Scrollable.ensureVisible(tester.element(find.byKey(
         const ValueKey('purchase-category-group-Money paid, credit & refunds'), skipOffstage: false)));
       await tester.pumpAndSettle();
       await Scrollable.ensureVisible(tester.element(money));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('purchase-category-Money paid, credit & refunds')).hitTestable(), findsOneWidget);
+      final moneyGroup = find.byKey(const ValueKey('purchase-category-group-Money paid, credit & refunds'), skipOffstage: false);
+      if (tester.widget<SliverPersistentHeader>(find.descendant(of: moneyGroup,
+          matching: find.byType(SliverPersistentHeader, skipOffstage: false), skipOffstage: false).first).pinned) {
+        expect(find.byKey(const Key('purchase-category-Money paid, credit & refunds')).hitTestable(), findsOneWidget);
+      }
       expect(money.hitTestable(), findsOneWidget);
       expect(entry.value, isNull);
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('P01-AC01 responsive pin resize preserves expanded category and complete action', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+      viewport: const Size(915, 412), textScale: 2);
+    await openPurchaseList(tester);
+    final action = await purchaseRegisterAction(tester, 'work-purchase-opening');
+    final group = find.byKey(const ValueKey('purchase-category-group-Starting records'), skipOffstage: false);
+    bool pinned() => tester.widget<SliverPersistentHeader>(find.descendant(of: group,
+      matching: find.byType(SliverPersistentHeader, skipOffstage: false), skipOffstage: false).first).pinned;
+    expect(pinned(), isFalse);
+    for (final height in [915.0, 412.0]) {
+      tester.view.physicalSize = Size(915, height);
+      await tester.pumpAndSettle();
+      expect(pinned(), height > 412);
+      await revealPurchaseAction(tester, action);
+      expect(tester.widget<Semantics>(find.byKey(const Key('purchase-category-state-Starting records'),
+        skipOffstage: false)).properties.expanded, isTrue);
+      expect(find.byKey(const Key('work-record-purchase')), findsNothing);
+    }
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('P01-AC01 approved entry opens collapsed categories and toggles in one tap', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
@@ -3767,7 +3840,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('purchase-action-record-bill')).hitTestable(), findsOneWidget);
     expect(find.text('Have a supplier invoice? Enter it here—even if goods arrive later.'), findsOneWidget);
-    await tester.tap(find.text('Supplier bills'));
+    await tester.tap(category);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('purchase-action-record-bill')), findsNothing);
     for (final item in [('Goods received & returns', 'receive'),
@@ -3778,7 +3851,10 @@ void main() {
       await expandPurchaseActionCategory(tester, item.$1);
       expect(find.byKey(Key('purchase-action-${item.$2}')), findsNothing);
     }
-    await tester.tap(find.byTooltip('Close purchase actions'));
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-action-centre')), findsNothing);
+    await Scrollable.ensureVisible(tester.element(button));
     await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pumpAndSettle();
@@ -3834,7 +3910,7 @@ void main() {
   });
 
   for (final geometry in [(const Size(320, 568), 2.0), (const Size(806, 360), 1.6)]) {
-    testWidgets('P01-AC01 categories and full-screen Back retain draft $geometry', (tester) async {
+    testWidgets('P01-AC01 inline categories and Back retain draft $geometry', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
       final work = manualPurchaseFixture(entry);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
@@ -3846,7 +3922,7 @@ void main() {
           'Starting records', 'Supplier accounts & documents']) {
         await Scrollable.ensureVisible(tester.element(find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false)));
         await tester.pumpAndSettle();
-        expect(find.text(category), findsOneWidget);
+        expect(find.byKey(Key('purchase-category-$category')), findsOneWidget);
       }
       await expandPurchaseActionCategory(tester, 'Supplier bills');
       expect(find.byKey(const Key('purchase-action-continue-bill')), findsNothing);
@@ -3857,8 +3933,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(last.hitTestable(), findsOneWidget);
       expect(tester.getSize(last).height, greaterThanOrEqualTo(48));
-      await tester.tap(find.byTooltip('Close purchase actions'));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-action-centre')), findsNothing);
       await openPurchaseEntryFromList(tester);
       await expandPurchasePrimarySections(tester);
       final name = find.byKey(const Key('work-purchase-supplier-name'));
@@ -4907,7 +4984,7 @@ void main() {
     testWidgets('P05-R09-C05 receipt and single footer fit short keyboard viewport $display', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
       await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
@@ -4920,6 +4997,8 @@ void main() {
       await revealPurchaseInput(tester, qty, delta: -40);
       expect(tester.getSize(qty).width, lessThanOrEqualTo(190));
       await tester.enterText(qty, '123456.125');
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+      await tester.pumpAndSettle();
       await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
       expect(find.byKey(const Key('work-purchase-draft-save')), findsOneWidget);
       expect(tester.widget<TextField>(qty).controller!.text, '123456.125');
@@ -4977,7 +5056,7 @@ void main() {
     testWidgets('P05-R01 collapsed headers and keyboard preserve reachable editing $display', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
       await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
@@ -4991,6 +5070,8 @@ void main() {
       final field = find.byKey(const Key('work-purchase-supplier-name'));
       await revealPurchaseInput(tester, field);
       await tester.enterText(field, 'Evaluation supplier with a longer displayed name');
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+      await tester.pumpAndSettle();
       for (var i = 0; i < 2; i++) {
         await revealPurchaseInput(tester, header, delta: -60);
         await tester.tap(header);
@@ -5058,6 +5139,62 @@ void main() {
       checkpointStore: checkpoint), isTrue);
     return work;
   }
+
+  testWidgets('P01-AC01 inline load closed before recovery stays closed', (tester) async {
+    final entry = _OpeningPostingFixtureStore();
+    final checkpoint = _LedgerCheckpointFixtureStore();
+    final work = postingOpeningFixture(entry, checkpoint);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    checkpoint.holdRead = Completer<void>();
+    await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Close purchase actions'));
+    await tester.pump();
+    checkpoint.holdRead!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-purchase-action-centre')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+    await tester.pumpAndSettle();
+    expect(find.text('Purchase invoices'), findsOneWidget);
+    expect(checkpoint.saveAttempts, 0);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('P01-AC01 late action recovery cannot open selector over Chat', (tester) async {
+    final entry = _OpeningPostingFixtureStore();
+    final checkpoint = _LedgerCheckpointFixtureStore(creditFailure: 'unavailable-read');
+    final work = postingOpeningFixture(entry, checkpoint);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
+    await openPurchaseList(tester);
+    await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+    await tester.pumpAndSettle();
+    await expandPurchaseActionCategory(tester, 'Supplier accounts & documents');
+    final action = find.byKey(const Key('purchase-action-accounts'));
+    await revealPurchaseAction(tester, action);
+    checkpoint.creditFailure = 'none';
+    checkpoint.holdRead = Completer<void>();
+    await tester.tap(action);
+    await tester.pump();
+    await tester.tap(find.text('Chat').hitTestable());
+    await tester.pumpAndSettle();
+    checkpoint.holdRead!.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Choose supplier'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('work-purchase-action-centre-open')), -120,
+      scrollable: find.descendant(of: find.byKey(const Key('purchase-action-category-scroll')),
+        matching: find.byType(Scrollable)).first);
+    await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+    await tester.pumpAndSettle();
+    expect(find.text('Purchase invoices'), findsOneWidget);
+    expect(checkpoint.saveAttempts, 0);
+    expect(entry.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final hasReference in [false, true]) {
     testWidgets('P01-AC01 receiving continuation ignores automatic date $hasReference', (tester) async {
@@ -8026,7 +8163,7 @@ void main() {
     testWidgets('P05-GST full invoice fields remain reachable with keyboard $display', (tester) async {
       await mount(tester, route: '/app/work/workspace/dashboard',
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
@@ -8043,6 +8180,8 @@ void main() {
         final field = find.byKey(Key(key));
         await revealPurchaseInput(tester, field);
         await tester.enterText(field, '4.5');
+        tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: key);
       }
       for (final key in ['work-purchase-tax-details', 'work-purchase-original-evidence']) {
@@ -8259,7 +8398,7 @@ void main() {
     testWidgets('P05-MATCH Add product fits large text and keyboard $display', (tester) async {
       final work = manualPurchaseFixture(_PurchaseEntryFixtureStore());
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
@@ -8268,6 +8407,8 @@ void main() {
       final item = find.byKey(const Key('work-purchase-item-0'));
       await revealPurchaseInput(tester, item);
       await tester.enterText(item, 'Evaluation unmatched item');
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+      await tester.pumpAndSettle();
       final add = find.byKey(const Key('work-purchase-add-product-0'));
       await revealPurchaseInput(tester, add);
       expect(tester.getSize(add).height, greaterThanOrEqualTo(48));
@@ -8388,7 +8529,7 @@ void main() {
     testWidgets('P05-R15 extra field and tax table keyboard reachability $display', (tester) async {
       final entry = _PurchaseEntryFixtureStore();
       await mount(tester, route:'/app/work/workspace/dashboard', work:manualPurchaseFixture(entry),
-        viewport:Size(display.$1,display.$2), textScale:display.$3, bottomInset:display.$4);
+        viewport:Size(display.$1,display.$2), textScale:display.$3, bottomInset:24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
@@ -8400,6 +8541,8 @@ void main() {
       await open('work-purchase-add-extra-invoice-all-all');
       final value = find.byWidgetPredicate((w) => w is TextField && w.decoration?.labelText=='Details on bill');
       await revealPurchaseInput(tester,value); await tester.enterText(value,'Long printed detail '*15);
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+      await tester.pumpAndSettle();
       await open('work-purchase-tax-details'); await open('work-purchase-printed-tax-table');
       await open('work-purchase-add-tax-row'); await open('purchase-tax-components-0');
       final tax = find.byKey(const Key('purchase-tax-totalTax-0'));
@@ -8506,7 +8649,7 @@ void main() {
     testWidgets('P05-R09 new optional fields remain reachable with keyboard $display', (tester) async {
       await mount(tester, route: '/app/work/workspace/dashboard',
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
@@ -8519,6 +8662,7 @@ void main() {
         final target = find.byKey(Key('work-purchase-$key'));
         await revealPurchaseInput(tester, target);
         await tester.enterText(target, 'Long retained evaluation detail, not a real payment');
+        tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: key);
       }
@@ -8542,11 +8686,14 @@ void main() {
   testWidgets('P05-R11-C02 Record purchase opens Purchase entry with a read-only draft voucher', (tester) async {
     await mount(tester, route: '/app/work/workspace/dashboard',
       work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
-      viewport: const Size(320, 568), textScale: 2, bottomInset: 240);
+      viewport: const Size(320, 568), textScale: 2, bottomInset: 24);
     await openPurchaseList(tester);
     await purchaseRegisterAction(tester, 'work-purchase-record');
     expect(find.text('Record supplier bill'), findsOneWidget);
     await openPurchaseEntryFromList(tester);
+    // Retain the original unusually large safe-area stress for this form, not the menu.
+    tester.view.viewPadding = const FakeViewPadding(bottom: 240);
+    await tester.pumpAndSettle();
     expect(find.text('Purchase entry'), findsOneWidget);
     await usePurchaseControl(tester, 'work-purchase-invoice-section');
     final voucher = find.byKey(const Key('work-purchase-voucher-reference'));
@@ -9122,13 +9269,15 @@ void main() {
     testWidgets('P05 expanded sections keyboard and large text fit $display', (tester) async {
       await mount(tester, route: '/app/work/workspace/dashboard',
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
-        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
+        viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
       await openPurchaseList(tester);
       await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
+      tester.view.viewInsets = FakeViewPadding(bottom: display.$4);
+      await tester.pumpAndSettle();
       for (final key in ['work-purchase-item-details-0', 'work-purchase-tax-details',
         'work-purchase-buyer-details', 'work-purchase-receipt-details', 'work-purchase-payment-details']) {
         await usePurchaseControl(tester, key);

@@ -652,6 +652,7 @@ class _WorkWorkspaceDashboardScreenState
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
   final _purchaseEntryKey = GlobalKey<_StoreRecordPurchaseState>();
+  final _purchasesKey = GlobalKey<_StorePurchasesSurfaceState>();
   final _receivingKey = GlobalKey<_StoreReceiveGoodsState>();
   bool _purchaseNavigationPending = false;
   Offset? _saleSwipeStart;
@@ -1803,6 +1804,7 @@ class _WorkWorkspaceDashboardScreenState
             }),
             counterKey: _counterKey,
             purchaseEntryKey: _purchaseEntryKey,
+            purchasesKey: _purchasesKey,
             receivingKey: _receivingKey,
             saleQuery: _saleSearchController.text,
             stockStatementBookmark: _stockStatementViews.putIfAbsent(
@@ -2493,6 +2495,9 @@ class _WorkWorkspaceDashboardScreenState
         return false;
       }
       if (!current()) return false;
+      if (operation == _WorkspaceOperation.sourcing) {
+        _purchasesKey.currentState?.cancelPendingAction();
+      }
       // An imperative destination can retain this editor underneath it.
       // Explicit discard must not resurrect its unsaved input on return.
       if (discardEditablePurchase) purchaseEntry.widget.onBack();
@@ -2570,6 +2575,10 @@ class _WorkWorkspaceDashboardScreenState
     final purchaseEntry = _purchaseEntryKey.currentState;
     if (_operation == _WorkspaceOperation.sourcing && purchaseEntry != null) {
       await purchaseEntry._back();
+      return;
+    }
+    if (_operation == _WorkspaceOperation.sourcing &&
+        (_purchasesKey.currentState?.backWithinPurchases() ?? false)) {
       return;
     }
     if (_operation == _WorkspaceOperation.sales &&
@@ -15413,8 +15422,9 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
 
 class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
   _PurchaseCategoryHeader({required this.title, required this.extent,
-    required this.expanded, required this.onChanged});
+    required this.label, required this.guide, required this.expanded, required this.onChanged});
   final String title;
+  final String label, guide;
   final double extent;
   final bool expanded;
   final ValueChanged<bool> onChanged;
@@ -15424,17 +15434,20 @@ class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
   double get maxExtent => extent;
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
-    SizedBox(height: extent, child: Material(color: Colors.white, child: ExpansionTile(
-      key: Key('purchase-category-$title'), initiallyExpanded: expanded,
-      onExpansionChanged: onChanged, minTileHeight: extent - 1,
-      expansionAnimationStyle: const AnimationStyle(duration: Duration.zero, reverseDuration: Duration.zero),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+    Semantics(key: Key('purchase-category-state-$title'), button: true, expanded: expanded,
+      child: SizedBox(key: Key('purchase-category-$title'),
+      height: extent, child: Material(color: Colors.white, child: ListTile(
+      onTap: () => onChanged(!expanded), minTileHeight: extent - 1,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       shape: const Border(bottom: BorderSide(color: MoolColors.line, width: .5)),
-      collapsedShape: const Border(bottom: BorderSide(color: MoolColors.line, width: .5)),
-      title: Text(title, style: (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
-        .copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-      iconColor: MoolColors.navy, collapsedIconColor: MoolColors.navy,
-    )));
+      title: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
+        children: [Text(label, style: (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+          .copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+          if (!expanded) ...[const SizedBox(height: 4), Text(guide,
+            style: (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+              .copyWith(fontSize: 11, color: MoolColors.muted))]]),
+      trailing: Icon(expanded ? Icons.expand_less : Icons.expand_more, color: MoolColors.navy),
+    ))));
   @override
   bool shouldRebuild(covariant _PurchaseCategoryHeader oldDelegate) =>
     title != oldDelegate.title || extent != oldDelegate.extent || expanded != oldDelegate.expanded;
@@ -15442,6 +15455,7 @@ class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
 
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({
+    super.key,
     required this.session,
     this.statement = false,
     this.onTrackPurchase,
@@ -15474,6 +15488,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   String _purchaseFilter = 'All';
   bool _recordPurchase = false, _openingOnly = false;
   bool _actionCentreOpen = false;
+  bool _centreVisible = false, _purchaseActionPending = false;
+  int _centreEpoch = 0;
+  final _expandedCategories = <String>{};
   final _receivingResumeIds = <String>{};
   bool _receivingResumeUnknown = false;
   bool _receiveGoods = false;
@@ -15558,7 +15575,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   Future<void> _purchaseAction(String action) async {
     _purchaseSearchFocus.unfocus();
     final scope = session.workspaceSupplierScope;
-    bool current() => mounted && scope != null && scope == session.workspaceSupplierScope;
+    final epoch = _centreEpoch;
+    bool current() => mounted && epoch == _centreEpoch && scope != null &&
+      scope == session.workspaceSupplierScope && ModalRoute.of(context)?.isCurrent != false;
     if (!current()) return;
     if (action == 'record-bill' || action == 'continue-bill') {
       if (action == 'record-bill' && session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed) {
@@ -15700,19 +15719,23 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   }
 
   Future<void> _openActionCentre() async {
-    if (_actionCentreOpen) return;
-    _actionCentreOpen = true;
+    _purchaseSearchFocus.unfocus();
+    if (_centreVisible) { backWithinPurchases(); return; }
+    if (_actionCentreOpen || _purchaseActionPending) return;
+    final epoch = ++_centreEpoch;
+    setState(() { _centreVisible = true; _actionCentreOpen = true; _expandedCategories.clear(); });
     try {
     final scope = session.workspaceSupplierScope;
     _receivingResumeIds.clear(); _receivingResumeUnknown = false;
-    _receivingResumeUnknown = !await session.recoverCustomerLedger();
-    if (!mounted || scope != session.workspaceSupplierScope) return;
+    final recovered = await session.recoverCustomerLedger();
+    if (!mounted || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
+    _receivingResumeUnknown = !recovered;
     for (final supplier in session.workspaceSuppliers) {
       final key = session.supplierReceivingInputFormKey(supplier.id);
       if (key == null) continue;
       try {
         final draft = await session.readLedgerForm(key);
-        if (!mounted || scope != session.workspaceSupplierScope) return;
+        if (!mounted || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
         final fields = draft?.fields;
         if (fields == null || fields.isEmpty) continue;
         final arrival = fields['arrivalId'];
@@ -15724,73 +15747,142 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             input.skip(2).any((v) => v is List && v.length > 1 && v[1] is String && (v[1] as String).isNotEmpty))) {
           _receivingResumeIds.add(supplier.id);
         }
-      } on Object { _receivingResumeUnknown = true; }
+      } on Object {
+        if (!mounted || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
+        _receivingResumeUnknown = true;
+      }
     }
-    if (!mounted || scope != session.workspaceSupplierScope) return;
-    final expandedCategories = <String>{};
-    final action = await showDialog<String>(context: context, useSafeArea: true,
-      builder: (dialogContext) => Dialog.fullscreen(child: SafeArea(
-        child: Column(key: const Key('work-purchase-action-centre'), children: [
-          ListTile(title: const Text('Purchases', style: TextStyle(fontSize: 16,
-            fontWeight: FontWeight.w700, color: MoolColors.navy)), trailing: IconButton(tooltip: 'Close purchase actions',
-            onPressed: () => Navigator.pop(dialogContext), icon: const Icon(Icons.close))),
-          Expanded(child: StatefulBuilder(builder: (categoryContext, updateCategories) =>
-            LayoutBuilder(builder: (context, constraints) => CustomScrollView(
-              key: const Key('purchase-action-category-scroll'), slivers: [
+    if (!mounted || epoch != _centreEpoch || scope != session.workspaceSupplierScope) return;
+    } finally {
+      if (mounted && epoch == _centreEpoch) setState(() => _actionCentreOpen = false);
+    }
+  }
+
+  bool backWithinPurchases() {
+    if (!_centreVisible && !_actionCentreOpen) return false;
+    ++_centreEpoch;
+    setState(() { _centreVisible = false; _actionCentreOpen = false; _expandedCategories.clear(); });
+    return true;
+  }
+
+  void cancelPendingAction() {
+    if (!backWithinPurchases()) ++_centreEpoch;
+  }
+
+  Future<void> _selectPurchaseAction(String action) async {
+    if (_purchaseActionPending || _actionCentreOpen || !_centreVisible) return;
+    _purchaseActionPending = true;
+    backWithinPurchases();
+    try { await _purchaseAction(action); }
+    finally { _purchaseActionPending = false; }
+  }
+
+  static (String, String) _categoryCopy(String id) => switch (id) {
+    'Supplier bills' => ('Purchase invoices', 'Purchase entry, saved invoices and corrections.'),
+    'Goods received & returns' => ('Goods receipt & returns', 'Goods inward, invoice matching and purchase returns.'),
+    'Money paid, credit & refunds' => ('Payments & credits', 'Supplier payments, advances, credit notes and refunds.'),
+    'Starting records' => ('Opening stock & balances', 'Stock and supplier balances when starting MoolSocial.'),
+    _ => ('Supplier accounts & statements', 'Supplier ledger, account statements and invoice copies.'),
+  };
+
+  List<Widget> _actionCentreSlivers(double width, double height) => [
+            SliverToBoxAdapter(child: SizedBox(
+              height: _actionCentreOpen ? 2 : 0,
+              child: _actionCentreOpen ? const LinearProgressIndicator() : null)),
             if (_receivingResumeUnknown) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Saved delivery status needs checking. Open Receive goods to recover it.',
                 style: TextStyle(fontSize: 12, color: MoolColors.ink)))),
             for (final category in _purchaseActions)
               SliverMainAxisGroup(key: ValueKey('purchase-category-group-${category.$1}'), slivers: [
-                SliverPersistentHeader(pinned: expandedCategories.contains(category.$1),
+                SliverPersistentHeader(pinned: _expandedCategories.contains(category.$1) &&
+                  _categoryCanPin(width, height, category.$1, category.$2),
                   delegate: _PurchaseCategoryHeader(title: category.$1,
-                    extent: _purchaseCategoryExtent(context, constraints.maxWidth, category.$1),
-                    expanded: expandedCategories.contains(category.$1), onChanged: (expanded) {
-                      updateCategories(() { if (expanded) { expandedCategories.add(category.$1); }
-                        else { expandedCategories.remove(category.$1); } });
+                    label: _categoryCopy(category.$1).$1, guide: _categoryCopy(category.$1).$2,
+                    extent: _purchaseCategoryExtent(context, width, category.$1),
+                    expanded: _expandedCategories.contains(category.$1), onChanged: (expanded) {
+                      setState(() { if (expanded) { _expandedCategories.add(category.$1); }
+                        else { _expandedCategories.remove(category.$1); } });
                     })),
-                if (expandedCategories.contains(category.$1)) SliverList.list(children: [
+                if (_expandedCategories.contains(category.$1)) SliverList.list(children: [
               for (final item in category.$2)
                 if ((item.$1 != 'continue-bill' || (session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed)) &&
                     (item.$1 != 'continue-receive' || _receivingResumeIds.isNotEmpty))
-                ListTile(key: Key('purchase-action-${item.$1}'), title: Text(item.$2,
+                Semantics(label: _categoryCopy(category.$1).$1, child: ListTile(key: Key('purchase-action-${item.$1}'), title: Text(item.$2,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: Theme.of(dialogContext).colorScheme.onSurface)),
+                    color: Theme.of(context).colorScheme.onSurface)),
                   contentPadding: const EdgeInsets.fromLTRB(24, 4, 16, 4),
                   subtitle: Text(item.$3, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
                   trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: (session.workspaceSuppliersLoaded || item.$1 == 'record-bill' || item.$1 == 'continue-bill' || item.$1 == 'edit') && (item.$1 != 'stock' || widget.onOpenStock != null) &&
+                  onTap: !_actionCentreOpen && !_purchaseActionPending && (session.workspaceSuppliersLoaded || item.$1 == 'record-bill' || item.$1 == 'continue-bill' || item.$1 == 'edit') && (item.$1 != 'stock' || widget.onOpenStock != null) &&
                     (item.$1 != 'record-bill' || session.workspacePurchaseEntryDraft == null || session.workspacePurchaseDraftReviewed)
-                    ? () => Navigator.pop(dialogContext, item.$1) : null),
+                    ? () => unawaited(_selectPurchaseAction(item.$1)) : null)),
               ]),
               ]),
-          ])))),
-        ]))));
-    if (!mounted || scope != session.workspaceSupplierScope || action == null) return;
-    await _purchaseAction(action);
-    } finally { _actionCentreOpen = false; }
-  }
+          ];
 
   double _purchaseCategoryExtent(BuildContext context, double width, String title) {
-    final painter = TextPainter(text: TextSpan(text: title,
+    final copy = _categoryCopy(title);
+    final painter = TextPainter(text: TextSpan(text: copy.$1,
       style: (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
         .copyWith(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
       textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))
       ..layout(maxWidth: (width - 80).clamp(1, double.infinity));
-    final height = (painter.height + 32).clamp(56, double.infinity).toDouble() + 1;
+    var textHeight = painter.height;
+    if (!_expandedCategories.contains(title)) {
+      painter.text = TextSpan(text: copy.$2,
+        style: (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+          .copyWith(fontSize: 11, color: MoolColors.muted));
+      painter.layout(maxWidth: (width - 80).clamp(1, double.infinity));
+      textHeight += painter.height + 4;
+    }
+    final padding = _expandedCategories.contains(title) ? 16 : 32;
+    final height = (textHeight + padding).clamp(48, double.infinity).toDouble() + 1;
     painter.dispose();
     return height;
   }
 
+  bool _categoryCanPin(double width, double height, String title,
+      List<(String, String, String)> actions) {
+    double measure(String text, TextStyle style) {
+      final painter = TextPainter(text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))
+        ..layout(maxWidth: (width - 80).clamp(1, double.infinity));
+      final result = painter.height;
+      painter.dispose();
+      return result;
+    }
+    final theme = Theme.of(context).textTheme;
+    var tallest = 80.0;
+    for (final action in actions) {
+      if (action.$1 == 'continue-bill' &&
+          (session.workspacePurchaseEntryDraft == null || session.workspacePurchaseDraftReviewed)) {
+        continue;
+      }
+      if (action.$1 == 'continue-receive' && _receivingResumeIds.isEmpty) continue;
+      final row = measure(action.$2, (theme.bodyLarge ?? const TextStyle())
+          .copyWith(fontSize: 13, fontWeight: FontWeight.w500)) +
+        measure(action.$3, (theme.bodyMedium ?? const TextStyle()).copyWith(fontSize: 12)) + 24;
+      if (row > tallest) tallest = row;
+    }
+    return _purchaseCategoryExtent(context, width, title) + tallest + 2 <= height;
+  }
+
+  Widget _actionCentreControls() => Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+    _actionCentreButton(),
+    if (_centreVisible) IconButton(tooltip: 'Close purchase actions',
+      onPressed: backWithinPurchases,
+      icon: const Icon(Icons.close, size: 18)),
+  ]);
+
   Widget _actionCentreButton() => OutlinedButton(
     key: const Key('work-purchase-action-centre-open'), onPressed: _openActionCentre,
     style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
       side: const BorderSide(color: MoolColors.navy)),
     child: const Row(mainAxisSize: MainAxisSize.min, children: [
       Flexible(child: Text('Manage purchases', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-      SizedBox(width: 6), Icon(Icons.chevron_right, size: 18),
+      SizedBox(width: 2), Icon(Icons.chevron_right, size: 16),
     ]));
 
   static const _purchaseActions = [
@@ -15846,6 +15938,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       _openingOnly = false;
       _newPurchase = false;
       _savedCopy = null;
+      _centreVisible = false; _actionCentreOpen = false; ++_centreEpoch; _expandedCategories.clear();
     }
     if (_receiveGoods && !statement) {
       final scope = session.workspaceSupplierScope;
@@ -16135,7 +16228,10 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     final savedCopies = session.workspacePurchaseCopies.where((c) => _purchaseFilter == 'All' &&
       terms.every('${c.supplier.name} ${c.supplier.phone} ${c.draft.invoiceReference} ${c.draft.invoiceDate}'
         .toLowerCase().contains)).toList()..sort((a, b) => b.savedAt.compareTo(a.savedAt));
-    return CustomScrollView(
+    return LayoutBuilder(builder: (context, constraints) => KeyedSubtree(
+      key: const Key('purchase-action-category-scroll'), child: Column(children: [
+      SizedBox(key: _centreVisible ? const Key('work-purchase-action-centre') : const Key('work-purchase-action-centre-closed'), height: 0),
+      Expanded(child: CustomScrollView(
       key: PageStorageKey('work-purchases-$storeId-$statement'),
       primary: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -16213,13 +16309,14 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 heading,
                 const SizedBox(height: 4),
-                _actionCentreButton(),
+                _actionCentreControls(),
               ]);
             }
             return Row(children: [Expanded(child: heading),
-              const SizedBox(width: 8), _actionCentreButton()]);
+              const SizedBox(width: 8), _actionCentreControls()]);
           }),
         )),
+        if (_centreVisible) ..._actionCentreSlivers(constraints.maxWidth, constraints.maxHeight),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
           sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
@@ -16271,6 +16368,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   if (!session.workspaceSuppliersLoaded || !session.workspacePurchaseCopies.contains(copy) ||
                       session.activeWorkspace?.id != storeId) { return; }
                   _purchaseSearchFocus.unfocus();
+                  cancelPendingAction();
                   setState(() => _savedCopy = copy);
                 }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -16298,6 +16396,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                     if (session.activeWorkspace?.id != storeId ||
                         !identical(history, session.workspaceRecentSearches('purchases'))) { return; }
                     _purchaseSearchFocus.unfocus();
+                    cancelPendingAction();
                     session.selectWorkspacePurchase(record.shipmentId);
                   },
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
@@ -16329,6 +16428,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                             if (session.activeWorkspace?.id != storeId ||
                                 !identical(history, session.workspaceRecentSearches('purchases'))) { return; }
                             _purchaseSearchFocus.unfocus();
+                            cancelPendingAction();
                             _lastViewedId = record.shipmentId;
                             if (record.stage != WorkspaceSupplyStage.unknown &&
                                 record.stage.incoming && widget.onTrackPurchase != null) {
@@ -16348,7 +16448,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           }, childCount: visible.length + savedCopies.length + 1)),
         ),
       ],
-    );
+    )),
+    ])));
   }
 }
 
@@ -17766,6 +17867,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onToggleStockActions,
     required this.counterKey,
     required this.purchaseEntryKey,
+    required this.purchasesKey,
     required this.receivingKey,
     required this.saleQuery,
     required this.requirementDraft,
@@ -17788,6 +17890,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final VoidCallback onToggleStockActions;
   final GlobalKey<_CounterOrderSurfaceState> counterKey;
   final GlobalKey<_StoreRecordPurchaseState> purchaseEntryKey;
+  final GlobalKey<_StorePurchasesSurfaceState> purchasesKey;
   final GlobalKey<_StoreReceiveGoodsState> receivingKey;
   final String saleQuery;
   final Map<String, String> requirementDraft;
@@ -17843,6 +17946,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return KeyedSubtree(
         key: const Key('work-store-track-stock'),
         child: _StorePurchasesSurface(
+          key: purchasesKey,
           session: session,
           purchaseEntryKey: purchaseEntryKey,
           receivingKey: receivingKey,
