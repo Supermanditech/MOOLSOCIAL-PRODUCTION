@@ -3552,6 +3552,13 @@ void main() {
 
 
   Future<void> revealPurchaseInput(WidgetTester tester, Finder target, {double delta = 60}) async {
+    final reader = find.byKey(const Key('purchase-full-screen-preview'));
+    if (reader.evaluate().isNotEmpty && target.evaluate().isNotEmpty &&
+        target.evaluate().every((element) => ModalRoute.of(element) != ModalRoute.of(tester.element(reader)))) {
+      // Editing/save controls are outside reading mode: explicitly return first.
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+      await tester.pumpAndSettle();
+    }
     if (target.evaluate().length == 1 && tester.widget(target) is Column) {
       // Static subsections can be taller than the viewport; their title, not centre, is the visible landmark.
       final title = find.descendant(of: target, matching: find.byType(Text)).first;
@@ -3581,7 +3588,7 @@ void main() {
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-name')), delta: -60);
   }
 
-  Future<void> usePurchaseControl(WidgetTester tester, String key) async {
+  Future<void> usePurchaseControl(WidgetTester tester, String key, {bool keepPreviewOpen = false}) async {
     final target = key == 'work-purchase-record'
       ? await purchaseRegisterAction(tester, key) : find.byKey(Key(key));
     await revealPurchaseInput(tester, target);
@@ -3593,6 +3600,12 @@ void main() {
     if (find.byKey(ValueKey('purchase-panel-$key')).evaluate().isNotEmpty) return;
     await tester.tap(target);
     await tester.pumpAndSettle();
+    if (key == 'work-purchase-preview' && !keepPreviewOpen) {
+      // Existing accounting/editing tests review then Close before saving/editing.
+      expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> expandPurchaseActionCategory(WidgetTester tester, String category) async {
@@ -3865,6 +3878,44 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final display in [(const Size(360, 806), 1.0), (const Size(806, 360), 1.6)]) {
+    testWidgets('R11-PREVIEW-FS01 reading uses remaining safe screen without management controls $display', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2);
+      await openPurchaseList(tester);
+      await openPurchaseEntryFromList(tester);
+      await usePurchaseControl(tester, 'work-purchase-preview', keepPreviewOpen: true);
+      final preview = find.byKey(const Key('purchase-full-screen-preview'));
+      expect(preview, findsOneWidget, reason: 'Preview must open reading mode directly.');
+      final viewer = find.byKey(const Key('purchase-review-zoom'));
+      final screen = tester.getRect(preview), page = tester.getRect(viewer);
+      expect(page.left, closeTo(screen.left, .1));
+      expect(page.right, closeTo(screen.right, .1));
+      expect(page.bottom, closeTo(screen.bottom, .1));
+      expect(page.height, greaterThanOrEqualTo(screen.height - 80));
+      for (final key in ['purchase-recorded-download', 'purchase-original-recorded',
+          'purchase-review-toolbar', 'work-purchase-draft-actions']) {
+        expect(find.descendant(of: preview, matching: find.byKey(Key(key))), findsNothing);
+      }
+      expect(find.byKey(const Key('purchase-full-screen-close')).hitTestable(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(preview, findsNothing);
+      final reviewStep = find.byKey(const Key('work-purchase-review-section'));
+      await revealPurchaseInput(tester, reviewStep);
+      await tester.tap(reviewStep);
+      await tester.pumpAndSettle();
+      expect(preview, findsOneWidget, reason: 'Step 08 opens the same reading view in one tap.');
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+      await tester.pumpAndSettle();
+      expect(preview, findsNothing);
+      expect(entry.value, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('R11-PREVIEW-FS01 fills safe display and preserves unfinished input on Close', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
@@ -3876,8 +3927,7 @@ void main() {
     final name = find.byKey(const Key('work-purchase-supplier-name'));
     await revealPurchaseInput(tester, name);
     await tester.enterText(name, 'Unfinished invoice review');
-    await usePurchaseControl(tester, 'work-purchase-preview');
-    await usePurchaseControl(tester, 'purchase-preview-full-screen');
+    await usePurchaseControl(tester, 'work-purchase-preview', keepPreviewOpen: true);
     final preview = find.byKey(const Key('purchase-full-screen-preview'));
     expect(preview, findsOneWidget);
     expect(tester.getSize(preview).width, 360);
@@ -3899,8 +3949,7 @@ void main() {
       viewport: const Size(360, 806), textScale: 1);
     await openPurchaseList(tester);
     await openPurchaseEntryFromList(tester);
-    await usePurchaseControl(tester, 'work-purchase-preview');
-    await usePurchaseControl(tester, 'purchase-preview-full-screen');
+    await usePurchaseControl(tester, 'work-purchase-preview', keepPreviewOpen: true);
     expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
@@ -3941,8 +3990,7 @@ void main() {
       final name = find.byKey(const Key('work-purchase-supplier-name'));
       await revealPurchaseInput(tester, name);
       await tester.enterText(name, 'Keep this review input');
-      await usePurchaseControl(tester, 'work-purchase-preview');
-      await usePurchaseControl(tester, 'purchase-preview-full-screen');
+      await usePurchaseControl(tester, 'work-purchase-preview', keepPreviewOpen: true);
       expect(tester.getSize(find.byKey(const Key('purchase-full-screen-preview'))).width, geometry.$1.width);
       expect(find.byKey(const Key('purchase-full-screen-close')).hitTestable(), findsOneWidget);
       await tester.binding.handlePopRoute();
@@ -3983,6 +4031,8 @@ void main() {
     await tester.tap(find.byKey(const Key('work-purchase-preview')));
     await tester.pumpAndSettle();
     final copyAction = find.byKey(const Key('work-purchase-copy-save'));
+    await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+    await tester.pumpAndSettle();
     final draftAction = find.byKey(const Key('work-purchase-draft-save'));
     // Host Ahem text metrics differ from OPPO's device font: permit wrapping,
     // but retain full labels, explicit hierarchy and accessible hit targets.
@@ -4536,9 +4586,7 @@ void main() {
     await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     final preview = find.byKey(const Key('work-purchase-preview'));
-    await revealPurchaseInput(tester, preview);
-    await tester.tap(preview);
-    await tester.pumpAndSettle();
+    await usePurchaseControl(tester, 'work-purchase-preview');
     expect(find.byKey(const Key('work-purchase-review-title')), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing, reason: 'Review stays inside the existing form.');
     expect(find.text('— = not entered, not zero. Supplier copy kept separately.'), findsOneWidget);
@@ -4599,8 +4647,7 @@ void main() {
         viewport:Size(view.$1,view.$2), textScale:view.$3);
       await openPurchaseList(tester);
       await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
-      final preview = find.byKey(const Key('work-purchase-preview'));
-      await revealPurchaseInput(tester, preview); await tester.tap(preview); await tester.pumpAndSettle();
+      await usePurchaseControl(tester, 'work-purchase-preview');
       final paper = find.byKey(const Key('purchase-review-paper'));
       expect(paper, findsOneWidget);
       expect(find.byKey(const ValueKey('purchase-instruction-work-purchase-review-section')),findsNothing,
@@ -4722,6 +4769,26 @@ void main() {
       }
       final transform=tester.widget<InteractiveViewer>(find.byKey(const Key('purchase-original-zoom')))
         .transformationController!;
+      await usePurchaseControl(tester, 'purchase-preview-full-screen');
+      expect(find.byKey(const Key('purchase-full-screen-preview')), findsOneWidget);
+      expect(find.byKey(const Key('purchase-original-download')), findsNothing);
+      expect(find.byKey(const Key('purchase-original-filename')), findsNothing);
+      expect(tester.getSize(find.byKey(const Key('purchase-original-zoom'))).width, viewport.width);
+      if (pdf) {
+        protected = true;
+        await tester.tap(find.byKey(const Key('purchase-original-next')));
+        await tester.pumpAndSettle();
+        expect(find.text('Page 1 of 2'), findsOneWidget);
+        expect(find.text('This PDF is password-protected. Choose an unlocked copy.'), findsOneWidget);
+        protected = false;
+        await tester.tap(find.byKey(const Key('purchase-original-retry')));
+        await tester.pumpAndSettle();
+        expect(find.text('Page 2 of 2'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('purchase-original-prev')));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(const Key('purchase-full-screen-close')));
+      await tester.pumpAndSettle();
       final zoom=find.byKey(const Key('purchase-original-zoom-in'));
       await revealPurchaseInput(tester,zoom);await tester.tap(zoom);await tester.pumpAndSettle();
       expect(transform.value.getMaxScaleOnAxis(),2);
@@ -4761,7 +4828,7 @@ void main() {
         expect(find.text('Page 1 of 2'),findsOneWidget);
         final next=find.byKey(const Key('purchase-original-next'));
         await revealPurchaseInput(tester,next);await tester.tap(next);await tester.pumpAndSettle();
-        expect(find.text('Page 2 of 2'),findsOneWidget);expect(pages,[0,1]);
+        expect(find.text('Page 2 of 2'),findsOneWidget);expect(pages,[0,1,0,1]);
         protected=true;
         final previousPage=find.byKey(const Key('purchase-original-prev'));
         await revealPurchaseInput(tester,previousPage);await tester.tap(previousPage);await tester.pumpAndSettle();
@@ -8780,6 +8847,7 @@ void main() {
     await usePurchaseControl(tester, 'work-purchase-preview');
     final saved = work.workspacePurchaseEntryDraft;
     Future<void> download() async {
+      await revealPurchaseInput(tester, find.byKey(const Key('purchase-recorded-download')));
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('purchase-recorded-download')));
         for (var i = 0; i < 40 && picker.bytes == null; i++) {
@@ -8814,6 +8882,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('work-purchase-reference')), 'UNSAVED-CHANGE');
     await usePurchaseControl(tester, 'work-purchase-preview');
     picker.bytes = null;
+    await revealPurchaseInput(tester, find.byKey(const Key('purchase-recorded-download')));
     await tester.tap(find.byKey(const Key('purchase-recorded-download')));
     await tester.pumpAndSettle();
     expect(picker.bytes, isNull);
@@ -8887,12 +8956,13 @@ void main() {
       if(config.$2==1) {
         expect(tester.getSize(find.byKey(const Key('purchase-review-toolbar'))).height,48,
           reason:'The recorded-copy controls use one compact accessible lane.');
-        final supplierBefore = tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name')));
+        await revealPurchaseInput(tester, find.byKey(const Key('purchase-review-item-scroll')));
+        final supplierBeforeDrag = tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name')));
         await tester.drag(find.byKey(const Key('purchase-review-item-scroll')),const Offset(-500,0));
         await tester.pumpAndSettle();
         final itemScroll = tester.widget<SingleChildScrollView>(find.byKey(const Key('purchase-review-item-scroll')));
         expect(itemScroll.controller!.offset,greaterThan(0));
-        expect(tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name'))),supplierBefore,
+        expect(tester.getRect(find.byKey(const ValueKey('purchase-review-supplier-Supplier name'))),supplierBeforeDrag,
           reason:'Sideways item-table reading must not move or clip the supplier header.');
       }
       await revealPurchaseInput(tester,find.byKey(const Key('work-purchase-draft-save')));

@@ -11944,7 +11944,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       final route = DialogRoute<void>(context: context, useSafeArea: true, barrierDismissible: false,
         builder: (previewContext) => Dialog.fullscreen(child: SafeArea(
           child: AnimatedBuilder(animation: Listenable.merge([_previewChanges, widget.session]),
-            builder: (_, _) => LayoutBuilder(builder: (context, constraints) => Column(
+            builder: (_, _) => Column(
               key: const Key('purchase-full-screen-preview'), children: [
                 Row(children: [const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 12),
                   child: Text('Invoice preview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)))),
@@ -11952,18 +11952,20 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                     style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                     onPressed: _closeFullScreenPreview, child: const Text('Close'))]),
                 Expanded(child: !_current ? const Center(child: Text('This purchase is no longer available. Close the preview.'))
-                  : SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 8),
-                    physics: _readingPointers.isEmpty ? null : const NeverScrollableScrollPhysics(),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: _sourceAttachment == null ? _reviewPurchase(constraints.maxHeight - 48)
-                        : _reviewOriginal(constraints.maxHeight - 48)))),
-              ]))))));
+                  : LayoutBuilder(builder: (context, constraints) => _sourceAttachment == null
+                    ? Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _reviewPurchase(constraints.maxHeight))
+                    : _originalReadingView())),
+              ])))));
       _previewRoute = route;
       await Navigator.of(context, rootNavigator: true).push(route);
       await route.completed;
     } finally {
       _previewRoute = null;
-      if (mounted) setState(() { _fullScreenPreview = false; _readingPointers.clear(); });
+      if (mounted) {
+        setState(() { _fullScreenPreview = false; _readingPointers.clear(); });
+        _positionReview();
+      }
     }
   }
   void _closeFullScreenPreview() {
@@ -11972,8 +11974,13 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _previewClosing = true;
     route.navigator?.pop();
   }
+  void _showReadingPreview({bool recorded = true}) {
+    _previewPurchase(recorded: recorded);
+    unawaited(_openFullScreenPreview());
+  }
   WorkspacePurchaseInvoiceAttachment? _lastOriginal;
   int _lastOriginalPage = 0;
+  int _requestedSourcePage = 0;
   WorkspacePurchaseInvoiceAttachment? _sourceAttachment;
   Uint8List? _sourceBytes;
   WorkPdfPage? _sourcePage;
@@ -12480,6 +12487,10 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         : key == 'work-purchase-items-section' ? _itemsAnchor : null,
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Semantics(expanded: expanded, child: InkWell(key: Key(key), onTap: () {
+        if (key == 'work-purchase-review-section') {
+          _showReadingPreview(recorded: _sourceAttachment == null);
+          return;
+        }
         FocusScope.of(context).unfocus();
         setState(() {
           _reviewFocused = key == 'work-purchase-review-section' && !expanded;
@@ -12589,6 +12600,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     _closeSource();
     _lastOriginal = attachment;
     _lastOriginalPage = page;
+    _requestedSourcePage = page;
     final epoch = _sourceEpoch;
     setState(() { _sourceAttachment = attachment; _sourceLoading = true; });
     _previewPurchase(recorded: false);
@@ -12619,7 +12631,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         index < 0 || index >= _sourcePage!.pageCount) { return; }
     final epoch = _sourceEpoch;
     if (!_sourceCurrent(epoch)) return;
-    setState(() { _sourceLoading = true; _sourceError = null; });
+    setState(() { _sourceLoading = true; _sourceError = null; _requestedSourcePage = index; });
     try {
       final page = await _sourcePdf.render(_sourceBytes!, page: index);
       if (_sourceCurrent(epoch)) {
@@ -12736,6 +12748,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
       '${_formatStoreAmount(absolute ~/ 100)}.${(absolute % 100).toString().padLeft(2, '0')}';
   }
   Widget _reviewCopies() {
+    if (_fullScreenPreview) return const SizedBox.shrink();
     final original = _sourceAttachment != null;
     final attachment = _attachments.where((a) => a.digest == _lastOriginal?.digest).firstOrNull
         ?? _attachments.firstOrNull;
@@ -12752,7 +12765,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         onPressed: original || _sourceSaving ? null : () => _openSource(attachment,
           page: attachment.digest == _lastOriginal?.digest ? _lastOriginalPage : 0),
         child: const Text('Supplier copy'))),
-      Semantics(selected: !original, child: TextButton(key: const Key('purchase-original-recorded'),
+      if (_readOnly || attachment != null) Semantics(selected: !original, child: TextButton(key: const Key('purchase-original-recorded'),
         style: TextButton.styleFrom(disabledForegroundColor: MoolColors.navy,
           minimumSize: const Size(48,48), padding: const EdgeInsets.symmetric(horizontal:4),
           textStyle: TextStyle(fontSize: 12, fontWeight: original ? FontWeight.w500 : FontWeight.w700)),
@@ -12763,7 +12776,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         tooltip: _sourceSaving ? 'Saving copy…' : 'Download supplier copy',
         onPressed: _sourceSaving ? null : _downloadSource,
         icon: const Icon(Icons.download_outlined, size: 20, color: MoolColors.navy)),
-      if (!original) IconButton(tooltip: _recordedSaving ? 'Preparing copy…' : 'Download recorded purchase copy',
+      if (!original && (_readOnly || _original != null)) IconButton(tooltip: _recordedSaving ? 'Preparing copy…' : 'Download recorded purchase copy',
         key: const Key('purchase-recorded-download'),
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         onPressed: _recordedSaving ? null : _downloadRecorded,
@@ -12796,9 +12809,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Widget _invoiceViewer(String key, double viewportHeight, Widget Function(double width) page) =>
     LayoutBuilder(builder: (context, constraints) => SizedBox(key: _sourceViewport,
-      // Reserve space for comparison controls and the fixed draft actions.
-      // The page starts at readable width; its remaining height pans inside.
-      height: _fullScreenPreview ? (viewportHeight - 160).clamp(80.0, 1600.0)
+      // Reading mode owns the entire remaining safe viewport; no form controls.
+      height: _fullScreenPreview ? viewportHeight
         : (viewportHeight * .55).clamp(160.0, 650.0),
       child: Listener(onPointerDown: (e) => _readingPointer(e, true),
         onPointerUp: (e) => _readingPointer(e, false), onPointerCancel: (e) => _readingPointer(e, false),
@@ -12806,11 +12818,11 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           child: InteractiveViewer(key: Key(key), transformationController: _previewZoom,
             constrained: false, alignment: Alignment.topLeft, minScale: .05, maxScale: 8,
             child: SizedBox(key: _documentPage,
-              width: key == 'purchase-review-zoom' ? constraints.maxWidth
+              width: key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
                 : constraints.maxWidth < 760 ? 760 : constraints.maxWidth,
-              child: page(key == 'purchase-review-zoom' ? constraints.maxWidth
+              child: page(key == 'purchase-review-zoom' || _fullScreenPreview ? constraints.maxWidth
                 : constraints.maxWidth < 760 ? 760 : constraints.maxWidth))))))));
-  Widget _invoiceTools({required bool original}) => Wrap(
+  Widget _invoiceTools({required bool original, bool pageNavigationOnly = false}) => Wrap(
     crossAxisAlignment: WrapCrossAlignment.center, children: [
       if (original && _sourcePage != null) Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(key: const Key('purchase-original-prev'), tooltip: 'Previous page',
@@ -12824,13 +12836,48 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           onPressed: _sourceLoading || _sourcePage!.index + 1 == _sourcePage!.pageCount ? null : () => _sourceTurnPage(_sourcePage!.index + 1),
           icon: const Icon(Icons.chevron_right, size: 20)),
       ]),
-      IconButton(key: Key(original ? 'purchase-original-zoom-in' : 'purchase-review-zoom-in'),
+      if (!pageNavigationOnly) IconButton(key: Key(original ? 'purchase-original-zoom-in' : 'purchase-review-zoom-in'),
         tooltip: 'Zoom in', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         onPressed: _zoomInvoice, icon: const Icon(Icons.zoom_in, size: 20, color: MoolColors.navy)),
-      IconButton(key: Key(original ? 'purchase-original-fit' : 'purchase-review-fit'),
+      if (!pageNavigationOnly) IconButton(key: Key(original ? 'purchase-original-fit' : 'purchase-review-fit'),
         tooltip: 'Fit page', constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         onPressed: _fitInvoice, icon: const Icon(Icons.fit_screen_outlined, size: 20, color: MoolColors.navy)),
     ]);
+  Widget _originalReadingView() {
+    final image = _sourceAttachment!.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_sourcePage != null && _sourcePage!.pageCount > 1)
+        _invoiceTools(original: true, pageNavigationOnly: true),
+      if (_sourceLoading && image != null) const LinearProgressIndicator(),
+      if (_sourceError != null && image != null)
+        Semantics(liveRegion: true, child: Row(children: [
+          Expanded(child: Text(_sourceError!, style: const TextStyle(color: Color(0xffa52a2a)))),
+          TextButton(key: const Key('purchase-original-retry'),
+            onPressed: _sourceLoading ? null : () => _sourceTurnPage(_requestedSourcePage),
+            child: const Text('Retry page')),
+        ])),
+      Expanded(child: LayoutBuilder(builder: (context, constraints) {
+        if (image != null) return _originalInvoiceImage(image, constraints.maxHeight);
+        if (_sourceLoading) return const Center(child: CircularProgressIndicator());
+        return Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+          mainAxisSize: MainAxisSize.min, children: [
+            Text(_sourceError ?? 'The supplier copy could not be opened.'),
+            TextButton(key: const Key('purchase-original-retry'),
+              onPressed: () => _openSource(_sourceAttachment!, page: _requestedSourcePage), child: const Text('Retry copy')),
+          ])));
+      })),
+    ]);
+  }
+  Widget _originalInvoiceImage(Uint8List image, double height) =>
+    _invoiceViewer('purchase-original-zoom', height, (width) => Semantics(
+      image: true, label: 'Supplier invoice copy', child: Image.memory(image,
+        width: width, fit: BoxFit.contain, gaplessPlayback: true, excludeFromSemantics: true,
+        frameBuilder: (context, child, frame, synchronous) {
+          final decoded = child is RawImage ? child.image : null;
+          final ratio = decoded != null ? decoded.width / decoded.height
+            : _sourcePage != null ? _sourcePage!.width / _sourcePage!.height : 1 / 1.414;
+          return AspectRatio(aspectRatio: ratio, child: child);
+        })));
   List<Widget> _reviewOriginal(double viewportHeight) {
     final attachment = _sourceAttachment!;
     final image = attachment.contentType == 'application/pdf' ? _sourcePage?.bytes : _sourceBytes;
@@ -12848,17 +12895,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         ],
         if (_sourceNotice != null) Text(_sourceNotice!, style: const TextStyle(fontSize: 12, color: _paperInk)),
         if (image != null) ...[
-          _invoiceViewer('purchase-original-zoom', viewportHeight, (width) => Semantics(
-            image: true, label: 'Supplier invoice copy', child: Image.memory(image,
-              width: width, fit: BoxFit.contain, gaplessPlayback: true, excludeFromSemantics: true,
-              frameBuilder: (context, child, frame, synchronous) {
-                final decoded = child is RawImage ? child.image : null;
-                // Keep a finite page before image decoding; use the actual source
-                // aspect ratio as soon as available, never stretch its pixels.
-                final ratio = decoded != null ? decoded.width / decoded.height
-                  : _sourcePage != null ? _sourcePage!.width / _sourcePage!.height : 1 / 1.414;
-                return AspectRatio(aspectRatio: ratio, child: child);
-              }))),
+          _originalInvoiceImage(image, viewportHeight),
         ],
         _section('Bill file details', 'purchase-original-file-details', [
           SelectableText(attachment.fileName, key: const Key('purchase-original-filename'),
@@ -12884,9 +12921,15 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   void _positionReview() {
     if (_fullScreenPreview) return;
+    final scope = _scope;
+    final draftId = _draftId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_current || _scope != scope || _draftId != draftId ||
+          _fullScreenPreview || !_reviewFocused || ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       final target = _reviewAnchor.currentContext;
-      if (mounted && target != null) {
+      if (target != null) {
         unawaited(Scrollable.ensureVisible(target, alignment: 0, duration: const Duration(milliseconds: 180)));
       }
     });
@@ -13151,6 +13194,16 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
               e.value.text,'receipt-$index-${e.key}'),
       ...extras('receipt'),
     ];
+    final invoice = _invoiceViewer('purchase-review-zoom', viewportHeight, (width) {
+      final content = Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final part in paperParts) if (width >= 600 || part is! Expanded) part]);
+      return SizedBox(width: width, child: DecoratedBox(key: const Key('purchase-review-paper'),
+        decoration: const BoxDecoration(color: Colors.white, border: Border.fromBorderSide(rule),
+          boxShadow: [BoxShadow(color: Color(0x22000000), blurRadius: 8, offset: Offset(0, 3))]),
+        child: width < 600 ? content : ConstrainedBox(constraints: const BoxConstraints(minHeight: 1075),
+          child: IntrinsicHeight(child: content))));
+    });
+    if (_fullScreenPreview) return [invoice];
     return [
       _reviewCopies(),
       Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, children: [
@@ -13167,16 +13220,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
           !_goods.any((line) => line.name.text.trim().isNotEmpty))
         const Text('Still to enter: check supplier, invoice number/date and items before saving.',
           style: TextStyle(fontSize: 12, color: Color(0xff8b3b13))),
-      _invoiceViewer('purchase-review-zoom', viewportHeight, (width) {
-        final content = Column(crossAxisAlignment:CrossAxisAlignment.stretch,
-          children: [for (final part in paperParts) if (width >= 600 || part is! Expanded) part]);
-        final paper = SizedBox(width:width,child:DecoratedBox(key:const Key('purchase-review-paper'),
-          decoration:const BoxDecoration(color:Colors.white,border:Border.fromBorderSide(rule),
-            boxShadow:[BoxShadow(color:Color(0x22000000),blurRadius:8,offset:Offset(0,3))]),
-          child: width < 600 ? content : ConstrainedBox(constraints:const BoxConstraints(minHeight:1075),
-            child:IntrinsicHeight(child:content))));
-        return paper;
-      }),
+      invoice,
       if (_recordedNotice != null) Padding(padding: const EdgeInsets.only(top: 6),
         child: Text(_recordedNotice!, key: const Key('purchase-recorded-notice'),
           style: const TextStyle(fontSize: 12, color: MoolColors.navy))),
@@ -13383,7 +13427,7 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
         TextButton(style: TextButton.styleFrom(minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 8)),
           onPressed: _back, child: const Text('Cancel', style: TextStyle(fontSize: 13))),
-        if (!_reviewFocused) TextButton(key: const Key('work-purchase-preview'), onPressed: _previewPurchase,
+        if (!_reviewFocused) TextButton(key: const Key('work-purchase-preview'), onPressed: _showReadingPreview,
           child: const Text('Preview')),
         if (_reviewFocused) TextButton(key: const Key('work-purchase-draft-save'),
           style: TextButton.styleFrom(minimumSize: const Size(48, 48),
