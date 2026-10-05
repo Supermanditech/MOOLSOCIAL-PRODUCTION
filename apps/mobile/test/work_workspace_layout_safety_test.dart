@@ -3313,21 +3313,73 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> openPurchaseEntryFromList(WidgetTester tester) async {
-    final action = find.byKey(const Key('work-purchase-record'));
-    expect(action, findsOneWidget);
-    // The register action rail can scroll horizontally at enlarged text sizes.
-    // It is not inside the editable purchase form until the action is tapped.
-    await Scrollable.ensureVisible(tester.element(action));
+  Future<void> revealPurchaseAction(WidgetTester tester, Finder action) async {
+    final viewport = find.byKey(const Key('purchase-action-category-scroll'));
+    await tester.scrollUntilVisible(action, 80,
+      scrollable: find.descendant(of: viewport, matching: find.byType(Scrollable)).first);
+    await tester.ensureVisible(action);
     await tester.pumpAndSettle();
-    expect(action.hitTestable(), findsOneWidget,
-      reason: 'Entry action ${tester.getRect(action)}; rail '
-        '${tester.getRect(find.byKey(const Key('work-purchase-actions')))}');
-    final actionRect = tester.getRect(action);
-    final railRect = tester.getRect(find.byKey(const Key('work-purchase-actions')));
-    expect(actionRect.left, greaterThanOrEqualTo(railRect.left - .1));
-    expect(actionRect.right, lessThanOrEqualTo(railRect.right + .1),
-      reason: 'The whole entry action, not only its centre, must fit the visible rail.');
+    expect(action.hitTestable(), findsOneWidget);
+    expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+    final bounds = tester.getRect(viewport), target = tester.getRect(action);
+    expect(target.left, greaterThanOrEqualTo(bounds.left - .1));
+    expect(target.right, lessThanOrEqualTo(bounds.right + .1));
+    expect(target.top, greaterThanOrEqualTo(bounds.top - .1));
+    expect(target.bottom, lessThanOrEqualTo(bounds.bottom + .1),
+      reason: 'The entire action must fit the visible category viewport.');
+  }
+
+  // Preserve intent parity while exercising the actual single entry point.
+  Future<Finder> purchaseRegisterAction(WidgetTester tester, String intent) async {
+    final work = tester.widget<MoolSocialApp>(find.byType(MoolSocialApp)).workSession!;
+    final action = switch (intent) {
+      'work-purchase-new' => 'record-bill',
+      'work-purchase-opening' => 'opening',
+      'work-purchase-receive-goods' => 'receive',
+      _ => work.workspacePurchaseEntryDraft == null ? 'record-bill'
+        : work.workspacePurchaseDraftReviewed ? 'edit' : 'continue-bill',
+    };
+    if (find.byKey(const Key('work-purchase-action-centre')).evaluate().isEmpty) {
+      final entry = find.byKey(const Key('work-purchase-action-centre-open'));
+      if (entry.evaluate().isEmpty) {
+        final register = find.byWidgetPredicate((w) => w is CustomScrollView &&
+          w.key is PageStorageKey<String> && (w.key! as PageStorageKey<String>).value.startsWith('work-purchases-'));
+        expect(register, findsOneWidget);
+        final scrollable = find.descendant(of: register, matching: find.byType(Scrollable)).first;
+        for (var attempt = 0; attempt < 20 &&
+            tester.state<ScrollableState>(scrollable).position.pixels > .1; attempt++) {
+          await tester.drag(register, const Offset(0, 400));
+          await tester.pumpAndSettle();
+        }
+        expect(tester.state<ScrollableState>(scrollable).position.pixels, closeTo(0, .1));
+        await tester.scrollUntilVisible(entry, 120, maxScrolls: 20,
+          scrollable: scrollable);
+      }
+      await tester.ensureVisible(entry);
+      await tester.pumpAndSettle();
+      expect(entry.hitTestable(), findsOneWidget);
+      expect(tester.getSize(entry).height, greaterThanOrEqualTo(48));
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+    }
+    final category = action == 'opening' ? 'Starting records'
+      : action == 'receive' ? 'Goods received & returns' : 'Supplier bills';
+    final group = find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false);
+    await Scrollable.ensureVisible(tester.element(group));
+    await tester.pumpAndSettle();
+    final tile = find.byKey(ValueKey('purchase-category-$category'));
+    if (!tester.widget<ExpansionTile>(tile).initiallyExpanded) {
+      await tester.tap(find.text(category));
+      await tester.pumpAndSettle();
+    }
+    final target = find.byKey(Key('purchase-action-$action'));
+    await revealPurchaseAction(tester, target);
+    return target;
+  }
+
+  Future<void> openPurchaseEntryFromList(WidgetTester tester) async {
+    final action = await purchaseRegisterAction(tester, 'work-purchase-record');
+    await revealPurchaseAction(tester, action);
     await tester.tap(action);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
@@ -3501,7 +3553,8 @@ void main() {
   }
 
   Future<void> usePurchaseControl(WidgetTester tester, String key) async {
-    final target = find.byKey(Key(key));
+    final target = key == 'work-purchase-record'
+      ? await purchaseRegisterAction(tester, key) : find.byKey(Key(key));
     await revealPurchaseInput(tester, target);
     if (tester.widget(target) is Column) {
       // Former nested reveal controls are now static subheadings with all children present.
@@ -3515,11 +3568,13 @@ void main() {
 
   Future<void> expandPurchaseActionCategory(WidgetTester tester, String category) async {
     final heading = find.text(category);
-    await Scrollable.ensureVisible(tester.element(heading));
+    final group = find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false);
+    await Scrollable.ensureVisible(tester.element(group));
     await tester.pumpAndSettle();
     await tester.tap(heading);
     await tester.pumpAndSettle();
   }
+
 
   testWidgets('P01-AC01 action centre exposes purpose-specific routes without posting', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
@@ -3542,6 +3597,155 @@ void main() {
     expect(entry.value == null ? null : jsonEncode(entry.value!.toJson()), before);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('P01-AC01 V01 management entry has a visible button affordance', (tester) async {
+    final entry = _PurchaseEntryFixtureStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
+    await openPurchaseList(tester);
+    final button = find.byKey(const Key('work-purchase-action-centre-open'));
+    expect(tester.widget(button), isA<OutlinedButton>());
+    final style = tester.widget<OutlinedButton>(button).style!;
+    final background = style.backgroundColor!.resolve({})!;
+    final foreground = style.foregroundColor!.resolve({})!;
+    expect(background, MoolColors.navy);
+    expect(foreground, Colors.white);
+    expect((foreground.computeLuminance() + .05) / (background.computeLuminance() + .05),
+      greaterThanOrEqualTo(4.5));
+    expect(find.descendant(of: button, matching: find.byIcon(Icons.chevron_right)), findsOneWidget);
+    expect(button.hitTestable(), findsOneWidget);
+    expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    for (final oldKey in ['work-purchase-actions', 'work-purchase-record',
+        'work-purchase-new', 'work-purchase-receive-goods', 'work-purchase-opening']) {
+      expect(find.byKey(Key(oldKey)), findsNothing,
+        reason: 'The retired rail must not compete with the approved single entry.');
+    }
+    expect(entry.value, isNull);
+  });
+
+  for (final total in ['123456.78', '']) {
+    testWidgets('P01-AC01 V05 V06 V07 saved rows distinguish bill total and metadata $total', (tester) async {
+      // Host-only layout fixture; no evaluation-device records injected.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: 2);
+      await openPurchaseList(tester);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 9, 30);
+      final supplier = WorkspaceSupplierProfile(id: 'host-row-supplier', name: 'Host-only supplier',
+        createdAt: at, updatedAt: at);
+      final draft = WorkspacePurchaseEntryDraft(id: 'host-row-draft', supplierId: supplier.id,
+        invoiceReference: 'HOST-ROW-01', invoiceDate: '30/09/2026', createdAt: at, updatedAt: at,
+        goods: [{'name': 'Host-only item', 'pack': '1 kg', 'quantity': '1', 'cost': '40', 'productId': ''}],
+        details: {'invoiceTotal': total});
+      final copy = WorkspacePurchaseSavedCopy(id: 'host-row-copy', storeName: 'Evaluation Store',
+        revision: 7, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 7, profiles: [supplier], draft: draft, copies: [copy]);
+      await work.loadWorkspaceSuppliers(retry: true);
+      await tester.pumpAndSettle();
+      final before = jsonEncode(entry.value!.toJson());
+      final row = find.byKey(const ValueKey('work-purchase-copy-host-row-copy'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: row, matching: find.text(total.isEmpty
+        ? 'Total not entered' : 'Bill total ₹1,23,456.78')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Invoice HOST-ROW-01 · 30/09/2026')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.byTooltip('Saved 30/09/2026 · Revision 7')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.textContaining('Revision')), findsNothing);
+      expect(jsonEncode(entry.value!.toJson()), before);
+      if (total.isNotEmpty) {
+        final stock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+        final movements = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
+        entry.failRead = true;
+        expect(await work.loadWorkspaceSuppliers(retry: true), isFalse);
+        await tester.pumpAndSettle();
+        final edit = await purchaseRegisterAction(tester, 'work-purchase-record');
+        expect(find.descendant(of: edit, matching: find.text('Edit saved bill entry')), findsOneWidget);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+        expect(work.workspaceSupplierRecoveryError, isNotNull);
+        expect(jsonEncode(entry.value!.toJson()), before);
+        final cancel = find.widgetWithText(TextButton, 'Cancel');
+        await revealPurchaseInput(tester, cancel);
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
+        final retry = find.text('Retry saved purchases');
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        entry.failRead = false;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(work.workspaceSuppliersLoaded, isTrue);
+        expect(jsonEncode(entry.value!.toJson()), before);
+        expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), stock);
+        expect(work.workspaceStockMovements, movements);
+      }
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final geometry in [(const Size(360, 806), 1.0), (const Size(320, 568), 2.0),
+      (const Size(806, 360), 1.6)]) {
+    testWidgets('P01-AC01 V04 search precedes compact management heading $geometry', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      final search = find.byKey(const Key('work-purchase-search'));
+      final filter = find.byKey(const Key('work-purchase-filter-all'));
+      final manage = find.byKey(const Key('work-purchase-action-centre-open'));
+      expect(tester.getTopLeft(search).dy, lessThan(tester.getTopLeft(filter).dy));
+      expect(tester.getTopLeft(filter).dy, lessThan(tester.getTopLeft(manage).dy));
+      await tester.ensureVisible(manage);
+      await tester.pumpAndSettle();
+      expect(manage.hitTestable(), findsOneWidget);
+      expect(tester.getSize(manage).height, greaterThanOrEqualTo(48));
+      if (geometry.$2 == 1.0) {
+        expect(tester.getCenter(find.byKey(const Key('work-purchase-register-heading'))).dy,
+          closeTo(tester.getCenter(manage).dy, .1));
+      }
+      expect(entry.value, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final geometry in [(const Size(320, 568), 2.0), (const Size(806, 360), 1.6)]) {
+    testWidgets('P01-AC01 V09 expanded category context follows scroll $geometry', (tester) async {
+      final entry = _PurchaseEntryFixtureStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
+      await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester, 'Goods received & returns');
+      await expandPurchaseActionCategory(tester, 'Money paid, credit & refunds');
+      final lastGoods = find.byKey(const Key('purchase-action-return'));
+      await Scrollable.ensureVisible(tester.element(find.byKey(
+        const ValueKey('purchase-category-group-Goods received & returns'), skipOffstage: false)));
+      await tester.pumpAndSettle();
+      final scrollable = find.descendant(of: find.byKey(const Key('purchase-action-category-scroll')),
+        matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(lastGoods, 100, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-category-Goods received & returns')).hitTestable(), findsOneWidget);
+      expect(find.byTooltip('Close purchase actions').hitTestable(), findsOneWidget);
+      final money = find.byKey(const Key('purchase-action-money'));
+      await Scrollable.ensureVisible(tester.element(find.byKey(
+        const ValueKey('purchase-category-group-Money paid, credit & refunds'), skipOffstage: false)));
+      await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(money));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('purchase-category-Money paid, credit & refunds')).hitTestable(), findsOneWidget);
+      expect(money.hitTestable(), findsOneWidget);
+      expect(entry.value, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('P01-AC01 approved entry opens collapsed categories and toggles in one tap', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
@@ -3640,13 +3844,16 @@ void main() {
       await tester.pumpAndSettle();
       for (final category in ['Supplier bills', 'Goods received & returns', 'Money paid, credit & refunds',
           'Starting records', 'Supplier accounts & documents']) {
+        await Scrollable.ensureVisible(tester.element(find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false)));
+        await tester.pumpAndSettle();
         expect(find.text(category), findsOneWidget);
       }
       await expandPurchaseActionCategory(tester, 'Supplier bills');
       expect(find.byKey(const Key('purchase-action-continue-bill')), findsNothing);
       await expandPurchaseActionCategory(tester, 'Supplier accounts & documents');
       final last = find.byKey(const Key('purchase-action-documents'));
-      await Scrollable.ensureVisible(tester.element(last));
+      await tester.scrollUntilVisible(last, 100, scrollable: find.descendant(
+        of: find.byKey(const Key('purchase-action-category-scroll')), matching: find.byType(Scrollable)).first);
       await tester.pumpAndSettle();
       expect(last.hitTestable(), findsOneWidget);
       expect(tester.getSize(last).height, greaterThanOrEqualTo(48));
@@ -3678,7 +3885,7 @@ void main() {
     await openPurchaseList(tester);
     final inventoryBefore = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
     final movementsBefore = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     for (final field in {'work-purchase-supplier-name': 'Evaluation R12 supplier',
@@ -3768,18 +3975,17 @@ void main() {
       final prior = jsonEncode(entry.value!.toJson());
       final priorStock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
       final priorMovements = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
-      final next = find.byKey(const Key('work-purchase-new'));
+      var next = await purchaseRegisterAction(tester, 'work-purchase-new');
       expect(next, findsOneWidget);
       await Scrollable.ensureVisible(tester.element(next));
       await tester.pumpAndSettle();
       expect(next.hitTestable(), findsOneWidget);
       expect(tester.getSize(next).height, greaterThanOrEqualTo(48));
-      final edit = find.byKey(const Key('work-purchase-record'));
-      expect(find.text('Edit entry'), findsOneWidget);
+      final edit = await purchaseRegisterAction(tester, 'work-purchase-record');
+      expect(find.text('Edit saved bill entry'), findsOneWidget);
       expect(tester.getSize(edit).height, greaterThanOrEqualTo(48));
-      if (geometry.$2 == 1.0) {
-        expect(tester.getTopLeft(next).dy, closeTo(tester.getTopLeft(edit).dy, .1));
-      }
+      expect(next, isNot(edit));
+      next = await purchaseRegisterAction(tester, 'work-purchase-new');
       await tester.tap(next);
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
@@ -3792,6 +3998,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(jsonEncode(entry.value!.toJson()), prior);
       // A dirty new editor must not overwrite or discard the saved draft below it.
+      next = await purchaseRegisterAction(tester, 'work-purchase-new');
       await Scrollable.ensureVisible(tester.element(next));
       await tester.pumpAndSettle();
       expect(next.hitTestable(), findsOneWidget);
@@ -4051,7 +4258,7 @@ void main() {
       await work.loadWorkspaceSuppliers(retry: true);
       await tester.pumpAndSettle();
       final saved = jsonEncode(entry.value!.toJson());
-      await tester.tap(find.byKey(const Key('work-purchase-new')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-new'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       final name = find.byKey(const Key('work-purchase-supplier-name'));
@@ -4130,7 +4337,7 @@ void main() {
       final work = manualPurchaseFixture(entry);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openPurchaseList(tester);
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       for (final field in {'work-purchase-supplier-name': 'Evaluation R12 supplier',
@@ -4142,7 +4349,7 @@ void main() {
       if (stale) {
         await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('work-purchase-record')));
+        await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
         await tester.pumpAndSettle();
         final competing = jsonDecode(jsonEncode(entry.value!.toJson())) as Map<String, dynamic>;
         competing['revision'] = 2;
@@ -4190,7 +4397,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     var previous = double.negativeInfinity;
     final steps = ['supplier-section', 'invoice-section', 'buyer-details', 'items-section',
@@ -4249,7 +4456,7 @@ void main() {
     final original = entry.value;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     final preview = find.byKey(const Key('work-purchase-preview'));
     await revealPurchaseInput(tester, preview);
@@ -4314,7 +4521,7 @@ void main() {
       await mount(tester, route:'/app/work/workspace/dashboard', work:work,
         viewport:Size(view.$1,view.$2), textScale:view.$3);
       await openPurchaseList(tester);
-      await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
       final preview = find.byKey(const Key('work-purchase-preview'));
       await revealPurchaseInput(tester, preview); await tester.tap(preview); await tester.pumpAndSettle();
       final paper = find.byKey(const Key('purchase-review-paper'));
@@ -4410,7 +4617,7 @@ void main() {
       });addTearDown(()=>messenger.setMockMethodCallHandler(channel,null));
       await mount(tester,route:'/app/work/workspace/dashboard',work:work,textScale:scale,viewport:viewport);
       await openPurchaseList(tester);
-      await tester.tap(find.byKey(const Key('work-purchase-record')));await tester.pumpAndSettle();
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));await tester.pumpAndSettle();
       await usePurchaseControl(tester,'work-purchase-invoice-section');
       final view=find.byKey(Key('work-purchase-view-${attachment.digest}'));
       await revealPurchaseInput(tester,view);expect(view.hitTestable(),findsOneWidget);
@@ -4549,7 +4756,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     final name = tester.widget<TextField>(find.byKey(const Key('work-purchase-supplier-name')));
@@ -4578,7 +4785,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     final items = find.byKey(const Key('work-purchase-items-section'));
     await revealPurchaseInput(tester, items);
@@ -4632,7 +4839,7 @@ void main() {
     final original = entry.value;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     final items = find.byKey(const Key('work-purchase-items-section'));
     await revealPurchaseInput(tester, items);
@@ -4658,7 +4865,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     final tax = find.byKey(const Key('work-purchase-tax-details'));
     await revealPurchaseInput(tester, tax);
@@ -4702,8 +4909,8 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       final section = find.byKey(const Key('work-purchase-receipt-details'));
       await revealPurchaseInput(tester, section);
@@ -4727,7 +4934,7 @@ void main() {
     final work = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     for (final key in ['supplier-name', 'reference', 'item-0', 'cgst', 'buyerName', 'paidAmount', 'receivedDate']) {
       expect(find.byKey(Key('work-purchase-$key')), findsNothing);
@@ -4772,9 +4979,9 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-purchase-supplier-name')), findsNothing);
       final header = find.byKey(const Key('work-purchase-supplier-section'));
@@ -4809,28 +5016,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(target.hitTestable(), findsOneWidget, reason: 'Opening record control must be reachable by touch.');
   }
-  Future<void> revealPurchaseAction(WidgetTester tester, Finder action) async {
-    final rail = find.byKey(const Key('work-purchase-actions'));
-    final register = find.byWidgetPredicate((w) => w is CustomScrollView &&
-      w.key is PageStorageKey<String> && (w.key! as PageStorageKey<String>).value.startsWith('work-purchases-'));
-    final vertical = find.descendant(of: register, matching: find.byWidgetPredicate((w) =>
-      w is Scrollable && w.axisDirection == AxisDirection.down)).first;
-    for (var attempt = 0; attempt < 12 && rail.hitTestable().evaluate().isEmpty; attempt++) {
-      await tester.drag(vertical, const Offset(0, 180));
-      await tester.pumpAndSettle();
-    }
-    expect(rail.hitTestable(), findsOneWidget, reason: 'Ordinary vertical gestures must expose the action rail.');
-    for (var attempt = 0; attempt < 12 && action.hitTestable().evaluate().isEmpty; attempt++) {
-      final target = tester.getCenter(action), bounds = tester.getRect(rail);
-      await tester.drag(rail, Offset(target.dx < bounds.left ? 180 : -180, 0));
-      await tester.pumpAndSettle();
-    }
-    expect(action.hitTestable(), findsOneWidget, reason: 'The exact action must be reachable by ordinary horizontal gestures.');
-  }
   Future<void> saveOpeningSupplier(WidgetTester tester, {String name = 'Evaluation opening supplier'}) async {
     await openPurchaseList(tester);
-    await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-section')));
     await tester.tap(find.byKey(const Key('work-purchase-supplier-section')));
@@ -4840,8 +5029,8 @@ void main() {
     await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-draft-save')));
     await tester.tap(find.byKey(const Key('work-purchase-draft-save')));
     await tester.pumpAndSettle();
-    await revealPurchaseAction(tester, find.byKey(const Key('work-purchase-opening')));
-    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await revealPurchaseAction(tester, await purchaseRegisterAction(tester, 'work-purchase-opening'));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-opening'));
     await tester.pumpAndSettle();
     await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -4943,7 +5132,7 @@ void main() {
         await mount(tester, route: '/app/work/workspace/dashboard', work: work,
           viewport: display, textScale: display.width > 500 ? 2 : 1.4);
         await openPurchaseList(tester);
-        final action = find.byKey(const Key('work-purchase-opening'));
+        final action = await purchaseRegisterAction(tester, 'work-purchase-opening');
         await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
         final picker = find.byType(DropdownButtonFormField<String>);
         await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
@@ -5019,7 +5208,7 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: display, textScale: display.width > 500 ? 2 : 1.4);
       await openPurchaseList(tester);
-      final openingAction = find.byKey(const Key('work-purchase-opening'));
+      final openingAction = await purchaseRegisterAction(tester, 'work-purchase-opening');
       await revealPurchaseAction(tester, openingAction); await tester.tap(openingAction); await tester.pumpAndSettle();
       final picker = find.byType(DropdownButtonFormField<String>);
       await revealOpening(tester, picker); await tester.tap(picker); await tester.pumpAndSettle();
@@ -5753,7 +5942,7 @@ void main() {
         viewport: variant == 'landscape' ? const Size(800, 360) : const Size(360, 800),
         textScale: variant == 'large-text' ? 2 : 1.4);
       await openPurchaseList(tester);
-      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
       await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-goods-receiving')), findsOneWidget);
       final supplierPicker = find.byKey(const Key('work-receive-supplier'));
@@ -5840,7 +6029,7 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: display, textScale: display.width > 800 ? 2 : 1.4);
       await openPurchaseList(tester);
-      final receive = find.byKey(const Key('work-purchase-receive-goods'));
+      final receive = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
       await revealPurchaseAction(tester, receive); await tester.tap(receive); await tester.pumpAndSettle();
       final picker = find.byKey(const Key('work-receive-supplier'));
       await Scrollable.ensureVisible(tester.element(picker), alignment: .5); await tester.pumpAndSettle();
@@ -5963,7 +6152,7 @@ void main() {
       final bookBefore = entry.value!.toJson();
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openPurchaseList(tester);
-      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
       await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
       final picker = find.byKey(const Key('work-receive-supplier'));
       await Scrollable.ensureVisible(tester.element(picker), alignment: .5); await tester.pumpAndSettle();
@@ -6002,7 +6191,7 @@ void main() {
       work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openPurchaseList(tester);
-      await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-receive-goods')); await tester.pumpAndSettle();
       await Scrollable.ensureVisible(tester.element(picker), alignment: .5); await tester.pumpAndSettle();
       await tester.tap(picker); await tester.pumpAndSettle();
       await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
@@ -6027,7 +6216,7 @@ void main() {
       revision: 1, profiles: suppliers);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    final action = find.byKey(const Key('work-purchase-receive-goods'));
+    final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
     await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
     final supplierPicker = find.byKey(const Key('work-receive-supplier'));
     await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
@@ -6099,7 +6288,7 @@ void main() {
     work = postingOpeningFixture(entry, checkpoint, moneyStore: forms);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-receive-goods')); await tester.pumpAndSettle();
     await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
     await tester.tap(supplierPicker); await tester.pumpAndSettle();
     await tester.tap(find.text(suppliers.first.name).last); await tester.pumpAndSettle();
@@ -6127,7 +6316,7 @@ void main() {
       entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3, revision: 1, profiles: [supplier]);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openPurchaseList(tester);
-      final action = find.byKey(const Key('work-purchase-receive-goods'));
+      final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
       await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
       final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
       Future<void> reveal(String key, {double delta = 120}) async {
@@ -6254,7 +6443,7 @@ void main() {
       viewport: variant == 'large-landscape' ? const Size(800, 360) : const Size(360, 800),
       textScale: variant == 'large-landscape' ? 2 : 1.4);
     await openPurchaseList(tester);
-    final action = find.byKey(const Key('work-purchase-receive-goods'));
+    final action = await purchaseRegisterAction(tester, 'work-purchase-receive-goods');
     await revealPurchaseAction(tester, action); await tester.tap(action); await tester.pumpAndSettle();
     final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')), matching: find.byType(Scrollable)).first;
     Future<void> reveal(String key, {double delta = 120}) async {
@@ -7243,8 +7432,8 @@ void main() {
     final fresh = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: fresh);
     await openPurchaseList(tester);
-    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
-    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-opening'));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-opening'));
     await tester.pumpAndSettle();
     await revealOpening(tester, find.byType(DropdownButtonFormField<String>));
     await tester.tap(find.byType(DropdownButtonFormField<String>));
@@ -7306,8 +7495,8 @@ void main() {
       await tester.tap(find.text('Discard changes'));
       await tester.pumpAndSettle();
       expect(entry.value!.openingRecords.single.sourceNote, 'Evaluation source retained after failure');
-      await revealPurchaseAction(tester, find.byKey(const Key('work-purchase-opening')));
-      expect(find.byKey(const Key('work-purchase-opening')), findsOneWidget);
+      await revealPurchaseAction(tester, await purchaseRegisterAction(tester, 'work-purchase-opening'));
+      expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -7325,8 +7514,8 @@ void main() {
       ]);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.ensureVisible(find.byKey(const Key('work-purchase-opening')));
-    await tester.tap(find.byKey(const Key('work-purchase-opening')));
+    await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-opening'));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-opening'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
@@ -7361,7 +7550,7 @@ void main() {
     final finance = work.workspaceFinance;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(find.text('Suppliers'), findsNothing);
@@ -7389,8 +7578,9 @@ void main() {
     expect(work.workspaceCatalogueItems, orderedEquals(products));
     expect(work.workspaceFinance, same(finance));
     expect(work.workspacePurchases, isEmpty);
-    expect(find.text('Resume purchase'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await purchaseRegisterAction(tester, 'work-purchase-record');
+    expect(find.text('Continue unfinished bill'), findsOneWidget);
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-reference')), findsNothing,
       reason: 'Saved drafts also reopen as a compact overview, with their values in summaries.');
@@ -7403,9 +7593,10 @@ void main() {
     expect(fresh.activeWorkspace!.id, saved.store);
     await mount(tester, route: '/app/work/workspace/dashboard', work: fresh);
     await openPurchaseList(tester);
-    expect(find.text('Resume purchase'), findsOneWidget,
+    await purchaseRegisterAction(tester, 'work-purchase-record');
+    expect(find.text('Continue unfinished bill'), findsOneWidget,
       reason: 'The saved draft must be discoverable before reopening its form.');
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(fresh.workspacePurchaseEntryDraft!.id, saved.draft!.id);
@@ -7419,7 +7610,7 @@ void main() {
     final work = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
@@ -7448,7 +7639,7 @@ void main() {
     final work = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     final supplier = find.byKey(const Key('work-purchase-supplier-name'));
@@ -7486,9 +7677,9 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       await revealPurchaseInput(tester, find.byKey(const Key('work-purchase-supplier-name')));
@@ -7504,7 +7695,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
@@ -7608,7 +7799,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-record-purchase')), findsNothing,
         reason: 'Returning must not resurrect explicitly discarded unsaved input.');
-      expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
+      expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
       expect(entry.value, isNull);
       expect(work.workspacePurchases, isEmpty);
       expect(work.workspacePurchaseCopies, isEmpty);
@@ -7622,13 +7813,13 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await tester.tap(find.byKey(const Key('work-operation-back')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     final supplier = find.byKey(const Key('work-purchase-supplier-name'));
@@ -7645,7 +7836,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard changes'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
+    expect(find.byKey(const Key('work-purchase-action-centre-open')), findsOneWidget);
     expect(entry.value, isNull);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -7691,7 +7882,7 @@ void main() {
     final work = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
@@ -7735,7 +7926,7 @@ void main() {
     final work = manualPurchaseFixture(entry);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
@@ -7802,7 +7993,7 @@ void main() {
     expect(saved.details['buyerUin'], 'AS-PRINTED');
     expect(saved.details['deliveryAddress'], 'Evaluation delivery');
     expect(work.workspacePurchases, isEmpty);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(work.workspacePurchaseEntryDraft!.id, saved.id);
@@ -7815,7 +8006,7 @@ void main() {
     await mount(tester, route: '/app/work/workspace/dashboard',
       work: manualPurchaseFixture(entry), textScale: 1);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await revealPurchaseInput(tester, section);
@@ -7837,9 +8028,9 @@ void main() {
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       for (final key in ['work-purchase-item-details-0', 'work-purchase-gst-split-0']) {
@@ -7892,7 +8083,7 @@ void main() {
     final finance = work.workspaceFinance;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(tester.getTopLeft(find.byKey(const Key('work-purchase-item-0'))).dy,
@@ -7940,7 +8131,7 @@ void main() {
     expect(work.workspaceCatalogueItems, orderedEquals(products));
     expect(work.workspaceFinance, same(finance));
     expect(work.workspacePurchases, isEmpty);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(work.workspacePurchaseEntryDraft!.id, saved.id);
@@ -7955,7 +8146,7 @@ void main() {
     final products = List.of(work.workspaceCatalogueItems);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     for (final e in {'supplier-name':'Evaluation supplier', 'reference':'EVAL-MATCH-1',
@@ -8009,7 +8200,7 @@ void main() {
     final finance = work.workspaceFinance;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     for (final e in {'supplier-name':'Evaluation supplier', 'reference':'EVAL-MATCH-2',
@@ -8055,7 +8246,7 @@ void main() {
     expect(draft.goods.single['cost'], '45.50');
     expect(work.workspaceFinance, same(finance));
     expect(work.workspacePurchases, isEmpty);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     expect(work.workspacePurchaseEntryDraft!.id, draft.id);
@@ -8070,8 +8261,8 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       final item = find.byKey(const Key('work-purchase-item-0'));
@@ -8099,7 +8290,7 @@ void main() {
     final finance = work.workspaceFinance;
     await mount(tester, route:'/app/work/workspace/dashboard', work:work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     Future<void> open(String key) async {
@@ -8153,7 +8344,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await mount(tester, route:'/app/work/workspace/dashboard', work:manualPurchaseFixture(entry));
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-documentTitle')), findsNothing);
     await open('work-purchase-invoice-section');
     await open('work-purchase-extra-invoice-all-all');
@@ -8167,7 +8358,7 @@ void main() {
     final entry = _PurchaseEntryFixtureStore();
     final work = manualPurchaseFixture(entry);
     await mount(tester, route:'/app/work/workspace/dashboard', work:work);
-    await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await openPurchaseList(tester); await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle(); await expandPurchasePrimarySections(tester);
     final product = work.workspaceCatalogueItems.first;
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
@@ -8199,8 +8390,8 @@ void main() {
       await mount(tester, route:'/app/work/workspace/dashboard', work:manualPurchaseFixture(entry),
         viewport:Size(display.$1,display.$2), textScale:display.$3, bottomInset:display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
-      await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
       Future<void> open(String key) async {
         await usePurchaseControl(tester, key);
       }
@@ -8222,7 +8413,7 @@ void main() {
   testWidgets('P05-R15 over-limit paste remains intact and failed save keeps the form', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route:'/app/work/workspace/dashboard', work:manualPurchaseFixture(entry));
-    await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await openPurchaseList(tester); await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle(); await expandPurchasePrimarySections(tester);
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
     for (final key in ['work-purchase-extra-invoice-all-all', 'work-purchase-add-extra-invoice-all-all']) {
@@ -8249,7 +8440,7 @@ void main() {
     final finance = work.workspaceFinance;
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     await tester.enterText(find.byKey(const Key('work-purchase-supplier-name')), 'Evaluation supplier');
@@ -8304,7 +8495,7 @@ void main() {
     expect(saved.goods.single['specifications'], 'Model A, retail pack');
     expect(work.workspaceCatalogueItems, orderedEquals(products));
     expect(work.workspaceFinance, same(finance));
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     expect(work.workspacePurchaseEntryDraft!.id, saved.id);
     expect(find.byKey(const Key('work-purchase-bankAccount')), findsNothing);
@@ -8317,9 +8508,9 @@ void main() {
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       for (final key in ['payment-details', 'supplier-instructions']) {
         await usePurchaseControl(tester, 'work-purchase-$key');
@@ -8353,7 +8544,8 @@ void main() {
       work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
       viewport: const Size(320, 568), textScale: 2, bottomInset: 240);
     await openPurchaseList(tester);
-    expect(find.text('Record purchase'), findsOneWidget);
+    await purchaseRegisterAction(tester, 'work-purchase-record');
+    expect(find.text('Record supplier bill'), findsOneWidget);
     await openPurchaseEntryFromList(tester);
     expect(find.text('Purchase entry'), findsOneWidget);
     await usePurchaseControl(tester, 'work-purchase-invoice-section');
@@ -8384,7 +8576,8 @@ void main() {
           createdAt: at, updatedAt: at)], draft: draft);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openPurchaseList(tester);
-      expect(find.text('Resume purchase'), findsOneWidget);
+      await purchaseRegisterAction(tester, 'work-purchase-record');
+      expect(find.text('Continue unfinished bill'), findsOneWidget);
       await usePurchaseControl(tester, 'work-purchase-record');
       expect(find.text('Purchase entry'), findsOneWidget);
       await usePurchaseControl(tester, 'work-purchase-invoice-section');
@@ -8435,7 +8628,7 @@ void main() {
     addTearDown(() => FilePickerPlatform.instance = previous);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await usePurchaseControl(tester, 'work-purchase-preview');
     final saved = work.workspacePurchaseEntryDraft;
@@ -8695,7 +8888,7 @@ void main() {
         details:{'sgst':'1','eInvoiceStatus':'IRN / QR shown','eInvoiceDeclaration':'Source declaration kept'}));
     await mount(tester, route:'/app/work/workspace/dashboard',work:work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record'))); await tester.pumpAndSettle();
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record')); await tester.pumpAndSettle();
     await expandPurchasePrimarySections(tester);
     for (final suffix in ['document-references','tax-details','buyer-details',
         'receipt-details','payment-details','item-details-0','item-receipt-0','gst-split-0','printed-rates',
@@ -8804,7 +8997,7 @@ void main() {
             digest:digest,fileName:'Automated scan-review fixture.png',contentType:'image/png',
             byteLength:bytes.length,source:'upload')]));
       await mount(tester,route:'/app/work/workspace/dashboard',work:work);
-      await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await openPurchaseList(tester); await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       Future<void> tap(String key) async {
         await usePurchaseControl(tester, key);
@@ -8863,7 +9056,7 @@ void main() {
           digest:digest,fileName:'Host-only no-item scan.png',contentType:'image/png',
           byteLength:bytes.length,source:'upload')]));
     await mount(tester,route:'/app/work/workspace/dashboard',work:work);
-    await openPurchaseList(tester); await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await openPurchaseList(tester); await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     await usePurchaseControl(tester,'work-purchase-document-$digest');
     await usePurchaseControl(tester,'work-purchase-read-$digest');
@@ -8899,7 +9092,7 @@ void main() {
             'Grand total: 600.60\nWarranty: Two years\nItem | Qty | Rate\nOCR item | 2 | 40') ]));
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await openPurchaseList(tester);
-    await tester.tap(find.byKey(const Key('work-purchase-record')));
+    await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-purchase-reference')), findsNothing);
     expect(find.byKey(const Key('work-purchase-item-0')), findsNothing);
@@ -8931,9 +9124,9 @@ void main() {
         work: manualPurchaseFixture(_PurchaseEntryFixtureStore()),
         viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: display.$4);
       await openPurchaseList(tester);
-      await tester.ensureVisible(find.byKey(const Key('work-purchase-record')));
+      await tester.ensureVisible(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('work-purchase-record')));
+      await tester.tap(await purchaseRegisterAction(tester, 'work-purchase-record'));
       await tester.pumpAndSettle();
       await expandPurchasePrimarySections(tester);
       for (final key in ['work-purchase-item-details-0', 'work-purchase-tax-details',
