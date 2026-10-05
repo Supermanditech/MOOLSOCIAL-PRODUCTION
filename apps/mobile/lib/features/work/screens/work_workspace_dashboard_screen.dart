@@ -30583,6 +30583,43 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
     decoration: const InputDecoration(labelText: 'Paid (₹)'),
     onChanged: (_) => draft.save(fields));
 
+  Widget _moneyViewport(BuildContext context, Widget fields) {
+    if (!manualMoney) return fields;
+    return LayoutBuilder(builder: (context, constraints) => ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          child: Row(children: [
+            Expanded(child: Text(title,
+              style: Theme.of(context).textTheme.titleMedium)),
+            IconButton(key: const Key('supplier-money-hide-keyboard'),
+              tooltip: 'Hide keyboard',
+              onPressed: () => FocusScope.of(context).unfocus(),
+              icon: const Icon(Icons.keyboard_hide_outlined)),
+            TextButton(key: const Key('supplier-money-close'),
+              onPressed: saving ? null : () async {
+                if (await draft.flush() && context.mounted) Navigator.pop(context);
+              }, child: const Text('Close')),
+          ])),
+        Flexible(child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0 &&
+                (notification is ScrollStartNotification ||
+                 notification is ScrollUpdateNotification)) {
+              // Selection handles follow their field outside the scrolling
+              // viewport; hide them before they can cover the fixed controls.
+              final editor = FocusManager.instance.primaryFocus?.context
+                  ?.findAncestorStateOfType<EditableTextState>();
+              if (editor?.context.findAncestorStateOfType<_StoreMoneyEntrySheetState>() == this) {
+                editor?.hideToolbar();
+              }
+            }
+            return false;
+          }, child: fields)),
+      ]),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !saving && !draft.busy && draft.error == null,
@@ -30595,7 +30632,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
       top: false,
       child: Padding(
         padding: EdgeInsets.only(bottom: manualMoney ? MediaQuery.viewInsetsOf(context).bottom : 0),
-      child: SingleChildScrollView(
+      child: _moneyViewport(context, SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           16,
           16,
@@ -30607,15 +30644,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (manualMoney) Wrap(alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center, children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                TextButton(key: const Key('supplier-money-close'),
-                  onPressed: saving ? null : () async {
-                    if (await draft.flush() && context.mounted) Navigator.pop(context);
-                  }, child: const Text('Close')),
-              ])
-            else Text(title, style: Theme.of(context).textTheme.titleLarge),
+            if (!manualMoney) Text(title, style: Theme.of(context).textTheme.titleLarge),
             Text(
               manualMoney ? '${moneyLedger?.supplierName ?? 'Supplier'}${widget.supplierMoney!.copy == null ? '' : ' · ${widget.supplierMoney!.copy!.draft.invoiceReference}'}'
               : expense
@@ -30767,7 +30796,7 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
             ),
           ],
         ),
-      ),
+      )),
       ),
     ),
   );

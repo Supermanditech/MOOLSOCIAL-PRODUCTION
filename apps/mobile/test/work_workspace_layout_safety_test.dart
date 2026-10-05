@@ -6810,12 +6810,29 @@ void main() {
       await revealMoney(reference);
       expect(tester.getRect(reference).bottom, lessThanOrEqualTo(display.height - keyboardHeight));
       final keyboardClose = find.byKey(const Key('supplier-money-close'));
+      await revealMoney(find.byKey(const Key('supplier-money-submit')));
+      expect(keyboardClose.hitTestable(), findsOneWidget,
+        reason: 'Close remains reachable without scrolling back from the last payment control.');
+      final hideKeyboard = find.byKey(const Key('supplier-money-hide-keyboard'));
+      expect(hideKeyboard.hitTestable(), findsOneWidget);
+      await tester.tap(hideKeyboard); await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
       await revealMoney(keyboardClose);
       expect(tester.getRect(keyboardClose).top, greaterThanOrEqualTo(28));
       expect(tester.widget<TextField>(amount).controller!.text, '1500');
       expect(tester.widget<TextField>(reference).controller!.text, 'HOST-PAY-FULL');
       expect(tester.takeException(), isNull);
       tester.view.viewInsets = FakeViewPadding.zero;
+      await revealMoney(reference); await tester.tap(reference); await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isTrue);
+      final retainedSelection = tester.widget<TextField>(reference).controller!.selection;
+      await revealMoney(find.byKey(const Key('supplier-money-submit')));
+      expect(keyboardClose.hitTestable(), findsOneWidget);
+      expect(hideKeyboard.hitTestable(), findsOneWidget,
+        reason: 'Dismissal must not depend on floating keyboards reporting bottom insets.');
+      await tester.tap(hideKeyboard); await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(tester.widget<TextField>(reference).controller!.selection, retainedSelection);
       FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
       final excluded = find.byKey(const Key('supplier-money-opening-excluded'));
       await revealMoney(excluded); await tester.tap(excluded); await tester.pumpAndSettle();
