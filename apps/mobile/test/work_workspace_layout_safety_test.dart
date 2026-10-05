@@ -5507,6 +5507,26 @@ void main() {
       await tester.ensureVisible(delivered); await tester.pumpAndSettle();
       expect(tester.widget<TextField>(delivered).enabled, isFalse);
       expect(tester.widget<TextField>(delivered).controller!.text, '3');
+      for (final fieldKey in ['work-receive-factor-0', 'work-receive-short-0']) {
+        final field = find.byKey(ValueKey(fieldKey));
+        await tester.ensureVisible(field); await tester.pumpAndSettle();
+        final input = tester.widget<TextField>(field);
+        final labelWidget = input.decoration!.label! as Text;
+        final label = labelWidget.data!;
+        final measure = TextPainter(
+          text: TextSpan(text: label, style: const TextStyle(fontSize: 12)),
+          textDirection: TextDirection.ltr,
+          textScaler: MediaQuery.textScalerOf(tester.element(field)),
+        )..layout();
+        final available = tester.getSize(find.ancestor(of: field, matching: find.byType(Wrap)).first).width;
+        final requiredWidth = measure.width + 12 < available ? measure.width + 12 : available;
+        expect(tester.getSize(field).width, greaterThanOrEqualTo(requiredWidth),
+          reason: 'Receiving label "$label" must remain complete at the selected text size.');
+        expect(labelWidget.softWrap, isTrue);
+        expect(labelWidget.overflow, isNot(TextOverflow.ellipsis));
+        expect(labelWidget.maxLines, greaterThan(1));
+        measure.dispose();
+      }
       expect(work.workspaceCatalogueItems.map((p) => (p.id, p.stock)), stock);
       expect(checkpoint.saveAttempts, 0);
       expect(tester.takeException(), isNull);
@@ -5756,7 +5776,28 @@ void main() {
     await tester.scrollUntilVisible(reference, 120, scrollable: scroll); await tester.pumpAndSettle();
     expect(reference.hitTestable(), findsOneWidget);
     await tester.enterText(reference, 'Delivery before bill');
-    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+    expect(MediaQuery.viewInsetsOf(tester.element(reference)).bottom, 0,
+      reason: 'Floating keyboards can retain focus with zero bottom insets.');
+    final referenceInput = tester.widget<TextField>(reference);
+    final retainedSelection = referenceInput.controller!.selection;
+    final referenceEditor = tester.widget<EditableText>(find.descendant(
+      of: reference, matching: find.byType(EditableText)));
+    expect(referenceEditor.focusNode.hasFocus, isTrue);
+    final hideKeyboard = find.byKey(const Key('work-receive-hide-keyboard'));
+    await tester.scrollUntilVisible(find.byKey(const Key('work-receive-header')), -120, scrollable: scroll);
+    await tester.pumpAndSettle();
+    expect(referenceEditor.focusNode.hasFocus, isTrue);
+    expect(hideKeyboard, findsOneWidget);
+    await tester.ensureVisible(hideKeyboard); await tester.pumpAndSettle();
+    expect(hideKeyboard.hitTestable(), findsOneWidget);
+    expect(tester.getSize(hideKeyboard).height, greaterThanOrEqualTo(48));
+    await tester.tap(hideKeyboard); await tester.pumpAndSettle();
+    expect(hideKeyboard, findsNothing);
+    expect(referenceInput.controller!.text, 'Delivery before bill');
+    expect(referenceInput.controller!.selection, retainedSelection);
+    expect(entry.value!.goodsReceiptDrafts, isEmpty);
+    expect(checkpoint.saveAttempts, 0);
     await tester.scrollUntilVisible(supplierPicker, -120, scrollable: scroll); await tester.pumpAndSettle();
     await Scrollable.ensureVisible(tester.element(supplierPicker), alignment: .5); await tester.pumpAndSettle();
     expect(supplierPicker.hitTestable(), findsOneWidget);

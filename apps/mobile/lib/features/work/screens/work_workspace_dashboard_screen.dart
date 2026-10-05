@@ -15020,13 +15020,39 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
   Future<void> _close() async {
     if (await confirmLeave() && _current) widget.onBack();
   }
+  Widget _receivingHeader(String title) => ListenableBuilder(
+    listenable: FocusManager.instance,
+    builder: (context, child) {
+      final focusContext = FocusManager.instance.primaryFocus?.context;
+      final receivingFocus = focusContext?.findAncestorStateOfType<_StoreReceiveGoodsState>() == this;
+      return Row(key: const Key('work-receive-header'), children: [
+        if (receivingFocus) IconButton(
+          key: const Key('work-receive-hide-keyboard'), tooltip: 'Hide keyboard',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          onPressed: () => FocusManager.instance.primaryFocus?.unfocus(),
+          icon: const Icon(Icons.keyboard_hide_outlined)),
+        Expanded(child: Text(title, style: const TextStyle(fontSize: 16,
+          fontWeight: FontWeight.w700, color: MoolColors.navy))),
+        TextButton(onPressed: _busy ? null : _close, child: const Text('Close')),
+      ]);
+    });
   Widget _field(String label, TextEditingController controller, String key, {bool number = true, bool enabled = true, String? errorText}) =>
-    SizedBox(width: number ? 116 : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
+    LayoutBuilder(builder: (context, constraints) {
+      final available = constraints.hasBoundedWidth ? constraints.maxWidth
+          : MediaQuery.sizeOf(context).width - 24;
+      final measure = TextPainter(text: TextSpan(text: label,
+        style: const TextStyle(fontSize: 12)), textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context))..layout();
+      final desired = measure.width + 16;
+      measure.dispose();
+      final width = (desired < 116 ? 116.0 : desired).clamp(0.0, available).toDouble();
+      return SizedBox(width: number ? width : double.infinity, child: TextField(key: ValueKey(key), controller: controller,
       enabled: !_busy && _loaded && !_discarding && _draft?.ready == true && _frozen == null && enabled,
       onChanged: (_) { setState(() {}); _saveInput(); },
       keyboardType: number ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       style: const TextStyle(fontSize: 13, color: MoolColors.ink),
-      decoration: InputDecoration(labelText: label, isDense: true, filled: false,
+      decoration: InputDecoration(label: Text(label, key: ValueKey('$key-label'),
+        maxLines: 3, softWrap: true, overflow: TextOverflow.visible), isDense: true, filled: false,
         errorText: errorText, errorMaxLines: 2,
         errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffa52a2a))),
         focusedErrorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xffa52a2a))),
@@ -15036,6 +15062,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         border: const UnderlineInputBorder(), enabledBorder: const UnderlineInputBorder(),
         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: MoolColors.navy)),
         disabledBorder: const UnderlineInputBorder())));
+    });
   @override
   Widget build(BuildContext context) {
     final editable = !_busy && _loaded && !_discarding && _frozen == null && (_supplierId == null || _draft?.ready == true);
@@ -15065,9 +15092,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
         ]);
       }
       return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        Row(children: [const Expanded(child: Text('Receive goods', style: TextStyle(fontSize: 16,
-          fontWeight: FontWeight.w700, color: MoolColors.navy))),
-          TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
+        _receivingHeader('Receive goods'),
         Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
         Text(linkedReceipts.isEmpty ? 'No received goods linked to this bill.' : 'Deliveries linked to this bill',
@@ -15099,9 +15124,7 @@ class _StoreReceiveGoodsState extends State<_StoreReceiveGoodsSurface> {
     }
     // WorkPageScaffold owns system Back; parent and local actions share confirmLeave.
     return ListView(key: const Key('work-goods-receiving'), padding: const EdgeInsets.all(12), children: [
-        Row(children: [Expanded(child: Text(_committed && !_conflict ? 'Goods received' : 'Receive goods', style: const TextStyle(fontSize: 16,
-          fontWeight: FontWeight.w700, color: MoolColors.navy))),
-          TextButton(onPressed: _busy ? null : _close, child: const Text('Close'))]),
+        _receivingHeader(_committed && !_conflict ? 'Goods received' : 'Receive goods'),
         if (bill != null) ...[
           Text('Supplier bill ${bill.draft.invoiceReference}', key: const Key('work-receive-bill-context'),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
