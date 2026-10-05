@@ -653,6 +653,7 @@ class _WorkWorkspaceDashboardScreenState
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
   final _purchaseEntryKey = GlobalKey<_StoreRecordPurchaseState>();
   final _receivingKey = GlobalKey<_StoreReceiveGoodsState>();
+  bool _purchaseNavigationPending = false;
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   final _saleSearchController = TextEditingController();
@@ -1365,7 +1366,7 @@ class _WorkWorkspaceDashboardScreenState
       session: session,
       title: title,
       subtitle: subtitle,
-      beforeExternalNavigation: () => _receivingKey.currentState?.confirmLeave() ?? Future.value(true),
+      beforeExternalNavigation: _confirmPurchaseNavigation,
       contentMaxWidth: (salesOpen || ordersContext) &&
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
@@ -2469,16 +2470,40 @@ class _WorkWorkspaceDashboardScreenState
       (session.workspaceOrderCustomer.trim().isNotEmpty ||
           session.workspaceOrderQuantities.isNotEmpty);
 
+  Future<bool> _confirmPurchaseNavigation() async {
+    if (_purchaseNavigationPending) return false;
+    _purchaseNavigationPending = true;
+    final scope = session.workspaceSupplierScope;
+    final view = _view, operation = _operation;
+    final receiving = _receivingKey.currentState;
+    final purchaseEntry = view == _WorkspaceControlView.operation &&
+        operation == _WorkspaceOperation.sourcing ? _purchaseEntryKey.currentState : null;
+    final discardEditablePurchase = purchaseEntry != null &&
+        !purchaseEntry.widget.openingOnly && !purchaseEntry._readOnly && purchaseEntry._dirty;
+    bool current() => mounted && scope == session.workspaceSupplierScope &&
+        view == _view && operation == _operation &&
+        identical(receiving, _receivingKey.currentState) &&
+        (purchaseEntry == null || (purchaseEntry.mounted &&
+          identical(purchaseEntry, _purchaseEntryKey.currentState)));
+    try {
+      if (!await (receiving?.confirmLeave() ?? Future.value(true)) || !current()) {
+        return false;
+      }
+      if (!await (purchaseEntry?.confirmLeave() ?? Future.value(true))) {
+        return false;
+      }
+      if (!current()) return false;
+      // An imperative destination can retain this editor underneath it.
+      // Explicit discard must not resurrect its unsaved input on return.
+      if (discardEditablePurchase) purchaseEntry.widget.onBack();
+      return current();
+    } finally {
+      _purchaseNavigationPending = false;
+    }
+  }
+
   Future<bool> _confirmDiscardCounterOrder() async {
-    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true))) {
-      return false;
-    }
-    if (_view == _WorkspaceControlView.operation &&
-        _operation == _WorkspaceOperation.sourcing &&
-        !await (_purchaseEntryKey.currentState?.confirmLeave() ??
-            Future.value(true))) {
-      return false;
-    }
+    if (!await _confirmPurchaseNavigation()) return false;
     if (_operation == _WorkspaceOperation.counterOrder &&
         !await (_counterKey.currentState?.flushForNavigation() ??
             Future.value(true))) {
@@ -2649,7 +2674,7 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _openProfile(BuildContext context, WorkWorkspace workspace) async {
-    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) || !context.mounted) return;
+    if (!await _confirmPurchaseNavigation() || !context.mounted) return;
     showGlobalProfilePanelV2(
       context,
       accountAuthenticated: widget.accountAuthenticated,
@@ -2745,7 +2770,7 @@ class _WorkWorkspaceDashboardScreenState
                   onTap: workspace.id == current.id
                       ? null
                       : () async {
-                          if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                          if (!await _confirmPurchaseNavigation() ||
                               !mounted || !sheetContext.mounted) { return; }
                           session.activateWorkspace(workspace);
                           Navigator.of(sheetContext).pop();
@@ -2776,7 +2801,7 @@ class _WorkWorkspaceDashboardScreenState
                       '${application.profileLabel} · ${application.status}',
                     ),
                     onTap: () async {
-                      if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                      if (!await _confirmPurchaseNavigation() ||
                           !mounted || !sheetContext.mounted) { return; }
                       if (!session.resumeWorkspaceApplication(application.id)) {
                         return;
@@ -2799,7 +2824,7 @@ class _WorkWorkspaceDashboardScreenState
                 child: OutlinedButton.icon(
                   key: const Key('work-switch-add-workspace'),
                   onPressed: () async {
-                    if (!await (_receivingKey.currentState?.confirmLeave() ?? Future.value(true)) ||
+                    if (!await _confirmPurchaseNavigation() ||
                         !mounted || !sheetContext.mounted) { return; }
                     if (session.startAnotherWork()) {
                       Navigator.of(sheetContext).pop();

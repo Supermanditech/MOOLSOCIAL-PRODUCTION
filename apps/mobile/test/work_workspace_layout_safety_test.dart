@@ -7342,6 +7342,63 @@ void main() {
     });
   }
 
+  for (final display in [(360.0, 800.0, 1.0), (800.0, 360.0, 1.6)]) {
+    testWidgets('P05-RECOVERY external Chat protects unsaved purchase input $display', (tester) async {
+      // Host-only transport and records; never injected into the OPPO Store.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      final originalStock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display.$1, display.$2), textScale: display.$3);
+      await openPurchaseList(tester);
+      await openPurchaseEntryFromList(tester);
+      await usePurchaseControl(tester, 'work-purchase-supplier-section');
+      final supplier = find.byKey(const Key('work-purchase-supplier-name'));
+      await revealPurchaseInput(tester, supplier);
+      await tester.enterText(supplier, 'Unsaved evaluation supplier');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final router = GoRouter.of(tester.element(supplier));
+      final originalRoute = router.routeInformationProvider.value.uri;
+      final chat = find.byKey(const Key('mool-global-chat'));
+      expect(chat.hitTestable(), findsOneWidget);
+      await tester.tap(chat);
+      await tester.pumpAndSettle();
+      expect(find.text('Leave purchase draft?'), findsOneWidget);
+      expect(router.routeInformationProvider.value.uri, originalRoute);
+      final scaffold = tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold));
+      expect(await scaffold.beforeExternalNavigation!(), isFalse,
+        reason: 'A second pending navigation cannot add another dialog or destination.');
+      expect(find.text('Leave purchase draft?'), findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+      expect(tester.widget<TextField>(supplier).controller!.text, 'Unsaved evaluation supplier');
+      await tester.tap(chat);
+      await tester.pumpAndSettle();
+      expect(find.text('Leave purchase draft?'), findsOneWidget);
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      final inbox = find.byKey(const ValueKey('chat-inbox-all'));
+      expect(inbox, findsOneWidget);
+      expect(find.byKey(const ValueKey('chat-inbox-all'), skipOffstage: false), findsOneWidget,
+        reason: 'The approved navigation opens exactly one Chat destination.');
+      expect(GoRouterState.of(tester.element(inbox)).uri.path, '/app/chat/inbox');
+      expect(find.byKey(const Key('work-record-purchase')), findsNothing);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-record-purchase')), findsNothing,
+        reason: 'Returning must not resurrect explicitly discarded unsaved input.');
+      expect(find.byKey(const Key('work-purchase-record')), findsOneWidget);
+      expect(entry.value, isNull);
+      expect(work.workspacePurchases, isEmpty);
+      expect(work.workspacePurchaseCopies, isEmpty);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), originalStock);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P05-VISUAL header Back returns to Purchases and guards dirty input', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry));
