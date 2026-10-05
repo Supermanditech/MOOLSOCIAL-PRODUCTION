@@ -15325,6 +15325,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   @override
   void initState() {
     super.initState();
+    _purchaseSearchFocus.addListener(_refreshPurchaseSearch);
     if (!statement) {
       unawaited(_loadEntry());
     }
@@ -15335,9 +15336,14 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     if (mounted) setState(() {});
   }
 
+  void _refreshPurchaseSearch() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _purchaseSearch.dispose();
+    _purchaseSearchFocus.removeListener(_refreshPurchaseSearch);
     _purchaseSearchFocus.dispose();
     super.dispose();
   }
@@ -15753,15 +15759,22 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   focusedBorder: InputBorder.none, disabledBorder: InputBorder.none,
                   errorBorder: InputBorder.none, focusedErrorBorder: InputBorder.none,
                   prefixIcon: const Icon(Icons.search_rounded, size: 21, color: MoolColors.navy),
-                  suffixIcon: _purchaseSearch.text.isEmpty ? null : IconButton(
-                    tooltip: 'Clear purchase search',
-                    onPressed: () => setState(_purchaseSearch.clear),
+                  suffixIcon: _purchaseSearch.text.isEmpty && !_purchaseSearchFocus.hasFocus ? null : IconButton(
+                    key: Key(_purchaseSearch.text.isEmpty ? 'work-purchase-search-close' : 'work-purchase-search-clear'),
+                    tooltip: _purchaseSearch.text.isEmpty ? 'Close purchase search' : 'Clear purchase search',
+                    onPressed: () {
+                      if (_purchaseSearch.text.isEmpty) {
+                        _purchaseSearchFocus.unfocus();
+                      } else {
+                        setState(_purchaseSearch.clear);
+                      }
+                    },
                     icon: const Icon(Icons.close_rounded, size: 18)),
                 ),
               ),
             ),
             SizedBox(
-              height: 28 + MediaQuery.textScalerOf(context).scale(20),
+              height: (MediaQuery.textScalerOf(context).scale(12) + 24).clamp(48.0, double.infinity).toDouble(),
               child: ListView(scrollDirection: Axis.horizontal, children: [
                 for (final filter in const ['All', 'Incoming', 'Needs receipt', 'Received'])
                   Padding(padding: const EdgeInsets.only(right: 6),
@@ -29236,7 +29249,7 @@ Future<void> _showSupplierMoneyEntry(BuildContext context, WorkSession session,
 
 Future<void> _showSupplierGoodsReturn(BuildContext context, WorkSession session,
     String supplierId, WorkspaceSupplierGoodsReceipt receipt) => showModalBottomSheet<void>(
-      context: context, isScrollControlled: true, isDismissible: false, enableDrag: false,
+      context: context, isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
       builder: (_) => _StoreSupplierGoodsReturnSheet(session: session, supplierId: supplierId, receipt: receipt));
 
 class _StoreSupplierGoodsReturnSheet extends StatefulWidget {

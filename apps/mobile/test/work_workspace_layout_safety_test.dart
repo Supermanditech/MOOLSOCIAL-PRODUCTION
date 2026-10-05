@@ -3368,10 +3368,25 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', work: work,
           viewport: Size(display.$1, display.$2), textScale: display.$3);
       await openPurchaseList(tester);
+      final allFilter = find.byKey(const Key('work-purchase-filter-all'));
+      expect(tester.getSize(allFilter).height, inInclusiveRange(48, 48),
+        reason: 'Receipt filters retain accessible targets without an oversized empty lane.');
       await tester.enterText(find.byKey(const Key('work-purchase-search')), 'Supplier new');
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-purchase-SHIP-new')), findsOneWidget);
       expect(find.text('Payment update unavailable'), findsOneWidget);
+      final search = find.byKey(const Key('work-purchase-search'));
+      await tester.ensureVisible(search);
+      await tester.enterText(search, ''); await tester.pumpAndSettle();
+      expect(work.workspaceRecentSearches('purchases'), contains('Supplier new'));
+      final closeSearch = find.byKey(const Key('work-purchase-search-close'));
+      await tester.ensureVisible(closeSearch); await tester.pumpAndSettle();
+      expect(closeSearch.hitTestable(), findsOneWidget);
+      await tester.tap(closeSearch); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).focusNode!.hasFocus, isFalse);
+      expect(work.workspaceRecentSearches('purchases'), contains('Supplier new'));
+      expect(find.widgetWithText(TextButton, 'Supplier new'), findsNothing,
+        reason: 'Closing search collapses its recent-reference lane without deleting history.');
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -5549,6 +5564,10 @@ void main() {
       await tester.tap(picker); await tester.pumpAndSettle();
       await tester.tap(find.text(supplier.name).last); await tester.pumpAndSettle();
       Future<void> reveal(Finder target) async {
+        // Dismiss the previous editor before navigating to another control,
+        // matching the physical Back-then-scroll journey. Do not leave its
+        // offscreen selection handle covering the next field's tap target.
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
         if (target.evaluate().isEmpty) {
           final scroll = find.descendant(of: find.byKey(const Key('work-goods-receiving')),
             matching: find.byType(Scrollable)).first;
@@ -5558,7 +5577,14 @@ void main() {
         expect(target.hitTestable(), findsOneWidget);
       }
       final returnAction = find.byKey(const Key('work-receive-return-goods'));
+      tester.view.padding = const FakeViewPadding(top: 41, bottom: 44);
+      tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+      await tester.pumpAndSettle();
       await reveal(returnAction); await tester.tap(returnAction); await tester.pumpAndSettle();
+      final initialClose = find.byKey(const Key('supplier-return-close'));
+      expect(tester.getTopLeft(initialClose).dy, greaterThanOrEqualTo(41),
+        reason: 'Return Close must not overlap the Android status area in landscape.');
+      expect(initialClose.hitTestable(), findsOneWidget);
       for (final (key, text) in [('supplier-return-reference', '  HOST-RETURN-01  '),
         ('supplier-return-reason', '  Damaged packaging  '), ('supplier-return-date', '  $day  ')]) {
         final field = find.byKey(Key(key)); await reveal(field); await tester.enterText(field, text);
