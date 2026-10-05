@@ -3609,6 +3609,8 @@ void main() {
       await work.loadWorkspaceSuppliers(retry: true);
       await tester.pumpAndSettle();
       final prior = jsonEncode(entry.value!.toJson());
+      final priorStock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final priorMovements = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
       final next = find.byKey(const Key('work-purchase-new'));
       expect(next, findsOneWidget);
       await Scrollable.ensureVisible(tester.element(next));
@@ -3632,6 +3634,36 @@ void main() {
       await tester.tap(cancel);
       await tester.pumpAndSettle();
       expect(jsonEncode(entry.value!.toJson()), prior);
+      // A dirty new editor must not overwrite or discard the saved draft below it.
+      await Scrollable.ensureVisible(tester.element(next));
+      await tester.pumpAndSettle();
+      expect(next.hitTestable(), findsOneWidget);
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      await usePurchaseControl(tester, 'work-purchase-supplier-section');
+      final unsavedSupplier = find.byKey(const Key('work-purchase-supplier-name'));
+      await revealPurchaseInput(tester, unsavedSupplier);
+      await tester.enterText(unsavedSupplier, 'Unsaved next supplier');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final router = GoRouter.of(tester.element(unsavedSupplier));
+      final chat = find.byKey(const Key('mool-global-chat'));
+      expect(chat.hitTestable(), findsOneWidget);
+      await tester.tap(chat);
+      await tester.pumpAndSettle();
+      expect(find.text('Leave purchase draft?'), findsOneWidget);
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+      final inbox = find.byKey(const ValueKey('chat-inbox-all'));
+      expect(inbox, findsOneWidget);
+      expect(GoRouterState.of(tester.element(inbox)).uri.path, '/app/chat/inbox');
+      expect(jsonEncode(entry.value!.toJson()), prior);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-record-purchase')), findsNothing);
+      expect(jsonEncode(entry.value!.toJson()), prior);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), priorStock);
+      expect(work.workspaceStockMovements, priorMovements);
       final savedRow = find.byKey(ValueKey('work-purchase-copy-${copy.id}'));
       final purchaseScroll = find.descendant(of: find.byKey(const Key('work-store-track-stock')),
         matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
