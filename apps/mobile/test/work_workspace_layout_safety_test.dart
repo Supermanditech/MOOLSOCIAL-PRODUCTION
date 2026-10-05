@@ -3313,6 +3313,26 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> openPurchaseEntryFromList(WidgetTester tester) async {
+    final action = find.byKey(const Key('work-purchase-record'));
+    expect(action, findsOneWidget);
+    // The register action rail can scroll horizontally at enlarged text sizes.
+    // It is not inside the editable purchase form until the action is tapped.
+    await Scrollable.ensureVisible(tester.element(action));
+    await tester.pumpAndSettle();
+    expect(action.hitTestable(), findsOneWidget,
+      reason: 'Entry action ${tester.getRect(action)}; rail '
+        '${tester.getRect(find.byKey(const Key('work-purchase-actions')))}');
+    final actionRect = tester.getRect(action);
+    final railRect = tester.getRect(find.byKey(const Key('work-purchase-actions')));
+    expect(actionRect.left, greaterThanOrEqualTo(railRect.left - .1));
+    expect(actionRect.right, lessThanOrEqualTo(railRect.right + .1),
+      reason: 'The whole entry action, not only its centre, must fit the visible rail.');
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-record-purchase')), findsOneWidget);
+  }
+
   testWidgets('P01 purchase search filters and exact detail return', (tester) async {
     final work = purchaseListFixture();
     final original = List<WorkspacePurchaseRecord>.of(work.workspacePurchases);
@@ -3373,10 +3393,21 @@ void main() {
         reason: 'Receipt filters retain accessible targets without an oversized empty lane.');
       await tester.enterText(find.byKey(const Key('work-purchase-search')), 'Supplier new');
       await tester.pumpAndSettle();
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final result = find.byKey(const Key('work-purchase-SHIP-new'));
+      final purchaseScroll = find.descendant(of: find.byKey(const Key('work-store-track-stock')),
+        matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+          widget.axisDirection == AxisDirection.down)).first;
+      await tester.scrollUntilVisible(result, 80, scrollable: purchaseScroll);
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-purchase-SHIP-new')), findsOneWidget);
       expect(find.text('Payment update unavailable'), findsOneWidget);
       final search = find.byKey(const Key('work-purchase-search'));
-      await tester.ensureVisible(search);
+      expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
+      await tester.scrollUntilVisible(search, -80, scrollable: purchaseScroll);
+      await tester.pumpAndSettle();
+      expect(search.hitTestable(), findsOneWidget);
       await tester.enterText(search, ''); await tester.pumpAndSettle();
       expect(work.workspaceRecentSearches('purchases'), contains('Supplier new'));
       final closeSearch = find.byKey(const Key('work-purchase-search-close'));
@@ -3730,6 +3761,19 @@ void main() {
     expect(find.text('No system voucher assigned'), findsOneWidget);
     expect(find.text('Supplier account status unavailable'), findsWidgets);
     expect(find.byKey(const Key('work-purchase-draft-save')), findsNothing);
+    final savedGoodsStatus = find.byKey(const ValueKey('purchase-review-receiptStatus'));
+    final savedScroll = find.descendant(of: find.byKey(const Key('work-purchase-saved-copy')),
+      matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+        widget.axisDirection == AxisDirection.down)).first;
+    await tester.scrollUntilVisible(savedGoodsStatus, 80, scrollable: savedScroll);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: savedGoodsStatus,
+      matching: find.text('Goods status when copy saved')), findsOneWidget);
+    expect(find.descendant(of: savedGoodsStatus,
+      matching: find.text('Already added to Stock')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('purchase-recorded-download')),
+      -80, scrollable: savedScroll);
+    await tester.pumpAndSettle();
     Future<void> download() async {
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('purchase-recorded-download')));
@@ -8034,7 +8078,7 @@ void main() {
       viewport: const Size(320, 568), textScale: 2, bottomInset: 240);
     await openPurchaseList(tester);
     expect(find.text('Record purchase'), findsOneWidget);
-    await usePurchaseControl(tester, 'work-purchase-record');
+    await openPurchaseEntryFromList(tester);
     expect(find.text('Purchase entry'), findsOneWidget);
     await usePurchaseControl(tester, 'work-purchase-invoice-section');
     final voucher = find.byKey(const Key('work-purchase-voucher-reference'));
@@ -8195,7 +8239,7 @@ void main() {
       final saved = entry.value;
       await mount(tester,route:'/app/work/workspace/dashboard',work:work,viewport:config.$1,textScale:config.$2);
       await openPurchaseList(tester);
-      await tester.tap(find.byKey(const Key('work-purchase-record')));await tester.pumpAndSettle();
+      await openPurchaseEntryFromList(tester);
       await usePurchaseControl(tester,'work-purchase-preview');
       for (final block in ['buyer','bank-signatory','notes-terms']) {
         expect(find.byKey(Key('purchase-review-paper-$block')),findsNothing);

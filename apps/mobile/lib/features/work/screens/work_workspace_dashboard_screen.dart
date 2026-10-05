@@ -12831,7 +12831,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
     Widget detail(String key, {bool cell = false, bool amount = false}) {
       used.add(key);
       final text = _details[key]!.text;
-      return value(_fieldLabels['work-purchase-$key']!, moneyKeys.contains(key) ? _invoiceMoney(text)
+      return value(storePurchaseCopyDetailLabel(key, _fieldLabels['work-purchase-$key']!,
+        isSavedCopy: _readOnly), moneyKeys.contains(key) ? _invoiceMoney(text)
         : key == 'documentType' ? storePurchaseDocumentTypeLabel(text) : text,
         key, cell: cell, amount: amount);
     }
@@ -15701,10 +15702,15 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              const Text('Purchases', style: TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w800, color: MoolColors.navy)),
-              const SizedBox(width: 8),
+            LayoutBuilder(builder: (context, constraints) {
+              final stacked = constraints.maxWidth < MediaQuery.textScalerOf(context).scale(260);
+              const heading = Text('Purchases', style: TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w800, color: MoolColors.navy));
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (stacked) heading,
+                Row(children: [
+              if (!stacked) heading,
+              if (!stacked) const SizedBox(width: 8),
               Expanded(child: SingleChildScrollView(key: const Key('work-purchase-actions'), scrollDirection: Axis.horizontal,
                 child: Row(children: [
               if (session.workspacePurchaseDraftReviewed) TextButton.icon(
@@ -15761,6 +15767,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             ]))),
               const Tooltip(message: 'Swipe actions left or right', child: Icon(Icons.chevron_right, size: 18, color: MoolColors.navy)),
             ]),
+              ]);
+            }),
             StoreRecentSearches(
               controller: _purchaseSearch,
               focusNode: _purchaseSearchFocus,

@@ -248,6 +248,49 @@ void main() {
       file.writeAsBytesSync(pdf);
     }
   });
+  test('SUPPLIERSTATEMENTBOUNDARY final table has no spacer-only PDF page', () async {
+    // Separately labelled host fixture reproduces the actual BV export geometry.
+    // It does not create evaluation-store records or prove device acceptance.
+    final report = StoreTabularReport(
+      title: 'Supplier account statement',
+      metadata: const [
+        ['Document', 'Supplier account statement'],
+        ['Store', 'TEST Store · product entry'],
+        ['Supplier', 'EVAL-DUE-SUPPLY-04OCT'],
+        ['Period', '04/10/2026 to 05/10/2026'],
+        ['Added to dues', '₹1,025.00'], ['Reduced dues', '₹300.00'],
+        ['Records available at', '2026-10-05T16:00:56.076182'],
+        ['Ledger revision', 21], ['Statement reference', 'a7df261c30328185'],
+        ['Coverage', 'Confirmed starting balance and recorded entries'],
+        ['Store identity', 'QA-STORE-V1-0-f6a08c5ac9b55b5b'],
+        ['Supplier identity', 'local-supplier-608dc1863c370ca28c5c10dc0059e52e'],
+      ],
+      disclosure: 'Evaluation only. Supporting purchase records, not a bank statement or GST return. '
+          'Positive balance: dues. Negative balance: credit with supplier. '
+          'Business dates are used when recorded; legacy entries use the local recording date. '
+          'Later-entered backdated records can restate a period. Goods movements and linked money are not counted twice.',
+      headers: const ['Date', 'Particulars', 'Reference', 'Added to dues (₹)',
+        'Reduced dues (₹)', 'Dues / credit (₹)', 'Details'],
+      moneyColumns: const {3, 4, 5},
+      rows: const [
+        ['', 'Opening balance', '', '', '', 1000, 'Dues (+), credit with supplier (-)'],
+        ['04/10/2026', 'Advance paid', 'EVAL-ADV-0410-L', '', 300, 700, 'Cash'],
+        ['04/10/2026', 'Purchase bill', 'EVAL-ADV-BILL-0410-L', 300, '', 1000, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-MANUAL-BILL-0410-U', 320, '', 1320, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-CAT-BILL-0410-Y', 165, '', 1485, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-CSV-BILL-0410-AD', 80, '', 1565, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-TOGETHER-BILL-0410-AH', 80, '', 1645, ''],
+        ['05/10/2026', 'Purchase bill', 'EVAL-PURCHASE-0510-BH-01', 80, '', 1725, ''],
+        ['', 'Closing balance', '', '', '', 1725, ''],
+        ['04/10/2026', 'Recorded money linked', 'EVAL-ADV-BILL-0410-L', '', '', '',
+          '₹300.00 · not another payment; no account-balance change'],
+      ],
+    );
+    final bytes = await report.generate(StoreStockExportFormat.pdf);
+    final pageObjects = RegExp(r'/Type\s*/Page\b').allMatches(latin1.decode(bytes));
+    expect(pageObjects.length, 1, reason: 'All ten rows fit; terminal spacing must not create a header/footer-only page.');
+    expect(report.rows.length, 10);
+  });
   for (final size in [const Size(320, 568), const Size(915, 412)]) {
     testWidgets('SUPPLIERSTATEMENTUI enlarged preview stale scope and unapplied dates $size', (tester) async {
       tester.view.physicalSize = size; tester.view.devicePixelRatio = 1;

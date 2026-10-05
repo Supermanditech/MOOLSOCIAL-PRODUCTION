@@ -1341,6 +1341,9 @@ List<String> storePurchasePdfTextParts(String value) {
 
 /// A copy of retailer entries with captured account status, not a reissued supplier bill.
 /// Original attachments and their visual evidence remain separate documents.
+String storePurchaseCopyDetailLabel(String key, String label, {required bool isSavedCopy}) =>
+    isSavedCopy && key == 'receiptStatus' ? 'Goods status when copy saved' : label;
+
 Future<Uint8List> generateStorePurchaseRecordedCopy({
   required WorkspacePurchaseEntryDraft draft,
   required WorkspaceSupplierProfile supplier,
@@ -1382,8 +1385,9 @@ Future<Uint8List> generateStorePurchaseRecordedCopy({
     'billDiscount', 'cgst', 'sgstAmount', 'sgst', 'utgst', 'igst', 'cess', 'freight',
     'otherCharges', 'roundOff', 'totalTax', 'invoiceTotal', 'amountPayable', 'paidAmount',
     'mrp', 'sellingPrice', 'discount'};
-  String label(String key) => labels[key] ?? key.replaceAllMapped(
-    RegExp(r'[A-Z]'), (m) => ' ${m[0]}').replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase());
+  String label(String key) => storePurchaseCopyDetailLabel(key,
+    labels[key] ?? key.replaceAllMapped(RegExp(r'[A-Z]'), (m) => ' ${m[0]}')
+      .replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase()), isSavedCopy: isSavedCopy);
   String amount(String raw) {
     final minor = WorkspacePurchaseEntryDraft.printedPaise(raw);
     if (minor == null) return raw.isEmpty ? '—' : raw;
@@ -2048,7 +2052,9 @@ Future<Uint8List> _generateStoreTable(
                   color: PdfColor.fromInt(0xfff5f6fb),
                 ),
               ),
-              if (report.summary.isEmpty || columns != sections.last)
+              // Space separates column sections, not terminal content: a final
+              // spacer can spill onto a header/footer-only continuation page.
+              if (columns != sections.last)
                 pw.SizedBox(height: 12),
             ],
           if (groupRows.isEmpty) pw.Text('No records for this period.'),
