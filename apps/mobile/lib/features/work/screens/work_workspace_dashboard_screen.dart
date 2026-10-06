@@ -17116,6 +17116,18 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   WorkspaceCustomerInvoice? _selectedInvoice;
   String? _invoiceStoreScope;
   String? _invoiceAccountScope;
+  bool _invoiceOpenedFromHome = false;
+  void _openSalesInvoice(WorkspaceCustomerInvoice invoice) {
+    final fromHome = widget.counterContent != null && _salesHubView == 'home';
+    setState(() {
+      _selectedInvoice = invoice;
+      _invoiceStoreScope = widget.session.activeWorkspace?.id;
+      _invoiceAccountScope = widget.session.workspaceFinance?.accountScope;
+      _invoiceOpenedFromHome = fromHome;
+      if (fromHome) _salesHubView = 'records';
+    });
+    if (fromHome) widget.onSalesTaskChanged?.call('records');
+  }
   bool closeSelectedInvoice() {
     if (_selectedInvoice == null && _returnSelection) {
       _toggleReturnSelection();
@@ -17129,7 +17141,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       return true;
     }
     if (_selectedInvoice == null) return false;
-    setState(() => _selectedInvoice = null);
+    final returnHome = _invoiceOpenedFromHome;
+    setState(() {
+      _selectedInvoice = null;
+      _invoiceOpenedFromHome = false;
+      if (returnHome) _salesHubView = 'home';
+    });
+    if (returnHome) widget.onSalesTaskChanged?.call(null);
     return true;
   }
 
@@ -17395,11 +17413,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:
                     Text('Payment records unavailable. Open the original invoice and recover its records before recording a return.')));
                 }
-                setState(() {
-                _selectedInvoice = invoice;
-                _invoiceStoreScope = session.activeWorkspace?.id;
-                _invoiceAccountScope = session.workspaceFinance?.accountScope;
-              }); },
+                _openSalesInvoice(invoice); },
               child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 LayoutBuilder(builder: (context, box) =>
@@ -17464,11 +17478,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       total: _formatStoreMinorAmount(totalMinor),
       notice: 'Recorded invoices only · not a customer balance statement',
       empty: 'No recorded invoices in this period.',
-      onOpen: (index) => setState(() {
-        _selectedInvoice = invoices[index];
-        _invoiceStoreScope = session.activeWorkspace?.id;
-        _invoiceAccountScope = session.workspaceFinance?.accountScope;
-      }),
+      onOpen: (index) => _openSalesInvoice(invoices[index]),
     );
     return register;
   }
@@ -17484,29 +17494,37 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     }
     return Material(color: Colors.white,
       child: IndexedStack(sizing: StackFit.expand,
-        index: _salesHubView == 'home' ? 2 : _salesHubView == 'counter' ? 0 : 1, children: [
+        index: _salesHubView == 'counter' ? 0 : 1, children: [
         ExcludeFocus(excluding: _salesHubView != 'counter',
           child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
-        _salesHubView == 'counter' || _salesHubView == 'home' ? const SizedBox.shrink() : _buildSalesContent(context),
-        SingleChildScrollView(key: const Key('work-sales-home'),
-          child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+        Column(key: const Key('work-sales-content'),
+          children: [
+          Expanded(child: _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context)),
+          if (_salesHubView == 'home') const SizedBox.shrink(key: Key('work-sales-home')),
+          if (_salesHubView == 'home') _StoreBottomActionShelf(
+            keyPrefix: 'work-sales-navigation', equalWidthActions: true, actions: [
           for (final route in const [
             (view: 'counter', key: 'work-sales-primary-counter-sale', label: 'Counter sale',
-              guide: 'Choose goods and prepare a customer bill.', icon: Icons.point_of_sale_outlined),
+              icon: Icons.point_of_sale_outlined),
             (view: 'manage', key: 'work-sales-manage', label: 'Manage sales',
-              guide: 'Customer receipts, returns, credits and statements.', icon: Icons.tune_rounded),
+              icon: Icons.tune_rounded),
             (view: 'records', key: 'work-sales-recorded', label: 'Recorded sales',
-              guide: 'Open saved bills and check payments or returns.', icon: Icons.receipt_long_outlined),
-          ]) Padding(padding: const EdgeInsets.only(bottom: 8), child: ListTile(
-            key: Key(route.key), minTileHeight: 64, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            leading: Icon(route.icon, color: MoolColors.navy),
-            title: Text(route.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            subtitle: Text(route.guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
-            trailing: const Icon(Icons.chevron_right_rounded, color: MoolColors.navy),
-            shape: RoundedRectangleBorder(side: const BorderSide(color: MoolColors.line), borderRadius: BorderRadius.circular(8)),
-            onTap: () => unawaited(_selectSalesHubView(route.view)),
-          )),
-        ]))),
+              icon: Icons.receipt_long_outlined),
+          ]) Semantics(key: Key('${route.key}-state'), selected: route.view == 'records',
+            child: TextButton(key: Key(route.key),
+              style: TextButton.styleFrom(minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                foregroundColor: route.view == 'records' ? Colors.white : MoolColors.navy,
+                backgroundColor: route.view == 'records' ? MoolColors.navy : Colors.transparent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+              onPressed: () => unawaited(_selectSalesHubView(route.view)),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(route.icon, size: 16), const SizedBox(height: 2),
+                Text(route.label, textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+              ]))),
+        ]),
+        ]),
       ]));
   }
 
@@ -17526,14 +17544,14 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         return;
       }
       setState(() {
-        _salesHubView = view;
+        _salesHubView = view == 'records' ? 'home' : view;
         _selectedInvoice = null;
         _returnSelection = false;
         _exchangeSelection = false;
         _salesManageOpen = view == 'manage';
         if (view == 'manage') _salesCategories.addAll({0, 1, 2, 3, 4});
       });
-      widget.onSalesTaskChanged?.call(view);
+      widget.onSalesTaskChanged?.call(view == 'records' ? null : view);
     } finally { _changingSalesHubView = false; }
   }
 
@@ -17572,7 +17590,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           invoice: _selectedInvoice!,
           embedded: true,
           salesPresentation: widget.salesOnly,
-          onClose: () => setState(() => _selectedInvoice = null),
+          onClose: () { closeSelectedInvoice(); },
         );
       }
     }
@@ -20155,17 +20173,22 @@ class _StockQuickActionsFrame extends StatelessWidget {
 /// Stock shelf retains its horizontal action list and original collapse control.
 class _StoreBottomActionShelf extends StatelessWidget {
   const _StoreBottomActionShelf({required this.keyPrefix,
-    required this.actions, this.height, this.toggle});
+    required this.actions, this.height, this.toggle, this.equalWidthActions = false});
   final String keyPrefix;
   final List<Widget> actions;
   final double? height;
   final Widget? toggle;
+  final bool equalWidthActions;
 
   @override
   Widget build(BuildContext context) => Container(
     key: Key('$keyPrefix-actions-panel'), height: height, color: Colors.white,
     child: Row(children: [
-      Expanded(child: SingleChildScrollView(
+      Expanded(child: equalWidthActions
+        ? Padding(padding: const EdgeInsets.all(4), child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [for (final action in actions) Expanded(child: action)])))
+        : SingleChildScrollView(
         key: Key('$keyPrefix-entry-controls'), scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(children: [for (final action in actions)

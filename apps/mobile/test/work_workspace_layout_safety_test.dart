@@ -982,7 +982,7 @@ Future<void> openSavedInvoiceFromSales(WidgetTester tester, String id) async {
   expect(visiblePoint, isNotNull, reason: 'An invoice row must be reachable above pinned navigation: '
       'row=${tester.getRect(row)}, list=${tester.getRect(find.ancestor(of: row, matching: find.byType(ListView)).first)}, '
       'view=${tester.view.physicalSize}, insets=${tester.view.viewInsets}, '
-      'heading=${tester.getRect(find.byKey(const Key("work-sales-task-heading")))}.');
+      'search=${tester.getRect(find.byKey(const Key("work-sales-search")))}.');
   await tester.tapAt(visiblePoint!.withinRect(tester.getRect(row)));
   await tester.pumpAndSettle();
 }
@@ -23566,7 +23566,7 @@ void main() {
       await tester.tap(find.byKey(const Key('work-store-sell')));
       await tester.pumpAndSettle();
       final bottomShelf = find.byKey(const Key('work-sales-navigation-actions-panel'));
-      expect(bottomShelf, findsNothing);
+      expect(bottomShelf, findsOneWidget);
       for (final key in ['work-sales-primary-counter-sale', 'work-sales-manage', 'work-sales-recorded']) {
         await tester.ensureVisible(find.byKey(Key(key)));
         await tester.pumpAndSettle();
@@ -23582,7 +23582,7 @@ void main() {
       expect(find.text('Create or resume a customer bill.'), findsNothing);
       await openSalesTask(tester, 'records');
       await tester.pumpAndSettle();
-      expect(tester.widget<Text>(find.byKey(const Key('work-sales-task-heading'))).data, 'Recorded sales');
+      expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
       expect(find.byKey(const Key('work-sales-search')).hitTestable(), findsOneWidget);
       await openSalesTask(tester, 'counter');
       await tester.pumpAndSettle();
@@ -23619,6 +23619,28 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('SALESHOMERAIL saved register is home with selected home-only routes', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 800), textScale: 1);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-search')).hitTestable(), findsOneWidget);
+    final rail = find.byKey(const Key('work-sales-navigation-actions-panel'));
+    expect(rail, findsOneWidget);
+    expect(tester.getBottomLeft(find.byKey(const Key('work-sales-search'))).dy,
+      lessThan(tester.getTopLeft(rail).dy));
+    expect(tester.widget<Semantics>(find.byKey(const Key('work-sales-recorded-state'))).properties.selected, isTrue);
+    expect(find.byType(ListTile).evaluate().where((e) => e.widget.key == const Key('work-sales-primary-counter-sale')), isEmpty);
+    await openSalesTask(tester, 'manage');
+    expect(rail, findsNothing);
+    expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+    await returnToSalesHome(tester);
+    expect(rail, findsOneWidget);
+    expect(find.byKey(const Key('work-sales-search')).hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('SALESFULL home opens full-width task without navigation rails', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -23686,9 +23708,13 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(Key(route == 'manage' ? 'work-sales-manage' : 'work-sales-recorded')));
         await tester.pumpAndSettle();
-        expect(tester.widget<Text>(find.byKey(const Key('work-sales-task-heading'))).data,
-          route == 'manage' ? 'Manage sales' : 'Recorded sales');
-        expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+        if (route == 'manage') {
+          expect(tester.widget<Text>(find.byKey(const Key('work-sales-task-heading'))).data, 'Manage sales');
+          expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+        } else {
+          expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
+          expect(find.byKey(const Key('work-sales-navigation-actions-panel')), findsOneWidget);
+        }
         await returnToSalesHome(tester);
       }
       await tester.ensureVisible(find.byKey(const Key('work-sales-primary-counter-sale')));
@@ -23830,10 +23856,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('work-sales-invoice-AC01')));
     await tester.pumpAndSettle();
     expect(find.text('Invoice No.: AC01'), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-navigation-actions-panel')), findsNothing);
+    expect(find.byKey(const Key('work-local-navigation')), findsNothing);
     expect(work.workspaceInvoices.single.id, 'AC01');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-sales-search')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-navigation-actions-panel')), findsOneWidget);
+    expect(tester.widget<TextField>(find.byKey(const Key('work-sales-search'))).controller!.text, 'Saved customer');
     await revealSalesAction(tester, 'work-sales-returns');
     await tester.tap(find.byKey(const Key('work-sales-returns')));
     await tester.pumpAndSettle();
@@ -23895,9 +23926,9 @@ void main() {
       expect(search.hitTestable(), findsOneWidget);
       final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
       final manage = find.byKey(const Key('work-sales-manage'));
-      expect(primary, findsNothing);
-      expect(manage, findsNothing);
-      expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+      expect(primary, findsOneWidget);
+      expect(manage, findsOneWidget);
+      expect(find.byKey(const Key('work-local-navigation')), findsOneWidget);
       await openSalesTask(tester, 'manage');
       await tester.pumpAndSettle();
       expect(find.text('Manage sales'), findsOneWidget);
@@ -24150,7 +24181,7 @@ void main() {
     expect(find.text('No recorded invoices in this period.'), findsOneWidget);
     expect(find.text('Voucher Type'), findsNothing);
     expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
-    expect(find.byKey(const Key('work-sales-task-heading')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
     expect(find.byKey(const Key('work-sales-settlement')), findsNothing);
     await reveal(tester, find.byKey(const Key('work-sales-dues')));
     await tester.tap(find.byKey(const Key('work-sales-dues')));
@@ -24199,8 +24230,8 @@ void main() {
     expect(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-NEW'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-OLD'))).dy));
     final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
-    expect(primary, findsNothing);
-    expect(find.byKey(const Key('work-sales-task-heading')), findsOneWidget);
+    expect(primary, findsOneWidget);
+    expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
     expect(work.workspaceOrderCustomer, 'Saved customer');
     expect(work.currentWorkspaceOrderId, isNull);
     await tester.tap(find.byKey(const Key('work-statement-period')));
@@ -47050,7 +47081,7 @@ void main() {
         await openSalesTask(tester, 'records');
         await tester.pumpAndSettle();
         if (refundChannel == WorkspacePaymentChannel.cash) {
-          expect(find.byKey(const Key('work-sales-task-heading')), findsOneWidget);
+          expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
           expect(tester.takeException(), isNull, reason: 'Expanded returns action');
           await reveal(tester, find.byKey(const Key('work-sales-returns')));
           await tester.tap(find.byKey(const Key('work-sales-returns')));
@@ -48842,7 +48873,7 @@ void main() {
     }
     await openSalesTask(tester, 'records');
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-sales-task-heading')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
     expect(work.workspaceInvoices, isEmpty);
     expect(tester.takeException(), isNull);
   });
@@ -48898,7 +48929,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byKey(Key(stock ? 'work-dashboard-catalogue-screen'
-          : 'work-sales-task-heading')), findsOneWidget);
+          : action == 'counter-close' ? 'work-sales-home' : 'work-sales-task-heading')), findsOneWidget);
       expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId,
           stock ? 'stock' : 'sell');
       expect(work.workspaceInvoices, isEmpty);
