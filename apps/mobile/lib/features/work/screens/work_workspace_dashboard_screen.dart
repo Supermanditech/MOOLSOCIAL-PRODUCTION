@@ -15913,21 +15913,24 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 
   Widget _actionCentreControls() => Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
     _actionCentreButton(),
-    if (_centreVisible) IconButton(tooltip: 'Close purchase actions',
+    if (_centreVisible) IconButton(tooltip: 'Back to recorded purchases',
       onPressed: backWithinPurchases,
       icon: const Icon(Icons.close, size: 18)),
   ]);
 
-  Widget _actionCentreButton() => OutlinedButton(
+  Widget _actionCentreButton() => Semantics(
+    key: const Key('work-purchase-management-state'),
+    selected: _centreVisible, expanded: _centreVisible,
+    child: OutlinedButton(
     key: const Key('work-purchase-action-centre-open'), onPressed: _openActionCentre,
     style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
       side: const BorderSide(color: MoolColors.navy)),
-    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-      Flexible(child: Text('Manage purchases', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-      SizedBox(width: 2), Icon(Icons.chevron_right, size: 16),
-    ]));
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      const Flexible(child: Text('Manage purchases', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+      const SizedBox(width: 2), Icon(_centreVisible ? Icons.check : Icons.chevron_right, size: 16),
+    ])));
 
   static const _purchaseActions = [
     ('Supplier bills', [
@@ -16276,11 +16279,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       key: const Key('purchase-action-category-scroll'), child: Column(children: [
       SizedBox(key: _centreVisible ? const Key('work-purchase-action-centre') : const Key('work-purchase-action-centre-closed'), height: 0),
       Expanded(child: CustomScrollView(
-      key: PageStorageKey('work-purchases-$storeId-$statement'),
+      key: PageStorageKey('work-purchases-$storeId-$statement-${_centreVisible ? 'management' : 'register'}'),
       primary: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
-        SliverToBoxAdapter(child: Padding(
+        if (!_centreVisible) SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             StoreRecentSearches(
@@ -16319,8 +16322,10 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               ),
             ),
             SizedBox(
+              key: const Key('work-purchase-receipt-filters'),
               height: (MediaQuery.textScalerOf(context).scale(12) + 24).clamp(48.0, double.infinity).toDouble(),
-              child: ListView(scrollDirection: Axis.horizontal, children: [
+              child: ListView(key: PageStorageKey('work-purchase-filters-$storeId-$statement'),
+                scrollDirection: Axis.horizontal, children: [
                 for (final filter in const ['All', 'Incoming', 'Needs receipt', 'Received'])
                   Padding(padding: const EdgeInsets.only(right: 6),
                     child: TextButton(
@@ -16344,8 +16349,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
         SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: LayoutBuilder(builder: (context, constraints) {
-            final heading = Text(!statement && savedCopies.isNotEmpty
-                ? 'Recorded purchases' : 'Purchases',
+            final heading = Text(_centreVisible ? 'Manage purchases' : 'Recorded purchases',
               key: const Key('work-purchase-register-heading'),
               style: const TextStyle(fontSize: 13,
                 fontWeight: FontWeight.w700, color: MoolColors.navy));
@@ -16361,7 +16365,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           }),
         )),
         if (_centreVisible) ..._actionCentreSlivers(constraints.maxWidth, constraints.maxHeight),
-        SliverPadding(
+        if (!_centreVisible) SliverPadding(
           padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
           sliver: SliverList(delegate: SliverChildBuilderDelegate((context, index) {
             if (index == 0) { return Column(

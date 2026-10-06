@@ -3643,6 +3643,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final geometry in [(const Size(360, 806), 1.0), (const Size(320, 568), 2.0),
+      (const Size(806, 360), 1.6)]) {
+    testWidgets('P01-AC01 VIEW01 separates register and management $geometry', (tester) async {
+      // Host-only presentation fixture; no device commerce records injected.
+      final entry = _PurchaseEntryFixtureStore();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry),
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      final heading = find.byKey(const Key('work-purchase-register-heading'));
+      expect(tester.widget<Text>(heading).data, 'Recorded purchases');
+      final manage = find.byKey(const Key('work-purchase-action-centre-open'));
+      final search = find.byKey(const Key('work-purchase-search'));
+      await tester.enterText(search, 'supplier query');
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(manage);
+      await tester.tap(manage);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(heading).data, 'Manage purchases');
+      expect(search, findsNothing);
+      expect(find.byKey(const Key('work-purchase-filter-all')), findsNothing);
+      final state = tester.widget<Semantics>(find.byKey(const Key('work-purchase-management-state')));
+      expect(state.properties.selected, isTrue);
+      expect(state.properties.expanded, isTrue);
+      expect(find.text('Purchase invoices'), findsOneWidget);
+      expect(find.text('No linked supplier deliveries'), findsNothing);
+      await tester.tap(find.byTooltip('Back to recorded purchases'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(heading).data, 'Recorded purchases');
+      await tester.scrollUntilVisible(search, -80, scrollable: find.descendant(
+        of: find.byKey(const Key('purchase-action-category-scroll')), matching: find.byType(Scrollable)).first);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).controller!.text, 'supplier query');
+      await tester.ensureVisible(find.byKey(const Key('work-purchase-receipt-filters')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-filter-all')), findsOneWidget);
+      await tester.ensureVisible(manage);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Semantics>(find.byKey(const Key('work-purchase-management-state')))
+        .properties.selected, isFalse);
+      expect(entry.value, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('P01-AC01 V01 management entry has a visible button affordance', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry), textScale: 1);
@@ -5216,7 +5262,7 @@ void main() {
     checkpoint.holdRead = Completer<void>();
     await tester.tap(find.byKey(const Key('work-purchase-action-centre-open')));
     await tester.pump();
-    await tester.tap(find.byTooltip('Close purchase actions'));
+    await tester.tap(find.byTooltip('Back to recorded purchases'));
     await tester.pump();
     checkpoint.holdRead!.complete();
     await tester.pumpAndSettle();
