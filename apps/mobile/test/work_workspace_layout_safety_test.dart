@@ -23642,6 +23642,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final display in [(const Size(360, 800), 1.0), (const Size(320, 720), 2.0), (const Size(720, 450), 1.4)]) {
+  testWidgets('SALESHOMERAIL Stock strip dimensions and collapse match exactly $display', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: display.$1, textScale: display.$2);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    final stockSize = tester.getSize(find.byKey(const Key('work-stock-actions-panel')));
+    expect(stockSize.width, tester.getSize(find.byKey(const Key('work-stock-action-content'))).width);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    final panel = find.byKey(const Key('work-sales-navigation-actions-panel'));
+    final salesSize = tester.getSize(panel);
+    expect(salesSize.height, stockSize.height);
+    expect(salesSize.width, display.$1.width);
+    expect(salesSize.width, tester.getSize(find.byKey(const Key('work-sales-navigation-action-content'))).width);
+    if (display.$1.width <= display.$1.height) expect(salesSize, stockSize);
+    final toggle = find.byKey(const Key('work-sales-navigation-actions-toggle'));
+    expect(toggle.hitTestable(), findsOneWidget);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(panel, findsNothing);
+    expect(find.byTooltip('Show Quick actions'), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-search')).hitTestable(), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('work-sales-navigation-action-content'))).width, display.$1.width);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(panel), salesSize);
+    final label = tester.widget<Text>(find.descendant(of: find.byKey(const Key('work-sales-primary-counter-sale')),
+      matching: find.text('Counter sale')));
+    expect(label.style!.fontSize, 11);
+    expect(label.style!.height, 1.25);
+    expect(tester.takeException(), isNull);
+  });
+  }
+
   testWidgets('SALESFULL home opens full-width task without navigation rails', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
@@ -23790,6 +23826,8 @@ void main() {
     await tester.pumpAndSettle();
     final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
     await returnToSalesHome(tester);
+    await tester.ensureVisible(primary);
+    await tester.pumpAndSettle();
     expect(primary.hitTestable(), findsOneWidget);
     expect(find.byKey(const Key('work-sales-action-centre')), findsNothing);
     await openSalesTask(tester, 'counter');

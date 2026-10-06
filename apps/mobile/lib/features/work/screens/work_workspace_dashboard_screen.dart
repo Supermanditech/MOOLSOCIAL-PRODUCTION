@@ -17066,6 +17066,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   final _invoiceSearch = TextEditingController();
   Object? _salesScope;
   bool _salesActionsExpanded = true;
+  bool _salesNavigationExpanded = true;
   bool _salesManageOpen = false;
   late String _salesHubView = widget.initialSalesTask;
   bool _changingSalesHubView = false;
@@ -17499,10 +17500,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
         Column(key: const Key('work-sales-content'),
           children: [
-          Expanded(child: _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context)),
-          if (_salesHubView == 'home') const SizedBox.shrink(key: Key('work-sales-home')),
-          if (_salesHubView == 'home') _StoreBottomActionShelf(
-            keyPrefix: 'work-sales-navigation', equalWidthActions: true, actions: [
+          Expanded(child: _StockQuickActionsFrame(
+            keyPrefix: 'work-sales-navigation', enabled: _salesHubView == 'home',
+            expanded: _salesNavigationExpanded,
+            onToggle: () => setState(() => _salesNavigationExpanded = !_salesNavigationExpanded),
+            actions: [
           for (final route in const [
             (view: 'counter', key: 'work-sales-primary-counter-sale', label: 'Counter sale',
               icon: Icons.point_of_sale_outlined),
@@ -17510,20 +17512,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               icon: Icons.tune_rounded),
             (view: 'records', key: 'work-sales-recorded', label: 'Recorded sales',
               icon: Icons.receipt_long_outlined),
-          ]) Semantics(key: Key('${route.key}-state'), selected: route.view == 'records',
-            child: TextButton(key: Key(route.key),
-              style: TextButton.styleFrom(minimumSize: const Size(0, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                foregroundColor: route.view == 'records' ? Colors.white : MoolColors.navy,
-                backgroundColor: route.view == 'records' ? MoolColors.navy : Colors.transparent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-              onPressed: () => unawaited(_selectSalesHubView(route.view)),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(route.icon, size: 16), const SizedBox(height: 2),
-                Text(route.label, textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              ]))),
-        ]),
+          ]) _StoreEdgeAction(keyName: route.key, label: route.label, icon: route.icon,
+            selected: route.view == 'records',
+            onTap: () => unawaited(_selectSalesHubView(route.view))),
+        ], child: _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context))),
+          if (_salesHubView == 'home') const SizedBox.shrink(key: Key('work-sales-home')),
         ]),
       ]));
   }
@@ -19957,15 +19950,18 @@ class _StoreEdgeAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.selected,
   });
   final String keyName, label;
   final IconData icon;
   final VoidCallback? onTap;
+  final bool? selected;
 
   @override
   Widget build(BuildContext context) => Semantics(
     key: Key('$keyName-state'),
     button: true,
+    selected: selected,
     label: label,
     enabled: onTap != null,
     onTap: onTap,
@@ -19976,7 +19972,7 @@ class _StoreEdgeAction extends StatelessWidget {
         color: Colors.transparent,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: selected == true ? MoolColors.navy : Colors.white,
             borderRadius: BorderRadius.circular(9),
           ),
           child: InkWell(
@@ -19993,12 +19989,12 @@ class _StoreEdgeAction extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 15, color: onTap == null
+                  Icon(icon, size: 15, color: selected == true ? Colors.white : onTap == null
                       ? MoolColors.muted : MoolColors.navy),
                   const SizedBox(width: 5),
                   Text(label, softWrap: false, style: TextStyle(
                     fontSize: 11, height: 1.25, fontWeight: FontWeight.w600,
-                    color: onTap == null ? MoolColors.muted : MoolColors.navy,
+                    color: selected == true ? Colors.white : onTap == null ? MoolColors.muted : MoolColors.navy,
                   )),
                 ],
               ),
@@ -20033,16 +20029,20 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.actions,
     required this.expanded,
     required this.onToggle,
+    this.keyPrefix = 'work-stock',
+    this.enabled = true,
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
-  final String keyPrefix = 'work-stock';
+  final String keyPrefix;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
+      if (!enabled) return child;
       // Preserve full-sized text and targets in short accessibility viewports.
       // Keep actions fixed while the register can use a readable scroll extent.
       final textScaler = MediaQuery.textScalerOf(context);
@@ -20173,22 +20173,17 @@ class _StockQuickActionsFrame extends StatelessWidget {
 /// Stock shelf retains its horizontal action list and original collapse control.
 class _StoreBottomActionShelf extends StatelessWidget {
   const _StoreBottomActionShelf({required this.keyPrefix,
-    required this.actions, this.height, this.toggle, this.equalWidthActions = false});
+    required this.actions, this.height, this.toggle});
   final String keyPrefix;
   final List<Widget> actions;
   final double? height;
   final Widget? toggle;
-  final bool equalWidthActions;
 
   @override
   Widget build(BuildContext context) => Container(
     key: Key('$keyPrefix-actions-panel'), height: height, color: Colors.white,
     child: Row(children: [
-      Expanded(child: equalWidthActions
-        ? Padding(padding: const EdgeInsets.all(4), child: IntrinsicHeight(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [for (final action in actions) Expanded(child: action)])))
-        : SingleChildScrollView(
+      Expanded(child: SingleChildScrollView(
         key: Key('$keyPrefix-entry-controls'), scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(children: [for (final action in actions)
