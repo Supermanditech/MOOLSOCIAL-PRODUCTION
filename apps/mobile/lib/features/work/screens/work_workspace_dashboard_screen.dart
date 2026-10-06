@@ -8177,7 +8177,27 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
+                if (widget.salesPresentation)
+                  Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8, children: [
+                      const Text('Invoice', key: Key('work-invoice-title'),
+                        style: TextStyle(color: MoolColors.ink, fontSize: 18, fontWeight: FontWeight.w700)),
+                      Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
+                        if (payment != null && (!paid || canAdjust))
+                          TextButton(key: const Key('work-invoice-jump-actions'),
+                            style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 12)),
+                            onPressed: _showInvoiceActions, child: const Text('Payment / returns')),
+                        TextButton.icon(key: const Key('work-invoice-open-pdf'),
+                          style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 12)),
+                          onPressed: _openPdf, icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                          label: const Text('PDF')),
+                      ]),
+                    ])
+                else Row(
                   children: [
                     Expanded(
                       child: Text(
@@ -8192,12 +8212,6 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         ),
                       ),
                     ),
-                    if (payment != null && (!paid || canAdjust) && widget.salesPresentation)
-                      SizedBox(width: 100, child: TextButton(
-                        key: const Key('work-invoice-jump-actions'),
-                        onPressed: _showInvoiceActions,
-                        child: const Text('Payment / returns', textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12)))),
                     if (payment != null && (!paid || canAdjust) && !widget.salesPresentation) IconButton(
                       key: const Key('work-invoice-jump-actions'),
                       tooltip: 'Payment and return actions',
@@ -8299,6 +8313,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         _invoiceItemRows(),
                         const Divider(height: 1),
                         _invoiceTotal(),
+                        if (!widget.salesPresentation)
                         Text(
                           storeInvoicePaymentMethod(invoice.payment, payment,
                               settlementLedger?.entries ?? const [],
@@ -8311,7 +8326,18 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  KeyedSubtree(key: _invoiceActions, child: _InvoiceCollectionSummary(
+                  KeyedSubtree(key: _invoiceActions, child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.salesPresentation)
+                        Text(
+                          storeInvoicePaymentMethod(invoice.payment, payment,
+                              settlementLedger?.entries ?? const [],
+                              describeUnpaidSelection: true),
+                          key: const Key('work-invoice-payment-method'),
+                          style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+                        ),
+                      _InvoiceCollectionSummary(
                     session: session,
                     invoice: invoice,
                     accountScope: invoiceAccount,
@@ -8319,6 +8345,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     onRecord: widget.onRecord,
                     receiptEditor: widget.receiptEditor,
                     salesPresentation: widget.salesPresentation,
+                      ),
+                    ],
                   )),
                   if (payment != null) _recordedPayments(payment),
                   ExpansionTile(
@@ -17113,17 +17141,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         padding: const EdgeInsets.only(bottom: 12), children: [
           for (var index = 0; index < categories.length; index++)
             Column(children: [
+              if (index != 0 || widget.counterContent == null)
               Semantics(key: Key('work-sales-category-state-$index'), button: true, expanded: _salesCategories.contains(index), child: ListTile(
                 key: Key('work-sales-category-$index'), minTileHeight: 48,
+                visualDensity: VisualDensity.compact,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 onTap: () => setState(() { if (!_salesCategories.add(index)) _salesCategories.remove(index); }),
                 title: Text(categories[index].title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-                subtitle: Text(categories[index].guide, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                subtitle: _salesCategories.contains(index) ? null
+                    : Text(categories[index].guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
                 trailing: Icon(_salesCategories.contains(index) ? Icons.expand_less : Icons.expand_more, color: MoolColors.navy),
               )),
-              if (_salesCategories.contains(index))
+              if (_salesCategories.contains(index) || index == 0 && widget.counterContent != null)
                 for (final action in categories[index].actions)
                   ListTile(key: Key(action.key), minTileHeight: 48,
+                    visualDensity: VisualDensity.compact,
                     contentPadding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
                     enabled: action.tap != null, onTap: action.tap,
                     title: Text(action.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: MoolColors.ink)),
@@ -17400,30 +17432,20 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     }
     return Material(color: Colors.white, child: Column(children: [
       Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: LayoutBuilder(builder: (context, constraints) {
-          final switcher = SegmentedButton<String>(key: const Key('work-sales-switcher'),
+        child: SegmentedButton<String>(key: const Key('work-sales-switcher'),
             showSelectedIcon: false,
-            emptySelectionAllowed: true,
             expandedInsets: EdgeInsets.zero,
-            style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(48, 48))),
+            style: const ButtonStyle(
+              minimumSize: WidgetStatePropertyAll(Size(48, 48)),
+              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6, vertical: 8)),
+              textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600))),
             segments: const [
-              ButtonSegment(value: 'counter', label: Text('Counter sale', key: Key('work-sales-primary-counter-sale'))),
-              ButtonSegment(value: 'manage', label: Text('Manage sales', key: Key('work-sales-manage'))),
+              ButtonSegment(value: 'counter', label: Text('Counter sale', textAlign: TextAlign.center, key: Key('work-sales-primary-counter-sale'))),
+              ButtonSegment(value: 'manage', label: Text('Manage sales', textAlign: TextAlign.center, key: Key('work-sales-manage'))),
+              ButtonSegment(value: 'records', label: Text('Recorded sales', textAlign: TextAlign.center, key: Key('work-sales-recorded'))),
             ], selected: _salesHubView == 'counter' ? {'counter'}
-                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? {'manage'} : {},
-            onSelectionChanged: (value) { if (value.isNotEmpty) unawaited(_selectSalesHubView(value.single)); });
-          final recorded = Semantics(selected: _salesHubView == 'records', child: TextButton.icon(
-            key: const Key('work-sales-recorded'),
-            onPressed: () => unawaited(_selectSalesHubView('records')),
-            icon: const Icon(Icons.receipt_long_outlined, size: 16),
-            label: Text('Recorded sales', style: TextStyle(fontWeight: _salesHubView == 'records' ? FontWeight.w700 : FontWeight.w400))));
-          if (constraints.maxWidth >= 620 && MediaQuery.textScalerOf(context).scale(14) <= 21) {
-            return Row(children: [Expanded(child: switcher), const SizedBox(width: 8), recorded]);
-          }
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            switcher, Align(alignment: Alignment.centerRight, child: recorded),
-          ]);
-        })),
+                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? {'manage'} : {'records'},
+            onSelectionChanged: (value) { if (value.isNotEmpty) unawaited(_selectSalesHubView(value.single)); })),
       Expanded(child: IndexedStack(sizing: StackFit.expand, index: _salesHubView == 'counter' ? 0 : 1, children: [
         ExcludeFocus(excluding: _salesHubView != 'counter',
           child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
@@ -17656,7 +17678,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   onPressed: () { FocusScope.of(context).unfocus(); setState(() => _salesManageOpen = true); },
                   icon: const Icon(Icons.more_horiz_rounded, size: 18), label: const Text('Manage sales')),
               ]))),
-          if (!_returnSelection && !landscapeBand) const Align(alignment: Alignment.centerLeft,
+          if (widget.counterContent == null && !_returnSelection && !landscapeBand) const Align(alignment: Alignment.centerLeft,
             child: Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Text('Recorded sales', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)))),
           Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl,
@@ -36768,7 +36790,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             alignment: Alignment.centerLeft,
           ),
-          child: Column(
+          child: Row(children: [Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -36789,7 +36811,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   style: const TextStyle(fontSize: 12, color: MoolColors.muted),
                 ),
             ],
-          ),
+          )), const Icon(Icons.edit_outlined, size: 16, key: Key('work-sale-customer-edit'))]),
         ),
       ),
     );
@@ -37548,6 +37570,8 @@ class _SaleProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quantity = session.workspaceOrderQuantities[product.id] ?? 0;
+    final availableForSale = product.canSellAtCounter &&
+        (product.stockMode == WorkspaceStockMode.availabilityOnly || product.stock > 0);
     final facts = Text(
       '${product.pack} · ${!product.available
           ? 'Unavailable'
@@ -37586,11 +37610,11 @@ class _SaleProductTile extends StatelessWidget {
                 children: [
                   Text(
                     product.title,
-                    style: const TextStyle(
-                      color: MoolColors.ink,
+                    style: TextStyle(
+                      color: availableForSale ? MoolColors.ink : MoolColors.muted,
                       fontSize: 14,
                       height: 1.25,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: availableForSale ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                   facts,
@@ -37610,6 +37634,7 @@ class _SaleProductTile extends StatelessWidget {
           tooltip: 'Reduce ${product.title}',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: quantity == 0 ? null : () => _adjustQuantity(-1),
+          style: IconButton.styleFrom(disabledForegroundColor: MoolColors.muted),
           icon: const Icon(Icons.remove_rounded, size: 20),
         ),
         ConstrainedBox(
@@ -37621,9 +37646,9 @@ class _SaleProductTile extends StatelessWidget {
               '$quantity',
               softWrap: false,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: MoolColors.navy,
-                fontWeight: FontWeight.w800,
+              style: TextStyle(
+                color: quantity == 0 ? MoolColors.muted : MoolColors.navy,
+                fontWeight: quantity == 0 ? FontWeight.w400 : FontWeight.w800,
               ),
             ),
           ),
@@ -37641,7 +37666,7 @@ class _SaleProductTile extends StatelessWidget {
               : null,
           style: IconButton.styleFrom(
             disabledForegroundColor: const Color(0xFF68758A),
-            disabledBackgroundColor: const Color(0xFFE6EAF1),
+            disabledBackgroundColor: Colors.transparent,
             foregroundColor: _counterSalePrimary,
             backgroundColor: _counterSaleTint,
           ),

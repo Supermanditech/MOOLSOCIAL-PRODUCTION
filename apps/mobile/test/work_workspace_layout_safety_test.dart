@@ -858,6 +858,16 @@ Future<void> revealSalesAction(WidgetTester tester, String key) async {
   }
   final target = find.byKey(Key(key));
   final scroll = find.descendant(of: find.byKey(const Key('work-sales-action-centre')), matching: find.byType(Scrollable));
+  if (category == 0 && target.evaluate().isEmpty &&
+      find.byKey(const Key('work-sales-switcher')).evaluate().isNotEmpty) {
+    // The direct resume row has no duplicated category heading in the inline hub.
+    for (var attempt = 0; attempt < 40 &&
+        tester.state<ScrollableState>(scroll).position.pixels > 0; attempt++) {
+      await tester.drag(scroll, const Offset(0, 180));
+      await tester.pumpAndSettle();
+    }
+    await tester.scrollUntilVisible(target, 80, scrollable: scroll);
+  }
   if (target.evaluate().isEmpty) {
     final header = find.byKey(Key('work-sales-category-$category'));
     if (header.evaluate().isEmpty) {
@@ -23411,6 +23421,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-sales-invoice-CREDIT-TARGET')));
       await tester.pumpAndSettle();
+      final method = find.byKey(const Key('work-invoice-payment-method'));
+      expect(tester.widget<Text>(method).data, 'Selected payment method: Cash');
+      final settlementGroup = find.ancestor(of: method, matching: find.byType(Column)).first;
+      expect(find.descendant(of: settlementGroup, matching: find.text('Amount due ₹800')), findsOneWidget);
+      for (final action in ['work-invoice-jump-actions', 'work-invoice-open-pdf']) {
+        expect(tester.getSize(find.byKey(Key(action))).height, greaterThanOrEqualTo(48));
+      }
       await tester.tap(find.byKey(const Key('work-invoice-jump-actions')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-invoice-use-credit')).hitTestable(), findsOneWidget);
@@ -23507,6 +23524,40 @@ void main() {
     expect(work.workspaceInvoices.length, invoiceCount);
   });
 
+  for (final size in [const Size(360, 720), const Size(320, 720), const Size(720, 450)]) {
+    testWidgets('SALESVISUAL9 compact selected views preserve draft $size', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      expect(work.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop'), isTrue);
+      final invoiceCount = work.workspaceInvoices.length;
+      final finance = work.workspaceFinance;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: size, textScale: size.width == 320 ? 2 : 1);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      final switcher = find.byKey(const Key('work-sales-switcher'));
+      expect(tester.widget<SegmentedButton<String>>(switcher).segments.length, 3);
+      expect(tester.widget<SegmentedButton<String>>(switcher).selected, {'counter'});
+      if (size.width == 360) expect(tester.getSize(switcher).height, lessThanOrEqualTo(64));
+      await tester.enterText(find.byKey(const Key('work-sale-customer-name')), 'Asha');
+      await tester.tap(find.byKey(const Key('work-sales-manage')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SegmentedButton<String>>(switcher).selected, {'manage'});
+      expect(find.byKey(const Key('work-sales-dues')), findsOneWidget);
+      expect(find.text('Create or resume a customer bill.'), findsNothing);
+      await tester.tap(find.byKey(const Key('work-sales-recorded')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SegmentedButton<String>>(switcher).selected, {'records'});
+      expect(find.text('Recorded sales'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sales-primary-counter-sale')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<EditableText>(find.descendant(of: find.byKey(const Key('work-sale-customer-name')),
+        matching: find.byType(EditableText))).controller.text, 'Asha');
+      expect(work.workspaceInvoices.length, invoiceCount);
+      expect(work.workspaceFinance, same(finance));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('SALESVISUAL10 register labels exact reference and selected year', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     work.workspaceInvoices.clear();
@@ -23544,7 +23595,8 @@ void main() {
     await tester.tap(find.byKey(const Key('work-sales-manage')));
     await tester.pumpAndSettle();
     await revealSalesAction(tester, 'work-sales-statement');
-    expect(find.text('Sales and collections · Year ${DateTime.now().year}'), findsOneWidget);
+    expect(find.text('View, download or print · Year ${DateTime.now().year}'), findsOneWidget);
+    expect(find.text('Sales and collections · Year ${DateTime.now().year}'), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-recorded')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('work-sales-invoice-$reference')));
@@ -23614,7 +23666,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Manage sales'), findsOneWidget);
     expect(find.byKey(const Key('work-sales-new-counter-sale')), findsOneWidget);
-    for (var category = 0; category < 5; category++) {
+    expect(find.byKey(const Key('work-sales-category-0')), findsNothing);
+    for (var category = 1; category < 5; category++) {
       await revealSalesAction(tester, ['work-sales-new-counter-sale', 'work-sales-dues',
         'work-sales-returns', 'work-sales-customer-credit', 'work-sales-statement'][category]);
       final header = find.byKey(Key('work-sales-category-$category'));
@@ -48622,7 +48675,10 @@ void main() {
     // the entry form intentionally covers the product search initially.
     await enterSaleCustomer(tester, '9829012345');
     for (final key in ['work-sales-recorded', 'work-counter-camera-scan', 'work-counter-usb-scan']) {
-      final control = find.byKey(Key(key));
+      final label = find.byKey(Key(key));
+      final control = key == 'work-sales-recorded'
+          ? find.ancestor(of: label, matching: find.byType(TextButton)).first
+          : label;
       expect(control.hitTestable(), findsOneWidget, reason: key);
       final bounds = tester.getRect(control);
       expect(bounds.left, greaterThanOrEqualTo(41), reason: key);
