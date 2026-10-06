@@ -1582,7 +1582,21 @@ class _WorkWorkspaceDashboardScreenState
                     session: session,
                     salesOnly: true,
                     showNewSaleAction: true,
-                    onOpenOperation: _showOperation,
+                    counterContent: session.workspaceOrderSource == 'Counter' &&
+                            session.workspaceOrderFulfilment == 'At the shop' &&
+                            (session.currentWorkspaceOrderId == null || _counterKey.currentState != null)
+                        ? counterSurface(true)
+                        : Center(child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const Text('Counter sale', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                            const Padding(padding: EdgeInsets.all(12), child: Text('Create a bill for a customer buying at your shop.', textAlign: TextAlign.center)),
+                            FilledButton(key: const Key('work-sales-start-counter'),
+                              onPressed: () {
+                                if (session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) setState(() {});
+                              }, child: const Text('Start counter bill')),
+                          ]))),
+                    beforeSalesViewChange: () async => await (_counterKey.currentState?.flushForNavigation() ?? Future.value(true)),
+                    onPrepareCounter: () => session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop'),
+                    onOpenOperation: (operation) => unawaited(_navigateFromCounterDraft(() => _showOperation(operation))),
                     onNewSale: () {
                       if (session.prepareWorkspaceOrder(
                         source: 'Counter',
@@ -2473,7 +2487,8 @@ class _WorkWorkspaceDashboardScreenState
 
   bool get _hasCounterOrderDraft =>
       _view == _WorkspaceControlView.operation &&
-      _operation == _WorkspaceOperation.counterOrder &&
+      (_operation == _WorkspaceOperation.counterOrder ||
+          (_operation == _WorkspaceOperation.sales && _counterKey.currentState != null)) &&
       (session.workspaceOrderCustomer.trim().isNotEmpty ||
           session.workspaceOrderQuantities.isNotEmpty);
 
@@ -2514,7 +2529,7 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<bool> _confirmDiscardCounterOrder() async {
     if (!await _confirmPurchaseNavigation()) return false;
-    if (_operation == _WorkspaceOperation.counterOrder &&
+    if ((_operation == _WorkspaceOperation.counterOrder || _counterKey.currentState != null) &&
         !await (_counterKey.currentState?.flushForNavigation() ??
             Future.value(true))) {
       return false;
@@ -2522,7 +2537,7 @@ class _WorkWorkspaceDashboardScreenState
     if (!mounted) return false;
     if (session.counterDraftSubmitting) return false;
     if (session.counterDraftNeedsReconciliation) return true;
-    if (_operation == _WorkspaceOperation.counterOrder &&
+    if ((_operation == _WorkspaceOperation.counterOrder || _counterKey.currentState != null) &&
         (_counterKey.currentState?.hasCompletedInvoice ?? false)) {
       // The invoice/ledger already owns this sale. Reset only the next-sale
       // editor, retaining the existing busy/reconciliation guards.
@@ -2591,7 +2606,9 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     if (!exitSale &&
-        _operation == _WorkspaceOperation.counterOrder &&
+        (_operation == _WorkspaceOperation.counterOrder ||
+            (_operation == _WorkspaceOperation.sales &&
+                _salesKey.currentState?._salesHubView == 'counter')) &&
         await (_counterKey.currentState?.backWithinSale() ??
             Future.value(false))) {
       return;
@@ -7920,6 +7937,10 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (widget.salesPresentation && customer != invoice.customer &&
+                  _storedCounterCustomerMobile(invoice.customer) != null)
+                Text('Phone: ${invoice.customer}',
+                    style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
             ],
           ),
         ),
@@ -7944,9 +7965,9 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
           childrenPadding: const EdgeInsets.only(bottom: 12),
           shape: const Border(),
           collapsedShape: const Border(),
-          title: const Text(
-            'Invoice details',
-            style: TextStyle(
+          title: Text(
+            widget.salesPresentation ? 'Bill details' : 'Invoice details',
+            style: const TextStyle(
               fontSize: 13,
               color: MoolColors.muted,
               fontWeight: FontWeight.w600,
@@ -8171,7 +8192,13 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         ),
                       ),
                     ),
-                    if (payment != null && (!paid || canAdjust)) IconButton(
+                    if (payment != null && (!paid || canAdjust) && widget.salesPresentation)
+                      SizedBox(width: 100, child: TextButton(
+                        key: const Key('work-invoice-jump-actions'),
+                        onPressed: _showInvoiceActions,
+                        child: const Text('Payment / returns', textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12)))),
+                    if (payment != null && (!paid || canAdjust) && !widget.salesPresentation) IconButton(
                       key: const Key('work-invoice-jump-actions'),
                       tooltip: 'Payment and return actions',
                       onPressed: _showInvoiceActions,
@@ -8246,7 +8273,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   ),
                   if (invoice.billingDetails.name.trim().isNotEmpty)
                     Text(
-                      invoice.customer,
+                      widget.salesPresentation && _storedCounterCustomerMobile(invoice.customer) != null
+                          ? 'Phone: ${invoice.customer}' : invoice.customer,
                       style: const TextStyle(color: MoolColors.muted),
                     ),
                   SizedBox(height: widget.salesPresentation ? 6 : 12),
@@ -8274,8 +8302,10 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         Text(
                           storeInvoicePaymentMethod(invoice.payment, payment,
                               settlementLedger?.entries ?? const [],
-                              describeUnpaidSelection: !widget.counterAppearance),
-                          style: const TextStyle(color: MoolColors.muted),
+                              describeUnpaidSelection: !widget.counterAppearance)
+                              .replaceFirst(widget.salesPresentation ? 'Selected payment method:' : '\u0000', 'Selected method:'),
+                          style: TextStyle(color: MoolColors.muted,
+                            fontSize: widget.salesPresentation ? 12 : null),
                         ),
                       ],
                     ),
@@ -8296,7 +8326,10 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: const EdgeInsets.only(bottom: 12),
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                    title: const Text('Invoice details'),
+                    shape: widget.salesPresentation ? const Border() : null,
+                    collapsedShape: widget.salesPresentation ? const Border() : null,
+                    title: Text(widget.salesPresentation ? 'Bill details' : 'Invoice details',
+                      style: widget.salesPresentation ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w500) : null),
                     children: [
                       if (widget.counterAppearance) Text(invoice.id),
                       Text('Sold by: $invoiceStoreName'),
@@ -8335,8 +8368,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                 )) ...[
                   const SizedBox(height: 12),
                   Text(
-                    storeCounterSettlementHint(payment,
-                        settlementLedger?.entries ?? const []),
+                    widget.salesPresentation
+                        ? (payment != null && payment.dueMinor > 0
+                            ? 'Record money received against this bill to update customer dues.'
+                            : 'Review this bill’s recorded payments and adjustments.')
+                        : storeCounterSettlementHint(payment,
+                            settlementLedger?.entries ?? const []),
                     key: Key('work-counter-handover-hint'),
                     style: const TextStyle(
                       color: MoolColors.muted,
@@ -16731,6 +16768,9 @@ class _StoreStatementSurface extends StatefulWidget {
     required this.session,
     this.salesOnly = false,
     this.showNewSaleAction = true,
+    this.counterContent,
+    this.beforeSalesViewChange,
+    this.onPrepareCounter,
     this.onNewSale,
     this.onOpenOperation,
     super.key,
@@ -16738,6 +16778,9 @@ class _StoreStatementSurface extends StatefulWidget {
   final WorkSession session;
   final bool salesOnly;
   final bool showNewSaleAction;
+  final Widget? counterContent;
+  final Future<bool> Function()? beforeSalesViewChange;
+  final bool Function()? onPrepareCounter;
   final VoidCallback? onNewSale;
   final ValueChanged<_WorkspaceOperation>? onOpenOperation;
   @override
@@ -16961,6 +17004,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Object? _salesScope;
   bool _salesActionsExpanded = true;
   bool _salesManageOpen = false;
+  String _salesHubView = 'counter';
+  bool _changingSalesHubView = false;
   bool _salesManageBeforeReturns = false;
   final _salesCategories = <int>{};
   bool _returnSelection = false;
@@ -17014,7 +17059,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       return true;
     }
     if (_selectedInvoice == null && _salesManageOpen) {
-      setState(() => _salesManageOpen = false);
+      setState(() {
+        _salesManageOpen = false;
+        if (widget.counterContent != null) _salesHubView = 'records';
+      });
       return true;
     }
     if (_selectedInvoice == null) return false;
@@ -17028,18 +17076,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         if (widget.showNewSaleAction)
           (key: 'work-sales-new-counter-sale', label: hasDraft ? 'Resume sale' : 'Counter sale',
             guide: hasDraft ? 'Continue the saved draft.' : 'Choose goods and bill the customer.',
-            tap: widget.onNewSale == null ? null : () { setState(() => _salesManageOpen = false); widget.onNewSale!(); }),
+            tap: widget.counterContent != null ? () {
+                  if (widget.onPrepareCounter?.call() ?? false) unawaited(_selectSalesHubView('counter'));
+                }
+                : widget.onNewSale == null ? null : () { setState(() => _salesManageOpen = false); widget.onNewSale!(); }),
       ]),
       (title: 'Customer receipts & dues', guide: 'Outstanding bills and money received.', actions: [
-        (key: 'work-sales-dues', label: 'Collect dues', guide: 'Select the customer whose dues were paid.',
+        (key: 'work-sales-dues', label: 'Collect dues', guide: 'Record money received against a customer’s pending bills.',
           tap: widget.onOpenOperation == null ? null : () { setState(() => _salesManageOpen = false); widget.onOpenOperation!(_WorkspaceOperation.dues); }),
       ]),
       (title: 'Sales returns & exchange', guide: 'Returned goods, refunds and replacement sales.', actions: [
-        (key: 'work-sales-returns', label: 'Returns & refunds', guide: 'Find the original bill across all dates.', tap: _toggleReturnSelection),
+        (key: 'work-sales-returns', label: 'Returns & refunds', guide: 'Record returned goods or refund against the original bill.', tap: _toggleReturnSelection),
         (key: 'work-sales-exchange', label: 'Exchange', guide: 'Choose the original bill for the replacement.', tap: () => _toggleReturnSelection(exchange: true)),
       ]),
-      (title: 'Customer credits', guide: 'Available credit for the next purchase.', actions: [
-        (key: 'work-sales-customer-credit', label: 'Customer credit', guide: 'Choose available credit to start a sale.',
+      (title: 'Customer credits', guide: 'Use the customer’s available balance towards a sale.', actions: [
+        (key: 'work-sales-customer-credit', label: 'Use available credit', guide: 'Choose the customer and check their available credit.',
           tap: () { FocusScope.of(context).unfocus(); _openCustomerCredit(); }),
       ]),
       (title: 'Statements & documents', guide: 'Sales and collections · $_salesPeriodLabel', actions: [
@@ -17048,7 +17099,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       ]),
     ];
     return Material(key: const Key('work-sales-action-centre'), color: Colors.white, child: Column(children: [
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: SizedBox(width: double.infinity, child: Wrap(
+      if (widget.counterContent == null) Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: SizedBox(width: double.infinity, child: Wrap(
         alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center,
         spacing: 12, children: [
           const Text('Manage sales', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
@@ -17227,6 +17278,13 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 : '${payment.state.label}${payment.dueMinor > 0 ? ' · Due ₹${_formatStoreMinorAmount(payment.dueMinor)}' : ''}';
             final customer = _RecentCounterCustomer(invoice.customer, invoice.billingDetails);
             final pendingRefund = payment?.state == WorkspacePaymentState.refundPending;
+            final refundLedger = payment == null ? null : finance?.customerLedgers.where((ledger) =>
+              ledger.valid && ledger.accountScope == finance.accountScope &&
+              ledger.workspaceId == finance.workspaceId && ledger.customerId == payment.customerId).firstOrNull;
+            final availableRefund = refundLedger?.invoiceBalance(invoice.id)?.refundableMinor;
+            final displayStatus = pendingRefund
+                ? '$status · ${availableRefund != null ? 'Available refund ₹${_formatStoreMinorAmount(availableRefund)}' : 'Refund amount unavailable'}'
+                : status;
             final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(customer.mobile != null && customer.label == invoice.customer
                   ? 'Phone: ${invoice.customer}' : customer.label,
@@ -17270,7 +17328,8 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   Expanded(child: Semantics(label: 'Invoice No.: ${invoice.id}', excludeSemantics: true,
                     child: Tooltip(message: 'Invoice No.: ${invoice.id}', excludeFromSemantics: true,
                     triggerMode: TooltipTriggerMode.longPress,
-                    child: Text(invoice.id, key: ValueKey('work-sales-reference-${invoice.id}'),
+                    child: Text(invoice.id.length > 20 ? 'Ref …${invoice.id.substring(invoice.id.length - 12)}' : invoice.id,
+                      key: ValueKey('work-sales-reference-${invoice.id}'),
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 10, color: MoolColors.muted))))),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy),
@@ -17280,7 +17339,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                     const Icon(Icons.schedule_rounded, size: 14, color: MoolColors.navy),
                     const SizedBox(width: 4),
                   ],
-                  Expanded(child: Text(status, key: ValueKey('work-sales-status-${invoice.id}'),
+                  Expanded(child: Text(displayStatus, key: ValueKey('work-sales-status-${invoice.id}'),
                     style: TextStyle(fontSize: 11, fontWeight: pendingRefund ? FontWeight.w600 : FontWeight.w400,
                       color: pendingRefund || (payment != null && payment.dueMinor > 0) ? MoolColors.navy : MoolColors.muted))),
                 ]),
@@ -17334,15 +17393,79 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final salesScope = session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id;
+    if (widget.counterContent == null) return _buildSalesContent(context);
+    if (_salesScope != salesScope) {
+      _salesHubView = 'counter';
+      _buildSalesContent(context);
+    }
+    return Material(color: Colors.white, child: Column(children: [
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: LayoutBuilder(builder: (context, constraints) {
+          final switcher = SegmentedButton<String>(key: const Key('work-sales-switcher'),
+            showSelectedIcon: false,
+            emptySelectionAllowed: true,
+            expandedInsets: EdgeInsets.zero,
+            style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(48, 48))),
+            segments: const [
+              ButtonSegment(value: 'counter', label: Text('Counter sale', key: Key('work-sales-primary-counter-sale'))),
+              ButtonSegment(value: 'manage', label: Text('Manage sales', key: Key('work-sales-manage'))),
+            ], selected: _salesHubView == 'counter' ? {'counter'}
+                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? {'manage'} : {},
+            onSelectionChanged: (value) { if (value.isNotEmpty) unawaited(_selectSalesHubView(value.single)); });
+          final recorded = Semantics(selected: _salesHubView == 'records', child: TextButton.icon(
+            key: const Key('work-sales-recorded'),
+            onPressed: () => unawaited(_selectSalesHubView('records')),
+            icon: const Icon(Icons.receipt_long_outlined, size: 16),
+            label: Text('Recorded sales', style: TextStyle(fontWeight: _salesHubView == 'records' ? FontWeight.w700 : FontWeight.w400))));
+          if (constraints.maxWidth >= 620 && MediaQuery.textScalerOf(context).scale(14) <= 21) {
+            return Row(children: [Expanded(child: switcher), const SizedBox(width: 8), recorded]);
+          }
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            switcher, Align(alignment: Alignment.centerRight, child: recorded),
+          ]);
+        })),
+      Expanded(child: IndexedStack(sizing: StackFit.expand, index: _salesHubView == 'counter' ? 0 : 1, children: [
+        ExcludeFocus(excluding: _salesHubView != 'counter',
+          child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
+        _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context),
+      ])),
+    ]));
+  }
+
+  Future<void> _selectSalesHubView(String view) async {
+    if (_changingSalesHubView) return;
+    _changingSalesHubView = true;
+    final scope = (widget.session.activeWorkspace?.id, widget.session.workspaceFinance?.accountScope);
+    FocusScope.of(context).unfocus();
+    try {
+      if (!(await (widget.beforeSalesViewChange?.call() ?? Future.value(true))) || !mounted ||
+          scope != (widget.session.activeWorkspace?.id, widget.session.workspaceFinance?.accountScope)) {
+        return;
+      }
+      setState(() {
+        _salesHubView = view;
+        _selectedInvoice = null;
+        _returnSelection = false;
+        _exchangeSelection = false;
+        _salesManageOpen = view == 'manage';
+        if (view == 'manage') _salesCategories.addAll({0, 1, 2, 3, 4});
+      });
+    } finally { _changingSalesHubView = false; }
+  }
+
+  Widget _buildSalesContent(BuildContext context) {
+    final session = widget.session;
+    final salesScope = session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id;
     if (_salesScope != salesScope) {
       _salesScope = salesScope;
       _invoiceSearch.clear();
       _returnSelection = false;
       _exchangeSelection = false;
       _salesQueryBeforeReturns = '';
-      _salesManageOpen = false;
+      _salesManageOpen = widget.counterContent != null && _salesHubView == 'manage';
       _salesManageBeforeReturns = false;
       _salesCategories.clear();
+      if (_salesManageOpen) _salesCategories.addAll({0, 1, 2, 3, 4});
       _salesActionsExpanded = true;
       _invoicePeriod = 'Today';
       _invoiceRange = null;
@@ -17504,9 +17627,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               )),
             ]),
           );
-      return ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
-          if (!landscapeBand) searchControl,
-          if (!_returnSelection)
+      return ColoredBox(color: Colors.white, child: LayoutBuilder(builder: (context, viewport) => Column(key: const Key('work-store-statement'), children: [
+          if (!landscapeBand) ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: viewport.maxHeight * .4),
+            child: SingleChildScrollView(child: searchControl)),
+          if (!_returnSelection && widget.counterContent == null)
             Align(alignment: Alignment.centerLeft, child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -17531,9 +17656,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   onPressed: () { FocusScope.of(context).unfocus(); setState(() => _salesManageOpen = true); },
                   icon: const Icon(Icons.more_horiz_rounded, size: 18), label: const Text('Manage sales')),
               ]))),
+          if (!_returnSelection && !landscapeBand) const Align(alignment: Alignment.centerLeft,
+            child: Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Text('Recorded sales', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)))),
           Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl,
             inlineSearch: landscapeBand ? searchControl : null)),
-        ]));
+        ])));
     }
     final content = Column(
       key: const Key('work-store-statement'),
@@ -36788,10 +36916,17 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
       ),
     );
-    final errorText =
+    var errorText =
         widget.session.counterDraftError ??
         _error ??
         (widget.fullScreen ? widget.session.errorMessage : null);
+    // The shared Sales shell already announces session errors. Keep local
+    // draft/retry failures here, without repeating the same global message.
+    if (widget.session.counterDraftError == null &&
+        errorText == widget.session.errorMessage &&
+        context.findAncestorWidgetOfExactType<WorkPageScaffold>() != null) {
+      errorText = null;
+    }
     final error = errorText == null
         ? null
         : Padding(
