@@ -15851,15 +15851,16 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
               for (final item in category.$2)
                 if ((item.$1 != 'continue-bill' || (session.workspacePurchaseEntryDraft != null && !session.workspacePurchaseDraftReviewed)) &&
                     (item.$1 != 'continue-receive' || _receivingResumeIds.isNotEmpty))
-                Semantics(label: _categoryCopy(category.$1).$1, child: ListTile(key: Key('purchase-action-${item.$1}'), title: Text(item.$2,
+                DecoratedBox(decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: MoolColors.line, width: .5))),
+                child: Semantics(label: _categoryCopy(category.$1).$1, child: ListTile(key: Key('purchase-action-${item.$1}'), title: Text(item.$2,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
                     color: Theme.of(context).colorScheme.onSurface)),
                   contentPadding: const EdgeInsets.fromLTRB(24, 4, 16, 4),
-                  subtitle: Text(item.$3, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                  subtitle: Text(item.$3, style: const TextStyle(fontSize: 12, height: 1.25, color: MoolColors.muted)),
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: !_actionCentreOpen && !_purchaseActionPending && (session.workspaceSuppliersLoaded || item.$1 == 'record-bill' || item.$1 == 'continue-bill' || item.$1 == 'edit') && (item.$1 != 'stock' || widget.onOpenStock != null) &&
                     (item.$1 != 'record-bill' || session.workspacePurchaseEntryDraft == null || session.workspacePurchaseDraftReviewed)
-                    ? () => unawaited(_selectPurchaseAction(item.$1)) : null)),
+                    ? () => unawaited(_selectPurchaseAction(item.$1)) : null))),
               ]),
               ]),
           ];
@@ -15879,7 +15880,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       painter.layout(maxWidth: (width - 80).clamp(1, double.infinity));
       textHeight += painter.height + 4;
     }
-    final padding = _expandedCategories.contains(title) ? 16 : 32;
+    final padding = _expandedCategories.contains(title) ? 16 : 20;
     final height = (textHeight + padding).clamp(48, double.infinity).toDouble() + 1;
     painter.dispose();
     return height;
@@ -15911,12 +15912,44 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     return _purchaseCategoryExtent(context, width, title) + tallest + 2 <= height;
   }
 
-  Widget _actionCentreControls() => Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-    _actionCentreButton(),
-    if (_centreVisible) IconButton(tooltip: 'Back to recorded purchases',
-      onPressed: backWithinPurchases,
-      icon: const Icon(Icons.close, size: 18)),
-  ]);
+  Widget _actionCentreControls() => _actionCentreButton();
+
+  Widget _managementHeader() => Semantics(
+    key: const Key('work-purchase-management-state'), selected: true, expanded: true,
+    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: LayoutBuilder(builder: (context, constraints) {
+        const heading = Text('Manage purchases', key: Key('work-purchase-register-heading'),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy));
+        final back = Tooltip(message: 'Back to recorded purchases', child: TextButton.icon(
+          key: const Key('work-purchase-management-return'),
+          onPressed: backWithinPurchases,
+          style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 4), foregroundColor: MoolColors.navy),
+          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          label: const Text('Recorded purchases', style: TextStyle(fontSize: 12))));
+        return Row(children: [const Expanded(child: heading), const SizedBox(width: 8),
+          Flexible(child: back)]);
+      })));
+
+  Widget _purchaseSupplierAmount(String supplier, String amount) => LayoutBuilder(
+    builder: (context, constraints) {
+      const style = TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy);
+      final effectiveStyle = DefaultTextStyle.of(context).style.merge(style);
+      double width(String text) {
+        final painter = TextPainter(text: TextSpan(text: text, style: effectiveStyle),
+          textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+        final result = painter.width;
+        painter.dispose();
+        return result;
+      }
+      final name = Text(supplier, style: style, softWrap: true);
+      final total = Text(amount, style: style, textAlign: TextAlign.right, softWrap: true);
+      if (width(supplier) + width(amount) + 24 > constraints.maxWidth) {
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [name, const SizedBox(height: 4), total]);
+      }
+      return Row(children: [Expanded(child: name), const SizedBox(width: 24), total]);
+    });
 
   Widget _actionCentreButton() => Semantics(
     key: const Key('work-purchase-management-state'),
@@ -15929,7 +15962,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       side: const BorderSide(color: MoolColors.navy)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       const Flexible(child: Text('Manage purchases', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-      const SizedBox(width: 2), Icon(_centreVisible ? Icons.check : Icons.chevron_right, size: 16),
+      const SizedBox(width: 2), const Icon(Icons.chevron_right, size: 16),
     ])));
 
   static const _purchaseActions = [
@@ -16275,10 +16308,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     final savedCopies = session.workspacePurchaseCopies.where((c) => _purchaseFilter == 'All' &&
       terms.every('${c.supplier.name} ${c.supplier.phone} ${c.draft.invoiceReference} ${c.draft.invoiceDate}'
         .toLowerCase().contains)).toList()..sort((a, b) => b.savedAt.compareTo(a.savedAt));
-    return LayoutBuilder(builder: (context, constraints) => KeyedSubtree(
-      key: const Key('purchase-action-category-scroll'), child: Column(children: [
+    return Column(children: [
       SizedBox(key: _centreVisible ? const Key('work-purchase-action-centre') : const Key('work-purchase-action-centre-closed'), height: 0),
-      Expanded(child: CustomScrollView(
+      if (_centreVisible) _managementHeader(),
+      Expanded(child: LayoutBuilder(builder: (context, constraints) => KeyedSubtree(
+      key: const Key('purchase-action-category-scroll'), child: CustomScrollView(
       key: PageStorageKey('work-purchases-$storeId-$statement-${_centreVisible ? 'management' : 'register'}'),
       primary: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -16346,12 +16380,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             ),
           ]),
         )),
-        SliverToBoxAdapter(child: Padding(
+        if (!_centreVisible) SliverToBoxAdapter(child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: LayoutBuilder(builder: (context, constraints) {
-            final heading = Text(_centreVisible ? 'Manage purchases' : 'Recorded purchases',
-              key: const Key('work-purchase-register-heading'),
-              style: const TextStyle(fontSize: 13,
+            const heading = Text('Recorded purchases',
+              key: Key('work-purchase-register-heading'),
+              style: TextStyle(fontSize: 13,
                 fontWeight: FontWeight.w700, color: MoolColors.navy));
             if (constraints.maxWidth < MediaQuery.textScalerOf(context).scale(320)) {
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -16420,13 +16454,17 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   setState(() => _savedCopy = copy);
                 }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    _StoreMoneyLine(alignAmountToEnd: true,
-                      leading: Text(copy.supplier.name, style: const TextStyle(fontSize: 13,
-                        fontWeight: FontWeight.w700, color: MoolColors.navy)),
-                      value: amount == null ? 'Total not entered' : 'Bill total ${_purchaseAmount(amount)}',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-                    Text('Invoice ${copy.draft.invoiceReference} · ${copy.draft.invoiceDate}',
+                    _purchaseSupplierAmount(copy.supplier.name,
+                      amount == null ? 'Total not entered' : 'Bill total ${_purchaseAmount(amount)}'),
+                    Text('Invoice ${copy.draft.invoiceReference}',
                       style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                    Text('Invoice date ${copy.draft.invoiceDate}',
+                      style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                    if (session.workspacePurchaseCopies.any((other) => other.draft.id == copy.draft.id && other.revision > copy.revision))
+                      Text('Earlier revision ${copy.revision} — not a separate purchase',
+                        style: const TextStyle(fontSize: 11, color: MoolColors.ink))
+                    else if (session.workspacePurchaseCopies.any((other) => other.draft.id == copy.draft.id && other.revision < copy.revision))
+                      const Text('Latest saved entry', style: TextStyle(fontSize: 11, color: MoolColors.ink)),
                     const SizedBox(height: 4),
                     Row(children: [Expanded(child: Text(postingStatus,
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: MoolColors.ink))),
@@ -16449,12 +16487,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                   },
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      _StoreMoneyLine(
-                        alignAmountToEnd: true,
-                        leading: Text(record.supplierName, style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
-                        value: _purchaseAmount(record.amountMinor),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: MoolColors.navy)),
+                      _purchaseSupplierAmount(record.supplierName, _purchaseAmount(record.amountMinor)),
                       Text('${_registerDate(record.createdAt)} · ${record.orderId}',
                           style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
                       if (record.invoiceReference?.isNotEmpty == true)
@@ -16496,8 +16529,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           }, childCount: visible.length + savedCopies.length + 1)),
         ),
       ],
-    )),
-    ])));
+    )))),
+    ]);
   }
 }
 

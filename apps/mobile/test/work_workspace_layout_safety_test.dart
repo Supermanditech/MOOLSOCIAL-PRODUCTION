@@ -3613,6 +3613,16 @@ void main() {
     final group = find.byKey(ValueKey('purchase-category-group-$category'), skipOffstage: false);
     await Scrollable.ensureVisible(tester.element(group));
     await tester.pumpAndSettle();
+    final viewport = find.byKey(const Key('purchase-action-category-scroll'));
+    final bounds = tester.getRect(viewport), target = tester.getRect(heading);
+    final scroll = tester.state<ScrollableState>(find.descendant(of: viewport,
+      matching: find.byType(Scrollable)).first).position;
+    if (target.top < bounds.top || target.bottom > bounds.bottom) {
+      scroll.jumpTo((scroll.pixels + target.top - bounds.top)
+        .clamp(scroll.minScrollExtent, scroll.maxScrollExtent));
+      await tester.pumpAndSettle();
+    }
+    expect(heading.hitTestable(), findsOneWidget);
     await tester.tap(heading);
     await tester.pumpAndSettle();
   }
@@ -3662,6 +3672,10 @@ void main() {
       await tester.tap(manage);
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(heading).data, 'Manage purchases');
+      expect(find.text('Manage purchases'), findsOneWidget,
+        reason: 'The current view must have one heading, not a duplicate active button.');
+      expect(find.byIcon(Icons.check), findsNothing);
+      expect(find.byKey(const Key('work-purchase-management-return')).hitTestable(), findsOneWidget);
       expect(search, findsNothing);
       expect(find.byKey(const Key('work-purchase-filter-all')), findsNothing);
       final state = tester.widget<Semantics>(find.byKey(const Key('work-purchase-management-state')));
@@ -3669,6 +3683,11 @@ void main() {
       expect(state.properties.expanded, isTrue);
       expect(find.text('Purchase invoices'), findsOneWidget);
       expect(find.text('No linked supplier deliveries'), findsNothing);
+      final headerTop = tester.getTopLeft(heading).dy;
+      await tester.drag(find.byKey(const Key('purchase-action-category-scroll')), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(heading).dy, headerTop);
+      expect(find.byKey(const Key('work-purchase-management-return')).hitTestable(), findsOneWidget);
       await tester.tap(find.byTooltip('Back to recorded purchases'));
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(heading).data, 'Recorded purchases');
@@ -3745,9 +3764,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.descendant(of: row, matching: find.text(total.isEmpty
         ? 'Total not entered' : 'Bill total ₹1,23,456.78')), findsOneWidget);
-      expect(find.descendant(of: row, matching: find.text('Invoice HOST-ROW-01 · 30/09/2026')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Invoice HOST-ROW-01')), findsOneWidget);
+      expect(find.descendant(of: row, matching: find.text('Invoice date 30/09/2026')), findsOneWidget);
       expect(find.descendant(of: row, matching: find.byTooltip('Saved 30/09/2026 · Revision 7')), findsOneWidget);
       expect(find.descendant(of: row, matching: find.textContaining('Revision')), findsNothing);
+      final name = find.descendant(of: row, matching: find.text(supplier.name));
+      final totalText = find.descendant(of: row, matching: find.text(total.isEmpty
+        ? 'Total not entered' : 'Bill total ₹1,23,456.78'));
+      expect(tester.getRect(totalText).top, greaterThan(tester.getRect(name).bottom),
+        reason: 'Full scaled supplier name and amount must be separated when they cannot fit one row.');
       expect(jsonEncode(entry.value!.toJson()), before);
       if (total.isNotEmpty) {
         final stock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
@@ -3812,6 +3837,50 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('P01-AC01 earlier revisions remain accessible without appearing as another purchase', (tester) async {
+    // Host-only revision fixture; no runtime records or balances injected.
+    final entry = _PurchaseEntryFixtureStore();
+    final work = manualPurchaseFixture(entry);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openPurchaseList(tester);
+    final scope = work.workspaceSupplierScope!;
+    final at = DateTime.utc(2026, 10, 6);
+    final supplier = WorkspaceSupplierProfile(id: 'host-history-supplier', name: 'Host history supplier',
+      createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'host-history-draft', supplierId: supplier.id,
+      invoiceReference: 'HOST-HISTORY-01', invoiceDate: '06/10/2026', createdAt: at, updatedAt: at,
+      goods: const [], details: const {'invoiceTotal': '80'});
+    final earlier = WorkspacePurchaseSavedCopy(id: 'host-history-old', storeName: 'Evaluation Store',
+      revision: 1, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    final latest = WorkspacePurchaseSavedCopy(id: 'host-history-new', storeName: 'Evaluation Store',
+      revision: 3, savedAt: at.add(const Duration(minutes: 2)), supplier: supplier, draft: draft, labels: const {});
+    final middle = WorkspacePurchaseSavedCopy(id: 'host-history-middle', storeName: 'Evaluation Store',
+      revision: 2, savedAt: at.add(const Duration(minutes: 1)), supplier: supplier, draft: draft, labels: const {});
+    entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+      revision: 3, profiles: [supplier], draft: draft, copies: [earlier, middle, latest]);
+    await work.loadWorkspaceSuppliers(retry: true);
+    await tester.pumpAndSettle();
+    final before = jsonEncode(entry.value!.toJson());
+    final latestRow = find.byKey(const ValueKey('work-purchase-copy-host-history-new'));
+    await tester.ensureVisible(latestRow);
+    expect(find.descendant(of: latestRow, matching: find.text('Latest saved entry')), findsOneWidget);
+    final middleRow = find.byKey(const ValueKey('work-purchase-copy-host-history-middle'));
+    await tester.ensureVisible(middleRow);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: middleRow,
+      matching: find.text('Earlier revision 2 — not a separate purchase')), findsOneWidget);
+    expect(find.descendant(of: middleRow, matching: find.text('Latest saved entry')), findsNothing);
+    final oldRow = find.byKey(const ValueKey('work-purchase-copy-host-history-old'));
+    await tester.ensureVisible(oldRow);
+    await tester.pumpAndSettle();
+    expect(find.descendant(of: oldRow,
+      matching: find.text('Earlier revision 1 — not a separate purchase')), findsOneWidget);
+    expect(oldRow.hitTestable(), findsOneWidget);
+    expect(work.workspacePurchaseCopies.map((copy) => copy.id), containsAll([earlier.id, latest.id]));
+    expect(jsonEncode(entry.value!.toJson()), before);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final geometry in [(const Size(320, 568), 2.0), (const Size(806, 360), 1.6)]) {
     testWidgets('P01-AC01 V09 expanded category context follows scroll $geometry', (tester) async {
