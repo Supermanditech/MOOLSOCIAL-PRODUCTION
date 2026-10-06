@@ -3708,6 +3708,111 @@ void main() {
     });
   }
 
+  for (final geometry in [(const Size(360, 806), 1.0), (const Size(320, 568), 2.0),
+      (const Size(806, 360), 1.6)]) {
+    testWidgets('P01-AC01 INLINE-RETURN01 preserves exact register bookmark $geometry', (tester) async {
+      // Host-only navigation fixture; no device records or accounting postings injected.
+      final entry = _PurchaseEntryFixtureStore();
+      final work = manualPurchaseFixture(entry);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: geometry.$1, textScale: geometry.$2);
+      await openPurchaseList(tester);
+      final scope = work.workspaceSupplierScope!;
+      final at = DateTime.utc(2026, 10, 6);
+      final supplier = WorkspaceSupplierProfile(id: 'host-return-supplier', name: 'Host return supplier',
+        createdAt: at, updatedAt: at);
+      final copies = List.generate(12, (index) {
+        final draft = WorkspacePurchaseEntryDraft(id: 'host-return-draft-$index', supplierId: supplier.id,
+          invoiceReference: 'HOST-RETURN-$index', invoiceDate: '06/10/2026', createdAt: at, updatedAt: at,
+          goods: [{'name': 'Host rice', 'pack': '1 kg', 'quantity': '1', 'cost': '80', 'productId': ''}],
+          details: const {'invoiceTotal': '80'});
+        return WorkspacePurchaseSavedCopy(id: 'host-return-copy-$index', storeName: 'Evaluation Store',
+          revision: index + 1, savedAt: at.add(Duration(minutes: index)), supplier: supplier, draft: draft, labels: const {});
+      });
+      entry.value = WorkspacePurchaseEntryBook(account: scope.$1, store: scope.$2, qa: scope.$3,
+        revision: 12, profiles: [supplier], copies: copies);
+      await work.loadWorkspaceSuppliers(retry: true);
+      await tester.pumpAndSettle();
+      final before = jsonEncode(entry.value!.toJson());
+      final stock = jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+      final movements = List<WorkspaceStockMovement>.of(work.workspaceStockMovements);
+      ScrollPosition position() => tester.state<ScrollableState>(find.descendant(
+        of: find.byKey(const Key('purchase-action-category-scroll')), matching: find.byType(Scrollable)).first).position;
+      final search = find.byKey(const Key('work-purchase-search'));
+      await tester.enterText(search, 'Host return');
+      final searchController = tester.widget<TextField>(search).controller!;
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final manage = find.byKey(const Key('work-purchase-action-centre-open'));
+      await tester.ensureVisible(manage);
+      await tester.pumpAndSettle();
+      position().jumpTo(position().pixels + 20);
+      await tester.pumpAndSettle();
+      expect(manage.hitTestable(), findsOneWidget);
+      final bookmark = position().pixels;
+      expect(bookmark, greaterThan(0));
+      for (final systemBack in [true, false]) {
+        await tester.tap(manage);
+        await tester.pumpAndSettle();
+        await expandPurchaseActionCategory(tester, 'Supplier accounts & documents');
+        await revealPurchaseAction(tester, find.byKey(const Key('purchase-action-documents')));
+        if (position().maxScrollExtent > 0) {
+          position().jumpTo(position().maxScrollExtent);
+          await tester.pumpAndSettle();
+          expect(position().pixels, greaterThan(0));
+        }
+        if (systemBack) {
+          await tester.binding.handlePopRoute();
+        } else {
+          await tester.tap(find.byKey(const Key('work-purchase-management-return')));
+        }
+        await tester.pumpAndSettle();
+        expect(position().pixels, closeTo(bookmark, .1),
+          reason: 'Deep management scrolling must not replace the register bookmark.');
+        expect(searchController.text, 'Host return');
+        expect(work.workspaceSupplierScope, scope);
+        expect(find.byKey(const Key('work-purchase-action-centre')), findsNothing);
+      }
+      // Offset assertions above precede revealing lazily built register controls.
+      position().jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(search);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).controller!.text, 'Host return');
+      await tester.ensureVisible(manage);
+      await tester.pumpAndSettle();
+      final cancelBookmark = position().pixels;
+      await tester.tap(manage);
+      await tester.pumpAndSettle();
+      await expandPurchaseActionCategory(tester, 'Supplier bills');
+      final newBill = find.byKey(const Key('purchase-action-record-bill'));
+      await revealPurchaseAction(tester, newBill);
+      await tester.tap(newBill);
+      await tester.pumpAndSettle();
+      final cancel = find.widgetWithText(TextButton, 'Cancel');
+      await revealPurchaseInput(tester, cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(position().pixels, closeTo(cancelBookmark, .1));
+      final row = find.byKey(const ValueKey('work-purchase-copy-host-return-copy-11'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final copyBookmark = position().pixels;
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-purchase-saved-copy')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-purchase-copy-close')));
+      await tester.pumpAndSettle();
+      expect(position().pixels, closeTo(copyBookmark, .1));
+      expect(row.hitTestable(), findsOneWidget);
+      expect(jsonEncode(entry.value!.toJson()), before);
+      expect(jsonEncode(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), stock);
+      expect(work.workspaceStockMovements, movements);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('P01-AC01 V01 management entry has a visible button affordance', (tester) async {
     final entry = _PurchaseEntryFixtureStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: manualPurchaseFixture(entry), textScale: 1);

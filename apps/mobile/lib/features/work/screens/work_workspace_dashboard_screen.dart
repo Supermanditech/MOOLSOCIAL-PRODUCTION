@@ -15541,6 +15541,29 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   String? _receivingSupplierId;
   WorkspacePurchaseSavedCopy? _returnReceivingCopy;
   Object? _surfaceScope;
+  double _registerBookmark = 0;
+  int _registerBookmarkEpoch = 0;
+  final _registerPositionEpochs = <ScrollPosition, int>{};
+  late final ScrollController _registerScroll = ScrollController(
+    keepScrollOffset: false,
+    onDetach: (position) {
+      if (_registerPositionEpochs.remove(position) == _registerBookmarkEpoch && position.hasPixels) {
+        _registerBookmark = position.pixels;
+      }
+    },
+    onAttach: (position) {
+      final scope = session.workspaceSupplierScope;
+      final epoch = _registerBookmarkEpoch;
+      _registerPositionEpochs[position] = epoch;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || epoch != _registerBookmarkEpoch || scope != session.workspaceSupplierScope ||
+            !_registerScroll.positions.contains(position) || !position.hasContentDimensions) {
+          return;
+        }
+        position.jumpTo(_registerBookmark.clamp(position.minScrollExtent, position.maxScrollExtent));
+      });
+    },
+  );
   bool _newPurchase = false;
   WorkspacePurchaseSavedCopy? _savedCopy;
 
@@ -15564,6 +15587,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 
   @override
   void dispose() {
+    _registerScroll.dispose();
     _purchaseSearch.dispose();
     _purchaseSearchFocus.removeListener(_refreshPurchaseSearch);
     _purchaseSearchFocus.dispose();
@@ -16011,6 +16035,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     if (_storeId != storeId || _surfaceScope != session.workspaceSupplierScope || !identical(_purchaseHistory, history)) {
       _storeId = storeId;
       _surfaceScope = session.workspaceSupplierScope;
+      _registerBookmark = 0;
+      ++_registerBookmarkEpoch;
       _lastViewedId = null;
       _showedDetails = false;
       _purchaseHistory = history;
@@ -16317,7 +16343,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       if (_centreVisible) _managementHeader(),
       Expanded(child: LayoutBuilder(builder: (context, constraints) => KeyedSubtree(
       key: const Key('purchase-action-category-scroll'), child: CustomScrollView(
-      key: PageStorageKey('work-purchases-$storeId-$statement-${_centreVisible ? 'management' : 'register'}'),
+      key: PageStorageKey('work-purchases-$storeId-$statement-$_registerBookmarkEpoch-${_centreVisible ? 'management' : 'register'}'),
+      controller: _centreVisible ? null : _registerScroll,
       primary: false,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
