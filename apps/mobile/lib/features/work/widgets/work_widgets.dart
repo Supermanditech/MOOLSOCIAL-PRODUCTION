@@ -635,6 +635,7 @@ class WorkPageScaffold extends StatelessWidget {
     this.contextualDestinationLabel,
     this.manageSystemBack = true,
     this.hideNavigationWhenKeyboardVisible = false,
+    this.showBottomNavigation = true,
     this.navigationOverBody = false,
     this.resizeToAvoidBottomInset = true,
     this.beforeExternalNavigation,
@@ -663,6 +664,7 @@ class WorkPageScaffold extends StatelessWidget {
   final String? contextualDestinationLabel;
   final bool manageSystemBack;
   final bool hideNavigationWhenKeyboardVisible;
+  final bool showBottomNavigation;
   final bool navigationOverBody;
   final bool resizeToAvoidBottomInset;
   final Future<bool> Function()? beforeExternalNavigation;
@@ -765,7 +767,7 @@ class WorkPageScaffold extends StatelessWidget {
 
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final showNavigation =
-        !hideNavigationWhenKeyboardVisible || !keyboardVisible;
+        showBottomNavigation && (!hideNavigationWhenKeyboardVisible || !keyboardVisible);
     final navigation = MoolDestinationNavigationV2(
       activeId: 'work',
       destinationLabel: contextualDestinationLabel ?? 'Work',

@@ -662,6 +662,14 @@ class _WorkWorkspaceDashboardScreenState
   bool _purchaseNavigationPending = false;
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
+  String? _salesTask;
+  String get _salesTaskTitle => switch (_salesTask) {
+    'counter' => 'Counter sale',
+    'manage' => 'Manage sales',
+    'records' => 'Recorded sales',
+    _ => 'Sales',
+  };
+  Object? _salesTaskScope;
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
@@ -1220,6 +1228,13 @@ class _WorkWorkspaceDashboardScreenState
     final salesOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.sales;
+    final salesTaskScope = session.workspaceStockHistoryScope()?.key ?? workspace.id;
+    if (_salesTaskScope != salesTaskScope) {
+      _salesTaskScope = salesTaskScope;
+      _salesTask = null;
+    }
+    final salesTaskOpen = salesOpen && _salesTask != null ||
+        _view == _WorkspaceControlView.operation && _operationReturnOperation == _WorkspaceOperation.sales;
     final procurementOpen = _view == _WorkspaceControlView.procurement;
     final ordersContext =
         (_view == _WorkspaceControlView.operation &&
@@ -1377,12 +1392,18 @@ class _WorkWorkspaceDashboardScreenState
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
           ? double.infinity : MoolMetrics.maximumContentWidth,
-      headerHeight: compactSettings
+      showBottomNavigation: !salesTaskOpen,
+      headerHeight: salesTaskOpen
+          ? MediaQuery.textScalerOf(context).scale(18).clamp(48, 72)
+          : compactSettings
           ? 64
           : storeRootSurface
           ? storeHeaderHeight
           : 88,
-      headerTitle: compactSettings
+      headerTitle: salesTaskOpen
+          ? Text(salesOpen ? _salesTaskTitle : title, key: const Key('work-sales-task-heading'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))
+          : compactSettings
           ? Row(
               children: [
                 if (_view == _WorkspaceControlView.operation)
@@ -1543,7 +1564,7 @@ class _WorkWorkspaceDashboardScreenState
           : null,
       fallbackBackRoute: '/app/work/earn',
       activeLocalAction: 'workspace',
-      showBack: !storeRootSurface,
+      showBack: salesTaskOpen || !storeRootSurface,
       showHeaderChat: false,
       showTrailingAction: false,
       contextualDestinationLabel: 'Store',
@@ -1580,6 +1601,8 @@ class _WorkWorkspaceDashboardScreenState
                 ? _StoreStatementSurface(
                     key: _salesKey,
                     session: session,
+                    onSalesTaskChanged: (task) => setState(() => _salesTask = task),
+                    initialSalesTask: _salesTask ?? 'home',
                     salesOnly: true,
                     showNewSaleAction: true,
                     counterContent: session.workspaceOrderSource == 'Counter' &&
@@ -2608,9 +2631,15 @@ class _WorkWorkspaceDashboardScreenState
     if (!exitSale &&
         (_operation == _WorkspaceOperation.counterOrder ||
             (_operation == _WorkspaceOperation.sales &&
-                _salesKey.currentState?._salesHubView == 'counter')) &&
+                _salesKey.currentState?._salesHubView == 'counter' &&
+                _counterKey.currentState?._stage != 'items')) &&
         await (_counterKey.currentState?.backWithinSale() ??
             Future.value(false))) {
+      return;
+    }
+    if (_operation == _WorkspaceOperation.sales && _salesTask != null) {
+      if (!await (_counterKey.currentState?.flushForNavigation() ?? Future.value(true)) || !mounted) return;
+      _salesKey.currentState?.showSalesHome();
       return;
     }
     if ((_operation == _WorkspaceOperation.sourcing ||
@@ -8235,7 +8264,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                 if (!widget.counterAppearance) ...[
                   Text('Invoice No.: ${invoice.id}',
                       key: const Key('work-invoice-visible-reference'),
-                      style: TextStyle(fontSize: widget.salesPresentation ? 10 : 12,
+                      style: TextStyle(fontSize: 12,
                           height: widget.salesPresentation ? 1.3 : null, color: MoolColors.muted)),
                   Text('Invoice date: $invoiceDate',
                       key: const Key('work-invoice-visible-date'),
@@ -8351,6 +8380,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                   if (payment != null) _recordedPayments(payment),
                   ExpansionTile(
                     key: const Key('work-invoice-details'),
+                    dense: widget.salesPresentation,
+                    minTileHeight: widget.salesPresentation ? 48 : null,
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: const EdgeInsets.only(bottom: 12),
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -8388,7 +8419,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       label: const Text('Returns & refunds'),
                     ),
                   ),
-                if (!adjusted && session.workspaceOrders.any(
+                if (!widget.salesPresentation && !adjusted && session.workspaceOrders.any(
                   (order) =>
                       order.id == invoice.orderId &&
                       order.source == 'Counter' &&
@@ -16797,6 +16828,8 @@ class _StoreStatementSurface extends StatefulWidget {
     this.salesOnly = false,
     this.showNewSaleAction = true,
     this.counterContent,
+    this.onSalesTaskChanged,
+    this.initialSalesTask = 'home',
     this.beforeSalesViewChange,
     this.onPrepareCounter,
     this.onNewSale,
@@ -16807,6 +16840,8 @@ class _StoreStatementSurface extends StatefulWidget {
   final bool salesOnly;
   final bool showNewSaleAction;
   final Widget? counterContent;
+  final ValueChanged<String?>? onSalesTaskChanged;
+  final String initialSalesTask;
   final Future<bool> Function()? beforeSalesViewChange;
   final bool Function()? onPrepareCounter;
   final VoidCallback? onNewSale;
@@ -17032,7 +17067,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Object? _salesScope;
   bool _salesActionsExpanded = true;
   bool _salesManageOpen = false;
-  String _salesHubView = 'counter';
+  late String _salesHubView = widget.initialSalesTask;
   bool _changingSalesHubView = false;
   bool _salesManageBeforeReturns = false;
   final _salesCategories = <int>{};
@@ -17086,7 +17121,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _toggleReturnSelection();
       return true;
     }
-    if (_selectedInvoice == null && _salesManageOpen) {
+    if (_selectedInvoice == null && _salesManageOpen && widget.onSalesTaskChanged == null) {
       setState(() {
         _salesManageOpen = false;
         if (widget.counterContent != null) _salesHubView = 'records';
@@ -17144,23 +17179,38 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               if (index != 0 || widget.counterContent == null)
               Semantics(key: Key('work-sales-category-state-$index'), button: true, expanded: _salesCategories.contains(index), child: ListTile(
                 key: Key('work-sales-category-$index'), minTileHeight: 48,
-                visualDensity: VisualDensity.compact,
+                dense: true, minVerticalPadding: 0,
+                visualDensity: VisualDensity.standard,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 onTap: () => setState(() { if (!_salesCategories.add(index)) _salesCategories.remove(index); }),
-                title: Text(categories[index].title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                title: Text(categories[index].title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy)),
                 subtitle: _salesCategories.contains(index) ? null
                     : Text(categories[index].guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
                 trailing: Icon(_salesCategories.contains(index) ? Icons.expand_less : Icons.expand_more, color: MoolColors.navy),
               )),
               if (_salesCategories.contains(index) || index == 0 && widget.counterContent != null)
                 for (final action in categories[index].actions)
-                  ListTile(key: Key(action.key), minTileHeight: 48,
-                    visualDensity: VisualDensity.compact,
-                    contentPadding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
-                    enabled: action.tap != null, onTap: action.tap,
-                    title: Text(action.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: MoolColors.ink)),
-                    subtitle: Text(action.guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy)),
+                  if (index == 0 && widget.counterContent != null)
+                    Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                      key: Key(action.key), onPressed: action.tap,
+                      style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                        visualDensity: VisualDensity.standard,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        textStyle: const TextStyle(fontSize: 11)),
+                      icon: const Icon(Icons.edit_note_rounded, size: 16), label: Text(action.label)))
+                  else InkWell(key: Key(action.key), onTap: action.tap,
+                    child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48),
+                      child: Padding(padding: const EdgeInsets.fromLTRB(24, 5, 16, 5),
+                        child: Row(children: [
+                          Expanded(child: Column(mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(action.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: MoolColors.ink)),
+                              const SizedBox(height: 2),
+                              Text(action.guide, style: const TextStyle(fontSize: 11, height: 1.2, color: MoolColors.muted)),
+                            ])),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy),
+                        ])))),
               const Divider(height: 1, thickness: .5),
             ]),
         ])),
@@ -17307,7 +17357,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             final candidates = payments[(invoice.orderId, invoice.id)] ?? const <WorkspacePaymentRecord>[];
             final payment = candidates.length == 1 ? candidates.single : null;
             final status = payment == null ? 'Payment status unavailable'
-                : '${payment.state.label}${payment.dueMinor > 0 ? ' · Due ₹${_formatStoreMinorAmount(payment.dueMinor)}' : ''}';
+                : payment.dueMinor > 0 && payment.state.label == 'Payment due'
+                    ? 'Amount due ₹${_formatStoreMinorAmount(payment.dueMinor)}'
+                    : '${payment.state.label}${payment.dueMinor > 0 ? ' · Due ₹${_formatStoreMinorAmount(payment.dueMinor)}' : ''}';
             final customer = _RecentCounterCustomer(invoice.customer, invoice.billingDetails);
             final pendingRefund = payment?.state == WorkspacePaymentState.refundPending;
             final refundLedger = payment == null ? null : finance?.customerLedgers.where((ledger) =>
@@ -17427,28 +17479,40 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     final salesScope = session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id;
     if (widget.counterContent == null) return _buildSalesContent(context);
     if (_salesScope != salesScope) {
-      _salesHubView = 'counter';
+      _salesHubView = _salesScope == null ? widget.initialSalesTask : 'home';
       _buildSalesContent(context);
     }
-    return Material(color: Colors.white, child: Column(children: [
-      Expanded(child: IndexedStack(sizing: StackFit.expand, index: _salesHubView == 'counter' ? 0 : 1, children: [
+    return Material(color: Colors.white,
+      child: IndexedStack(sizing: StackFit.expand,
+        index: _salesHubView == 'home' ? 2 : _salesHubView == 'counter' ? 0 : 1, children: [
         ExcludeFocus(excluding: _salesHubView != 'counter',
           child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
-        _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context),
-      ])),
-      _StoreBottomActionShelf(key: const Key('work-sales-switcher'),
-        keyPrefix: 'work-sales-navigation', equalWidthActions: true,
-        actions: [
+        _salesHubView == 'counter' || _salesHubView == 'home' ? const SizedBox.shrink() : _buildSalesContent(context),
+        SingleChildScrollView(key: const Key('work-sales-home'),
+          child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
           for (final route in const [
-            (view: 'counter', key: 'work-sales-primary-counter-sale', label: 'Counter sale', icon: Icons.point_of_sale_outlined),
-            (view: 'manage', key: 'work-sales-manage', label: 'Manage sales', icon: Icons.tune_rounded),
-            (view: 'records', key: 'work-sales-recorded', label: 'Recorded sales', icon: Icons.receipt_long_outlined),
-          ]) _StoreEdgeAction(keyName: route.key, label: route.label, icon: route.icon,
-            selected: route.view == (_salesHubView == 'counter' ? 'counter'
-                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? 'manage' : 'records'),
-            wrapLabel: true, onTap: () => unawaited(_selectSalesHubView(route.view))),
-        ]),
-    ]));
+            (view: 'counter', key: 'work-sales-primary-counter-sale', label: 'Counter sale',
+              guide: 'Choose goods and prepare a customer bill.', icon: Icons.point_of_sale_outlined),
+            (view: 'manage', key: 'work-sales-manage', label: 'Manage sales',
+              guide: 'Customer receipts, returns, credits and statements.', icon: Icons.tune_rounded),
+            (view: 'records', key: 'work-sales-recorded', label: 'Recorded sales',
+              guide: 'Open saved bills and check payments or returns.', icon: Icons.receipt_long_outlined),
+          ]) Padding(padding: const EdgeInsets.only(bottom: 8), child: ListTile(
+            key: Key(route.key), minTileHeight: 64, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            leading: Icon(route.icon, color: MoolColors.navy),
+            title: Text(route.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            subtitle: Text(route.guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: MoolColors.navy),
+            shape: RoundedRectangleBorder(side: const BorderSide(color: MoolColors.line), borderRadius: BorderRadius.circular(8)),
+            onTap: () => unawaited(_selectSalesHubView(route.view)),
+          )),
+        ]))),
+      ]));
+  }
+
+  void showSalesHome() {
+    setState(() { _salesHubView = 'home'; _salesManageOpen = false; });
+    widget.onSalesTaskChanged?.call(null);
   }
 
   Future<void> _selectSalesHubView(String view) async {
@@ -17469,6 +17533,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         _salesManageOpen = view == 'manage';
         if (view == 'manage') _salesCategories.addAll({0, 1, 2, 3, 4});
       });
+      widget.onSalesTaskChanged?.call(view);
     } finally { _changingSalesHubView = false; }
   }
 
@@ -19874,19 +19939,15 @@ class _StoreEdgeAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.selected = false,
-    this.wrapLabel = false,
   });
   final String keyName, label;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool selected, wrapLabel;
 
   @override
   Widget build(BuildContext context) => Semantics(
     key: Key('$keyName-state'),
     button: true,
-    selected: selected ? true : wrapLabel ? false : null,
     label: label,
     enabled: onTap != null,
     onTap: onTap,
@@ -19897,8 +19958,7 @@ class _StoreEdgeAction extends StatelessWidget {
         color: Colors.transparent,
         child: Ink(
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFF0F1F7) : Colors.white,
-            border: selected ? Border.all(color: MoolColors.navy) : null,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(9),
           ),
           child: InkWell(
@@ -19918,10 +19978,7 @@ class _StoreEdgeAction extends StatelessWidget {
                   Icon(icon, size: 15, color: onTap == null
                       ? MoolColors.muted : MoolColors.navy),
                   const SizedBox(width: 5),
-                  if (wrapLabel) Flexible(child: Text(label, textAlign: TextAlign.center, style: TextStyle(
-                    fontSize: 11, height: 1.25, fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: onTap == null ? MoolColors.muted : MoolColors.navy,
-                  ))) else Text(label, softWrap: false, style: TextStyle(
+                  Text(label, softWrap: false, style: TextStyle(
                     fontSize: 11, height: 1.25, fontWeight: FontWeight.w600,
                     color: onTap == null ? MoolColors.muted : MoolColors.navy,
                   )),
@@ -20095,27 +20152,20 @@ class _StockQuickActionsFrame extends StatelessWidget {
   );
 }
 
-/// Shared Stock-style shelf. Sales supplies three always-visible view routes;
-/// Stock retains its horizontal action list and original collapse control.
+/// Stock shelf retains its horizontal action list and original collapse control.
 class _StoreBottomActionShelf extends StatelessWidget {
-  const _StoreBottomActionShelf({super.key, required this.keyPrefix,
-    required this.actions, this.height, this.toggle, this.equalWidthActions = false});
+  const _StoreBottomActionShelf({required this.keyPrefix,
+    required this.actions, this.height, this.toggle});
   final String keyPrefix;
   final List<Widget> actions;
   final double? height;
   final Widget? toggle;
-  final bool equalWidthActions;
 
   @override
   Widget build(BuildContext context) => Container(
     key: Key('$keyPrefix-actions-panel'), height: height, color: Colors.white,
     child: Row(children: [
-      if (equalWidthActions) Expanded(child: Padding(
-        key: Key('$keyPrefix-entry-controls'),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-        child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [for (final action in actions) Expanded(child: action)])),
-      )) else Expanded(child: SingleChildScrollView(
+      Expanded(child: SingleChildScrollView(
         key: Key('$keyPrefix-entry-controls'), scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(children: [for (final action in actions)
@@ -35463,6 +35513,10 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
             Text('Received ${_purchaseAmount(payment.paidMinor)}',
                 style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+            if (payment.dueMinor > 0) Padding(padding: const EdgeInsets.only(top: 4),
+              child: Text('Record money received against this bill to update customer dues.',
+                key: const Key('work-counter-handover-hint'),
+                style: const TextStyle(fontSize: 11, height: 1.2, color: MoolColors.muted))),
           ] else if (!orderDetails) Text(
             'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           ),
@@ -35538,11 +35592,6 @@ const _counterSaleHeaderGradient = LinearGradient(
   colors: [Color(0xfff2f3f9), Colors.white],
   begin: Alignment.centerLeft,
   end: Alignment.centerRight,
-);
-const _counterSalePaperGradient = LinearGradient(
-  colors: [_counterSaleTint, Colors.white],
-  begin: Alignment.topCenter,
-  end: Alignment.bottomCenter,
 );
 
 ThemeData _counterSaleTheme(ThemeData base) => base.copyWith(
@@ -36890,7 +36939,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                           _productSearchFocus.unfocus();
                           _scanProduct();
                         },
-                        icon: const Icon(Icons.qr_code_scanner, size: 20),
+                        icon: const Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.qr_code_scanner, size: 18),
+                          Text('Camera', style: TextStyle(fontSize: 9)),
+                        ]),
                       ),
                       IconButton(
                         key: const Key('work-counter-usb-scan'),
@@ -36899,7 +36951,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                             : 'Use attached scanner',
                         onPressed: _toggleUsbScanner,
                         isSelected: _usbScanMode,
-                        icon: const Icon(Icons.barcode_reader, size: 20),
+                        icon: const Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.barcode_reader, size: 18),
+                          Text('Scanner', style: TextStyle(fontSize: 9)),
+                        ]),
                       ),
                     ],
                   ),
@@ -36992,10 +37047,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           );
     final total = Container(
       key: const Key('work-sale-total-bar'),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       decoration: const BoxDecoration(
-        gradient: _counterSalePaperGradient,
-        border: Border(top: BorderSide(color: _counterSaleLine)),
+        color: _counterSaleTint,
+        border: Border(top: BorderSide(color: _counterSaleLine), bottom: BorderSide(color: _counterSaleLine)),
       ),
       child: _StoreScaledPair(
         forceStack: widget.session.workspaceOrderTotal >= 10000000,
@@ -37602,10 +37657,10 @@ class _SaleProductTile extends StatelessWidget {
       ),
     );
     final price = '₹${_formatStoreAmount(product.sellingPrice)}';
-    const priceStyle = TextStyle(
-      color: MoolColors.navy,
-      fontSize: 15,
-      fontWeight: FontWeight.w800,
+    final priceStyle = TextStyle(
+      color: availableForSale ? MoolColors.navy : MoolColors.muted,
+      fontSize: availableForSale ? 15 : 12,
+      fontWeight: availableForSale ? FontWeight.w800 : FontWeight.w500,
     );
     Widget identity({bool includePrice = false}) => InkWell(
       key: Key('work-sale-product-open-${product.id}'),
@@ -37643,7 +37698,8 @@ class _SaleProductTile extends StatelessWidget {
         ),
       ),
     );
-    final quantityControls = Row(
+    final quantityControls = Opacity(opacity: !availableForSale && quantity == 0 ? 0 : 1,
+      alwaysIncludeSemantics: true, child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
@@ -37690,10 +37746,10 @@ class _SaleProductTile extends StatelessWidget {
           icon: const Icon(Icons.add_rounded, size: 20),
         ),
       ],
-    );
+    ));
     return Container(
       key: Key('work-sale-product-${product.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: availableForSale ? 4 : 2),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
