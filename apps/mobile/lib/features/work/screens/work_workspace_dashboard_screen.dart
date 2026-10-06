@@ -17480,15 +17480,28 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           if (!_returnSelection)
             Align(alignment: Alignment.centerLeft, child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: TextButton(key: const Key('work-sales-manage'),
-                style: TextButton.styleFrom(minimumSize: const Size(48, 48), padding: EdgeInsets.zero),
-                onPressed: () { FocusScope.of(context).unfocus(); setState(() => _salesManageOpen = true); },
-                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(color: MoolColors.navy, borderRadius: BorderRadius.circular(7)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Manage sales', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                    SizedBox(width: 4), Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white),
-                  ]))))),
+              child: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                if (widget.showNewSaleAction)
+                  FilledButton.icon(key: const Key('work-sales-primary-counter-sale'),
+                    style: FilledButton.styleFrom(minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
+                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7))),
+                    onPressed: widget.onNewSale == null ? null : () {
+                      FocusScope.of(context).unfocus();
+                      widget.onNewSale!();
+                    },
+                    icon: Icon(hasDraft ? Icons.play_arrow_rounded : Icons.point_of_sale_rounded, size: 18),
+                    label: Text(hasDraft ? 'Resume sale' : 'Counter sale')),
+                TextButton.icon(key: const Key('work-sales-manage'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    foregroundColor: MoolColors.navy,
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  onPressed: () { FocusScope.of(context).unfocus(); setState(() => _salesManageOpen = true); },
+                  icon: const Icon(Icons.more_horiz_rounded, size: 18), label: const Text('Manage sales')),
+              ]))),
           Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl,
             inlineSearch: landscapeBand ? searchControl : null)),
         ]));

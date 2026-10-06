@@ -23450,6 +23450,49 @@ void main() {
     }
   }
 
+  testWidgets('SALESAC01 frequent sale is direct on home and returns to search', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    work.workspaceInvoices.clear();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-sales-search')), 'Saved search');
+    await tester.pumpAndSettle();
+    final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
+    expect(primary.hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-action-centre')), findsNothing);
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-counter-fullscreen-back')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-sales-search'))).controller!.text, 'Saved search');
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SALESAC01 direct home resume keeps the form-saved draft', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    await enterSaleCustomer(tester, '9000092035');
+    await tester.tap(find.byKey(const Key('work-counter-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+    expect(find.descendant(of: primary, matching: find.text('Resume sale')), findsOneWidget);
+    await tester.tap(primary);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
+    expect(work.workspaceOrderCustomer, '9000092035');
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('SALESAC01 management preserves register search and contextual invoice', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
     work.workspaceInvoices.clear();
@@ -23542,6 +23585,13 @@ void main() {
       expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
       expect(find.byKey(const Key('work-sales-statement')), findsNothing);
       expect(search.hitTestable(), findsOneWidget);
+      final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
+      final manage = find.byKey(const Key('work-sales-manage'));
+      expect(primary.hitTestable(), findsOneWidget);
+      expect(manage.hitTestable(), findsOneWidget);
+      expect(tester.getSize(primary).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(manage).height, greaterThanOrEqualTo(48));
+      expect(tester.getRect(primary).overlaps(tester.getRect(manage)), isFalse);
       await tester.tap(find.byKey(const Key('work-sales-manage')));
       await tester.pumpAndSettle();
       expect(find.text('Manage sales'), findsOneWidget);
@@ -23841,11 +23891,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-NEW'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-OLD'))).dy));
-    await revealSalesAction(tester, 'work-sales-new-counter-sale');
-    expect(find.text('Resume sale'), findsOneWidget);
+    final primary = find.byKey(const Key('work-sales-primary-counter-sale'));
+    expect(primary.hitTestable(), findsOneWidget);
+    expect(find.descendant(of: primary, matching: find.text('Resume sale')), findsOneWidget);
     expect(work.workspaceOrderCustomer, 'Saved customer');
-    await tester.tap(find.byKey(const Key('work-sales-recorded')));
-    await tester.pumpAndSettle();
+    expect(work.currentWorkspaceOrderId, isNull);
     await tester.tap(find.byKey(const Key('work-statement-period')));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(PopupMenuItem<String>, 'Custom range'));
