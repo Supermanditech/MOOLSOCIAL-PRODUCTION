@@ -16952,6 +16952,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   final _invoiceSearch = TextEditingController();
   Object? _salesScope;
   bool _salesActionsExpanded = true;
+  bool _salesManageOpen = false;
+  bool _salesManageBeforeReturns = false;
+  final _salesCategories = <int>{};
   bool _returnSelection = false;
   bool _exchangeSelection = false;
   String _salesQueryBeforeReturns = '';
@@ -16962,9 +16965,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       if (_returnSelection) {
         _invoiceSearch.text = _salesQueryBeforeReturns;
         _salesActionsExpanded = _salesActionsBeforeReturns;
+        _salesManageOpen = _salesManageBeforeReturns;
       } else {
         _salesQueryBeforeReturns = _invoiceSearch.text;
         _salesActionsBeforeReturns = _salesActionsExpanded;
+        _salesManageBeforeReturns = _salesManageOpen;
+        _salesManageOpen = false;
         _salesActionsExpanded = false;
         _invoiceSearch.clear();
       }
@@ -16997,9 +17003,75 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _toggleReturnSelection();
       return true;
     }
+    if (_selectedInvoice == null && _salesManageOpen) {
+      setState(() => _salesManageOpen = false);
+      return true;
+    }
     if (_selectedInvoice == null) return false;
     setState(() => _selectedInvoice = null);
     return true;
+  }
+
+  Widget _salesActionCentre(bool hasDraft) {
+    final categories = <({String title, String guide, List<({String key, String label, String guide, VoidCallback? tap})> actions})>[
+      (title: 'Sales invoices', guide: 'Prepare a bill; use Recorded sales above to view invoices.', actions: [
+        if (widget.showNewSaleAction)
+          (key: 'work-sales-new-counter-sale', label: hasDraft ? 'Resume sale' : 'Counter sale',
+            guide: hasDraft ? 'Continue the unfinished bill without starting another sale.' : 'Select goods and prepare a customer bill.',
+            tap: widget.onNewSale == null ? null : () { setState(() => _salesManageOpen = false); widget.onNewSale!(); }),
+      ]),
+      (title: 'Customer receipts & dues', guide: 'Record collections against unpaid customer bills.', actions: [
+        (key: 'work-sales-dues', label: 'Collect dues', guide: 'Select a customer and record money received against their bills.',
+          tap: widget.onOpenOperation == null ? null : () { setState(() => _salesManageOpen = false); widget.onOpenOperation!(_WorkspaceOperation.dues); }),
+      ]),
+      (title: 'Sales returns & exchange', guide: 'Find the original invoice for a return, refund or exchange.', actions: [
+        (key: 'work-sales-returns', label: 'Returns & refunds', guide: 'Select the original bill to record returned goods or review its refund.', tap: _toggleReturnSelection),
+        (key: 'work-sales-exchange', label: 'Exchange', guide: 'Select the original bill before preparing the replacement sale.', tap: () => _toggleReturnSelection(exchange: true)),
+      ]),
+      (title: 'Customer credits', guide: 'Review available credit for a customer’s next sale.', actions: [
+        (key: 'work-sales-customer-credit', label: 'Customer credit', guide: 'Select a customer with verified available credit to start their next sale.',
+          tap: () { FocusScope.of(context).unfocus(); _openCustomerCredit(); }),
+      ]),
+      (title: 'Statements & documents', guide: 'Review sales and collections for $_salesPeriodLabel.', actions: [
+        (key: 'work-sales-statement', label: 'Sales statement', guide: 'View, download or print the statement for $_salesPeriodLabel.',
+          tap: () { FocusScope.of(context).unfocus(); _openSalesStatement(); }),
+      ]),
+    ];
+    return Material(key: const Key('work-sales-action-centre'), color: Colors.white, child: Column(children: [
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: SizedBox(width: double.infinity, child: Wrap(
+        alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12, children: [
+          const Text('Manage sales', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+          TextButton.icon(key: const Key('work-sales-recorded'),
+            onPressed: () => setState(() => _salesManageOpen = false),
+            style: TextButton.styleFrom(minimumSize: const Size(48, 48), foregroundColor: MoolColors.navy),
+            icon: const Icon(Icons.list_alt_outlined, size: 18),
+            label: const Text('Recorded sales', style: TextStyle(fontSize: 12))),
+        ]))),
+      Expanded(child: ListView(key: PageStorageKey(('sales-management', _salesScope)),
+        padding: const EdgeInsets.only(bottom: 12), children: [
+          for (var index = 0; index < categories.length; index++)
+            Column(children: [
+              Semantics(key: Key('work-sales-category-state-$index'), button: true, expanded: _salesCategories.contains(index), child: ListTile(
+                key: Key('work-sales-category-$index'), minTileHeight: 48,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                onTap: () => setState(() { if (!_salesCategories.add(index)) _salesCategories.remove(index); }),
+                title: Text(categories[index].title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+                subtitle: Text(categories[index].guide, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+                trailing: Icon(_salesCategories.contains(index) ? Icons.expand_less : Icons.expand_more, color: MoolColors.navy),
+              )),
+              if (_salesCategories.contains(index))
+                for (final action in categories[index].actions)
+                  ListTile(key: Key(action.key), minTileHeight: 48,
+                    contentPadding: const EdgeInsets.fromLTRB(24, 2, 16, 2),
+                    enabled: action.tap != null, onTap: action.tap,
+                    title: Text(action.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: MoolColors.ink)),
+                    subtitle: Text(action.guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                    trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy)),
+              const Divider(height: 1, thickness: .5),
+            ]),
+        ])),
+    ]));
   }
 
   Future<void> _openSalesStatement() async {
@@ -17098,7 +17170,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
               if (_exchangeSelection) IconButton(tooltip: 'How exchange works',
                 onPressed: () => _exchangeSteps(), icon: const Icon(Icons.info_outline, size: 18)),
-              IconButton(tooltip: 'Back to sales register', onPressed: _toggleReturnSelection,
+              IconButton(tooltip: _salesManageBeforeReturns ? 'Back to Manage sales' : 'Back to sales register', onPressed: _toggleReturnSelection,
                 icon: const Icon(Icons.close_rounded, size: 18)),
             ])))),
         if (!_returnSelection)
@@ -17119,14 +17191,6 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink,
                         fontFeatures: [FontFeature.tabularFigures()])),
                   ])),
-                TextButton.icon(key: const Key('work-sales-statement'), onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    _openSalesStatement();
-                  },
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4),
-                    minimumSize: const Size(48, 48), foregroundColor: MoolColors.navy),
-                  icon: const Icon(Icons.description_outlined, size: 16),
-                  label: const Text('Sales statement', style: TextStyle(fontSize: 12))),
               ]),
             if (_invoicePeriod == 'Custom range')
               Padding(padding: const EdgeInsets.only(bottom: 4),
@@ -17248,6 +17312,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _returnSelection = false;
       _exchangeSelection = false;
       _salesQueryBeforeReturns = '';
+      _salesManageOpen = false;
+      _salesManageBeforeReturns = false;
+      _salesCategories.clear();
       _salesActionsExpanded = true;
       _invoicePeriod = 'Today';
       _invoiceRange = null;
@@ -17375,6 +17442,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       final hasDraft = session.workspaceOrderSource == 'Counter' &&
           session.workspaceOrderFulfilment == 'At the shop' && session.currentWorkspaceOrderId == null &&
           (session.workspaceOrderCustomer.trim().isNotEmpty || session.workspaceOrderQuantities.isNotEmpty);
+      if (_salesManageOpen) return _salesActionCentre(hasDraft);
       final landscapeBand = !_returnSelection &&
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450 &&
@@ -17407,32 +17475,23 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               )),
             ]),
           );
-      final salesFrame = _StockQuickActionsFrame(
-        keyPrefix: 'work-sales',
-        expanded: _salesActionsExpanded,
-        onToggle: () { FocusScope.of(context).unfocus(); _changeSalesBrowse(() => _salesActionsExpanded = !_salesActionsExpanded); },
-        actions: [
-          if (widget.showNewSaleAction)
-            _StoreEdgeAction(keyName: 'work-sales-new-counter-sale', icon: hasDraft ? Icons.edit_note_rounded : Icons.add_rounded,
-              label: hasDraft ? 'Resume sale' : 'Counter sale', onTap: widget.onNewSale),
-          _StoreEdgeAction(keyName: 'work-sales-exchange', icon: Icons.swap_horiz_rounded,
-            label: 'Exchange', onTap: () => _toggleReturnSelection(exchange: true)),
-          _StoreEdgeAction(keyName: 'work-sales-customer-credit', icon: Icons.account_balance_wallet_outlined,
-            label: 'Customer credit', onTap: _openCustomerCredit),
-          _StoreEdgeAction(keyName: 'work-sales-returns', icon: Icons.assignment_return_outlined,
-            label: 'Returns & refunds', onTap: _returnSelection ? null : _toggleReturnSelection),
-          if (widget.onOpenOperation != null) ...[
-            _StoreEdgeAction(keyName: 'work-sales-dues', icon: Icons.account_balance_wallet_outlined,
-              label: 'Collect dues', onTap: () => widget.onOpenOperation!(_WorkspaceOperation.dues)),
-          ],
-        ],
-        child: ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
+      return ColoredBox(color: Colors.white, child: Column(key: const Key('work-store-statement'), children: [
           if (!landscapeBand) searchControl,
+          if (!_returnSelection)
+            Align(alignment: Alignment.centerLeft, child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: TextButton(key: const Key('work-sales-manage'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48), padding: EdgeInsets.zero),
+                onPressed: () { FocusScope.of(context).unfocus(); setState(() => _salesManageOpen = true); },
+                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(color: MoolColors.navy, borderRadius: BorderRadius.circular(7)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Manage sales', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                    SizedBox(width: 4), Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white),
+                  ]))))),
           Expanded(child: _compactInvoices(session, salesPeriodControl: periodControl,
             inlineSearch: landscapeBand ? searchControl : null)),
-        ])),
-      );
-      return _returnSelection ? salesFrame.child : salesFrame;
+        ]));
     }
     final content = Column(
       key: const Key('work-store-statement'),
@@ -19701,13 +19760,12 @@ class _StockQuickActionsFrame extends StatelessWidget {
     required this.actions,
     required this.expanded,
     required this.onToggle,
-    this.keyPrefix = 'work-stock',
   });
   final Widget child;
   final List<Widget> actions;
   final bool expanded;
   final VoidCallback onToggle;
-  final String keyPrefix;
+  final String keyPrefix = 'work-stock';
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(

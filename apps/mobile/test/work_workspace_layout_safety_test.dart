@@ -843,13 +843,52 @@ class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
 
 // Counter-sale tests enter through the approved Sales records action.
 // The direct Counter sale shortcut and records-only first tap are tested separately.
+Future<void> revealSalesAction(WidgetTester tester, String key) async {
+  final category = switch (key) {
+    'work-sales-new-counter-sale' => 0,
+    'work-sales-dues' => 1,
+    'work-sales-returns' || 'work-sales-exchange' => 2,
+    'work-sales-customer-credit' => 3,
+    'work-sales-statement' => 4,
+    _ => throw StateError('Unknown Sales action $key'),
+  };
+  if (find.byKey(const Key('work-sales-manage')).evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const Key('work-sales-manage')));
+    await tester.pumpAndSettle();
+  }
+  final target = find.byKey(Key(key));
+  final scroll = find.descendant(of: find.byKey(const Key('work-sales-action-centre')), matching: find.byType(Scrollable));
+  if (target.evaluate().isEmpty) {
+    final header = find.byKey(Key('work-sales-category-$category'));
+    if (header.evaluate().isEmpty) {
+      // A previously expanded category may leave the viewport below this header.
+      // Return by real scroll gestures before searching forward through lazy rows.
+      for (var attempt = 0; attempt < 40 &&
+          tester.state<ScrollableState>(scroll).position.pixels > 0; attempt++) {
+        await tester.drag(scroll, const Offset(0, 180));
+        await tester.pumpAndSettle();
+      }
+      await tester.scrollUntilVisible(header, 80, scrollable: scroll);
+    }
+    await tester.ensureVisible(header);
+    await tester.pumpAndSettle();
+    final state = tester.widget<Semantics>(find.byKey(Key('work-sales-category-state-$category')));
+    if (state.properties.expanded != true) {
+      await tester.tap(header);
+      await tester.pumpAndSettle();
+    }
+  }
+  if (target.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(target, 80, scrollable: scroll);
+  }
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
 Future<void> openCounterSaleFromSales(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('work-store-sell')));
   await tester.pumpAndSettle();
-  if (find.byKey(const Key('work-sales-new-counter-sale')).evaluate().isEmpty) {
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
-  }
+  await revealSalesAction(tester, 'work-sales-new-counter-sale');
   await tester.ensureVisible(
     find.byKey(const Key('work-sales-new-counter-sale')),
   );
@@ -897,10 +936,7 @@ Future<void> openSalesCollections(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(sales);
   await tester.pumpAndSettle();
-  if (find.byKey(const Key('work-sales-actions-panel')).evaluate().isEmpty) {
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
-  }
+  await revealSalesAction(tester, 'work-sales-dues');
   final collections = find.byKey(const Key('work-sales-dues'));
   await tester.ensureVisible(collections);
   await tester.pumpAndSettle();
@@ -2278,6 +2314,17 @@ void main() {
   }
 
   Future<void> reveal(WidgetTester tester, Finder finder) async {
+    if (finder.evaluate().isEmpty &&
+        (find.byKey(const Key('work-sales-manage')).evaluate().isNotEmpty ||
+         find.byKey(const Key('work-sales-recorded')).evaluate().isNotEmpty)) {
+      final description = finder.describeMatch(Plurality.zero);
+      for (final action in ['new-counter-sale', 'dues', 'returns', 'exchange', 'customer-credit', 'statement']) {
+        if (description.contains('work-sales-$action')) {
+          await revealSalesAction(tester, 'work-sales-$action');
+          break;
+        }
+      }
+    }
     // Follow the approved contextual entry points, not obsolete Home controls.
     if (finder.evaluate().isEmpty &&
         find.byKey(const Key('work-store-home')).evaluate().isNotEmpty) {
@@ -23403,6 +23450,53 @@ void main() {
     }
   }
 
+  testWidgets('SALESAC01 management preserves register search and contextual invoice', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    work.workspaceInvoices.clear();
+    work.workspaceInvoices.add(WorkspaceCustomerInvoice(
+      id: 'AC01', orderId: 'AC01-ORDER', customer: 'Saved customer',
+      items: 'Goods', amount: 100, payment: 'Cash', issuedAt: DateTime.now()));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-sales-search')), 'Saved customer');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
+    await tester.tap(find.byKey(const Key('work-sales-manage')));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage sales'), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-new-counter-sale')), findsNothing);
+    for (var category = 0; category < 5; category++) {
+      final header = find.byKey(Key('work-sales-category-$category'));
+      await tester.ensureVisible(header);
+      await tester.pumpAndSettle();
+      expect(header.hitTestable(), findsOneWidget);
+      expect(tester.getSize(header).height, greaterThanOrEqualTo(48));
+    }
+    await tester.tap(find.byKey(const Key('work-sales-recorded')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-sales-search'))).controller!.text, 'Saved customer');
+    await tester.tap(find.byKey(const ValueKey('work-sales-invoice-AC01')));
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice No.: AC01'), findsOneWidget);
+    expect(work.workspaceInvoices.single.id, 'AC01');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-search')), findsOneWidget);
+    await revealSalesAction(tester, 'work-sales-returns');
+    await tester.tap(find.byKey(const Key('work-sales-returns')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-sales-search'))).controller!.text, isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-sales-recorded')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const Key('work-sales-search'))).controller!.text, 'Saved customer');
+    expect(work.workspaceInvoices.single.amount, 100);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final display in [(const Size(360, 720), 1.0), (const Size(320, 568), 2.0), (const Size(720, 360), 1.0)]) {
     testWidgets('SALESHOME Stock-style search and actions $display', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -23425,7 +23519,7 @@ void main() {
       expect(input.decoration!.filled, false);
       expect(input.decoration!.contentPadding, const EdgeInsets.symmetric(vertical: 12));
       final summary = find.byKey(const Key('work-sales-period-summary'));
-      for (final key in ['work-statement-period', 'work-sales-statement']) {
+      for (final key in ['work-statement-period']) {
         expect(find.descendant(of: summary, matching: find.byKey(Key(key))), findsOneWidget);
       }
       if (display.$2 == 1 && display.$1.width == 360) {
@@ -23440,46 +23534,29 @@ void main() {
         expect(tester.getSize(register).height, greaterThanOrEqualTo(100),
           reason: 'Expanded actions must leave useful invoice reading space; '
             'summary=${tester.getRect(summary)}, search=${tester.getRect(search)}, '
-            'content=${tester.getRect(find.byKey(const Key('work-sales-action-content')))}');
+            'content=${tester.getRect(find.byKey(const Key('work-store-statement')))}');
       }
       expect(find.text('₹1,00,00,000.25'), findsNWidgets(2));
       expect(find.text('Retail customer with a long business name'), findsOneWidget);
       expect(find.text('Payment status unavailable'), findsOneWidget);
-      expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-      await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
-      final closedContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
-      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-      await tester.pumpAndSettle();
-      final salesContent = tester.getRect(find.byKey(const Key('work-sales-action-content')));
-      final actionsPanel = tester.getRect(find.byKey(const Key('work-sales-actions-panel')));
-      expect(salesContent.width, closedContent.width);
-      expect(salesContent.right, actionsPanel.right);
-      expect(salesContent.overlaps(actionsPanel), isFalse,
-        reason: 'Expanded actions must not cover search, Statement or invoice amounts');
-      expect(actionsPanel.top, greaterThanOrEqualTo(salesContent.bottom));
-      expect(actionsPanel.height, lessThanOrEqualTo(closedContent.height * .35));
-      expect(find.byKey(const Key('work-sales-actions-dismiss')), findsNothing);
-      final sale = find.byKey(const Key('work-sales-new-counter-sale'));
-      final exchange = find.byKey(const Key('work-sales-exchange'));
-      expect(tester.getTopLeft(sale).dx, lessThan(tester.getTopLeft(exchange).dx));
-      expect(sale.hitTestable(), findsOneWidget);
-      expect(tester.getSize(sale).width, greaterThan(tester.getSize(exchange).width),
-        reason: 'Each action fits its own label rather than sharing a fixed width');
+      expect(find.byKey(const Key('work-sales-statement')), findsNothing);
       expect(search.hitTestable(), findsOneWidget);
-      await reveal(tester, find.byKey(const Key('work-sales-statement')));
-      expect(find.byKey(const Key('work-sales-statement')).hitTestable(), findsOneWidget);
-      expect(find.byKey(const Key('work-sales-customer-credit')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sales-manage')));
+      await tester.pumpAndSettle();
+      expect(find.text('Manage sales'), findsOneWidget);
+      expect(find.text('Recorded sales'), findsOneWidget);
+      expect(tester.getTopLeft(find.text('Manage sales')).dx, 12);
+      expect(find.byKey(const Key('work-sales-new-counter-sale')), findsNothing);
       await captureStoreView(tester, 'sales-access-expanded-${display.$1.width}-${display.$2}');
-      for (final action in ['new-counter-sale', 'exchange', 'customer-credit', 'returns', 'dues']) {
+      for (final action in ['new-counter-sale', 'exchange', 'customer-credit', 'returns', 'dues', 'statement']) {
         final target = find.byKey(Key('work-sales-$action'));
         await reveal(tester, target);
         expect(target.hitTestable(), findsOneWidget);
         expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
       }
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+      await tester.tap(find.byKey(const Key('work-sales-recorded')));
       await tester.pumpAndSettle();
       await tester.enterText(search, 'Retail customer');
       await tester.pumpAndSettle();
@@ -23552,7 +23629,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('No matching sale. Check the invoice number, customer name or phone.'), findsOneWidget);
       tester.testTextInput.hide();
-      await tester.tap(find.byTooltip('Back to sales register'));
+      await tester.tap(find.byTooltip('Back to Manage sales'));
+      await tester.pumpAndSettle();
+      expect(find.text('Manage sales'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-sales-recorded')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(search).controller!.text, 'previous query');
       expect(find.byKey(const Key('work-sales-period-summary')), findsOneWidget);
@@ -23713,10 +23793,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No recorded invoices in this period.'), findsOneWidget);
     expect(find.text('Voucher Type'), findsNothing);
-    expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
-    for (final action in ['new-counter-sale', 'dues', 'statement', 'returns']) {
-      expect(find.byKey(Key('work-sales-$action')), findsOneWidget);
-    }
+    expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
+    expect(find.byKey(const Key('work-sales-manage')), findsOneWidget);
     expect(find.byKey(const Key('work-sales-settlement')), findsNothing);
     await reveal(tester, find.byKey(const Key('work-sales-dues')));
     await tester.tap(find.byKey(const Key('work-sales-dues')));
@@ -23724,13 +23802,11 @@ void main() {
     expect(find.byKey(const Key('work-store-dues')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
+    await revealSalesAction(tester, 'work-sales-statement');
     expect(find.byKey(const Key('work-sales-actions-panel')), findsNothing);
     await tester.tap(find.byKey(const Key('work-sales-statement')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-recorded')), findsOneWidget);
     expect(find.text('View statement'), findsNothing);
     // An unrecovered fixture must not export an apparently complete empty book.
     expect(find.text('Sales records are not ready. Please retry after loading.'), findsOneWidget);
@@ -23739,8 +23815,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-store-sell')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
-    await tester.pumpAndSettle();
+    await revealSalesAction(tester, 'work-sales-new-counter-sale');
     await tester.tap(find.byKey(const Key('work-sales-new-counter-sale')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-counter-fullscreen-back')), findsOneWidget);
@@ -23766,9 +23841,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-NEW'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const ValueKey('work-sales-invoice-OLD'))).dy));
+    await revealSalesAction(tester, 'work-sales-new-counter-sale');
     expect(find.text('Resume sale'), findsOneWidget);
     expect(work.workspaceOrderCustomer, 'Saved customer');
-    await tester.tap(find.byKey(const Key('work-sales-actions-toggle')));
+    await tester.tap(find.byKey(const Key('work-sales-recorded')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-statement-period')));
     await tester.pumpAndSettle();
@@ -46597,7 +46673,7 @@ void main() {
         await tester.tap(find.byTooltip('Open Sales'));
         await tester.pumpAndSettle();
         if (refundChannel == WorkspacePaymentChannel.cash) {
-          expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
+          expect(find.byKey(const Key('work-sales-manage')), findsOneWidget);
           expect(tester.takeException(), isNull, reason: 'Expanded returns action');
           await reveal(tester, find.byKey(const Key('work-sales-returns')));
           await tester.tap(find.byKey(const Key('work-sales-returns')));
@@ -46774,7 +46850,10 @@ void main() {
         if (refundChannel == WorkspacePaymentChannel.cash) {
           expect(tester.takeException(), isNull, reason: 'Return search after refund sheet');
           expect(find.text('Returns & refunds · All saved sales'), findsOneWidget);
-          await tester.tap(find.byTooltip('Back to sales register'));
+          await tester.tap(find.byTooltip('Back to Manage sales'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-sales-recorded')), findsOneWidget);
+          await tester.tap(find.byKey(const Key('work-sales-recorded')));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull, reason: 'Restored Sales register');
           await reveal(tester, invoiceRow);
@@ -48379,7 +48458,7 @@ void main() {
     }
     await tester.tap(find.byKey(const Key('work-counter-close')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-sales-actions-panel')), findsOneWidget);
+    expect(find.byKey(const Key('work-sales-manage')), findsOneWidget);
     expect(work.workspaceInvoices, isEmpty);
     expect(tester.takeException(), isNull);
   });
@@ -48432,7 +48511,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byKey(Key(stock ? 'work-dashboard-catalogue-screen'
-          : 'work-sales-actions-panel')), findsOneWidget);
+          : 'work-sales-manage')), findsOneWidget);
       expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).contextualActiveId,
           stock ? 'stock' : 'sell');
       expect(work.workspaceInvoices, isEmpty);
