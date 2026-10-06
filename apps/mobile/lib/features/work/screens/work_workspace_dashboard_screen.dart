@@ -7531,6 +7531,7 @@ class _StoreInvoiceSurface extends StatefulWidget {
     this.embedded = false,
     this.counterAppearance = false,
     this.orderDetails = false,
+    this.salesPresentation = false,
     super.key,
   });
   final WorkSession session;
@@ -7542,6 +7543,7 @@ class _StoreInvoiceSurface extends StatefulWidget {
   final bool embedded;
   final bool counterAppearance;
   final bool orderDetails;
+  final bool salesPresentation;
   @override
   State<_StoreInvoiceSurface> createState() => _StoreInvoiceSurfaceState();
 }
@@ -8192,11 +8194,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                 if (!widget.counterAppearance) ...[
                   Text('Invoice No.: ${invoice.id}',
                       key: const Key('work-invoice-visible-reference'),
-                      style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                      style: TextStyle(fontSize: widget.salesPresentation ? 10 : 12,
+                          height: widget.salesPresentation ? 1.3 : null, color: MoolColors.muted)),
                   Text('Invoice date: $invoiceDate',
                       key: const Key('work-invoice-visible-date'),
                       style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
-                  const SizedBox(height: 8),
+                  SizedBox(height: widget.salesPresentation ? 4 : 8),
                 ],
                 if (paid)
                   _paidReceipt(payment)
@@ -8230,12 +8233,15 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     ),
                   const SizedBox(height: 8),
                   Text(
-                    invoice.billingDetails.name.trim().isNotEmpty
+                    widget.salesPresentation && invoice.billingDetails.name.trim().isEmpty &&
+                            _storedCounterCustomerMobile(invoice.customer) != null
+                        ? 'Customer phone: ${invoice.customer}'
+                        : invoice.billingDetails.name.trim().isNotEmpty
                         ? invoice.billingDetails.name
                         : invoice.customer,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: widget.counterAppearance ? 14 : 17,
+                      fontSize: widget.counterAppearance || widget.salesPresentation ? 14 : 17,
                     ),
                   ),
                   if (invoice.billingDetails.name.trim().isNotEmpty)
@@ -8243,11 +8249,12 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       invoice.customer,
                       style: const TextStyle(color: MoolColors.muted),
                     ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: widget.salesPresentation ? 6 : 12),
                   Container(
                     padding: widget.counterAppearance
                         ? const EdgeInsets.symmetric(vertical: 8)
                         : EdgeInsets.all(
+                            widget.salesPresentation ? 10 :
                             MediaQuery.textScalerOf(sheetContext).scale(1) > 1.5
                                 ? 8
                                 : 14,
@@ -8281,6 +8288,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     storeId: invoiceStore,
                     onRecord: widget.onRecord,
                     receiptEditor: widget.receiptEditor,
+                    salesPresentation: widget.salesPresentation,
                   )),
                   if (payment != null) _recordedPayments(payment),
                   ExpansionTile(
@@ -16980,7 +16988,9 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   }
   String get _salesPeriodLabel => _invoicePeriod == 'Custom range' && _invoiceRange != null
       ? '${_registerDate(_invoiceRange!.start)} – ${_registerDate(_invoiceRange!.end)}'
-      : _invoicePeriod;
+      : _invoicePeriod == 'Year' ? 'Year ${DateTime.now().year}'
+      : _invoicePeriod == 'Month' ? MaterialLocalizations.of(context).formatMonthYear(DateTime.now())
+      : _invoicePeriod == 'Week' ? 'This week' : _invoicePeriod;
 
   void _changeSalesBrowse(VoidCallback change) {
     setState(change);
@@ -17014,26 +17024,26 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
 
   Widget _salesActionCentre(bool hasDraft) {
     final categories = <({String title, String guide, List<({String key, String label, String guide, VoidCallback? tap})> actions})>[
-      (title: 'Sales invoices', guide: 'Prepare a bill; use Recorded sales above to view invoices.', actions: [
+      (title: 'Sales invoices', guide: 'Create or resume a customer bill.', actions: [
         if (widget.showNewSaleAction)
           (key: 'work-sales-new-counter-sale', label: hasDraft ? 'Resume sale' : 'Counter sale',
-            guide: hasDraft ? 'Continue the unfinished bill without starting another sale.' : 'Select goods and prepare a customer bill.',
+            guide: hasDraft ? 'Continue the saved draft.' : 'Choose goods and bill the customer.',
             tap: widget.onNewSale == null ? null : () { setState(() => _salesManageOpen = false); widget.onNewSale!(); }),
       ]),
-      (title: 'Customer receipts & dues', guide: 'Record collections against unpaid customer bills.', actions: [
-        (key: 'work-sales-dues', label: 'Collect dues', guide: 'Select a customer and record money received against their bills.',
+      (title: 'Customer receipts & dues', guide: 'Outstanding bills and money received.', actions: [
+        (key: 'work-sales-dues', label: 'Collect dues', guide: 'Select the customer whose dues were paid.',
           tap: widget.onOpenOperation == null ? null : () { setState(() => _salesManageOpen = false); widget.onOpenOperation!(_WorkspaceOperation.dues); }),
       ]),
-      (title: 'Sales returns & exchange', guide: 'Find the original invoice for a return, refund or exchange.', actions: [
-        (key: 'work-sales-returns', label: 'Returns & refunds', guide: 'Select the original bill to record returned goods or review its refund.', tap: _toggleReturnSelection),
-        (key: 'work-sales-exchange', label: 'Exchange', guide: 'Select the original bill before preparing the replacement sale.', tap: () => _toggleReturnSelection(exchange: true)),
+      (title: 'Sales returns & exchange', guide: 'Returned goods, refunds and replacement sales.', actions: [
+        (key: 'work-sales-returns', label: 'Returns & refunds', guide: 'Find the original bill across all dates.', tap: _toggleReturnSelection),
+        (key: 'work-sales-exchange', label: 'Exchange', guide: 'Choose the original bill for the replacement.', tap: () => _toggleReturnSelection(exchange: true)),
       ]),
-      (title: 'Customer credits', guide: 'Review available credit for a customer’s next sale.', actions: [
-        (key: 'work-sales-customer-credit', label: 'Customer credit', guide: 'Select a customer with verified available credit to start their next sale.',
+      (title: 'Customer credits', guide: 'Available credit for the next purchase.', actions: [
+        (key: 'work-sales-customer-credit', label: 'Customer credit', guide: 'Choose available credit to start a sale.',
           tap: () { FocusScope.of(context).unfocus(); _openCustomerCredit(); }),
       ]),
-      (title: 'Statements & documents', guide: 'Review sales and collections for $_salesPeriodLabel.', actions: [
-        (key: 'work-sales-statement', label: 'Sales statement', guide: 'View, download or print the statement for $_salesPeriodLabel.',
+      (title: 'Statements & documents', guide: 'Sales and collections · $_salesPeriodLabel', actions: [
+        (key: 'work-sales-statement', label: 'Sales statement', guide: 'View, download or print · $_salesPeriodLabel',
           tap: () { FocusScope.of(context).unfocus(); _openSalesStatement(); }),
       ]),
     ];
@@ -17054,7 +17064,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             Column(children: [
               Semantics(key: Key('work-sales-category-state-$index'), button: true, expanded: _salesCategories.contains(index), child: ListTile(
                 key: Key('work-sales-category-$index'), minTileHeight: 48,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 onTap: () => setState(() { if (!_salesCategories.add(index)) _salesCategories.remove(index); }),
                 title: Text(categories[index].title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
                 subtitle: Text(categories[index].guide, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
@@ -17063,7 +17073,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
               if (_salesCategories.contains(index))
                 for (final action in categories[index].actions)
                   ListTile(key: Key(action.key), minTileHeight: 48,
-                    contentPadding: const EdgeInsets.fromLTRB(24, 2, 16, 2),
+                    contentPadding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
                     enabled: action.tap != null, onTap: action.tap,
                     title: Text(action.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: MoolColors.ink)),
                     subtitle: Text(action.guide, style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
@@ -17215,15 +17225,21 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             final payment = candidates.length == 1 ? candidates.single : null;
             final status = payment == null ? 'Payment status unavailable'
                 : '${payment.state.label}${payment.dueMinor > 0 ? ' · Due ₹${_formatStoreMinorAmount(payment.dueMinor)}' : ''}';
+            final customer = _RecentCounterCustomer(invoice.customer, invoice.billingDetails);
+            final pendingRefund = payment?.state == WorkspacePaymentState.refundPending;
             final details = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_RecentCounterCustomer(invoice.customer, invoice.billingDetails).label,
+              Text(customer.mobile != null && customer.label == invoice.customer
+                  ? 'Phone: ${invoice.customer}' : customer.label,
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink)),
               Text(_registerDate(invoice.issuedAt),
                 style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
             ]);
-            final amount = Text('₹${_formatStoreMinorAmount(invoice.payableMinor)}', textAlign: TextAlign.right,
+            final amount = Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              const Text('Bill total', style: TextStyle(fontSize: 10, color: MoolColors.muted)),
+              Text('₹${_formatStoreMinorAmount(invoice.payableMinor)}', textAlign: TextAlign.right,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: MoolColors.ink,
-                fontFeatures: [FontFeature.tabularFigures()]));
+                fontFeatures: [FontFeature.tabularFigures()])),
+            ]);
             return InkWell(
               key: ValueKey('work-sales-invoice-${invoice.id}'),
               onTap: () { FocusScope.of(context).unfocus();
@@ -17251,11 +17267,23 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                       Expanded(flex: 3, child: details), const SizedBox(width: 12), Expanded(flex: 2, child: amount),
                     ])),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: Text(invoice.id, style: const TextStyle(fontSize: 11, color: MoolColors.muted))),
+                  Expanded(child: Semantics(label: 'Invoice No.: ${invoice.id}', excludeSemantics: true,
+                    child: Tooltip(message: 'Invoice No.: ${invoice.id}', excludeFromSemantics: true,
+                    triggerMode: TooltipTriggerMode.longPress,
+                    child: Text(invoice.id, key: ValueKey('work-sales-reference-${invoice.id}'),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10, color: MoolColors.muted))))),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: MoolColors.navy),
                 ]),
-                Text(status, key: ValueKey('work-sales-status-${invoice.id}'),
-                  style: TextStyle(fontSize: 11, color: payment != null && payment.dueMinor > 0 ? MoolColors.navy : MoolColors.muted)),
+                Row(children: [
+                  if (pendingRefund) ...[
+                    const Icon(Icons.schedule_rounded, size: 14, color: MoolColors.navy),
+                    const SizedBox(width: 4),
+                  ],
+                  Expanded(child: Text(status, key: ValueKey('work-sales-status-${invoice.id}'),
+                    style: TextStyle(fontSize: 11, fontWeight: pendingRefund ? FontWeight.w600 : FontWeight.w400,
+                      color: pendingRefund || (payment != null && payment.dueMinor > 0) ? MoolColors.navy : MoolColors.muted))),
+                ]),
               ])),
             );
           },
@@ -17336,6 +17364,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           session: session,
           invoice: _selectedInvoice!,
           embedded: true,
+          salesPresentation: widget.salesOnly,
           onClose: () => setState(() => _selectedInvoice = null),
         );
       }
@@ -17426,7 +17455,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           children: [
             Text(
               widget.salesOnly
-                  ? (_invoicePeriod == 'Custom range' ? 'Dates' : _invoicePeriod)
+                  ? (_invoicePeriod == 'Custom range' ? 'Dates' : _salesPeriodLabel)
                   : session.workspaceMoneyPeriod,
               style: const TextStyle(
                 color: MoolColors.navy,
@@ -35165,12 +35194,14 @@ class _InvoiceCollectionSummary extends StatelessWidget {
     this.onRecord,
     this.receiptEditor,
     this.orderDetails = false,
+    this.salesPresentation = false,
   });
 
   final WorkSession session;
   final ValueChanged<WorkspacePaymentRecord>? onRecord;
   final Widget? receiptEditor;
   final bool orderDetails;
+  final bool salesPresentation;
   final WorkspaceCustomerInvoice invoice;
   final String? accountScope, storeId;
 
@@ -35213,6 +35244,18 @@ class _InvoiceCollectionSummary extends StatelessWidget {
           );
       final creditLedger = finance?.customerLedgers.where((l) => l.customerId == payment.customerId).firstOrNull;
       final balance = creditLedger?.invoiceBalance(invoice.id);
+      final creditAction = creditLedger != null && payment.dueMinor > 0 && _availableCustomerCredit(creditLedger) > 0
+          ? Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+              key: const Key('work-invoice-use-credit'), icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+              style: salesPresentation ? TextButton.styleFrom(minimumSize: const Size(48, 48),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400))
+                  : orderDetails ? TextButton.styleFrom(
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)) : null,
+              label: Text('Use customer credit · ${_purchaseAmount(_availableCustomerCredit(creditLedger))} available'),
+              onPressed: !session.customerCreditAvailable ? null : () => showModalBottomSheet<void>(
+                context: context, isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
+                builder: (_) => _CustomerCreditApplication(session: session, ledger: creditLedger, payment: payment))))
+          : null;
       return DefaultTextStyle.merge(
         style: orderDetails ? const TextStyle(fontSize: 12, color: MoolColors.ink) : const TextStyle(),
         child: Column(
@@ -35247,7 +35290,13 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                 ('Available to refund', balance.refundableMinor),
             ]),
           ],
-          if (!orderDetails) Text(
+          if (salesPresentation) ...[
+            Text('Amount due ${_purchaseAmount(payment.dueMinor)}',
+                key: const Key('work-sales-invoice-due'),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.navy)),
+            Text('Received ${_purchaseAmount(payment.paidMinor)}',
+                style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+          ] else if (!orderDetails) Text(
             'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
           ),
           if (orderDetails && payment.state == WorkspacePaymentState.refundPending && balance == null)
@@ -35257,15 +35306,7 @@ class _InvoiceCollectionSummary extends StatelessWidget {
             Text('Customer credit applied ${_purchaseAmount(creditLedger.entries.where((e) =>
               e.invoiceId == invoice.id && e.kind == WorkspaceLedgerEntryKind.creditReceived &&
               e.state == WorkspaceLedgerPostingState.posted).fold<int>(0, (sum, e) => sum + e.amountMinor))}'),
-          if (creditLedger != null && payment.dueMinor > 0 && _availableCustomerCredit(creditLedger) > 0)
-            Align(alignment: Alignment.centerLeft, child: TextButton.icon(
-              key: const Key('work-invoice-use-credit'), icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
-              style: orderDetails ? TextButton.styleFrom(
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)) : null,
-              label: Text('Use customer credit · ${_purchaseAmount(_availableCustomerCredit(creditLedger))} available'),
-              onPressed: !session.customerCreditAvailable ? null : () => showModalBottomSheet<void>(
-                context: context, isScrollControlled: true, useSafeArea: true, isDismissible: false, enableDrag: false,
-                builder: (_) => _CustomerCreditApplication(session: session, ledger: creditLedger, payment: payment)))),
+          if (!salesPresentation && creditAction != null) creditAction,
           if (receiptEditor != null)
             receiptEditor!
           else if (payment.dueMinor > 0 &&
@@ -35302,16 +35343,19 @@ class _InvoiceCollectionSummary extends StatelessWidget {
                           ),
                         );
                       },
-                style: orderDetails ? TextButton.styleFrom(
+                style: salesPresentation ? TextButton.styleFrom(minimumSize: const Size(48, 48),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))
+                    : orderDetails ? TextButton.styleFrom(
                     textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)) : null,
                 icon: Icon(Icons.payments_outlined, size: orderDetails ? 18 : null),
                 label: Text(
                   invoice.payment == 'Cash'
-                      ? orderDetails ? 'Record payment receipt' : 'Record Payment Receipt'
+                      ? orderDetails || salesPresentation ? 'Record payment receipt' : 'Record Payment Receipt'
                       : 'Confirm bank transfer',
                 ),
               ),
             ),
+          if (salesPresentation && creditAction != null) creditAction,
         ],
       ));
     },

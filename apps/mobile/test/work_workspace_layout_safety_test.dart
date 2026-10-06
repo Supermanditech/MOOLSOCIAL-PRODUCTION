@@ -23385,6 +23385,12 @@ void main() {
       await tester.tap(find.byKey(const Key('work-invoice-jump-actions')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-invoice-use-credit')).hitTestable(), findsOneWidget);
+      final receipt = find.byKey(const Key('work-invoice-record-payment'));
+      expect(find.descendant(of: receipt, matching: find.text('Record payment receipt')), findsOneWidget);
+      expect(tester.getTopLeft(receipt).dy,
+          lessThan(tester.getTopLeft(find.byKey(const Key('work-invoice-use-credit'))).dy));
+      expect(tester.getSize(receipt).height, greaterThanOrEqualTo(48));
+      expect(find.text('Amount due ₹800'), findsOneWidget);
       await reveal(tester, find.byKey(const Key('work-invoice-use-credit')));
       await tester.tap(find.byKey(const Key('work-invoice-use-credit')));
       await tester.pumpAndSettle();
@@ -23449,6 +23455,53 @@ void main() {
     });
     }
   }
+
+  testWidgets('SALESVISUAL10 register labels exact reference and selected year', (tester) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    work.workspaceInvoices.clear();
+    const reference = 'INV-ORD-1234567890123456789012345678901234567890';
+    work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: reference, orderId: 'VISUAL-ORDER',
+      customer: '9000091941', items: 'Goods', amount: 100, payment: 'Cash', issuedAt: DateTime.now()));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1);
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    expect(find.text('Phone: 9000091941'), findsOneWidget);
+    expect(tester.getSize(find.byKey(const ValueKey('work-sales-invoice-$reference'))).height,
+      lessThanOrEqualTo(90), reason: 'Phone label must not inflate normal portrait invoice rows.');
+    expect(find.text('Bill total'), findsOneWidget);
+    final rowReference = find.byKey(const ValueKey('work-sales-reference-$reference'));
+    final text = tester.widget<Text>(rowReference);
+    expect(text.maxLines, 1);
+    expect(text.overflow, TextOverflow.ellipsis);
+    expect(find.byTooltip('Invoice No.: $reference'), findsOneWidget);
+    expect(find.byWidgetPredicate((widget) => widget is Semantics &&
+        widget.properties.label == 'Invoice No.: $reference'), findsOneWidget);
+    await tester.longPress(rowReference);
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice No.: $reference'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-sales-search')), reference);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('work-sales-invoice-$reference')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-statement-period')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(PopupMenuItem<String>, 'Year'));
+    await tester.pumpAndSettle();
+    expect(find.text('Year ${DateTime.now().year}'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-sales-manage')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sales and collections · Year ${DateTime.now().year}'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-sales-recorded')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('work-sales-invoice-$reference')));
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice No.: $reference'), findsOneWidget);
+    expect(work.workspaceInvoices.single.id, reference);
+    expect(work.workspaceInvoices.single.amount, 100);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('SALESAC01 frequent sale is direct on home and returns to search', (tester) async {
     final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -24146,8 +24199,11 @@ void main() {
             .data,
         '₹${includedCount * 125}',
       );
-      expect(find.descendant(of: period, matching: find.text(label)), findsOneWidget);
-      expect(find.byTooltip('Sales period · $label'), findsOneWidget);
+      final displayLabel = label == 'Year' ? 'Year ${now.year}'
+          : label == 'Month' ? MaterialLocalizations.of(tester.element(period)).formatMonthYear(now)
+          : label == 'Week' ? 'This week' : label;
+      expect(find.descendant(of: period, matching: find.text(displayLabel)), findsOneWidget);
+      expect(find.byTooltip('Sales period · $displayLabel'), findsOneWidget);
       for (var index = 0; index < dates.length; index++) {
         final included =
             !dates[index].isBefore(start) &&
@@ -24174,7 +24230,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(
-      find.descendant(of: period, matching: find.text('Year')),
+      find.descendant(of: period, matching: find.text('Year ${now.year}')),
       findsOneWidget,
     );
     expect(work.workspaceInvoices, hasLength(dates.length));
