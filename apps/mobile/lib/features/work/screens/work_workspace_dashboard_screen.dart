@@ -155,6 +155,7 @@ String storeInvoicePaymentMethod(String selectedMethod,
     WorkspacePaymentRecord? payment,
     Iterable<WorkspaceCustomerLedgerEntry> entries, {
     bool preferRecordedMethods = false,
+    bool describeUnpaidSelection = false,
   }) {
   final original = 'Payment method: $selectedMethod';
   if (payment == null || !payment.valid) return original;
@@ -173,6 +174,10 @@ String storeInvoicePaymentMethod(String selectedMethod,
     }
   }
   if (credit == 0 && payment.state != WorkspacePaymentState.creditApplied) {
+    if (describeUnpaidSelection && payment.paidMinor == 0 &&
+        payment.state == WorkspacePaymentState.unpaid) {
+      return 'Selected payment method: $selectedMethod';
+    }
     if (preferRecordedMethods && payment.paidMinor > 0) {
       if (collected != payment.paidMinor || channels.isEmpty) {
         return 'Payment method: Recorded payments · details unavailable';
@@ -8120,6 +8125,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
     final issued = invoice.issuedAt.toLocal();
     final paid = payment != null && payment.dueMinor == 0 &&
         payment.paidMinor > 0 && payment.paidMinor >= payment.amountMinor;
+    final invoiceDate = '${issued.day.toString().padLeft(2, '0')}/${issued.month.toString().padLeft(2, '0')}/${issued.year}';
     final settlementLedger = finance?.customerLedgers.where((ledger) =>
         ledger.valid && ledger.accountScope == invoiceAccount &&
         ledger.workspaceId == invoiceStore &&
@@ -8183,6 +8189,15 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                       ),
                   ],
                 ),
+                if (!widget.counterAppearance) ...[
+                  Text('Invoice No.: ${invoice.id}',
+                      key: const Key('work-invoice-visible-reference'),
+                      style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                  Text('Invoice date: $invoiceDate',
+                      key: const Key('work-invoice-visible-date'),
+                      style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+                  const SizedBox(height: 8),
+                ],
                 if (paid)
                   _paidReceipt(payment)
                 else ...[
@@ -8251,7 +8266,8 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                         _invoiceTotal(),
                         Text(
                           storeInvoicePaymentMethod(invoice.payment, payment,
-                              settlementLedger?.entries ?? const []),
+                              settlementLedger?.entries ?? const [],
+                              describeUnpaidSelection: !widget.counterAppearance),
                           style: const TextStyle(color: MoolColors.muted),
                         ),
                       ],
@@ -8274,14 +8290,13 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     expandedCrossAxisAlignment: CrossAxisAlignment.start,
                     title: const Text('Invoice details'),
                     children: [
-                      Text(invoice.id),
+                      if (widget.counterAppearance) Text(invoice.id),
                       Text('Sold by: $invoiceStoreName'),
                       for (final line
                           in invoice.seller?.detailLines ?? const <String>[])
                         Text(line),
-                      Text(
-                        'Invoice date: ${issued.day}/${issued.month}/${issued.year}',
-                      ),
+                      if (widget.counterAppearance)
+                        Text('Invoice date: $invoiceDate'),
                       if (invoice.billingDetails.business &&
                           invoice.billingDetails.businessName.trim().isNotEmpty)
                         Text(invoice.billingDetails.businessName),

@@ -1079,13 +1079,21 @@ void main() {
       expect(storeInvoicePaymentMethod('Cash', payment(paid: 0), const []),
           'Payment method: Customer credit');
     });
-    test('payment method ordinary unpaid remains selected method', () {
+    test('SALES-V08 unpaid selected method is not a recorded receipt', () {
       final unpaid = payment(paid: 0, due: 26000, state: WorkspacePaymentState.unpaid);
       expect(storeInvoicePaymentMethod('Cash', unpaid, [
         entry('pending', 26000, WorkspaceLedgerEntryKind.creditReceived,
             state: WorkspaceLedgerPostingState.pending),
         entry('other', 26000, WorkspaceLedgerEntryKind.creditReceived, invoice: 'other'),
-      ]), 'Payment method: Cash');
+      ], describeUnpaidSelection: true), 'Selected payment method: Cash');
+      expect(storeInvoicePaymentMethod('UPI', unpaid, const [],
+          describeUnpaidSelection: true),
+          'Selected payment method: UPI');
+      expect(storeInvoicePaymentMethod('Bank transfer', unpaid, const [],
+          preferRecordedMethods: true, describeUnpaidSelection: true),
+          'Selected payment method: Bank transfer');
+      expect(storeInvoicePaymentMethod('Cash', unpaid, const []),
+          'Payment method: Cash', reason: 'Preserve approved Counter Sale wording');
       expect(storeInvoicePaymentMethod('UPI', null, const []), 'Payment method: UPI');
     });
     test('Orders recorded payment methods reconcile mixed receipts', () {
@@ -23235,7 +23243,7 @@ void main() {
       now.timeZoneOffset.isNegative ? 23 : 1,
     );
     final stored = local.toUtc();
-    final date = '${local.day}/${local.month}/${local.year}';
+    final date = '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
     work.workspaceInvoices
       ..clear()
       ..add(
@@ -23270,6 +23278,10 @@ void main() {
     await tester.tap(row);
     await tester.pumpAndSettle();
     final invoiceDetails = find.byKey(const Key('work-invoice-details'));
+    expect(find.text('Invoice No.: LOCAL-DATE'), findsOneWidget);
+    expect(find.text('Invoice date: $date'), findsOneWidget);
+    expect(tester.getRect(find.text('Invoice No.: LOCAL-DATE')).top,
+        lessThan(tester.getRect(invoiceDetails).top));
     await reveal(tester, invoiceDetails);
     await tester.tap(
       find.descendant(
@@ -26164,7 +26176,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final entry in ['work-quick-counter-sale', 'work-store-sell']) {
+  for (final entry in ['work-sales-new-counter-sale', 'work-store-sell']) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('COUNTERD01 full cash sale through $entry $scale', (
         tester,
@@ -26206,9 +26218,13 @@ void main() {
         final dashboardBottom = tester.getRect(
           find.byKey(const Key('work-store-sell')),
         );
-        await reveal(tester, find.byKey(Key(entry)));
-        await tester.tap(find.byKey(Key(entry)));
-        await tester.pumpAndSettle();
+        if (entry == 'work-sales-new-counter-sale') {
+          await openCounterSaleFromSales(tester);
+        } else {
+          await reveal(tester, find.byKey(Key(entry)));
+          await tester.tap(find.byKey(Key(entry)));
+          await tester.pumpAndSettle();
+        }
         if (entry == 'work-store-sell') {
           expect(find.byKey(const Key('work-order-review')), findsNothing);
           await captureStoreView(tester, 'pos-sales-records-$scale');
@@ -26712,15 +26728,16 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(BottomSheet), findsNothing);
         if (scale == 1) {
-          final invoiceViewport = find.byKey(
-            const Key('work-active-content-area'),
-          );
-          final workArea = tester.getRect(
-            find.byKey(const Key('work-active-counter-layout')),
+          final invoiceViewport = find.ancestor(
+            of: find.byKey(const Key('work-invoice-title')),
+            matching: find.byType(SingleChildScrollView),
+          ).first;
+          final navigation = tester.getRect(
+            find.byKey(const Key('work-store-sell')),
           );
           expect(
             tester.getRect(invoiceViewport).bottom,
-            greaterThanOrEqualTo(workArea.bottom - 24),
+            greaterThanOrEqualTo(navigation.top - 24),
             reason:
                 'Invoice must use available height above navigation, not '
                 'reserve unused summary flex space.',
@@ -42419,7 +42436,7 @@ void main() {
           await tester.pumpAndSettle();
         }
 
-        await press('work-quick-counter-sale');
+        await openCounterSaleFromSales(tester);
         await tester.enterText(
           find.byKey(const Key('work-order-customer')),
           '9000092035',
