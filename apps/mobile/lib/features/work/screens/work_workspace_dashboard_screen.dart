@@ -17431,26 +17431,23 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
       _buildSalesContent(context);
     }
     return Material(color: Colors.white, child: Column(children: [
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: SegmentedButton<String>(key: const Key('work-sales-switcher'),
-            showSelectedIcon: false,
-            expandedInsets: EdgeInsets.zero,
-            style: const ButtonStyle(
-              minimumSize: WidgetStatePropertyAll(Size(48, 48)),
-              padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 6, vertical: 8)),
-              textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w600))),
-            segments: const [
-              ButtonSegment(value: 'counter', label: Text('Counter sale', textAlign: TextAlign.center, key: Key('work-sales-primary-counter-sale'))),
-              ButtonSegment(value: 'manage', label: Text('Manage sales', textAlign: TextAlign.center, key: Key('work-sales-manage'))),
-              ButtonSegment(value: 'records', label: Text('Recorded sales', textAlign: TextAlign.center, key: Key('work-sales-recorded'))),
-            ], selected: _salesHubView == 'counter' ? {'counter'}
-                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? {'manage'} : {'records'},
-            onSelectionChanged: (value) { if (value.isNotEmpty) unawaited(_selectSalesHubView(value.single)); })),
       Expanded(child: IndexedStack(sizing: StackFit.expand, index: _salesHubView == 'counter' ? 0 : 1, children: [
         ExcludeFocus(excluding: _salesHubView != 'counter',
           child: TickerMode(enabled: _salesHubView == 'counter', child: widget.counterContent!)),
         _salesHubView == 'counter' ? const SizedBox.shrink() : _buildSalesContent(context),
       ])),
+      _StoreBottomActionShelf(key: const Key('work-sales-switcher'),
+        keyPrefix: 'work-sales-navigation', equalWidthActions: true,
+        actions: [
+          for (final route in const [
+            (view: 'counter', key: 'work-sales-primary-counter-sale', label: 'Counter sale', icon: Icons.point_of_sale_outlined),
+            (view: 'manage', key: 'work-sales-manage', label: 'Manage sales', icon: Icons.tune_rounded),
+            (view: 'records', key: 'work-sales-recorded', label: 'Recorded sales', icon: Icons.receipt_long_outlined),
+          ]) _StoreEdgeAction(keyName: route.key, label: route.label, icon: route.icon,
+            selected: route.view == (_salesHubView == 'counter' ? 'counter'
+                : _salesManageOpen && _selectedInvoice == null && !_returnSelection ? 'manage' : 'records'),
+            wrapLabel: true, onTap: () => unawaited(_selectSalesHubView(route.view))),
+        ]),
     ]));
   }
 
@@ -19877,14 +19874,19 @@ class _StoreEdgeAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.selected = false,
+    this.wrapLabel = false,
   });
   final String keyName, label;
   final IconData icon;
   final VoidCallback? onTap;
+  final bool selected, wrapLabel;
 
   @override
   Widget build(BuildContext context) => Semantics(
+    key: Key('$keyName-state'),
     button: true,
+    selected: selected ? true : wrapLabel ? false : null,
     label: label,
     enabled: onTap != null,
     onTap: onTap,
@@ -19895,7 +19897,8 @@ class _StoreEdgeAction extends StatelessWidget {
         color: Colors.transparent,
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: selected ? const Color(0xFFF0F1F7) : Colors.white,
+            border: selected ? Border.all(color: MoolColors.navy) : null,
             borderRadius: BorderRadius.circular(9),
           ),
           child: InkWell(
@@ -19915,7 +19918,10 @@ class _StoreEdgeAction extends StatelessWidget {
                   Icon(icon, size: 15, color: onTap == null
                       ? MoolColors.muted : MoolColors.navy),
                   const SizedBox(width: 5),
-                  Text(label, softWrap: false, style: TextStyle(
+                  if (wrapLabel) Flexible(child: Text(label, textAlign: TextAlign.center, style: TextStyle(
+                    fontSize: 11, height: 1.25, fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: onTap == null ? MoolColors.muted : MoolColors.navy,
+                  ))) else Text(label, softWrap: false, style: TextStyle(
                     fontSize: 11, height: 1.25, fontWeight: FontWeight.w600,
                     color: onTap == null ? MoolColors.muted : MoolColors.navy,
                   )),
@@ -20065,28 +20071,8 @@ class _StockQuickActionsFrame extends StatelessWidget {
               width: double.infinity,
               child: readableContent,
             )),
-            Container(
-              key: Key('$keyPrefix-actions-panel'),
-              height: actionHeight + 6,
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Expanded(child: SingleChildScrollView(
-                    key: Key('$keyPrefix-entry-controls'),
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                    child: Row(children: [
-                      for (final action in actions)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: action,
-                        ),
-                    ]),
-                  )),
-                  toggle,
-                ],
-              ),
-            ),
+            _StoreBottomActionShelf(keyPrefix: keyPrefix, actions: actions,
+              height: actionHeight + 6, toggle: toggle),
           ],
         );
       }
@@ -20106,6 +20092,37 @@ class _StockQuickActionsFrame extends StatelessWidget {
         ),
       );
     },
+  );
+}
+
+/// Shared Stock-style shelf. Sales supplies three always-visible view routes;
+/// Stock retains its horizontal action list and original collapse control.
+class _StoreBottomActionShelf extends StatelessWidget {
+  const _StoreBottomActionShelf({super.key, required this.keyPrefix,
+    required this.actions, this.height, this.toggle, this.equalWidthActions = false});
+  final String keyPrefix;
+  final List<Widget> actions;
+  final double? height;
+  final Widget? toggle;
+  final bool equalWidthActions;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: Key('$keyPrefix-actions-panel'), height: height, color: Colors.white,
+    child: Row(children: [
+      if (equalWidthActions) Expanded(child: Padding(
+        key: Key('$keyPrefix-entry-controls'),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [for (final action in actions) Expanded(child: action)])),
+      )) else Expanded(child: SingleChildScrollView(
+        key: Key('$keyPrefix-entry-controls'), scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: Row(children: [for (final action in actions)
+          Padding(padding: const EdgeInsets.only(right: 4), child: action)]),
+      )),
+      ?toggle,
+    ]),
   );
 }
 
