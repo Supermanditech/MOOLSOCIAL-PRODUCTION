@@ -7,6 +7,199 @@ import '../buy/buy_v2_models.dart';
 import 'work_publication_data.dart';
 export 'work_publication_data.dart';
 
+/// Read-only report boundaries; these never authorize a stock or ledger write.
+enum WorkspaceAnalyticsState { loading, error, unavailable, verified }
+
+enum WorkspaceAnalyticsCoverage { unknown, partial, complete }
+
+enum WorkspaceAnalyticsBasis { periodActivity, currentPosition }
+
+enum WorkspaceAnalyticsUnit { count, quantity, inrMinor, percent }
+
+class WorkspaceAnalyticsRequest {
+  WorkspaceAnalyticsRequest({
+    required this.accountScope,
+    required this.storeId,
+    required this.start,
+    required this.end,
+    Iterable<String> skuIds = const [],
+  }) : skuIds = Set<String>.unmodifiable(skuIds);
+
+  final String accountScope, storeId;
+  final DateTime start, end;
+  final Set<String> skuIds;
+
+  bool get valid =>
+      accountScope.trim().isNotEmpty &&
+      storeId.trim().isNotEmpty &&
+      start.isBefore(end) &&
+      skuIds.every((id) => id.trim().isNotEmpty);
+
+  bool sameScope(WorkspaceAnalyticsRequest other) =>
+      valid &&
+      other.valid &&
+      accountScope == other.accountScope &&
+      storeId == other.storeId &&
+      start.isAtSameMomentAs(other.start) &&
+      end.isAtSameMomentAs(other.end) &&
+      skuIds.length == other.skuIds.length &&
+      skuIds.containsAll(other.skuIds);
+}
+
+/// Value absence is deliberate: unknown, failed and loading are not zero.
+class WorkspaceAnalyticsMetric {
+  const WorkspaceAnalyticsMetric({
+    required this.id,
+    required this.state,
+    required this.coverage,
+    required this.basis,
+    required this.unit,
+    required this.source,
+    this.value,
+    this.asOf,
+    this.cohortId,
+  });
+
+  final String id, source;
+  final WorkspaceAnalyticsState state;
+  final WorkspaceAnalyticsCoverage coverage;
+  final WorkspaceAnalyticsBasis basis;
+  final WorkspaceAnalyticsUnit unit;
+  final num? value;
+  final DateTime? asOf;
+  /// Required by the consumer for conversion/drop-off rates; supplied by the
+  /// aggregate provider, never inferred from independent counts.
+  final String? cohortId;
+
+  bool validAt(DateTime now) {
+    if (id.trim().isEmpty || source.trim().isEmpty) {
+      return false;
+    }
+    if (state != WorkspaceAnalyticsState.verified) {
+      return value == null && coverage == WorkspaceAnalyticsCoverage.unknown;
+    }
+    final amount = value;
+    if (amount == null ||
+        !amount.isFinite ||
+        (amount < 0 && unit != WorkspaceAnalyticsUnit.inrMinor) ||
+        coverage == WorkspaceAnalyticsCoverage.unknown ||
+        asOf == null ||
+        asOf!.isAfter(now)) {
+      return false;
+    }
+    if (unit == WorkspaceAnalyticsUnit.count ||
+        unit == WorkspaceAnalyticsUnit.inrMinor) {
+      if (amount != amount.roundToDouble()) {
+        return false;
+      }
+    }
+    return unit != WorkspaceAnalyticsUnit.percent || amount <= 100;
+  }
+}
+
+enum WorkspaceAnalyticsDimension { discoverySource, broadLocation, product }
+
+class WorkspaceAnalyticsRank {
+  const WorkspaceAnalyticsRank({required this.id, required this.label, required this.count});
+  final String id, label;
+  final int count;
+  bool get valid => id.trim().isNotEmpty && label.trim().isNotEmpty && count >= 0;
+}
+
+/// Aggregated rankings only. Location labels must be city/district/delivery area,
+/// never addresses, precise coordinates or customer identities.
+class WorkspaceAnalyticsBreakdown {
+  WorkspaceAnalyticsBreakdown({required this.id, required this.dimension,
+    required this.coverage, required this.asOf, required this.source,
+    required Iterable<WorkspaceAnalyticsRank> rows})
+    : rows = List<WorkspaceAnalyticsRank>.unmodifiable(rows);
+  final String id, source;
+  final WorkspaceAnalyticsDimension dimension;
+  final WorkspaceAnalyticsCoverage coverage;
+  final DateTime asOf;
+  final List<WorkspaceAnalyticsRank> rows;
+  bool validAt(DateTime now) {
+    final ids = <String>{};
+    return id.trim().isNotEmpty && source.trim().isNotEmpty && !asOf.isAfter(now) &&
+      coverage != WorkspaceAnalyticsCoverage.unknown &&
+      rows.every((row) => row.valid && ids.add(row.id));
+  }
+}
+
+class WorkspaceAnalyticsSnapshot {
+  WorkspaceAnalyticsSnapshot({
+    required this.request,
+    required this.state,
+    required this.coverage,
+    required this.source,
+    required Iterable<WorkspaceAnalyticsMetric> metrics,
+    Iterable<WorkspaceAnalyticsBreakdown> breakdowns = const [],
+    this.updatedAt,
+    this.coveredFrom,
+    this.coveredUntil,
+  }) : metrics = List<WorkspaceAnalyticsMetric>.unmodifiable(metrics),
+       breakdowns = List<WorkspaceAnalyticsBreakdown>.unmodifiable(breakdowns);
+
+  final WorkspaceAnalyticsRequest request;
+  final WorkspaceAnalyticsState state;
+  final WorkspaceAnalyticsCoverage coverage;
+  final String source;
+  final List<WorkspaceAnalyticsMetric> metrics;
+  final List<WorkspaceAnalyticsBreakdown> breakdowns;
+  final DateTime? updatedAt;
+  final DateTime? coveredFrom, coveredUntil;
+
+  /// Caller pins the latest request; an older Store/period response is rejected.
+  bool usableFor(WorkspaceAnalyticsRequest expected, DateTime now) {
+    if (!request.sameScope(expected) || source.trim().isEmpty) {
+      return false;
+    }
+    if (state != WorkspaceAnalyticsState.verified) {
+      return metrics.isEmpty && breakdowns.isEmpty && coverage == WorkspaceAnalyticsCoverage.unknown;
+    }
+    final refreshed = updatedAt;
+    final from = coveredFrom;
+    final until = coveredUntil;
+    if (refreshed == null ||
+        refreshed.isAfter(now) ||
+        coverage == WorkspaceAnalyticsCoverage.unknown ||
+        from == null ||
+        until == null ||
+        !from.isBefore(until) ||
+        !from.isBefore(request.end) ||
+        !until.isAfter(request.start) ||
+        until.isAfter(refreshed)) {
+      return false;
+    }
+    if (coverage == WorkspaceAnalyticsCoverage.complete &&
+        (from.isAfter(request.start) || until.isBefore(request.end))) {
+      return false;
+    }
+    final ids = <String>{};
+    final groupIds = <String>{};
+    return breakdowns.every((group) => groupIds.add(group.id) && group.validAt(now) &&
+      !group.asOf.isAfter(until) && !group.asOf.isBefore(from) &&
+      (group.coverage != WorkspaceAnalyticsCoverage.complete ||
+        (coverage == WorkspaceAnalyticsCoverage.complete && !group.asOf.isBefore(request.end)))) && metrics.every(
+      (metric) =>
+          ids.add(metric.id) &&
+          metric.validAt(now) &&
+          (metric.asOf == null || !metric.asOf!.isAfter(refreshed)) &&
+          (metric.state != WorkspaceAnalyticsState.verified ||
+            metric.basis != WorkspaceAnalyticsBasis.periodActivity ||
+            (!metric.asOf!.isBefore(from) && !metric.asOf!.isAfter(until) &&
+              (metric.coverage != WorkspaceAnalyticsCoverage.complete ||
+                (coverage == WorkspaceAnalyticsCoverage.complete &&
+                  !metric.asOf!.isBefore(request.end))))),
+    );
+  }
+}
+
+typedef WorkspaceAnalyticsReader =
+    Future<WorkspaceAnalyticsSnapshot> Function(
+      WorkspaceAnalyticsRequest request,
+    );
+
 enum WorkspaceIssueTarget { customerOrder, supplierShipment }
 
 /// Choices are supplied with the case, not inferred from an order's status.

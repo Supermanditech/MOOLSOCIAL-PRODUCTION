@@ -1215,6 +1215,8 @@ class _WorkWorkspaceDashboardScreenState
         (_view == _WorkspaceControlView.operation &&
             (_operation == _WorkspaceOperation.deliverySettings ||
                 _operation == _WorkspaceOperation.staff));
+    final analyticsSurface = _view == _WorkspaceControlView.dashboard && _reviewedOrder == null &&
+      (session.retailerSetupSaved || session.reviewStage == WorkReviewStage.live);
     final storeRootSurface =
         _view == _WorkspaceControlView.dashboard ||
         _view == _WorkspaceControlView.search ||
@@ -1277,7 +1279,7 @@ class _WorkWorkspaceDashboardScreenState
           text: TextSpan(
             text: workspace.name,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
-              fontSize: 13,
+              fontSize: analyticsSurface ? 16 : 13,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1298,6 +1300,7 @@ class _WorkWorkspaceDashboardScreenState
           procurementOpen || shortHomeHeader ? 48.0 : 44.0,
           double.infinity,
         );
+    final analyticsHeaderHeight = (namePainter.height + 12).clamp(48.0, double.infinity);
     namePainter.dispose();
     Widget counterSurface(bool expanded) => _CounterOrderSurface(
       key: _counterKey,
@@ -1395,6 +1398,8 @@ class _WorkWorkspaceDashboardScreenState
       showBottomNavigation: !salesTaskOpen,
       headerHeight: salesTaskOpen
           ? MediaQuery.textScalerOf(context).scale(18).clamp(48, 72)
+          : analyticsSurface
+          ? analyticsHeaderHeight
           : compactSettings
           ? 64
           : storeRootSurface
@@ -1403,6 +1408,9 @@ class _WorkWorkspaceDashboardScreenState
       headerTitle: salesTaskOpen
           ? Text(salesOpen ? _salesTaskTitle : title, key: const Key('work-sales-task-heading'),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))
+          : analyticsSurface
+          ? Text(workspace.name, key: const Key('work-store-full-name'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))
           : compactSettings
           ? Row(
               children: [
@@ -4117,6 +4125,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   Timer? _dayBoundary;
   Timer? _orderClock;
   final Set<String> _expandedCategories = {};
+  int _periodDays = 1;
+  DateTime _periodEnd = DateTime.now();
 
   void _toggleCategory(String id) => setState(() {
     if (!_expandedCategories.remove(id)) _expandedCategories.add(id);
@@ -4142,7 +4152,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     _dayBoundary?.cancel();
     final now = DateTime.now();
     final day = DateUtils.dateOnly(now);
-    if (day != _today && mounted) setState(() => _today = day);
+    if (day != _today && mounted) setState(() { _today = day; _periodEnd = now; });
     _dayBoundary = Timer(
       DateTime(now.year, now.month, now.day + 1).difference(now),
       _scheduleDayBoundary,
@@ -4161,7 +4171,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     if (state == AppLifecycleState.resumed) {
       _scheduleDayBoundary();
       _startOrderClock();
-      setState(() {});
+      setState(() => _periodEnd = DateTime.now());
     }
     if (state == AppLifecycleState.paused) {
       _dayBoundary?.cancel();
@@ -4182,6 +4192,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     listenable: widget.session,
     builder: (context, _) {
       final session = widget.session;
+      final periodEnd = _periodEnd;
+      final periodStart = DateTime(_today.year, _today.month, _today.day - _periodDays + 1);
+      final periodLabel = _periodDays == 1 ? 'today' : 'in last $_periodDays days';
+      bool inPeriod(DateTime at) => !at.isBefore(periodStart) && at.isBefore(periodEnd);
       final invoices = session.workspaceInvoices;
       final invoiceIds = <String>{};
       final invoiceReady =
@@ -4191,7 +4205,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             (invoice) => invoice.validBillAmounts && invoiceIds.add(invoice.id),
           );
       final todayInvoices = invoices.where(
-        (invoice) => DateUtils.isSameDay(invoice.issuedAt.toLocal(), _today),
+        (invoice) => inPeriod(invoice.issuedAt.toLocal()),
       );
       final billed = invoiceReady
           ? todayInvoices.fold<int>(
@@ -4240,6 +4254,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           finance.valid &&
           finance.historyComplete &&
           !session.workspaceFinanceStale &&
+          !finance.asOf.isAfter(DateTime.now()) &&
           finance.customerLedgers.every((ledger) => ledger.historyComplete);
       final collected = collectionsReady
           ? finance.customerLedgers
@@ -4248,14 +4263,13 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   (entry) =>
                       entry.kind == WorkspaceLedgerEntryKind.collection &&
                       entry.state == WorkspaceLedgerPostingState.posted &&
-                      DateUtils.isSameDay(entry.occurredAt.toLocal(), _today),
+                      inPeriod(entry.occurredAt.toLocal()),
                 )
                 .fold<int>(0, (sum, entry) => sum + entry.amountMinor)
           : null;
       final returnReasons = collectionsReady
           ? finance.returnReasonsBetween(
-              DateTime(_today.year, _today.month, _today.day),
-              DateTime(_today.year, _today.month, _today.day + 1))
+              periodStart, periodEnd)
           : null;
       String money(int? value) =>
           value == null ? '—' : '₹${_formatStoreMinorAmount(value)}';
@@ -4365,21 +4379,13 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             action: 'Review costs in Stock', onTap: widget.onStock,
             color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
       ];
-      return SingleChildScrollView(
-        key: const Key('work-store-operating-board'),
-        controller: widget.scrollController,
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-        child: Material(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0xFFE5E8F1)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: _OperatingGroups(
-              children: [
+      return _StoreAnalyticsPresentation(
+        session: session,
+        periodDays: _periodDays, periodStart: periodStart, periodEnd: periodEnd,
+        onPeriod: (days) => setState(() { _periodDays = days; _periodEnd = DateTime.now(); }),
+        onRefresh: () => setState(() => _periodEnd = DateTime.now()),
+        scrollController: widget.scrollController,
+        sections: [
                 const Text('Store overview', style: TextStyle(fontSize: 14,
                   fontWeight: FontWeight.w700, color: MoolColors.navy)),
                 const SizedBox(height: 4),
@@ -4400,7 +4406,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 _OperatingMetric(
                   id: 'billed',
                   onTap: widget.onSales,
-                  label: 'Billed today',
+                  label: 'Billed $periodLabel',
                   value: money(billed),
                   detail: invoiceReady
                       ? '${todayInvoices.length} invoices · before returns'
@@ -4408,7 +4414,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'collections',
-                  label: 'Collected today',
+                  label: 'Collected $periodLabel',
                   value: money(collected),
                   detail: collectionsReady
                       ? 'Customer payments received · before refunds'
@@ -4416,29 +4422,29 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 ),
                 _OperatingMetric(
                   id: 'invoice-count',
-                  label: 'Invoices today',
+                  label: 'Invoices $periodLabel',
                   value: count(invoiceReady ? todayInvoices.length : null),
                   detail: invoiceReady
-                      ? 'Invoices recorded today. Open Sales to review.'
+                      ? 'Invoices recorded $periodLabel. Open Sales to review.'
                       : 'Sales history is not available yet',
                   onTap: widget.onSales,
                 ),
                 _OperatingMetric(
-                  id: 'average-bill', label: 'Average bill today',
+                  id: 'average-bill', label: 'Average bill $periodLabel',
                   value: money(billed != null && todayInvoices.isNotEmpty
                     ? (billed / todayInvoices.length).round() : null),
                   detail: !invoiceReady ? 'Sales history is not available yet'
-                    : todayInvoices.isEmpty ? 'No bills saved today'
-                    : 'Billed today divided by invoice count · before returns; not spend per visitor',
+                    : todayInvoices.isEmpty ? 'No bills saved $periodLabel'
+                    : 'Selected-period billed value divided by invoice count · before returns; not spend per visitor',
                 ),
                 _OperatingMetric(
-                  id: 'return-count', label: 'Returns today',
+                  id: 'return-count', label: 'Returns $periodLabel',
                   value: count(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.count)),
                   detail: returnReasons == null ? 'Complete return history is not available yet'
                     : 'Confirmed returns, not returned units or refunds',
                 ),
                 _OperatingMetric(
-                  id: 'return-credit', label: 'Return credit today',
+                  id: 'return-credit', label: 'Return credit $periodLabel',
                   value: money(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.creditMinor)),
                   detail: 'Credit against original bills, not money refunded',
                 ),
@@ -4448,7 +4454,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                       id: 'return-reason-${entry.key}',
                       label: WorkspaceCustomerReturn.reasonLabels[entry.key] ?? 'Reason not categorised',
                       value: money(entry.value.creditMinor),
-                      detail: '${entry.value.count} confirmed ${entry.value.count == 1 ? 'return' : 'returns'} today · credited value',
+                      detail: '${entry.value.count} confirmed ${entry.value.count == 1 ? 'return' : 'returns'} $periodLabel · credited value',
                     ),
                 ]),
                 _OperatingCategory(id: 'stock', title: 'Stock & visibility',
@@ -4660,13 +4666,577 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary),
                 ),
                 ]),
-              ],
-            ),
-          ),
-        ),
+        ],
       );
     },
   );
+}
+
+String _analyticsReportTitle(String report) => switch (report) {
+  'public' => 'Public Store',
+  'journey' => 'Customer journey',
+  'operations' => 'Store operations',
+  'supply' => 'Buy / Restock',
+  'receiving' => 'Purchases & goods received',
+  'orders' => 'Customer orders',
+  'stock' => 'Stock',
+  'sales' => 'Sales & collections',
+  'money' => 'Money & dues',
+  _ => 'Overview',
+};
+
+Widget _analyticsPeriodPicker(int days, ValueChanged<int> onChanged) => PopupMenuButton<int>(
+  key: const Key('store-analytics-period-picker'), tooltip: 'Choose reporting period',
+  initialValue: days, onSelected: onChanged,
+  itemBuilder: (_) => [for (final value in const [1, 7, 30])
+    PopupMenuItem<int>(value: value, child: Text(value == 1 ? 'Today' : 'Last $value days'))],
+  child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 48),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.date_range_outlined, size: 16, color: MoolColors.navy),
+      const SizedBox(width: 6),
+      Text(days == 1 ? 'Today' : 'Last $days days',
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MoolColors.navy)),
+      const Icon(Icons.arrow_drop_down, color: MoolColors.navy, size: 20),
+    ])),
+);
+/// One reporting canvas; domain expansion never starts a request or a route.
+class _StoreAnalyticsPresentation extends StatefulWidget {
+  const _StoreAnalyticsPresentation({
+    required this.session, required this.sections, required this.periodDays,
+    required this.periodStart, required this.periodEnd, required this.onPeriod,
+    required this.onRefresh,
+    this.scrollController,
+  });
+  final WorkSession session;
+  final int periodDays;
+  final DateTime periodStart, periodEnd;
+  final ValueChanged<int> onPeriod;
+  final VoidCallback onRefresh;
+  final List<Widget> sections;
+  final ScrollController? scrollController;
+  @override
+  State<_StoreAnalyticsPresentation> createState() => _StoreAnalyticsPresentationState();
+}
+
+class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation> {
+  String? _expanded;
+  WorkspaceAnalyticsRequest? _request;
+  Future<WorkspaceAnalyticsSnapshot>? _result;
+  Object? _scopeIdentity;
+  final _detailKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _scopeIdentity = widget.session.workspaceStockHistoryScope()?.key ?? widget.session.activeWorkspace?.id;
+    _request = widget.session.analyticsRequest(
+      start: widget.periodStart, end: widget.periodEnd);
+    _result = _request == null ? null : widget.session.readWorkspaceAnalytics(_request!);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StoreAnalyticsPresentation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final request = _request;
+    final scopeChanged = oldWidget.session != widget.session || _scopeIdentity !=
+      (widget.session.workspaceStockHistoryScope()?.key ?? widget.session.activeWorkspace?.id);
+    final requestChanged = request != null &&
+      widget.session.analyticsRequest(start: request.start, end: request.end)?.sameScope(request) != true;
+    if (scopeChanged) _expanded = null;
+    if (scopeChanged || requestChanged || oldWidget.periodDays != widget.periodDays ||
+        oldWidget.periodEnd != widget.periodEnd) {
+      _load();
+    }
+  }
+
+  void _toggle(String id) {
+    setState(() => _expanded = _expanded == id ? null : id);
+    if (_expanded != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _detailKey.currentContext;
+        if (mounted && target != null) {
+          Scrollable.ensureVisible(target,
+            duration: const Duration(milliseconds: 180), alignment: 0);
+        }
+      });
+    }
+  }
+
+  Widget _metrics(Iterable<_OperatingMetric> source) => LayoutBuilder(builder: (context, box) {
+    final columns = box.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final metric in source) SizedBox(width: (box.maxWidth - (columns - 1) * 8) / columns,
+        child: Padding(padding: const EdgeInsets.all(8), child: metric)),
+    ]);
+  });
+
+  Widget _attention(Widget item) => item is _OperatingAttention
+    ? _OperatingAttention(id: item.id, title: item.title, detail: item.detail,
+      action: item.action, color: item.color, expanded: true, onTap: item.onTap)
+    : item;
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = {for (final c in widget.sections.whereType<_OperatingCategory>()) c.id: c};
+    final metrics = {for (final c in categories.values)
+      for (final m in c.children.whereType<_OperatingMetric>()) m.id: m};
+    return FutureBuilder<WorkspaceAnalyticsSnapshot>(
+      key: ObjectKey(_result), future: _result, builder: (context, result) {
+        final snapshot = result.data;
+        final valid = snapshot != null && _request != null && snapshot.usableFor(_request!, DateTime.now());
+        final verified = result.connectionState == ConnectionState.done && valid &&
+          snapshot.state == WorkspaceAnalyticsState.verified;
+        final loading = _result != null && (result.connectionState != ConnectionState.done ||
+          valid && snapshot.state == WorkspaceAnalyticsState.loading);
+        final failed = result.hasError || valid && snapshot.state == WorkspaceAnalyticsState.error;
+        final status = loading ? result.connectionState == ConnectionState.done
+          ? 'Report update pending' : 'Loading analytics…' : failed
+          ? 'Could not load analytics' : verified
+          ? '${snapshot.coverage == WorkspaceAnalyticsCoverage.complete ? 'Complete' : 'Partial'} provider coverage · ${snapshot.source}'
+          : widget.session.analyticsReader == null ? 'Public and supply data not connected' : 'Provider data unavailable';
+        String remote(String id, {bool position = false}) {
+          final metric = verified ? snapshot.metrics.where((m) => m.id == id).firstOrNull : null;
+          return metric?.state == WorkspaceAnalyticsState.verified &&
+            metric?.unit == WorkspaceAnalyticsUnit.count &&
+            metric?.basis == (position ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity)
+              ? '${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? '~' : ''}${_formatStoreAmount(metric.value!.toInt())}' : '—';
+        }
+        String local(String id) => metrics[id]?.value ?? '—';
+        final summaries = <String, String>{
+          'public': '${remote('visitors')} visitors in period · ${remote('visible-skus', position: true)} products visible now',
+          'journey': '${remote('journey-cart')} added to cart · ${remote('journey-order')} ordered',
+          'supply': '${remote('supply-placed')} orders in period · ${remote('supply-delivery', position: true)} deliveries pending now',
+          'receiving': '${remote('goods-without-bill', position: true)} goods without bill · ${remote('bills-without-goods', position: true)} bills awaiting goods',
+          'orders': '${local('recorded-open-orders')} open · ${local('overdue-fulfilment')} overdue',
+          'stock': '${local('stock-cost')} at purchase cost · ${local('low-stock')} low stock',
+          'sales': '${local('billed')} billed · ${local('collections')} collected',
+          'money': '${local('customer-dues')} customer dues · ${local('payables')} supplier dues',
+        };
+        final figures = <String, List<(String, String)>>{
+          'public': [('Visitors (period)', remote('visitors')), ('Visible now', remote('visible-skus', position: true))],
+          'journey': [('Added to cart', remote('journey-cart')), ('Ordered', remote('journey-order'))],
+          'supply': [('Orders (period)', remote('supply-placed')), ('Delivery pending', remote('supply-delivery', position: true))],
+          'receiving': [('Goods, no bill', remote('goods-without-bill', position: true)), ('Bills, no goods', remote('bills-without-goods', position: true))],
+          'orders': [('Open orders', local('recorded-open-orders')), ('Overdue', local('overdue-fulfilment'))],
+          'stock': [('Stock cost', local('stock-cost')), ('Low stock', local('low-stock'))],
+          'sales': [('Billed', local('billed')), ('Collected', local('collections'))],
+          'money': [('Customer dues', local('customer-dues')), ('Supplier dues', local('payables'))],
+        };
+        List<Widget> categoryDetail(String id) {
+          final c = categories[id]!;
+          return [
+            if (c.alertCount > 0) Text(id == 'stock'
+              ? '${c.alertCount} ${c.alertCount == 1 ? 'issue type' : 'issue types'}'
+              : '${c.alertCount} ${c.alertCount == 1 ? 'order' : 'orders'} to review',
+              key: Key('store-category-alerts-$id'), style: const TextStyle(fontSize: 12, color: _OperatingPalette.warning)),
+            if (c.coverage != null) Text(c.coverage!, style: const TextStyle(fontSize: 12)),
+            _metrics(c.children.whereType<_OperatingMetric>()),
+            if (id == 'stock') const Text(
+              '* Selling value less purchase value, before tax, discounts and expenses. Not earned profit. Values use saved quantities and prices.',
+              key: Key('store-analytics-stock-valuation-guide'), style: TextStyle(fontSize: 12)),
+            if (c.attention != null) _attention(c.attention!),
+            ...c.children.where((item) => item is! _OperatingMetric && item is! _OperatingSection).map(_attention),
+          ];
+        }
+        final expanded = _expanded;
+        final end = _request?.end ?? widget.periodEnd;
+        final start = _request?.start ?? widget.periodStart;
+        return SingleChildScrollView(
+          key: const Key('work-store-operating-board'), controller: widget.scrollController,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [const Expanded(child: Text('Store overview',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
+              IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
+                onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20))]),
+            Text('${MaterialLocalizations.of(context).formatShortDate(start)} – ${MaterialLocalizations.of(context).formatShortDate(end)} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
+              style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
+            ...widget.sections.where((item) => item is Tooltip || item is _DashboardSyncBanner),
+            Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text(status,
+              key: const Key('store-analytics-provider-status'),
+              style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
+            if (verified) Text('Provider updated ${MaterialLocalizations.of(context).formatShortDate(snapshot.updatedAt!.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.updatedAt!.toLocal()))}',
+              style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+            const Padding(padding: EdgeInsets.only(bottom: 8), child: Text(
+              '— unavailable · ~ partial data · tap an area for details',
+              style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
+            LayoutBuilder(builder: (context, box) {
+              final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
+              return Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final id in summaries.keys) SizedBox(width: (box.maxWidth - (columns - 1) * 8) / columns,
+                  child: Material(color: expanded == id ? const Color(0xFFEAF0FA) : const Color(0xFFF5F7FC),
+                    borderRadius: BorderRadius.circular(10), child: Semantics(
+                      expanded: expanded == id, button: true,
+                      child: InkWell(key: Key('store-analytics-$id'), onTap: () => _toggle(id),
+                        borderRadius: BorderRadius.circular(10), child: Padding(
+                          padding: const EdgeInsets.all(8), child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Expanded(child: Text(_analyticsReportTitle(id),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+                                Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18),
+                              ]),
+                              const SizedBox(height: 5),
+                              Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
+                                child: Column(children: [for (final figure in figures[id]!)
+                                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Expanded(child: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
+                                    const SizedBox(width: 4),
+                                    ConstrainedBox(constraints: BoxConstraints(
+                                      maxWidth: ((box.maxWidth - (columns - 1) * 8) / columns - 16) * .6),
+                                      child: Text(figure.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+                                  ])])),
+                              if (id == 'orders') const Text('Saved orders · current', style: TextStyle(fontSize: 11)),
+                              if (id == 'stock' || id == 'money' || id == 'receiving') const Text('Current position', style: TextStyle(fontSize: 11)),
+                              if (id == 'journey' || id == 'sales') const Text('Selected period', style: TextStyle(fontSize: 11)),
+                              if (id == 'supply') const Text('Pending: current position', style: TextStyle(fontSize: 11)),
+                            ])))))),
+              ]);
+            }),
+            if (expanded != null) Padding(key: _detailKey, padding: const EdgeInsets.only(top: 12),
+              child: Column(key: Key('store-analytics-detail-$expanded'),
+                crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [Expanded(child: Text(_analyticsReportTitle(expanded),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+                    IconButton(tooltip: 'Collapse details', onPressed: () => _toggle(expanded),
+                      icon: const Icon(Icons.expand_less))]),
+                  if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
+                    _StoreAnalyticsProviderReport(session: widget.session, report: expanded,
+                      request: _request, result: _result),
+                  if (expanded == 'receiving')
+                    ...categories['stock']!.children.whereType<_OperatingAttention>()
+                      .where((a) => a.id.startsWith('receipt-')).map(_attention),
+                  if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
+                  if (expanded == 'money') ...categoryDetail('capital'),
+                ])),
+          ]),
+        );
+      });
+  }
+}
+
+class _StoreAnalyticsProviderReport extends StatefulWidget {
+  const _StoreAnalyticsProviderReport({
+    required this.session, required this.report, required this.request, required this.result,
+  });
+  final WorkSession session;
+  final String report;
+  final WorkspaceAnalyticsRequest? request;
+  final Future<WorkspaceAnalyticsSnapshot>? result;
+  @override
+  State<_StoreAnalyticsProviderReport> createState() => _StoreAnalyticsProviderReportState();
+}
+
+class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderReport> {
+  WorkspaceAnalyticsRequest? get _request => widget.request;
+  Future<WorkspaceAnalyticsSnapshot>? get _result => widget.result;
+  @override
+  Widget build(BuildContext context) {
+    final rows = switch (widget.report) {
+      'public' => const [
+        (
+          id: 'visitors',
+          label: 'Visitors',
+          guide: 'Unique visitors to your Store',
+        ),
+        (
+          id: 'visits',
+          label: 'Visits',
+          guide: 'Visits, including repeat visits',
+        ),
+        (
+          id: 'store-views',
+          label: 'Store views',
+          guide: 'Times your public Store was viewed',
+        ),
+        (
+          id: 'product-views',
+          label: 'Product views',
+          guide: 'Views of your Store’s products',
+        ),
+        (
+          id: 'visible-skus',
+          label: 'Visible products',
+          guide: 'Confirmed visible on the public Store · current position',
+        ),
+        (
+          id: 'hidden-skus',
+          label: 'Hidden products',
+          guide: 'Confirmed hidden listings · current position',
+        ),
+        (
+          id: 'unavailable-skus',
+          label: 'Unavailable products',
+          guide: 'Confirmed unavailable online · current position',
+        ),
+        (
+          id: 'interest-no-order',
+          label: 'Interest without orders',
+          guide: 'Products viewed but not ordered',
+        ),
+        (id: 'listing-corrections', label: 'Listings needing correction', guide: 'Confirmed listing issues · current position'),
+        (id: 'enquiries', label: 'Customer enquiries', guide: 'Enquiries about your Store or products'),
+        (id: 'offer-orders', label: 'Orders from offers', guide: 'Customer orders with verified offer attribution'),
+      ],
+      'journey' => const [
+        (
+          id: 'journey-store',
+          label: 'Visited Store',
+          guide: 'Start of the customer journey',
+        ),
+        (
+          id: 'journey-product',
+          label: 'Viewed a product',
+          guide: 'Customers exploring your products',
+        ),
+        (
+          id: 'journey-cart',
+          label: 'Added to cart',
+          guide: 'Customers adding your Store’s products',
+        ),
+        (
+          id: 'journey-order',
+          label: 'Placed an order',
+          guide: 'Customer orders received by this Store',
+        ),
+        (
+          id: 'journey-completed',
+          label: 'Completed an order',
+          guide: 'Confirmed delivery or collection',
+        ),
+        (
+          id: 'journey-left',
+          label: 'Left without ordering',
+          guide: 'Verified customer drop-off',
+        ),
+        (
+          id: 'repeat-customers',
+          label: 'Repeat customers',
+          guide: 'Customers with a previous completed order',
+        ),
+        (id: 'order-conversion', label: 'Visitors who ordered', guide: 'Verified share of the same tracked customer group'),
+        (id: 'cart-dropoff', label: 'Customers who left their cart', guide: 'Verified share who added items but did not order'),
+      ],
+      'supply' => const [
+        (
+          id: 'supply-placed',
+          label: 'Supplier orders placed',
+          guide: 'Your Store buying from suppliers · selected period',
+        ),
+        (
+          id: 'supply-acceptance',
+          label: 'Awaiting supplier acceptance',
+          guide: 'Current pending supplier orders',
+        ),
+        (
+          id: 'supply-dispatch',
+          label: 'Dispatch pending',
+          guide: 'Accepted orders not yet dispatched',
+        ),
+        (
+          id: 'supply-transit',
+          label: 'Goods in transit',
+          guide: 'Dispatched goods not yet received',
+        ),
+        (
+          id: 'supply-delivery',
+          label: 'Deliveries pending',
+          guide: 'Current goods awaiting delivery',
+        ),
+        (
+          id: 'supply-cancelled',
+          label: 'Cancelled supplier orders',
+          guide: 'Confirmed cancellations · selected period',
+        ),
+      ],
+      _ => const [
+        (
+          id: 'received-full',
+          label: 'Fully received',
+          guide: 'Confirmed full receipts · selected period',
+        ),
+        (
+          id: 'received-part',
+          label: 'Partly received',
+          guide: 'Receipts with goods still pending',
+        ),
+        (
+          id: 'received-short',
+          label: 'Shortages',
+          guide: 'Recorded missing quantities',
+        ),
+        (
+          id: 'received-damaged',
+          label: 'Damage reported',
+          guide: 'Receipts with damaged goods',
+        ),
+        (
+          id: 'goods-without-bill',
+          label: 'Goods received without bill',
+          guide: 'Awaiting the supplier’s invoice',
+        ),
+        (
+          id: 'bills-without-goods',
+          label: 'Bills awaiting goods',
+          guide: 'Invoice received before delivery',
+        ),
+      ],
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+
+        FutureBuilder<WorkspaceAnalyticsSnapshot>(
+          key: ObjectKey(_result),
+          future: _result,
+          builder: (context, result) {
+            final snapshot = result.data;
+            final request = _request;
+            final valid =
+                snapshot != null &&
+                request != null &&
+                snapshot.usableFor(request, DateTime.now());
+            final verified =
+                result.connectionState == ConnectionState.done &&
+                valid && snapshot.state == WorkspaceAnalyticsState.verified;
+            final loading =
+                _result != null &&
+                (result.connectionState != ConnectionState.done ||
+                  (valid && snapshot.state == WorkspaceAnalyticsState.loading));
+            final values = verified
+                ? {for (final metric in snapshot.metrics) metric.id: metric}
+                : <String, WorkspaceAnalyticsMetric>{};
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+
+                if (verified) ...[
+                  Text(
+                    'Updated ${MaterialLocalizations.of(context).formatShortDate(snapshot.updatedAt!.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.updatedAt!.toLocal()))}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Text('Records covered: ${MaterialLocalizations.of(context).formatShortDate(snapshot.coveredFrom!.toLocal())} ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.coveredFrom!.toLocal()))} – ${MaterialLocalizations.of(context).formatShortDate(snapshot.coveredUntil!.toLocal())} ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.coveredUntil!.toLocal()))}',
+                    key: const Key('store-analytics-covered-period'),
+                    style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+                ],
+                if (!loading && !verified)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      'Verified provider data is needed. — means unavailable, not zero.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                for (final row in rows) ...[
+                  const Divider(height: 16, thickness: 0.5),
+                  Builder(
+                    builder: (_) {
+                      final metric = values[row.id];
+                      final percentage = const {'order-conversion', 'cart-dropoff'}.contains(row.id);
+                      final position = const {'visible-skus', 'hidden-skus', 'unavailable-skus',
+                        'listing-corrections', 'supply-acceptance', 'supply-dispatch',
+                        'supply-transit', 'supply-delivery', 'received-part',
+                        'goods-without-bill', 'bills-without-goods'}.contains(row.id);
+                      final known =
+                          metric?.state == WorkspaceAnalyticsState.verified &&
+                          metric?.basis == (position ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity) &&
+                          metric?.unit == (percentage ? WorkspaceAnalyticsUnit.percent : WorkspaceAnalyticsUnit.count) &&
+                          (!percentage || (metric?.cohortId?.trim().isNotEmpty ?? false));
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  row.label,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  row.guide,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: _OperatingPalette.secondary,
+                                  ),
+                                ),
+                                if (known)
+                                  Text(
+                                    '${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? 'Partial · ' : ''}${metric.basis == WorkspaceAnalyticsBasis.currentPosition ? 'As of' : 'Recorded through'} ${MaterialLocalizations.of(context).formatShortDate(metric.asOf!.toLocal())}',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            known
+                                ? percentage ? '${metric!.value!.toStringAsFixed(1)}%' : _formatStoreAmount(metric!.value!.toInt())
+                                : '—',
+                            key: Key('store-analytics-value-${row.id}'),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: MoolColors.navy,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+                if (widget.report == 'public')
+                  for (final group in const [
+                    (id: 'discovery-sources', title: 'How customers found you', dimension: WorkspaceAnalyticsDimension.discoverySource),
+                    (id: 'broad-locations', title: 'Customer areas', dimension: WorkspaceAnalyticsDimension.broadLocation),
+                    (id: 'most-viewed-products', title: 'Most-viewed products', dimension: WorkspaceAnalyticsDimension.product),
+                    (id: 'products-without-orders', title: 'Products viewed without orders', dimension: WorkspaceAnalyticsDimension.product),
+                  ]) Builder(builder: (_) {
+                    final matches = verified ? snapshot.breakdowns.where((data) =>
+                      data.id == group.id && data.dimension == group.dimension).toList()
+                      : <WorkspaceAnalyticsBreakdown>[];
+                    final data = matches.isEmpty ? null : matches.single;
+                    return Padding(padding: const EdgeInsets.only(top: 16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        Text(group.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        if (data == null) const Text('Not available yet', style: TextStyle(fontSize: 12))
+                        else ...[
+                          Text('${data.coverage == WorkspaceAnalyticsCoverage.complete ? 'Complete' : 'Partial'} coverage · ${data.source}', style: const TextStyle(fontSize: 11)),
+                          if (data.rows.isEmpty) const Text('No recorded activity in covered data', style: TextStyle(fontSize: 12)),
+                          for (final row in (data.rows.toList()..sort((a, b) => b.count.compareTo(a.count))).take(10))
+                            Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
+                              Expanded(child: Text(row.label, style: const TextStyle(fontSize: 13))),
+                              const SizedBox(width: 12),
+                              Text(_formatStoreAmount(row.count), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            ])),
+                        ],
+                        if (group.dimension == WorkspaceAnalyticsDimension.broadLocation)
+                          const Text('City, district or delivery-area summary', style: TextStyle(fontSize: 11)),
+                      ]));
+                  }),
+                if (widget.report == 'journey')
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text(
+                      'Each stage needs the same tracked customer group before a drop-off rate can be calculated. Orders are your customers’ purchases—not supplier Restock.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
 }
 
 abstract final class _OperatingPalette {

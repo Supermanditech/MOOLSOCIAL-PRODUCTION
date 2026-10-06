@@ -80,6 +80,24 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Approved Store owner understands all eight analytics areas on one canvas, with compact summaries and exclusive in-place detail expansion.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "748DBC463480691EFE141C05FE919AEFB1400FD0DDCEA6A24AE092C351F1C65C",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "Reuse existing Store board calculations and provider hooks; replace only analytics report navigation with one eight-area summary canvas and exclusive inline details. One captured request/cutoff serves all areas; no expansion-triggered reads, duplicate route, ledger, persistence or backend substitute.",
+      "robustnessCoverage": ["All eight summaries, exclusive expansion, sibling collapse and repeat-tap close without route changes or additional reads", "Compact/enlarged layouts and analytics-only header with operational neighbour controls preserved", "Store/SKU and period isolation, stale response rejection and retry/loading/error/unavailable", "Verified zero versus missing/partial coverage, public readiness versus actual visibility", "Shared captured period for activity; current positions and provider freshness separately labelled", "Focused and impacted local tests, rendered inspection, guarded OPPO reload/audit/fix/retest and founder screenwise handoff"],
+      "adjustments": ["Latest explicit YES replaces earlier analytics shelf/folders/report routes with exclusive inline expansion; prior approval retained as history", "One shared scoped provider request across all areas; expansion never triggers reads", "Analytics-only Store header; neighbouring operational controls unchanged"],
+      "explicitExclusions": ["No backend/authentication/tracking/posting, production transactions or fabricated runtime records", "No Cursor integration/branch writes, APK/OCR/build/install/release/push or approved neighbouring-screen redesign"],
+      "dependenciesAndApprovals": ["Latest founder YES approves single canvas and restricted analytics header; complete36-source decision and fresh Check", "Architect current-source review; local/device evidence and founder acceptance remain separate", "Actual public tracking and combined provider wiring need later approved integration"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorPurchaseGoalSelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Retailer completes opening supplier position, bill/receipt linkage, payment/advance and supplier return reconciliation without duplicate stock or debt.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
       "manifestSha256": "DFE9C2939DF34BA0FAF228C6A4CB61D8B7AA54583872A187820E4415BC3B1823",
@@ -152,14 +170,24 @@
     "head": "0bdeed235ec30a6f236709244eadc3420e1c5873",
     "successorRegistered": true,
     "priorApprovalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending.",
-    "approvalState": "Founder CONTINUE NEXT selects P04-C01 unposted opening-record dependency after reuse/architect review and fresh founder Check. P03-C02/C11 and P04 actual device qualification remain pending; no OPPO interaction while busy."
+    "priorPurchaseApprovalState": "Founder CONTINUE NEXT selects P04-C01 unposted opening-record dependency after reuse/architect review and fresh founder Check. P03-C02/C11 and P04 actual device qualification remain pending; no OPPO interaction while busy.",
+    "approvalState": "Latest founder YES approves single-canvas analytics, exclusive inline detail expansion and Store/date/freshness-only header. Fresh36-source admission; local/device checks then founder review. No backend/integration/APK/release authority."
   },
   "ticket": {
     "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
-    "customerOutcome": "Retailer completes confirmed opening supplier dues/advance, bills and goods in either order, supplier payments and returns with exact reconciliation and no duplicate stock/debt.",
+    "priorPurchaseCustomerOutcome": "Retailer completes confirmed opening supplier dues/advance, bills and goods in either order, supplier payments and returns with exact reconciliation and no duplicate stock/debt.",
+    "customerOutcome": "Approved Retailer/Grocery Store owner can understand Store operations and public customer activity with readable verified analytics and clear unavailable data.",
     "classification": "mvp_supporting",
-    "classificationReason": "Necessary complete purchase bookkeeping journey behind existing frontend owners; current explicit founder goal permits bounded posting, not backend integration or release.",
+    "priorPurchaseClassificationReason": "Necessary complete purchase bookkeeping journey behind existing frontend owners; current explicit founder goal permits bounded posting, not backend integration or release.",
+    "classificationReason": "Founder-approved launch-supporting frontend report redesign over existing Store records; no new operational or backend authority.",
     "minimumCompleteScope": [
+      "Compact information-first Overview with period/freshness/coverage and verified numbers/units",
+      "All eight domain summaries on one canvas; one detail expands in place, sibling collapses and repeat tap closes; no analytics rail/folders/report routes",
+      "Analytics header limited to Store identity, reporting period and truthful local/provider freshness; shared operational headers outside analytics preserved",
+      "Read-only provider hooks with Store/SKU/period isolation, freshness/coverage and loading/error/unavailable/verified; unknown never zero",
+      "Local focused/impacted tests, rendered inspection, guarded OPPO reload/screenshots, bounded defect corrections/retest, then screenwise founder handoff"
+    ],
+    "priorPurchaseGoalMinimumCompleteScope": [
       "Durable scoped posting identity/recovery; explicitly confirmed opening position and exact bill inclusion",
       "Reviewed manual bill identity, partial/short/damaged receiving and exact already-stocked allocation across Catalogue/manual/CSV",
       "Supplier payment, advance/credit allocations, goods returns and monetary credits/refunds as separate effects",
@@ -185,7 +213,8 @@
       "26 September Store home authority v1: HOME-01–04 correction, reproduce HOME-05/06, explicit wallet Actions expand/manual collapse with central reflow, remove working-screen contextual rails while preserving actions, local and OPPO hot-reload tests",
       "2 October founder continuation P05-R12 only: immutable reviewed purchase-copy snapshots in existing encrypted scoped book; existing Purchases/preview/download; draft-save and legacy compatibility; local tests then OPPO hot reload. No posting, backend or new APK authority."
     ],
-    "explicitExclusions": [
+    "explicitExclusions": ["No shared policy weakening, unclaimed owner or global release replacement", "No backend/authentication/tracking/posting, fabricated runtime data or production transaction", "No Cursor integration/branch changes, APK/OCR/build/install/release/push or approved neighbouring-screen redesign"],
+    "priorPurchaseGoalExplicitExclusions": [
       "No global release replacement, unclaimed owners, fabricated platform identities or unconfirmed legacy posting; old unposted-only restriction retained in prior P04 assessment and superseded only by the 3 October explicit goal",
       "No device interaction during OPPO call, APK, backend, other-tree change or push",
       "CSV batch-review redesign pending its screenwise approval",
@@ -193,11 +222,13 @@
       "Unapproved builds/installs or live service writes; Cursor edits/integration",
       "Counter Sale work unrelated to the 31 grouped r66.38 findings, directly related child defects, or founder bounded extension v1 printing/history/photos"
     ],
-    "dependenciesAndApprovals": [
+    "dependenciesAndApprovals": ["Founder single-canvas YES7October, existing Store scope and complete36-source decision/Check", "Architect source review; verified data reuse and scoped provider hooks only", "Public live tracking/provider wiring deferred to approved integration; source/device/founder review independent"],
+    "priorPurchaseGoalDependenciesAndApprovals": [
       "Founder bounded active end-to-end purchase goal 3 October; exact reuse and architect review complete, fresh31-source founder-input Check before source edits",
       "C11/P03 actual device variants remain open until observed; latest connection is not acceptance"
     ],
-    "testAndEvidencePlan": [
+    "testAndEvidencePlan": ["Exact Store founder/ownership/regression/incremental/scope gates and unchanged release restrictions", "Focused and impacted analysis/tests: no-route exclusive expansion/shared reads, compact/enlarged layout, captured cutoff, scope/stale responses, unknown-versus-zero and distinct financial bases", "Actual rendered inspection, guarded OPPO hot reload/screenshots, visual/technical defect list and bounded corrections/reload/retest, then founder screenwise review"],
+    "priorPurchaseGoalTestAndEvidencePlan": [
       "Explicit Store scope, continuation/incremental/regression-memory gates; unchanged global release and owner claims",
       "Unknown/zero and opening inclusion; partial receipts/exact prior stock, payment/advance/return/refund reconciliation; durable interrupted-save recovery, retry/collision/restart/stale/scope; focused analysis",
       "Actual three-path and late-bill unchanged quantity checks on free OPPO; scoped local Git checkpoint, no false closure"
@@ -222,6 +253,14 @@
     "externalServiceWriteAuthorized": false
   },
   "nextCandidate": {
+    "id": "STORE-ANALYTICS-FRONTEND-20261007",
+    "state": "selected_frontend_goal_implementation_and_device_review_pending",
+    "customerOutcome": "Eight-area single analytics canvas with exclusive in-place details and provider-ready read-only hooks; local/device qualification then founder review.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "deferred": ["Backend/authentication/public tracking/provider integration", "Cursor integration", "APK/OCR and release qualification"]
+  },
+  "priorPurchaseGoalNextCandidate": {
     "id": "P04-P11-BOUNDED-PURCHASE-JOURNEY",
     "state": "selected_frontend_goal_implementation_and_device_review_pending",
     "customerOutcome": "Complete supplier opening, bill/goods timing, payments and returns without duplicate stock/debt; reload/audit/fix/reload then founder review.",

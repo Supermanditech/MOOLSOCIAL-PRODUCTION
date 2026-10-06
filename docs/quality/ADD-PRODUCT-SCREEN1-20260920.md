@@ -1,5 +1,69 @@
 # UAW-ADD-PRODUCT-SCREEN1-20260920
 
+## 7 October — approved single-canvas correction
+
+Latest founder YES supersedes the analytics rail, folders and separate report
+pages described below. Header contains Store identity only; the canvas supplies
+one date-range control and truthful local/provider freshness. Operational search,
+scanner, alerts and profile controls remain unchanged outside analytics.
+All eight areas show compact summaries; one tap expands details in place,
+opening another collapses its sibling, and repeating the tap closes it. No report
+route or Back step. Reuse existing calculations and one scoped provider request;
+expansion must not start reads. Clear prior data/expansion on scope changes,
+retain timeout, stale-response and unavailable-versus-zero protections.
+Fresh36-source founder admission and architect source review precede edits.
+Acceptance includes responsive, scope/period/retry and unchanged-record tests,
+host render inspection, guarded OPPO reload/retest and founder review. Existing
+backend/integration/APK/transaction/push exclusions remain. Prior evidence below
+is history, not the current navigation contract.
+
+## 7 October — bounded Store analytics frontend goal
+
+Founder approved replacement of the rejected analytics layout and made this a
+bounded goal. Actor: an approved Retailer/Grocery Store owner viewing that Store's
+operations and public customer activity. Classification: mvp_supporting, to make
+existing operational records understandable without adding transactional authority.
+
+Reuse the existing Store operating board in work_workspace_dashboard_screen.dart,
+work_models.dart, work_session.dart, work_services.dart and work_widgets.dart.
+Reuse Stock's compact home-only shelf. Overview, Public Store, Customer journey
+and Store operations open the requested views; reports use full-screen native
+presentation with Back and no navigation rails. Operations groups Buy/Restock,
+purchases/goods received, customer orders, Stock, Sales and money/dues. Existing
+approved Stock, purchase and Sales working screens remain unchanged.
+
+Overview is compact and information-first: readable figures with units and plain
+Indian business wording, explicit period, freshness and coverage, small optional
+trends only where verified history exists. Keep incoming supply, outgoing customer
+sales, collections, refunds and current/as-of balances distinct. Local listing
+readiness is not proof of public visibility. A missing or incomplete population,
+event feed or provider is unavailable, never zero. Do not infer conversion,
+abandonment causes, supplier totals or analytics from unrelated/partial records.
+
+Prepare read-only provider hooks in existing owned models/services/session with
+Store/SKU scope, period, source freshness, coverage and loading/error/unavailable/
+verified states. Scope results to the requested Store and period, reject stale or
+mismatched responses, preserve retry/leave/return state and existing saved records.
+Public activity is aggregate Store/product information, not browsing identities,
+precise customer trails, other Stores' baskets or payment credentials. The supplied
+Buy commit 6425d196e3a1254c6bd9be6be4788eadf45f1115 is read-only reference;
+Source14 local changes and Cursor integration are excluded.
+
+Acceptance: founder-input Check, exact ownership/regression/incremental/scope
+gates; focused contract and layout/navigation tests plus affected regressions;
+actual rendered normal/compact/enlarged layouts; guarded OPPO reload, screenshots
+and visual/technical defect list, bounded corrections and reload/retest. Reports
+must have no rails; Analytics home alone has the Stock-pattern shelf. Confirm
+figures against their actual source and unknown-versus-zero behavior. Stop with
+verified changed screens ready for founder screenwise review, listing remaining
+integration-bound checks. Founder acceptance remains a separate ticket-close gate.
+
+Excluded: backend tracking/authentication/posting, provider live instrumentation,
+Cursor branch mutation/integration, APK/OCR/build/install/release/push, fabricated
+runtime records, production transactions and redesign of approved neighbouring
+screens. No shared policy weakening or broader permissions. Existing histories
+below remain retained. Implementation and OPPO verification are pending.
+
 ## 2 October — P03-C02 CSV retry identity safeguard
 
 Founder explicitly answered YES to switching this existing ticket from audit to

@@ -570,6 +570,161 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('ANALYTICS read-only report contract', () {
+    final start = DateTime.utc(2026, 10, 1);
+    final end = DateTime.utc(2026, 10, 2);
+    final now = DateTime.utc(2026, 10, 3);
+    WorkspaceAnalyticsRequest request({
+      String store = 'store-A',
+      Iterable<String> skus = const ['sku-A'],
+    }) => WorkspaceAnalyticsRequest(
+      accountScope: 'account-A',
+      storeId: store,
+      start: start,
+      end: end,
+      skuIds: skus,
+    );
+    WorkspaceAnalyticsMetric metric({
+      num? value = 0,
+      WorkspaceAnalyticsState state = WorkspaceAnalyticsState.verified,
+      WorkspaceAnalyticsCoverage coverage = WorkspaceAnalyticsCoverage.complete,
+      DateTime? at,
+    }) => WorkspaceAnalyticsMetric(
+      id: 'visitors',
+      state: state,
+      coverage: coverage,
+      basis: WorkspaceAnalyticsBasis.periodActivity,
+      unit: WorkspaceAnalyticsUnit.count,
+      source: 'aggregate-visits',
+      value: value,
+      asOf: at ?? end,
+    );
+    WorkspaceAnalyticsSnapshot snapshot({
+      Iterable<WorkspaceAnalyticsMetric>? rows,
+      DateTime? until,
+    }) => WorkspaceAnalyticsSnapshot(
+      request: request(),
+      state: WorkspaceAnalyticsState.verified,
+      coverage: WorkspaceAnalyticsCoverage.complete,
+      source: 'aggregate-visits',
+      metrics: rows ?? [metric()],
+      updatedAt: now,
+      coveredFrom: start,
+      coveredUntil: until ?? end,
+    );
+
+    test('verified zero is distinct from unavailable and loading', () {
+      expect(metric().validAt(now), isTrue);
+      for (final state in [
+        WorkspaceAnalyticsState.loading,
+        WorkspaceAnalyticsState.error,
+        WorkspaceAnalyticsState.unavailable,
+      ]) {
+        expect(
+          metric(
+            state: state,
+            value: null,
+            coverage: WorkspaceAnalyticsCoverage.unknown,
+          ).validAt(now),
+          isTrue,
+        );
+        expect(
+          metric(
+            state: state,
+            coverage: WorkspaceAnalyticsCoverage.unknown,
+          ).validAt(now),
+          isFalse,
+        );
+      }
+    });
+    test('rejects another Store, SKU or requested period', () {
+      expect(snapshot().usableFor(request(), now), isTrue);
+      expect(snapshot().usableFor(request(store: 'store-B'), now), isFalse);
+      expect(snapshot().usableFor(request(skus: ['sku-B']), now), isFalse);
+      expect(
+        snapshot().usableFor(
+          WorkspaceAnalyticsRequest(
+            accountScope: 'account-A',
+            storeId: 'store-A',
+            start: start,
+            end: now,
+            skuIds: ['sku-A'],
+          ),
+          now,
+        ),
+        isFalse,
+      );
+    });
+    test(
+      'rejects incomplete full coverage, duplicate metrics and future data',
+      () {
+        expect(
+          snapshot(
+            until: start.add(const Duration(hours: 1)),
+          ).usableFor(request(), now),
+          isFalse,
+        );
+        expect(
+          snapshot(rows: [metric(), metric()]).usableFor(request(), now),
+          isFalse,
+        );
+        expect(
+          snapshot(
+            rows: [metric(at: now.add(const Duration(seconds: 1)))],
+          ).usableFor(request(), now),
+          isFalse,
+        );
+        expect(metric(value: double.nan).validAt(now), isFalse);
+        expect(metric(value: 0.5).validAt(now), isFalse);
+      },
+    );
+    test('freezes caller-owned SKU and metric collections', () {
+      final skus = ['sku-A'];
+      final rows = [metric()];
+      final frozenRequest = request(skus: skus);
+      final frozenSnapshot = snapshot(rows: rows);
+      skus.add('sku-B');
+      rows.clear();
+      expect(frozenRequest.skuIds, {'sku-A'});
+      expect(frozenSnapshot.metrics, hasLength(1));
+    });
+    test('partial coverage overlaps the requested period and limits period metrics', () {
+      WorkspaceAnalyticsSnapshot partial(DateTime from, DateTime until,
+          WorkspaceAnalyticsMetric row) => WorkspaceAnalyticsSnapshot(
+        request: request(), state: WorkspaceAnalyticsState.verified,
+        coverage: WorkspaceAnalyticsCoverage.partial, source: 'aggregate-visits',
+        metrics: [row], updatedAt: now, coveredFrom: from, coveredUntil: until);
+      final row = metric(coverage: WorkspaceAnalyticsCoverage.partial,
+        at: start.add(const Duration(hours: 12)));
+      expect(partial(start, start.add(const Duration(hours: 12)), row)
+        .usableFor(request(), now), isTrue);
+      expect(partial(start.subtract(const Duration(days: 2)),
+        start.subtract(const Duration(days: 1)), row).usableFor(request(), now), isFalse);
+      expect(partial(start.subtract(const Duration(days: 1)), start, row)
+        .usableFor(request(), now), isFalse);
+      expect(partial(start, end, metric()).usableFor(request(), now), isFalse);
+      expect(snapshot(rows: [metric(at: start.subtract(const Duration(hours: 1)))])
+        .usableFor(request(), now), isFalse);
+    });
+    test('aggregate rankings are immutable and reject duplicate or negative rows', () {
+      final rows = [const WorkspaceAnalyticsRank(id: 'district-A', label: 'District A', count: 0)];
+      WorkspaceAnalyticsBreakdown group(Iterable<WorkspaceAnalyticsRank> entries) =>
+        WorkspaceAnalyticsBreakdown(id: 'broad-locations', dimension: WorkspaceAnalyticsDimension.broadLocation,
+          coverage: WorkspaceAnalyticsCoverage.complete, asOf: end,
+          source: 'Automated aggregate fixture', rows: entries);
+      final frozen = group(rows);
+      rows.clear();
+      expect(frozen.rows, hasLength(1));
+      expect(frozen.validAt(now), isTrue);
+      expect(group([frozen.rows.single, frozen.rows.single]).validAt(now), isFalse);
+      expect(group([const WorkspaceAnalyticsRank(id: 'district-A', label: 'District A', count: -1)])
+        .validAt(now), isFalse);
+      expect(WorkspaceAnalyticsSnapshot(request: request(), state: WorkspaceAnalyticsState.unavailable,
+        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Provider', metrics: const [],
+        breakdowns: [frozen]).usableFor(request(), now), isFalse);
+    });
+  });
+
   // Local automated fixture evidence only; no runtime supplier/bill injection.
   WorkspacePurchaseEntryBook entryFixture({int revision = 1, String reference = 'EVAL-P-001'}) {
     final at = DateTime.utc(2026, 9, 30);

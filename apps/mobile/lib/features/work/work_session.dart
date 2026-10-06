@@ -569,6 +569,7 @@ class WorkSession extends ChangeNotifier {
     this.purchaseInvoiceCapture,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
+    this.analyticsReader,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -613,6 +614,7 @@ class WorkSession extends ChangeNotifier {
     this.purchaseInvoiceCapture,
     this.catalogueReference,
     this.productPhotoSupportDirectory,
+    this.analyticsReader,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -628,6 +630,70 @@ class WorkSession extends ChangeNotifier {
        proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
+  /// Read-only integration seam. No tracking, posting or local analytics seed.
+  final WorkspaceAnalyticsReader? analyticsReader;
+
+  WorkspaceAnalyticsRequest? analyticsRequest({
+    required DateTime start,
+    required DateTime end,
+    Iterable<String> skuIds = const [],
+  }) {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (_disposed || account == null || store == null) return null;
+    final request = WorkspaceAnalyticsRequest(
+      accountScope: account,
+      storeId: store,
+      start: start,
+      end: end,
+      skuIds: skuIds,
+    );
+    return request.valid ? request : null;
+  }
+
+  Future<WorkspaceAnalyticsSnapshot> readWorkspaceAnalytics(
+    WorkspaceAnalyticsRequest request,
+  ) async {
+    WorkspaceAnalyticsSnapshot absent(WorkspaceAnalyticsState state) =>
+        WorkspaceAnalyticsSnapshot(
+          request: request,
+          state: state,
+          coverage: WorkspaceAnalyticsCoverage.unknown,
+          source: 'Analytics provider',
+          metrics: const [],
+        );
+    bool current() =>
+        analyticsRequest(
+          start: request.start,
+          end: request.end,
+          skuIds: request.skuIds,
+        )?.sameScope(request) ==
+        true;
+    if (!current() || analyticsReader == null) {
+      return absent(WorkspaceAnalyticsState.unavailable);
+    }
+    var scopeChanged = false;
+    void watchScope() { if (!current()) scopeChanged = true; }
+    addListener(watchScope);
+    try {
+      // Release the scope watcher even if an integration provider never settles.
+      // A late result after this deadline cannot publish through this operation.
+      final response = await analyticsReader!(request).timeout(const Duration(seconds: 30));
+      if (scopeChanged || !current()) return absent(WorkspaceAnalyticsState.unavailable);
+      return response.usableFor(request, DateTime.now())
+          ? response
+          : absent(WorkspaceAnalyticsState.error);
+    } catch (_) {
+      return absent(
+        current() && !scopeChanged
+            ? WorkspaceAnalyticsState.error
+            : WorkspaceAnalyticsState.unavailable,
+      );
+    } finally {
+      removeListener(watchScope);
+    }
+  }
+
   final WorkProofPicker proofPicker;
   final WorkPendingProofStore? pendingProofStore;
   final WorkPendingProofStore? contactDraftStore;

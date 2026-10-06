@@ -1037,33 +1037,32 @@ Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
 }
 
 Future<void> _toggleHomeCategory(WidgetTester tester, String id) async {
-  final toggle = find.byKey(Key('store-category-toggle-$id'));
-  await tester.ensureVisible(toggle);
-  await tester.tap(toggle);
+  final report = id == 'capital' ? 'money' : id;
+  final tile = find.byKey(Key('store-analytics-$report'));
+  await tester.ensureVisible(tile);
+  await tester.tap(tile);
   await tester.pumpAndSettle();
 }
 
-void _expectHomeCategoryContrast(WidgetTester tester, String id) {
-  final category = find.byKey(Key('store-category-$id'));
-  final decoration = tester.widget<DecoratedBox>(category).decoration as BoxDecoration;
-  expect(decoration.gradient, isNull, reason: 'Rejected wide gradients must not return');
-  expect(decoration.color, Colors.white, reason: 'Rejected pastel fills must not return');
-  final backgrounds = [decoration.color!];
-  final badge = tester.widget<DecoratedBox>(find.byKey(Key('store-category-badge-$id'))).decoration as BoxDecoration;
-  final icon = tester.widget<Icon>(find.byKey(Key('store-category-icon-$id'))).color!;
-  final iconContrast = (icon.computeLuminance() + 0.05) / (badge.color!.computeLuminance() + 0.05);
-  expect(iconContrast, greaterThanOrEqualTo(3));
-  for (final text in tester.widgetList<Text>(find.descendant(of: category, matching: find.byType(Text)))) {
-    final foreground = text.style?.color;
-    if (foreground == null) continue;
-    for (final background in backgrounds) {
-      final first = foreground.computeLuminance();
-      final second = background.computeLuminance();
-      final ratio = (first > second ? first + 0.05 : second + 0.05) /
-          (first > second ? second + 0.05 : first + 0.05);
-      expect(ratio, greaterThanOrEqualTo(7), reason: '${text.data}: high-contrast text on category tint');
-    }
-  }
+
+
+Future<void> _captureAnalyticsFixture(WidgetTester tester, String name) async {
+  if (!const bool.fromEnvironment('MOOL_CAPTURE_ANALYTICS')) return;
+  const directory = String.fromEnvironment('MOOL_ANALYTICS_CAPTURE_DIR');
+  if (directory.isEmpty) throw StateError('Analytics capture needs an explicit evidence directory');
+  final root = find.byKey(const Key('store-review-root'));
+  final boundary = tester.renderObject<RenderRepaintBoundary>(root);
+  final image = (await tester.runAsync(() => boundary.toImage()))!;
+  try {
+    final bytes = (await tester.runAsync(() => image.toByteData(format: ui.ImageByteFormat.png)))!;
+    await tester.runAsync(() async {
+      final output = Directory(directory);
+      await output.create(recursive: true);
+      final file = File('$directory/$name.png');
+      if (await file.exists()) throw StateError('Preserve existing raster evidence: $name');
+      await file.writeAsBytes(bytes.buffer.asUint8List());
+    });
+  } finally { image.dispose(); }
 }
 
 void main() {
@@ -1971,8 +1970,9 @@ void main() {
     },
   );
 
-  WorkSession liveStore({ReviewWorkGateway? gateway}) =>
-      WorkSession(gateway: gateway)
+  WorkSession liveStore({ReviewWorkGateway? gateway, WorkspaceAnalyticsReader? analyticsReader}) =>
+      WorkSession(gateway: gateway, analyticsReader: analyticsReader,
+        contactDraftStore: analyticsReader == null ? null : _ContactDraftFixtureStore())
         ..seedVerifiedWorkspace()
         ..retailerSetupSaved = true
         ..reviewStage = WorkReviewStage.live
@@ -2667,10 +2667,257 @@ void main() {
     },
   );
 
+  testWidgets('ANALYTICS CANVAS summaries expand once in place without reads or navigation', (tester) async {
+    var reads = 0;
+    final work = liveStore(analyticsReader: (request) async {
+      reads++;
+      return WorkspaceAnalyticsSnapshot(request: request,
+        state: WorkspaceAnalyticsState.unavailable,
+        coverage: WorkspaceAnalyticsCoverage.unknown, source: 'Automated fixture', metrics: const []);
+    });
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing);
+    expect(find.byKey(const Key('work-dashboard-settings')), findsNothing);
+    expect(find.byKey(const Key('store-analytics-home-rail')), findsNothing);
+    for (final id in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+      expect(find.byKey(Key('store-analytics-$id')), findsOneWidget);
+      expect(find.byKey(Key('store-analytics-summary-$id')), findsOneWidget);
+    }
+    expect(reads, 1);
+    Future<void> toggle(String id) async {
+      final header = find.byKey(Key('store-analytics-$id'));
+      await tester.ensureVisible(header);
+      await tester.tap(header);
+      await tester.pumpAndSettle();
+    }
+    await toggle('public');
+    expect(find.byKey(const Key('store-analytics-detail-public')), findsOneWidget);
+    expect(find.byKey(const Key('store-analytics-report-back')), findsNothing);
+    await toggle('journey');
+    expect(find.byKey(const Key('store-analytics-detail-public')), findsNothing);
+    expect(find.byKey(const Key('store-analytics-detail-journey')), findsOneWidget);
+    await toggle('journey');
+    expect(find.byKey(const Key('store-analytics-detail-journey')), findsNothing);
+    for (final id in ['supply', 'receiving']) {
+      await toggle(id);
+      expect(find.byKey(Key('store-analytics-detail-$id')), findsOneWidget);
+      await toggle(id);
+    }
+    expect(reads, 1);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS public and journey inline details preserve Store records', (tester) async {
+    final work = liveStore();
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    await _captureAnalyticsFixture(tester, 'canvas-automated-fixture');
+    for (final id in ['public', 'journey']) {
+      final tile = find.byKey(Key('store-analytics-$id'));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('store-analytics-detail-$id')), findsOneWidget);
+      expect(find.byKey(const Key('store-analytics-report-back')), findsNothing);
+      expect(find.byKey(const Key('store-analytics-home-rail')), findsNothing);
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      expect(find.text(id == 'public' ? 'Visitors' : 'Visited Store'), findsOneWidget);
+      await _captureAnalyticsFixture(tester, '$id-inline-automated-fixture');
+      await tester.tap(find.byTooltip('Collapse details'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('store-analytics-detail-$id')), findsNothing);
+    }
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS changing period rejects delayed earlier data', (tester) async {
+    final pending = <Completer<WorkspaceAnalyticsSnapshot>>[];
+    final requests = <WorkspaceAnalyticsRequest>[];
+    final work = liveStore(analyticsReader: (request) {
+      requests.add(request);
+      final result = Completer<WorkspaceAnalyticsSnapshot>();
+      pending.add(result);
+      return result.future;
+    });
+    WorkspaceAnalyticsSnapshot response(int index, int count) {
+      final request = requests[index];
+      return WorkspaceAnalyticsSnapshot(request: request,
+        state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+        source: 'Automated aggregate fixture', updatedAt: DateTime.now(),
+        coveredFrom: request.start, coveredUntil: request.end,
+        metrics: [WorkspaceAnalyticsMetric(id: 'visitors', state: WorkspaceAnalyticsState.verified,
+          coverage: WorkspaceAnalyticsCoverage.complete, basis: WorkspaceAnalyticsBasis.periodActivity,
+          unit: WorkspaceAnalyticsUnit.count, source: 'Automated aggregate fixture', value: count, asOf: request.end)]);
+    }
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    final public = find.byKey(const Key('store-analytics-public'));
+    await tester.ensureVisible(public);
+    await tester.tap(public);
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(1));
+    expect(find.text('Loading analytics…'), findsOneWidget);
+    // Explicit recovery must remain possible even if the provider never settles.
+    await tester.ensureVisible(find.byTooltip('Refresh analytics'));
+    await tester.tap(find.byTooltip('Refresh analytics'));
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(2));
+    await tester.tap(find.byKey(const Key('store-analytics-period-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Last 7 days').last);
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(3));
+    pending[2].complete(response(2, 7));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('store-analytics-value-visitors'))).data, '7');
+    expect(tester.widget<Text>(find.byKey(const Key('store-analytics-value-visits'))).data, '—');
+    pending[0].complete(response(0, 91));
+    pending[1].complete(response(1, 92));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('store-analytics-value-visitors'))).data, '7');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS hanging reader has a bounded lifetime and ignores late completion', (tester) async {
+    final pending = Completer<WorkspaceAnalyticsSnapshot>();
+    final work = liveStore(analyticsReader: (_) => pending.future);
+    final end = DateTime.now();
+    final request = work.analyticsRequest(start: end.subtract(const Duration(hours: 1)), end: end)!;
+    WorkspaceAnalyticsSnapshot? received;
+    final operation = work.readWorkspaceAnalytics(request).then((value) => received = value);
+    await tester.pump(const Duration(seconds: 29));
+    expect(received, isNull);
+    await tester.pump(const Duration(seconds: 2));
+    await operation;
+    expect(received!.state, WorkspaceAnalyticsState.error);
+    expect(received!.metrics, isEmpty);
+    pending.complete(WorkspaceAnalyticsSnapshot(request: request,
+      state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+      source: 'Automated aggregate fixture', updatedAt: DateTime.now(), coveredFrom: request.start,
+      coveredUntil: request.end, metrics: const []));
+    await tester.pump();
+    expect(received!.state, WorkspaceAnalyticsState.error);
+    work.dispose();
+  });
+
+  test('ANALYTICS reader rejects an intervening Store exit and return', () async {
+    final pending = Completer<WorkspaceAnalyticsSnapshot>();
+    final work = liveStore(analyticsReader: (_) => pending.future);
+    final store = work.activeWorkspace;
+    final end = DateTime.now();
+    final request = work.analyticsRequest(start: end.subtract(const Duration(hours: 1)), end: end)!;
+    final result = work.readWorkspaceAnalytics(request);
+    work.activeWorkspace = null;
+    work.showNotice('Automated scope transition fixture');
+    work.activeWorkspace = store;
+    work.showNotice('Automated return fixture');
+    pending.complete(WorkspaceAnalyticsSnapshot(request: request,
+      state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+      source: 'Automated aggregate fixture', updatedAt: DateTime.now(), coveredFrom: request.start,
+      coveredUntil: request.end, metrics: const []));
+    expect((await result).state, WorkspaceAnalyticsState.unavailable);
+    work.dispose();
+  });
+
+  testWidgets('ANALYTICS refresh distinguishes wrong basis, pending, verified zero and error', (tester) async {
+    var reads = 0;
+    final work = liveStore(analyticsReader: (request) async {
+      reads++;
+      if (reads == 4) throw StateError('Automated provider failure');
+      if (reads == 2) {
+        return WorkspaceAnalyticsSnapshot(request: request,
+        state: WorkspaceAnalyticsState.loading, coverage: WorkspaceAnalyticsCoverage.unknown,
+        source: 'Automated aggregate fixture', metrics: const []);
+      }
+      return WorkspaceAnalyticsSnapshot(request: request,
+        state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+        source: 'Automated aggregate fixture', updatedAt: DateTime.now(),
+        coveredFrom: request.start, coveredUntil: request.end,
+        metrics: [WorkspaceAnalyticsMetric(id: 'visitors', state: WorkspaceAnalyticsState.verified,
+          coverage: WorkspaceAnalyticsCoverage.complete,
+          basis: reads == 1 ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity,
+          unit: WorkspaceAnalyticsUnit.count, source: 'Automated aggregate fixture', value: 0, asOf: request.end),
+          WorkspaceAnalyticsMetric(id: 'visible-skus', state: WorkspaceAnalyticsState.verified,
+            coverage: WorkspaceAnalyticsCoverage.complete, basis: WorkspaceAnalyticsBasis.periodActivity,
+            unit: WorkspaceAnalyticsUnit.count, source: 'Automated aggregate fixture', value: 50, asOf: request.end)],
+        breakdowns: [WorkspaceAnalyticsBreakdown(id: 'broad-locations', dimension: WorkspaceAnalyticsDimension.broadLocation,
+          coverage: WorkspaceAnalyticsCoverage.complete, asOf: request.end, source: 'Automated aggregate fixture',
+          rows: const [WorkspaceAnalyticsRank(id: 'district-A', label: 'District A', count: 3)])]);
+    });
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    final public = find.byKey(const Key('store-analytics-public'));
+    await tester.ensureVisible(public);
+    await tester.tap(public);
+    await tester.pumpAndSettle();
+    String visitors() => tester.widget<Text>(find.byKey(const Key('store-analytics-value-visitors'))).data!;
+    expect(visitors(), '—');
+    final refresh = find.byTooltip('Refresh analytics');
+    await tester.ensureVisible(refresh);
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(find.text('Report update pending'), findsOneWidget);
+    expect(refresh.hitTestable(), findsOneWidget);
+    expect(visitors(), '—');
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(visitors(), '0');
+    expect(tester.widget<Text>(find.byKey(const Key('store-analytics-value-visible-skus'))).data, '—');
+    expect(find.text('District A'), findsOneWidget);
+    await tester.tap(refresh);
+    await tester.pumpAndSettle();
+    expect(find.text('Could not load analytics'), findsOneWidget);
+    expect(find.byTooltip('Retry analytics'), findsOneWidget);
+    expect(visitors(), '—');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS percentages require matching cohort basis and unit', (tester) async {
+    var phase = 0;
+    final work = liveStore(analyticsReader: (request) async {
+      WorkspaceAnalyticsMetric rate(String id, double value) => WorkspaceAnalyticsMetric(
+        id: id, state: WorkspaceAnalyticsState.verified,
+        coverage: WorkspaceAnalyticsCoverage.complete,
+        basis: phase == 2 ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity,
+        unit: phase == 3 ? WorkspaceAnalyticsUnit.count : WorkspaceAnalyticsUnit.percent,
+        cohortId: phase == 0 ? null : phase == 1 ? '   ' : 'tracked-cohort',
+        source: 'Automated aggregate fixture', value: value, asOf: request.end);
+      return WorkspaceAnalyticsSnapshot(request: request,
+        state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+        source: 'Automated aggregate fixture', updatedAt: DateTime.now(),
+        coveredFrom: request.start, coveredUntil: request.end,
+        metrics: [rate('order-conversion', 0), rate('cart-dropoff', 25)]);
+    });
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    final journey = find.byKey(const Key('store-analytics-journey'));
+    await tester.ensureVisible(journey);
+    await tester.tap(journey);
+    await tester.pumpAndSettle();
+    String value(String id) => tester.widget<Text>(find.byKey(Key('store-analytics-value-$id'))).data!;
+    for (phase = 0; phase < 5; phase++) {
+      if (phase > 0) {
+        await tester.ensureVisible(find.byTooltip('Refresh analytics'));
+        await tester.tap(find.byTooltip('Refresh analytics'));
+        await tester.pumpAndSettle();
+      }
+      expect(value('order-conversion'), phase == 4 ? '0.0%' : '—');
+      expect(value('cart-dropoff'), phase == 4 ? '25.0%' : '—');
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final display in [
     (const Size(360, 720), 1.0),
     (const Size(320, 568), 2.0),
     (const Size(720, 360), 1.0),
+    (const Size(915, 412), 1.6),
   ]) {
     testWidgets('HOMEBOARD analytics only and Stock entry routes $display', (
       tester,
@@ -2695,133 +2942,47 @@ void main() {
       expect(find.byKey(const Key('work-home-actions-toggle')), findsNothing);
       expect(find.byKey(const Key('work-store-activity-deck')), findsNothing);
       expect(find.byKey(const Key('work-quick-add-products')), findsNothing);
-      // An unhydrated or incomplete ledger must not become a zero sales total.
-      expect(find.text('Today'), findsNothing);
-      expect(find.text('Stock & visibility'), findsOneWidget);
-      for (final id in ['sales', 'stock', 'orders', 'money', 'capital']) {
-        expect(find.byKey(Key('store-category-toggle-$id')), findsOneWidget);
-        _expectHomeCategoryContrast(tester, id);
-        expect(tester.getSize(find.byKey(Key('store-category-toggle-$id'))).height, greaterThanOrEqualTo(48));
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.byKey(const Key('store-analytics-home-rail')), findsNothing);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing);
+      if (display.$1.width == 915 && display.$2 > 1.3) {
+        await _captureAnalyticsFixture(tester, 'canvas-large-landscape-automated-fixture');
       }
-      final categoryColours = <Color>{};
-      for (final id in ['sales', 'stock', 'orders', 'money', 'capital']) {
-        categoryColours.add((tester.widget<DecoratedBox>(find.byKey(Key('store-category-badge-$id'))).decoration as BoxDecoration).color!);
-        expect((tester.widget<DecoratedBox>(find.byKey(Key('store-category-$id'))).decoration as BoxDecoration).boxShadow, isEmpty);
+      for (final report in ['supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+        final tile = find.byKey(Key('store-analytics-$report'));
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key('store-analytics-detail-$report')), findsOneWidget);
+        expect(find.byKey(const Key('store-analytics-report-back')), findsNothing);
+        if (report == 'stock') {
+          expect(find.byKey(const Key('store-analytics-stock-valuation-guide')), findsOneWidget);
+        }
+        if (display.$1.width == 360 && display.$2 == 1) {
+          await _captureAnalyticsFixture(tester, '$report-inline-automated-fixture');
+        }
+        if (report == 'money') {
+          for (final id in ['payables', 'trade-cash', 'stock-days']) {
+            expect(tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data, '—');
+          }
+        }
+        if (report == 'sales') {
+          for (final id in ['billed', 'collections', 'average-bill']) {
+            expect(tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data, '—');
+          }
+          final info = find.byKey(const Key('store-overview-info-collections'));
+          await tester.ensureVisible(info);
+          await tester.tap(info);
+          await tester.pumpAndSettle();
+          expect(find.text('Complete payment history is not available yet'), findsOneWidget);
+          await tester.tap(find.text('Close'));
+          await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(find.byTooltip('Collapse details'));
+        await tester.tap(find.byTooltip('Collapse details'));
+        await tester.pumpAndSettle();
       }
-      expect(categoryColours.length, 5);
-      for (final title in ['Sales & collections', 'Stock & visibility', 'Orders & fulfilment', 'Receivables & payables', 'Working capital']) {
-        final text = tester.renderObject<RenderParagraph>(find.text(title));
-        expect(text.size.width, greaterThanOrEqualTo(text.getMinIntrinsicWidth(double.infinity) - 0.1),
-          reason: '$title should wrap between words, not inside a word');
-      }
-      if (display.$1.width == 360 && display.$2 == 1) {
-        expect(tester.getRect(find.byKey(const Key('store-overview-stock-days'))).bottom,
-          lessThanOrEqualTo(tester.getRect(find.byKey(const Key('work-store-operating-board'))).bottom));
-      }
-      for (final id in ['billed', 'collections', 'stock-cost', 'low-stock',
-        'recorded-open-orders', 'overdue-fulfilment', 'customer-dues', 'payables', 'trade-cash', 'stock-days']) {
-        expect(find.byKey(Key('store-overview-$id')), findsOneWidget);
-      }
-      for (final id in ['invoice-count', 'stock-sale', 'stock-spread', 'awaiting-acceptance']) {
-        expect(find.byKey(Key('store-overview-$id')), findsNothing);
-      }
-      expect(find.byKey(const Key('store-overview-details-toggle')), findsNothing);
-      await _toggleHomeCategory(tester, 'sales');
-      expect((tester.widget<DecoratedBox>(find.byKey(const Key('store-category-sales'))).decoration as BoxDecoration).boxShadow, isNotEmpty);
-      await _toggleHomeCategory(tester, 'stock');
-      expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget);
-      expect(find.byKey(const Key('store-overview-stock-spread')), findsOneWidget);
-      final stockCollapse = find.byKey(const Key('store-category-collapse-end-stock'));
-      await tester.ensureVisible(stockCollapse);
-      await tester.pumpAndSettle();
-      expect(tester.getSize(stockCollapse).height, greaterThanOrEqualTo(48));
-      await tester.tap(stockCollapse);
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('store-overview-invoice-count')), findsOneWidget,
-        reason: 'Closing Stock must not close Sales');
-      expect(find.byKey(const Key('store-overview-stock-spread')), findsNothing);
-      await _toggleHomeCategory(tester, 'stock');
-      await _toggleHomeCategory(tester, 'money');
-      for (final id in ['sales', 'stock', 'money']) {
-        _expectHomeCategoryContrast(tester, id);
-      }
-      expect(find.text('Current stock value'), findsOneWidget);
-      for (final label in ['Billed today', 'Collected today', 'Invoices today',
-        'Saved products', 'Low stock', 'Out of stock', 'Money in stock',
-        'Stock sale value', 'Potential gross profit*']) {
-        expect(find.text(label), findsOneWidget);
-        final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-        expect(paragraph.size.height,
-          greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - 0.1),
-          reason: '$label must not clip its wrapped text');
-      }
-      expect(find.text('Sales & collections'), findsOneWidget);
-      expect(find.text('Store overview'), findsOneWidget);
-      expect(find.text('Phone records · update time unavailable'), findsOneWidget);
-      expect(find.text('Online activity & forecasts · Not available yet'), findsNothing,
-        reason: 'Unavailable online analytics are explained once inside Stock details');
-      expect(find.text('Working capital'), findsOneWidget);
-      for (final id in ['payables', 'trade-cash', 'stock-days']) {
-        expect(tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data, '—');
-        final metric = tester.widget<InkWell>(find.byKey(Key('store-overview-info-$id')));
-        expect(metric.onTap, isNotNull);
-        expect(find.descendant(of: find.byKey(Key('store-metric-band-$id')),
-          matching: find.byIcon(Icons.north_east_rounded)), findsNothing);
-      }
-      expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
-      await _toggleHomeCategory(tester, 'capital');
-      expect(find.byKey(const Key('store-working-capital-coverage')), findsOneWidget);
-      for (final id in ['billed', 'stock-cost', 'stock-spread', 'payables', 'stock-days']) {
-        expect(find.byKey(Key('store-overview-$id')), findsOneWidget);
-      }
-      await _toggleHomeCategory(tester, 'capital');
-      expect(find.byKey(const Key('store-working-capital-coverage')), findsNothing);
-      expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
-      expect(find.byKey(const Key('store-overview-settlement-available')), findsNothing);
-      expect(tester.widget<Text>(find.byKey(const Key('store-overview-average-bill'))).data, '—');
-      if (display.$1.width == 360 && display.$2 == 1) {
-        final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
-        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
-        expect(billedRect.top, collectedRect.top);
-        expect(billedRect.right, lessThan(collectedRect.left));
-        expect(tester.widget<DecoratedBox>(find.byKey(const Key('store-category-stock'))).decoration,
-          isA<BoxDecoration>());
-        expect(tester.widget<Text>(find.byKey(const Key('store-overview-billed'))).style?.fontSize, 17);
-        expect(find.byKey(const Key('store-metric-tile-billed')), findsNothing);
-      } else if (display.$2 == 2) {
-        final billedRect = tester.getRect(find.byKey(const Key('store-metric-band-billed')));
-        final collectedRect = tester.getRect(find.byKey(const Key('store-metric-band-collections')));
-        expect(billedRect.bottom, lessThan(collectedRect.top));
-        expect(find.byKey(const Key('store-overview-column-guide-collections')), findsNothing);
-      }
-      final billedInfo = find.byKey(
-        const Key('store-overview-info-collections'),
-      );
-      await tester.ensureVisible(billedInfo);
-      await tester.tap(billedInfo);
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Complete payment history is not available yet'),
-        findsOneWidget,
-      );
-      await tester.tap(find.text('Close'));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<Text>(find.byKey(const Key('store-overview-billed')))
-            .data,
-        '—',
-      );
-      expect(
-        tester
-            .widget<Text>(find.byKey(const Key('store-overview-collections')))
-            .data,
-        '—',
-      );
-      await tester.ensureVisible(
-        find.text('Online views, carts, repeat purchases and forecasts need verified activity and more history.'),
-      );
-      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.tap(find.byKey(const Key('work-store-stock')));
       await tester.pumpAndSettle();
@@ -3176,10 +3337,12 @@ void main() {
       );
       String value(String id) =>
           tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data!;
-      expect(value('stock-cost'), '₹160');
+      expect(tester.widget<Semantics>(find.byKey(const Key('store-analytics-summary-stock'))).properties.label,
+        contains('₹160 at purchase cost'));
       expect(find.byKey(const Key('store-overview-stock-sale')), findsNothing);
       expect(find.byKey(const Key('store-insight-visibility')), findsNothing);
       await _toggleHomeCategory(tester, 'stock');
+      expect(value('stock-cost'), '₹160');
       expect(value('stock-sale'), '₹240');
       expect(value('stock-spread'), '₹80');
       expect(value('low-stock'), '1');
@@ -42320,7 +42483,7 @@ void main() {
       expect(work.currentWorkspaceOrderId, selected);
       expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
       expect(
-        find.byKey(const Key('work-sales-new-counter-sale')).hitTestable(),
+        find.byKey(const Key('work-sales-start-counter')).hitTestable(),
         findsOneWidget,
       );
       expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
@@ -42395,7 +42558,16 @@ void main() {
         await captureStoreView(tester, 'counter-refused-save-$scale');
         expect(tester.takeException(), isNull);
         // Recovery uses real controls; do not fix selection directly in tests.
-        await tester.tap(find.byKey(const Key('work-counter-close')));
+        await tester.tap(find.byKey(const Key('work-back')));
+        await tester.pumpAndSettle();
+        // Full-screen Back first returns from Review to Items. Only the next
+        // Back attempts to leave the protected Counter draft.
+        expect(find.byKey(const Key('work-order-review-summary')), findsNothing);
+        expect(work.currentWorkspaceOrder, same(incoming));
+        expect(work.workspaceOrderCustomer, '9829012345');
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(work.workspaceInvoices, isEmpty);
+        await tester.tap(find.byKey(const Key('work-back')));
         await tester.pumpAndSettle();
         if (storeReviewRuntime) {
           // Runtime binds an account: a conflicted selected order cannot be
