@@ -3715,8 +3715,11 @@ void main() {
     final button = find.byKey(const Key('work-purchase-action-centre-open'));
     expect(tester.widget(button), isA<OutlinedButton>());
     final style = tester.widget<OutlinedButton>(button).style!;
-    final background = style.backgroundColor!.resolve({})!;
+    final capsule = find.byKey(const Key('work-purchase-management-fill'));
+    expect(capsule, findsOneWidget);
+    final background = (tester.widget<Container>(capsule).decoration! as BoxDecoration).color!;
     final foreground = style.foregroundColor!.resolve({})!;
+    expect(style.backgroundColor!.resolve({}), Colors.transparent);
     expect(background, MoolColors.navy);
     expect(foreground, Colors.white);
     expect((foreground.computeLuminance() + .05) / (background.computeLuminance() + .05),
@@ -3724,6 +3727,9 @@ void main() {
     expect(find.descendant(of: button, matching: find.byIcon(Icons.chevron_right)), findsOneWidget);
     expect(button.hitTestable(), findsOneWidget);
     expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(capsule).height, lessThanOrEqualTo(34),
+      reason: 'Visible fill is slimmer than the accessible 48dp button target.');
+    expect(tester.getSize(capsule).width, lessThanOrEqualTo(135));
     expect(tester.getSize(button).width, lessThanOrEqualTo(145),
       reason: 'Keep the solid entry compact without shrinking its label or tap height.');
     expect(tester.widget<Text>(find.descendant(of: button,

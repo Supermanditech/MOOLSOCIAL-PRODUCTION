@@ -15957,13 +15957,17 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     child: OutlinedButton(
     key: const Key('work-purchase-action-centre-open'), onPressed: _openActionCentre,
     style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      backgroundColor: MoolColors.navy, foregroundColor: Colors.white,
-      side: const BorderSide(color: MoolColors.navy)),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      padding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent, foregroundColor: Colors.white,
+      side: BorderSide.none),
+    child: Container(key: const Key('work-purchase-management-fill'),
+      constraints: const BoxConstraints(minHeight: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      decoration: BoxDecoration(color: MoolColors.navy, borderRadius: BorderRadius.circular(8)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
       const Flexible(child: Text('Manage purchases', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
-      const SizedBox(width: 2), const Icon(Icons.chevron_right, size: 16),
-    ])));
+      const SizedBox(width: 2), const Icon(Icons.chevron_right, size: 14),
+    ]))));
 
   static const _purchaseActions = [
     ('Supplier bills', [
