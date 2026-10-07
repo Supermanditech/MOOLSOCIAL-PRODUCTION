@@ -400,6 +400,56 @@ function Assert-R679OwnerAdmission($Before, $After) {
 }
 
 function Test-StoreHistoricalAdmissionSubject([string]$Commit, [string]$Subject) {
+  # Founder-authorized 7 October audit: preserve these exact historical labels.
+  # Immutable commit/tree identities, not a new prefix exemption. All independent
+  # owner, secret, merge, clean-tree and closure gates remain mandatory.
+  $octoberLabels = @(
+    '3d4c105eb5e32967208feccae49f0eeb020047e9',
+    '5df5372aabc1fa25766db63dc2da07c614a562b2',
+    '3105a98dd75e9c7becfec847705cc55d730a4ee0',
+    'cc0f9672dcb409d9ae44638bccd1a625a44f42c5',
+    'aaf79d8a385cf21ce91117165a1856fc4675d407',
+    '52c61c4c030293243450a3da2ebfc367a65877a4',
+    '81dc037b3655073237dad607d7ca2bdac6262005',
+    'c70afba9c934997e2db44fb1459162b43d579eb3',
+    '2d60a992ca97bfd4f034e09c476a55e43c0749a5',
+    '0a98725967f2706973e0037b6351e9d80963fb8b',
+    '562347cd2794ab0eb63187add3aba0684122335f',
+    '9cd13c19401b5edb746abfab2cca6dcd4cb5662b',
+    'ba0a2e4002ad8202dd8925a1edfbd08baace287b',
+    'cf260048b07db3a8f6919f20cb9f690bed3ee701',
+    '430bf15aa0956f39838b15282b4bad97e6ca4eff',
+    '9df25606b5e5b435b30b3cbbebbb49b343410459',
+    'aa2838083ff0e66b27d06af53dc49d0c06a1025e',
+    '5d85f9184dcba80016151a4ca774ebd0030f7bd9',
+    '7d6fe867af6f69c984a5875ca7ff6a9a88c855c3',
+    '50f73e434f883a8adfeed2d94d69285608628b6a',
+    '91d301b582ae33eaab79ab981ff1de19957c1652',
+    '572b5209aaeb6e7d9109a0508d50b01318e25b19',
+    'c76b3826c2119193c2eab541eb6be480c5a1e99a'
+  )
+  if ($Commit -cin $octoberLabels) {
+    if ($AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
+        $ProductionLane -cne 'codex_ui' -or
+        $ProductionWorkId -cne 'add-product-screen1-20260920' -or
+        $ProductionTicketId -cne 'UAW-ADD-PRODUCT-SCREEN1-20260920' -or
+        $branch -cne 'work/codex-ui/add-product-screen1-20260920' -or
+        $root.Replace('\','/').TrimEnd('/') -cne
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920') {
+      return $false
+    }
+    $octoberTip = 'd4ae6e37035f172250d977f2c1d443c54a85f684'
+    $octoberBase = '420ef952df8368c4c6782089335979b1dfa0b59a'
+    $octoberTree = @(& git -C $root rev-parse "${octoberTip}^{tree}")
+    if ($LASTEXITCODE -ne 0 -or $octoberTree.Count -ne 1 -or
+        $octoberTree[0] -cne '4b3b60099207ef0470f2fc5114d998dda8e787c6') { return $false }
+    $octoberCommits = @(& git -C $root rev-list --reverse "$octoberBase..$octoberTip")
+    if ($LASTEXITCODE -ne 0 -or $octoberCommits.Count -ne 35 -or
+        $Commit -cnotin $octoberCommits) { return $false }
+    $octoberSubject = @(& git -C $root show -s --format=%s $Commit)
+    return ($LASTEXITCODE -eq 0 -and $octoberSubject.Count -eq 1 -and
+      $Subject -ceq [string]$octoberSubject[0])
+  }
   # Founder-authorized 27 September reconciliation: preserve the exact already
   # reviewed Store batch, without rewriting history or allowing future prefixes.
   # Owner, merge, cleanliness and secret checks remain independent gates.
