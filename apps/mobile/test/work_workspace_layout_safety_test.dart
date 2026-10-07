@@ -2699,6 +2699,20 @@ void main() {
         await mount(tester, route: '/app/work/workspace/dashboard', work: work,
           viewport: scenario.$1, textScale: scenario.$2, openHomeActions: false);
         void checkAmounts() {
+          final captions = find.byWidgetPredicate((w) => w is RichText && w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('analytics-') && (w.key! as ValueKey<String>).value.endsWith('-amount'));
+          for (final element in captions.evaluate()) {
+            final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == element));
+            final token = paragraph.text.toPlainText();
+            expect(paragraph.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: token.length)), hasLength(1),
+              reason: 'Chart caption currency token must not wrap internally');
+            expect(paragraph.size.width, greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .1));
+            final span = find.byElementPredicate((e) => e == element);
+            final available = tester.getRect(find.ancestor(of: span, matching: find.byType(LayoutBuilder)).first);
+            final actual = tester.getRect(span);
+            expect(actual.left, greaterThanOrEqualTo(available.left - .1));
+            expect(actual.right, lessThanOrEqualTo(available.right + .1));
+          }
           final amounts = find.byWidgetPredicate((w) => w is Text && (w.data?.contains(',') ?? false) &&
             (w.data?.startsWith('₹') == true || RegExp(r'^\d[\d,]+$').hasMatch(w.data ?? '')));
           expect(amounts, findsWidgets);
@@ -2993,6 +3007,16 @@ void main() {
     await _toggleHomeCategory(tester, 'sales');
     expect(find.byKey(const Key('analytics-sales-bars')), findsOneWidget);
     expect(find.text('Saved bills · last 7 days'), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-line')), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const Key('analytics-sales-point-6'))).dy,
+      tester.getTopLeft(find.byKey(const Key('analytics-sales-point-0'))).dy,
+      reason: 'Seven dates should remain one row at normal 360px text size');
+    final point = find.byKey(const Key('analytics-sales-point-6'));
+    await tester.ensureVisible(point); await tester.tap(point); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-sales-selected-point')), findsOneWidget);
+    expect(tester.widget<Semantics>(find.byKey(const Key('analytics-sales-selected-point'))).properties.label, contains('₹200.25'));
+    await tester.ensureVisible(find.byKey(const Key('analytics-sales-plot'))); await tester.pumpAndSettle();
+    await _captureAnalyticsFixture(tester, 'motion-sales-plot-host-fixture');
     expect(find.text('₹200.25 today · ₹100 yesterday'), findsOneWidget,
       reason: 'Yesterday later than the current clock must not enter the comparison');
     expect(find.text('Up ₹100.25 · through the same time'), findsOneWidget);
@@ -3023,6 +3047,19 @@ void main() {
       work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
       expect(find.text('Down ${boundary.$3} · through the same time'), findsOneWidget);
       expect(find.text(boundary.$3), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('analytics-sales-point-5')));
+      await tester.tap(find.byKey(const Key('analytics-sales-point-5'))); await tester.pumpAndSettle();
+      final chartAmount = tester.renderObject<RenderParagraph>(find.byKey(const Key('analytics-sales-selected-point-amount')));
+      final token = chartAmount.text.toPlainText();
+      expect(token, boundary.$3);
+      expect(chartAmount.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: token.length)), hasLength(1));
+      tester.view.physicalSize = const Size(320, 568);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      await tester.pumpAndSettle();
+      final enlargedAmount = tester.renderObject<RenderParagraph>(find.byKey(const Key('analytics-sales-selected-point-amount')));
+      expect(enlargedAmount.text.toPlainText(), boundary.$3);
+      expect(enlargedAmount.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: boundary.$3.length)), hasLength(1));
+      expect(enlargedAmount.size.width, greaterThanOrEqualTo(enlargedAmount.getMaxIntrinsicWidth(double.infinity) - .1));
       final number = tester.renderObject<RenderParagraph>(find.text(boundary.$3));
       expect(number.size.width, greaterThanOrEqualTo(number.getMaxIntrinsicWidth(double.infinity) - .1));
       await tester.ensureVisible(find.text(boundary.$3)); await tester.pumpAndSettle();
@@ -3275,6 +3312,110 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('ANALYTICS REPORT visual surfaces preserve unavailable data', (tester) async {
+    await mount(tester, route: '/app/work/workspace/dashboard', work: liveStore(), openHomeActions: false);
+    await _toggleHomeCategory(tester, 'public');
+    expect(find.byKey(const Key('analytics-provider-cell-visitors')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-breakdown-broad-locations')), findsOneWidget);
+    final heading = tester.widget<Container>(find.byKey(const Key('analytics-report-heading-public')));
+    expect((heading.decoration as BoxDecoration).gradient, isNotNull);
+    final unknown = tester.widget<Text>(find.byKey(const Key('store-analytics-value-visitors')));
+    expect(unknown.data, '—');
+    expect(unknown.style!.color, const Color(0xFF536078));
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await _toggleHomeCategory(tester, 'journey');
+    expect(find.byKey(const Key('analytics-journey-stage-journey-cart')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'report-unknown-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS MOTION stock comparison uses real saved valuation', (tester) async {
+    final work = storeViewFixture();
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final base = work.workspaceCatalogueItems.first;
+    work.workspaceCatalogueItems..clear()..add(base.copyWith(stock: 5,
+      stockMode: WorkspaceStockMode.exactQuantity, purchasePrice: 100, sellingPrice: 200));
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 568), textScale: 2, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'stock');
+    final cost = find.byKey(const Key('analytics-stock-value-cost'));
+    final sale = find.byKey(const Key('analytics-stock-value-sale'));
+    expect(cost, findsOneWidget); expect(sale, findsOneWidget);
+    expect(tester.getSize(cost).width, closeTo(tester.getSize(sale).width / 2, .1));
+    expect(tester.widget<Semantics>(find.byKey(const Key('analytics-stock-caption-cost'))).properties.label, 'Money in stock · ₹500');
+    expect(tester.widget<Semantics>(find.byKey(const Key('analytics-stock-caption-sale'))).properties.label, 'Stock sale value · ₹1,000');
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.byKey(const Key('analytics-stock-value-comparison'))); await tester.pumpAndSettle();
+    await _captureAnalyticsFixture(tester, 'motion-stock-comparison-host-fixture');
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first.copyWith(stock: 0);
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+    expect(tester.getSize(cost).width, 0); expect(tester.getSize(sale).width, 0);
+    work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first.copyWith(stockMode: WorkspaceStockMode.availabilityOnly);
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-stock-value-comparison')), findsNothing,
+      reason: 'Availability-only records cannot imply a known monetary valuation');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final reduced in [false, true]) {
+    testWidgets('ANALYTICS MOTION reveal geometry reduced=$reduced', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue = FakeAccessibilityFeatures(disableAnimations: reduced);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      final work = storeViewFixture();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final base = work.workspaceCatalogueItems.first;
+      work.workspaceCatalogueItems..clear()..add(base.copyWith(stock: 5,
+        stockMode: WorkspaceStockMode.exactQuantity, purchasePrice: 100, sellingPrice: 200));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+      tester.widget<InkWell>(find.byKey(const Key('store-analytics-stock'))).onTap!();
+      await tester.pump(); await tester.pump(const Duration(milliseconds: 40));
+      final clip = find.byKey(const Key('analytics-chart-clip-stock-cost'));
+      expect(clip, reduced ? findsNothing : findsOneWidget);
+      expect(tester.widget<Semantics>(find.byKey(const Key('analytics-stock-caption-cost'))).properties.label, 'Money in stock · ₹500');
+      if (!reduced) {
+        final before = tester.widget<ClipRect>(clip).clipper!.getClip(const Size(200, 16));
+        expect(before.width, inExclusiveRange(0, 200));
+        await tester.pumpAndSettle();
+        expect(tester.widget<ClipRect>(clip).clipper!.getClip(const Size(200, 16)).width, 200);
+        work.setWorkspaceMoneyPeriod('Today'); await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.widget<ClipRect>(clip).clipper!.getClip(const Size(200, 16)).width, 200,
+          reason: 'Ordinary record rebuild must not restart the entry animation');
+      }
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final display in [(const Size(360, 720), 1.0), (const Size(320, 568), 2.0)]) {
+    testWidgets('ANALYTICS REPORT detail hierarchy and contrast $display', (tester) async {
+      final work = storeViewFixture();
+      final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: display.$1, textScale: display.$2, openHomeActions: false);
+      for (final report in ['orders', 'stock', 'sales', 'money']) {
+        await _toggleHomeCategory(tester, report);
+        final heading = tester.widget<Container>(find.byKey(Key('analytics-report-heading-$report')));
+        final gradient = (heading.decoration as BoxDecoration).gradient! as LinearGradient;
+        for (final colour in gradient.colors) {
+          final contrast = (colour.computeLuminance() + .05) / (const Color(0xFF192B42).computeLuminance() + .05);
+          expect(contrast, greaterThanOrEqualTo(4.5));
+        }
+        final surfaces = find.descendant(of: find.byKey(Key('store-analytics-detail-$report')), matching: find.byType(DecoratedBox));
+        expect(tester.widgetList<DecoratedBox>(surfaces).any((box) => box.decoration is BoxDecoration &&
+          (box.decoration as BoxDecoration).gradient != null), isTrue);
+        expect(tester.takeException(), isNull);
+      }
+      expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+      await _captureAnalyticsFixture(tester, 'detail-hierarchy-${display.$1.width.toInt()}-host-fixture');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('ANALYTICS percentages require matching cohort basis and unit', (tester) async {
     var phase = 0;
     final work = liveStore(analyticsReader: (request) async {
@@ -3289,7 +3430,7 @@ void main() {
         state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
         source: 'Automated aggregate fixture', updatedAt: DateTime.now(),
         coveredFrom: request.start, coveredUntil: request.end,
-        metrics: [rate('order-conversion', 0), rate('cart-dropoff', 25)]);
+        metrics: [rate('order-conversion', 0), rate('cart-dropoff', phase == 5 ? 125 : 25)]);
     });
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
     final journey = find.byKey(const Key('store-analytics-journey'));
@@ -3297,7 +3438,7 @@ void main() {
     await tester.tap(journey);
     await tester.pumpAndSettle();
     String value(String id) => tester.widget<Text>(find.byKey(Key('store-analytics-value-$id'))).data!;
-    for (phase = 0; phase < 5; phase++) {
+    for (phase = 0; phase < 6; phase++) {
       if (phase > 0) {
         await tester.ensureVisible(find.byTooltip('Refresh analytics'));
         await tester.tap(find.byTooltip('Refresh analytics'));
@@ -3305,6 +3446,12 @@ void main() {
       }
       expect(value('order-conversion'), phase == 4 ? '0.0%' : '—');
       expect(value('cart-dropoff'), phase == 4 ? '25.0%' : '—');
+      final bar = find.byKey(const Key('analytics-percent-cart-dropoff'));
+      expect(bar, phase == 4 ? findsOneWidget : findsNothing);
+      if (phase == 4) {
+        expect(tester.widget<LinearProgressIndicator>(bar).value, .25);
+        expect(tester.widget<LinearProgressIndicator>(find.byKey(const Key('analytics-percent-order-conversion'))).value, 0);
+      }
     }
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
