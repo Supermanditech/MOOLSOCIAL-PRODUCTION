@@ -2779,7 +2779,10 @@ void main() {
     expect(tester.getSize(half).width, closeTo(tester.getSize(large).width / 2, .1));
     expect(tester.getSize(zero).width, 0);
     expect(tester.getTopLeft(find.text('Area A')).dy, lessThan(tester.getTopLeft(find.text('Area B')).dy));
-    expect(find.text('10'), findsOneWidget); expect(find.text('5'), findsOneWidget); expect(find.text('0'), findsOneWidget);
+    for (final rank in [(large, '10'), (half, '5'), (zero, '0')]) {
+      final row = find.ancestor(of: rank.$1, matching: find.byType(Column)).first;
+      expect(find.descendant(of: row, matching: find.text(rank.$2)), findsOneWidget);
+    }
     expect(find.text('Partial coverage · Automated aggregate fixture'), findsOneWidget);
     expect(find.byKey(const Key('analytics-rank-bar-discovery-sources')), findsNothing);
     await tester.ensureVisible(find.text('Area A')); await tester.pumpAndSettle();
@@ -11047,6 +11050,12 @@ void main() {
       await tester.ensureVisible(filter);
       await tester.tap(filter);
       await tester.pumpAndSettle();
+      if (collectionState == ScanPickState.collected) {
+        final history = find.byKey(const Key('work-order-history-open-APP-1043'));
+        await reveal(tester, history);
+        await tester.tap(history);
+        await tester.pumpAndSettle();
+      }
       expect(open, findsOneWidget);
       expect(find.text('Confirm pickup'), findsNothing);
       expect(find.text('Complete pickup'), findsNothing);
@@ -11235,6 +11244,17 @@ void main() {
         textScale: scale,
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final collection = find.byKey(const Key('work-order-collection-open-APP-1043'));
+      await reveal(tester, collection);
+      await tester.tap(collection);
+      await tester.pumpAndSettle();
+      final title = find.byKey(const Key('work-customer-collection-title'));
+      expect(title, findsOneWidget);
+      final titleParagraph = tester.renderObject<RenderParagraph>(title);
+      expect(titleParagraph.didExceedMaxLines, isFalse);
+      expect(tester.getRect(title).bottom, lessThanOrEqualTo(640));
       final amount = find.byKey(const Key('work-collection-amount'));
       await tester.ensureVisible(amount);
       await tester.pumpAndSettle();
@@ -11254,6 +11274,8 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('₹10,00,00,00,000.50'), findsOneWidget);
+        expectExactMoneyVisible(tester, find.text('₹10,00,00,00,000.50'));
+        await _captureAnalyticsFixture(tester, 'pos-collection-exact-$scale-host-fixture');
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
       } else {
@@ -11264,6 +11286,8 @@ void main() {
           ),
           findsOneWidget,
         );
+        expectExactMoneyVisible(tester, find.text('₹10,00,00,00,000.50'));
+        await _captureAnalyticsFixture(tester, 'pos-collection-exact-$scale-host-fixture');
       }
       expect(work.currentCollection!.snapshot!.totalMinor, 1000000000050);
       expect(work.currentWorkspaceOrderId, 'APP-1043');
@@ -11273,6 +11297,13 @@ void main() {
         isEmpty,
       );
       expect(tester.takeException(), isNull);
+      expect(work.selectWorkspaceOrder('SALE-1042'), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Collection no longer available. Return to Orders.'), findsOneWidget);
+      expect(find.byKey(const Key('work-collection-amount')), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       expect(work.selectWorkspaceOrder('SALE-1042'), isTrue);
       expect(work.currentCollection, isNull);
@@ -11560,12 +11591,21 @@ void main() {
         if (surface == 'invoice') {
           await openRecordedSales(tester);
           await tester.pumpAndSettle();
+        } else if (surface == 'credit') {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+          await tester.pumpAndSettle();
+          final operations = find.byKey(const Key('global-profile-quick-operations'));
+          await reveal(tester, operations);
+          await tester.tap(operations);
+          await tester.pumpAndSettle();
         }
         final action = find.byKey(
           Key(switch (surface) {
             'invoice' => 'work-sales-invoice-INV-RANGE',
             'group' => 'work-quick-group-buy',
-            _ => 'work-pulse-settlement',
+            _ => 'work-business-money',
           }),
         );
         await reveal(tester, action);
@@ -25125,7 +25165,7 @@ void main() {
           await tester.pumpAndSettle();
         }
 
-        await press('work-quick-counter-sale');
+        await openCounterSaleFromSales(tester);
         await enterSaleCustomer(
           tester,
           '9000091620',
@@ -30674,19 +30714,22 @@ void main() {
             viewport: Size(display.$1, display.$2),
             textScale: display.$3,
           );
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
           if (surface == 'details') {
-            final review = find.byKey(const Key('work-activity-order-review'));
+            await tester.tap(find.byKey(const Key('work-dashboard-search')));
+            await tester.pumpAndSettle();
+            await tester.enterText(find.byKey(const Key('work-dashboard-search-field')), 'APP-1043');
+            await tester.pumpAndSettle();
+            final review = find.byKey(const Key('work-search-order-APP-1043'));
             await reveal(tester, review);
             expect(review.hitTestable(), findsOneWidget);
             await tester.tap(review);
             await tester.pumpAndSettle();
           }
-          final card = find.byKey(
-            Key(switch (surface) {
-              'incoming' => 'work-activity-incoming-order',
-              'packing' => 'work-activity-packing',
-              _ => 'work-store-exact-order',
-            }),
+          final card = find.ancestor(
+            of: find.byKey(Key(surface == 'details' ? 'work-focused-order-id' : 'work-order-stage-label-APP-1043')),
+            matching: find.byKey(const Key('work-live-order-ticket')),
           );
           var total = find.descendant(of: card, matching: find.text(amount.$2));
           final compact = total.evaluate().isEmpty;
@@ -30782,13 +30825,13 @@ void main() {
             expect(work.currentWorkspaceOrderId, 'APP-1043');
           }
           if (surface == 'details') {
-            final close = find.byKey(const Key('work-order-details-close'));
+            final close = find.byKey(const Key('work-operation-back'));
             await reveal(tester, close);
             expect(close.hitTestable(), findsOneWidget);
             await tester.tap(close);
             await tester.pumpAndSettle();
             expect(
-              find.byKey(const Key('work-activity-incoming-order')),
+              find.byKey(const Key('work-dashboard-search-results')),
               findsOneWidget,
             );
             expect(work.workspaceOrders, orderedEquals(orders));
@@ -44429,13 +44472,25 @@ void main() {
             );
             await mount(
               tester,
-              route: '/app/work/workspace/dashboard',
+              route: '/app/work/workspace/dashboard?section=stock',
               work: work,
               viewport: scale == 1
                   ? const Size(412, 915)
                   : const Size(320, 568),
               textScale: scale,
             );
+            // Global saved-record search belongs to an operational screen,
+            // not the analytics header or Stock's product-only search.
+            await tester.tap(find.byKey(const Key('work-store-orders')));
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+            await tester.pumpAndSettle();
+            final operations = find.byKey(const Key('global-profile-quick-operations'));
+            await reveal(tester, operations);
+            await tester.tap(operations);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('work-business-customers')));
+            await tester.pumpAndSettle();
             await tester.tap(find.byKey(const Key('work-dashboard-search')));
             await tester.pumpAndSettle();
             await tester.enterText(

@@ -540,13 +540,13 @@ class _StoreOrderAmount extends StatelessWidget {
             builder: (context) => Dialog(
               key: const Key('work-order-exact-amount-dialog'),
               insetPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
+                horizontal: 4,
                 vertical: 24,
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1865,7 +1865,8 @@ class _WorkWorkspaceDashboardScreenState
               workspace.id,
               () => {},
             ),
-            onOpenStore: _showDashboard,
+            onOpenStore: _operation == _WorkspaceOperation.orders
+                ? _openCustomerCollection : _showDashboard,
             onBuyStock: _showProcurement,
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
@@ -1877,6 +1878,41 @@ class _WorkWorkspaceDashboardScreenState
         },
       ),
     );
+  }
+
+  void _openCustomerCollection() {
+    final order = session.currentWorkspaceOrder;
+    final controller = session.currentCollection;
+    final storeId = session.activeWorkspace?.id;
+    if (order == null || !order.isCustomerCollection || storeId == null ||
+        order.collectionStoreId != storeId || controller?.orderId != order.id ||
+        controller?.storeId != storeId) {
+      session.showNotice('Collection details are not available for this order.');
+      return;
+    }
+    Navigator.of(context).push<void>(MaterialPageRoute(builder: (context) => Scaffold(
+      appBar: AppBar(
+        toolbarHeight: (MediaQuery.textScalerOf(context).scale(18) * 2.4 + 12)
+            .clamp(kToolbarHeight, 112).toDouble(),
+        title: const Text('Customer collection',
+          key: Key('work-customer-collection-title'),
+          maxLines: 2, softWrap: true, overflow: TextOverflow.visible,
+          style: TextStyle(fontSize: 18, height: 1.2)),
+      ),
+      body: SafeArea(child: AnimatedBuilder(animation: session, builder: (context, _) {
+        if (session.activeWorkspace?.id != storeId ||
+            session.currentWorkspaceOrderId != order.id ||
+            !identical(session.currentCollection, controller)) {
+          return const Center(child: Text('Collection no longer available. Return to Orders.'));
+        }
+        return Padding(padding: const EdgeInsets.all(14), child: WorkCollectionLiveCard(
+          key: ValueKey('collection-$storeId-${order.id}'), order: order, controller: controller,
+          amountBuilder: (value, minor, style) => _StoreOrderAmount(value,
+            amountMinor: minor, amountLabel: 'Amount', orderReference: order.id,
+            style: style, textAlign: TextAlign.end),
+        ));
+      })),
+    )));
   }
 
   void _showDashboard() {
@@ -26590,6 +26626,19 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     _filter = widget.session.workspaceOrderFilter;
     _filterScroll.addListener(_scheduleFilterMetrics);
     _revealSelectedFilter();
+    // Analytics no longer mounts the collection card. Read its existing
+    // gateway when Orders first needs it; never infer collection from payment.
+    final controller = widget.session.currentCollection;
+    final storeId = widget.session.activeWorkspace?.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.session.activeWorkspace?.id != storeId ||
+          !identical(widget.session.currentCollection, controller) ||
+          controller == null || controller.storeId != storeId ||
+          controller.snapshot != null || controller.busy) {
+        return;
+      }
+      unawaited(controller.refresh());
+    });
   }
 
   @override
