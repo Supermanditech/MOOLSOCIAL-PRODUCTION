@@ -2805,7 +2805,7 @@ void main() {
       expect(find.byKey(const Key('analytics-provider-loading')), findsNothing);
       final animatedReveal = find.descendant(of: find.byKey(const Key('analytics-inline-reveal')),
         matching: find.byType(TweenAnimationBuilder<double>));
-      expect(animatedReveal, findsNothing, reason: 'Only charts animate; report values/actions must remain immediate');
+      expect(animatedReveal, findsNothing, reason: 'Collapsed content has no running reveal');
       await _toggleHomeCategory(tester, 'stock');
       expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
       final selected = find.ancestor(of: find.byKey(const Key('store-analytics-stock')),
@@ -2842,8 +2842,9 @@ void main() {
     final next = tester.getRect(find.byKey(const Key('store-analytics-supply')));
     expect(detail.top, greaterThanOrEqualTo(selected.bottom));
     expect(detail.bottom, lessThanOrEqualTo(next.top));
-    expect(find.descendant(of: find.byKey(const Key('analytics-inline-reveal')),
-      matching: find.byType(TweenAnimationBuilder<double>)), findsNothing);
+    final reveal = tester.widget<TweenAnimationBuilder<double>>(find.descendant(
+      of: find.byKey(const Key('analytics-inline-reveal')), matching: find.byType(TweenAnimationBuilder<double>)).first);
+    expect(reveal.duration, const Duration(milliseconds: 240));
     await tester.ensureVisible(find.byKey(const Key('store-analytics-value-visible-skus')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('analytics-context-heading-public')), findsOneWidget);
@@ -2894,6 +2895,25 @@ void main() {
     expect(find.byKey(const Key('store-overview-customer-dues')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await _captureAnalyticsFixture(tester, 'composition-money-host-fixture');
+    for (final amounts in [(10000, 5000), (10000, 0), (0, 0)]) {
+      expect(work.applyWorkspaceFinance(WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+        revision: 3 + [(10000, 5000), (10000, 0), (0, 0)].indexOf(amounts), asOf: DateTime.now(),
+        salesTodayMinor: 0, duesMinor: 0, availableMinor: amounts.$1, heldMinor: amounts.$2,
+        requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+        refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true)), isTrue);
+      await tester.pumpAndSettle();
+      if (amounts.$1 == 0) { expect(find.byKey(const Key('analytics-settlement-bars')), findsNothing); }
+      else {
+        final available = tester.getSize(find.byKey(const Key('analytics-settlement-value-Settlement available'))).width;
+        final held = tester.getSize(find.byKey(const Key('analytics-settlement-value-Settlement on hold'))).width;
+        expect(available, greaterThan(0));
+        expect(held, closeTo(available * amounts.$2 / amounts.$1, .1));
+        expect(find.byKey(const Key('analytics-settlement-Settlement available-caption-amount')), findsOneWidget);
+      }
+    }
+    work.markWorkspaceFinanceStale(accountScope: scope.$1, storeId: scope.$2);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-settlement-bars')), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -2911,7 +2931,7 @@ void main() {
     work.workspaceInvoices.clear();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1, openHomeActions: false);
     await _toggleHomeCategory(tester, 'sales');
-    expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 52);
+    expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 32);
     expect(find.byKey(const Key('analytics-sales-axis-zero')), findsOneWidget);
     expect(find.byKey(const Key('analytics-sales-axis-max')), findsNothing);
     final dates = find.descendant(of: find.byKey(const Key('analytics-sales-point-0')), matching: find.byType(Text));
@@ -2922,6 +2942,20 @@ void main() {
     expect(tester.getRect(find.byKey(const Key('store-overview-billed'))).top,
       lessThan(tester.getRect(find.byKey(const Key('analytics-sales-line'))).top));
     await _captureAnalyticsFixture(tester, 'composition-zero-sales-host-fixture');
+    tester.widget<TextButton>(find.byKey(const Key('analytics-sales-point-0'))).onPressed!();
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(320, 720);
+    await tester.pumpAndSettle();
+    final strip = tester.getRect(find.byKey(const Key('analytics-sales-date-strip')));
+    final chosen = tester.getRect(find.byKey(const Key('analytics-sales-point-0')));
+    expect(chosen.left, greaterThanOrEqualTo(strip.left - 1));
+    expect(chosen.right, lessThanOrEqualTo(strip.right + 1));
+    final dateController = tester.widget<SingleChildScrollView>(find.byKey(const Key('analytics-sales-date-strip'))).controller!;
+    dateController.jumpTo(0);
+    await tester.pumpAndSettle();
+    work.setWorkspaceMoneyPeriod('Today');
+    await tester.pumpAndSettle();
+    expect(dateController.offset, 0, reason: 'Unrelated refresh must not snap dates back to selection');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -3061,23 +3095,21 @@ void main() {
     final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
       viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
-    expect(find.byKey(const Key('analytics-stock-strip')), findsOneWidget);
-    expect(tester.getRect(find.byKey(const Key('analytics-stock-strip'))).bottom,
-      lessThanOrEqualTo(tester.getRect(find.text('Stock position · now')).bottom + 1),
-      reason: 'Supplemental charts must not add a row that clips the last cards');
-    final stockColours = tester.widgetList<ColoredBox>(find.descendant(
-      of: find.byKey(const Key('analytics-stock-strip')), matching: find.byType(ColoredBox))).map((box) => box.color).toList();
+    expect(find.byKey(const Key('analytics-stock-strip')), findsNothing,
+      reason: 'Compact report selectors no longer duplicate Overview graphics');
+    final ring = tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-overview-stock-ring')));
+    expect(ring.value, .5);
+    await _toggleHomeCategory(tester, 'stock');
+    final detailRing = tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-stock-ring')));
+    expect(detailRing.value, .5);
+    final stockColours = [detailRing.color!, detailRing.backgroundColor!];
     expect(stockColours, const [Color(0xFF187E76), Color(0xFFB45E71)]);
     for (final colour in [...stockColours, const Color(0xFF586AC8)]) {
       expect(1.05 / (colour.computeLuminance() + .05), greaterThanOrEqualTo(3),
         reason: 'Analytics segments need non-text contrast on the light canvas');
     }
-    for (final segment in find.descendant(of: find.byKey(const Key('analytics-stock-strip')),
-      matching: find.byType(ColoredBox)).evaluate()) {
-      expect(tester.getSize(find.byElementPredicate((e) => e == segment)).height, greaterThan(0),
-        reason: 'Semantic counts alone do not prove a visible distribution');
-    }
-    await _toggleHomeCategory(tester, 'stock');
+    expect(tester.getSize(find.byKey(const Key('analytics-stock-ring'))).height, greaterThan(0),
+      reason: 'Semantic counts alone do not prove a visible distribution');
     final stockDetail = find.byKey(const Key('store-analytics-detail-stock'));
     expect(find.descendant(of: stockDetail, matching: find.text('2 available')), findsOneWidget);
     expect(find.descendant(of: stockDetail, matching: find.text('2 unavailable')), findsOneWidget);
@@ -3250,7 +3282,7 @@ void main() {
       expect((material.shape! as RoundedRectangleBorder).side.style, BorderStyle.solid);
     }
     expect(find.text('Purchases'), findsOneWidget);
-    expect(find.text('Receipt status · now'), findsOneWidget);
+    expect(find.byKey(const Key('store-analytics-summary-receiving')), findsOneWidget);
     final card = find.byKey(const Key('store-analytics-public'));
     await tester.ensureVisible(card); await tester.tap(card); await tester.pumpAndSettle();
     expect(find.descendant(of: find.byKey(const Key('analytics-report-heading-public')),
@@ -3476,6 +3508,34 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await _captureAnalyticsFixture(tester, 'consistency-$report-host-fixture');
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS DEPTH Explore precedes heroes and reports use distinct visual lanes', (tester) async {
+    // Labelled automated layout fixture; never runtime acceptance data.
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 640), textScale: 1, openHomeActions: false);
+    expect(tester.getTopLeft(find.byKey(const Key('store-analytics-money'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const Key('analytics-overview-stock-hero'))).dy));
+    expect(tester.getBottomRight(find.byKey(const Key('store-analytics-money'))).dy,
+      lessThanOrEqualTo(570));
+    for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+      await _toggleHomeCategory(tester, report);
+      final visualKey = switch (report) {
+        'public' => 'analytics-breakdown-discovery-sources',
+        'journey' => 'analytics-stage-spine-journey-store',
+        'supply' => 'analytics-journey-stage-supply-transit',
+        'receiving' => 'analytics-reconciliation-lanes',
+        'orders' => 'analytics-status-glyph-recorded-open-orders',
+        'stock' => 'analytics-stock-ring',
+        'money' => 'analytics-balance-glyph-payables',
+        _ => 'analytics-metric-surface-billed',
+      };
+      expect(find.byKey(Key(visualKey)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await _captureAnalyticsFixture(tester, 'depth-$report-host-fixture');
     }
     await tester.pumpWidget(const SizedBox.shrink());
   });

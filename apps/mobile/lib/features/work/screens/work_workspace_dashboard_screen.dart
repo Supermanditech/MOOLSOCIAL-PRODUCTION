@@ -4884,16 +4884,28 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
   Widget _inlineReveal(Widget child) {
     return KeyedSubtree(key: const Key('analytics-inline-reveal'),
-      child: child);
+      child: _expanded == null || MoolMotion.isReduced(context) ? child : TweenAnimationBuilder<double>(key: ValueKey(_expanded),
+        tween: Tween(begin: MoolMotion.isReduced(context) ? 1 : .35, end: 1),
+        duration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic, child: child,
+        builder: (_, opacity, child) => Opacity(opacity: opacity, child: child)));
   }
 
   Widget _metrics(Iterable<_OperatingMetric> source, {bool hero = false, bool ledger = false}) => LayoutBuilder(builder: (context, box) {
     if (ledger) { return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (final metric in source) Padding(padding: const EdgeInsets.symmetric(vertical: 1),
-        child: _OperatingMetric(id: metric.id, label: metric.label, value: metric.value,
+        child: Row(children: [if (box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3) ...[Icon(switch (metric.id) {
+          'recorded-open-orders' => Icons.receipt_long_outlined,
+          'awaiting-acceptance' => Icons.hourglass_empty_rounded,
+          'overdue-fulfilment' => Icons.schedule_outlined,
+          'settlement-held' => Icons.lock_outline,
+          _ => Icons.account_balance_wallet_outlined,
+        }, key: Key('analytics-status-glyph-${metric.id}'), size: 20, color: _AnalyticsChartPalette.reportAccent(_expanded ?? 'money')),
+        const SizedBox(width: 10)], Expanded(child: _OperatingMetric(id: metric.id, label: metric.label, value: metric.value,
           detail: metric.detail, onTap: metric.onTap, alertColor: metric.alertColor ?? _AnalyticsChartPalette.ink,
           ledger: true,
-          valueFontSize: _analyticsNumberSize(context, metric.value, 20, box.maxWidth - 34))),
+          valueFontSize: _analyticsNumberSize(context, metric.value, 20, box.maxWidth -
+            (box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 64 : 34))))])),
     ]); }
     final preferred = hero ? 24.0 : 20.0;
     var columns = box.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
@@ -4911,11 +4923,16 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             borderRadius: _AnalyticsChartPalette.radius,
             border: Border.all(color: _AnalyticsChartPalette.border),
             boxShadow: const [_AnalyticsChartPalette.softShadow]),
-          child: Padding(padding: const EdgeInsets.all(10), child: _OperatingMetric(
+          child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (metric.id == 'customer-dues' || metric.id == 'payables')
+              Padding(padding: const EdgeInsets.only(bottom: 6), child: Icon(
+                metric.id == 'customer-dues' ? Icons.call_received : Icons.call_made,
+                key: Key('analytics-balance-glyph-${metric.id}'), color: _AnalyticsChartPalette.reportAccent(metric.id == 'customer-dues' ? 'sales' : 'stock'), size: 20)),
+            _OperatingMetric(
             id: metric.id, label: metric.label, value: metric.value, detail: metric.detail,
             alertColor: metric.alertColor ?? (metric.value == '—' ? _AnalyticsChartPalette.secondary : _AnalyticsChartPalette.ink), onTap: metric.onTap,
             valueFontSize: _analyticsNumberSize(context, metric.value, preferred,
-              (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))));
+              (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))])));
     final items = source.toList();
     if (hero && columns == 2 && items.length == 2) {
       // These non-ledger children contain no LayoutBuilder; enlarged values stack above.
@@ -4932,8 +4949,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   Widget _attention(Widget item) => item is _OperatingAttention
     ? Container(margin: const EdgeInsets.symmetric(vertical: 3),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-        decoration: BoxDecoration(color: _AnalyticsChartPalette.surface,
-          borderRadius: _AnalyticsChartPalette.radius,
+        decoration: BoxDecoration(
           border: Border(left: BorderSide(width: 3, color: item.color == MoolColors.navy
             ? _AnalyticsChartPalette.reportAccent(_expanded ?? 'stock') : item.color))),
         child: _OperatingAttention(
@@ -5046,6 +5062,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           padding: const EdgeInsets.symmetric(vertical: 12), child: Column(key: Key('store-analytics-detail-$expanded'),
             crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               reportHeading(expanded),
+              SizedBox(key: Key('analytics-depth-$expanded'), height: 8),
               if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
                 _StoreAnalyticsProviderReport(session: widget.session, report: expanded, request: _request, result: _result),
               if (expanded == 'receiving') ...categories['stock']!.children.whereType<_OperatingAttention>()
@@ -5063,11 +5080,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                   decoration: BoxDecoration(color: _AnalyticsChartPalette.softSurface, borderRadius: _AnalyticsChartPalette.radius),
                   child: _metrics(categories['money']!.children.whereType<_OperatingMetric>()
                     .where((m) => m.id.startsWith('settlement-')), ledger: true)),
+                if (metrics['settlement-available']?.value != null && metrics['settlement-available']!.value != '—' &&
+                    metrics['settlement-held']?.value != null && metrics['settlement-held']!.value != '—' &&
+                    widget.session.workspaceFinance != null)
+                  _AnalyticsSettlementGraphic(available: widget.session.workspaceFinance!.availableMinor,
+                    held: widget.session.workspaceFinance!.heldMinor),
               ],
               if (widget.detailVisuals[expanded] != null)
-                Container(margin: const EdgeInsets.symmetric(vertical: 8), padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: _AnalyticsChartPalette.reportTint(expanded),
-                    borderRadius: _AnalyticsChartPalette.radius), child: widget.detailVisuals[expanded]!),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: widget.detailVisuals[expanded]!),
               if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
               if (expanded == 'money') ...categoryDetail('capital'),
             ]));
@@ -5121,23 +5141,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
               'Tap a card for details · — unavailable · ~ partial data',
               style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
-            _AnalyticsOverviewPanel(id: 'stock-hero', title: 'Stock',
-              colour: _AnalyticsChartPalette.stockSurface,
-              figures: [('Money in stock', local('stock-cost'))],
-              guide: metrics['stock-cost']?.detail ?? 'Stock valuation unavailable',
-              graphic: widget.overviewVisuals['stock'], onTap: () => _toggle('stock')),
-            const SizedBox(height: 10),
-            _AnalyticsOverviewPanel(id: 'sales-hero', title: 'Sales & collections',
-              colour: _AnalyticsChartPalette.moneySurface,
-              figures: figures['sales']!,
-              guide: '${metrics['billed']?.detail ?? 'Sales history unavailable'} · ${metrics['collections']?.detail ?? 'Collection history unavailable'}',
-              graphic: widget.overviewVisuals['sales'], onTap: () => _toggle('sales')),
-            const SizedBox(height: 10),
-            _AnalyticsOverviewPanel(id: 'dues-strip', title: 'Outstanding balances',
-              figures: figures['money']!,
-              guide: categories['money']?.coverage ?? 'Balances use their own saved sources; not a combined cash position.',
-              onTap: () => _toggle('money')),
-            const Padding(padding: EdgeInsets.only(top: 16, bottom: 8), child: Text('Explore reports',
+            const Padding(padding: EdgeInsets.only(top: 4, bottom: 8), child: Text('Explore reports',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
             LayoutBuilder(builder: (context, box) {
               final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
@@ -5146,7 +5150,6 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               Widget card(String id) {
                 final known = figures[id]!.first.$2 != '—';
                 const foreground = _AnalyticsChartPalette.ink;
-                const supporting = _AnalyticsChartPalette.secondary;
                 final background = !known ? _AnalyticsChartPalette.softSurface
                   : id == 'sales' ? const Color(0xFFEDF1FC)
                   : id == 'orders' ? const Color(0xFFEDF6F4) : _AnalyticsChartPalette.surface;
@@ -5178,30 +5181,9 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: foreground))),
                                 Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18, color: foreground),
                               ]),
-                              const SizedBox(height: 5),
+                              // Exact summary remains accessible without repeating hero figures.
                               Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
-                                child: Column(children: [for (final (index, figure) in figures[id]!.indexed)
-                                  _AnalyticsFigure(availableWidth: width - 16,
-                                    label: Text(figure.$1, style: TextStyle(fontSize: 12, color: supporting)),
-                                    value: Text(figure.$2, style: TextStyle(fontSize: index == 0 && figure.$2 != '—' ? 16 : 13,
-                                        fontWeight: index == 0 ? FontWeight.w700 : FontWeight.w600,
-                                        color: figure.$2 == '—' ? supporting : index == 0 ? foreground : supporting)))])),
-                              const SizedBox(height: 3),
-                              Row(children: [Expanded(child: Text(switch (id) {
-                                'public' => 'Period / current listings',
-                                'supply' => 'Pending deliveries · now',
-                                'orders' => 'Saved orders · now',
-                                'receiving' => 'Receipt status · now',
-                                'stock' => 'Stock position · now',
-                                'sales' => widget.compactVisuals.containsKey('sales') ? 'Period / 7-day bills' : 'Selected period',
-                                'journey' => 'Selected period',
-                                _ => 'Current balance',
-                              }, style: TextStyle(fontSize: 11, color: supporting))),
-                                if (widget.compactVisuals[id] != null) ...[
-                                  const SizedBox(width: 6),
-                                  SizedBox(width: 32, child: widget.compactVisuals[id]!),
-                                ],
-                              ]),
+                                child: const SizedBox(height: 8)),
                             ])))));
               }
               return Column(children: [
@@ -5218,6 +5200,21 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                 if (expanded == null) _inlineReveal(const SizedBox.shrink()),
               ]);
             }),
+            const SizedBox(height: 16),
+            _AnalyticsOverviewPanel(id: 'stock-hero', title: 'Stock',
+              colour: _AnalyticsChartPalette.stockSurface,
+              figures: [('Money in stock', local('stock-cost'))],
+              guide: metrics['stock-cost']?.detail ?? 'Stock valuation unavailable',
+              graphic: widget.overviewVisuals['stock'], onTap: () => _toggle('stock')),
+            const SizedBox(height: 10),
+            _AnalyticsOverviewPanel(id: 'sales-hero', title: 'Sales & collections',
+              colour: _AnalyticsChartPalette.moneySurface, figures: figures['sales']!,
+              guide: '${metrics['billed']?.detail ?? 'Sales history unavailable'} · ${metrics['collections']?.detail ?? 'Collection history unavailable'}',
+              graphic: widget.overviewVisuals['sales'], onTap: () => _toggle('sales')),
+            const SizedBox(height: 10),
+            _AnalyticsOverviewPanel(id: 'dues-strip', title: 'Outstanding balances', figures: figures['money']!,
+              guide: categories['money']?.coverage ?? 'Balances use their own saved sources; not a combined cash position.',
+              onTap: () => _toggle('money')),
           ]),
         )))),
         ]);
@@ -5322,12 +5319,11 @@ class _AnalyticsOverviewTrend extends StatelessWidget {
 
 /// Keep the entire number together; long amounts move below their label.
 class _AnalyticsFigure extends StatelessWidget {
-  const _AnalyticsFigure({required this.label, required this.value, this.availableWidth});
+  const _AnalyticsFigure({required this.label, required this.value});
   final Widget label;
   final Text value;
-  final double? availableWidth;
   @override
-  Widget build(BuildContext context) => availableWidth != null ? _build(context, availableWidth!) :
+  Widget build(BuildContext context) =>
     LayoutBuilder(builder: (context, box) => _build(context, box.maxWidth));
   Widget _build(BuildContext context, double width) {
     final style = DefaultTextStyle.of(context).style.merge(value.style);
@@ -5467,8 +5463,6 @@ class _StockValueGraphic extends StatelessWidget {
   Widget build(BuildContext context) {
     final maximum = cost > sale ? cost : sale;
     return Container(key: const Key('analytics-stock-value-comparison'), padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(gradient: _AnalyticsChartPalette.reportGradient('stock'),
-        borderRadius: _AnalyticsChartPalette.radius, border: Border.all(color: _AnalyticsChartPalette.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (final row in [(cost, 'cost', 'Money in stock', _AnalyticsChartPalette.available),
           (sale, 'sale', 'Stock sale value', _AnalyticsChartPalette.sales)]) ...[
@@ -5486,6 +5480,28 @@ class _StockValueGraphic extends StatelessWidget {
         ],
         const Text('Potential sales value · not money received',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+      ]));
+  }
+}
+
+/// Keep the currency token intact, even when the caption wraps around it.
+class _AnalyticsSettlementGraphic extends StatelessWidget {
+  const _AnalyticsSettlementGraphic({required this.available, required this.held});
+  final int available, held;
+  @override
+  Widget build(BuildContext context) {
+    final maximum = available > held ? available : held;
+    if (maximum <= 0) return const SizedBox.shrink();
+    return Padding(key: const Key('analytics-settlement-bars'), padding: const EdgeInsets.all(10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (final item in [(available, 'Settlement available'), (held, 'Settlement on hold')]) ...[
+          _AnalyticsMoneyCaption(id: 'analytics-settlement-${item.$2}-caption', label: item.$2, minor: item.$1),
+          const SizedBox(height: 4),
+          ExcludeSemantics(child: _AnalyticsChartReveal(id: 'settlement-${item.$2}', child: LayoutBuilder(builder: (context, box) =>
+            Align(alignment: Alignment.centerLeft, child: Container(key: Key('analytics-settlement-value-${item.$2}'), height: 8, width: box.maxWidth * item.$1 / maximum,
+              decoration: BoxDecoration(gradient: _AnalyticsChartPalette.barGradient, borderRadius: BorderRadius.circular(4))))))),
+          const SizedBox(height: 8),
+        ],
       ]));
   }
 }
@@ -5523,27 +5539,49 @@ class _AnalyticsSalesPlot extends StatefulWidget {
 
 class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
   int? _selected;
+  final _dateScroll = ScrollController();
+  final _dateViewport = GlobalKey();
+  final _dateKeys = <GlobalKey>[];
+  (int, Size, double, DateTime)? _dateRevealSignature;
+  @override
+  void dispose() { _dateScroll.dispose(); super.dispose(); }
+  void _revealSelected(int index) {
+    final item = _dateKeys[index].currentContext?.findRenderObject();
+    final viewport = _dateViewport.currentContext?.findRenderObject();
+    if (!mounted || !_dateScroll.hasClients || item is! RenderBox || viewport is! RenderBox) return;
+    final start = item.localToGlobal(Offset.zero).dx - viewport.localToGlobal(Offset.zero).dx;
+    final end = start + item.size.width;
+    final delta = start < 0 ? start : end > viewport.size.width ? end - viewport.size.width : 0.0;
+    if (delta.abs() > .5) _dateScroll.jumpTo((_dateScroll.offset - delta).clamp(0.0, _dateScroll.position.maxScrollExtent));
+  }
   @override
   Widget build(BuildContext context) {
+    while (_dateKeys.length < widget.series.length) { _dateKeys.add(GlobalKey()); }
     final index = (_selected ?? widget.series.length - 1).clamp(0, widget.series.length - 1);
     final selected = widget.series[index];
+    final signature = (index, MediaQuery.sizeOf(context), MediaQuery.textScalerOf(context).scale(1), selected.$1);
+    if (_dateRevealSignature != signature) {
+      _dateRevealSignature = signature;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _dateRevealSignature == signature) _revealSelected(index);
+      });
+    }
     final maximum = widget.series.fold<int>(0, (value, row) => row.$2 > value ? row.$2 : value);
     String date(DateTime at) => '${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')}';
     return Container(key: const Key('analytics-sales-plot'), padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(gradient: _AnalyticsChartPalette.reportGradient('sales'),
-        borderRadius: _AnalyticsChartPalette.radius, border: Border.all(color: _AnalyticsChartPalette.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _AnalyticsMoneyCaption(id: 'analytics-sales-selected-point', label: date(selected.$1),
           minor: selected.$2, suffix: 'Before returns'),
         const SizedBox(height: 8),
         _AnalyticsMoneyCaption(id: 'analytics-sales-axis-zero', label: maximum == 0 ? 'Baseline' : 'Scale from', minor: 0),
         if (maximum > 0) _AnalyticsMoneyCaption(id: 'analytics-sales-axis-max', label: 'Scale to', minor: maximum),
-        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: maximum == 0 ? 52 : 112,
+        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: maximum == 0 ? 32 : 112,
           child: CustomPaint(key: const Key('analytics-sales-line'),
             painter: _AnalyticsSalesPainter(widget.series.map((row) => row.$2).toList(), index))))),
-        Wrap(children: [for (var i = 0; i < widget.series.length; i++)
+        SizedBox(key: _dateViewport, child: SingleChildScrollView(key: const Key('analytics-sales-date-strip'), controller: _dateScroll, scrollDirection: Axis.horizontal,
+          reverse: true, child: Row(mainAxisSize: MainAxisSize.min, children: [for (var i = 0; i < widget.series.length; i++)
           Semantics(selected: i == index, label: 'Select ${date(widget.series[i].$1)} · ₹${_formatStoreMinorAmount(widget.series[i].$2)}',
-            child: TextButton(key: Key('analytics-sales-point-$i'),
+            child: SizedBox(key: _dateKeys[i], child: TextButton(key: Key('analytics-sales-point-$i'),
               style: TextButton.styleFrom(minimumSize: const Size(44, 44), padding: const EdgeInsets.symmetric(horizontal: 6),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: _AnalyticsChartPalette.ink,
@@ -5552,8 +5590,8 @@ class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
                 key: Key('analytics-sales-date-style-$i'),
                 duration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 180),
                 style: DefaultTextStyle.of(context).style.copyWith(fontSize: 11, color: _AnalyticsChartPalette.ink,
-                  fontWeight: i == index ? FontWeight.w700 : FontWeight.w500), child: Text(date(widget.series[i].$1))))),
-        ]),
+                  fontWeight: i == index ? FontWeight.w700 : FontWeight.w500), child: Text(date(widget.series[i].$1)))))),
+        ]))),
       ]));
   }
 }
@@ -5881,7 +5919,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
-                for (final row in rows) ...[
+                for (final row in rows.where((row) => row.id != 'bills-without-goods')) ...[
                   if (row == rows.first || const {'visible-skus', 'interest-no-order', 'listing-corrections', 'enquiries', 'supply-acceptance', 'supply-cancelled', 'received-part', 'received-short', 'goods-without-bill', 'journey-left'}.contains(row.id))
                     Container(margin: const EdgeInsets.only(top: 8, bottom: 2),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -5903,7 +5941,27 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       widget.report == 'supply' ? 'Supplier orders · selected period' : 'Goods received · selected period',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                         color: _AnalyticsChartPalette.reportAccent(widget.report)))),
-                  Builder(
+                  if (row.id == 'goods-without-bill') LayoutBuilder(key: const Key('analytics-reconciliation-lanes'), builder: (context, box) {
+                    Widget lane(String id, IconData icon) {
+                      final item = rows.firstWhere((item) => item.id == id);
+                      final metric = values[id];
+                      final known = metric?.state == WorkspaceAnalyticsState.verified &&
+                        metric?.basis == WorkspaceAnalyticsBasis.currentPosition && metric?.unit == WorkspaceAnalyticsUnit.count;
+                      return Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Icon(icon, color: _AnalyticsChartPalette.reportAccent('receiving'), size: 24),
+                        const SizedBox(height: 8), Text(item.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        _AnalyticsFigure(label: const SizedBox.shrink(), value: Text(known ? _formatStoreAmount(metric!.value!.toInt()) : '—',
+                          key: Key('store-analytics-value-$id'), style: TextStyle(fontSize: known ? 20 : 14, fontWeight: FontWeight.w700))),
+                        Text(item.guide, style: const TextStyle(fontSize: 12, color: _AnalyticsChartPalette.secondary)),
+                        if (known) Text('${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? 'Partial · ' : ''}As of ${MaterialLocalizations.of(context).formatShortDate(metric.asOf!.toLocal())}', style: const TextStyle(fontSize: 11)),
+                      ]));
+                    }
+                    final goods = lane('goods-without-bill', Icons.inventory_2_outlined);
+                    final bill = lane('bills-without-goods', Icons.receipt_long_outlined);
+                    return box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                      ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: goods), Expanded(child: bill)])
+                      : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [goods, bill]);
+                  }) else Builder(
                     builder: (_) {
                       final metric = values[row.id];
                       final percentage = const {'order-conversion', 'cart-dropoff'}.contains(row.id);
@@ -5922,13 +5980,25 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                         'journey-cart' => Icons.shopping_cart_outlined,
                         'journey-order' => Icons.receipt_long_outlined,
                         'journey-completed' => Icons.shopping_bag_outlined,
+                        'supply-acceptance' => Icons.pending_actions_outlined,
+                        'supply-dispatch' => Icons.warehouse_outlined,
+                        'supply-transit' => Icons.local_shipping_outlined,
+                        'supply-delivery' => Icons.move_to_inbox_outlined,
+                        'goods-without-bill' => Icons.inventory_2_outlined,
+                        'bills-without-goods' => Icons.receipt_long_outlined,
+                        'received-short' => Icons.inventory_outlined,
+                        'received-damaged' => Icons.warning_amber_outlined,
+                        'visitors' => Icons.people_outline,
+                        'visible-skus' => Icons.visibility_outlined,
                         _ => null,
                       };
                       return Container(key: Key('analytics-provider-cell-${row.id}'),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(color: known ? _AnalyticsChartPalette.reportTint(widget.report) :
                           const Color(0xFFF6F8FA),
-                          border: const Border(bottom: BorderSide(color: _AnalyticsChartPalette.border, width: .5))),
+                          border: Border(bottom: const BorderSide(color: _AnalyticsChartPalette.border, width: .5),
+                            left: BorderSide(width: stageIcon == null ? 0 : 2,
+                              color: stageIcon == null ? Colors.transparent : _AnalyticsChartPalette.reportAccent(widget.report).withValues(alpha: .25)))),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           _AnalyticsFigure(
                             label: Column(
@@ -5948,13 +6018,17 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                                   ),
                                 )),
                                 ]),
-                                Text(
-                                  row.guide,
+                                Container(key: row.id.startsWith('journey-') && stageIcon != null ? Key('analytics-stage-spine-${row.id}') : null,
+                                  margin: EdgeInsets.only(left: stageIcon == null ? 0 : 9),
+                                  padding: EdgeInsets.only(left: stageIcon == null ? 0 : 15, top: 4, bottom: 4),
+                                  decoration: BoxDecoration(border: row.id.startsWith('journey-') && stageIcon != null && row.id != 'journey-completed'
+                                    ? Border(left: BorderSide(width: 2, color: _AnalyticsChartPalette.border)) : null),
+                                  child: Text(row.guide,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _OperatingPalette.secondary,
                                   ),
-                                ),
+                                )),
                                 if (known)
                                   Text(
                                     '${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? 'Partial · ' : ''}${metric.basis == WorkspaceAnalyticsBasis.currentPosition ? 'As of' : 'Recorded through'} ${MaterialLocalizations.of(context).formatShortDate(metric.asOf!.toLocal())}',
@@ -5976,11 +6050,11 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                           ),
                           if (known && percentage && metric!.value! >= 0 && metric.value! <= 100)
                             Padding(padding: const EdgeInsets.only(top: 8), child: ExcludeSemantics(
-                              child: LinearProgressIndicator(key: Key('analytics-percent-${row.id}'),
+                              child: _AnalyticsChartReveal(id: 'percent-${row.id}', child: LinearProgressIndicator(key: Key('analytics-percent-${row.id}'),
                                 value: metric.value! / 100, minHeight: 6,
                                 borderRadius: BorderRadius.circular(3),
                                 color: _AnalyticsChartPalette.sales,
-                                backgroundColor: _AnalyticsChartPalette.emptyTrack))),
+                                backgroundColor: _AnalyticsChartPalette.emptyTrack)))),
                         ]));
                     },
                   ),
@@ -5997,9 +6071,8 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       : <WorkspaceAnalyticsBreakdown>[];
                     final data = matches.isEmpty ? null : matches.single;
                     return Padding(padding: const EdgeInsets.only(top: 12),
-                      child: Container(key: Key('analytics-breakdown-${group.id}'), padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: data == null ? _AnalyticsChartPalette.softSurface : _AnalyticsChartPalette.surface,
-                        borderRadius: _AnalyticsChartPalette.radius, border: Border.all(color: _AnalyticsChartPalette.border)),
+                      child: Container(key: Key('analytics-breakdown-${group.id}'), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _AnalyticsChartPalette.border))),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         Text(group.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                         if (data == null) const Text('Not available yet', style: TextStyle(fontSize: 12))
@@ -6049,13 +6122,13 @@ class _AnalyticsRankRow extends StatelessWidget {
       _AnalyticsFigure(label: Text(row.label, style: const TextStyle(fontSize: 13)),
         value: Text(_formatStoreAmount(row.count), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
       const SizedBox(height: 4),
-      ExcludeSemantics(child: LayoutBuilder(builder: (context, box) => Align(
+      ExcludeSemantics(child: _AnalyticsChartReveal(id: 'rank-$groupId-${row.id}', child: LayoutBuilder(builder: (context, box) => Align(
           alignment: Alignment.centerLeft, child: Container(
             key: Key('analytics-rank-bar-$groupId-${row.id}'),
             height: 5, width: maximum == 0 ? 0 : box.maxWidth * row.count / maximum,
             decoration: BoxDecoration(gradient: _AnalyticsChartPalette.barGradient,
               borderRadius: BorderRadius.circular(3)),
-          )))),
+          ))))),
     ]))));
 }
 
