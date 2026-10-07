@@ -2710,6 +2710,33 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('ANALYTICS POLISH paired cards have boundaries and a clear selected detail', (tester) async {
+    final work = liveStore();
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    for (final pair in [('public', 'journey'), ('supply', 'receiving'), ('orders', 'stock'), ('sales', 'money')]) {
+      final first = find.byKey(Key('store-analytics-${pair.$1}'));
+      final second = find.byKey(Key('store-analytics-${pair.$2}'));
+      expect(tester.getSize(first).height, closeTo(tester.getSize(second).height, .1));
+      final material = tester.widget<Material>(find.ancestor(of: first, matching: find.byType(Material)).first);
+      expect(material.shape, isA<RoundedRectangleBorder>());
+      expect((material.shape! as RoundedRectangleBorder).side.style, BorderStyle.solid);
+    }
+    expect(find.text('Purchases'), findsOneWidget);
+    expect(find.text('Receipt status · now'), findsOneWidget);
+    final card = find.byKey(const Key('store-analytics-public'));
+    await tester.ensureVisible(card); await tester.tap(card); await tester.pumpAndSettle();
+    expect(find.text('Hide details'), findsOneWidget);
+    final semantics = tester.widget<Semantics>(find.ancestor(of: card, matching: find.byType(Semantics)).first);
+    expect(semantics.properties.selected, isTrue);
+    await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-analytics-detail-public')), findsNothing);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS public and journey inline details preserve Store records', (tester) async {
     final work = liveStore();
     final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();

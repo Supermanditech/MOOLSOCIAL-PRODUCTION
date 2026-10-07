@@ -4854,30 +4854,34 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
               IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
                 onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20))]),
-            Text('${MaterialLocalizations.of(context).formatShortDate(start)} – ${MaterialLocalizations.of(context).formatShortDate(end)} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
+            Text('${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
               style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
             ...widget.sections.where((item) => item is Tooltip || item is _DashboardSyncBanner),
-            Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text(status,
+            Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(status,
               key: const Key('store-analytics-provider-status'),
               style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
             if (verified) Text('Provider updated ${MaterialLocalizations.of(context).formatShortDate(snapshot.updatedAt!.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.updatedAt!.toLocal()))}',
               style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
-            const Padding(padding: EdgeInsets.only(bottom: 8), child: Text(
-              '— unavailable · ~ partial data · tap an area for details',
+            const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
+              'Tap a card for details · — unavailable · ~ partial data',
               style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
             LayoutBuilder(builder: (context, box) {
               final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
-              return Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final id in summaries.keys) SizedBox(width: (box.maxWidth - (columns - 1) * 8) / columns,
-                  child: Material(color: expanded == id ? const Color(0xFFEAF0FA) : const Color(0xFFF5F7FC),
-                    borderRadius: BorderRadius.circular(10), child: Semantics(
-                      expanded: expanded == id, button: true,
+              final width = (box.maxWidth - (columns - 1) * 8) / columns;
+              final ids = summaries.keys.toList();
+              Widget card(String id) => Material(
+                    color: expanded == id ? const Color(0xFFEAF0FA) : Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(color: expanded == id ? MoolColors.navy : const Color(0xFFDCE2EE))),
+                    child: Semantics(
+                      expanded: expanded == id, selected: expanded == id, button: true,
                       child: InkWell(key: Key('store-analytics-$id'), onTap: () => _toggle(id),
                         borderRadius: BorderRadius.circular(10), child: Padding(
                           padding: const EdgeInsets.all(8), child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Expanded(child: Text(_analyticsReportTitle(id),
+                                Expanded(child: Text(id == 'receiving' ? 'Purchases' : _analyticsReportTitle(id),
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy))),
                                 Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18),
                               ]),
@@ -4888,23 +4892,44 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                     Expanded(child: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
                                     const SizedBox(width: 4),
                                     ConstrainedBox(constraints: BoxConstraints(
-                                      maxWidth: ((box.maxWidth - (columns - 1) * 8) / columns - 16) * .6),
+                                      maxWidth: (width - 16) * .6),
                                       child: Text(figure.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
                                   ])])),
-                              if (id == 'orders') const Text('Saved orders · current', style: TextStyle(fontSize: 11)),
-                              if (id == 'stock' || id == 'money' || id == 'receiving') const Text('Current position', style: TextStyle(fontSize: 11)),
-                              if (id == 'journey' || id == 'sales') const Text('Selected period', style: TextStyle(fontSize: 11)),
-                              if (id == 'supply') const Text('Pending: current position', style: TextStyle(fontSize: 11)),
-                            ])))))),
+                              const SizedBox(height: 3),
+                              Text(switch (id) {
+                                'public' => 'Period / current listings',
+                                'supply' => 'Pending deliveries · now',
+                                'orders' => 'Saved orders · now',
+                                'receiving' => 'Receipt status · now',
+                                'stock' => 'Stock position · now',
+                                'journey' || 'sales' => 'Selected period',
+                                _ => 'Current balance',
+                              }, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+                            ])))));
+              return Column(children: [
+                for (var index = 0; index < ids.length; index += columns)
+                  Padding(padding: EdgeInsets.only(bottom: index + columns < ids.length ? 8 : 0),
+                    child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      for (var offset = 0; offset < columns && index + offset < ids.length; offset++) ...[
+                        if (offset > 0) const SizedBox(width: 8),
+                        SizedBox(width: width, child: card(ids[index + offset])),
+                      ],
+                    ]))),
               ]);
             }),
             if (expanded != null) Padding(key: _detailKey, padding: const EdgeInsets.only(top: 12),
               child: Column(key: Key('store-analytics-detail-$expanded'),
                 crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [Expanded(child: Text(_analyticsReportTitle(expanded),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-                    IconButton(tooltip: 'Collapse details', onPressed: () => _toggle(expanded),
-                      icon: const Icon(Icons.expand_less))]),
+                  Container(padding: const EdgeInsets.only(left: 8),
+                    decoration: const BoxDecoration(color: Color(0xFFEAF0FA),
+                      border: Border(left: BorderSide(color: MoolColors.navy, width: 3))),
+                    child: Row(children: [Expanded(child: Text(_analyticsReportTitle(expanded),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+                      Tooltip(message: 'Collapse details', child: TextButton(
+                        style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                        onPressed: () => _toggle(expanded), child: const Row(mainAxisSize: MainAxisSize.min,
+                          children: [Text('Hide details', style: TextStyle(fontSize: 11)),
+                            Icon(Icons.expand_less, size: 18)])))])),
                   if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
                     _StoreAnalyticsProviderReport(session: widget.session, report: expanded,
                       request: _request, result: _result),
