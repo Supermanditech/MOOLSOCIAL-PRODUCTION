@@ -2760,6 +2760,67 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('ANALYTICS PREMIUM ROUND pending and error stay truthful and settle', (tester) async {
+    final pending = Completer<WorkspaceAnalyticsSnapshot>();
+    final work = liveStore(analyticsReader: (_) => pending.future);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), openHomeActions: false);
+    expect(find.byKey(const Key('analytics-provider-loading')), findsOneWidget);
+    expect(find.text('Loading analytics…'), findsOneWidget);
+    await _toggleHomeCategory(tester, 'public');
+    expect(find.text('—'), findsWidgets);
+    pending.completeError(StateError('Automated pending-provider fixture'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-provider-loading')), findsNothing);
+    expect(find.text('Could not load analytics'), findsOneWidget);
+    expect(find.text('—'), findsWidgets);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final reduced in [false, true]) {
+    testWidgets('ANALYTICS PREMIUM ROUND inline motion and retained content reduced=$reduced', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          FakeAccessibilityFeatures(disableAnimations: reduced);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      final work = storeViewFixture();
+      final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(360, 720), openHomeActions: false);
+      expect(find.byKey(const Key('analytics-provider-status-surface')), findsOneWidget);
+      expect(find.byKey(const Key('analytics-provider-loading')), findsNothing);
+      final animatedReveal = find.descendant(of: find.byKey(const Key('analytics-inline-reveal')),
+        matching: find.byType(TweenAnimationBuilder<double>));
+      expect(animatedReveal, reduced ? findsNothing : findsOneWidget);
+      if (!reduced) {
+        expect(tester.widget<TweenAnimationBuilder<double>>(animatedReveal).duration, const Duration(milliseconds: 180));
+      }
+      await _toggleHomeCategory(tester, 'stock');
+      expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
+      final selected = find.ancestor(of: find.byKey(const Key('store-analytics-stock')),
+        matching: find.byType(Material)).first;
+      expect(tester.widget<Material>(selected).elevation, greaterThan(0));
+      await _toggleHomeCategory(tester, 'money');
+      expect(find.byKey(const Key('store-analytics-detail-stock')), findsNothing);
+      expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
+      await tester.ensureVisible(find.byTooltip('Collapse details'));
+      await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-analytics-detail-money')), findsNothing);
+      // Rapid callbacks exercise stale completion/scroll guards without waiting
+      // for each intermediate expansion to finish (automated layout fixture).
+      final stockTap = tester.widget<InkWell>(find.byKey(const Key('store-analytics-stock'))).onTap!;
+      final moneyTap = tester.widget<InkWell>(find.byKey(const Key('store-analytics-money'))).onTap!;
+      stockTap(); await tester.pump(const Duration(milliseconds: 16));
+      stockTap(); stockTap(); moneyTap(); stockTap();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
+      expect(find.byKey(const Key('store-analytics-detail-money')), findsNothing);
+      expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('ANALYTICS PREMIUM verified ranking bars retain exact counts and zero', (tester) async {
     final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(request: request,
       state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
@@ -2786,6 +2847,11 @@ void main() {
     expect(find.text('Partial coverage · Automated aggregate fixture'), findsOneWidget);
     expect(find.byKey(const Key('analytics-rank-bar-discovery-sources')), findsNothing);
     await tester.ensureVisible(find.text('Area A')); await tester.pumpAndSettle();
+    final rankTooltip = find.byTooltip('Area A: 10');
+    expect(tester.getSize(rankTooltip).height, greaterThanOrEqualTo(44));
+    await tester.tap(rankTooltip); await tester.pumpAndSettle();
+    expect(find.text('Area A: 10'), findsOneWidget);
+    Tooltip.dismissAllToolTips(); await tester.pumpAndSettle();
     await _captureAnalyticsFixture(tester, 'premium-ranking-host-fixture');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -2838,6 +2904,12 @@ void main() {
     await _toggleHomeCategory(tester, 'stock');
     expect(find.text('2 available · 2 unavailable'), findsOneWidget);
     expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
+    final distribution = find.byTooltip('2 available · 2 unavailable · Product count, not units');
+    expect(distribution, findsOneWidget);
+    await tester.ensureVisible(distribution);
+    await tester.tap(distribution); await tester.pumpAndSettle();
+    expect(find.text('2 available · 2 unavailable · Product count, not units'), findsOneWidget);
+    Tooltip.dismissAllToolTips(); await tester.pumpAndSettle();
     expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
     await _captureAnalyticsFixture(tester, 'graphics-stock-host-fixture');
     expect(tester.takeException(), isNull);

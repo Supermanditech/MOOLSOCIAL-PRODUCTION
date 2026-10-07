@@ -4796,6 +4796,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   Future<WorkspaceAnalyticsSnapshot>? _result;
   Object? _scopeIdentity;
   final _detailKey = GlobalKey();
+  int _transition = 0;
 
   @override
   void initState() {
@@ -4818,7 +4819,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
       (widget.session.workspaceStockHistoryScope()?.key ?? widget.session.activeWorkspace?.id);
     final requestChanged = request != null &&
       widget.session.analyticsRequest(start: request.start, end: request.end)?.sameScope(request) != true;
-    if (scopeChanged) _expanded = null;
+    if (scopeChanged) { _expanded = null; _transition++; }
     if (scopeChanged || requestChanged || oldWidget.periodDays != widget.periodDays ||
         oldWidget.periodEnd != widget.periodEnd) {
       _load();
@@ -4826,16 +4827,34 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   }
 
   void _toggle(String id) {
+    final generation = ++_transition;
     setState(() => _expanded = _expanded == id ? null : id);
     if (_expanded != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final target = _detailKey.currentContext;
-        if (mounted && target != null) {
-          Scrollable.ensureVisible(target,
-            duration: const Duration(milliseconds: 180), alignment: 0);
-        }
+        if (!mounted || generation != _transition) return;
+        _scheduleReveal(generation);
       });
     }
+  }
+
+  void _scheduleReveal(int generation) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _detailKey.currentContext;
+      if (mounted && generation == _transition && _expanded != null && target != null) {
+        Scrollable.ensureVisible(target, duration: MoolMotion.isReduced(context)
+          ? Duration.zero : const Duration(milliseconds: 180), alignment: 0);
+      }
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  Widget _inlineReveal(Widget child) {
+    return KeyedSubtree(key: const Key('analytics-inline-reveal'),
+      child: MoolMotion.isReduced(context) ? child : TweenAnimationBuilder<double>(
+        tween: Tween(begin: .65, end: _expanded == null ? .65 : 1), duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        builder: (context, opacity, content) => Opacity(opacity: opacity, child: content),
+        child: child));
   }
 
   Widget _metrics(Iterable<_OperatingMetric> source) => LayoutBuilder(builder: (context, box) {
@@ -4850,11 +4869,13 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     return Wrap(spacing: 8, runSpacing: 8, children: [
       for (final metric in source) SizedBox(width: (box.maxWidth - (columns - 1) * 8) / columns,
         child: DecoratedBox(key: Key('analytics-metric-surface-${metric.id}'),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFDCE2EE))),
+          decoration: BoxDecoration(color: _AnalyticsChartPalette.surface,
+            borderRadius: _AnalyticsChartPalette.radius,
+            border: Border.all(color: _AnalyticsChartPalette.border),
+            boxShadow: const [_AnalyticsChartPalette.softShadow]),
           child: Padding(padding: const EdgeInsets.all(10), child: _OperatingMetric(
             id: metric.id, label: metric.label, value: metric.value, detail: metric.detail,
-            alertColor: metric.alertColor, onTap: metric.onTap,
+            alertColor: metric.alertColor ?? _AnalyticsChartPalette.ink, onTap: metric.onTap,
             valueFontSize: _analyticsNumberSize(context, metric.value, 18,
               (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))))),
     ]);
@@ -4947,9 +4968,26 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             Text('${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
               style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
             ...widget.sections.where((item) => item is Tooltip || item is _DashboardSyncBanner),
-            Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(status,
-              key: const Key('store-analytics-provider-status'),
-              style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
+            Padding(padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Container(key: const Key('analytics-provider-status-surface'),
+                decoration: BoxDecoration(color: failed ? const Color(0xFFFFF0ED) :
+                  verified ? const Color(0xFFEDF6F4) : _AnalyticsChartPalette.softSurface,
+                  borderRadius: BorderRadius.circular(6)),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (loading) SizedBox(key: const Key('analytics-provider-loading'), width: 12, height: 12,
+                    child: TweenAnimationBuilder<double>(
+                      duration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 180),
+                      tween: Tween(begin: .4, end: 1),
+                      builder: (context, value, child) => Opacity(opacity: value, child: child),
+                      child: const Icon(Icons.hourglass_empty_rounded, size: 12, color: _AnalyticsChartPalette.sales)))
+                  else Icon(failed ? Icons.error_outline_rounded : verified ? Icons.check_circle_outline_rounded :
+                    Icons.info_outline_rounded, size: 14,
+                    color: failed ? _OperatingPalette.error : _AnalyticsChartPalette.secondary),
+                  const SizedBox(width: 5), Expanded(child: Text(status,
+                    key: const Key('store-analytics-provider-status'),
+                    style: const TextStyle(fontSize: 12, color: _AnalyticsChartPalette.secondary))),
+                ]))),
             if (verified) Text('Provider updated ${MaterialLocalizations.of(context).formatShortDate(snapshot.updatedAt!.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.updatedAt!.toLocal()))}',
               style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
             const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
@@ -4960,19 +4998,26 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               final width = (box.maxWidth - (columns - 1) * 8) / columns;
               final ids = summaries.keys.toList();
               Widget card(String id) => Material(
-                    color: expanded == id ? const Color(0xFFEAF0FA) : Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: expanded == id ? MoolColors.navy : const Color(0xFFDCE2EE))),
+                    animationDuration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 180),
+                    elevation: expanded == id ? 2 : .5,
+                    shadowColor: _AnalyticsChartPalette.ink.withValues(alpha: .14),
+                    surfaceTintColor: Colors.transparent,
+                    color: expanded == id ? _AnalyticsChartPalette.selectedSurface : _AnalyticsChartPalette.surface,
+                    shape: RoundedRectangleBorder(borderRadius: _AnalyticsChartPalette.radius,
+                      side: BorderSide(color: expanded == id ? _AnalyticsChartPalette.sales : _AnalyticsChartPalette.border)),
                     child: Semantics(
                       expanded: expanded == id, selected: expanded == id, button: true,
                       child: InkWell(key: Key('store-analytics-$id'), onTap: () => _toggle(id),
-                        borderRadius: BorderRadius.circular(10), child: Padding(
+                        hoverColor: _AnalyticsChartPalette.sales.withValues(alpha: .06),
+                        focusColor: _AnalyticsChartPalette.sales.withValues(alpha: .10),
+                        highlightColor: _AnalyticsChartPalette.sales.withValues(alpha: .08),
+                        borderRadius: _AnalyticsChartPalette.radius, child: Padding(
                           padding: const EdgeInsets.all(8), child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Expanded(child: Text(id == 'receiving' ? 'Purchases' : _analyticsReportTitle(id),
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
                                 Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18),
                               ]),
                               const SizedBox(height: 5),
@@ -4982,7 +5027,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                     label: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
                                     value: Text(figure.$2, style: TextStyle(fontSize: index == 0 ? 16 : 14,
                                         fontWeight: index == 0 ? FontWeight.w700 : FontWeight.w600,
-                                        color: figure.$2 == '—' ? _OperatingPalette.secondary : index == 0 ? MoolColors.navy : _OperatingPalette.secondary)))])),
+                                        color: figure.$2 == '—' ? _AnalyticsChartPalette.secondary : index == 0 ? _AnalyticsChartPalette.ink : _AnalyticsChartPalette.secondary)))])),
                               const SizedBox(height: 3),
                               Row(children: [Expanded(child: Text(switch (id) {
                                 'public' => 'Period / current listings',
@@ -5011,12 +5056,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                     ]))),
               ]);
             }),
-            if (expanded != null) Padding(key: _detailKey, padding: const EdgeInsets.only(top: 12),
+            _inlineReveal(expanded == null ? const SizedBox.shrink() :
+              Padding(key: _detailKey, padding: const EdgeInsets.only(top: 12),
               child: Column(key: Key('store-analytics-detail-$expanded'),
                 crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Container(padding: const EdgeInsets.only(left: 8),
-                    decoration: const BoxDecoration(color: Color(0xFFEAF0FA),
-                      border: Border(left: BorderSide(color: MoolColors.navy, width: 3))),
+                    decoration: const BoxDecoration(color: _AnalyticsChartPalette.selectedSurface,
+                      borderRadius: _AnalyticsChartPalette.radius,
+                      border: Border(left: BorderSide(color: _AnalyticsChartPalette.sales, width: 3))),
                     child: LayoutBuilder(builder: (context, box) {
                       final heading = Row(children: [Icon(switch (expanded) {
                       'public' => Icons.storefront_outlined,
@@ -5050,7 +5097,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                     Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: widget.detailVisuals[expanded]!),
                   if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
                   if (expanded == 'money') ...categoryDetail('capital'),
-                ])),
+                ]))),
           ]),
         );
       });
@@ -5093,6 +5140,14 @@ class _AnalyticsFigure extends StatelessWidget {
 
 /// Supplemental visuals of the same saved-record projection; never write records.
 abstract final class _AnalyticsChartPalette {
+  static const ink = Color(0xFF192B42);
+  static const secondary = Color(0xFF536078);
+  static const surface = Colors.white;
+  static const softSurface = Color(0xFFF0F3F8);
+  static const selectedSurface = Color(0xFFF0F2FC);
+  static const border = Color(0xFFDCE2EC);
+  static const radius = BorderRadius.all(Radius.circular(10));
+  static const softShadow = BoxShadow(color: Color(0x08192B42), blurRadius: 6, offset: Offset(0, 2));
   static const available = Color(0xFF187E76);
   static const unavailable = Color(0xFFB45E71);
   static const sales = Color(0xFF586AC8);
@@ -5116,9 +5171,16 @@ class _StockAvailabilityGraphic extends StatelessWidget {
                 if (available > 0) Expanded(flex: available, child: const ColoredBox(color: _AnalyticsChartPalette.available)),
                 if (unavailable > 0) Expanded(flex: unavailable, child: const ColoredBox(color: _AnalyticsChartPalette.unavailable)),
               ])))));
-    return compact ? strip : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final interactiveStrip = Tooltip(
+      message: '$label · ${compact ? 'Saved Stock' : 'Product count, not units'}',
+      triggerMode: compact ? TooltipTriggerMode.longPress : TooltipTriggerMode.tap,
+      showDuration: const Duration(seconds: 4),
+      decoration: BoxDecoration(color: _AnalyticsChartPalette.ink, borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      child: strip);
+    return compact ? interactiveStrip : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Stock availability', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8), strip, const SizedBox(height: 6),
+      const SizedBox(height: 8), interactiveStrip, const SizedBox(height: 6),
       Text(label, style: const TextStyle(fontSize: 13)),
       const Text('Product count, not units · saved Stock',
         style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
@@ -5141,13 +5203,16 @@ class _SavedBillGraphic extends StatelessWidget {
     String date(DateTime day) => '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}';
     final label = series.map((row) => '${date(row.$1)} ${money(row.$2)}').join(', ');
     if (compact) {
-      return Semantics(label: 'Saved bills last 7 days, before returns: $label',
+      return Tooltip(message: 'Saved bills last 7 days, before returns: $label',
+      decoration: BoxDecoration(color: _AnalyticsChartPalette.ink, borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      child: Semantics(label: 'Saved bills last 7 days, before returns: $label',
       child: ExcludeSemantics(child: SizedBox(key: const Key('analytics-sales-spark-bars'), height: 12,
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (final row in series)
           Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 1),
             child: Container(height: maximum == 0 ? 1 : 1 + 11 * row.$2 / maximum,
               decoration: BoxDecoration(color: row.$2 == 0 ? _AnalyticsChartPalette.emptyTrack : _AnalyticsChartPalette.sales,
-                borderRadius: BorderRadius.circular(2))))) ]))));
+                borderRadius: BorderRadius.circular(2))))) ])))));
     }
     final change = todayMinor - previousMinor;
     final comparison = change == 0 ? 'No change · through the same time' :
@@ -5169,13 +5234,21 @@ class _SavedBillGraphic extends StatelessWidget {
               Align(alignment: Alignment.centerLeft, child: Container(
                 width: maximum == 0 ? 0 : track.maxWidth * row.$2 / maximum,
                 decoration: BoxDecoration(color: _AnalyticsChartPalette.sales, borderRadius: BorderRadius.circular(3))))))));
-          return wide ? Row(children: [SizedBox(width: 44, child: Text(date(row.$1), style: const TextStyle(fontSize: 11))),
+          final content = wide ? Row(children: [SizedBox(width: 44, child: Text(date(row.$1), style: const TextStyle(fontSize: 11))),
             Expanded(child: bar), const SizedBox(width: 8),
             SizedBox(width: box.maxWidth * .35, child: Text(money(row.$2), textAlign: TextAlign.end,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]) :
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(date(row.$1), style: const TextStyle(fontSize: 11)),
               Text(money(row.$2), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)), bar]);
+          return Tooltip(message: '${date(row.$1)} · ${money(row.$2)} · Before returns',
+            triggerMode: TooltipTriggerMode.tap, showDuration: const Duration(seconds: 4),
+            decoration: BoxDecoration(color: _AnalyticsChartPalette.ink, borderRadius: BorderRadius.circular(8)),
+            textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+            child: Container(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              constraints: const BoxConstraints(minHeight: 44),
+              decoration: BoxDecoration(color: _AnalyticsChartPalette.softSurface, borderRadius: BorderRadius.circular(6)),
+              child: content));
         })),
       if (maximum == 0) const Text('No bills saved in this period', style: TextStyle(fontSize: 12)),
       const SizedBox(height: 8),
@@ -5508,19 +5581,23 @@ class _AnalyticsRankRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    child: Tooltip(message: '${row.label}: ${_formatStoreAmount(row.count)}',
+      triggerMode: TooltipTriggerMode.tap,
+      decoration: BoxDecoration(color: _AnalyticsChartPalette.ink, borderRadius: BorderRadius.circular(8)),
+      textStyle: const TextStyle(color: Colors.white, fontSize: 13),
+      child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 44),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _AnalyticsFigure(label: Text(row.label, style: const TextStyle(fontSize: 13)),
         value: Text(_formatStoreAmount(row.count), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
       const SizedBox(height: 4),
-      Tooltip(message: '${row.label}: ${_formatStoreAmount(row.count)}',
-        child: ExcludeSemantics(child: LayoutBuilder(builder: (context, box) => Align(
+      ExcludeSemantics(child: LayoutBuilder(builder: (context, box) => Align(
           alignment: Alignment.centerLeft, child: Container(
             key: Key('analytics-rank-bar-$groupId-${row.id}'),
             height: 5, width: maximum == 0 ? 0 : box.maxWidth * row.count / maximum,
             decoration: BoxDecoration(color: _AnalyticsChartPalette.sales,
               borderRadius: BorderRadius.circular(3)),
-          ))))),
-    ]));
+          )))),
+    ]))));
 }
 
 abstract final class _OperatingPalette {
