@@ -2667,6 +2667,126 @@ void main() {
     },
   );
 
+  testWidgets('ANALYTICS GRAPHICS unavailable history is not a zero trend', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'sales');
+    expect(find.byKey(const Key('analytics-sales-trend-unavailable')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-bars')), findsNothing);
+    expect(find.byKey(const Key('analytics-sales-comparison')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS GRAPHICS Stock partition includes manual availability and no writes', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final work = WorkSession(contactDraftStore: account,
+      inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final base = work.workspaceCatalogueItems.first;
+    work.workspaceCatalogueItems..clear()..addAll([
+      WorkspaceCatalogueItem.fromInventoryJson({...base.copyWith(stock: 8, available: true).toInventoryJson(), 'id': 'EXACT'}),
+      WorkspaceCatalogueItem.fromInventoryJson({...base.copyWith(stock: 5, available: false).toInventoryJson(), 'id': 'MANUAL-OFF'}),
+      WorkspaceCatalogueItem.fromInventoryJson({...base.copyWith(stock: 0, available: true, stockMode: WorkspaceStockMode.availabilityOnly).toInventoryJson(), 'id': 'AVAILABILITY'}),
+      WorkspaceCatalogueItem.fromInventoryJson({...base.copyWith(stock: 0, available: true).toInventoryJson(), 'id': 'EMPTY'}),
+    ]);
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    expect(find.byKey(const Key('analytics-stock-strip')), findsOneWidget);
+    expect(tester.getRect(find.byKey(const Key('analytics-stock-strip'))).bottom,
+      lessThanOrEqualTo(tester.getRect(find.text('Stock position · now')).bottom + 1),
+      reason: 'Supplemental charts must not add a row that clips the last cards');
+    final stockColours = tester.widgetList<ColoredBox>(find.descendant(
+      of: find.byKey(const Key('analytics-stock-strip')), matching: find.byType(ColoredBox))).map((box) => box.color).toList();
+    expect(stockColours, const [Color(0xFF187E76), Color(0xFFB45E71)]);
+    for (final colour in [...stockColours, const Color(0xFF586AC8)]) {
+      expect(1.05 / (colour.computeLuminance() + .05), greaterThanOrEqualTo(3),
+        reason: 'Analytics segments need non-text contrast on the light canvas');
+    }
+    for (final segment in find.descendant(of: find.byKey(const Key('analytics-stock-strip')),
+      matching: find.byType(ColoredBox)).evaluate()) {
+      expect(tester.getSize(find.byElementPredicate((e) => e == segment)).height, greaterThan(0),
+        reason: 'Semantic counts alone do not prove a visible distribution');
+    }
+    await _toggleHomeCategory(tester, 'stock');
+    expect(find.text('2 available · 2 unavailable'), findsOneWidget);
+    expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    await _captureAnalyticsFixture(tester, 'graphics-stock-host-fixture');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS GRAPHICS saved daily sums and same-clock comparison', (tester) async {
+    final checkpoint = _LedgerCheckpointFixtureStore();
+    final account = _ContactDraftFixtureStore();
+    final work = storeViewFixture(null, account);
+    final scope = (account.accountScope, work.activeWorkspace!.id);
+    final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: checkpoint), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    final now = DateTime.now(), today = DateUtils.dateOnly(DateTime.now());
+    final yesterday = DateTime(today.year, today.month, today.day - 1);
+    work.workspaceInvoices..clear()..addAll([
+      WorkspaceCustomerInvoice(id: 'GRAPH-TODAY', orderId: 'GRAPH-TODAY', customer: 'Host fixture', items: 'Goods',
+        amount: 200, remainderPaise: 25, payment: 'Cash', issuedAt: today),
+      WorkspaceCustomerInvoice(id: 'GRAPH-YESTERDAY', orderId: 'GRAPH-YESTERDAY', customer: 'Host fixture', items: 'Goods',
+        amount: 100, payment: 'Cash', issuedAt: yesterday),
+      WorkspaceCustomerInvoice(id: 'GRAPH-LATER', orderId: 'GRAPH-LATER', customer: 'Host fixture', items: 'Goods',
+        amount: 300, payment: 'Cash', issuedAt: DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59)),
+      WorkspaceCustomerInvoice(id: 'GRAPH-OLD', orderId: 'GRAPH-OLD', customer: 'Host fixture', items: 'Goods',
+        amount: 999, payment: 'Cash', issuedAt: DateTime(today.year, today.month, today.day - 7)),
+      WorkspaceCustomerInvoice(id: 'GRAPH-FUTURE', orderId: 'GRAPH-FUTURE', customer: 'Host fixture', items: 'Goods',
+        amount: 999, payment: 'Cash', issuedAt: now.add(const Duration(days: 1))),
+    ]);
+    final identities = work.workspaceInvoices.map((i) => i.id).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'sales');
+    expect(find.byKey(const Key('analytics-sales-bars')), findsOneWidget);
+    expect(find.text('Saved bills · last 7 days'), findsOneWidget);
+    expect(find.text('₹200.25 today · ₹100 yesterday'), findsOneWidget,
+      reason: 'Yesterday later than the current clock must not enter the comparison');
+    expect(find.text('Up ₹100.25 · through the same time'), findsOneWidget);
+    expect(find.byWidgetPredicate((widget) => widget is Semantics &&
+      widget.properties.label == '${yesterday.day.toString().padLeft(2, '0')}/${yesterday.month.toString().padLeft(2, '0')} saved bill total ₹400'),
+      findsOneWidget, reason: 'The completed yesterday chart includes its later invoice at normal or enlarged text');
+    expect(work.workspaceInvoices.map((i) => i.id).toList(), identities);
+    expect(checkpoint.saveAttempts, 0);
+    await _captureAnalyticsFixture(tester, 'graphics-sales-host-fixture');
+    work.workspaceInvoices.add(work.workspaceInvoices.first);
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-sales-trend-unavailable')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-bars')), findsNothing,
+      reason: 'Conflicting duplicate identities cannot be counted twice');
+    work.workspaceInvoices.clear();
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+    expect(find.text('No bills saved in this period'), findsOneWidget);
+    expect(find.byWidgetPredicate((widget) => widget is Semantics &&
+      (widget.properties.label?.contains('saved bill total ₹0') ?? false)), findsNothing,
+      reason: 'A verified empty period needs one clear summary, not seven empty chart rows');
+    expect(find.text('No change · through the same time'), findsOneWidget);
+    expect(find.byIcon(Icons.trending_up), findsNothing);
+    work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'GRAPH-LARGE', orderId: 'GRAPH-LARGE',
+      customer: 'Host boundary fixture', items: 'Goods', amount: 10000000, payment: 'Cash', issuedAt: yesterday));
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+    expect(find.text('Down ₹1,00,00,000 · through the same time'), findsOneWidget);
+    await _captureAnalyticsFixture(tester, 'graphics-large-digits-host-fixture');
+    for (final element in find.textContaining('₹1,00,00,000').evaluate()) {
+      final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == element));
+      expect(paragraph.size.height, greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .1));
+    }
+    expect(checkpoint.saveAttempts, 0);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS CANVAS summaries expand once in place without reads or navigation', (tester) async {
     var reads = 0;
     final work = liveStore(analyticsReader: (request) async {

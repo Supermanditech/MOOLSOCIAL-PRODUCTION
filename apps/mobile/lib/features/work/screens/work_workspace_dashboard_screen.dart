@@ -4284,6 +4284,25 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           ? session.workspaceLowStockProducts.where((p) => p.stock > 0).length
           : 0;
       final unavailable = stockReady ? session.workspaceOutOfStockCount : 0;
+      final trendDay = DateUtils.dateOnly(periodEnd);
+      final savedBillDays = invoiceReady ? [
+        for (var offset = 6; offset >= 0; offset--)
+          DateTime(trendDay.year, trendDay.month, trendDay.day - offset),
+      ] : <DateTime>[];
+      final savedBillSeries = [for (final day in savedBillDays)
+        (day, invoices.where((invoice) {
+          final at = invoice.issuedAt.toLocal();
+          return !at.isBefore(day) && at.isBefore(DateTime(day.year, day.month, day.day + 1)) &&
+            at.isBefore(periodEnd);
+        }).fold<int>(0, (sum, invoice) => sum + invoice.payableMinor))];
+      final previousStart = DateTime(trendDay.year, trendDay.month, trendDay.day - 1);
+      // Calendar-local same-clock cutoff, not a full yesterday against a partial today.
+      final previousEnd = DateTime(periodEnd.year, periodEnd.month, periodEnd.day - 1,
+        periodEnd.hour, periodEnd.minute, periodEnd.second, periodEnd.millisecond, periodEnd.microsecond);
+      final previousBilled = invoiceReady ? invoices.where((invoice) {
+        final at = invoice.issuedAt.toLocal();
+        return !at.isBefore(previousStart) && at.isBefore(previousEnd);
+      }).fold<int>(0, (sum, invoice) => sum + invoice.payableMinor) : null;
       final financeReady = finance != null && finance.valid &&
           finance.historyComplete && !session.workspaceFinanceStale &&
           !finance.asOf.isAfter(DateTime.now());
@@ -4385,6 +4404,21 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         onPeriod: (days) => setState(() { _periodDays = days; _periodEnd = DateTime.now(); }),
         onRefresh: () => setState(() => _periodEnd = DateTime.now()),
         scrollController: widget.scrollController,
+        compactVisuals: {
+          if (stockReady && products.isNotEmpty) 'stock': _StockAvailabilityGraphic(
+            available: products.length - unavailable, unavailable: unavailable, compact: true),
+          if (invoiceReady) 'sales': _SavedBillGraphic(series: savedBillSeries, compact: true,
+            todayMinor: savedBillSeries.last.$2, previousMinor: previousBilled!),
+        },
+        detailVisuals: {
+          'stock': stockReady ? _StockAvailabilityGraphic(
+            available: products.length - unavailable, unavailable: unavailable) :
+            const Text('Stock distribution unavailable · load saved Stock first'),
+          'sales': invoiceReady ? _SavedBillGraphic(series: savedBillSeries,
+            todayMinor: savedBillSeries.last.$2, previousMinor: previousBilled!) :
+            const Text('Saved-bill trend unavailable · recover Sales history first',
+              key: Key('analytics-sales-trend-unavailable')),
+        },
         sections: [
                 const Text('Store overview', style: TextStyle(fontSize: 14,
                   fontWeight: FontWeight.w700, color: MoolColors.navy)),
@@ -4705,6 +4739,7 @@ class _StoreAnalyticsPresentation extends StatefulWidget {
     required this.session, required this.sections, required this.periodDays,
     required this.periodStart, required this.periodEnd, required this.onPeriod,
     required this.onRefresh,
+    this.compactVisuals = const {}, this.detailVisuals = const {},
     this.scrollController,
   });
   final WorkSession session;
@@ -4713,6 +4748,7 @@ class _StoreAnalyticsPresentation extends StatefulWidget {
   final ValueChanged<int> onPeriod;
   final VoidCallback onRefresh;
   final List<Widget> sections;
+  final Map<String, Widget> compactVisuals, detailVisuals;
   final ScrollController? scrollController;
   @override
   State<_StoreAnalyticsPresentation> createState() => _StoreAnalyticsPresentationState();
@@ -4896,15 +4932,21 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                       child: Text(figure.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
                                   ])])),
                               const SizedBox(height: 3),
-                              Text(switch (id) {
+                              Row(children: [Expanded(child: Text(switch (id) {
                                 'public' => 'Period / current listings',
                                 'supply' => 'Pending deliveries · now',
                                 'orders' => 'Saved orders · now',
                                 'receiving' => 'Receipt status · now',
                                 'stock' => 'Stock position · now',
-                                'journey' || 'sales' => 'Selected period',
+                                'sales' => widget.compactVisuals.containsKey('sales') ? 'Period / 7-day bills' : 'Selected period',
+                                'journey' => 'Selected period',
                                 _ => 'Current balance',
-                              }, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+                              }, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
+                                if (widget.compactVisuals[id] != null) ...[
+                                  const SizedBox(width: 6),
+                                  SizedBox(width: 32, child: widget.compactVisuals[id]!),
+                                ],
+                              ]),
                             ])))));
               return Column(children: [
                 for (var index = 0; index < ids.length; index += columns)
@@ -4936,12 +4978,106 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                   if (expanded == 'receiving')
                     ...categories['stock']!.children.whereType<_OperatingAttention>()
                       .where((a) => a.id.startsWith('receipt-')).map(_attention),
+                  if (widget.detailVisuals[expanded] != null)
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: widget.detailVisuals[expanded]!),
                   if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
                   if (expanded == 'money') ...categoryDetail('capital'),
                 ])),
           ]),
         );
       });
+  }
+}
+
+/// Supplemental visuals of the same saved-record projection; never write records.
+abstract final class _AnalyticsChartPalette {
+  static const available = Color(0xFF187E76);
+  static const unavailable = Color(0xFFB45E71);
+  static const sales = Color(0xFF586AC8);
+  static const emptyTrack = Color(0xFFDDE3F0);
+}
+
+class _StockAvailabilityGraphic extends StatelessWidget {
+  const _StockAvailabilityGraphic({required this.available, required this.unavailable, this.compact = false});
+  final int available, unavailable;
+  final bool compact;
+  @override
+  Widget build(BuildContext context) {
+    final total = available + unavailable;
+    final label = '$available available · $unavailable unavailable';
+    final strip = Semantics(label: 'Saved Stock product availability: $label',
+      child: ExcludeSemantics(child: ClipRRect(borderRadius: BorderRadius.circular(4),
+        child: SizedBox(key: Key(compact ? 'analytics-stock-strip' : 'analytics-stock-distribution'),
+          height: compact ? 8 : 14, child: total == 0
+            ? const ColoredBox(color: Color(0xFFE4E8EF))
+            : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (available > 0) Expanded(flex: available, child: const ColoredBox(color: _AnalyticsChartPalette.available)),
+                if (unavailable > 0) Expanded(flex: unavailable, child: const ColoredBox(color: _AnalyticsChartPalette.unavailable)),
+              ])))));
+    return compact ? strip : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Stock availability', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 8), strip, const SizedBox(height: 6),
+      Text(label, style: const TextStyle(fontSize: 13)),
+      const Text('Product count, not units · saved Stock',
+        style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+      if (total == 0) const Text('No products saved yet', style: TextStyle(fontSize: 12)),
+    ]);
+  }
+}
+
+class _SavedBillGraphic extends StatelessWidget {
+  const _SavedBillGraphic({required this.series, required this.todayMinor,
+    required this.previousMinor, this.compact = false});
+  final List<(DateTime, int)> series;
+  final int todayMinor, previousMinor;
+  final bool compact;
+  String money(int minor) => '₹${_formatStoreMinorAmount(minor)}';
+  @override
+  Widget build(BuildContext context) {
+    final maximum = series.fold<int>(0, (max, row) => row.$2 > max ? row.$2 : max);
+    final total = series.fold<int>(0, (sum, row) => sum + row.$2);
+    String date(DateTime day) => '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}';
+    final label = series.map((row) => '${date(row.$1)} ${money(row.$2)}').join(', ');
+    if (compact) {
+      return Semantics(label: 'Saved bills last 7 days, before returns: $label',
+      child: ExcludeSemantics(child: SizedBox(key: const Key('analytics-sales-spark-bars'), height: 12,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [for (final row in series)
+          Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 1),
+            child: Container(height: maximum == 0 ? 1 : 1 + 11 * row.$2 / maximum,
+              decoration: BoxDecoration(color: row.$2 == 0 ? _AnalyticsChartPalette.emptyTrack : _AnalyticsChartPalette.sales,
+                borderRadius: BorderRadius.circular(2))))) ]))));
+    }
+    final change = todayMinor - previousMinor;
+    final comparison = change == 0 ? 'No change · through the same time' :
+      '${change > 0 ? 'Up' : 'Down'} ${money(change.abs())} · through the same time';
+    return Column(key: const Key('analytics-sales-bars'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Saved bills · last 7 days', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Text('${money(total)} billed · before returns', style: const TextStyle(fontSize: 12)),
+      const SizedBox(height: 6),
+      if (maximum > 0) for (final row in series) Padding(padding: const EdgeInsets.symmetric(vertical: 3),
+        child: LayoutBuilder(builder: (context, box) {
+          final wide = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+          final bar = Semantics(label: '${date(row.$1)} saved bill total ${money(row.$2)}',
+            child: ExcludeSemantics(child: SizedBox(height: 10, child: LayoutBuilder(builder: (context, track) =>
+              Align(alignment: Alignment.centerLeft, child: Container(
+                width: maximum == 0 ? 0 : track.maxWidth * row.$2 / maximum,
+                decoration: BoxDecoration(color: _AnalyticsChartPalette.sales, borderRadius: BorderRadius.circular(3))))))));
+          return wide ? Row(children: [SizedBox(width: 44, child: Text(date(row.$1), style: const TextStyle(fontSize: 11))),
+            Expanded(child: bar), const SizedBox(width: 8),
+            SizedBox(width: box.maxWidth * .35, child: Text(money(row.$2), textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]) :
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('${date(row.$1)} · ${money(row.$2)}', style: const TextStyle(fontSize: 12)), bar]);
+        })),
+      if (maximum == 0) const Text('No bills saved in this period', style: TextStyle(fontSize: 12)),
+      const SizedBox(height: 8),
+      Row(children: [Icon(change == 0 ? Icons.trending_flat : change > 0 ? Icons.trending_up : Icons.trending_down,
+        color: _AnalyticsChartPalette.sales, size: 20), const SizedBox(width: 6), Expanded(child: Text(comparison,
+          key: const Key('analytics-sales-comparison'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
+      Text('${money(todayMinor)} today · ${money(previousMinor)} yesterday', style: const TextStyle(fontSize: 12)),
+      const Text('Saved invoices only · today ends at the displayed time. Not live online sales or money collected.',
+        style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+    ]);
   }
 }
 
