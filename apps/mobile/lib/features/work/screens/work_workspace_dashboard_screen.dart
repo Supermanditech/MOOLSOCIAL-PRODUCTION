@@ -4803,16 +4803,34 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   }
 
   Widget _metrics(Iterable<_OperatingMetric> source) => LayoutBuilder(builder: (context, box) {
-    final columns = box.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
+    var columns = box.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
+    for (final metric in source) {
+      final measured = TextPainter(text: TextSpan(text: metric.value,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+      if (measured.width + 42 > (box.maxWidth - 8) / 2) columns = 1;
+      measured.dispose();
+    }
     return Wrap(spacing: 8, runSpacing: 8, children: [
       for (final metric in source) SizedBox(width: (box.maxWidth - (columns - 1) * 8) / columns,
-        child: Padding(padding: const EdgeInsets.all(8), child: metric)),
+        child: DecoratedBox(key: Key('analytics-metric-surface-${metric.id}'),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFDCE2EE))),
+          child: Padding(padding: const EdgeInsets.all(10), child: _OperatingMetric(
+            id: metric.id, label: metric.label, value: metric.value, detail: metric.detail,
+            alertColor: metric.alertColor, onTap: metric.onTap,
+            valueFontSize: _analyticsNumberSize(context, metric.value, 18,
+              (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))))),
     ]);
   });
 
   Widget _attention(Widget item) => item is _OperatingAttention
-    ? _OperatingAttention(id: item.id, title: item.title, detail: item.detail,
-      action: item.action, color: item.color, expanded: true, onTap: item.onTap)
+    ? Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: DecoratedBox(
+        decoration: BoxDecoration(color: item.color.withValues(alpha: .04),
+          borderRadius: BorderRadius.circular(10), border: Border.all(color: item.color.withValues(alpha: .18))),
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: _OperatingAttention(
+          id: item.id, title: item.title, detail: item.detail,
+          action: item.action, color: item.color, expanded: true, onTap: item.onTap))))
     : item;
 
   @override
@@ -4923,14 +4941,12 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                               ]),
                               const SizedBox(height: 5),
                               Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
-                                child: Column(children: [for (final figure in figures[id]!)
-                                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Expanded(child: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary))),
-                                    const SizedBox(width: 4),
-                                    ConstrainedBox(constraints: BoxConstraints(
-                                      maxWidth: (width - 16) * .6),
-                                      child: Text(figure.$2, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-                                  ])])),
+                                child: Column(children: [for (final (index, figure) in figures[id]!.indexed)
+                                  _AnalyticsFigure(availableWidth: width - 16,
+                                    label: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
+                                    value: Text(figure.$2, style: TextStyle(fontSize: index == 0 ? 16 : 14,
+                                        fontWeight: index == 0 ? FontWeight.w700 : FontWeight.w600,
+                                        color: figure.$2 == '—' ? _OperatingPalette.secondary : index == 0 ? MoolColors.navy : _OperatingPalette.secondary)))])),
                               const SizedBox(height: 3),
                               Row(children: [Expanded(child: Text(switch (id) {
                                 'public' => 'Period / current listings',
@@ -4965,13 +4981,29 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                   Container(padding: const EdgeInsets.only(left: 8),
                     decoration: const BoxDecoration(color: Color(0xFFEAF0FA),
                       border: Border(left: BorderSide(color: MoolColors.navy, width: 3))),
-                    child: Row(children: [Expanded(child: Text(_analyticsReportTitle(expanded),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-                      Tooltip(message: 'Collapse details', child: TextButton(
+                    child: LayoutBuilder(builder: (context, box) {
+                      final heading = Row(children: [Icon(switch (expanded) {
+                      'public' => Icons.storefront_outlined,
+                      'journey' => Icons.route_outlined,
+                      'supply' => Icons.local_shipping_outlined,
+                      'receiving' => Icons.move_to_inbox_outlined,
+                      'orders' => Icons.receipt_long_outlined,
+                      'stock' => Icons.inventory_2_outlined,
+                      'sales' => Icons.bar_chart_rounded,
+                      _ => Icons.account_balance_wallet_outlined,
+                    }, size: 20, color: _AnalyticsChartPalette.sales),
+                      const SizedBox(width: 8), Expanded(child: Text(_analyticsReportTitle(expanded),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy)))]);
+                      final hide = Tooltip(message: 'Collapse details', child: TextButton(
                         style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                         onPressed: () => _toggle(expanded), child: const Row(mainAxisSize: MainAxisSize.min,
                           children: [Text('Hide details', style: TextStyle(fontSize: 11)),
-                            Icon(Icons.expand_less, size: 18)])))])),
+                            Icon(Icons.expand_less, size: 18)])));
+                      return box.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                        ? Row(children: [Expanded(child: heading), hide])
+                        : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            heading, Align(alignment: Alignment.centerRight, child: hide)]);
+                    })),
                   if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
                     _StoreAnalyticsProviderReport(session: widget.session, report: expanded,
                       request: _request, result: _result),
@@ -4986,6 +5018,40 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           ]),
         );
       });
+  }
+}
+
+double _analyticsNumberSize(BuildContext context, String value, double preferred, double width) {
+  final measured = TextPainter(text: TextSpan(text: value,
+    style: TextStyle(fontSize: preferred, fontWeight: FontWeight.w700)),
+    textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+  final size = measured.width <= width ? preferred : (preferred * width / measured.width).clamp(12.0, preferred);
+  measured.dispose();
+  return size;
+}
+
+/// Keep the entire number together; long amounts move below their label.
+class _AnalyticsFigure extends StatelessWidget {
+  const _AnalyticsFigure({required this.label, required this.value, this.availableWidth});
+  final Widget label;
+  final Text value;
+  final double? availableWidth;
+  @override
+  Widget build(BuildContext context) => availableWidth != null ? _build(context, availableWidth!) :
+    LayoutBuilder(builder: (context, box) => _build(context, box.maxWidth));
+  Widget _build(BuildContext context, double width) {
+    final style = DefaultTextStyle.of(context).style.merge(value.style);
+    final measured = TextPainter(text: TextSpan(text: value.data, style: style),
+      textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+    final horizontal = measured.width <= width * .6;
+    measured.dispose();
+    if (horizontal) { return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: label), const SizedBox(width: 4), value,
+    ]); }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      label, Text(value.data!, key: value.key, style: style.copyWith(
+        fontSize: _analyticsNumberSize(context, value.data!, style.fontSize!, width))),
+    ]);
   }
 }
 
@@ -5056,7 +5122,12 @@ class _SavedBillGraphic extends StatelessWidget {
       const SizedBox(height: 6),
       if (maximum > 0) for (final row in series) Padding(padding: const EdgeInsets.symmetric(vertical: 3),
         child: LayoutBuilder(builder: (context, box) {
-          final wide = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+          final amountMeasure = TextPainter(text: TextSpan(text: money(row.$2),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+          final wide = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 &&
+            amountMeasure.width <= box.maxWidth * .35;
+          amountMeasure.dispose();
           final bar = Semantics(label: '${date(row.$1)} saved bill total ${money(row.$2)}',
             child: ExcludeSemantics(child: SizedBox(height: 10, child: LayoutBuilder(builder: (context, track) =>
               Align(alignment: Alignment.centerLeft, child: Container(
@@ -5067,7 +5138,8 @@ class _SavedBillGraphic extends StatelessWidget {
             SizedBox(width: box.maxWidth * .35, child: Text(money(row.$2), textAlign: TextAlign.end,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]) :
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('${date(row.$1)} · ${money(row.$2)}', style: const TextStyle(fontSize: 12)), bar]);
+              Text(date(row.$1), style: const TextStyle(fontSize: 11)),
+              Text(money(row.$2), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)), bar]);
         })),
       if (maximum == 0) const Text('No bills saved in this period', style: TextStyle(fontSize: 12)),
       const SizedBox(height: 8),
@@ -5308,11 +5380,8 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                           metric?.basis == (position ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity) &&
                           metric?.unit == (percentage ? WorkspaceAnalyticsUnit.percent : WorkspaceAnalyticsUnit.count) &&
                           (!percentage || (metric?.cohortId?.trim().isNotEmpty ?? false));
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
+                      return _AnalyticsFigure(
+                            label: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
@@ -5336,9 +5405,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                                   ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
+                          value: Text(
                             known
                                 ? percentage ? '${metric!.value!.toStringAsFixed(1)}%' : _formatStoreAmount(metric!.value!.toInt())
                                 : '—',
@@ -5349,7 +5416,6 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                               color: MoolColors.navy,
                             ),
                           ),
-                        ],
                       );
                     },
                   ),
@@ -5373,11 +5439,8 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                           Text('${data.coverage == WorkspaceAnalyticsCoverage.complete ? 'Complete' : 'Partial'} coverage · ${data.source}', style: const TextStyle(fontSize: 11)),
                           if (data.rows.isEmpty) const Text('No recorded activity in covered data', style: TextStyle(fontSize: 12)),
                           for (final row in (data.rows.toList()..sort((a, b) => b.count.compareTo(a.count))).take(10))
-                            Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
-                              Expanded(child: Text(row.label, style: const TextStyle(fontSize: 13))),
-                              const SizedBox(width: 12),
-                              Text(_formatStoreAmount(row.count), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                            ])),
+                            _AnalyticsRankRow(groupId: group.id, row: row,
+                              maximum: data.rows.fold<int>(0, (max, item) => item.count > max ? item.count : max)),
                         ],
                         if (group.dimension == WorkspaceAnalyticsDimension.broadLocation)
                           const Text('City, district or delivery-area summary', style: TextStyle(fontSize: 11)),
@@ -5398,6 +5461,30 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
       ],
     );
   }
+}
+
+/// Relative magnitude within this verified ranking, not a conversion rate or share.
+class _AnalyticsRankRow extends StatelessWidget {
+  const _AnalyticsRankRow({required this.groupId, required this.row, required this.maximum});
+  final String groupId;
+  final WorkspaceAnalyticsRank row;
+  final int maximum;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _AnalyticsFigure(label: Text(row.label, style: const TextStyle(fontSize: 13)),
+        value: Text(_formatStoreAmount(row.count), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+      const SizedBox(height: 4),
+      Tooltip(message: '${row.label}: ${_formatStoreAmount(row.count)}',
+        child: ExcludeSemantics(child: LayoutBuilder(builder: (context, box) => Align(
+          alignment: Alignment.centerLeft, child: Container(
+            key: Key('analytics-rank-bar-$groupId-${row.id}'),
+            height: 5, width: maximum == 0 ? 0 : box.maxWidth * row.count / maximum,
+            decoration: BoxDecoration(color: _AnalyticsChartPalette.sales,
+              borderRadius: BorderRadius.circular(3)),
+          ))))),
+    ]));
 }
 
 abstract final class _OperatingPalette {
@@ -5676,11 +5763,12 @@ class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id, required this.label, required this.value,
     required this.detail, this.alertColor, this.onTap,
-    this.captionHeight, this.compact = false,
+    this.captionHeight, this.compact = false, this.valueFontSize,
   });
   final String id, label, value, detail;
   final Color? alertColor;
   final double? captionHeight;
+  final double? valueFontSize;
   final bool compact;
   final VoidCallback? onTap;
   bool get showInfo => !const {
@@ -5721,7 +5809,7 @@ class _OperatingMetric extends StatelessWidget {
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                   Expanded(child: _StoreValueMotion(value: value, child: Text(value,
                     key: Key('store-overview-$id'),
-                    style: TextStyle(fontSize: compact ? 17 : 18, fontWeight: FontWeight.w700,
+                    style: TextStyle(fontSize: valueFontSize ?? (compact ? 17 : 18), fontWeight: FontWeight.w700,
                       color: alertColor ?? MoolColors.navy)))),
                   if (onTap != null)
                     const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary),

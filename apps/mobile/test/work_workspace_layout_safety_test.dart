@@ -2667,6 +2667,127 @@ void main() {
     },
   );
 
+  for (final rupees in [100000000, 1000000000]) {
+    for (final scenario in [(const Size(360, 720), 1.0), (const Size(320, 568), 2.0), (const Size(915, 412), 1.6)]) {
+      testWidgets('ANALYTICS LARGEVALUES $rupees ${scenario.$1} ${scenario.$2}', (tester) async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final account = _ContactDraftFixtureStore();
+        final work = WorkSession(contactDraftStore: account,
+          analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(request: request,
+            state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+            source: 'Automated numeric boundary fixture', updatedAt: DateTime.now(),
+            coveredFrom: request.start, coveredUntil: request.end,
+            metrics: [for (final id in ['visitors', 'visible-skus', 'journey-cart', 'journey-order',
+              'supply-placed', 'supply-delivery', 'goods-without-bill', 'bills-without-goods'])
+              WorkspaceAnalyticsMetric(id: id, state: WorkspaceAnalyticsState.verified,
+                coverage: WorkspaceAnalyticsCoverage.complete,
+                basis: const {'visible-skus', 'supply-delivery', 'goods-without-bill', 'bills-without-goods'}.contains(id)
+                  ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity,
+                unit: WorkspaceAnalyticsUnit.count, source: 'Automated numeric boundary fixture', value: rupees.toDouble(), asOf: request.end)]),
+          inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+          ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        final base = work.workspaceCatalogueItems.first;
+        work.workspaceCatalogueItems..clear()..add(base.copyWith(stock: 1,
+          purchasePrice: rupees, sellingPrice: rupees, stockMode: WorkspaceStockMode.exactQuantity));
+        expect(work.applyWorkspaceFinance(WorkspaceFinanceSnapshot(accountScope: account.accountScope,
+          workspaceId: work.activeWorkspace!.id, revision: 1, asOf: DateTime.now(),
+          salesTodayMinor: rupees * 100 + 99, duesMinor: rupees * 100 + 99,
+          availableMinor: rupees * 100 + 99, heldMinor: rupees * 100 + 99,
+          requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+          refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true)), isTrue);
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: scenario.$1, textScale: scenario.$2, openHomeActions: false);
+        void checkAmounts() {
+          final amounts = find.byWidgetPredicate((w) => w is Text && (w.data?.contains(',') ?? false) &&
+            (w.data?.startsWith('₹') == true || RegExp(r'^\d[\d,]+$').hasMatch(w.data ?? '')));
+          expect(amounts, findsWidgets);
+          for (final element in amounts.evaluate()) {
+            final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == element));
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(paragraph.size.width, greaterThanOrEqualTo(paragraph.getMaxIntrinsicWidth(double.infinity) - .1),
+              reason: 'Full Indian-grouped amount including paise must remain one readable number');
+          }
+        }
+        checkAmounts();
+        await _captureAnalyticsFixture(tester, 'large-summary-$rupees-${scenario.$1.width.toInt()}-${scenario.$2}-host-fixture');
+        for (final category in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+          await _toggleHomeCategory(tester, category); checkAmounts();
+          final title = find.descendant(of: find.byKey(Key('store-analytics-detail-$category')),
+            matching: find.byWidgetPredicate((w) => w is Text && w.style?.fontSize == 16));
+          for (final element in title.evaluate()) {
+            final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == element));
+            expect(paragraph.size.width, greaterThanOrEqualTo(paragraph.getMinIntrinsicWidth(double.infinity) - .1),
+              reason: 'Report title words must remain intact at enlarged text');
+          }
+          if (category == 'stock') {
+            await tester.ensureVisible(find.byKey(const Key('store-overview-stock-cost'))); await tester.pumpAndSettle();
+          }
+          await _captureAnalyticsFixture(tester, 'large-$category-$rupees-${scenario.$1.width.toInt()}-${scenario.$2}-host-fixture');
+          await tester.ensureVisible(find.byTooltip('Collapse details'));
+          await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  testWidgets('ANALYTICS PREMIUM metric surfaces preserve content and navigation', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'money');
+    final surfaces = find.byWidgetPredicate((w) => w.key is ValueKey<String> &&
+      (w.key! as ValueKey<String>).value.startsWith('analytics-metric-surface-'));
+    expect(surfaces, findsWidgets);
+    expect(find.text('Cash tied up'), findsOneWidget);
+    expect(find.text('Stock days'), findsOneWidget);
+    for (final element in surfaces.evaluate()) {
+      final cell = find.byElementPredicate((e) => e == element);
+      final rect = tester.getRect(cell);
+      for (final label in find.descendant(of: cell, matching: find.byType(Text)).evaluate()) {
+        final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == label));
+        expect(paragraph.size.height, greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .1));
+        expect(tester.getRect(find.byElementPredicate((e) => e == label)).right, lessThanOrEqualTo(rect.right + 1));
+      }
+    }
+    await _captureAnalyticsFixture(tester, 'premium-money-host-fixture');
+    await tester.ensureVisible(find.byTooltip('Collapse details'));
+    await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-analytics-detail-money')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS PREMIUM verified ranking bars retain exact counts and zero', (tester) async {
+    final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(request: request,
+      state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+      source: 'Automated aggregate fixture', updatedAt: DateTime.now(), coveredFrom: request.start,
+      coveredUntil: request.end, metrics: const [], breakdowns: [WorkspaceAnalyticsBreakdown(
+        id: 'broad-locations', dimension: WorkspaceAnalyticsDimension.broadLocation,
+        coverage: WorkspaceAnalyticsCoverage.partial, asOf: request.end, source: 'Automated aggregate fixture',
+        rows: const [WorkspaceAnalyticsRank(id: 'area-b', label: 'Area B', count: 5),
+          WorkspaceAnalyticsRank(id: 'area-a', label: 'Area A', count: 10),
+          WorkspaceAnalyticsRank(id: 'area-zero', label: 'Area Zero', count: 0)])]));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'public');
+    final large = find.byKey(const Key('analytics-rank-bar-broad-locations-area-a'));
+    final half = find.byKey(const Key('analytics-rank-bar-broad-locations-area-b'));
+    final zero = find.byKey(const Key('analytics-rank-bar-broad-locations-area-zero'));
+    expect(large, findsOneWidget); expect(half, findsOneWidget); expect(zero, findsOneWidget);
+    expect(tester.getSize(half).width, closeTo(tester.getSize(large).width / 2, .1));
+    expect(tester.getSize(zero).width, 0);
+    expect(tester.getTopLeft(find.text('Area A')).dy, lessThan(tester.getTopLeft(find.text('Area B')).dy));
+    expect(find.text('10'), findsOneWidget); expect(find.text('5'), findsOneWidget); expect(find.text('0'), findsOneWidget);
+    expect(find.text('Partial coverage · Automated aggregate fixture'), findsOneWidget);
+    expect(find.byKey(const Key('analytics-rank-bar-discovery-sources')), findsNothing);
+    await tester.ensureVisible(find.text('Area A')); await tester.pumpAndSettle();
+    await _captureAnalyticsFixture(tester, 'premium-ranking-host-fixture');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS GRAPHICS unavailable history is not a zero trend', (tester) async {
     final work = liveStore();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
@@ -2773,14 +2894,22 @@ void main() {
       reason: 'A verified empty period needs one clear summary, not seven empty chart rows');
     expect(find.text('No change · through the same time'), findsOneWidget);
     expect(find.byIcon(Icons.trending_up), findsNothing);
-    work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'GRAPH-LARGE', orderId: 'GRAPH-LARGE',
-      customer: 'Host boundary fixture', items: 'Goods', amount: 10000000, payment: 'Cash', issuedAt: yesterday));
-    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
-    expect(find.text('Down ₹1,00,00,000 · through the same time'), findsOneWidget);
-    await _captureAnalyticsFixture(tester, 'graphics-large-digits-host-fixture');
-    for (final element in find.textContaining('₹1,00,00,000').evaluate()) {
+    for (final boundary in [(10000000, 0, '₹1,00,00,000'), (100000000, 0, '₹10,00,00,000'),
+      (1000000000, 99, '₹1,00,00,00,000.99')]) {
+      work.workspaceInvoices..clear()..add(WorkspaceCustomerInvoice(id: 'GRAPH-LARGE', orderId: 'GRAPH-LARGE',
+        customer: 'Host boundary fixture', items: 'Goods', amount: boundary.$1,
+        remainderPaise: boundary.$2, payment: 'Cash', issuedAt: yesterday));
+      work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle();
+      expect(find.text('Down ${boundary.$3} · through the same time'), findsOneWidget);
+      expect(find.text(boundary.$3), findsOneWidget);
+      final number = tester.renderObject<RenderParagraph>(find.text(boundary.$3));
+      expect(number.size.width, greaterThanOrEqualTo(number.getMaxIntrinsicWidth(double.infinity) - .1));
+      await tester.ensureVisible(find.text(boundary.$3)); await tester.pumpAndSettle();
+      await _captureAnalyticsFixture(tester, 'graphics-large-digits-${boundary.$1}-host-fixture');
+    for (final element in find.textContaining(boundary.$3).evaluate()) {
       final paragraph = tester.renderObject<RenderParagraph>(find.byElementPredicate((e) => e == element));
       expect(paragraph.size.height, greaterThanOrEqualTo(paragraph.getMaxIntrinsicHeight(paragraph.size.width) - .1));
+    }
     }
     expect(checkpoint.saveAttempts, 0);
     expect(tester.takeException(), isNull);
