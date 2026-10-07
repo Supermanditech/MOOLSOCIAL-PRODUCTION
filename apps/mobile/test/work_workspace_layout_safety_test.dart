@@ -2805,10 +2805,7 @@ void main() {
       expect(find.byKey(const Key('analytics-provider-loading')), findsNothing);
       final animatedReveal = find.descendant(of: find.byKey(const Key('analytics-inline-reveal')),
         matching: find.byType(TweenAnimationBuilder<double>));
-      expect(animatedReveal, reduced ? findsNothing : findsOneWidget);
-      if (!reduced) {
-        expect(tester.widget<TweenAnimationBuilder<double>>(animatedReveal).duration, const Duration(milliseconds: 180));
-      }
+      expect(animatedReveal, findsNothing, reason: 'Only charts animate; report values/actions must remain immediate');
       await _toggleHomeCategory(tester, 'stock');
       expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
       final selected = find.ancestor(of: find.byKey(const Key('store-analytics-stock')),
@@ -2835,6 +2832,125 @@ void main() {
     });
   }
 
+  testWidgets('ANALYTICS COMPOSITION inline placement and chart-only presentation', (tester) async {
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await _toggleHomeCategory(tester, 'public');
+    final detail = tester.getRect(find.byKey(const Key('store-analytics-detail-public')));
+    final selected = tester.getRect(find.byKey(const Key('store-analytics-public')));
+    final next = tester.getRect(find.byKey(const Key('store-analytics-supply')));
+    expect(detail.top, greaterThanOrEqualTo(selected.bottom));
+    expect(detail.bottom, lessThanOrEqualTo(next.top));
+    expect(find.descendant(of: find.byKey(const Key('analytics-inline-reveal')),
+      matching: find.byType(TweenAnimationBuilder<double>)), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('store-analytics-value-visible-skus')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-context-heading-public')), findsOneWidget);
+    await tester.tap(find.byTooltip('Hide active report')); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-context-heading-public')), findsNothing);
+    expect(find.byKey(const Key('store-analytics-detail-public')), findsNothing);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS COMPOSITION Stock and Money own distinct balance groups', (tester) async {
+    final account = _ContactDraftFixtureStore();
+    final work = storeViewFixture(null, account);
+    final scope = (account.accountScope, work.activeWorkspace!.id);
+    final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'stock');
+    expect(find.byKey(const Key('analytics-stock-distribution')), findsNothing);
+    expect(find.byKey(const Key('store-overview-stock-cost')), findsOneWidget);
+    expect(find.byKey(const Key('store-overview-stock-sale')), findsOneWidget);
+    final value = tester.getRect(find.byKey(const Key('store-overview-stock-cost')));
+    final ring = tester.getRect(find.byKey(const Key('analytics-stock-ring')));
+    expect(value.top, lessThan(ring.top));
+    await _captureAnalyticsFixture(tester, 'composition-stock-host-fixture');
+    // Explicitly qualify this automated balance fixture after inventory recovery;
+    // no phone or provider acceptance is inferred from these known-zero values.
+    expect(work.applyWorkspaceFinance(WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 2, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true)), isTrue);
+    await tester.pumpAndSettle();
+    await _toggleHomeCategory(tester, 'money');
+    expect(find.byKey(const Key('analytics-settlement-group')), findsOneWidget);
+    final settlementLabel = tester.getRect(find.text('Settlement available'));
+    final settlementAmount = tester.getRect(find.byKey(const Key('store-overview-settlement-available')));
+    expect(settlementLabel.right, lessThan(settlementAmount.left));
+    expect((settlementLabel.center.dy - settlementAmount.center.dy).abs(), lessThanOrEqualTo(1),
+      reason: 'Normal-size settlement ledger labels and amounts occupy the same row');
+    expect(find.byKey(const Key('store-overview-payables')), findsOneWidget);
+    expect(find.byKey(const Key('store-overview-customer-dues')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'composition-money-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS COMPOSITION zero Sales is compact and dates identify month', (tester) async {
+    final account = _ContactDraftFixtureStore();
+    final work = storeViewFixture(null, account);
+    final scope = (account.accountScope, work.activeWorkspace!.id);
+    final finance = WorkspaceFinanceSnapshot(accountScope: scope.$1, workspaceId: scope.$2,
+      revision: 1, asOf: DateTime.now(), salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+    expect(work.bindCustomerCollectionGateway(accountScope: scope.$1, storeId: scope.$2,
+      adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    work.workspaceInvoices.clear();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'sales');
+    expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 52);
+    expect(find.byKey(const Key('analytics-sales-axis-zero')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-axis-max')), findsNothing);
+    final dates = find.descendant(of: find.byKey(const Key('analytics-sales-point-0')), matching: find.byType(Text));
+    expect(tester.widget<Text>(dates).data, matches(RegExp(r'^\d{2}/\d{2}$')));
+    final dateStyle = tester.widget<AnimatedDefaultTextStyle>(find.byKey(const Key('analytics-sales-date-style-0'))).style;
+    expect(dateStyle.fontFamily, DefaultTextStyle.of(tester.element(find.byKey(const Key('analytics-sales-point-0')))).style.fontFamily,
+      reason: 'Date selection must preserve the app typography instead of resetting to a fallback font');
+    expect(tester.getRect(find.byKey(const Key('store-overview-billed'))).top,
+      lessThan(tester.getRect(find.byKey(const Key('analytics-sales-line'))).top));
+    await _captureAnalyticsFixture(tester, 'composition-zero-sales-host-fixture');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS COMPOSITION enlarged context bounds and summary recovery', (tester) async {
+    final work = storeViewFixture();
+    await work.loadWorkspaceInventory();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 568), textScale: 2, openHomeActions: false);
+    final board = find.byKey(const Key('work-store-operating-board'));
+    final scroll = tester.widget<SingleChildScrollView>(board).controller!;
+    await tester.ensureVisible(find.byKey(const Key('store-analytics-stock'))); await tester.pumpAndSettle();
+    final summaryOffset = scroll.offset;
+    await tester.tap(find.byKey(const Key('store-analytics-stock'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('analytics-stock-ring'))); await tester.pumpAndSettle();
+    final header = find.byKey(const Key('analytics-context-heading-stock'));
+    expect(header, findsOneWidget);
+    expect(tester.getRect(header).bottom, lessThanOrEqualTo(tester.getRect(board).top + .1));
+    final close = find.byTooltip('Hide active report');
+    expect(close.hitTestable(), findsOneWidget);
+    expect(tester.getSize(close).height, greaterThanOrEqualTo(48));
+    await tester.tap(close); await tester.pumpAndSettle();
+    expect(header, findsNothing);
+    expect(scroll.offset, closeTo(summaryOffset.clamp(0, scroll.position.maxScrollExtent), .1));
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'composition-enlarged-summary-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS STRONG primary KPI surfaces and truthful Stock ring', (tester) async {
     final work = storeViewFixture();
     final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
@@ -2860,7 +2976,8 @@ void main() {
     final available = work.workspaceCatalogueItems.where((p) => p.available &&
       (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0)).length;
     expect(ring.value, closeTo(available / work.workspaceCatalogueItems.length, .00001));
-    expect(find.byKey(const Key('analytics-stock-distribution')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-stock-distribution')), findsNothing,
+      reason: 'Expanded Stock uses one ring/legend, not a second distribution strip');
     expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
     expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
     expect(tester.takeException(), isNull);
@@ -3008,9 +3125,8 @@ void main() {
     expect(find.byKey(const Key('analytics-sales-bars')), findsOneWidget);
     expect(find.text('Saved bills · last 7 days'), findsOneWidget);
     expect(find.byKey(const Key('analytics-sales-line')), findsOneWidget);
-    expect(tester.getTopLeft(find.byKey(const Key('analytics-sales-point-6'))).dy,
-      tester.getTopLeft(find.byKey(const Key('analytics-sales-point-0'))).dy,
-      reason: 'Seven dates should remain one row at normal 360px text size');
+    expect(tester.widget<Text>(find.descendant(of: find.byKey(const Key('analytics-sales-point-6')),
+      matching: find.byType(Text))).data, matches(RegExp(r'^\d{2}/\d{2}$')), reason: 'Date controls include month context');
     final point = find.byKey(const Key('analytics-sales-point-6'));
     await tester.ensureVisible(point); await tester.tap(point); await tester.pumpAndSettle();
     expect(find.byKey(const Key('analytics-sales-selected-point')), findsOneWidget);

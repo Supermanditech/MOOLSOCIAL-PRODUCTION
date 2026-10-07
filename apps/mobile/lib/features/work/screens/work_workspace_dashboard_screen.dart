@@ -4448,10 +4448,11 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         },
         detailVisuals: {
           'stock': stockReady ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _StockAvailabilityGraphic(available: products.length - unavailable, unavailable: unavailable),
             if (cost != null && resale != null) ...[
               const SizedBox(height: 12), _StockValueGraphic(cost: cost, sale: resale),
             ],
+            const SizedBox(height: 12),
+            _StockAvailabilityGraphic(available: products.length - unavailable, unavailable: unavailable),
           ]) :
             const Text('Stock distribution unavailable · load saved Stock first'),
           'sales': invoiceReady ? _SavedBillGraphic(series: savedBillSeries,
@@ -4800,7 +4801,24 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   Future<WorkspaceAnalyticsSnapshot>? _result;
   Object? _scopeIdentity;
   final _detailKey = GlobalKey();
+  final _viewportKey = GlobalKey();
+  final _localScroll = ScrollController();
+  ScrollController get _scroll => widget.scrollController ?? _localScroll;
+  bool _contextHeader = false;
+  double? _summaryOffset;
   int _transition = 0;
+
+  @override
+  void dispose() { _localScroll.dispose(); super.dispose(); }
+
+  void _checkContextHeader() {
+    final detail = _detailKey.currentContext?.findRenderObject();
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (detail is! RenderBox || viewport is! RenderBox || !detail.attached || !viewport.attached) return;
+    final top = detail.localToGlobal(Offset.zero).dy - viewport.localToGlobal(Offset.zero).dy;
+    final show = _expanded != null && top < -1 && top + detail.size.height > 48;
+    if (show != _contextHeader && mounted) setState(() => _contextHeader = show);
+  }
 
   @override
   void initState() {
@@ -4832,7 +4850,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
   void _toggle(String id) {
     final generation = ++_transition;
-    setState(() => _expanded = _expanded == id ? null : id);
+    final closing = _expanded == id;
+    if (_expanded == null && _scroll.hasClients) _summaryOffset = _scroll.offset;
+    setState(() { _expanded = closing ? null : id; _contextHeader = false; });
+    if (closing) { WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && generation == _transition && _scroll.hasClients && _summaryOffset != null) {
+        _scroll.jumpTo(_summaryOffset!.clamp(0, _scroll.position.maxScrollExtent));
+      }
+    }); }
     if (_expanded != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || generation != _transition) return;
@@ -4854,18 +4879,22 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
   Widget _inlineReveal(Widget child) {
     return KeyedSubtree(key: const Key('analytics-inline-reveal'),
-      child: MoolMotion.isReduced(context) ? child : TweenAnimationBuilder<double>(
-        tween: Tween(begin: .65, end: _expanded == null ? .65 : 1), duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        builder: (context, opacity, content) => Opacity(opacity: opacity, child: content),
-        child: child));
+      child: child);
   }
 
-  Widget _metrics(Iterable<_OperatingMetric> source) => LayoutBuilder(builder: (context, box) {
+  Widget _metrics(Iterable<_OperatingMetric> source, {bool hero = false, bool ledger = false}) => LayoutBuilder(builder: (context, box) {
+    if (ledger) { return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final metric in source) Padding(padding: const EdgeInsets.symmetric(vertical: 4),
+        child: _OperatingMetric(id: metric.id, label: metric.label, value: metric.value,
+          detail: metric.detail, onTap: metric.onTap, alertColor: metric.alertColor,
+          ledger: true,
+          valueFontSize: _analyticsNumberSize(context, metric.value, 20, box.maxWidth - 34))),
+    ]); }
+    final preferred = hero ? 24.0 : 20.0;
     var columns = box.maxWidth >= 300 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
     for (final metric in source) {
       final measured = TextPainter(text: TextSpan(text: metric.value,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+        style: TextStyle(fontSize: preferred, fontWeight: FontWeight.w700)),
         textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
       if (measured.width + 42 > (box.maxWidth - 8) / 2) columns = 1;
       measured.dispose();
@@ -4882,18 +4911,15 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           child: Padding(padding: const EdgeInsets.all(10), child: _OperatingMetric(
             id: metric.id, label: metric.label, value: metric.value, detail: metric.detail,
             alertColor: metric.alertColor ?? (metric.value == '—' ? _AnalyticsChartPalette.secondary : _AnalyticsChartPalette.ink), onTap: metric.onTap,
-            valueFontSize: _analyticsNumberSize(context, metric.value, 20,
+            valueFontSize: _analyticsNumberSize(context, metric.value, preferred,
               (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))))),
     ]);
   });
 
   Widget _attention(Widget item) => item is _OperatingAttention
-    ? Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: DecoratedBox(
-        decoration: BoxDecoration(color: item.color.withValues(alpha: .04),
-          borderRadius: BorderRadius.circular(10), border: Border.all(color: item.color.withValues(alpha: .18))),
-        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: _OperatingAttention(
+    ? Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: _OperatingAttention(
           id: item.id, title: item.title, detail: item.detail,
-          action: item.action, color: item.color, expanded: true, onTap: item.onTap))))
+          action: item.action, color: item.color, expanded: true, onTap: item.onTap))
     : item;
 
   @override
@@ -4950,8 +4976,12 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               ? '${c.alertCount} ${c.alertCount == 1 ? 'issue type' : 'issue types'}'
               : '${c.alertCount} ${c.alertCount == 1 ? 'order' : 'orders'} to review',
               key: Key('store-category-alerts-$id'), style: const TextStyle(fontSize: 12, color: _OperatingPalette.warning)),
-            if (c.coverage != null) Text(c.coverage!, style: const TextStyle(fontSize: 12)),
-            _metrics(c.children.whereType<_OperatingMetric>()),
+            if (c.coverage != null && id != 'money') Text(c.coverage!, style: const TextStyle(fontSize: 12)),
+            _metrics(c.children.whereType<_OperatingMetric>().where((m) =>
+              id == 'stock' ? m.id != 'stock-cost' && m.id != 'stock-sale' :
+              id == 'sales' ? m.id != 'billed' && m.id != 'collections' :
+              id == 'money' ? m.id != 'customer-dues' && m.id != 'payables' && !m.id.startsWith('settlement-') : true),
+              ledger: id == 'orders' || id == 'capital'),
             if (id == 'stock') const Text(
               '* Selling value less purchase value, before tax, discounts and expenses. Not earned profit. Values use saved quantities and prices.',
               key: Key('store-analytics-stock-valuation-guide'), style: TextStyle(fontSize: 12)),
@@ -4960,10 +4990,66 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           ];
         }
         final expanded = _expanded;
+        WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _checkContextHeader(); });
         final end = _request?.end ?? widget.periodEnd;
         final start = _request?.start ?? widget.periodStart;
-        return SingleChildScrollView(
-          key: const Key('work-store-operating-board'), controller: widget.scrollController,
+        Widget reportHeading(String id, {bool compact = false}) => Container(
+          key: Key(compact ? 'analytics-context-heading-$id' : 'analytics-report-heading-$id'),
+          padding: const EdgeInsets.only(left: 8),
+          decoration: BoxDecoration(gradient: _AnalyticsChartPalette.reportGradient(id),
+            borderRadius: _AnalyticsChartPalette.radius,
+            border: Border.all(color: _AnalyticsChartPalette.reportAccent(id).withValues(alpha: .35))),
+          child: LayoutBuilder(builder: (context, box) {
+            final heading = Row(children: [Icon(switch (id) {
+              'public' => Icons.storefront_outlined, 'journey' => Icons.route_outlined,
+              'supply' => Icons.local_shipping_outlined, 'receiving' => Icons.move_to_inbox_outlined,
+              'orders' => Icons.receipt_long_outlined, 'stock' => Icons.inventory_2_outlined,
+              'sales' => Icons.bar_chart_rounded, _ => Icons.account_balance_wallet_outlined,
+            }, size: 20, color: _AnalyticsChartPalette.reportAccent(id)), const SizedBox(width: 8),
+              Expanded(child: Text(_analyticsReportTitle(id), style: TextStyle(fontSize: compact ? 14 : 18,
+                fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink)))]);
+            final hide = Tooltip(message: compact ? 'Hide active report' : 'Collapse details', child: TextButton(
+              style: TextButton.styleFrom(foregroundColor: _AnalyticsChartPalette.ink, minimumSize: const Size(48, 48)),
+              onPressed: () => _toggle(id), child: Row(mainAxisSize: MainAxisSize.min,
+                children: [Text(compact ? 'Close report' : 'Hide details', style: const TextStyle(fontSize: 11)), const Icon(Icons.expand_less, size: 18)])));
+            return box.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
+              ? Row(children: [Expanded(child: heading), hide]) : Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [heading, Align(alignment: Alignment.centerRight, child: hide)]);
+          }));
+        final detail = expanded == null ? const SizedBox.shrink() : Padding(key: _detailKey,
+          padding: const EdgeInsets.symmetric(vertical: 12), child: Column(key: Key('store-analytics-detail-$expanded'),
+            crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              reportHeading(expanded),
+              if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
+                _StoreAnalyticsProviderReport(session: widget.session, report: expanded, request: _request, result: _result),
+              if (expanded == 'receiving') ...categories['stock']!.children.whereType<_OperatingAttention>()
+                .where((a) => a.id.startsWith('receipt-')).map(_attention),
+              if (expanded == 'stock') _metrics(categories['stock']!.children.whereType<_OperatingMetric>()
+                .where((m) => m.id == 'stock-cost' || m.id == 'stock-sale'), hero: true),
+              if (expanded == 'sales') _metrics(categories['sales']!.children.whereType<_OperatingMetric>()
+                .where((m) => m.id == 'billed' || m.id == 'collections'), hero: true),
+              if (expanded == 'money') ...[
+                _metrics(categories['money']!.children.whereType<_OperatingMetric>()
+                  .where((m) => m.id == 'customer-dues' || m.id == 'payables'), hero: true),
+                if (categories['money']!.coverage != null) Text(categories['money']!.coverage!, style: const TextStyle(fontSize: 12)),
+                if (categories['money']!.children.whereType<_OperatingMetric>().any((m) => m.id.startsWith('settlement-')))
+                Container(key: const Key('analytics-settlement-group'), padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: _AnalyticsChartPalette.softSurface, borderRadius: _AnalyticsChartPalette.radius),
+                  child: _metrics(categories['money']!.children.whereType<_OperatingMetric>()
+                    .where((m) => m.id.startsWith('settlement-')), ledger: true)),
+              ],
+              if (widget.detailVisuals[expanded] != null)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: widget.detailVisuals[expanded]!),
+              if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
+              if (expanded == 'money') ...categoryDetail('capital'),
+            ]));
+        return Column(children: [
+          if (_contextHeader && expanded != null) reportHeading(expanded, compact: true),
+          Expanded(child: NotificationListener<ScrollNotification>(onNotification: (_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _checkContextHeader(); });
+            return false;
+          }, child: SizedBox(key: _viewportKey, child: SingleChildScrollView(
+          key: const Key('work-store-operating-board'), controller: _scroll,
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             LayoutBuilder(builder: (context, box) {
@@ -5073,7 +5159,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                             ])))));
               }
               return Column(children: [
-                for (var index = 0; index < ids.length; index += columns)
+                for (var index = 0; index < ids.length; index += columns) ...[
                   Padding(padding: EdgeInsets.only(bottom: index + columns < ids.length ? 8 : 0),
                     child: IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                       for (var offset = 0; offset < columns && index + offset < ids.length; offset++) ...[
@@ -5081,52 +5167,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                         SizedBox(width: width, child: card(ids[index + offset])),
                       ],
                     ]))),
+                  if (expanded != null && ids.skip(index).take(columns).contains(expanded)) _inlineReveal(detail),
+                ],
+                if (expanded == null) _inlineReveal(const SizedBox.shrink()),
               ]);
             }),
-            _inlineReveal(expanded == null ? const SizedBox.shrink() :
-              Padding(key: _detailKey, padding: const EdgeInsets.only(top: 12),
-              child: Column(key: Key('store-analytics-detail-$expanded'),
-                crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Container(key: Key('analytics-report-heading-$expanded'), padding: const EdgeInsets.only(left: 8),
-                    decoration: BoxDecoration(gradient: _AnalyticsChartPalette.reportGradient(expanded),
-                      borderRadius: _AnalyticsChartPalette.radius,
-                      border: Border.all(color: _AnalyticsChartPalette.reportAccent(expanded).withValues(alpha: .35))),
-                    child: LayoutBuilder(builder: (context, box) {
-                      final heading = Row(children: [Icon(switch (expanded) {
-                      'public' => Icons.storefront_outlined,
-                      'journey' => Icons.route_outlined,
-                      'supply' => Icons.local_shipping_outlined,
-                      'receiving' => Icons.move_to_inbox_outlined,
-                      'orders' => Icons.receipt_long_outlined,
-                      'stock' => Icons.inventory_2_outlined,
-                      'sales' => Icons.bar_chart_rounded,
-                      _ => Icons.account_balance_wallet_outlined,
-                    }, size: 20, color: _AnalyticsChartPalette.reportAccent(expanded)),
-                      const SizedBox(width: 8), Expanded(child: Text(_analyticsReportTitle(expanded),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy)))]);
-                      final hide = Tooltip(message: 'Collapse details', child: TextButton(
-                        style: TextButton.styleFrom(foregroundColor: _AnalyticsChartPalette.ink, minimumSize: const Size(48, 48)),
-                        onPressed: () => _toggle(expanded), child: const Row(mainAxisSize: MainAxisSize.min,
-                          children: [Text('Hide details', style: TextStyle(fontSize: 11)),
-                            Icon(Icons.expand_less, size: 18)])));
-                      return box.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
-                        ? Row(children: [Expanded(child: heading), hide])
-                        : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                            heading, Align(alignment: Alignment.centerRight, child: hide)]);
-                    })),
-                  if (const {'public', 'journey', 'supply', 'receiving'}.contains(expanded))
-                    _StoreAnalyticsProviderReport(session: widget.session, report: expanded,
-                      request: _request, result: _result),
-                  if (expanded == 'receiving')
-                    ...categories['stock']!.children.whereType<_OperatingAttention>()
-                      .where((a) => a.id.startsWith('receipt-')).map(_attention),
-                  if (widget.detailVisuals[expanded] != null)
-                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: widget.detailVisuals[expanded]!),
-                  if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
-                  if (expanded == 'money') ...categoryDetail('capital'),
-                ]))),
           ]),
-        );
+        )))),
+        ]);
       });
   }
 }
@@ -5219,16 +5267,26 @@ class _StockAvailabilityGraphic extends StatelessWidget {
     return compact ? interactiveStrip : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Stock availability', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
-      if (total > 0) Row(children: [
+      if (total > 0) Tooltip(message: '$label · Product count, not units', triggerMode: TooltipTriggerMode.tap,
+        child: Semantics(label: 'Saved Stock product availability: $label', child: Row(children: [
         ExcludeSemantics(child: SizedBox(width: 72, height: 72,
-          child: Padding(padding: const EdgeInsets.all(5), child: CircularProgressIndicator(
+          child: Stack(alignment: Alignment.center, children: [Padding(padding: const EdgeInsets.all(5), child: CircularProgressIndicator(
             key: const Key('analytics-stock-ring'), value: available / total,
             strokeWidth: 8, color: _AnalyticsChartPalette.available,
-            backgroundColor: _AnalyticsChartPalette.unavailable)))),
-        const SizedBox(width: 16), Expanded(child: interactiveStrip),
-      ]) else interactiveStrip,
+            backgroundColor: _AnalyticsChartPalette.unavailable)),
+            Text('$total', style: TextStyle(fontSize: _analyticsNumberSize(context, '$total', 18, 48), fontWeight: FontWeight.w700)),
+          ]))),
+        const SizedBox(width: 16), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final row in [(available, 'available', _AnalyticsChartPalette.available),
+            (unavailable, 'unavailable', _AnalyticsChartPalette.unavailable)])
+            Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+              SizedBox(width: 8, height: 8, child: ColoredBox(color: row.$3)), const SizedBox(width: 6),
+              Expanded(child: Text('${row.$1} ${row.$2}', style: const TextStyle(fontSize: 13))),
+            ])),
+        ])),
+      ]))) else const SizedBox.shrink(),
       const SizedBox(height: 6),
-      Text(label, style: const TextStyle(fontSize: 13)),
+      ExcludeSemantics(child: Text(label, style: const TextStyle(fontSize: 13))),
       const Text('Product count, not units · saved Stock',
         style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
       if (total == 0) const Text('No products saved yet', style: TextStyle(fontSize: 12)),
@@ -5273,7 +5331,8 @@ class _StockValueGraphic extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (final row in [(cost, 'cost', 'Money in stock', _AnalyticsChartPalette.available),
           (sale, 'sale', 'Stock sale value', _AnalyticsChartPalette.sales)]) ...[
-          _AnalyticsMoneyCaption(id: 'analytics-stock-caption-${row.$2}', label: row.$3, minor: row.$1),
+          Semantics(key: Key('analytics-stock-caption-${row.$2}'), label: '${row.$3} · ₹${_formatStoreMinorAmount(row.$1)}',
+            child: ExcludeSemantics(child: Text(row.$3, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)))),
           const SizedBox(height: 6),
           Tooltip(message: '${row.$3} · ₹${_formatStoreMinorAmount(row.$1)}', triggerMode: TooltipTriggerMode.tap,
             child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 44),
@@ -5327,6 +5386,7 @@ class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
   Widget build(BuildContext context) {
     final index = (_selected ?? widget.series.length - 1).clamp(0, widget.series.length - 1);
     final selected = widget.series[index];
+    final maximum = widget.series.fold<int>(0, (value, row) => row.$2 > value ? row.$2 : value);
     String date(DateTime at) => '${at.day.toString().padLeft(2, '0')}/${at.month.toString().padLeft(2, '0')}';
     return Container(key: const Key('analytics-sales-plot'), padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(gradient: _AnalyticsChartPalette.reportGradient('sales'),
@@ -5335,7 +5395,9 @@ class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
         _AnalyticsMoneyCaption(id: 'analytics-sales-selected-point', label: date(selected.$1),
           minor: selected.$2, suffix: 'Before returns'),
         const SizedBox(height: 8),
-        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: 100,
+        _AnalyticsMoneyCaption(id: 'analytics-sales-axis-zero', label: 'Scale from', minor: 0),
+        if (maximum > 0) _AnalyticsMoneyCaption(id: 'analytics-sales-axis-max', label: 'Scale to', minor: maximum),
+        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: maximum == 0 ? 52 : 112,
           child: CustomPaint(key: const Key('analytics-sales-line'),
             painter: _AnalyticsSalesPainter(widget.series.map((row) => row.$2).toList(), index))))),
         Wrap(children: [for (var i = 0; i < widget.series.length; i++)
@@ -5345,7 +5407,11 @@ class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: _AnalyticsChartPalette.ink,
                 backgroundColor: i == index ? _AnalyticsChartPalette.sales.withValues(alpha: .14) : Colors.transparent),
-              onPressed: () => setState(() => _selected = i), child: Text('${widget.series[i].$1.day}'))),
+              onPressed: () => setState(() => _selected = i), child: AnimatedDefaultTextStyle(
+                key: Key('analytics-sales-date-style-$i'),
+                duration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 180),
+                style: DefaultTextStyle.of(context).style.copyWith(fontSize: 11, color: _AnalyticsChartPalette.ink,
+                  fontWeight: i == index ? FontWeight.w700 : FontWeight.w500), child: Text(date(widget.series[i].$1))))),
         ]),
       ]));
   }
@@ -5415,6 +5481,13 @@ class _SavedBillGraphic extends StatelessWidget {
     final comparison = change == 0 ? 'No change · through the same time' :
       '${change > 0 ? 'Up' : 'Down'} ${money(change.abs())} · through the same time';
     return Column(key: const Key('analytics-sales-bars'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(change == 0 ? Icons.trending_flat : change > 0 ? Icons.trending_up : Icons.trending_down,
+        color: _AnalyticsChartPalette.sales, size: 20), const SizedBox(width: 6), Expanded(child: Text(comparison,
+          key: const Key('analytics-sales-comparison'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
+      Text('${money(todayMinor)} today · ${money(previousMinor)} yesterday', style: const TextStyle(fontSize: 12)),
+      const Text('Saved invoices only · today ends at the displayed time. Not live online sales or money collected.',
+        style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+      const SizedBox(height: 8),
       const Text('Saved bills · last 7 days', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Text('${money(total)} billed · before returns', style: const TextStyle(fontSize: 12)),
       const SizedBox(height: 6),
@@ -5451,12 +5524,6 @@ class _SavedBillGraphic extends StatelessWidget {
         })),
       if (maximum == 0) const Text('No bills saved in this period', style: TextStyle(fontSize: 12)),
       const SizedBox(height: 8),
-      Row(children: [Icon(change == 0 ? Icons.trending_flat : change > 0 ? Icons.trending_up : Icons.trending_down,
-        color: _AnalyticsChartPalette.sales, size: 20), const SizedBox(width: 6), Expanded(child: Text(comparison,
-          key: const Key('analytics-sales-comparison'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
-      Text('${money(todayMinor)} today · ${money(previousMinor)} yesterday', style: const TextStyle(fontSize: 12)),
-      const Text('Saved invoices only · today ends at the displayed time. Not live online sales or money collected.',
-        style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
     ]);
   }
 }
@@ -5674,7 +5741,20 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                     ),
                   ),
                 for (final row in rows) ...[
-                  const SizedBox(height: 8),
+                  if (row == rows.first || const {'visible-skus', 'interest-no-order', 'listing-corrections', 'enquiries', 'supply-acceptance', 'supply-cancelled', 'received-part', 'received-short', 'goods-without-bill'}.contains(row.id))
+                    Padding(padding: const EdgeInsets.only(top: 10, bottom: 4), child: Text(
+                      row.id == 'visible-skus' ? 'Public listings · current position' :
+                      row.id == 'interest-no-order' ? 'Customer interest · selected period' :
+                      row.id == 'listing-corrections' ? 'Listing issues · current position' :
+                      row.id == 'enquiries' ? 'Customer response · selected period' :
+                      const {'received-part', 'goods-without-bill'}.contains(row.id) ? 'Pending receipts · current position' :
+                      row.id == 'received-short' ? 'Receipt issues · selected period' :
+                      row.id == 'supply-acceptance' ? 'Pending supply · current position' :
+                      row.id == 'supply-cancelled' ? 'Cancelled orders · selected period' :
+                      widget.report == 'public' ? 'Store activity · selected period' :
+                      widget.report == 'journey' ? 'Customer journey · selected period' :
+                      widget.report == 'supply' ? 'Supplier orders · selected period' : 'Goods received · selected period',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
                   Builder(
                     builder: (_) {
                       final metric = values[row.id];
@@ -5697,12 +5777,8 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                         _ => null,
                       };
                       return Container(key: Key('analytics-provider-cell-${row.id}'),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: known ? null : _AnalyticsChartPalette.softSurface,
-                          gradient: known ? _AnalyticsChartPalette.reportGradient(widget.report) : null,
-                          borderRadius: _AnalyticsChartPalette.radius,
-                          border: Border.all(color: _AnalyticsChartPalette.border)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _AnalyticsChartPalette.border, width: .5))),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           _AnalyticsFigure(
                             label: Column(
@@ -6109,13 +6185,14 @@ class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id, required this.label, required this.value,
     required this.detail, this.alertColor, this.onTap,
-    this.captionHeight, this.compact = false, this.valueFontSize,
+    this.captionHeight, this.compact = false, this.valueFontSize, this.ledger = false,
   });
   final String id, label, value, detail;
   final Color? alertColor;
   final double? captionHeight;
   final double? valueFontSize;
   final bool compact;
+  final bool ledger;
   final VoidCallback? onTap;
   bool get showInfo => !const {
     'invoice-count', 'skus', 'low-stock', 'out-of-stock',
@@ -6128,6 +6205,38 @@ class _OperatingMetric extends StatelessWidget {
       actions: [TextButton(onPressed: () => Navigator.of(context).pop(),
         child: const Text('Close'))],
     ),
+  );
+
+  bool _ledgerFits(BuildContext context, double width) {
+    double measure(String text, TextStyle style) {
+      final painter = TextPainter(text: TextSpan(text: text,
+        style: DefaultTextStyle.of(context).style.merge(style)),
+        textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+      final measured = painter.width;
+      painter.dispose();
+      return measured;
+    }
+    return measure(label, _operatingCaptionStyle(context)) +
+      measure(value, TextStyle(fontSize: valueFontSize ?? 20, fontWeight: FontWeight.w700)) +
+      12 + (onTap == null ? 0 : 22) <= width;
+  }
+
+  Widget _stacked(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(height: captionHeight, child: Align(alignment: Alignment.bottomLeft,
+        child: Text(label, style: _operatingCaptionStyle(context)))),
+      const SizedBox(height: 3),
+      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Expanded(child: _StoreValueMotion(value: value, child: Text(value,
+          key: Key('store-overview-$id'),
+          style: TextStyle(fontSize: valueFontSize ?? (compact ? 17 : 18), fontWeight: FontWeight.w700,
+            color: alertColor ?? MoolColors.navy)))),
+        if (onTap != null) const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary),
+      ]),
+      if (id == 'billed') const Text('Before returns',
+        style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+    ],
   );
 
   @override
@@ -6145,26 +6254,16 @@ class _OperatingMetric extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: captionHeight,
-                  child: Align(alignment: Alignment.bottomLeft,
-                    child: Text(label, style: _operatingCaptionStyle(context)))),
-                const SizedBox(height: 3),
-                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Expanded(child: _StoreValueMotion(value: value, child: Text(value,
-                    key: Key('store-overview-$id'),
-                    style: TextStyle(fontSize: valueFontSize ?? (compact ? 17 : 18), fontWeight: FontWeight.w700,
-                      color: alertColor ?? MoolColors.navy)))),
-                  if (onTap != null)
-                    const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary),
-                ]),
-                if (id == 'billed')
-                  const Text('Before returns', style: TextStyle(fontSize: 11,
-                    color: _OperatingPalette.secondary)),
-              ],
-            ),
+            child: ledger ? LayoutBuilder(builder: (context, box) =>
+              MediaQuery.textScalerOf(context).scale(1) <= 1.3 && _ledgerFits(context, box.maxWidth) ? Row(children: [
+              Expanded(child: Text(label, style: _operatingCaptionStyle(context))),
+              const SizedBox(width: 12),
+              _StoreValueMotion(value: value, child: Text(value, key: Key('store-overview-$id'),
+                style: TextStyle(fontSize: valueFontSize ?? 20, fontWeight: FontWeight.w700,
+                  color: alertColor ?? MoolColors.navy))),
+              if (onTap != null) ...[const SizedBox(width: 8),
+                const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary)],
+            ]) : _stacked(context)) : _stacked(context),
           ),
         ),
       ),
