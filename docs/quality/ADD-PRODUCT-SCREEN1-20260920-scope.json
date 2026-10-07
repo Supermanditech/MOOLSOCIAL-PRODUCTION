@@ -82,13 +82,13 @@
       "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
       "customerOutcome": "Approved Store owner understands all eight analytics areas on one canvas, with compact summaries and exclusive in-place detail expansion.",
       "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
-      "manifestSha256": "748DBC463480691EFE141C05FE919AEFB1400FD0DDCEA6A24AE092C351F1C65C",
+      "manifestSha256": "9313227F575DFF5FFC2D623C016D7A14F301BAE6299E7CCFBFC1D75F701EAE22",
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
       "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
       "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
       "newScreens": [], "newRoutes": [], "newBackendOwners": [],
-      "necessityProof": "Reuse existing Store board calculations and provider hooks; replace only analytics report navigation with one eight-area summary canvas and exclusive inline details. One captured request/cutoff serves all areas; no expansion-triggered reads, duplicate route, ledger, persistence or backend substitute.",
+      "necessityProof": "Reuse approved eight-area canvas and existing Store calculations/provider hooks. Complete retained analytics PDF request using existing work_downloads.dart, work_stock_export.dart and download tests already claimed; immutable primitive projection of same eligible values/request, exact formatted money, per-row source/coverage/basis/date, explicit unavailable domains and scoped picker. Correct confirmed analytics Back-state loss using existing scoped PageStorage for in-session selected report/period/cutoff only. No export re-query, new calculation, route, ledger, durable persistence, native bridge change or backend substitute; restored presentation never qualifies stale financial/provider data.",
       "robustnessCoverage": ["All eight summaries, exclusive expansion, sibling collapse and repeat-tap close without route changes or additional reads", "Compact/enlarged layouts and analytics-only header with operational neighbour controls preserved", "Store/SKU and period isolation, stale response rejection and retry/loading/error/unavailable", "Verified zero versus missing/partial coverage, public readiness versus actual visibility", "Shared captured period for activity; current positions and provider freshness separately labelled", "Focused and impacted local tests, rendered inspection, guarded OPPO reload/audit/fix/retest and founder screenwise handoff"],
       "adjustments": ["Latest explicit YES replaces earlier analytics shelf/folders/report routes with exclusive inline expansion; prior approval retained as history", "One shared scoped provider request across all areas; expansion never triggers reads", "Analytics-only Store header; neighbouring operational controls unchanged"],
       "explicitExclusions": ["No backend/authentication/tracking/posting, production transactions or fabricated runtime records", "No Cursor integration/branch writes, APK/OCR/build/install/release/push or approved neighbouring-screen redesign"],
@@ -185,7 +185,8 @@
       "All eight domain summaries on one canvas; one detail expands in place, sibling collapses and repeat tap closes; no analytics rail/folders/report routes",
       "Analytics header limited to Store identity, reporting period and truthful local/provider freshness; shared operational headers outside analytics preserved",
       "Read-only provider hooks with Store/SKU/period isolation, freshness/coverage and loading/error/unavailable/verified; unknown never zero",
-      "Local focused/impacted tests, rendered inspection, guarded OPPO reload/screenshots, bounded defect corrections/retest, then screenwise founder handoff"
+      "Local focused/impacted tests, rendered inspection, guarded OPPO reload/screenshots, bounded defect corrections/retest, then screenwise founder handoff",
+      "Retained analytics PDF export from one selected immutable snapshot with exact money, source/as-of/coverage/basis, unknown states, cancellation/failure/scope guards; fresh independent Sales/Stock qualification"
     ],
     "priorPurchaseGoalMinimumCompleteScope": [
       "Durable scoped posting identity/recovery; explicitly confirmed opening position and exact bill inclusion",

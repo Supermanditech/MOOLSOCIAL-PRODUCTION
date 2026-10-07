@@ -4163,6 +4163,35 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   final Set<String> _expandedCategories = {};
   int _periodDays = 1;
   DateTime _periodEnd = DateTime.now();
+  bool _periodRestored = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_periodRestored) return;
+    _periodRestored = true;
+    final scope = widget.session.workspaceStockHistoryScope()?.key;
+    if (scope == null) return;
+    final saved = PageStorage.maybeOf(context)?.readState(context,
+      identifier: ('analytics-period', scope));
+    final now = DateTime.now();
+    if (saved is ({int days, DateTime cutoff}) &&
+        const {1, 7, 30}.contains(saved.days) && !saved.cutoff.isAfter(now)) {
+      _periodDays = saved.days;
+      // Preserve an ordinary Back cutoff, but never label yesterday as Today.
+      _periodEnd = DateUtils.dateOnly(saved.cutoff.toLocal()) == _today
+        ? saved.cutoff : now;
+    }
+  }
+
+  void _rememberPeriod() {
+    final scope = widget.session.workspaceStockHistoryScope()?.key;
+    if (scope != null) {
+      PageStorage.maybeOf(context)?.writeState(context,
+      (days: _periodDays, cutoff: _periodEnd),
+      identifier: ('analytics-period', scope));
+    }
+  }
 
   void _toggleCategory(String id) => setState(() {
     if (!_expandedCategories.remove(id)) _expandedCategories.add(id);
@@ -4188,7 +4217,10 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     _dayBoundary?.cancel();
     final now = DateTime.now();
     final day = DateUtils.dateOnly(now);
-    if (day != _today && mounted) setState(() { _today = day; _periodEnd = now; });
+    if (day != _today && mounted) {
+      setState(() { _today = day; _periodEnd = now; });
+      if (_periodRestored) _rememberPeriod();
+    }
     _dayBoundary = Timer(
       DateTime(now.year, now.month, now.day + 1).difference(now),
       _scheduleDayBoundary,
@@ -4208,6 +4240,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       _scheduleDayBoundary();
       _startOrderClock();
       setState(() => _periodEnd = DateTime.now());
+      _rememberPeriod();
     }
     if (state == AppLifecycleState.paused) {
       _dayBoundary?.cancel();
@@ -4436,11 +4469,73 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             action: 'Review costs in Stock', onTap: widget.onStock,
             color: MoolColors.navy, expanded: _expandedCategories.contains('stock')),
       ];
+      // Freeze the same eligible primitive values as the canvas, not widgets or
+      // a second query/calculation owner. Device history is not remote coverage.
+      StoreAnalyticsReportRow exportRow(String area, String label, String value,
+          String meaning, {bool period = false, DateTime? asOf}) => StoreAnalyticsReportRow(
+        area: area, label: label, value: value == '—' ? 'Unavailable' : value,
+        basis: period ? 'Selected period activity' : 'Current position',
+        source: area == 'Stock' ? 'Saved inventory; captured at export, not a historical stock balance'
+          : area == 'Sales' && label == 'Billed' || label == 'Invoice count' || label == 'Average bill'
+          ? 'Saved invoices; cutoff ${periodEnd.toUtc().toIso8601String()}'
+          : area == 'Orders' ? 'Orders saved on this phone; captured at export'
+          : 'Saved finance${asOf == null ? '; as-of unavailable' : '; as of ${asOf.toUtc().toIso8601String()}'}',
+        coverage: value == '—' ? 'Unavailable; incomplete source' : area == 'Orders'
+          ? 'Partial saved records; online coverage unverified' : 'Saved device records only; backend coverage unverified',
+        meaning: meaning);
+      final exportRows = <StoreAnalyticsReportRow>[
+        exportRow('Sales', 'Billed', money(billed), 'INR; before returns', period: true),
+        exportRow('Sales', 'Collected', money(collected), 'INR; customer receipts before refunds', period: true, asOf: collectionsReady ? finance.asOf : null),
+        exportRow('Sales', 'Invoice count', count(invoiceReady ? todayInvoices.length : null), 'Saved invoices, not visitors', period: true),
+        exportRow('Sales', 'Average bill', money(billed != null && todayInvoices.isNotEmpty ? (billed / todayInvoices.length).round() : null), 'INR; billed value divided by invoice count; no bills means unavailable', period: true),
+        exportRow('Sales', 'Returns', count(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.count)), 'Confirmed returns, not units or refunds', period: true, asOf: collectionsReady ? finance.asOf : null),
+        exportRow('Sales', 'Return credit', money(returnReasons?.values.fold<int>(0, (sum, row) => sum + row.creditMinor)), 'INR; credit against original bills, not cash refunded', period: true, asOf: collectionsReady ? finance.asOf : null),
+        if (returnReasons != null) for (final reason in returnReasons.entries)
+          exportRow('Sales', WorkspaceCustomerReturn.reasonLabels[reason.key] ?? 'Reason not categorised', money(reason.value.creditMinor), '${reason.value.count} confirmed returns; credited value, not cash refund', period: true, asOf: finance?.asOf),
+        for (final day in savedBillSeries)
+          StoreAnalyticsReportRow(area: 'Saved bill trend - separate 7-day window',
+            label: '${day.$1.year}-${day.$1.month}-${day.$1.day}', value: money(day.$2),
+            basis: 'Independent 7-day series ${savedBillDays.first.toUtc().toIso8601String()} to ${periodEnd.toUtc().toIso8601String()}',
+            source: 'Saved invoices; before returns', coverage: 'Saved device invoice history only; backend coverage unverified',
+            meaning: 'Daily INR; independent trend window, not selected-period total'),
+        if (!invoiceReady) const StoreAnalyticsReportRow(area: 'Saved bill trend - separate 7-day window',
+          label: 'Saved bill history', value: 'Unavailable', basis: 'Independent 7-day series',
+          source: 'Saved invoices unavailable', coverage: 'Unknown; not zero', meaning: 'No trend inferred'),
+        if (previousBilled != null) StoreAnalyticsReportRow(area: 'Saved bill comparison',
+          label: 'Previous day at comparable cutoff', value: money(previousBilled),
+          basis: '${previousStart.toUtc().toIso8601String()} to ${previousEnd.toUtc().toIso8601String()}',
+          source: 'Saved invoices; before returns', coverage: 'Saved device invoice history only; backend coverage unverified',
+          meaning: 'INR; same-clock previous day, not a full day versus a partial day'),
+        exportRow('Stock', 'Saved products', count(stockReady ? products.length : null), 'Product count, not units'),
+        exportRow('Stock', 'Low stock', count(stockReady ? session.workspaceLowStockCount : null), 'Products using their saved alert levels'),
+        exportRow('Stock', 'Unavailable products', count(stockReady ? unavailable : null), 'Product count, not units'),
+        exportRow('Stock', 'Available products', count(stockReady ? products.length - unavailable : null), 'Product count, not units'),
+        exportRow('Stock', 'Stock cost', money(cost), 'INR; saved purchase prices; not audited valuation'),
+        exportRow('Stock', 'Stock sale value', money(resale), 'INR; potential selling value, not received money'),
+        exportRow('Stock', 'Potential gross profit', money(cost != null && resale != null ? resale - cost : null), 'INR; before taxes, discounts and expenses; not earned profit'),
+        exportRow('Orders', 'Open orders', count(session.workspaceOrders.isEmpty ? null : openOrders.length), 'Open saved orders; not all online orders'),
+        exportRow('Orders', 'Awaiting acceptance', count(session.workspaceOrders.isEmpty ? null : awaitingAcceptance.length), 'Saved orders; expired acceptance excluded'),
+        exportRow('Orders', 'Fulfilment overdue', count(session.workspaceOrders.isEmpty ? null : overdueOrders.length), 'Saved orders past recorded deadline; missing deadlines excluded'),
+        exportRow('Money', 'Customer dues', money(financeReady ? finance.duesMinor : null), 'INR; money owed, not cash', asOf: financeReady ? finance.asOf : null),
+        exportRow('Money', 'Supplier dues', '—', 'Complete supplier population unavailable; not zero'),
+        exportRow('Money', 'Settlement available', money(financeReady ? finance.availableMinor : null), 'INR; MoolSocial settlement, not bank balance', asOf: financeReady ? finance.asOf : null),
+        exportRow('Money', 'Settlement on hold', money(financeReady ? finance.heldMinor : null), 'INR; held, not available for payout', asOf: financeReady ? finance.asOf : null),
+        exportRow('Working capital', 'Cash tied up', '—', 'Compatible complete balances unavailable'),
+        exportRow('Working capital', 'Stock days', '—', 'Complete historical quantities and turnover unavailable'),
+      ];
       return _StoreAnalyticsPresentation(
         session: session,
+        exportRows: List.unmodifiable(exportRows),
         periodDays: _periodDays, periodStart: periodStart, periodEnd: periodEnd,
-        onPeriod: (days) => setState(() { _periodDays = days; _periodEnd = DateTime.now(); }),
-        onRefresh: () => setState(() => _periodEnd = DateTime.now()),
+        onPeriod: (days) {
+          if (!const {1, 7, 30}.contains(days)) return;
+          setState(() { _periodDays = days; _periodEnd = DateTime.now(); });
+          _rememberPeriod();
+        },
+        onRefresh: () {
+          setState(() => _periodEnd = DateTime.now());
+          _rememberPeriod();
+        },
         scrollController: widget.scrollController,
             overviewVisuals: {
               if (stockReady) 'stock': _StockAvailabilityGraphic(
@@ -4788,7 +4883,7 @@ class _StoreAnalyticsPresentation extends StatefulWidget {
     required this.periodStart, required this.periodEnd, required this.onPeriod,
     required this.onRefresh,
     this.compactVisuals = const {}, this.detailVisuals = const {}, this.overviewVisuals = const {},
-    this.scrollController,
+    this.scrollController, this.exportRows = const [],
   });
   final WorkSession session;
   final int periodDays;
@@ -4798,6 +4893,7 @@ class _StoreAnalyticsPresentation extends StatefulWidget {
   final List<Widget> sections;
   final Map<String, Widget> compactVisuals, detailVisuals, overviewVisuals;
   final ScrollController? scrollController;
+  final List<StoreAnalyticsReportRow> exportRows;
   @override
   State<_StoreAnalyticsPresentation> createState() => _StoreAnalyticsPresentationState();
 }
@@ -4814,6 +4910,97 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   bool _contextHeader = false;
   double? _summaryOffset;
   int _transition = 0;
+  bool _exportBusy = false;
+  String? _exportNotice;
+  bool _reportRestored = false;
+
+  void _restoreReport() {
+    final scope = widget.session.workspaceStockHistoryScope()?.key;
+    if (scope == null) return;
+    final saved = PageStorage.maybeOf(context)?.readState(context,
+      identifier: ('analytics-report', scope));
+    if (saved is! ({String? report, double? summaryOffset})) return;
+    if (saved.report != null && !const {
+      'public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money',
+    }.contains(saved.report)) { return; }
+    if (saved.summaryOffset != null &&
+        (!saved.summaryOffset!.isFinite || saved.summaryOffset! < 0)) { return; }
+    _expanded = saved.report;
+    _summaryOffset = saved.summaryOffset;
+  }
+
+  void _rememberReport() {
+    final scope = widget.session.workspaceStockHistoryScope()?.key;
+    if (scope != null) {
+      PageStorage.maybeOf(context)?.writeState(context,
+      (report: _expanded, summaryOffset: _summaryOffset),
+      identifier: ('analytics-report', scope));
+    }
+  }
+
+  Future<void> _exportAnalytics(WorkspaceAnalyticsSnapshot? provider) async {
+    final request = _request;
+    if (_exportBusy || request == null) { return; }
+    final session = widget.session;
+    bool current() => mounted && identical(_request, request) &&
+      identical(widget.session, session) && session.analyticsRequest(
+        start: request.start, end: request.end)?.sameScope(request) == true;
+    setState(() { _exportBusy = true; _exportNotice = null; });
+    try {
+    final capturedAt = DateTime.now();
+    final eligible = provider != null && provider.usableFor(request, capturedAt) &&
+      provider.state == WorkspaceAnalyticsState.verified;
+    final rows = <StoreAnalyticsReportRow>[...widget.exportRows];
+    for (final area in const ['public', 'journey', 'supply', 'receiving']) {
+      for (final definition in _StoreAnalyticsProviderReportState.definitions(area)) {
+        final metric = eligible ? provider.metrics.where((m) => m.id == definition.id).firstOrNull : null;
+        final percentage = const {'order-conversion', 'cart-dropoff'}.contains(definition.id);
+        final known = storeAnalyticsMetricEligible(definition.id, metric);
+        rows.add(StoreAnalyticsReportRow(area: _analyticsReportTitle(area),
+          label: definition.label,
+          value: known ? percentage ? '${metric!.value!.toStringAsFixed(1)}%' : '${_formatStoreAmount(metric!.value!.toInt())} count' : 'Unavailable',
+          basis: known ? metric!.basis == WorkspaceAnalyticsBasis.periodActivity
+            ? 'Selected period activity' : 'Current position' : 'Basis unverified',
+          source: known ? '${metric!.source}; as of ${metric.asOf!.toUtc().toIso8601String()}' : 'Report source not connected or eligible',
+          coverage: known ? '${metric!.coverage.name}; provider records ${provider!.coveredFrom!.toUtc().toIso8601String()} to ${provider.coveredUntil!.toUtc().toIso8601String()}' : 'Unknown; not zero',
+          meaning: definition.guide));
+      }
+    }
+    for (final group in const [
+      (id: 'discovery-sources', title: 'How customers found you', dimension: WorkspaceAnalyticsDimension.discoverySource),
+      (id: 'broad-locations', title: 'Customer areas', dimension: WorkspaceAnalyticsDimension.broadLocation),
+      (id: 'most-viewed-products', title: 'Most-viewed products', dimension: WorkspaceAnalyticsDimension.product),
+      (id: 'products-without-orders', title: 'Products viewed without orders', dimension: WorkspaceAnalyticsDimension.product),
+    ]) {
+      final data = eligible ? provider.breakdowns.where((r) => r.id == group.id && r.dimension == group.dimension).firstOrNull : null;
+      final source = data == null ? 'Report source not connected' : '${data.source}; as of ${data.asOf.toUtc().toIso8601String()}';
+      final coverage = data == null ? 'Unknown; not zero' : '${data.coverage.name}; aggregate provider records';
+      if (data == null || data.rows.isEmpty) {
+        rows.add(StoreAnalyticsReportRow(area: 'Public Store rankings', label: group.title,
+          value: data == null ? 'Unavailable' : 'No ranked records', basis: 'Selected period activity',
+          source: source, coverage: coverage, meaning: 'Aggregate rankings, not a conversion rate'));
+      } else {
+        for (final row in data.rows) { rows.add(StoreAnalyticsReportRow(area: 'Public Store rankings',
+          label: '${group.title}: ${row.label}', value: '${_formatStoreAmount(row.count)} count',
+          basis: 'Selected period activity', source: source, coverage: coverage,
+          meaning: 'Aggregate ranking; provider definition, not customer identities')); }
+      }
+    }
+    final statement = StoreAnalyticsStatement(request: request,
+      storeName: session.activeWorkspace?.name ?? session.workName,
+      capturedAt: capturedAt, rows: rows,
+      reviewOnly: const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'));
+      final bytes = await statement.report.generate(StoreStockExportFormat.pdf);
+      if (!current()) { return; }
+      final saved = await saveStoreStockFile(bytes, statement.fileName, StoreStockExportFormat.pdf);
+      if (current()) setState(() => _exportNotice = saved ? 'Analytics PDF saved.' : 'Download cancelled.');
+    } catch (error) {
+      if (current()) { setState(() => _exportNotice = error is FormatException
+        ? error.message : 'Could not save analytics. Check your files before retrying.'); }
+    } finally {
+      if (mounted) setState(() => _exportBusy = false);
+    }
+  }
 
   @override
   void dispose() { _localScroll.dispose(); super.dispose(); }
@@ -4828,8 +5015,11 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   }
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_reportRestored) return;
+    _reportRestored = true;
+    _restoreReport();
     _load();
   }
 
@@ -4848,9 +5038,13 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
       (widget.session.workspaceStockHistoryScope()?.key ?? widget.session.activeWorkspace?.id);
     final requestChanged = request != null &&
       widget.session.analyticsRequest(start: request.start, end: request.end)?.sameScope(request) != true;
-    if (scopeChanged) { _expanded = null; _transition++; }
+    if (scopeChanged) {
+      _expanded = null; _summaryOffset = null; _contextHeader = false; _transition++;
+      _restoreReport();
+    }
     if (scopeChanged || requestChanged || oldWidget.periodDays != widget.periodDays ||
         oldWidget.periodEnd != widget.periodEnd) {
+      _exportNotice = null;
       _load();
     }
   }
@@ -4860,6 +5054,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     final closing = _expanded == id;
     if (_expanded == null && _scroll.hasClients) _summaryOffset = _scroll.offset;
     setState(() { _expanded = closing ? null : id; _contextHeader = false; });
+    _rememberReport();
     if (closing) { WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && generation == _transition && _scroll.hasClients && _summaryOffset != null) {
         _scroll.jumpTo(_summaryOffset!.clamp(0, _scroll.position.maxScrollExtent));
@@ -5114,6 +5309,10 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink));
               final controls = [
                 _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
+                IconButton(key: const Key('store-analytics-export'), tooltip: 'Download analytics PDF',
+                  onPressed: _exportBusy || loading || _request == null ? null : () => _exportAnalytics(snapshot),
+                  icon: _exportBusy ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download_outlined, size: 20)),
                 IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
                   onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20)),
               ];
@@ -5122,6 +5321,8 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                     Row(mainAxisAlignment: MainAxisAlignment.end, children: controls)])
                 : Row(children: [const Expanded(child: heading), ...controls]);
             }),
+            if (_exportNotice != null) Text(_exportNotice!, key: const Key('store-analytics-export-notice'),
+              style: const TextStyle(fontSize: 12)),
             Text('${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
               style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
             ...widget.sections.where((item) => item is Tooltip || item is _DashboardSyncBanner),
@@ -5894,9 +6095,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
   bool _definitions = false;
   WorkspaceAnalyticsRequest? get _request => widget.request;
   Future<WorkspaceAnalyticsSnapshot>? get _result => widget.result;
-  @override
-  Widget build(BuildContext context) {
-    final rows = switch (widget.report) {
+  static List<({String id, String label, String guide})> definitions(String report) => switch (report) {
       'public' => const [
         (
           id: 'visitors',
@@ -6046,6 +6245,9 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
         ),
       ],
     };
+  @override
+  Widget build(BuildContext context) {
+    final rows = definitions(widget.report);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -6180,15 +6382,7 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                     builder: (_) {
                       final metric = values[row.id];
                       final percentage = const {'order-conversion', 'cart-dropoff'}.contains(row.id);
-                      final position = const {'visible-skus', 'hidden-skus', 'unavailable-skus',
-                        'listing-corrections', 'supply-acceptance', 'supply-dispatch',
-                        'supply-transit', 'supply-delivery', 'received-part',
-                        'goods-without-bill', 'bills-without-goods'}.contains(row.id);
-                      final known =
-                          metric?.state == WorkspaceAnalyticsState.verified &&
-                          metric?.basis == (position ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity) &&
-                          metric?.unit == (percentage ? WorkspaceAnalyticsUnit.percent : WorkspaceAnalyticsUnit.count) &&
-                          (!percentage || (metric?.cohortId?.trim().isNotEmpty ?? false));
+                      final known = storeAnalyticsMetricEligible(row.id, metric);
                       final stageIcon = switch (row.id) {
                         'journey-store' => Icons.storefront_outlined,
                         'journey-product' => Icons.inventory_2_outlined,

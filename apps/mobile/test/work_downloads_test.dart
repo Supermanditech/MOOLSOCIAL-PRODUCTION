@@ -119,6 +119,70 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('ANALYTICSPDF shares provider eligibility with the screen', () {
+    WorkspaceAnalyticsMetric metric(String id, WorkspaceAnalyticsUnit unit,
+        WorkspaceAnalyticsBasis basis, {String? cohort}) => WorkspaceAnalyticsMetric(
+      id: id, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
+      basis: basis, unit: unit, source: 'HOST aggregate provider', value: 0,
+      asOf: DateTime.utc(2026, 10, 7), cohortId: cohort);
+    expect(storeAnalyticsMetricEligible('visitors', metric('visitors', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.currentPosition)), isFalse);
+    expect(storeAnalyticsMetricEligible('visible-skus', metric('visible-skus', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity)), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity, cohort: 'HOST-cohort')), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.percent,
+      WorkspaceAnalyticsBasis.periodActivity)), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.percent,
+      WorkspaceAnalyticsBasis.periodActivity, cohort: 'HOST-cohort')), isTrue);
+    expect(storeAnalyticsMetricEligible('visitors', metric('visitors', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity)), isTrue, reason: 'Verified zero remains exportable.');
+    expect(storeAnalyticsMetricEligible('visitors', null), isFalse);
+  });
+  test('ANALYTICSPDF freezes exact values coverage and selected snapshot', () async {
+    // Isolated host fixture, never runtime commerce or device acceptance.
+    final at = DateTime.utc(2026, 10, 7, 9);
+    final rows = <StoreAnalyticsReportRow>[
+      const StoreAnalyticsReportRow(area: 'Stock', label: 'Stock cost',
+        value: '₹1,00,00,00,000.09', basis: 'Current position',
+        source: 'Saved inventory - captured, not historical',
+        coverage: 'Saved records only', meaning: 'Not audited valuation'),
+      const StoreAnalyticsReportRow(area: 'Sales', label: 'Billed', value: '₹0',
+        basis: 'Selected period', source: 'Saved invoices',
+        coverage: 'Device history only', meaning: 'Before returns'),
+      const StoreAnalyticsReportRow(area: 'Money', label: 'Supplier dues',
+        value: 'Unavailable', basis: 'Current position', source: 'Not connected',
+        coverage: 'Unknown', meaning: 'Not zero'),
+    ];
+    final request = WorkspaceAnalyticsRequest(accountScope: 'HOST-account',
+      storeId: 'HOST-store', start: at.subtract(const Duration(days: 1)), end: at);
+    final statement = StoreAnalyticsStatement(request: request,
+      storeName: 'HOST Store', capturedAt: at, rows: rows, reviewOnly: true);
+    rows.clear();
+    expect(statement.report.rows.length, 3);
+    expect(statement.report.rows.first[1], '₹1,00,00,00,000.09');
+    expect(statement.report.rows[1][1], '₹0');
+    expect(statement.report.rows[2][1], 'Unavailable');
+    expect(statement.report.disclosure, contains('not backend-synchronised'));
+    expect(statement.fileName, matches(RegExp(r'^store-analytics-[A-F0-9]{16}\.pdf$')));
+    expect(() => statement.report.rows.first[1] = '0', throwsUnsupportedError);
+    expect(() => StoreAnalyticsStatement(request: request, storeName: 'HOST',
+      capturedAt: at.subtract(const Duration(days: 2)), rows: const []), throwsFormatException);
+    final pdf = await statement.report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+  });
+  test('ANALYTICSPDF uses scoped system picker and truthful cancellation', () async {
+    final previous = FilePickerPlatform.instance;
+    final picker = SupplierStatementPickerFixture();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    expect(await saveStoreStockFile(pdfBytes(), 'store-analytics-1234567890ABCDEF.pdf',
+      StoreStockExportFormat.pdf), isTrue);
+    expect(picker.calls.single, contains('Save Store analytics'));
+    picker.cancelled = true;
+    expect(await saveStoreStockFile(pdfBytes(), 'store-analytics-1234567890ABCDEF.pdf',
+      StoreStockExportFormat.pdf), isFalse);
+  });
   test('PURCHASEACCOUNTING captured status distinguishes confirmed unavailable and revisions', () async {
     // Host-only evidence. Never written into a device evaluation Store.
     final at = DateTime.utc(2026, 10, 1);

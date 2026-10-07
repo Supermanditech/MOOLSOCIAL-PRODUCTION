@@ -8,6 +8,69 @@ import 'work_models.dart';
 import 'work_stock_export.dart';
 import 'screens/store_add_product_sheet.dart' show StoreRecentSearches;
 
+/// Immutable presentation projection; never a ledger, tracking or posting owner.
+bool storeAnalyticsMetricEligible(String id, WorkspaceAnalyticsMetric? metric) {
+  final percentage = const {'order-conversion', 'cart-dropoff'}.contains(id);
+  final position = const {'visible-skus', 'hidden-skus', 'unavailable-skus',
+    'listing-corrections', 'supply-acceptance', 'supply-dispatch',
+    'supply-transit', 'supply-delivery', 'received-part',
+    'goods-without-bill', 'bills-without-goods'}.contains(id);
+  return metric?.id == id && metric?.state == WorkspaceAnalyticsState.verified &&
+    metric?.basis == (position ? WorkspaceAnalyticsBasis.currentPosition : WorkspaceAnalyticsBasis.periodActivity) &&
+    metric?.unit == (percentage ? WorkspaceAnalyticsUnit.percent : WorkspaceAnalyticsUnit.count) &&
+    (!percentage || (metric?.cohortId?.trim().isNotEmpty ?? false));
+}
+
+class StoreAnalyticsReportRow {
+  const StoreAnalyticsReportRow({required this.area, required this.label,
+    required this.value, required this.basis, required this.source,
+    required this.coverage, required this.meaning});
+  final String area, label, value, basis, source, coverage, meaning;
+}
+
+class StoreAnalyticsStatement {
+  StoreAnalyticsStatement({required this.request, required this.storeName,
+    required this.capturedAt, required Iterable<StoreAnalyticsReportRow> rows,
+    this.reviewOnly = false}) : rows = List.unmodifiable(rows) {
+    if (!request.valid || storeName.trim().isEmpty || request.end.isAfter(capturedAt) ||
+        this.rows.any((r) => [r.area, r.label, r.value, r.basis, r.source,
+          r.coverage, r.meaning].any((v) => v.trim().isEmpty))) {
+      throw const FormatException('The analytics snapshot is not ready to export.');
+    }
+  }
+  final WorkspaceAnalyticsRequest request;
+  final String storeName;
+  final DateTime capturedAt;
+  final bool reviewOnly;
+  final List<StoreAnalyticsReportRow> rows;
+  String get fileName => 'store-analytics-${sha256.convert(utf8.encode(jsonEncode([
+    request.accountScope, request.storeId, request.start.toIso8601String(),
+    request.end.toIso8601String(), capturedAt.toIso8601String(), (request.skuIds.toList()..sort()),
+    for (final r in rows) [r.area, r.label, r.value, r.basis, r.source, r.coverage, r.meaning],
+  ]))).toString().substring(0, 16).toUpperCase()}.pdf';
+  StoreTabularReport get report => StoreTabularReport(
+    title: 'Store analytics',
+    disclosure: '${reviewOnly ? 'Evaluation Store. ' : ''}Saved device records and eligible provider data; not backend-synchronised or audited accounts. '
+      'Unavailable is not zero. Current positions are not historical balances. '
+      'Potential stock profit is not earned profit. Supply and customer sales remain separate.',
+    metadata: [
+      ['Store', storeName], ['Store identity', request.storeId],
+      ['SKU scope', request.skuIds.isEmpty ? 'All products in selected Store' : (request.skuIds.toList()..sort()).join(', ')],
+      ['Period from (inclusive, UTC)', request.start.toUtc().toIso8601String()],
+      ['Period through (exclusive, UTC)', request.end.toUtc().toIso8601String()],
+      ['Snapshot captured (UTC)', capturedAt.toUtc().toIso8601String()],
+      ['Device calendar offset', capturedAt.timeZoneOffset.toString()],
+      ['Time basis', 'UTC cutoff timestamps; selected calendar dates use device timezone'],
+    ],
+    headers: const ['Measure', 'Exact value / unit', 'Basis / coverage', 'Source / date', 'Meaning'],
+    rows: [for (final r in rows) [r.label, r.value, '${r.basis}\n${r.coverage}', r.source, r.meaning]],
+    moneyColumns: const {}, // Already exact integer-derived currency strings, not paise as rupees.
+    pdfGroups: [for (final area in rows.map((r) => r.area).toSet())
+      StoreReportPdfGroup(area, const [0, 1, 2, 3, 4],
+        [for (var i = 0; i < rows.length; i++) if (rows[i].area == area) i])],
+  );
+}
+
 /// A read-only report of saved invoices, not a tax return or audited accounts.
 /// The caller supplies the entire scoped register, never its search results.
 class StoreSalesStatement {

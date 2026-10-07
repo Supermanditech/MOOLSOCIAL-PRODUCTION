@@ -232,10 +232,12 @@ Future<bool> saveStoreStockFile(
   final supplierStatement = RegExp(r'^supplier-statement-[a-f0-9]{16}\.(pdf|csv)$').hasMatch(fileName) &&
       (format == StoreStockExportFormat.pdf || format == StoreStockExportFormat.csv) &&
       fileName.endsWith('.${format.extension}');
-  if (supplierStatement || (RegExp(r'^sales-collections-[A-F0-9]{16}\.pdf$').hasMatch(fileName) &&
+  final analyticsStatement = RegExp(r'^store-analytics-[A-F0-9]{16}\.pdf$').hasMatch(fileName) &&
+      format == StoreStockExportFormat.pdf;
+  if (analyticsStatement || supplierStatement || (RegExp(r'^sales-collections-[A-F0-9]{16}\.pdf$').hasMatch(fileName) &&
       format == StoreStockExportFormat.pdf)) {
     return await FilePicker.saveFile(
-      dialogTitle: supplierStatement ? 'Save supplier statement' : 'Save Sales & Collections Statement',
+      dialogTitle: analyticsStatement ? 'Save Store analytics' : supplierStatement ? 'Save supplier statement' : 'Save Sales & Collections Statement',
       fileName: fileName,
       mimeType: format.mimeType,
       type: FileType.custom,

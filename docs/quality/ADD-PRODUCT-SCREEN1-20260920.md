@@ -4071,3 +4071,35 @@ and audited correction remain required, not inferred from this UI test.
 OPPO foreground is still YouTube/launcher; no interruption, hot reload or record
 change. Next shortage intent/review plan is saved separately in task outputs;
 it is not implemented UI. Full end-to-end purchase goal remains active/incomplete.
+# Independent completion amendment - 7 October 2026
+
+Founder authorizes retained analytics PDF export and fresh Sales/Stock device
+qualification while Cursor reconciliation proceeds separately. MVP supporting:
+one small accessible PDF control; frozen selected-request local/provider rows;
+exact formatted values, Store identity, cutoff, per-measure source, coverage,
+basis and date. Unknown remains unavailable. Reuse existing tabular renderer and
+system picker with an analytics-specific filename; no native bridge relaxation.
+Test snapshot immutability, scope/period guard, zero/unknown, large money/paise,
+cancel/failure, renderer pagination and impacted analytics/downloads. Inspect PDF
+render and OPPO. No backend, fake runtime data, commerce writes, Cursor change,
+APK or redesign. Earlier gated normal Codex feature push authority is retained;
+implementation/handoff tests do not themselves satisfy final evidence closure.
+
+## Independent analytics return recovery — 8 October 2026
+
+Known-finance round-trip host evidence reaches settlement details with exact
+large-money, signed adjustment, disabled payout and partial-payment checks, but
+returning recreates the analytics board/presentation with Today/no report.
+Correct this in-session presentation recovery within the existing analytics
+ticket. Reuse scoped PageStorage already used by Sales; preserve selected
+report, supported period and cutoff, without storing provider/ledger/transaction
+data or making a stale source eligible. Account/Store scope is mandatory; never
+share a null-key state. Invalid values fall back; local-midnight rollover uses a
+fresh correctly dated cutoff. Existing scroll controller stays authoritative.
+
+Acceptance: Money and a seven-day period survive financial-detail Back; original
+25 payment/100 order identities and all no-write checks remain; malformed state,
+scope isolation and stale-source eligibility are tested. No new screen/route,
+backend, durable data persistence, approved-layout redesign, APK or Cursor write.
+Host-only fixtures are not device acceptance or real-user-flow evidence. Remaining
+legacy-route tests are mapped individually; no wholesale skip/deletion/false pass.

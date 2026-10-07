@@ -2049,53 +2049,50 @@ void main() {
     );
   }
 
-  void expectFinanceActionWords(WidgetTester tester) {
+  // Host-only qualified projection. Never writes a device/backend record.
+  void qualifyFinance(WorkSession work, {required int available, int dues = 0}) {
+    final scope = work.workspaceStockHistoryScope()!;
+    final revision = (work.workspaceFinance?.revision ?? 0) + 1;
+    final now = DateTime.now();
+    final snapshot = WorkspaceFinanceSnapshot(accountScope: scope.accountScope,
+      workspaceId: scope.workspaceId, revision: revision, asOf: now,
+      salesTodayMinor: 0, duesMinor: dues * 100, availableMinor: available * 100,
+      heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
+      deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      historyComplete: true, payouts: const [], payments: [
+        if (dues > 0) WorkspacePaymentRecord(orderId: 'APP-1043',
+          customerId: 'money-layout-customer', customerName: 'Rakesh',
+          revision: revision, updatedAt: now, amountMinor: dues * 100,
+          paidMinor: 0, dueMinor: dues * 100, refundedMinor: 0,
+          state: WorkspacePaymentState.unpaid, channel: WorkspacePaymentChannel.platform,
+          invoiceId: 'INV-RANGE'),
+      ]);
+    expect(work.applyWorkspaceFinance(snapshot), available >= 0);
+    if (available < 0) {
+      work.markWorkspaceFinanceStale(accountScope: scope.accountScope, storeId: scope.workspaceId);
+    }
+  }
+
+  Future<void> expectFinanceActionWords(WidgetTester tester) async {
     for (final entry in const {
-      'work-pulse-sales': 'View statement',
-      'work-pulse-dues': 'Collect dues',
-      'work-pulse-settlement': 'MoolSocial settlement',
+      'customer-dues': 'Receivables',
+      'settlement-available': 'Settlement available',
     }.entries) {
-      final label = find.descendant(
-        of: find.byKey(Key(entry.key)),
-        matching: find.text(entry.value),
-      );
+      final action = find.byKey(Key('store-overview-open-${entry.key}'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(action.hitTestable(), findsOneWidget);
+      expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      final label = find.descendant(of: action, matching: find.text(entry.value));
       final paragraph = tester.renderObject<RenderParagraph>(label);
       expect(paragraph.didExceedMaxLines, isFalse);
       for (final word in RegExp(r'\S+').allMatches(entry.value)) {
-        final boxes = paragraph.getBoxesForSelection(
-          TextSelection(baseOffset: word.start, extentOffset: word.end),
-        );
-        expect(boxes, hasLength(1), reason: '${entry.key}: ${word.group(0)}');
+        final boxes = paragraph.getBoxesForSelection(TextSelection(baseOffset: word.start, extentOffset: word.end));
+        expect(boxes, hasLength(1), reason: entry.value);
         expect(boxes.single.left, greaterThanOrEqualTo(-.5));
-        expect(
-          boxes.single.right,
-          lessThanOrEqualTo(paragraph.size.width + .5),
-        );
+        expect(boxes.single.right, lessThanOrEqualTo(paragraph.size.width + .5));
       }
-      final amount = find.descendant(
-        of: find.byKey(Key('${entry.key}-value-motion')),
-        matching: find.byType(Text),
-      );
-      if (entry.key == 'work-pulse-sales') {
-        expect(amount, findsNothing);
-        continue;
-      }
-      expect(amount, findsOneWidget);
-      final amountText = tester.widget<Text>(amount).data!;
-      final amountParagraph = tester.renderObject<RenderParagraph>(amount);
-      expect(amountParagraph.didExceedMaxLines, isFalse);
-      for (final digits in RegExp(r'[\d,.]+').allMatches(amountText)) {
-        final boxes = amountParagraph.getBoxesForSelection(
-          TextSelection(baseOffset: digits.start, extentOffset: digits.end),
-        );
-        expect(boxes, hasLength(1), reason: '${entry.key}: $amountText');
-        expect(boxes.single.left, greaterThanOrEqualTo(-.5));
-        expect(
-          boxes.single.right,
-          lessThanOrEqualTo(amountParagraph.size.width + .5),
-          reason: '${entry.key}: all amount digits must fit',
-        );
-      }
+      expectExactMoneyVisible(tester, find.byKey(Key('store-overview-${entry.key}')));
     }
   }
 
@@ -2773,6 +2770,103 @@ void main() {
     await tester.ensureVisible(find.byTooltip('Collapse details'));
     await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
     expect(find.byKey(const Key('store-analytics-detail-money')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final scenario in ['malformed', 'future', 'unknown-report', 'invalid-offset', 'other-scope', 'midnight', 'collapsed']) {
+    testWidgets('ANALYTICSRECOVERY scoped presentation $scenario', (tester) async {
+      // Host-only presentation seeds, never provider, ledger or runtime records.
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        openHomeActions: false);
+      final scope = work.workspaceStockHistoryScope()!.key;
+      final context = tester.element(find.byKey(const Key('store-analytics-public')));
+      final bucket = PageStorage.of(context);
+      final now = DateTime.now();
+      final yesterday = DateTime(now.year, now.month, now.day - 1, 12);
+      final identifier = scenario == 'other-scope' ? '$scope-other-account' : scope;
+      bucket.writeState(context, scenario == 'malformed' ? 'not a period' :
+        (days: scenario == 'invalid-offset' ? 99 : 7,
+         cutoff: scenario == 'future' ? now.add(const Duration(days: 1)) : yesterday),
+        identifier: ('analytics-period', identifier));
+      bucket.writeState(context, scenario == 'malformed' ? 123 :
+        (report: scenario == 'collapsed' ? null : scenario == 'unknown-report' ? 'invented' : 'money',
+         summaryOffset: scenario == 'invalid-offset' ? double.nan : 0.0),
+        identifier: ('analytics-report', identifier));
+      final invoices = List.of(work.workspaceInvoices);
+      final movements = List.of(work.workspaceStockMovements);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-home')));
+      await tester.pumpAndSettle();
+      final restored = const {'future', 'midnight'}.contains(scenario);
+      expect(find.byKey(const Key('store-analytics-detail-money')), restored ? findsOneWidget : findsNothing);
+      expect(find.text(const {'unknown-report', 'midnight', 'collapsed'}.contains(scenario) ? 'Last 7 days' : 'Today'), findsOneWidget);
+      final restoredPeriod = bucket.readState(context, identifier: ('analytics-period', scope));
+      // Refresh must write today's cutoff without changing the selected duration.
+      await reveal(tester, find.byTooltip('Refresh analytics'));
+      await tester.tap(find.byTooltip('Refresh analytics'));
+      await tester.pumpAndSettle();
+      final refreshed = bucket.readState(context, identifier: ('analytics-period', scope)) as ({int days, DateTime cutoff});
+      expect(DateUtils.dateOnly(refreshed.cutoff), DateUtils.dateOnly(now));
+      expect(refreshed.days, const {'unknown-report', 'midnight', 'collapsed'}.contains(scenario) ? 7 : 1);
+      if (scenario == 'midnight') expect((restoredPeriod as ({int days, DateTime cutoff})).cutoff, yesterday);
+      expect(work.workspaceInvoices, invoices);
+      expect(work.workspaceStockMovements, movements);
+      expect(find.byKey(const Key('store-overview-open-settlement-available')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('ANALYTICSPDF canvas cancellation failure and late period result stay truthful', (tester) async {
+    // Host-only save transport; no device data or transactions.
+    final picker = _PurchaseOriginalSaveFixture();
+    final previous = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(
+      request: request, state: WorkspaceAnalyticsState.unavailable,
+      coverage: WorkspaceAnalyticsCoverage.unknown, source: 'HOST unconnected provider', metrics: const []));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 568), textScale: 2, openHomeActions: false);
+    final export = find.byKey(const Key('store-analytics-export'));
+    expect(export, findsOneWidget);
+    Future<void> save() async {
+      await tester.ensureVisible(export); await tester.tap(export);
+      await tester.runAsync(() async {
+        for (var i = 0; i < 100 && picker.calls == 0; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+      });
+      await tester.pumpAndSettle();
+    }
+    await save();
+    expect(picker.calls, 1);
+    expect(picker.name, matches(RegExp(r'^store-analytics-[A-F0-9]{16}\.pdf$')));
+    expect(find.text('Download cancelled.'), findsOneWidget);
+    expect(picker.bytes!.take(5), utf8.encode('%PDF-'));
+    const output = String.fromEnvironment('MOOL_ANALYTICS_PDF_TEST_DIR');
+    if (output.isNotEmpty) {
+      Directory(output).createSync(recursive: true);
+      File('$output/analytics-canvas-host.pdf').writeAsBytesSync(picker.bytes!);
+    }
+    picker.calls = 0; picker.fail = true;
+    await save();
+    expect(find.text('Could not save analytics. Check your files before retrying.'), findsOneWidget);
+    picker.calls = 0; picker.fail = false; picker.holdSave = Completer<Uri?>();
+    await tester.ensureVisible(export); await tester.tap(export);
+    await tester.runAsync(() async {
+      for (var i = 0; i < 100 && picker.calls == 0; i++) { await Future<void>.delayed(const Duration(milliseconds: 100)); }
+    });
+    await tester.pump();
+    expect(picker.calls, 1);
+    await tester.ensureVisible(find.byTooltip('Refresh analytics'));
+    await tester.tap(find.byTooltip('Refresh analytics')); await tester.pump();
+    picker.holdSave!.complete(Uri.parse('content://host/late-result'));
+    await tester.pumpAndSettle();
+    expect(find.text('Analytics PDF saved.'), findsNothing,
+      reason: 'Late save must not claim success for a different request.');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -4077,7 +4171,7 @@ void main() {
     expect(work.workspaceFinance!.payments.firstWhere((p) => p.orderId == 'HOME-refundPending').refundedMinor, 0);
     await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
-    await _toggleHomeCategory(tester, 'money');
+    expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
     final dues = find.byKey(const Key('store-insight-customer-dues'));
     await tester.ensureVisible(dues);
     await tester.tap(dues);
@@ -4085,7 +4179,7 @@ void main() {
     expect(find.byKey(const ValueKey('work-finance-dues')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
-    await _toggleHomeCategory(tester, 'money');
+    expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
     final issues = find.byKey(const Key('store-insight-settlement-issues'));
     await tester.ensureVisible(issues);
     await tester.tap(issues);
@@ -4097,7 +4191,7 @@ void main() {
     expect(find.byKey(const ValueKey('work-finance-payout-HOME-failed')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-store-home')));
     await tester.pumpAndSettle();
-    await _toggleHomeCategory(tester, 'money');
+    expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
     expect(work.applyWorkspaceFinance(snapshot(3, complete: false)), isTrue);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('store-insight-customer-dues')), findsNothing);
@@ -4164,7 +4258,7 @@ void main() {
         expect(find.byKey(const Key('work-purchase-receipt-status')), findsOneWidget);
         await tester.tap(find.byKey(const Key('work-store-home')));
         await tester.pumpAndSettle();
-        await _toggleHomeCategory(tester, 'stock');
+        expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
       }
       expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), beforeStock);
       expect(tester.takeException(), isNull);
@@ -4275,7 +4369,7 @@ void main() {
       expect(find.byKey(const Key('work-stock-action-content')), findsOneWidget);
       await tester.tap(find.byKey(const Key('work-store-home')));
       await tester.pumpAndSettle();
-      await _toggleHomeCategory(tester, 'stock');
+      expect(find.byKey(const Key('store-analytics-detail-stock')), findsOneWidget);
       work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
           .copyWith(stock: 10, purchasePrice: 0, sellingPrice: 30);
       work.setWorkspaceMoneyPeriod('Today');
@@ -11389,6 +11483,32 @@ void main() {
     });
   });
 
+  Future<void> openCurrentCollection(
+    WidgetTester tester,
+    ScanPickState state,
+  ) async {
+    final orders = find.byKey(const Key('work-store-orders'));
+    expect(orders, findsOneWidget);
+    await tester.tap(orders);
+    await tester.pumpAndSettle();
+    if (state == ScanPickState.collected || state == ScanPickState.cancelled) {
+      final done = find.byKey(const Key('work-orders-filter-done'));
+      await tester.ensureVisible(done);
+      await tester.tap(done);
+      await tester.pumpAndSettle();
+      final history = find.byKey(const Key('work-order-history-open-APP-1043'));
+      await reveal(tester, history);
+      await tester.tap(history);
+      await tester.pumpAndSettle();
+    }
+    final open = find.byKey(const Key('work-order-collection-open-APP-1043'));
+    await reveal(tester, open);
+    expect(open, findsOneWidget);
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-collection-live-card')), findsOneWidget);
+  }
+
   for (final display in [
     (width: 412.0, height: 915.0, scale: 1.0),
     (width: 320.0, height: 640.0, scale: 1.4),
@@ -11414,6 +11534,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openCurrentCollection(tester, ScanPickState.preparing);
       await tester.pump(const Duration(seconds: 6));
       await tester.pumpAndSettle();
       expect(gate.readyRequests, isEmpty);
@@ -11512,6 +11633,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await openCurrentCollection(tester, state);
         expect(
           find.byKey(const Key('work-collection-live-card')),
           findsOneWidget,
@@ -11740,6 +11862,7 @@ void main() {
     final work = collectionStore(gate);
     await mount(tester, route: '/app/work/workspace/dashboard', work: work);
     await tester.pumpAndSettle();
+    await openCurrentCollection(tester, ScanPickState.awaitingCustomer);
     expect(find.text('Checking order…'), findsOneWidget);
     expect(find.text('Ready for collection'), findsNothing);
     expect(find.textContaining('private transport detail'), findsNothing);
@@ -11773,6 +11896,7 @@ void main() {
         viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
         textScale: scale,
       );
+      await openCurrentCollection(tester, ScanPickState.matched);
       final pending = Completer<ScanPickResult>();
       ScanPickRequest? submitted;
       gate.respond = (request) {
@@ -11821,6 +11945,7 @@ void main() {
       final work = collectionStore(gate);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await tester.pumpAndSettle();
+      await openCurrentCollection(tester, ScanPickState.matched);
       final action = find.byKey(const Key('work-collection-hand-over'));
       expect(tester.widget<FilledButton>(action).onPressed, isNotNull);
       final retainedTap = tester.widget<FilledButton>(action).onPressed!;
@@ -11939,228 +12064,153 @@ void main() {
   ]) {
     final suffix = '${display.width.toInt()}-${display.scale}';
     testWidgets('S09 money live figures $suffix', (tester) async {
-      final work = liveStore();
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final semantics = tester.ensureSemantics();
       try {
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.width, display.height),
-          textScale: display.scale,
-        );
-        await openFinanceSummaryOrHome(tester, money: true);
-        final sales = find.byKey(const Key('work-pulse-settlement'));
-        final originalTop = tester.getTopLeft(sales).dy;
-        final originalHeight = tester.getSize(sales).height;
-        for (final value in [
-          (0, '₹0', '₹0'),
-          (999, '₹999', '₹999'),
-          (99999, '₹99,999', '₹99,999'),
-          (100000, '₹1 lakh', '₹1,00,000'),
-          (9999999, '≈₹99.99 lakh', '₹99,99,999'),
-          (10000000, '₹1 cr', '₹1,00,00,000'),
-          (1000000000, '₹100 cr', '₹1,00,00,00,000'),
-          (9990000000, '₹999 cr', '₹9,99,00,00,000'),
-          (10000000000, '₹1,000 cr', '₹10,00,00,00,000'),
-          (100000000000, '₹10,000 cr', '₹1,00,00,00,00,000'),
-          // A negative settlement balance must not offer a negative payout.
-          (-10000000000, '₹0', '₹0'),
-          (10000000001, '≈₹1,000 cr', '₹10,00,00,00,001'),
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.width, display.height), textScale: display.scale);
+        await _toggleHomeCategory(tester, 'money');
+        final orders = work.workspaceOrders.map((o) => (o.id, o.stage)).toList();
+        for (final value in const [
+          (0, '₹0'), (999, '₹999'), (99999, '₹99,999'), (100000, '₹1,00,000'),
+          (9999999, '₹99,99,999'), (10000000, '₹1,00,00,000'),
+          (1000000000, '₹1,00,00,00,000'), (9990000000, '₹9,99,00,00,000'),
+          (10000000000, '₹10,00,00,00,000'), (100000000000, '₹1,00,00,00,00,000'),
+          (-10000000000, '—'), (10000000001, '₹10,00,00,00,001'),
         ]) {
-          work.workspaceSettlementBalance = value.$1;
-          work.setWorkspaceMoneyPeriod('Today');
+          qualifyFinance(work, available: value.$1);
           await tester.pumpAndSettle();
-          final expectedDigits = RegExp(r'-?[\d,.]+').firstMatch(value.$2)!;
-          final currency = value.$2.substring(0, expectedDigits.start);
-          final unit = value.$2.substring(expectedDigits.end).trim();
-          final separateUnit =
-              '$currency${unit.isEmpty ? '' : ' $unit'}\n${expectedDigits.group(0)}';
-          final amount = find.descendant(
-            of: sales,
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Text &&
-                  (widget.data == value.$2 || widget.data == separateUnit),
-            ),
-          );
-          expect(amount, findsOneWidget);
-          final paragraph = tester.renderObject<RenderParagraph>(amount);
-          expect(paragraph.didExceedMaxLines, isFalse, reason: value.$2);
-          final digits = RegExp(
-            r'-?[\d,.]+',
-          ).firstMatch(tester.widget<Text>(amount).data!)!;
-          expect(
-            paragraph.getBoxesForSelection(
-              TextSelection(baseOffset: digits.start, extentOffset: digits.end),
-            ),
-            hasLength(1),
-            reason: 'The digits must stay together: ${value.$2}',
-          );
-          expect(
-            tester.widget<Text>(amount).style!.fontSize,
-            greaterThanOrEqualTo(14),
-          );
-          expect(
-            paragraph.textScaler.scale(17),
-            closeTo(17 * display.scale, .01),
-          );
-          expect(
-            find.bySemanticsLabel(
-              'MoolSocial settlement, Available to settle, ${value.$3} in store records',
-            ),
-            findsOneWidget,
-          );
-          expect(tester.getTopLeft(sales).dy, closeTo(originalTop, .1));
-          expect(
-            tester.getSize(sales).height,
-            closeTo(originalHeight, .1),
-            reason: 'Live totals must not move the financial action area',
-          );
-          expect(work.workspaceSettlementBalance, value.$1);
+          final amount = find.byKey(const Key('store-overview-settlement-available'));
+          if (value.$1 >= 0) {
+            await reveal(tester, amount);
+            expect(tester.widget<Text>(amount).data, value.$2);
+            expectExactMoneyVisible(tester, amount);
+            expect(tester.widget<Text>(amount).style!.fontSize, greaterThanOrEqualTo(12));
+            expect(tester.renderObject<RenderParagraph>(amount).textScaler.scale(1), closeTo(display.scale, .01));
+            expect(tester.getSemantics(amount).getSemanticsData().label, contains(value.$2));
+            final action = find.byKey(const Key('store-overview-open-settlement-available'));
+            await reveal(tester, action);
+            expect(action.hitTestable(), findsOneWidget);
+            expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+            expect(work.workspaceFinance!.availableMinor, value.$1 * 100);
+          } else {
+            expect(amount, findsNothing);
+            expect(find.byKey(const Key('store-overview-open-settlement-available')), findsNothing);
+            expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
+          }
+          expect(work.workspaceOrders.map((o) => (o.id, o.stage)), orders);
+          expect(work.workspaceStockMovements, isEmpty);
+          expect(work.workspaceSettlementRequested, 0);
           expect(tester.takeException(), isNull);
         }
         await captureStoreView(tester, 'r665-money-live-$suffix');
-        expect(work.workspaceOrders, isEmpty);
-        expect(work.workspaceSettlementRequested, 0);
-      } finally {
-        semantics.dispose();
-      }
+      } finally { semantics.dispose(); }
     });
 
     for (final destination in [
-      ('work-pulse-sales', 'work-store-statement'),
-      ('work-pulse-dues', 'work-store-dues'),
-      ('work-pulse-settlement', 'work-money-destination'),
+      ('statement', 'work-store-statement'),
+      ('dues', 'work-store-dues'),
+      ('settlement', 'work-money-destination'),
     ]) {
-      testWidgets('S09 money destination ${destination.$2} $suffix', (
-        tester,
-      ) async {
-        final work = storeViewFixture()
-          ..workspaceSalesToday = 10000000000
-          ..workspaceSettlementBalance = 10000000000
-          ..workspaceOrderAmount = '10000000000';
-        final isRegister = destination.$2 == 'work-store-statement';
-        if (isRegister) {
-          work.workspaceInvoices.add(
-            WorkspaceCustomerInvoice(
-              id: 'INV-RANGE',
-              orderId: 'ORDER-RANGE',
-              customer: 'Customer',
-              items: 'Goods supplied',
-              amount: 10000000000,
-              payment: 'Payment due',
-              issuedAt: DateTime.now(),
-            ),
-          );
+      testWidgets('S09 money destination ${destination.$2} $suffix', (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.width, display.height), textScale: display.scale);
+        qualifyFinance(work, available: 10000000000, dues: 10000000000);
+        final finance = work.workspaceFinance!;
+        final checkpoint = _LedgerCheckpointFixtureStore();
+        expect(work.bindCustomerCollectionGateway(accountScope: finance.accountScope,
+          storeId: finance.workspaceId, adapter: StoreReviewCustomerCollectionGateway(finance),
+          checkpointStore: checkpoint), isTrue);
+        expect(await work.recoverCustomerLedger(), isTrue);
+        for (var i = 0; i < work.workspaceOrders.length; i++) {
+          work.workspaceOrders[i] = work.workspaceOrders[i].copyWith(amount: 10000000000);
         }
-        for (var index = 0; index < work.workspaceOrders.length; index++) {
-          work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
-            amount: 10000000000,
-          );
+        if (destination.$1 == 'statement') {
+          work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'INV-RANGE',
+            orderId: 'ORDER-RANGE', customer: 'Customer', items: 'Goods supplied',
+            amount: 10000000000, payment: 'Payment due', issuedAt: DateTime.now()));
         }
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.width, display.height),
-          textScale: display.scale,
-        );
-        expect(tester.takeException(), isNull);
-        final action = find.byKey(Key(destination.$1));
-        await reveal(tester, action);
-        await tester.tap(action);
+        work.setWorkspaceMoneyPeriod('Today');
         await tester.pumpAndSettle();
-        expect(find.byKey(Key(destination.$2)), findsOneWidget);
-        final amounts = find.text(
-          isRegister ? '10,00,00,00,000' : '₹10,00,00,00,000',
-        );
-        expect(amounts, findsWidgets);
-        if (isRegister) {
-          await reveal(tester, amounts.first);
-          expect(find.text('Amount (₹)'), findsOneWidget);
-          expect(
-            tester.getRect(amounts.first).right,
-            lessThanOrEqualTo(display.width),
-          );
+        final identities = work.workspaceOrders.map((o) => (o.id, o.stage, o.amount)).toList();
+        final invoiceIds = work.workspaceInvoices.map((i) => i.id).toList();
+        if (destination.$1 == 'settlement') {
+          await _toggleHomeCategory(tester, 'money');
+          final action = find.byKey(const Key('store-overview-open-settlement-available'));
+          await reveal(tester, action);
+          await tester.tap(action);
         } else {
-          expectExactMoneyVisible(tester, amounts);
-        }
-        for (final element in amounts.evaluate()) {
-          final paragraph = element.renderObject! as RenderParagraph;
-          expect(paragraph.didExceedMaxLines, isFalse);
-          final boxes = paragraph.getBoxesForSelection(
-            TextSelection(
-              baseOffset: 0,
-              extentOffset: (element.widget as Text).data!.length,
-            ),
-          );
-          expect(
-            boxes,
-            hasLength(1),
-            reason: 'Do not split the amount across lines',
-          );
-          expect(
-            paragraph.textScaler.scale(14),
-            closeTo(14 * display.scale, .01),
-          );
-        }
-        if (destination.$2 != 'work-money-destination') {
-          await reveal(tester, amounts.first);
-        }
-        await captureStoreView(tester, 'r665-money-${destination.$2}-$suffix');
-        if (destination.$2 == 'work-money-destination') {
-          final request = find.byKey(
-            const Key('work-money-request-settlement'),
-          );
-          await reveal(tester, request);
-          await tester.tap(request);
+          await tester.tap(find.byKey(const Key('work-store-sell')));
           await tester.pumpAndSettle();
-          final field = find.byKey(const Key('work-settlement-request-amount'));
-          await reveal(tester, field);
-          final editable = find.descendant(
-            of: field,
-            matching: find.byType(EditableText),
-          );
-          expect(
-            tester.widget<EditableText>(editable).controller.text,
-            '10000000000',
-          );
-          await tester.enterText(field, '9999999999');
-          await tester.pumpAndSettle();
-          expect(
-            tester.widget<EditableText>(editable).controller.text,
-            '9999999999',
-          );
-          expect(find.text('₹9,99,99,99,999'), findsOneWidget);
-          expectExactMoneyVisible(tester, find.text('₹9,99,99,99,999'));
-          tester.view.viewInsets = const FakeViewPadding(bottom: 260);
-          await tester.pumpAndSettle();
-          final confirm = find.byKey(const Key('work-settlement-confirm'));
-          await reveal(tester, confirm);
-          expect(confirm.hitTestable(), findsOneWidget);
-          expect(tester.getSize(confirm).height, greaterThanOrEqualTo(48));
-          await captureStoreView(tester, 'r665-money-payout-keyboard-$suffix');
-          tester.testTextInput.hide();
-          tester.view.viewInsets = FakeViewPadding.zero;
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-          expect(
-            find.byKey(const Key('work-money-destination')),
-            findsOneWidget,
-          );
-          await reveal(tester, find.text('Recorded sales'));
-          final sale = find.text('APP-1043');
-          await reveal(tester, sale);
-          expectExactMoneyVisible(tester, find.text('₹10,00,00,00,000'));
-          await captureStoreView(tester, 'r665-money-recorded-sales-$suffix');
+          final key = destination.$1 == 'statement' ? 'work-sales-statement' : 'work-sales-dues';
+          await revealSalesAction(tester, key);
+          await tester.tap(find.byKey(Key(key)));
         }
-        expect(
-          work.workspaceOrders.map((order) => order.amount),
-          everyElement(10000000000),
-        );
-        expect(work.workspaceSettlementEligible, 10000000000);
+        await tester.pumpAndSettle();
+        final surface = destination.$1 == 'statement' ? 'work-store-statement'
+          : destination.$1 == 'dues' ? 'work-finance-dues' : 'work-finance-settlement';
+        expect(destination.$1 == 'statement' ? find.byType(StoreSalesStatementPanel)
+          : find.byKey(Key(surface)), findsOneWidget);
+        if (destination.$1 == 'statement') {
+          final statement = tester.widget<StoreSalesStatementPanel>(find.byType(StoreSalesStatementPanel)).statement;
+          expect(statement.storeId, finance.workspaceId);
+          expect(statement.accountId, finance.accountScope);
+          expect(statement.selected.single.id, 'INV-RANGE');
+          expect(statement.selected.single.orderId, 'ORDER-RANGE');
+          expect(statement.billedMinor, 1000000000000);
+          final amount = find.text('1 recorded invoice · INR 10000000000.00');
+          await reveal(tester, amount);
+          final p = tester.renderObject<RenderParagraph>(amount);
+          final number = tester.widget<Text>(amount).data!.indexOf('10000000000.00');
+          final boxes = p.getBoxesForSelection(TextSelection(baseOffset: number, extentOffset: number + 14));
+          expect(boxes, hasLength(1));
+          expect(boxes.single.right, lessThanOrEqualTo(p.size.width + .5));
+          expect(p.didExceedMaxLines, isFalse);
+          await reveal(tester, find.byKey(const Key('sales-statement-download')));
+          expect(tester.widget<TextButton>(find.byKey(const Key('sales-statement-download'))).onPressed, isNotNull);
+        } else {
+          final row = find.byKey(const Key('work-finance-payment-APP-1043'));
+          await reveal(tester, row);
+          expect(find.text('Rakesh · APP-1043'), findsWidgets);
+          final amount = find.text('₹10,00,00,00,000');
+          expect(amount, findsWidgets);
+          // Current finance detail intentionally permits horizontal exact-value
+          // access at enlarged text; semantics retain every digit.
+          for (final element in amount.evaluate()) {
+            final p = element.renderObject! as RenderParagraph;
+            expect(p.didExceedMaxLines, isFalse);
+          }
+          if (destination.$1 == 'settlement') {
+            await tester.scrollUntilVisible(find.text('Request settlement'), -200,
+              scrollable: find.descendant(of: find.byKey(const Key('work-finance-settlement')),
+                matching: find.byType(Scrollable)).first, maxScrolls: 30);
+            await reveal(tester, find.text('Request settlement'));
+            final request = find.ancestor(of: find.text('Request settlement'), matching: find.byType(FilledButton));
+            expect(tester.widget<FilledButton>(request).onPressed, isNull);
+            expect(find.text('Settlement requests are not connected yet. No money will move from this screen.'), findsOneWidget);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+            await tester.pumpAndSettle();
+            await reveal(tester, request);
+            expect(request.hitTestable(), findsOneWidget);
+            expect(tester.getSize(request).height, greaterThanOrEqualTo(48));
+            expect(find.byKey(const Key('work-settlement-request-amount')), findsNothing);
+            tester.view.viewInsets = FakeViewPadding.zero;
+            await tester.pumpAndSettle();
+          }
+        }
+        expect(work.workspaceOrders.map((o) => (o.id, o.stage, o.amount)), identities);
+        expect(work.workspaceInvoices.map((i) => i.id), invoiceIds);
+        expect(work.workspaceFinance!.availableMinor, 1000000000000);
+        expect(work.workspaceStockMovements, isEmpty);
         expect(work.workspaceSettlementRequested, 0);
+        expect(checkpoint.saveAttempts, 0);
+        await captureStoreView(tester, 'r665-money-${destination.$2}-$suffix');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        if (destination.$1 == 'settlement') {
+          expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
+        }
         expect(tester.takeException(), isNull);
       });
     }
@@ -12354,120 +12404,72 @@ void main() {
     for (final hasOrder in [false, true]) {
       testWidgets('S09 rail word fit $hasOrder $suffix', (tester) async {
         final work = hasOrder ? storeViewFixture() : liveStore();
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.width, display.height),
-          textScale: display.scale,
-        );
-        await captureStoreView(tester, 'r665-rail-root-$hasOrder-$suffix');
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.width, display.height), textScale: display.scale);
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
         Future<void> checkWords(Finder text, String value) async {
           await reveal(tester, text);
-          final paragraph = tester.renderObject<RenderParagraph>(text);
-          expect(paragraph.textScaler.scale(1), closeTo(display.scale, .01));
-          expect(paragraph.didExceedMaxLines, isFalse);
+          final p = tester.renderObject<RenderParagraph>(text);
+          expect(p.textScaler.scale(1), closeTo(display.scale, .01));
+          expect(p.didExceedMaxLines, isFalse);
           for (final word in RegExp(r'\S+').allMatches(value)) {
-            final boxes = paragraph.getBoxesForSelection(
-              TextSelection(baseOffset: word.start, extentOffset: word.end),
-            );
-            expect(
-              boxes,
-              hasLength(1),
-              reason: '$value: ${word.group(0)} splits',
-            );
-            expect(
-              boxes.single.right,
-              lessThanOrEqualTo(paragraph.size.width + .5),
-            );
+            final boxes = p.getBoxesForSelection(TextSelection(baseOffset: word.start, extentOffset: word.end));
+            expect(boxes, hasLength(1), reason: '$value: ${word.group(0)}');
+            expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+            expect(boxes.single.right, lessThanOrEqualTo(p.size.width + .5));
           }
         }
-
-        if (hasOrder) {
-          final centre = find.byKey(const Key('work-activity-incoming-order'));
-          for (final value in [
-            'Rakesh',
-            'Customer pickup',
-            'Awaiting acceptance',
-            'View details',
-            'Accept',
-            'Reject',
-          ]) {
-            await checkWords(
-              find.descendant(of: centre, matching: find.text(value)),
-              value,
-            );
-          }
-          final clock = find.descendant(
-            of: centre,
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Text &&
-                  RegExp(r'^\d{2}:\d{2}$').hasMatch(widget.data ?? ''),
-            ),
-          );
-          expect(clock, findsOneWidget);
-          await checkWords(clock, tester.widget<Text>(clock).data!);
-          await captureStoreView(tester, 'r665-rail-order-controls-$suffix');
-        } else {
-          await checkWords(find.text('Ready for orders'), 'Ready for orders');
+        final identities = work.workspaceOrders.map((o) => (o.id, o.stage)).toList();
+        final selectedOrder = work.currentWorkspaceOrderId;
+        // Orders card decisions/collection readiness are qualified separately.
+        // This case checks the actual inbox navigation, not its retired deck.
+        for (final entry in [('new', 'New'), ('packing', 'Packing'), ('done', 'History')]) {
+          final filter = find.byKey(Key('work-orders-filter-${entry.$1}'));
+          await reveal(tester, filter);
+          expect(filter.hitTestable(), findsOneWidget);
+          expect(tester.getSize(filter).height, greaterThanOrEqualTo(48));
+          final label = tester.widget<ChoiceChip>(filter).label as Text;
+          final value = label.data!;
+          expect(value, matches('^${entry.$2} [0-9]+\$'));
+          await checkWords(find.descendant(of: filter, matching: find.text(value)), value);
         }
-        final labels = [
-          ('work-pulse-sales', 'View statement'),
-          ('work-pulse-dues', 'Collect dues'),
-          ('work-pulse-settlement', 'MoolSocial settlement'),
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        for (final entry in [
+          ('work-quick-add-products', 'Add products'),
           ('work-quick-buy', 'Buy stock'),
-          ('work-incoming-purchases', 'Track purchases'),
-          ('work-quick-group-buy', 'Buy together'),
-          ('work-quick-store-link', 'Share store link'),
-          ('work-quick-create-offer', 'Create offer'),
-          ('work-quick-requirement', 'Post requirement'),
-        ];
-        for (final entry in labels) {
+          ('work-incoming-purchases', 'Purchases'),
+        ]) {
           final action = find.byKey(Key(entry.$1));
           await reveal(tester, action);
           expect(action.hitTestable(), findsOneWidget);
           expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
           expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
-          final text = find.descendant(
-            of: action,
-            matching: find.text(entry.$2),
-          );
-          final paragraph = tester.renderObject<RenderParagraph>(text);
-          expect(
-            paragraph.textScaler.scale(11),
-            closeTo(11 * display.scale, .01),
-          );
-          for (final word in RegExp(r'\S+').allMatches(entry.$2)) {
-            final boxes = paragraph.getBoxesForSelection(
-              TextSelection(baseOffset: word.start, extentOffset: word.end),
-            );
-            expect(
-              boxes,
-              hasLength(1),
-              reason: '${entry.$2}: ${word.group(0)} splits',
-            );
-            expect(boxes.single.left, greaterThanOrEqualTo(-.5));
-            expect(
-              boxes.single.right,
-              lessThanOrEqualTo(paragraph.size.width + .5),
-            );
-          }
+          await checkWords(find.descendant(of: action, matching: find.text(entry.$2)), entry.$2);
         }
-        await captureStoreView(tester, 'r665-rail-reach-$hasOrder-$suffix');
-        await reveal(tester, find.byKey(const Key('work-quick-requirement')));
-        await tester.tap(find.byKey(const Key('work-quick-requirement')));
+        await tester.tap(find.byKey(const Key('work-store-sell')));
         await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-requirement-selector')),
-          findsOneWidget,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+        for (final entry in [
+          ('work-sales-primary-counter-sale', 'Counter sale'),
+          ('work-sales-manage', 'Manage sales'),
+          ('work-sales-recorded', 'Recorded sales'),
+        ]) {
+          final action = find.byKey(Key(entry.$1));
+          await reveal(tester, action);
+          expect(action.hitTestable(), findsOneWidget);
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+          await checkWords(find.descendant(of: action, matching: find.text(entry.$2)), entry.$2);
+        }
+        expect(find.byKey(const Key('work-quick-store-link')), findsNothing);
+        expect(work.workspaceOrders.map((o) => (o.id, o.stage)), identities);
+        expect(work.currentWorkspaceOrderId, selectedOrder);
         expect(work.workspaceVisibleToCustomers, isTrue);
         expect(work.workspaceAcceptingOrders, isTrue);
         expect(work.workspaceOrders.length, hasOrder ? 2 : 0);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        await captureStoreView(tester, 'r665-rail-reach-$hasOrder-$suffix');
         expect(tester.takeException(), isNull);
       });
     }
@@ -12608,15 +12610,27 @@ void main() {
       expect(work.workspaceAcceptingOrders, isFalse);
       expect(tester.takeException(), isNull);
     });
-    Future<void> tapRefinementAction(WidgetTester tester, String key) async {
-      final action = find.byKey(Key(key));
-      await reveal(tester, action);
-      await tester.tap(action);
+    Future<void> openPromotionFromOperations(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+      await tester.pumpAndSettle();
+      final operations = find.byKey(const Key('global-profile-quick-operations'));
+      await reveal(tester, operations);
+      await tester.tap(operations);
+      await tester.pumpAndSettle();
+      final grow = find.byKey(const Key('work-business-grow'));
+      await reveal(tester, grow);
+      await tester.tap(grow);
+      await tester.pumpAndSettle();
+      final offer = find.byKey(const Key('work-growth-offers'));
+      await reveal(tester, offer);
+      await tester.tap(offer);
       await tester.pumpAndSettle();
     }
 
     testWidgets('S09 refinement finance context $suffix', (tester) async {
-      final work = storeViewFixture();
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final semantics = tester.ensureSemantics();
       try {
         await mount(
@@ -12626,12 +12640,20 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
-        await openFinanceSummaryOrHome(tester, money: true);
+        qualifyFinance(work, available: 17820, dues: 860);
+        final finance = work.workspaceFinance!;
+        expect(work.bindCustomerCollectionGateway(accountScope: finance.accountScope,
+          storeId: finance.workspaceId, adapter: StoreReviewCustomerCollectionGateway(finance),
+          checkpointStore: _LedgerCheckpointFixtureStore()), isTrue);
+        expect(await work.recoverCustomerLedger(), isTrue);
+        await tester.pumpAndSettle();
+        await _toggleHomeCategory(tester, 'money');
         for (final metric in [
-          ('work-pulse-dues', 'Unpaid bills', '₹860'),
-          ('work-pulse-settlement', 'Available to settle', '₹17,820'),
+          ('store-overview-open-customer-dues', 'Receivables', '₹860'),
+          ('store-overview-open-settlement-available', 'Settlement available', '₹17,820'),
         ]) {
           final target = find.byKey(Key(metric.$1));
+          await reveal(tester, target);
           expect(target.hitTestable(), findsOneWidget);
           expect(
             find.descendant(of: target, matching: find.text(metric.$2)),
@@ -12651,14 +12673,19 @@ void main() {
           );
           expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
         }
-        expect(find.bySemanticsLabel('View statement'), findsOneWidget);
+        await expectFinanceActionWords(tester);
+        expect(tester.widget<Text>(find.byKey(const Key('store-overview-payables'))).data, '—');
         expect(find.text('Sales today'), findsNothing);
         expect(find.text('₹28,450'), findsNothing);
         await captureStoreView(tester, 'r665-refinement-finance-$suffix');
-        await tester.tap(find.byKey(const Key('work-pulse-sales')));
+        await tester.tap(find.byKey(const Key('work-store-sell')));
         await tester.pumpAndSettle();
-        expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
-        expect(work.workspaceSalesToday, 28450);
+        await revealSalesAction(tester, 'work-sales-statement');
+        await tester.tap(find.byKey(const Key('work-sales-statement')));
+        await tester.pumpAndSettle();
+        expect(find.byType(StoreSalesStatementPanel), findsOneWidget);
+        expect(tester.widget<StoreSalesStatementPanel>(find.byType(StoreSalesStatementPanel)).statement.billedMinor, 0);
+        expect(work.workspaceFinance!.availableMinor, 1782000);
         expect(tester.takeException(), isNull);
       } finally {
         semantics.dispose();
@@ -12714,10 +12741,9 @@ void main() {
           textScale: display.scale,
         );
         final share = find.byKey(const Key('work-quick-store-link'));
-        await reveal(tester, share);
-        expect(tester.widget<InkWell>(share).onTap, isNull);
-        await tester.tap(share);
-        await tester.pumpAndSettle();
+        // Without an authoritative published Store link, Analytics exposes
+        // no share entry at all. A local visibility setting cannot enable it.
+        expect(share, findsNothing);
         expect(
           find.byKey(const Key('work-store-link-unavailable')),
           findsNothing,
@@ -12729,7 +12755,7 @@ void main() {
         expect(find.byKey(const Key('work-store-link')), findsNothing);
         expect(find.byKey(const Key('work-store-link-recovery')), findsNothing);
         expect(
-          find.byKey(const Key('work-store-activity-deck')),
+          find.byKey(const Key('work-store-operating-board')),
           findsOneWidget,
         );
         await captureStoreView(tester, 'sharing-disabled-$setup-$suffix');
@@ -12776,8 +12802,8 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(
-        // Add was opened from Home, so cancellation returns to Home.
-        find.byKey(const Key('work-store-action-edge')),
+        // Add was opened from Stock; cancellation preserves that origin.
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
         findsOneWidget,
       );
     });
@@ -12793,7 +12819,7 @@ void main() {
           viewport: Size(display.width, display.height),
           textScale: display.scale,
         );
-        await tapRefinementAction(tester, 'work-quick-create-offer');
+        await openPromotionFromOperations(tester);
         final prerequisites = find.byKey(const Key('work-offer-prerequisites'));
         expect(prerequisites, findsOneWidget);
         final prerequisiteBounds = tester.getRect(prerequisites);
@@ -12851,106 +12877,53 @@ void main() {
       'S09 DF04 full-width working screens and canonical actions $display',
       (tester) async {
         final work = liveStore();
-        await mount(
-          tester,
-          route: '/app/work/workspace/dashboard',
-          work: work,
-          viewport: Size(display.$1, display.$2),
-          textScale: display.$3,
-          bottomInset: 24,
-        );
-        for (final action in [
-          ('work-pulse-sales', 'work-store-statement'),
-          ('work-pulse-dues', 'work-store-dues'),
-          ('work-pulse-settlement', 'work-money-destination'),
-          ('work-incoming-purchases', 'work-store-track-stock'),
-          ('work-quick-create-offer', 'work-store-offers-screen'),
-        ]) {
-          final target = find.byKey(Key(action.$1));
-          await reveal(tester, target);
-          await tester.tap(target);
-          await tester.pumpAndSettle();
-          expect(find.byKey(Key(action.$2)), findsOneWidget);
-          if (action.$2 == 'work-store-offers-screen') {
-            final offerScroll = find
-                .descendant(
-                  of: find.byKey(Key(action.$2)),
-                  matching: find.byType(Scrollable),
-                )
-                .first;
-            expect(
-              tester.getSize(find.byKey(Key(action.$2))).height,
-              greaterThan(display.$2 * .55),
-            );
-            await tester.scrollUntilVisible(
-              find.byKey(const Key('work-offer-order-cap')),
-              120,
-              scrollable: offerScroll,
-              maxScrolls: 30,
-            );
-            await tester.pumpAndSettle();
-            expect(find.text('Order limit'), findsOneWidget);
-            final publish = find.byKey(const Key('work-offer-publish'));
-            await tester.scrollUntilVisible(
-              publish,
-              120,
-              scrollable: offerScroll,
-              maxScrolls: 30,
-            );
-            await tester.pumpAndSettle();
-            expect(publish.hitTestable(), findsOneWidget);
-            expect(tester.widget<FilledButton>(publish).onPressed, isNull);
-          }
-          expect(
-            find.byKey(const Key('work-contextual-shortcuts')),
-            findsNothing,
-          );
-          expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
-          expect(
-            tester
-                .getSize(
-                  find.byKey(const Key('work-first-tap-working-surface')),
-                )
-                .width,
-            display.$1,
-          );
-          expect(tester.takeException(), isNull);
-          await tester.tap(find.byKey(const Key('work-store-home')));
-          await tester.pumpAndSettle();
-          await openFinanceSummaryOrHome(tester, money: false);
-          expect(
-            find.byKey(const Key('work-quick-counter-sale')),
-            findsOneWidget,
-            reason:
-                'Returning home must retain the explicitly expanded Actions choice.',
-          );
-        }
-        final share = find.byKey(const Key('work-quick-store-link'));
-        await reveal(tester, share);
-        expect(tester.widget<InkWell>(share).onTap, isNull);
-        final requirement = find.byKey(const Key('work-quick-requirement'));
-        await reveal(tester, requirement);
-        await tester.tap(requirement);
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-requirement-selector')),
-          findsOneWidget,
-        );
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-store-activity-deck')),
-          findsOneWidget,
-        );
-        expect(work.workspaceOffers, isEmpty);
-        await openRecordedSales(tester);
-        await tester.pumpAndSettle();
+        final inventory = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.$1, display.$2), textScale: display.$3, bottomInset: 24);
+        await openCounterSaleFromSales(tester);
+        await enterSaleCustomer(tester, '9829012345');
+        final product = work.workspaceCatalogueItems.first;
+        await reveal(tester, find.byKey(Key('work-order-add-${product.id}')));
+        await addCounterProduct(tester, find.byKey(Key('work-order-add-${product.id}')));
+        final total = work.workspaceOrderTotal;
+        final customer = work.workspaceOrderCustomer;
+        final quantities = Map.of(work.workspaceOrderQuantities);
+        expect(total, greaterThan(0));
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).showBottomNavigation, isFalse);
+        expect(find.byKey(const Key('work-sales-switcher')), findsNothing);
         expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
-        final sale = find.byKey(const Key('work-sales-new-counter-sale'));
-        await reveal(tester, sale);
-        expect(sale.hitTestable(), findsOneWidget);
+        expect(tester.getSize(find.byKey(const Key('work-sale-total-bar'))).width, display.$1);
+        final review = find.byKey(const Key('work-order-review'));
+        await reveal(tester, review);
+        expect(review.hitTestable(), findsOneWidget);
+        expect(tester.getSize(review).height, greaterThanOrEqualTo(48));
+        await tester.tap(find.byKey(const Key('work-back')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).showBottomNavigation, isTrue);
+        await openSalesTask(tester, 'manage');
+        expect(find.byKey(const Key('work-sales-action-centre')), findsOneWidget);
+        expect(tester.getSize(find.byKey(const Key('work-sales-action-centre'))).width, display.$1);
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).showBottomNavigation, isFalse);
+        for (final key in ['work-sales-dues', 'work-sales-statement']) {
+          await revealSalesAction(tester, key);
+          expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+          expect(tester.getSize(find.byKey(Key(key))).height, greaterThanOrEqualTo(48));
+        }
+        await tester.tap(find.byKey(const Key('work-back')));
+        await tester.pumpAndSettle();
+        await openSalesTask(tester, 'records');
+        expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
+        expect(tester.widget<WorkPageScaffold>(find.byType(WorkPageScaffold)).showBottomNavigation, isTrue);
+        expect(work.workspaceOrderTotal, total);
+        expect(work.workspaceOrderCustomer, customer);
+        expect(work.workspaceOrderQuantities, quantities);
+        expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), inventory);
         expect(work.workspaceInvoices, isEmpty);
         expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceOffers, isEmpty);
+        expect(work.workspaceStockMovements, isEmpty);
+        await captureStoreView(tester, 'r665-fullwidth-current-$display');
         expect(tester.takeException(), isNull);
       },
     );
@@ -13090,7 +13063,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-counter-close')));
+    await tester.tap(find.byKey(const Key('work-back')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
     await openCounterSaleFromSales(tester);
@@ -13153,21 +13126,26 @@ void main() {
       expect(buy.view, BuyV2View.catalogue);
       await tester.tap(find.byKey(const Key('work-back')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
-      final statement = find.byKey(const Key('work-pulse-sales'));
-      await reveal(tester, statement);
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await revealSalesAction(tester, 'work-sales-statement');
+      final statement = find.byKey(const Key('work-sales-statement'));
       await tester.tap(statement);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+      expect(find.text('Sales records are not ready. Please retry after loading.'), findsOneWidget);
+      expect(find.byKey(const Key('work-sales-action-centre')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-statement')), findsNothing);
       expect(buy.selectedFilter, 'freight');
       expect(buy.quantityFor(product.id), quantity);
       expect(consumer.selectedFilter, isNull);
       expect(consumer.quantityFor(product.id), 0);
-      await tester.binding.handlePopRoute();
+      expect(find.byKey(const Key('work-sales-action-centre')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      await returnToSalesHome(tester);
       await openFinanceSummaryOrHome(tester, money: false);
-      expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -13306,7 +13284,7 @@ void main() {
           );
           expect(toggle, findsOneWidget);
           expect(tester.widget<Switch>(toggle).value, isPublic);
-          expect(find.text('Show to customers'), findsOneWidget);
+          expect(find.text('Public visibility'), findsOneWidget);
           await captureStoreView(
             tester,
             'r665-catalogue-visibility-$isPublic-${display.$1}-${display.$3}',
@@ -13362,7 +13340,7 @@ void main() {
       expect(find.text('Catalogue'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
       expect(work.workspaceCatalogueItems, isEmpty);
       expect(tester.takeException(), isNull);
     });
@@ -13457,7 +13435,10 @@ void main() {
           work: work,
           textScale: 1,
         );
-        if (origin == 'stock') {
+        if (origin == 'dashboard') {
+          // Analytics has no scanner. The operational Orders header does.
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+        } else if (origin == 'stock') {
           await tester.tap(find.byKey(const Key('work-store-stock')));
         } else if (origin == 'sourcing') {
           await openTrackedPurchases(tester);
@@ -13489,7 +13470,7 @@ void main() {
             Key(switch (origin) {
               'stock' => 'work-dashboard-catalogue-screen',
               'sourcing' => 'work-dashboard-catalogue-screen',
-              _ => 'work-store-activity-deck',
+              _ => 'work-orders-destination',
             }),
           ),
           findsOneWidget,
@@ -31115,6 +31096,20 @@ void main() {
             viewport: Size(display.$1, display.$2),
             textScale: display.$3,
           );
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          if (surface == 'product') {
+            // The global saved-record search remains in Customer records;
+            // Stock search intentionally searches only Stock products.
+            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+            await tester.pumpAndSettle();
+            final operations = find.byKey(const Key('global-profile-quick-operations'));
+            await reveal(tester, operations);
+            await tester.tap(operations);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('work-business-customers')));
+            await tester.pumpAndSettle();
+          }
           if (surface == 'alert') {
             await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
           } else {
@@ -31206,7 +31201,9 @@ void main() {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('work-workspace-dashboard')),
+            find.byKey(Key(surface == 'order'
+                ? 'work-orders-destination'
+                : 'work-workspace-dashboard')),
             findsOneWidget,
           );
           expect(work.currentWorkspaceOrderId, 'APP-1043');
@@ -31216,99 +31213,38 @@ void main() {
       }
     }
     testWidgets('S09 pulse column amounts $display', (tester) async {
-      final work = storeViewFixture();
-      await mount(
-        tester,
-        route: '/app/work/workspace/dashboard',
-        work: work,
-        viewport: Size(display.$1, display.$2),
-        textScale: display.$3,
-      );
-      for (final value in [
-        17820,
-        28450,
-        99999,
-        100000,
-        10000000000,
-        100000000000,
-      ]) {
-        final exact = {
-          17820: '₹17,820',
-          28450: '₹28,450',
-          99999: '₹99,999',
-          100000: '₹1,00,000',
-          10000000000: '₹10,00,00,00,000',
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final semantics = tester.ensureSemantics();
+      try {
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+          viewport: Size(display.$1, display.$2), textScale: display.$3);
+        await _toggleHomeCategory(tester, 'money');
+        final invoices = List.of(work.workspaceInvoices);
+        final orders = work.workspaceOrders.map((o) => (o.id, o.amount)).toList();
+        for (final value in const {
+          17820: '₹17,820', 28450: '₹28,450', 99999: '₹99,999',
+          100000: '₹1,00,000', 10000000000: '₹10,00,00,00,000',
           100000000000: '₹1,00,00,00,00,000',
-        }[value]!;
-        work.workspaceSalesToday = value;
-        work.workspaceSettlementBalance = value;
-        work.workspaceOrders[1] = work.workspaceOrders[1].copyWith(
-          amount: value,
-        );
-        work.setWorkspaceMoneyPeriod('Today');
-        await tester.pumpAndSettle();
-        for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
-          final metric = find.byKey(Key(key));
-          await reveal(tester, metric);
-          final action = switch (key) {
-            'work-pulse-sales' => 'View statement',
-            'work-pulse-dues' => 'Collect dues',
-            _ => 'MoolSocial settlement',
-          };
-          final fullValue = find.byWidgetPredicate(
-            (widget) =>
-                widget is Semantics &&
-                (widget.properties.label?.startsWith('$action,') ?? false) &&
-                (widget.properties.label?.endsWith('$exact in store records') ??
-                    false),
-          );
-          expect(fullValue, findsOneWidget);
-          expect(
-            tester.widget<Semantics>(fullValue).properties.onTap,
-            isNotNull,
-          );
-          final total = find.descendant(
-            of: metric,
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Text &&
-                  RegExp(r'^[≈]?₹').hasMatch(widget.data ?? ''),
-            ),
-          );
-          expect(total, findsOneWidget);
-          final paragraph = tester.renderObject<RenderParagraph>(total);
-          final text = tester.widget<Text>(total);
-          final digits = RegExp(r'-?[\d,.]+').firstMatch(text.data!)!;
-          final boxes = paragraph.getBoxesForSelection(
-            TextSelection(baseOffset: digits.start, extentOffset: digits.end),
-          );
-          expect(boxes, hasLength(1), reason: '$key $value ${text.data}');
-          expect(
-            boxes.single.right,
-            lessThanOrEqualTo(paragraph.size.width + .5),
-          );
-          expect(paragraph.didExceedMaxLines, isFalse);
-          expect(paragraph.textScaler.scale(1), closeTo(display.$3, .01));
-          expect(text.style!.fontSize, greaterThanOrEqualTo(14));
+        }.entries) {
+          qualifyFinance(work, available: value.key, dues: value.key);
+          await tester.pumpAndSettle();
+          await expectFinanceActionWords(tester);
+          for (final key in ['customer-dues', 'settlement-available']) {
+            final amount = find.byKey(Key('store-overview-$key'));
+            expect(tester.widget<Text>(amount).data, value.value);
+            expectExactMoneyVisible(tester, amount);
+            expect(tester.renderObject<RenderParagraph>(amount).textScaler.scale(1), closeTo(display.$3, .01));
+            expect(tester.getSemantics(amount).getSemanticsData().label, contains(value.value));
+          }
+          expect(work.workspaceFinance!.duesMinor, value.key * 100);
+          expect(work.workspaceFinance!.availableMinor, value.key * 100);
+          expect(work.workspaceOrders.map((o) => (o.id, o.amount)), orders);
+          expect(work.workspaceInvoices, invoices);
+          expect(work.workspaceStockMovements, isEmpty);
+          expect(work.workspaceSettlementRequested, 0);
           expect(tester.takeException(), isNull);
         }
-        expect(work.workspaceSalesToday, value);
-        expect(work.workspaceSettlementBalance, value);
-        expect(
-          work.workspaceCustomerBook.fold<int>(
-            0,
-            (sum, customer) => sum + customer.amountDue,
-          ),
-          value,
-        );
-        if (value == 17820) {
-          await captureStoreView(
-            tester,
-            'r665-pulse-columns-${display.$1}-${display.$3}',
-          );
-        }
-      }
-      expect(work.workspaceInvoices, isEmpty);
+      } finally { semantics.dispose(); }
     });
     for (final surface in ['incoming', 'packing', 'details']) {
       for (final amount in [
@@ -34285,6 +34221,8 @@ void main() {
         priorErrorHandler(details);
       };
       try {
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
         await openStoreTools(tester);
       } finally {
         FlutterError.onError = priorErrorHandler;
@@ -34385,6 +34323,8 @@ void main() {
         viewport: Size(display.width, display.height),
         textScale: display.scale,
       );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
       await openStoreTools(tester);
       final customers = find.byKey(const Key('work-business-customers'));
       await reveal(tester, customers);
@@ -48737,6 +48677,7 @@ void main() {
             deliveryAdjustmentsMinor: -525,
             refundsMinor: 0,
             taxWithheldMinor: 5000,
+            historyComplete: true,
             payments: [
               for (var i = 0; i < 25; i++)
                 WorkspacePaymentRecord(
@@ -48798,43 +48739,25 @@ void main() {
             viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
             textScale: scale,
           );
-          await openFinanceSummaryOrHome(tester, money: true);
-          expectFinanceActionWords(tester);
-          await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
+          await reveal(tester, find.byKey(const Key('store-analytics-period-picker')));
+          await tester.tap(find.byKey(const Key('store-analytics-period-picker')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Last 7 days').last);
+          await tester.pumpAndSettle();
+          await _toggleHomeCategory(tester, 'money');
+          await reveal(tester, find.byKey(const Key('store-overview-open-settlement-available')));
           await captureStoreView(tester, 'finance-paise-boundary-$scale');
           expect(work.applyWorkspaceFinance(snapshot(2)), isTrue);
           await tester.pumpAndSettle();
-          expectFinanceActionWords(tester);
           await captureStoreView(tester, 'finance-dashboard-$scale');
-          await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
-          final pulseText = tester
-              .widgetList<Text>(
-                find.descendant(
-                  of: find.byKey(const Key('work-pulse-settlement')),
-                  matching: find.byType(Text),
-                ),
-              )
-              .map((w) => w.data ?? '')
-              .toList();
-          expect(
-            pulseText.any(
-              (t) => t.contains('≈') && t.contains('1,000') && t.contains('cr'),
-            ),
-            isTrue,
-          );
-          expect(
-            pulseText.any((t) => t.contains('10,00,00,00,000.50')),
-            isFalse,
-          );
-          expect(
-            find.bySemanticsLabel(
-              RegExp(
-                r'MoolSocial settlement, Available to settle, ₹10,00,00,00,000\.50',
-              ),
-            ),
-            findsOneWidget,
-          );
-          await tester.tap(find.byKey(const Key('work-pulse-settlement')));
+          final settlement = find.byKey(const Key('store-overview-open-settlement-available'));
+          await reveal(tester, settlement);
+          expect(find.descendant(of: settlement, matching: find.text('Settlement available')), findsOneWidget);
+          final availableAmount = find.byKey(const Key('store-overview-settlement-available'));
+          expect(tester.widget<Text>(availableAmount).data, '₹10,00,00,00,000.50');
+          expectExactMoneyVisible(tester, availableAmount);
+          expect(tester.getSize(settlement).height, greaterThanOrEqualTo(48));
+          await tester.tap(settlement);
           await tester.pumpAndSettle();
           expect(
             find.byKey(const Key('work-finance-settlement')),
@@ -48897,7 +48820,7 @@ void main() {
             find.byKey(const Key('work-settlement-reconciliation')),
           );
           expect(
-            find.text('Full payout history is needed to reconcile this total.'),
+            find.text('Paid-out total matches the supplied payout records.'),
             findsOneWidget,
           );
           await captureStoreView(
@@ -48922,8 +48845,11 @@ void main() {
           expect(work.currentWorkspaceOrderId, originalOrder);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          await reveal(tester, find.byKey(const Key('work-pulse-dues')));
-          await tester.tap(find.byKey(const Key('work-pulse-dues')));
+          expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
+          expect(find.text('Last 7 days'), findsOneWidget);
+          final duesAction = find.byKey(const Key('store-overview-open-customer-dues'));
+          await reveal(tester, duesAction);
+          await tester.tap(duesAction);
           await tester.pumpAndSettle();
           expect(find.byKey(const Key('work-finance-dues')), findsOneWidget);
           await reveal(
@@ -48940,26 +48866,16 @@ void main() {
           await captureStoreView(tester, 'finance-stale-$scale');
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
-            final pulse = find.byKey(Key(key));
-            await reveal(tester, pulse);
-            expect(
-              find.descendant(of: pulse, matching: find.text('Last update')),
-              findsOneWidget,
-              reason: key,
-            );
-            expect(
-              find.descendant(of: pulse, matching: find.text('—')),
-              findsNothing,
-              reason: 'Retain the confirmed amount for $key',
-            );
-          }
-          expectFinanceActionWords(tester);
+          final unavailableDue = find.byKey(const Key('store-overview-customer-dues'));
+          await reveal(tester, unavailableDue);
+          expect(tester.widget<Text>(unavailableDue).data, '—');
+          expect(find.byKey(const Key('store-overview-open-settlement-available')), findsNothing);
+          expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
           await captureStoreView(tester, 'finance-stale-pulse-$scale');
-          await reveal(tester, find.byKey(const Key('work-pulse-sales')));
-          await captureStoreView(tester, 'finance-stale-pulse-leading-$scale');
-          await reveal(tester, find.byKey(const Key('work-pulse-dues')));
-          await tester.tap(find.byKey(const Key('work-pulse-dues')));
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+          await revealSalesAction(tester, 'work-sales-dues');
+          await tester.tap(find.byKey(const Key('work-sales-dues')));
           await tester.pumpAndSettle();
           expect(work.applyWorkspaceFinance(snapshot(3, paid: true)), isTrue);
           await tester.pumpAndSettle();
@@ -48972,19 +48888,20 @@ void main() {
           expect(work.workspaceOrders.map((o) => (o.id, o.stage)), states);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          final duesPulse = find.byKey(const Key('work-pulse-dues'));
-          await reveal(tester, duesPulse);
+          await returnToSalesHome(tester);
+          await tester.tap(find.byKey(const Key('work-store-home')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('store-analytics-detail-money')), findsOneWidget);
+          final confirmedDue = find.byKey(const Key('store-overview-customer-dues'));
+          await reveal(tester, confirmedDue);
+          expect(tester.widget<Text>(confirmedDue).data, '₹0');
+          // Current settlement details retain all payment updates; Collect dues
+          // deliberately excludes fully paid records and is not payment history.
+          await reveal(tester, settlement);
+          await tester.tap(settlement);
+          await tester.pumpAndSettle();
           expect(
-            find.descendant(of: duesPulse, matching: find.text('₹0')),
-            findsOneWidget,
-          );
-          expect(
-            find.descendant(of: duesPulse, matching: find.text('Unpaid bills')),
-            findsOneWidget,
-          );
-          await openSalesCollections(tester);
-          expect(
-            find.byKey(const Key('work-finance-payments')),
+            find.byKey(const Key('work-finance-settlement')),
             findsOneWidget,
           );
           await reveal(
@@ -49000,7 +48917,7 @@ void main() {
                 'work-finance-order-details',
                 'review-draft-account',
                 work.activeWorkspace!.id,
-                'payments',
+                'settlement',
                 'APP-1043',
               )),
             ),
@@ -49035,67 +48952,24 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
-        for (final key in ['work-pulse-dues', 'work-pulse-settlement']) {
-          final pulse = find.byKey(Key(key));
-          await reveal(tester, pulse);
-          expect(
-            find.descendant(of: pulse, matching: find.text('Update pending')),
-            findsOneWidget,
-            reason: key,
-          );
-          expect(
-            find.descendant(of: pulse, matching: find.text('—')),
-            findsOneWidget,
-            reason: 'Unavailable $key must not infer a balance',
-          );
-          final semantics = tester.widget<Semantics>(
-            find
-                .ancestor(
-                  of: pulse,
-                  matching: find.byWidgetPredicate(
-                    (widget) =>
-                        widget is Semantics && widget.properties.button == true,
-                  ),
-                )
-                .first,
-          );
-          expect(semantics.properties.label, contains('amount unavailable'));
-        }
-        expectFinanceActionWords(tester);
-        await captureStoreView(tester, 'finance-unavailable-pulse-$scale');
-        await reveal(tester, find.byKey(const Key('work-pulse-sales')));
-        await captureStoreView(
-          tester,
-          'finance-unavailable-pulse-leading-$scale',
-        );
-        await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
-        await tester.tap(find.byKey(const Key('work-pulse-settlement')));
-        await tester.pumpAndSettle();
+        // The approved canvas does not offer a settlement operation without
+        // a qualified balance. Unknown is not a zero or a selectable payout.
+        await _toggleHomeCategory(tester, 'money');
+        final due = find.byKey(const Key('store-overview-customer-dues'));
+        await reveal(tester, due);
+        expect(tester.widget<Text>(due).data, '—');
+        expect(find.byKey(const Key('store-overview-open-settlement-available')), findsNothing);
+        expect(find.byKey(const Key('store-overview-open-customer-dues')), findsNothing);
+        expect(find.byKey(const Key('store-insights-finance-unavailable')), findsOneWidget);
+        expect(find.text('Request settlement'), findsNothing);
+        await captureStoreView(tester, 'finance-unavailable-canvas-$scale');
+        // Existing financial-detail access remains fail-closed too; opening
+        // collections must not manufacture an empty payment book or balance.
+        await openSalesCollections(tester);
         expect(find.text('Payment updates unavailable'), findsOneWidget);
         expect(find.text('₹0'), findsNothing);
-        await captureStoreView(tester, 'finance-unavailable-$scale');
         expect(find.text('Request settlement'), findsNothing);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-store-activity-deck')),
-          findsOneWidget,
-        );
-        for (final key in ['work-pulse-sales', 'work-pulse-dues']) {
-          if (key == 'work-pulse-sales') {
-            await openSalesCollections(tester);
-          } else {
-            final pulse = find.byKey(Key(key));
-            await reveal(tester, pulse);
-            await tester.tap(pulse);
-            await tester.pumpAndSettle();
-          }
-          expect(find.text('Payment updates unavailable'), findsOneWidget);
-          expect(find.text('₹0'), findsNothing);
-          await captureStoreView(tester, 'finance-unavailable-$key-$scale');
-          await tester.binding.handlePopRoute();
-          await tester.pumpAndSettle();
-        }
+        await captureStoreView(tester, 'finance-unavailable-collections-$scale');
         expect(work.currentWorkspaceOrderId, orderBefore);
         expect(work.workspaceInvoices.length, invoicesBefore);
         expect(work.workspaceStockMovements.length, movementsBefore);
