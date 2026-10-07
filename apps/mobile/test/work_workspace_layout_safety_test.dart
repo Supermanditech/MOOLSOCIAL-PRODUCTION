@@ -1038,10 +1038,13 @@ Future<void> chooseAddProductMode(WidgetTester tester, String mode) async {
 
 Future<void> _toggleHomeCategory(WidgetTester tester, String id) async {
   final report = id == 'capital' ? 'money' : id;
-  final tile = find.byKey(Key('store-analytics-$report'));
-  await tester.ensureVisible(tile);
-  await tester.tap(tile);
+  final cue = find.byKey(Key('analytics-preview-action-$report'));
+  final wasOpen = find.byKey(Key('store-analytics-detail-$report')).evaluate().isNotEmpty;
+  await tester.ensureVisible(cue);
   await tester.pumpAndSettle();
+  await tester.tap(cue);
+  await tester.pumpAndSettle();
+  expect(find.byKey(Key('store-analytics-detail-$report')), wasOpen ? findsNothing : findsOneWidget);
 }
 
 
@@ -2930,6 +2933,8 @@ void main() {
     expect(await work.recoverCustomerLedger(), isTrue);
     work.workspaceInvoices.clear();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1, openHomeActions: false);
+    expect(find.byKey(const Key('analytics-sales-spark-bars')), findsOneWidget);
+    expect(find.text('Selected period'), findsOneWidget);
     await _toggleHomeCategory(tester, 'sales');
     expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 32);
     expect(find.byKey(const Key('analytics-sales-axis-zero')), findsOneWidget);
@@ -2967,9 +2972,9 @@ void main() {
       viewport: const Size(320, 568), textScale: 2, openHomeActions: false);
     final board = find.byKey(const Key('work-store-operating-board'));
     final scroll = tester.widget<SingleChildScrollView>(board).controller!;
-    await tester.ensureVisible(find.byKey(const Key('store-analytics-stock'))); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('analytics-preview-action-stock'))); await tester.pumpAndSettle();
     final summaryOffset = scroll.offset;
-    await tester.tap(find.byKey(const Key('store-analytics-stock'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('analytics-preview-action-stock'))); await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const Key('analytics-stock-ring'))); await tester.pumpAndSettle();
     final header = find.byKey(const Key('analytics-context-heading-stock'));
     expect(header, findsOneWidget);
@@ -3025,6 +3030,8 @@ void main() {
     expect(find.byTooltip('Choose reporting period'), findsOneWidget);
     await _toggleHomeCategory(tester, 'stock');
     expect(find.byKey(const Key('analytics-stock-ring')), findsNothing);
+    expect(find.descendant(of: find.byKey(const Key('analytics-preview-stock')),
+      matching: find.text('0 available\n0 unavailable')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('store-analytics-detail-stock')),
       matching: find.text('No products saved yet')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -3311,7 +3318,8 @@ void main() {
       expect(find.byKey(const Key('store-analytics-report-back')), findsNothing);
       expect(find.byKey(const Key('store-analytics-home-rail')), findsNothing);
       expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
-      expect(find.text(id == 'public' ? 'Visitors' : 'Visited Store'), findsOneWidget);
+      expect(find.descendant(of: find.byKey(Key('store-analytics-detail-$id')),
+        matching: find.text(id == 'public' ? 'Visitors' : 'Visited Store')), findsOneWidget);
       await _captureAnalyticsFixture(tester, '$id-inline-automated-fixture');
       await tester.tap(find.byTooltip('Collapse details'));
       await tester.pumpAndSettle();
@@ -3512,6 +3520,62 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('ANALYTICS EXPLORE previews communicate before tapping', (tester) async {
+    // Host-only presentation fixture, not device acceptance data.
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 640), textScale: 1, openHomeActions: false);
+    for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+      expect(find.byKey(Key('analytics-preview-$report')), findsOneWidget);
+      expect(find.byKey(Key('analytics-preview-visual-$report')), findsOneWidget);
+      expect(find.byKey(Key('analytics-preview-action-$report')), findsOneWidget);
+    }
+    expect(find.text('Tracking not connected'), findsNWidgets(2));
+    expect(find.text('Supply data not connected'), findsNWidgets(2));
+    expect(find.byKey(const Key('analytics-preview-public-ranking')), findsNothing);
+    expect(find.byKey(const Key('store-analytics-detail-stock')), findsNothing);
+    expect(tester.getSize(find.text('Dispatch')).height, lessThanOrEqualTo(20));
+    expect(find.byKey(const Key('analytics-chart-motion-preview-public')), findsNothing);
+    expect(find.byKey(const Key('analytics-chart-motion-preview-supply')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'explore-previews-host-fixture');
+    await tester.ensureVisible(find.byKey(const Key('store-analytics-money')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('analytics-preview-value-stock-0')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-preview-stock-ring')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-spark-bars')), findsNothing,
+      reason: 'This fixture has not recovered qualified invoice history');
+    expect(find.text('Selected period'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'explore-previews-lower-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS EXPLORE verified ranking cannot animate unknown siblings', (tester) async {
+    final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(request: request,
+      state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
+      source: 'Automated aggregate fixture', updatedAt: DateTime.now(), coveredFrom: request.start,
+      coveredUntil: request.end, metrics: const [], breakdowns: [WorkspaceAnalyticsBreakdown(
+        id: 'discovery-sources', dimension: WorkspaceAnalyticsDimension.discoverySource,
+        coverage: WorkspaceAnalyticsCoverage.partial, asOf: request.end, source: 'Automated aggregate fixture',
+        rows: const [WorkspaceAnalyticsRank(id: 'source-b', label: 'Source B', count: 5),
+          WorkspaceAnalyticsRank(id: 'source-a', label: 'Source A', count: 10)])]));
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    expect(find.byKey(const Key('analytics-preview-public-ranking')), findsOneWidget);
+    expect(find.text('Source A · 10'), findsOneWidget);
+    expect(find.text('Discovery · partial'), findsOneWidget);
+    expect(find.text('Visitor totals unavailable'), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('analytics-preview-rank-source-b'))).width,
+      closeTo(tester.getSize(find.byKey(const Key('analytics-preview-rank-source-a'))).width / 2, .1));
+    for (final report in ['journey', 'supply', 'receiving']) {
+      expect(find.byKey(Key('analytics-chart-motion-preview-$report')), findsNothing);
+    }
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'explore-ranked-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS DEPTH Explore precedes heroes and reports use distinct visual lanes', (tester) async {
     // Labelled automated layout fixture; never runtime acceptance data.
     final work = storeViewFixture();
@@ -3519,8 +3583,10 @@ void main() {
       viewport: const Size(360, 640), textScale: 1, openHomeActions: false);
     expect(tester.getTopLeft(find.byKey(const Key('store-analytics-money'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const Key('analytics-overview-stock-hero'))).dy));
+    // Visible metric/graphic previews supersede the title-only first-fold grid.
+    // Keep every entry before heroes; scroll instead of shrinking text.
     expect(tester.getBottomRight(find.byKey(const Key('store-analytics-money'))).dy,
-      lessThanOrEqualTo(570));
+      lessThan(tester.getTopLeft(find.byKey(const Key('analytics-overview-stock-hero'))).dy));
     for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
       await _toggleHomeCategory(tester, report);
       final visualKey = switch (report) {

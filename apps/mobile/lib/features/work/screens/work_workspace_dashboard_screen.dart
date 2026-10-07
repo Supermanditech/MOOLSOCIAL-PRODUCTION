@@ -4446,7 +4446,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
               if (invoiceReady) 'sales': _AnalyticsOverviewTrend(series: savedBillSeries),
             },
             compactVisuals: {
-          if (stockReady && products.isNotEmpty) 'stock': _StockAvailabilityGraphic(
+          if (stockReady) 'stock': _StockAvailabilityGraphic(
             available: products.length - unavailable, unavailable: unavailable, compact: true),
           if (invoiceReady) 'sales': _SavedBillGraphic(series: savedBillSeries, compact: true,
             todayMinor: savedBillSeries.last.$2, previousMinor: previousBilled!),
@@ -5144,7 +5144,16 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             const Padding(padding: EdgeInsets.only(top: 4, bottom: 8), child: Text('Explore reports',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
             LayoutBuilder(builder: (context, box) {
-              final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
+              final halfWidth = (box.maxWidth - 8) / 2 - 16;
+              final fitsFigures = figures.values.expand((rows) => rows).every((row) {
+                final measure = TextPainter(text: TextSpan(text: row.$2,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+                final fits = measure.width <= halfWidth;
+                measure.dispose();
+                return fits;
+              });
+              final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 && fitsFigures ? 2 : 1;
               final width = (box.maxWidth - (columns - 1) * 8) / columns;
               final ids = summaries.keys.toList();
               Widget card(String id) {
@@ -5181,9 +5190,15 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: foreground))),
                                 Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18, color: foreground),
                               ]),
-                              // Exact summary remains accessible without repeating hero figures.
                               Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
-                                child: const SizedBox(height: 8)),
+                                child: _AnalyticsExplorePreview(id: id, figures: figures[id]!,
+                                  graphic: widget.compactVisuals[id],
+                                  unavailable: failed ? 'Could not load data' : loading ? 'Updating data…' :
+                                    widget.session.analyticsReader == null
+                                      ? (id == 'public' || id == 'journey' ? 'Tracking not connected' : 'Supply data not connected')
+                                      : 'Data unavailable',
+                                  publicRanking: verified ? snapshot.breakdowns.where((data) =>
+                                    data.id == 'discovery-sources' && data.dimension == WorkspaceAnalyticsDimension.discoverySource).firstOrNull : null)),
                             ])))));
               }
               return Column(children: [
@@ -5232,6 +5247,122 @@ double _analyticsNumberSize(BuildContext context, String value, double preferred
 }
 
 /// Overview composition uses the same read-only metric owners as each report.
+/// Visible read-only report previews. Decorative stages never imply measured flow.
+class _AnalyticsExplorePreview extends StatelessWidget {
+  const _AnalyticsExplorePreview({required this.id, required this.figures,
+    required this.unavailable, this.graphic, this.publicRanking});
+  final String id, unavailable;
+  final List<(String, String)> figures;
+  final Widget? graphic;
+  final WorkspaceAnalyticsBreakdown? publicRanking;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _AnalyticsChartPalette.reportAccent(id);
+    final known = figures.any((row) => row.$2 != '—');
+    final cue = switch (id) {
+      'public' => 'View reach', 'journey' => 'View journey', 'supply' => 'View supply',
+      'receiving' => 'View receiving', 'orders' => 'View orders', 'stock' => 'View stock',
+      'sales' => 'View sales', _ => 'View balances',
+    };
+    Widget stages(List<(IconData, String)> rows, {bool connected = false}) {
+      if (rows.length == 4) { return Column(children: [
+        for (var start = 0; start < rows.length; start += 2) Padding(
+          padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
+            for (var offset = 0; offset < 2; offset++) Expanded(child: Row(children: [
+              Icon(rows[start + offset].$1, size: 14, color: accent), const SizedBox(width: 3),
+              Expanded(child: Text(rows[start + offset].$2,
+                style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
+            ])),
+          ])),
+      ]); }
+      return Row(
+      crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (final (index, row) in rows.indexed) ...[
+          if (index > 0 && connected) Padding(padding: const EdgeInsets.only(top: 9),
+            child: SizedBox(width: 8, height: 1, child: ColoredBox(color: accent.withValues(alpha: .3)))),
+          Expanded(child: Column(children: [Icon(row.$1, size: 20, color: accent),
+            const SizedBox(height: 3), Text(row.$2, textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))])),
+        ],
+      ]);
+    }
+    Widget visual;
+    if (id == 'stock' && graphic is _StockAvailabilityGraphic) {
+      final stock = graphic! as _StockAvailabilityGraphic;
+      final total = stock.available + stock.unavailable;
+      visual = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [
+        if (total > 0) SizedBox(width: 36, height: 36, child: Padding(padding: const EdgeInsets.all(4),
+          child: CircularProgressIndicator(key: const Key('analytics-preview-stock-ring'),
+            value: stock.available / total, strokeWidth: 5,
+            color: _AnalyticsChartPalette.available, backgroundColor: _AnalyticsChartPalette.unavailable))),
+        if (total > 0) const SizedBox(width: 6),
+        Expanded(child: Text('${stock.available} available\n${stock.unavailable} unavailable',
+          style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
+      ]), const SizedBox(height: 3), const Text('Products · saved Stock',
+        style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))]);
+    } else if (id == 'sales' && graphic != null) {
+      visual = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _AnalyticsChartReveal(id: 'preview-sales', child: graphic!),
+        const SizedBox(height: 4), const Text('Saved bills · 7 days\nBefore returns',
+          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+      ]);
+    } else if (id == 'public' && publicRanking != null && publicRanking!.rows.isNotEmpty) {
+      final data = publicRanking!;
+      final rows = (data.rows.toList()..sort((a, b) => b.count.compareTo(a.count))).take(2);
+      final maximum = data.rows.fold<int>(0, (value, row) => row.count > value ? row.count : value);
+      visual = Column(key: const Key('analytics-preview-public-ranking'),
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Discovery · ${data.coverage == WorkspaceAnalyticsCoverage.partial ? 'partial' : 'complete'}',
+            style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+          for (final row in rows) ...[
+            Text('${row.label} · ${row.count}', style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.ink)),
+            if (maximum > 0) Align(alignment: Alignment.centerLeft, child: FractionallySizedBox(
+              widthFactor: row.count / maximum, child: SizedBox(key: Key('analytics-preview-rank-${row.id}'),
+                height: 4, child: ColoredBox(color: accent)))),
+          ],
+        ]);
+    } else {
+      visual = switch (id) {
+        'public' => stages([(Icons.visibility_outlined, 'Visitors'), (Icons.storefront_outlined, 'Listings')]),
+        'journey' => stages([(Icons.visibility_outlined, 'Browse'), (Icons.shopping_cart_outlined, 'Cart'),
+          (Icons.receipt_long_outlined, 'Order')], connected: true),
+        'supply' => stages([(Icons.fact_check_outlined, 'Accept'), (Icons.local_shipping_outlined, 'Dispatch'), (Icons.route_outlined, 'Transit'),
+          (Icons.inventory_2_outlined, 'Receive')]),
+        'receiving' => stages([(Icons.inventory_2_outlined, 'Goods'), (Icons.description_outlined, 'Bill')]),
+        'orders' => stages([(Icons.receipt_long_outlined, 'Open'), (Icons.schedule_outlined, 'Overdue')]),
+        'money' => stages([(Icons.south_west_rounded, 'Customer'), (Icons.north_east_rounded, 'Supplier')]),
+        _ => stages([(_AnalyticsChartPalette.reportIcon(id), 'Data unavailable')]),
+      };
+    }
+    return Padding(key: Key('analytics-preview-$id'), padding: const EdgeInsets.only(top: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (known && id == 'sales') const Text('Selected period',
+          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+        if (known) for (final (index, row) in figures.indexed) Padding(
+          padding: const EdgeInsets.only(bottom: 5), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(row.$1, style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+            Text(row.$2, key: Key('analytics-preview-value-$id-$index'), softWrap: false,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink)),
+          ])),
+        KeyedSubtree(key: Key('analytics-preview-visual-$id'),
+          child: id != 'sales' && (known || id == 'public' && publicRanking != null && publicRanking!.rows.isNotEmpty)
+            ? _AnalyticsChartReveal(id: 'preview-$id', child: visual) : visual),
+        if (!known && const {'public', 'journey', 'supply', 'receiving'}.contains(id))
+          Padding(padding: const EdgeInsets.only(top: 5), child: Text(
+            id == 'public' && publicRanking != null && publicRanking!.rows.isNotEmpty ? 'Visitor totals unavailable' : unavailable,
+            style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
+        if (id == 'orders') const Text('Saved orders · current',
+          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+        if (id == 'money') const Text('Dated balances · see report',
+          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+        const SizedBox(height: 6),
+        Text(cue, key: Key('analytics-preview-action-$id'),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: accent)),
+      ]));
+  }
+}
+
 class _AnalyticsOverviewPanel extends StatelessWidget {
   const _AnalyticsOverviewPanel({required this.id, required this.title,
     required this.figures, required this.guide, required this.onTap, this.colour, this.graphic});
