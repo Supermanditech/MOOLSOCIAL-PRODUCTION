@@ -2933,11 +2933,11 @@ void main() {
     expect(await work.recoverCustomerLedger(), isTrue);
     work.workspaceInvoices.clear();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work, textScale: 1, openHomeActions: false);
-    expect(find.byKey(const Key('analytics-sales-spark-bars')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-sales-zero-preview')), findsOneWidget);
     expect(find.text('Selected period'), findsOneWidget);
     await _toggleHomeCategory(tester, 'sales');
-    expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 32);
-    expect(find.byKey(const Key('analytics-sales-axis-zero')), findsOneWidget);
+    expect(tester.getSize(find.byKey(const Key('analytics-sales-line'))).height, 20);
+    expect(find.byKey(const Key('analytics-sales-axis-zero')), findsNothing);
     expect(find.byKey(const Key('analytics-sales-axis-max')), findsNothing);
     final dates = find.descendant(of: find.byKey(const Key('analytics-sales-point-0')), matching: find.byType(Text));
     expect(tester.widget<Text>(dates).data, matches(RegExp(r'^\d{2}/\d{2}$')));
@@ -2961,6 +2961,15 @@ void main() {
     work.setWorkspaceMoneyPeriod('Today');
     await tester.pumpAndSettle();
     expect(dateController.offset, 0, reason: 'Unrelated refresh must not snap dates back to selection');
+    // Host-only zero-valued invoice: zero money must not imply no saved bills.
+    work.workspaceInvoices.add(WorkspaceCustomerInvoice(id: 'HOST-ZERO-BILL', orderId: 'HOST-ZERO-ORDER',
+      customer: 'Automated fixture', items: 'Automated zero-value fixture', amount: 0,
+      payment: 'Cash', issuedAt: DateTime.now().subtract(const Duration(minutes: 1))));
+    work.setWorkspaceMoneyPeriod('Week');
+    await tester.pumpAndSettle();
+    expect(find.text('Saved bills have a zero billed total'), findsOneWidget);
+    expect(find.text('No bills saved in this period'), findsNothing);
+    await _captureAnalyticsFixture(tester, 'composition-zero-valued-bill-host-fixture');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -3517,6 +3526,46 @@ void main() {
       expect(tester.takeException(), isNull);
       await _captureAnalyticsFixture(tester, 'consistency-$report-host-fixture');
     }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS AUDIT23 compact previews and truthful report meanings', (tester) async {
+    // Automated presentation fixture, never runtime commerce or device acceptance.
+    await mount(tester, route: '/app/work/workspace/dashboard', work: storeViewFixture(),
+      viewport: const Size(360, 720), textScale: 1, openHomeActions: false);
+    expect(find.text('Low-stock products'), findsOneWidget);
+    expect(find.text('Selected stages'), findsOneWidget);
+    final orderPreview = find.byKey(const Key('analytics-preview-orders'));
+    expect(find.descendant(of: orderPreview, matching: find.text('Open orders')), findsOneWidget);
+    expect(find.descendant(of: orderPreview, matching: find.text('Overdue')), findsOneWidget);
+    expect(find.descendant(of: orderPreview, matching: find.text('Open')), findsNothing);
+    final moneyPreview = find.byKey(const Key('analytics-preview-money'));
+    expect(find.descendant(of: moneyPreview, matching: find.text('Customer')), findsNothing);
+    expect(find.descendant(of: moneyPreview, matching: find.text('Supplier')), findsNothing);
+    await _toggleHomeCategory(tester, 'receiving');
+    expect(find.text('About these measures'), findsOneWidget);
+    expect(find.textContaining('Selected period:'), findsWidgets);
+    expect(find.byKey(const Key('analytics-receiving-value-goods-without-bill')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-receiving-value-bills-without-goods')), findsOneWidget);
+    final goodsValue = find.byKey(const Key('store-analytics-value-goods-without-bill'));
+    final billValue = find.byKey(const Key('store-analytics-value-bills-without-goods'));
+    expect(tester.getTopLeft(goodsValue).dy, closeTo(tester.getTopLeft(billValue).dy, .1));
+    expect(tester.getTopLeft(goodsValue).dx,
+      closeTo(tester.getTopLeft(find.byKey(const Key('analytics-receiving-value-goods-without-bill'))).dx, .1));
+    await tester.ensureVisible(find.byKey(const Key('analytics-measure-definitions-receiving')));
+    await tester.tap(find.byKey(const Key('analytics-measure-definitions-receiving')));
+    await tester.pumpAndSettle();
+    expect(find.text('Awaiting the supplier’s invoice'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'audit23-receiving-host-fixture');
+    await _toggleHomeCategory(tester, 'stock');
+    expect(find.text('Relative values · same scale'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'audit23-stock-host-fixture');
+    await _toggleHomeCategory(tester, 'journey');
+    expect(find.text('Separate stage counts · not a conversion funnel'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'audit23-journey-host-fixture');
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

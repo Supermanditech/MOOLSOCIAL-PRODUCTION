@@ -4331,6 +4331,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           return !at.isBefore(day) && at.isBefore(DateTime(day.year, day.month, day.day + 1)) &&
             at.isBefore(periodEnd);
         }).fold<int>(0, (sum, invoice) => sum + invoice.payableMinor))];
+      final hasSavedBillsInTrend = invoiceReady && invoices.any((invoice) =>
+        !invoice.issuedAt.toLocal().isBefore(savedBillDays.first) && invoice.issuedAt.toLocal().isBefore(periodEnd));
       final previousStart = DateTime(trendDay.year, trendDay.month, trendDay.day - 1);
       // Calendar-local same-clock cutoff, not a full yesterday against a partial today.
       final previousEnd = DateTime(periodEnd.year, periodEnd.month, periodEnd.day - 1,
@@ -4448,7 +4450,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             compactVisuals: {
           if (stockReady) 'stock': _StockAvailabilityGraphic(
             available: products.length - unavailable, unavailable: unavailable, compact: true),
-          if (invoiceReady) 'sales': _SavedBillGraphic(series: savedBillSeries, compact: true,
+          if (invoiceReady) 'sales': _SavedBillGraphic(series: savedBillSeries, compact: true, hasSavedBills: hasSavedBillsInTrend,
             todayMinor: savedBillSeries.last.$2, previousMinor: previousBilled!),
         },
         detailVisuals: {
@@ -4460,7 +4462,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
             _StockAvailabilityGraphic(available: products.length - unavailable, unavailable: unavailable),
           ]) :
             const Text('Stock distribution unavailable · load saved Stock first'),
-          'sales': invoiceReady ? _SavedBillGraphic(series: savedBillSeries,
+          'sales': invoiceReady ? _SavedBillGraphic(series: savedBillSeries, hasSavedBills: hasSavedBillsInTrend,
             todayMinor: savedBillSeries.last.$2, previousMinor: previousBilled!) :
             const Text('Saved-bill trend unavailable · recover Sales history first',
               key: Key('analytics-sales-trend-unavailable')),
@@ -4903,7 +4905,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
         }, key: Key('analytics-status-glyph-${metric.id}'), size: 20, color: _AnalyticsChartPalette.reportAccent(_expanded ?? 'money')),
         const SizedBox(width: 10)], Expanded(child: _OperatingMetric(id: metric.id, label: metric.label, value: metric.value,
           detail: metric.detail, onTap: metric.onTap, alertColor: metric.alertColor ?? _AnalyticsChartPalette.ink,
-          ledger: true,
+          ledger: true, analyticsNavigation: true,
           valueFontSize: _analyticsNumberSize(context, metric.value, 20, box.maxWidth -
             (box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 64 : 34))))])),
     ]); }
@@ -4929,10 +4931,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                 metric.id == 'customer-dues' ? Icons.call_received : Icons.call_made,
                 key: Key('analytics-balance-glyph-${metric.id}'), color: _AnalyticsChartPalette.reportAccent(metric.id == 'customer-dues' ? 'sales' : 'stock'), size: 20)),
             _OperatingMetric(
-            id: metric.id, label: metric.label, value: metric.value, detail: metric.detail,
+            id: metric.id, label: metric.label, value: metric.value, detail: metric.detail, analyticsNavigation: true,
             alertColor: metric.alertColor ?? (metric.value == '—' ? _AnalyticsChartPalette.secondary : _AnalyticsChartPalette.ink), onTap: metric.onTap,
             valueFontSize: _analyticsNumberSize(context, metric.value, preferred,
-              (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14)))])));
+              (box.maxWidth - (columns - 1) * 8) / columns - 20 - (metric.onTap == null ? 0 : 14))),
+            if (metric.id == 'customer-dues' && metric.value != '—' && widget.session.workspaceFinance != null)
+              Text('As of ${MaterialLocalizations.of(context).formatShortDate(widget.session.workspaceFinance!.asOf.toLocal())}',
+                style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+          ])));
     final items = source.toList();
     if (hero && columns == 2 && items.length == 2) {
       // These non-ledger children contain no LayoutBuilder; enlarged values stack above.
@@ -4947,15 +4953,17 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   });
 
   Widget _attention(Widget item) => item is _OperatingAttention
-    ? Container(margin: const EdgeInsets.symmetric(vertical: 3),
+    ? Tooltip(message: item.detail, triggerMode: TooltipTriggerMode.longPress,
+      child: Container(margin: const EdgeInsets.symmetric(vertical: 3),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         decoration: BoxDecoration(
           border: Border(left: BorderSide(width: 3, color: item.color == MoolColors.navy
             ? _AnalyticsChartPalette.reportAccent(_expanded ?? 'stock') : item.color))),
         child: _OperatingAttention(
-          id: item.id, title: item.title, detail: item.detail,
+          id: item.id, title: item.title, detail: item.id == 'pending-refunds'
+            ? 'Open the payment record to check the refund. Not confirmed as refunded.' : item.detail,
           action: item.action, color: item.color, expanded: true, onTap: item.onTap,
-          analyticsAccent: _AnalyticsChartPalette.reportAccent(_expanded ?? 'stock')))
+          analyticsAccent: _AnalyticsChartPalette.reportAccent(_expanded ?? 'stock'))))
     : item;
 
   @override
@@ -5012,7 +5020,8 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               ? '${c.alertCount} ${c.alertCount == 1 ? 'issue type' : 'issue types'}'
               : '${c.alertCount} ${c.alertCount == 1 ? 'order' : 'orders'} to review',
               key: Key('store-category-alerts-$id'), style: const TextStyle(fontSize: 12, color: _OperatingPalette.warning)),
-            if (c.coverage != null && id != 'money') Text(c.coverage!, style: const TextStyle(fontSize: 12)),
+            if (c.coverage != null && id != 'money') Text(c.coverage!,
+              style: TextStyle(fontSize: 12, fontWeight: id == 'orders' ? FontWeight.w600 : FontWeight.w400)),
             _metrics(c.children.whereType<_OperatingMetric>().where((m) =>
               id == 'stock' ? m.id != 'stock-cost' && m.id != 'stock-sale' :
               id == 'sales' ? m.id != 'billed' && m.id != 'collections' :
@@ -5046,7 +5055,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(_analyticsReportTitle(id), style: TextStyle(fontSize: compact ? 14 : 16,
                     fontWeight: FontWeight.w700, color: Colors.white)),
-                  Text('Requested: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
+                  Text('Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
                     key: Key(compact ? 'analytics-context-period-$id' : 'analytics-report-period-$id'),
                     style: const TextStyle(fontSize: 11, color: Color(0xFFE4EDF4))),
                 ])))]);
@@ -5076,7 +5085,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                   .where((m) => m.id == 'customer-dues' || m.id == 'payables'), hero: true),
                 if (categories['money']!.coverage != null) Text(categories['money']!.coverage!, style: const TextStyle(fontSize: 12)),
                 if (categories['money']!.children.whereType<_OperatingMetric>().any((m) => m.id.startsWith('settlement-')))
-                Container(key: const Key('analytics-settlement-group'), padding: const EdgeInsets.all(10),
+                Container(key: const Key('analytics-settlement-group'), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: _AnalyticsChartPalette.softSurface, borderRadius: _AnalyticsChartPalette.radius),
                   child: _metrics(categories['money']!.children.whereType<_OperatingMetric>()
                     .where((m) => m.id.startsWith('settlement-')), ledger: true)),
@@ -5138,11 +5147,11 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                 ]))),
             if (verified) Text('Provider updated ${MaterialLocalizations.of(context).formatShortDate(snapshot.updatedAt!.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(snapshot.updatedAt!.toLocal()))}',
               style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
-            const Padding(padding: EdgeInsets.only(bottom: 6), child: Text(
-              'Tap a card for details · — unavailable · ~ partial data',
-              style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
-            const Padding(padding: EdgeInsets.only(top: 4, bottom: 8), child: Text('Explore reports',
+            Row(children: [const Expanded(child: Text('Explore reports',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
+              const Tooltip(message: 'Tap a card for details · — unavailable · ~ partial data',
+                triggerMode: TooltipTriggerMode.tap, child: SizedBox(width: 44, height: 44,
+                  child: Icon(Icons.info_outline, size: 16, color: _AnalyticsChartPalette.secondary)))]),
             LayoutBuilder(builder: (context, box) {
               final halfWidth = (box.maxWidth - 8) / 2 - 16;
               final fitsFigures = figures.values.expand((rows) => rows).every((row) {
@@ -5188,7 +5197,6 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                     color: _AnalyticsChartPalette.reportAccent(id))),
                                 Expanded(child: Text(id == 'receiving' ? 'Purchases' : _analyticsReportTitle(id),
                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: foreground))),
-                                Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18, color: foreground),
                               ]),
                               Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
                                 child: _AnalyticsExplorePreview(id: id, figures: figures[id]!,
@@ -5197,6 +5205,9 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                     widget.session.analyticsReader == null
                                       ? (id == 'public' || id == 'journey' ? 'Tracking not connected' : 'Supply data not connected')
                                       : 'Data unavailable',
+                                  balanceDate: id == 'money' && local('customer-dues') != '—'
+                                    ? widget.session.workspaceFinance?.asOf : null,
+                                  expanded: expanded == id,
                                   publicRanking: verified ? snapshot.breakdowns.where((data) =>
                                     data.id == 'discovery-sources' && data.dimension == WorkspaceAnalyticsDimension.discoverySource).firstOrNull : null)),
                             ])))));
@@ -5239,9 +5250,10 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
 double _analyticsNumberSize(BuildContext context, String value, double preferred, double width) {
   final measured = TextPainter(text: TextSpan(text: value,
-    style: TextStyle(fontSize: preferred, fontWeight: FontWeight.w700)),
+    style: DefaultTextStyle.of(context).style.merge(TextStyle(fontSize: preferred, fontWeight: FontWeight.w700))),
     textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
-  final size = measured.width <= width ? preferred : (preferred * width / measured.width).clamp(12.0, preferred);
+  final available = (width - 4).clamp(0.0, double.infinity);
+  final size = measured.width <= available ? preferred : (preferred * available / measured.width).clamp(12.0, preferred);
   measured.dispose();
   return size;
 }
@@ -5250,11 +5262,13 @@ double _analyticsNumberSize(BuildContext context, String value, double preferred
 /// Visible read-only report previews. Decorative stages never imply measured flow.
 class _AnalyticsExplorePreview extends StatelessWidget {
   const _AnalyticsExplorePreview({required this.id, required this.figures,
-    required this.unavailable, this.graphic, this.publicRanking});
+    required this.unavailable, this.graphic, this.publicRanking, this.balanceDate, this.expanded = false});
   final String id, unavailable;
   final List<(String, String)> figures;
   final Widget? graphic;
   final WorkspaceAnalyticsBreakdown? publicRanking;
+  final DateTime? balanceDate;
+  final bool expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -5325,13 +5339,12 @@ class _AnalyticsExplorePreview extends StatelessWidget {
     } else {
       visual = switch (id) {
         'public' => stages([(Icons.visibility_outlined, 'Visitors'), (Icons.storefront_outlined, 'Listings')]),
-        'journey' => stages([(Icons.visibility_outlined, 'Browse'), (Icons.shopping_cart_outlined, 'Cart'),
+        'journey' => stages([(Icons.storefront_outlined, 'Store'), (Icons.shopping_cart_outlined, 'Cart'),
           (Icons.receipt_long_outlined, 'Order')], connected: true),
         'supply' => stages([(Icons.fact_check_outlined, 'Accept'), (Icons.local_shipping_outlined, 'Dispatch'), (Icons.route_outlined, 'Transit'),
           (Icons.inventory_2_outlined, 'Receive')]),
         'receiving' => stages([(Icons.inventory_2_outlined, 'Goods'), (Icons.description_outlined, 'Bill')]),
-        'orders' => stages([(Icons.receipt_long_outlined, 'Open'), (Icons.schedule_outlined, 'Overdue')]),
-        'money' => stages([(Icons.south_west_rounded, 'Customer'), (Icons.north_east_rounded, 'Supplier')]),
+        'orders' || 'money' => const SizedBox.shrink(),
         _ => stages([(_AnalyticsChartPalette.reportIcon(id), 'Data unavailable')]),
       };
     }
@@ -5340,10 +5353,23 @@ class _AnalyticsExplorePreview extends StatelessWidget {
         if (known && id == 'sales') const Text('Selected period',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
         if (known) for (final (index, row) in figures.indexed) Padding(
-          padding: const EdgeInsets.only(bottom: 5), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(row.$1, style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+          padding: const EdgeInsets.only(bottom: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (id == 'orders' || id == 'money') ...[
+                ExcludeSemantics(child: Icon(id == 'orders'
+                  ? index == 0 ? Icons.receipt_long_outlined : Icons.schedule_outlined
+                  : index == 0 ? Icons.call_received : Icons.call_made, size: 14, color: accent)),
+                const SizedBox(width: 4),
+              ],
+              Expanded(child: Text(id == 'stock' && index == 1 ? 'Low-stock products' : row.$1,
+                style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
+            ]),
             Text(row.$2, key: Key('analytics-preview-value-$id-$index'), softWrap: false,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink)),
+            if (id == 'money' && index == 0 && balanceDate != null)
+              Text('As of ${MaterialLocalizations.of(context).formatShortDate(balanceDate!.toLocal())}',
+                key: const Key('analytics-preview-customer-balance-date'),
+                style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
           ])),
         KeyedSubtree(key: Key('analytics-preview-visual-$id'),
           child: id != 'sales' && (known || id == 'public' && publicRanking != null && publicRanking!.rows.isNotEmpty)
@@ -5352,13 +5378,17 @@ class _AnalyticsExplorePreview extends StatelessWidget {
           Padding(padding: const EdgeInsets.only(top: 5), child: Text(
             id == 'public' && publicRanking != null && publicRanking!.rows.isNotEmpty ? 'Visitor totals unavailable' : unavailable,
             style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
-        if (id == 'orders') const Text('Saved orders · current',
+        if (id == 'journey') const Text('Selected stages',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
-        if (id == 'money') const Text('Dated balances · see report',
+        if (id == 'orders') const Text('Saved orders · online coverage incomplete',
+          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+        if (id == 'money' && figures.last.$2 == '—') const Text('Supplier balance unavailable',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
         const SizedBox(height: 6),
-        Text(cue, key: Key('analytics-preview-action-$id'),
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: accent)),
+        Row(key: Key('analytics-preview-action-$id'), children: [Expanded(child: Text(
+          expanded ? 'Hide details' : cue,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: accent))),
+          Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 16, color: accent)]),
       ]));
   }
 }
@@ -5557,6 +5587,8 @@ class _StockAvailabilityGraphic extends StatelessWidget {
       const SizedBox(height: 6),
       Text('Product count, not units · saved Stock',
         style: TextStyle(fontSize: 11, color: overview ? const Color(0xFFD9E4EF) : _OperatingPalette.secondary)),
+      if (!compact) Text('Unavailable: marked unavailable, or exact recorded quantity is zero or less. Public listing status is separate.',
+        style: TextStyle(fontSize: 11, color: overview ? const Color(0xFFD9E4EF) : _OperatingPalette.secondary)),
       if (total == 0) Text('No products saved yet', style: TextStyle(fontSize: 12, color: overview ? Colors.white : null)),
     ]);
   }
@@ -5593,13 +5625,14 @@ class _StockValueGraphic extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maximum = cost > sale ? cost : sale;
-    return Container(key: const Key('analytics-stock-value-comparison'), padding: const EdgeInsets.all(12),
+    return Container(key: const Key('analytics-stock-value-comparison'), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Relative values · same scale', style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
         for (final row in [(cost, 'cost', 'Money in stock', _AnalyticsChartPalette.available),
           (sale, 'sale', 'Stock sale value', _AnalyticsChartPalette.sales)]) ...[
           Semantics(key: Key('analytics-stock-caption-${row.$2}'), label: '${row.$3} · ₹${_formatStoreMinorAmount(row.$1)}',
-            child: ExcludeSemantics(child: Text(row.$3, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)))),
-          const SizedBox(height: 6),
+            child: ExcludeSemantics(child: _AnalyticsMoneyCaption(id: 'analytics-stock-bar-caption-${row.$2}',
+              label: row.$3, minor: row.$1))),
           Tooltip(message: '${row.$3} · ₹${_formatStoreMinorAmount(row.$1)}', triggerMode: TooltipTriggerMode.tap,
             child: ConstrainedBox(constraints: const BoxConstraints(minHeight: 44),
               child: ExcludeSemantics(child: _AnalyticsChartReveal(id: 'stock-${row.$2}',
@@ -5704,9 +5737,9 @@ class _AnalyticsSalesPlotState extends State<_AnalyticsSalesPlot> {
         _AnalyticsMoneyCaption(id: 'analytics-sales-selected-point', label: date(selected.$1),
           minor: selected.$2, suffix: 'Before returns'),
         const SizedBox(height: 8),
-        _AnalyticsMoneyCaption(id: 'analytics-sales-axis-zero', label: maximum == 0 ? 'Baseline' : 'Scale from', minor: 0),
+        if (maximum > 0) _AnalyticsMoneyCaption(id: 'analytics-sales-axis-zero', label: 'Scale from', minor: 0),
         if (maximum > 0) _AnalyticsMoneyCaption(id: 'analytics-sales-axis-max', label: 'Scale to', minor: maximum),
-        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: maximum == 0 ? 32 : 112,
+        ExcludeSemantics(child: _AnalyticsChartReveal(id: 'sales-line', child: SizedBox(height: maximum == 0 ? 20 : 112,
           child: CustomPaint(key: const Key('analytics-sales-line'),
             painter: _AnalyticsSalesPainter(widget.series.map((row) => row.$2).toList(), index))))),
         SizedBox(key: _dateViewport, child: SingleChildScrollView(key: const Key('analytics-sales-date-strip'), controller: _dateScroll, scrollDirection: Axis.horizontal,
@@ -5764,10 +5797,11 @@ class _AnalyticsSalesPainter extends CustomPainter {
 
 class _SavedBillGraphic extends StatelessWidget {
   const _SavedBillGraphic({required this.series, required this.todayMinor,
-    required this.previousMinor, this.compact = false});
+    required this.previousMinor, this.compact = false, this.hasSavedBills = false});
   final List<(DateTime, int)> series;
   final int todayMinor, previousMinor;
   final bool compact;
+  final bool hasSavedBills;
   String money(int minor) => '₹${_formatStoreMinorAmount(minor)}';
   @override
   Widget build(BuildContext context) {
@@ -5775,6 +5809,11 @@ class _SavedBillGraphic extends StatelessWidget {
     final total = series.fold<int>(0, (sum, row) => sum + row.$2);
     String date(DateTime day) => '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}';
     final label = series.map((row) => '${date(row.$1)} ${money(row.$2)}').join(', ');
+    if (compact && maximum == 0) {
+      return Text(hasSavedBills ? '₹0 billed · last 7 days' : 'No saved bills · last 7 days',
+        key: const Key('analytics-sales-zero-preview'),
+        style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary));
+    }
     if (compact) {
       return Tooltip(message: 'Saved bills last 7 days, before returns: $label',
       decoration: BoxDecoration(color: _AnalyticsChartPalette.ink, borderRadius: BorderRadius.circular(8)),
@@ -5832,7 +5871,8 @@ class _SavedBillGraphic extends StatelessWidget {
               decoration: BoxDecoration(color: _AnalyticsChartPalette.softSurface, borderRadius: BorderRadius.circular(6)),
               child: content));
         })),
-      if (maximum == 0) const Text('No bills saved in this period', style: TextStyle(fontSize: 12)),
+      if (maximum == 0) Text(hasSavedBills ? 'Saved bills have a zero billed total' : 'No bills saved in this period',
+        style: const TextStyle(fontSize: 12)),
       const SizedBox(height: 8),
     ]);
   }
@@ -5851,6 +5891,7 @@ class _StoreAnalyticsProviderReport extends StatefulWidget {
 }
 
 class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderReport> {
+  bool _definitions = false;
   WorkspaceAnalyticsRequest? get _request => widget.request;
   Future<WorkspaceAnalyticsSnapshot>? get _result => widget.result;
   @override
@@ -6046,10 +6087,24 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                   const Padding(
                     padding: EdgeInsets.only(top: 4, bottom: 8),
                     child: Text(
-                      'Verified provider data is needed. — means unavailable, not zero.',
+                      'Report data unavailable · — does not mean zero.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
+                Align(alignment: Alignment.centerLeft, child: TextButton(
+                  key: Key('analytics-measure-definitions-${widget.report}'),
+                  onPressed: () => setState(() => _definitions = !_definitions),
+                  child: Text(_definitions ? 'Hide explanations' : 'About these measures'))),
+                if (widget.report == 'journey') const Text('Separate stage counts · not a conversion funnel',
+                  style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+                if (widget.report == 'supply') const Text('Independent supply statuses · do not add them together',
+                  style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+                if (_definitions) Text(switch (widget.report) {
+                  'public' => 'Visitors, visits and views are separate measures. Their counting definitions depend on the connected report source.',
+                  'journey' => 'Stage counts may represent different measures. Compare conversion only for the same verified customer group.',
+                  'supply' => 'Order and delivery statuses can overlap. A count does not establish delivered units.',
+                  _ => 'Bill, receipt and shortage measures are independent. Counted receipts and missing units need their own confirmed definitions.',
+                }, style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
                 for (final row in rows.where((row) => row.id != 'bills-without-goods')) ...[
                   if (row == rows.first || const {'visible-skus', 'interest-no-order', 'listing-corrections', 'enquiries', 'supply-acceptance', 'supply-cancelled', 'received-part', 'received-short', 'goods-without-bill', 'journey-left'}.contains(row.id))
                     Container(margin: const EdgeInsets.only(top: 8, bottom: 2),
@@ -6073,6 +6128,29 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                         color: _AnalyticsChartPalette.reportAccent(widget.report)))),
                   if (row.id == 'goods-without-bill') LayoutBuilder(key: const Key('analytics-reconciliation-lanes'), builder: (context, box) {
+                    var paired = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3;
+                    for (final id in ['goods-without-bill', 'bills-without-goods']) {
+                      final metric = values[id];
+                      final text = metric?.state == WorkspaceAnalyticsState.verified &&
+                        metric?.basis == WorkspaceAnalyticsBasis.currentPosition && metric?.unit == WorkspaceAnalyticsUnit.count
+                          ? _formatStoreAmount(metric!.value!.toInt()) : '—';
+                      final painter = TextPainter(text: TextSpan(text: text,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                        textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))..layout();
+                      if (painter.width > box.maxWidth / 2 - 16) paired = false;
+                      painter.dispose();
+                    }
+                    double titleHeight = 0;
+                    if (paired) {
+                      for (final item in rows.where((item) => item.id == 'goods-without-bill' || item.id == 'bills-without-goods')) {
+                        final painter = TextPainter(text: TextSpan(text: item.label,
+                          style: DefaultTextStyle.of(context).style.merge(const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                          textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))
+                          ..layout(maxWidth: box.maxWidth / 2 - 16);
+                        if (painter.height > titleHeight) titleHeight = painter.height;
+                        painter.dispose();
+                      }
+                    }
                     Widget lane(String id, IconData icon) {
                       final item = rows.firstWhere((item) => item.id == id);
                       final metric = values[id];
@@ -6080,16 +6158,22 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                         metric?.basis == WorkspaceAnalyticsBasis.currentPosition && metric?.unit == WorkspaceAnalyticsUnit.count;
                       return Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Icon(icon, color: _AnalyticsChartPalette.reportAccent('receiving'), size: 24),
-                        const SizedBox(height: 8), Text(item.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        _AnalyticsFigure(label: const SizedBox.shrink(), value: Text(known ? _formatStoreAmount(metric!.value!.toInt()) : '—',
-                          key: Key('store-analytics-value-$id'), style: TextStyle(fontSize: known ? 20 : 14, fontWeight: FontWeight.w700))),
-                        Text(item.guide, style: const TextStyle(fontSize: 12, color: _AnalyticsChartPalette.secondary)),
+                        const SizedBox(height: 4), SizedBox(height: paired ? titleHeight : null,
+                          child: Text(item.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+                        Align(key: Key('analytics-receiving-value-$id'), alignment: Alignment.centerLeft,
+                          child: LayoutBuilder(builder: (context, laneBox) {
+                            final value = known ? _formatStoreAmount(metric!.value!.toInt()) : '—';
+                            return Text(value, key: Key('store-analytics-value-$id'), softWrap: false,
+                              style: TextStyle(fontSize: _analyticsNumberSize(context, value, known ? 20 : 14, laneBox.maxWidth),
+                                fontWeight: FontWeight.w700));
+                          })),
+                        if (known || _definitions) Text(item.guide, style: const TextStyle(fontSize: 12, color: _AnalyticsChartPalette.secondary)),
                         if (known) Text('${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? 'Partial · ' : ''}As of ${MaterialLocalizations.of(context).formatShortDate(metric.asOf!.toLocal())}', style: const TextStyle(fontSize: 11)),
                       ]));
                     }
                     final goods = lane('goods-without-bill', Icons.inventory_2_outlined);
                     final bill = lane('bills-without-goods', Icons.receipt_long_outlined);
-                    return box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
+                    return paired
                       ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: goods), Expanded(child: bill)])
                       : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [goods, bill]);
                   }) else Builder(
@@ -6141,25 +6225,25 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                                       size: 18, color: _AnalyticsChartPalette.reportAccent(widget.report))),
                                     const SizedBox(width: 6),
                                   ],
-                                  Expanded(child: Text(
+                                  Expanded(child: Tooltip(message: row.guide, triggerMode: TooltipTriggerMode.tap, child: Text(
                                   row.label,
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
-                                )),
+                                ))),
                                 ]),
                                 Container(key: row.id.startsWith('journey-') && stageIcon != null ? Key('analytics-stage-spine-${row.id}') : null,
                                   margin: EdgeInsets.only(left: stageIcon == null ? 0 : 9),
                                   padding: EdgeInsets.only(left: stageIcon == null ? 0 : 15, top: 4, bottom: 4),
                                   decoration: BoxDecoration(border: row.id.startsWith('journey-') && stageIcon != null && row.id != 'journey-completed'
                                     ? Border(left: BorderSide(width: 2, color: _AnalyticsChartPalette.border)) : null),
-                                  child: Text(row.guide,
+                                  child: known || _definitions ? Text(row.guide,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _OperatingPalette.secondary,
                                   ),
-                                )),
+                                ) : const SizedBox(height: 2)),
                                 if (known)
                                   Text(
                                     '${metric!.coverage == WorkspaceAnalyticsCoverage.partial ? 'Partial · ' : ''}${metric.basis == WorkspaceAnalyticsBasis.currentPosition ? 'As of' : 'Recorded through'} ${MaterialLocalizations.of(context).formatShortDate(metric.asOf!.toLocal())}',
@@ -6541,7 +6625,7 @@ class _OperatingMetric extends StatelessWidget {
   const _OperatingMetric({
     required this.id, required this.label, required this.value,
     required this.detail, this.alertColor, this.onTap,
-    this.captionHeight, this.compact = false, this.valueFontSize, this.ledger = false,
+    this.captionHeight, this.compact = false, this.valueFontSize, this.ledger = false, this.analyticsNavigation = false,
   });
   final String id, label, value, detail;
   final Color? alertColor;
@@ -6549,6 +6633,7 @@ class _OperatingMetric extends StatelessWidget {
   final double? valueFontSize;
   final bool compact;
   final bool ledger;
+  final bool analyticsNavigation;
   final VoidCallback? onTap;
   bool get showInfo => !const {
     'invoice-count', 'skus', 'low-stock', 'out-of-stock',
@@ -6588,7 +6673,8 @@ class _OperatingMetric extends StatelessWidget {
           key: Key('store-overview-$id'),
           style: TextStyle(fontSize: valueFontSize ?? (compact ? 17 : 18), fontWeight: FontWeight.w700,
             color: alertColor ?? MoolColors.navy)))),
-        if (onTap != null) const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary),
+        if (onTap != null) Icon(analyticsNavigation ? Icons.chevron_right : Icons.north_east_rounded,
+          size: 14, color: _OperatingPalette.secondary),
       ]),
       if (id == 'billed') const Text('Before returns',
         style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
@@ -6618,7 +6704,8 @@ class _OperatingMetric extends StatelessWidget {
                 style: TextStyle(fontSize: valueFontSize ?? 20, fontWeight: FontWeight.w700,
                   color: alertColor ?? MoolColors.navy))),
               if (onTap != null) ...[const SizedBox(width: 8),
-                const Icon(Icons.north_east_rounded, size: 14, color: _OperatingPalette.secondary)],
+                Icon(analyticsNavigation ? Icons.chevron_right : Icons.north_east_rounded,
+                  size: 14, color: _OperatingPalette.secondary)],
             ]) : _stacked(context)) : _stacked(context),
           ),
         ),
