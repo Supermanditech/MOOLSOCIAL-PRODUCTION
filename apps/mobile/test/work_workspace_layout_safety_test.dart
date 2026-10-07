@@ -2821,6 +2821,51 @@ void main() {
     });
   }
 
+  testWidgets('ANALYTICS STRONG primary KPI surfaces and truthful Stock ring', (tester) async {
+    final work = storeViewFixture();
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(360, 720), openHomeActions: false);
+    final stock = find.byKey(const Key('store-analytics-stock'));
+    final stockMaterial = tester.widget<Material>(find.ancestor(of: stock,
+      matching: find.byType(Material)).first);
+    expect(stockMaterial.color, const Color(0xFF123F43));
+    final primary = find.descendant(of: stock, matching: find.byWidgetPredicate((w) =>
+      w is Text && w.data != null && w.data!.startsWith('₹'))).first;
+    final text = tester.widget<Text>(primary);
+    expect(text.style!.fontSize, greaterThanOrEqualTo(20));
+    expect(text.style!.color, Colors.white);
+    double contrast(Color light, Color dark) =>
+      (light.computeLuminance() + .05) / (dark.computeLuminance() + .05);
+    for (final surface in [const Color(0xFF123F43), const Color(0xFF303C70)]) {
+      expect(contrast(Colors.white, surface), greaterThanOrEqualTo(4.5));
+      expect(contrast(const Color(0xFFD9E4EF), surface), greaterThanOrEqualTo(4.5));
+    }
+    await _toggleHomeCategory(tester, 'stock');
+    final ring = tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-stock-ring')));
+    final available = work.workspaceCatalogueItems.where((p) => p.available &&
+      (p.stockMode == WorkspaceStockMode.availabilityOnly || p.stock > 0)).length;
+    expect(ring.value, closeTo(available / work.workspaceCatalogueItems.length, .00001));
+    expect(find.byKey(const Key('analytics-stock-distribution')), findsOneWidget);
+    expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS STRONG enlarged header preserves complete title', (tester) async {
+    final work = storeViewFixture()..workspaceCatalogueItems.clear();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 568), textScale: 2, openHomeActions: false);
+    expect(tester.getSize(find.text('Store overview')).height, lessThanOrEqualTo(48));
+    expect(find.byTooltip('Choose reporting period'), findsOneWidget);
+    await _toggleHomeCategory(tester, 'stock');
+    expect(find.byKey(const Key('analytics-stock-ring')), findsNothing);
+    expect(find.text('No products saved yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS PREMIUM verified ranking bars retain exact counts and zero', (tester) async {
     final work = liveStore(analyticsReader: (request) async => WorkspaceAnalyticsSnapshot(request: request,
       state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.complete,
@@ -2903,6 +2948,7 @@ void main() {
     }
     await _toggleHomeCategory(tester, 'stock');
     expect(find.text('2 available · 2 unavailable'), findsOneWidget);
+    expect(tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-stock-ring'))).value, .5);
     expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
     final distribution = find.byTooltip('2 available · 2 unavailable · Product count, not units');
     expect(distribution, findsOneWidget);

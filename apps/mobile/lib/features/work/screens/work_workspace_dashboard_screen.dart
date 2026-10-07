@@ -4960,11 +4960,19 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           key: const Key('work-store-operating-board'), controller: widget.scrollController,
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [const Expanded(child: Text('Store overview',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
-              _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
-              IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
-                onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20))]),
+            LayoutBuilder(builder: (context, box) {
+              const heading = Text('Store overview',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink));
+              final controls = [
+                _analyticsPeriodPicker(widget.periodDays, widget.onPeriod),
+                IconButton(tooltip: failed ? 'Retry analytics' : 'Refresh analytics',
+                  onPressed: widget.onRefresh, icon: const Icon(Icons.refresh, size: 20)),
+              ];
+              return MediaQuery.textScalerOf(context).scale(16) > 20
+                ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [heading,
+                    Row(mainAxisAlignment: MainAxisAlignment.end, children: controls)])
+                : Row(children: [const Expanded(child: heading), ...controls]);
+            }),
             Text('${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'} · through ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end))}',
               style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
             ...widget.sections.where((item) => item is Tooltip || item is _DashboardSyncBanner),
@@ -4997,37 +5005,49 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               final columns = box.maxWidth >= 320 && MediaQuery.textScalerOf(context).scale(1) <= 1.3 ? 2 : 1;
               final width = (box.maxWidth - (columns - 1) * 8) / columns;
               final ids = summaries.keys.toList();
-              Widget card(String id) => Material(
+              Widget card(String id) {
+                final known = figures[id]!.first.$2 != '—';
+                final emphasis = known && (id == 'stock' || id == 'money');
+                final foreground = emphasis ? Colors.white : _AnalyticsChartPalette.ink;
+                final supporting = emphasis ? const Color(0xFFD9E4EF) : _AnalyticsChartPalette.secondary;
+                final background = emphasis
+                  ? (id == 'stock' ? _AnalyticsChartPalette.stockSurface : _AnalyticsChartPalette.moneySurface)
+                  : !known ? _AnalyticsChartPalette.softSurface
+                  : id == 'sales' ? const Color(0xFFEDF1FC)
+                  : id == 'orders' ? const Color(0xFFEDF6F4) : _AnalyticsChartPalette.surface;
+                return Material(
                     animationDuration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 180),
-                    elevation: expanded == id ? 2 : .5,
+                    elevation: expanded == id ? 3 : emphasis ? 2 : .5,
                     shadowColor: _AnalyticsChartPalette.ink.withValues(alpha: .14),
                     surfaceTintColor: Colors.transparent,
-                    color: expanded == id ? _AnalyticsChartPalette.selectedSurface : _AnalyticsChartPalette.surface,
+                    color: emphasis ? background : expanded == id ? _AnalyticsChartPalette.selectedSurface : background,
                     shape: RoundedRectangleBorder(borderRadius: _AnalyticsChartPalette.radius,
-                      side: BorderSide(color: expanded == id ? _AnalyticsChartPalette.sales : _AnalyticsChartPalette.border)),
+                      side: BorderSide(width: expanded == id ? 2 : 1,
+                        color: expanded == id ? emphasis ? const Color(0xFF99D9D1) : _AnalyticsChartPalette.sales
+                        : emphasis ? background : _AnalyticsChartPalette.border)),
                     child: Semantics(
                       expanded: expanded == id, selected: expanded == id, button: true,
                       child: InkWell(key: Key('store-analytics-$id'), onTap: () => _toggle(id),
-                        hoverColor: _AnalyticsChartPalette.sales.withValues(alpha: .06),
-                        focusColor: _AnalyticsChartPalette.sales.withValues(alpha: .10),
-                        highlightColor: _AnalyticsChartPalette.sales.withValues(alpha: .08),
+                        hoverColor: foreground.withValues(alpha: .06),
+                        focusColor: foreground.withValues(alpha: .10),
+                        highlightColor: foreground.withValues(alpha: .08),
                         borderRadius: _AnalyticsChartPalette.radius, child: Padding(
                           padding: const EdgeInsets.all(8), child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Expanded(child: Text(id == 'receiving' ? 'Purchases' : _analyticsReportTitle(id),
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _AnalyticsChartPalette.ink))),
-                                Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18),
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: foreground))),
+                                Icon(expanded == id ? Icons.expand_less : Icons.expand_more, size: 18, color: foreground),
                               ]),
                               const SizedBox(height: 5),
                               Semantics(key: Key('store-analytics-summary-$id'), label: summaries[id],
                                 child: Column(children: [for (final (index, figure) in figures[id]!.indexed)
                                   _AnalyticsFigure(availableWidth: width - 16,
-                                    label: Text(figure.$1, style: const TextStyle(fontSize: 12, color: _OperatingPalette.secondary)),
-                                    value: Text(figure.$2, style: TextStyle(fontSize: index == 0 ? 16 : 14,
+                                    label: Text(figure.$1, style: TextStyle(fontSize: 12, color: supporting)),
+                                    value: Text(figure.$2, style: TextStyle(fontSize: index == 0 && figure.$2 != '—' ? 20 : 13,
                                         fontWeight: index == 0 ? FontWeight.w700 : FontWeight.w600,
-                                        color: figure.$2 == '—' ? _AnalyticsChartPalette.secondary : index == 0 ? _AnalyticsChartPalette.ink : _AnalyticsChartPalette.secondary)))])),
+                                        color: figure.$2 == '—' ? supporting : index == 0 ? foreground : supporting)))])),
                               const SizedBox(height: 3),
                               Row(children: [Expanded(child: Text(switch (id) {
                                 'public' => 'Period / current listings',
@@ -5038,13 +5058,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                 'sales' => widget.compactVisuals.containsKey('sales') ? 'Period / 7-day bills' : 'Selected period',
                                 'journey' => 'Selected period',
                                 _ => 'Current balance',
-                              }, style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary))),
+                              }, style: TextStyle(fontSize: 11, color: supporting))),
                                 if (widget.compactVisuals[id] != null) ...[
                                   const SizedBox(width: 6),
                                   SizedBox(width: 32, child: widget.compactVisuals[id]!),
                                 ],
                               ]),
                             ])))));
+              }
               return Column(children: [
                 for (var index = 0; index < ids.length; index += columns)
                   Padding(padding: EdgeInsets.only(bottom: index + columns < ids.length ? 8 : 0),
@@ -5141,6 +5162,8 @@ class _AnalyticsFigure extends StatelessWidget {
 /// Supplemental visuals of the same saved-record projection; never write records.
 abstract final class _AnalyticsChartPalette {
   static const ink = Color(0xFF192B42);
+  static const stockSurface = Color(0xFF123F43);
+  static const moneySurface = Color(0xFF303C70);
   static const secondary = Color(0xFF536078);
   static const surface = Colors.white;
   static const softSurface = Color(0xFFF0F3F8);
@@ -5180,7 +5203,16 @@ class _StockAvailabilityGraphic extends StatelessWidget {
       child: strip);
     return compact ? interactiveStrip : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Stock availability', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8), interactiveStrip, const SizedBox(height: 6),
+      const SizedBox(height: 8),
+      if (total > 0) Row(children: [
+        ExcludeSemantics(child: SizedBox(width: 72, height: 72,
+          child: Padding(padding: const EdgeInsets.all(5), child: CircularProgressIndicator(
+            key: const Key('analytics-stock-ring'), value: available / total,
+            strokeWidth: 8, color: _AnalyticsChartPalette.available,
+            backgroundColor: _AnalyticsChartPalette.unavailable)))),
+        const SizedBox(width: 16), Expanded(child: interactiveStrip),
+      ]) else interactiveStrip,
+      const SizedBox(height: 6),
       Text(label, style: const TextStyle(fontSize: 13)),
       const Text('Product count, not units · saved Stock',
         style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
