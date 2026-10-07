@@ -2956,12 +2956,10 @@ void main() {
     final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
     await mount(tester, route: '/app/work/workspace/dashboard', work: work,
       viewport: const Size(360, 720), openHomeActions: false);
-    final stock = find.byKey(const Key('store-analytics-stock'));
-    final stockMaterial = tester.widget<Material>(find.ancestor(of: stock,
-      matching: find.byType(Material)).first);
-    expect(stockMaterial.color, const Color(0xFF123F43));
-    final primary = find.descendant(of: stock, matching: find.byWidgetPredicate((w) =>
-      w is Text && w.data != null && w.data!.startsWith('₹'))).first;
+    final stock = find.byKey(const Key('analytics-overview-stock-hero'));
+    final stockSurface = tester.widget<Container>(stock).decoration! as BoxDecoration;
+    expect((stockSurface.gradient! as LinearGradient).colors.first, const Color(0xFF123F43));
+    final primary = find.byKey(const Key('analytics-overview-stock-hero-0'));
     final text = tester.widget<Text>(primary);
     expect(text.style!.fontSize, greaterThanOrEqualTo(20));
     expect(text.style!.color, Colors.white);
@@ -2978,7 +2976,8 @@ void main() {
     expect(ring.value, closeTo(available / work.workspaceCatalogueItems.length, .00001));
     expect(find.byKey(const Key('analytics-stock-distribution')), findsNothing,
       reason: 'Expanded Stock uses one ring/legend, not a second distribution strip');
-    expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('store-analytics-detail-stock')),
+      matching: find.text('Product count, not units · saved Stock')), findsOneWidget);
     expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -2992,7 +2991,8 @@ void main() {
     expect(find.byTooltip('Choose reporting period'), findsOneWidget);
     await _toggleHomeCategory(tester, 'stock');
     expect(find.byKey(const Key('analytics-stock-ring')), findsNothing);
-    expect(find.text('No products saved yet'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('store-analytics-detail-stock')),
+      matching: find.text('No products saved yet')), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -3078,10 +3078,13 @@ void main() {
         reason: 'Semantic counts alone do not prove a visible distribution');
     }
     await _toggleHomeCategory(tester, 'stock');
-    expect(find.text('2 available · 2 unavailable'), findsOneWidget);
+    final stockDetail = find.byKey(const Key('store-analytics-detail-stock'));
+    expect(find.descendant(of: stockDetail, matching: find.text('2 available')), findsOneWidget);
+    expect(find.descendant(of: stockDetail, matching: find.text('2 unavailable')), findsOneWidget);
     expect(tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-stock-ring'))).value, .5);
-    expect(find.text('Product count, not units · saved Stock'), findsOneWidget);
-    final distribution = find.byTooltip('2 available · 2 unavailable · Product count, not units');
+    expect(find.descendant(of: stockDetail, matching: find.text('Product count, not units · saved Stock')), findsOneWidget);
+    final distribution = find.descendant(of: stockDetail,
+      matching: find.byTooltip('2 available · 2 unavailable · Product count, not units'));
     expect(distribution, findsOneWidget);
     await tester.ensureVisible(distribution);
     await tester.tap(distribution); await tester.pumpAndSettle();
@@ -3250,7 +3253,8 @@ void main() {
     expect(find.text('Receipt status · now'), findsOneWidget);
     final card = find.byKey(const Key('store-analytics-public'));
     await tester.ensureVisible(card); await tester.tap(card); await tester.pumpAndSettle();
-    expect(find.text('Hide details'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('analytics-report-heading-public')),
+      matching: find.text('Hide')), findsOneWidget);
     final semantics = tester.widget<Semantics>(find.ancestor(of: card, matching: find.byType(Semantics)).first);
     expect(semantics.properties.selected, isTrue);
     await tester.tap(find.byTooltip('Collapse details')); await tester.pumpAndSettle();
@@ -3446,6 +3450,68 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('ANALYTICS CONSISTENCY rich headers preserve readable context in all reports', (tester) async {
+    // Automated presentation fixture; not runtime provider or device evidence.
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      textScale: 1, openHomeActions: false);
+    for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+      await _toggleHomeCategory(tester, report);
+      final heading = tester.widget<Container>(find.byKey(Key('analytics-report-heading-$report')));
+      final gradient = (heading.decoration as BoxDecoration).gradient! as LinearGradient;
+      for (final endpoint in gradient.colors) {
+        expect(1.05 / (endpoint.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+        expect((const Color(0xFFE4EDF4).computeLuminance() + .05) /
+          (endpoint.computeLuminance() + .05), greaterThanOrEqualTo(4.5));
+      }
+      expect(find.byKey(Key('analytics-report-period-$report')), findsOneWidget);
+      if (report == 'sales') {
+        expect(tester.getSize(find.byKey(const Key('analytics-metric-surface-billed'))).height,
+          tester.getSize(find.byKey(const Key('analytics-metric-surface-collections'))).height,
+          reason: 'Normal-width KPI pair must share height without hiding Before returns');
+      }
+      if (report == 'receiving') {
+        expect(find.text('Pending receipts · current position'), findsOneWidget);
+        expect(find.text('Bill / goods reconciliation · current position'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+      await _captureAnalyticsFixture(tester, 'consistency-$report-host-fixture');
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('ANALYTICS MOCKUP overview has distinct saved-data hero compositions', (tester) async {
+    // Automated presentation fixture only; never injected into device storage.
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work, openHomeActions: false);
+    expect(find.byKey(const Key('analytics-overview-stock-hero')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-overview-sales-hero')), findsOneWidget);
+    expect(find.byKey(const Key('analytics-overview-dues-strip')), findsOneWidget);
+    final stockHero = find.byKey(const Key('analytics-overview-stock-hero'));
+    final colours = (tester.widget<Container>(stockHero).decoration! as BoxDecoration).gradient! as LinearGradient;
+    final ring = tester.widget<CircularProgressIndicator>(find.byKey(const Key('analytics-overview-stock-ring')));
+    for (final segment in [ring.color!, ring.backgroundColor!]) {
+      for (final background in colours.colors) {
+        final light = segment.computeLuminance(), dark = background.computeLuminance();
+        expect((light + .05) / (dark + .05), greaterThanOrEqualTo(3),
+          reason: 'Overview ring segments must remain distinguishable on their actual dark backing');
+      }
+    }
+    for (final panel in ['stock-hero', 'sales-hero', 'dues-strip']) {
+      await tester.ensureVisible(find.byKey(Key('analytics-overview-$panel')));
+      await tester.pumpAndSettle();
+      await _captureAnalyticsFixture(tester, 'mockup-$panel-host-fixture');
+    }
+    for (final report in ['public', 'journey', 'supply', 'receiving', 'orders', 'stock', 'sales', 'money']) {
+      expect(find.byKey(Key('store-analytics-$report')), findsOneWidget);
+    }
+    await _toggleHomeCategory(tester, 'stock');
+    expect(find.byKey(const Key('analytics-stock-ring')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _captureAnalyticsFixture(tester, 'mockup-stock-host-fixture');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS MOTION stock comparison uses real saved valuation', (tester) async {
     final work = storeViewFixture();
     expect(await work.loadWorkspaceInventory(), isTrue);
@@ -3518,7 +3584,7 @@ void main() {
         final heading = tester.widget<Container>(find.byKey(Key('analytics-report-heading-$report')));
         final gradient = (heading.decoration as BoxDecoration).gradient! as LinearGradient;
         for (final colour in gradient.colors) {
-          final contrast = (colour.computeLuminance() + .05) / (const Color(0xFF192B42).computeLuminance() + .05);
+          final contrast = 1.05 / (colour.computeLuminance() + .05);
           expect(contrast, greaterThanOrEqualTo(4.5));
         }
         final surfaces = find.descendant(of: find.byKey(Key('store-analytics-detail-$report')), matching: find.byType(DecoratedBox));
