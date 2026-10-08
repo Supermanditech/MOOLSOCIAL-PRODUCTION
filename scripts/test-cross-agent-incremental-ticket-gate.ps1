@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+  [switch]$RequireCompatibilityProbes
 )
 
 Set-StrictMode -Version Latest
@@ -41,6 +42,44 @@ function Assert-GateFails([scriptblock]$Invocation, [string]$Expected) {
     )
   }
   Assert-Fixture $failed "negative fixture did not fail with: $Expected"
+}
+
+if($RequireCompatibilityProbes) {
+  $tokens=$null; $errors=$null
+  $ast=[System.Management.Automation.Language.Parser]::ParseFile($gate,[ref]$tokens,[ref]$errors)
+  Assert-Fixture ($errors.Count -eq 0) 'incremental checker has parse errors.'
+  $functions=@($ast.FindAll({param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -ceq 'Test-CompatibilityIncrementalIdentity'
+  },$true))
+  Assert-Fixture ($functions.Count -eq 1) 'compatibility predicate absent/duplicated.'
+  . ([scriptblock]::Create($functions[0].Extent.Text))
+  $facts=@{
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
+    Branch='work/integration-repair/store-buy-compatibility-20261008'; Lane='integration_repair'
+    Ticket='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'
+    Scope='store.buy_publication_compatibility'; Package='com.moolsocial.app.runtime'
+    VersionName='1.0.0-r66.42'; VersionCode=2026100801; Phase='ticket_start'
+  }
+  $cases=0
+  foreach($phase in @('ticket_start','implementation','handoff')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-Fixture (Test-CompatibilityIncrementalIdentity $probe) 'exact host identity rejected.'
+    $cases++
+  }
+  foreach($key in @($facts.Keys)) {
+    $altered=$facts.Clone(); $altered[$key]='altered'
+    Assert-Fixture (-not (Test-CompatibilityIncrementalIdentity $altered)) "changed$key admitted."
+    $missing=$facts.Clone(); $missing.Remove($key)
+    Assert-Fixture (-not (Test-CompatibilityIncrementalIdentity $missing)) "missing$key admitted."
+    $cases+=2
+  }
+  $build=$facts.Clone(); $build.Phase='pre_build'
+  Assert-Fixture (-not (Test-CompatibilityIncrementalIdentity $build)) 'repair-lane APK build admitted.'
+  $cases++
+  Assert-Fixture ($cases -eq 22) 'compatibility identity probe count changed.'
+  Write-Output "Compatibility incremental identity: $cases cases passed; no fixture repositories or APK authorization created."
+  return
 }
 
 $tempParent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd(

@@ -5,7 +5,7 @@ param(
   [string]$Phase,
 
   [Parameter(Mandatory)]
-  [ValidateSet('cursor_ui', 'codex_ui', 'codex_backend', 'integration')]
+  [ValidateSet('cursor_ui', 'codex_ui', 'codex_backend', 'integration', 'integration_repair')]
   [string]$Lane,
 
   [Parameter(Mandatory)]
@@ -56,6 +56,23 @@ function Assert-IncrementalTicket([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CompatibilityIncrementalIdentity([hashtable]$Facts) {
+  $expected=@{
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
+    Branch='work/integration-repair/store-buy-compatibility-20261008'
+    Lane='integration_repair'
+    Ticket='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'
+    Scope='store.buy_publication_compatibility'
+    Package='com.moolsocial.app.runtime'
+    VersionName='1.0.0-r66.42'; VersionCode=2026100801
+  }
+  foreach($key in $expected.Keys) {
+    if(-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Phase') -and
+    [string]$Facts.Phase -cin @('ticket_start','implementation','handoff')
+}
+
 Assert-IncrementalTicket (
   $resolvedState.StartsWith(
     $root + [IO.Path]::DirectorySeparatorChar,
@@ -66,7 +83,7 @@ Assert-IncrementalTicket (
 
 try {
   $state = Get-Content -LiteralPath $resolvedState -Raw |
-    ConvertFrom-Json -Depth 30
+    ConvertFrom-Json
 } catch {
   throw 'Incremental ticket gate rejected: machine state is invalid JSON.'
 }
@@ -77,10 +94,19 @@ Assert-IncrementalTicket (
     'MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001'
 ) 'machine-state identity changed.'
 
-$selectedLane = @($state.lanes | Where-Object { $_.id -ceq $Lane })
+$compatibilityIncremental=$Lane -ceq 'integration_repair'
+$selectedLane = @($state.lanes | Where-Object {
+  $_.id -ceq $(if($compatibilityIncremental){'codex_ui'}else{$Lane})
+})
 Assert-IncrementalTicket ($selectedLane.Count -eq 1) `
   'lane contract is missing or duplicated.'
 $selectedLane = $selectedLane[0]
+if($compatibilityIncremental) {
+  # Host/source preparation only; pre_build is intentionally not admitted.
+  # Preserve the real runtime package/version floor and annotated baseline.
+  $selectedLane=$selectedLane.PSObject.Copy()
+  $selectedLane.branchPrefix='work/integration-repair/'
+}
 
 $branch = @(& git -C $root rev-parse --abbrev-ref HEAD)
 Assert-IncrementalTicket (
@@ -97,6 +123,38 @@ Assert-IncrementalTicket (
   [string]$head[0] -cmatch '^[0-9a-f]{40}$'
 ) 'HEAD is unavailable.'
 $head = [string]$head[0]
+if($compatibilityIncremental) {
+  Assert-IncrementalTicket (Test-CompatibilityIncrementalIdentity @{
+    Root=$root.Replace('\','/'); Branch=[string]$branch[0]; Lane=$Lane
+    Ticket=$TicketId; Scope=$UiScope; Package=$PackageId
+    VersionName=$CandidateVersionName; VersionCode=$CandidateVersionCode; Phase=$Phase
+  }) 'compatibility lane requires exact host-only identity/package/version; APK builds remain integration-gated.'
+  $checkerPath=Join-Path $root 'scripts/check-codex-subagent-coordination-policy.ps1'
+  $tokens=$null; $errors=$null
+  $ast=[System.Management.Automation.Language.Parser]::ParseFile($checkerPath,[ref]$tokens,[ref]$errors)
+  Assert-IncrementalTicket ($errors.Count -eq 0) 'compatibility graph checker has parse errors.'
+  foreach($name in @('Assert-Coordination','Get-OctoberCompatibilityBinding',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityLayoutOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage')) {
+    $functions=@($ast.FindAll({param($node)
+      $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name
+    },$true))
+    Assert-IncrementalTicket ($functions.Count -eq 1) 'compatibility graph function missing/duplicated.'
+    . ([scriptblock]::Create($functions[0].Extent.Text))
+  }
+  $compatibilityHistory=Get-OctoberCompatibilityHistoryStage $head
+  $compatibilityPolicy=Get-Content -Raw -LiteralPath (Join-Path $root 'config/codex-subagent-coordination-policy.json') | ConvertFrom-Json
+  $baseLines=@(Get-OctoberCompatibilityGitLines @('show',"$($compatibilityHistory.Base):config/codex-subagent-coordination-policy.json"))
+  $basePolicy=($baseLines -join "`n") | ConvertFrom-Json
+  Assert-IncrementalTicket (Test-OctoberCompatibilityBindingInventory `
+    -Bindings @($compatibilityPolicy.productionGitDiscipline.continuationBindings) `
+    -BaseBindings @($basePolicy.productionGitDiscipline.continuationBindings)) 'compatibility binding inventory changed.'
+  Assert-IncrementalTicket ($Phase -cne 'ticket_start' -or $compatibilityHistory.Stage -eq 1) 'compatibility start must be clean at exact G, not unqualified E.'
+  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3)) 'compatibility implementation requires exact G/C/L.'
+  # Q is not documentary success: coordination handoff qualification remains
+  # mandatory separately and this gate does not authorize integration.
+  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 4) 'compatibility handoff requires exact Q after L.'
+}
 
 $baselineTag = [string]$state.baselineTag
 $tagType = @(& git -C $root cat-file -t $baselineTag 2>$null)
@@ -136,7 +194,7 @@ Assert-IncrementalTicket ($LASTEXITCODE -eq 0) `
   'untracked-owner inventory failed.'
 $worktreeClean = $unstagedClean -and $stagedClean -and $untracked.Count -eq 0
 
-if ($Phase -ceq 'ticket_start') {
+if ($Phase -ceq 'ticket_start' -and -not $compatibilityIncremental) {
   $ticketStartsAtBaseline = $head -ceq $baselineCommit
   $ticketStartsAtAuthorizedBootstrap = $false
   if (-not $ticketStartsAtBaseline) {
@@ -147,7 +205,7 @@ if ($Phase -ceq 'ticket_start') {
     ) 'coordination policy is unavailable for bootstrap verification.'
     try {
       $coordinationPolicy = Get-Content -Raw -LiteralPath `
-        $coordinationPolicyPath | ConvertFrom-Json -Depth 50
+        $coordinationPolicyPath | ConvertFrom-Json
     } catch {
       throw 'Incremental ticket gate rejected: coordination policy is invalid JSON.'
     }
@@ -205,7 +263,7 @@ if ($Phase -ceq 'ticket_start') {
   Assert-IncrementalTicket $worktreeClean `
     'ticket-start worktree is not clean.'
 }
-if ($Phase -ceq 'handoff') {
+if ($Phase -ceq 'handoff' -or ($compatibilityIncremental -and $Phase -ceq 'ticket_start')) {
   Assert-IncrementalTicket $worktreeClean `
     'handoff worktree is not clean.'
 }

@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4623,
-    "sha256": "920F2E84F6262068AB1201E6883CEA17E7A94479FC4D7E0F04D56818886B6055"
+    "sha256": "8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -126,7 +126,10 @@
         "scripts/check-cleanup-artifact-retention.ps1",
         "scripts/test-artifact-evidence-retention.ps1",
         "scripts/test-codex-integration-repair-coordination-policy.ps1",
-        "docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md"
+        "docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "docs/quality/STORE-BUY-COMPATIBILITY-20261008.md"
       ]
     },
     {
@@ -1945,6 +1948,31 @@
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "scripts/test-codex-integration-repair-coordination-policy.ps1",
           "docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_compatibility_20261008",
+        "state": "founder_authorized_2026_10_08",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-compatibility-20261008",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008",
+        "branch": "work/integration-repair/store-buy-compatibility-20261008",
+        "baselineHead": "22df0d27a3087ad5e6f53f52ad99116803635670",
+        "bootstrapCommitSubject": "coordination(store-buy-compatibility-20261008): bind narrow publication compatibility",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1",
+          "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+          "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+          "scripts/check-approved-ui-locks.ps1",
+          "docs/quality/STORE-BUY-COMPATIBILITY-20261008.md"
         ],
         "cursorIndependent": false,
         "integrationRequiredBeforeSuccessorApk": true

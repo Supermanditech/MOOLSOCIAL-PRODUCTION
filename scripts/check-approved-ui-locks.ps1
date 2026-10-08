@@ -172,6 +172,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008' {
       'work/integration-repair/store-buy-combined-20261008'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008' {
+      'work/integration-repair/store-buy-compatibility-20261008'
+    }
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008' {
       'integration/moolsocial/store-buy-combined-baseline-20261008'
     }
@@ -200,9 +203,16 @@ function Get-CursorAccessibilityNativeProjection {
   }
   $octoberUIComposition = $requiredBranch -cin @(
     'work/integration-repair/store-buy-combined-20261008',
+    'work/integration-repair/store-buy-compatibility-20261008',
     'integration/moolsocial/store-buy-combined-baseline-20261008'
   )
   if ($octoberUIComposition) {
+    if ($requiredBranch -ceq 'work/integration-repair/store-buy-compatibility-20261008') {
+      # Exact forward successor inherits sealed native/reference bytes only.
+      # This is not admission of E as a qualified integration source.
+      & git -C $root merge-base --is-ancestor '22df0d27a3087ad5e6f53f52ad99116803635670' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Compatibility UI projection requires the exact sealed E ancestor.' }
+    }
     # Exact inherited Store printing/download native composition, not authority
     # for new Android edits. All original reference/accessibility hashes run.
     $storeSource = '8002e8cd740aaf613b75dc749212fb12ae4fddb7'
@@ -327,6 +337,7 @@ function Get-CursorAccessibilityNativeProjection {
       'work/codex-ui/add-product-screen1-20260920',
       'integration/moolsocial/store-add-product-20260921',
       'work/integration-repair/store-buy-combined-20261008',
+      'work/integration-repair/store-buy-compatibility-20261008',
       'integration/moolsocial/store-buy-combined-baseline-20261008'
     )) {
     # Founder-authorized r66.37 review: exact download bridge only. Project its
