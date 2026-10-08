@@ -100,7 +100,11 @@ abstract final class WorkspacePublicationContract {
     'mediaAssets': 'Approved exact pack photo binding',
     'title': 'Product title',
     'variant': 'Exact variant, empty only when not applicable',
+    'variantAttributes':
+        'Structured variant dimensions require a verified source; legacy variant text is not converted',
     'pack': 'Exact selling pack',
+    'packTerms':
+        'Provider SKU pack and pricing terms pending; saved packMeasure remains the local quantity source',
     'price':
         'Channel selling price in whole rupees; comparison uses minor units',
     'unitPrice':
@@ -118,6 +122,10 @@ abstract final class WorkspacePublicationContract {
     'composition': 'Applicable product composition',
     'regulatoryNote': 'Applicable product note; not an approval',
     'minimumOrder': 'Product/channel minimum packs',
+    'offerClass':
+        'Explicit provider offer classification pending; not inferred from quantity',
+    'reviewDeliveryOptions':
+        'Device-review choices only; never public provider eligibility',
     'returnPolicy':
         'Per-product override or inherited one-time Store return summary',
     'purchaseProtection':
@@ -148,11 +156,22 @@ abstract final class WorkspacePublicationContract {
         'Caller source reference; authoritative revision from backend remains pending',
     'media': 'Same approved exact-pack media as public product projection',
     'highlights': 'Catalogue prefill or shared editor/CSV content.highlights',
+    'highlightFields':
+        'Typed highlight attributes pending; legacy highlights remain separate',
     'specifications':
         'Catalogue prefill or shared editor/CSV content.specifications',
+    'categoryFacts': 'Verified typed category facts pending; no inferred IDs',
     'description': 'Catalogue prefill or shared editor/CSV content.description',
     'customerMessage': 'Unavailable/error state; no retailer entry',
     'observedAt': 'Authoritative source timestamp; not invented on local save',
+    'sizeChart': 'Verified source-specific size chart pending',
+    'priceHistory':
+        'Authoritative price history pending; local edits are not history',
+    'supplierPolicy': 'Verified supplier policy and revision pending',
+    'supplierPolicyAcceptanceRequired':
+        'Unknown until supplied by the authoritative policy owner; null is not consent',
+    'retryable':
+        'False for this local snapshot adapter; not a backend success state',
   };
 
   /// Fields supplied by the shared product record. Comparison is two-way:
@@ -255,6 +274,41 @@ abstract final class WorkspacePublicationContract {
       'compliance.fssaiLicenseNumber': c.fssaiLicenseNumber,
       'compliance.consumerCare': c.consumerCare,
     },
+  };
+
+  /// Extend the audit without silently changing the retained v1 export schema.
+  /// Unsupported provider values cannot be inferred from legacy text/quantity.
+  static Map<String, Object?> sourceProductAuditValues(
+    WorkspaceCatalogueItem p, {
+    required String storeId,
+    required String storeName,
+    BuyV2Destination channel = BuyV2Destination.shop,
+    WorkspaceStorePublicationDetails? storeDetails,
+  }) => {
+    ...sourceProductValues(
+      p,
+      storeId: storeId,
+      storeName: storeName,
+      channel: channel,
+      storeDetails: storeDetails,
+    ),
+    'variantAttributes': const <BuyV2VariantAttribute>[],
+    'packTerms': null,
+    'offerClass': null,
+    'reviewDeliveryOptions': const <BuyV2DeliveryOption>{},
+  };
+
+  static Map<String, Object?> publicProductAuditValues(BuyV2Product p) => {
+    ...publicProductValues(p),
+    // Empty allocations are equivalent; nonempty unowned values must reject.
+    'variantAttributes': p.variantAttributes.isEmpty
+        ? const <BuyV2VariantAttribute>[]
+        : p.variantAttributes,
+    'packTerms': p.packTerms,
+    'offerClass': p.offerClass,
+    'reviewDeliveryOptions': p.reviewDeliveryOptions.isEmpty
+        ? const <BuyV2DeliveryOption>{}
+        : p.reviewDeliveryOptions,
   };
 
   static List<WorkspacePublicationIssue> productIssues(
@@ -365,14 +419,14 @@ abstract final class WorkspacePublicationContract {
         );
       }
     }
-    final from = sourceProductValues(
+    final from = sourceProductAuditValues(
       item,
       storeId: storeId,
       storeName: storeName,
       channel: channel,
       storeDetails: storeDetails,
     );
-    final to = publicProductValues(target);
+    final to = publicProductAuditValues(target);
     for (final key in {...from.keys, ...to.keys}) {
       if (!from.containsKey(key) ||
           !to.containsKey(key) ||

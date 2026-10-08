@@ -379,6 +379,58 @@ void main() {
     },
   );
   test(
+    'CONTENT compatibility keeps provider facts and policy decisions unknown',
+    () {
+      final item = handoffStock().copyWith(content: content);
+      final original = item.content.toJson();
+      final adapter = WorkspacePublicContentAdapter(
+        storeId: 'a',
+        item: item,
+        sourceId: 'labelled-host-content-fixture',
+      );
+      for (final channel in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final product = item.toBuyPublicProduct(
+          storeName: 'Store',
+          storeId: 'a',
+          channel: channel,
+        );
+        final ready = adapter.snapshotFor(product);
+        final unavailable = adapter.snapshotFor(product.copyWith(storeId: 'b'));
+        expect(ready.state, BuyV2ProductContentState.ready);
+        expect(ready.highlights, content.highlights);
+        expect(ready.description, content.description);
+        expect(unavailable.state, BuyV2ProductContentState.unavailable);
+        for (final snapshot in [ready, unavailable]) {
+          expect(snapshot.highlightFields, isEmpty);
+          expect(snapshot.categoryFacts, isNull);
+          expect(snapshot.sizeChart, isNull);
+          expect(snapshot.priceHistory, isNull);
+          expect(snapshot.supplierPolicy, isNull);
+          expect(snapshot.supplierPolicyAcceptanceRequired, isNull);
+          expect(snapshot.retryable, isFalse);
+          expect(snapshot.observedAt, isNull);
+          expect(snapshot.sourceId, 'labelled-host-content-fixture');
+        }
+      }
+      expect(item.content.toJson(), original);
+      for (final field in [
+        'highlightFields',
+        'categoryFacts',
+        'sizeChart',
+        'priceHistory',
+        'supplierPolicy',
+        'supplierPolicyAcceptanceRequired',
+        'retryable',
+      ]) {
+        expect(WorkspacePublicationContract.contentBindings[field], isNotEmpty);
+      }
+    },
+  );
+
+  test(
     'CONTENT CSV template, quoted multiline, exact prefill and errors share schema',
     () {
       final template = WorkspaceProductImport.csv(

@@ -247,6 +247,162 @@ void main() {
   );
 
   test(
+    'PUB compatibility accounts for absent structured variants and pack terms',
+    () {
+      final item = fixture();
+      final public = item.toBuyPublicProduct(
+        storeId: store.id,
+        storeName: store.name,
+      );
+      final source = WorkspacePublicationContract.sourceProductAuditValues(
+        item,
+        storeId: store.id,
+        storeName: store.name,
+      );
+      final projected = WorkspacePublicationContract.publicProductAuditValues(
+        public,
+      );
+      for (final values in [source, projected]) {
+        expect(values.keys, containsAll(['variantAttributes', 'packTerms']));
+        expect(values['variantAttributes'], isEmpty);
+        expect(values['packTerms'], isNull);
+        expect(values['offerClass'], isNull);
+        expect(values['reviewDeliveryOptions'], isEmpty);
+      }
+      expect(source, projected);
+      expect(
+        audit(
+          item,
+          target: public.copyWith(
+            variantAttributes: <BuyV2VariantAttribute>[],
+            reviewDeliveryOptions: <BuyV2DeliveryOption>{},
+          ),
+        ),
+        isEmpty,
+      );
+      expect(item.variant, fixture().variant);
+      expect(item.pack, fixture().pack);
+      expect(
+        item.publicListing,
+        fixture().publicListing,
+      ); // Intent is unchanged.
+    },
+  );
+
+  test('PUB compatibility rejects unowned structured variant values', () {
+    final item = fixture();
+    final public = item.toBuyPublicProduct(
+      storeId: store.id,
+      storeName: store.name,
+    );
+    final changed = public.copyWith(
+      variantAttributes: const [
+        BuyV2VariantAttribute(
+          dimensionId: 'size',
+          dimensionLabel: 'Size',
+          optionId: 'large',
+          optionLabel: 'Large',
+        ),
+      ],
+    );
+    expect(
+      audit(item, target: changed).map((issue) => issue.field),
+      contains('${item.id}:variantAttributes'),
+    );
+    expect(audit(item), isEmpty);
+  });
+
+  test('PUB compatibility preserves the v1 export field set', () {
+    final item = fixture();
+    final public = item.toBuyPublicProduct(
+      storeId: store.id,
+      storeName: store.name,
+    );
+    final source = WorkspacePublicationContract.sourceProductValues(
+      item,
+      storeId: store.id,
+      storeName: store.name,
+    );
+    final projected = WorkspacePublicationContract.publicProductValues(public);
+    expect(source, projected);
+    for (final key in [
+      'variantAttributes',
+      'packTerms',
+      'offerClass',
+      'reviewDeliveryOptions',
+    ]) {
+      expect(source.containsKey(key), isFalse);
+      expect(projected.containsKey(key), isFalse);
+    }
+  });
+
+  test(
+    'PUB compatibility rejects unowned classification and review options',
+    () {
+      final item = fixture();
+      final public = item.toBuyPublicProduct(
+        storeId: store.id,
+        storeName: store.name,
+      );
+      for (final value in BuyV2OfferClass.values) {
+        expect(
+          audit(
+            item,
+            target: public.copyWith(offerClass: value),
+          ).map((issue) => issue.field),
+          contains('${item.id}:offerClass'),
+        );
+      }
+      for (final value in BuyV2DeliveryOption.values) {
+        expect(
+          audit(
+            item,
+            target: public.copyWith(reviewDeliveryOptions: {value}),
+          ).map((issue) => issue.field),
+          contains('${item.id}:reviewDeliveryOptions'),
+        );
+      }
+      expect(
+        audit(
+          item,
+          target: public.copyWith(
+            variantAttributes: const [
+              BuyV2VariantAttribute(
+                dimensionId: '',
+                dimensionLabel: '',
+                optionId: '',
+                optionLabel: '',
+              ),
+            ],
+          ),
+        ).map((issue) => issue.field),
+        contains('${item.id}:variantAttributes'),
+      );
+      expect(audit(item), isEmpty);
+    },
+  );
+
+  test('PUB compatibility rejects unowned provider pack terms', () {
+    final item = fixture();
+    final public = item.toBuyPublicProduct(
+      storeId: store.id,
+      storeName: store.name,
+    );
+    final changed = public.copyWith(
+      packTerms: BuyV2PackTerms(
+        skuId: item.id,
+        revision: 'labelled-host-fixture',
+        sellUnit: 'pack',
+      ),
+    );
+    expect(
+      audit(item, target: changed).map((issue) => issue.field),
+      contains('${item.id}:packTerms'),
+    );
+    expect(audit(item), isEmpty);
+  });
+
+  test(
     'PUB photo revision is shared exactly and replacement cannot reuse old image',
     () {
       final p = fixture();
