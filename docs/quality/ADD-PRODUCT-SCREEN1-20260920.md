@@ -4103,3 +4103,49 @@ scope isolation and stale-source eligibility are tested. No new screen/route,
 backend, durable data persistence, approved-layout redesign, APK or Cursor write.
 Host-only fixtures are not device acceptance or real-user-flow evidence. Remaining
 legacy-route tests are mapped individually; no wholesale skip/deletion/false pass.
+
+## Enlarged-landscape analytics reading space — 8 October 2026
+
+REG-20261008-4648 records actual OPPO font1.6 landscape failure: the pinned
+report title/period/Hide stack consumes almost all available body height. Failing
+captures remain in TASK outputs/evidence/combined-preclosure-v362-large-public-values.png
+and combined-preclosure-v363-large-public-depth.xml. External TASK root is
+C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store; these are
+external provenance, not repository-relative memory-check owners. REG4649 also
+retains preparation diagnostic failures and the cancelled, unsuccessful attach.
+
+Within the approved analytics ticket, use a scaling compact pinned title and
+48dp labelled collapse control. Keep the complete selected period in the original
+scroll heading and assistive context. Reserve at least60percent of the available
+analytics body for reading; if a complete pinned title cannot fit its measured
+budget, keep the full heading scrollable instead of clipping or shrinking text.
+Preserve normal portrait composition, report/period/Store recovery, provider
+coverage, exact monetary values, saved identities and all callbacks. No shared
+Store-shell redesign, record injection, backend substitute or transaction.
+
+Acceptance requires failing-before and passing-after host layout regressions,
+normal/enlarged short viewports, reachable content/collapse, impacted checks and
+fresh source-bound native OPPO verification.0f94 remains preserved and accepted;
+this new source correction is not passed, closed, published or APK-qualified yet.
+
+Correction qualification: three focused host cases pass, including the forced
+640x2401.6 scroll-only fallback.60 impacted analytics/recovery cases pass and
+two-owner analysis is clean before the later test-only status migration. Native
+OPPO source reconnect/hot restart3715ms and read-only v376–v388 establish stable
+compact context in Public/Receiving/Stock/Sales/Money:100px pinned header in a
+308px body, no original-header duplication; Hide restores the summary. Stock
+cost28590/sellingvalue36463,21available/6unavailable/17lowstock and observed
+customer dues1786 retain their saved origins. Four review defines were requested;
+this is warm source qualification, not APK/backend acceptance. Normal portrait
+on corrected source is still pending manual setup.
+
+Broader365 v1 exposed12 previously unselected OPPO S09 status tests demanding
+retired operational Analytics controls. Keep failures; migrate the same12 cases
+to the retained Orders header. Replace superseded58px/icon-only styling with
+full scaled visible state-label containment and min48dp width; exact semantics,
+all status/public combinations, panel/no-write, Back/barrier and header geometry
+remain. Focused12/12 pass. No application status or neighbouring layout changed.
+Full broadened v2 terminal0:365 pass/0fail/0skip. Name-level comparison confirms
+all prior327 cases included, no omissions. Final two-owner analyzer v2 terminal0:
+no issues after test-only migration. Do not mark0f94 as containing this correction;
+new checkpoint and exact acceptance/closure/publication are still pending.

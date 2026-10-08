@@ -3093,6 +3093,65 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final size in [const Size(806, 360), const Size(640, 320)]) {
+    testWidgets('ANALYTICS SHORT LANDSCAPE reading budget at1.6 $size', (tester) async {
+      // Labelled host-only layout fixture; not native or backend acceptance.
+      final work = storeViewFixture();
+      final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: size, textScale: 1.6, openHomeActions: false);
+      await _toggleHomeCategory(tester, 'public');
+      await tester.ensureVisible(find.byKey(const Key('store-analytics-value-visible-skus')));
+      await tester.pumpAndSettle();
+      final board = find.byKey(const Key('work-store-operating-board'));
+      final header = find.byKey(const Key('analytics-context-heading-public'));
+      expect(header, findsOneWidget);
+      final bodyHeight = tester.getSize(board).height;
+      final headerHeight = tester.getSize(header).height;
+      expect(bodyHeight, greaterThanOrEqualTo((bodyHeight + headerHeight) * .6),
+        reason: 'Pinned context must leave useful space for report data at native enlarged scale');
+      final hide = find.byTooltip('Hide active report');
+      expect(hide.hitTestable(), findsOneWidget);
+      expect(tester.getSize(hide).height, greaterThanOrEqualTo(48));
+      expect(find.byKey(const Key('analytics-report-period-public')), findsOneWidget);
+      final valueRect = tester.getRect(find.byKey(const Key('store-analytics-value-visible-skus')));
+      expect(valueRect.overlaps(tester.getRect(board)), isTrue);
+      await tester.tap(hide); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('store-analytics-detail-public')), findsNothing);
+      expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('ANALYTICS SHORT LANDSCAPE over-budget context remains scrollable', (tester) async {
+    // Extreme host-only viewport deliberately exercises the no-pin fallback.
+    final work = storeViewFixture();
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(640, 240), textScale: 1.6, openHomeActions: false);
+    await _toggleHomeCategory(tester, 'receiving');
+    final value = find.byKey(const Key('store-analytics-value-bills-without-goods'));
+    await tester.ensureVisible(value); await tester.pumpAndSettle();
+    final board = find.byKey(const Key('work-store-operating-board'));
+    expect(tester.getSize(board).height, lessThan(125),
+      reason: 'This fixture must actually force the measured header over its40% budget');
+    expect(find.byKey(const Key('analytics-context-heading-receiving')), findsNothing);
+    expect(tester.getRect(value).overlaps(tester.getRect(board)), isTrue);
+    expect(find.byKey(const Key('analytics-report-period-receiving')), findsOneWidget);
+    final hide = find.byTooltip('Collapse details');
+    await tester.ensureVisible(hide); await tester.pumpAndSettle();
+    expect(hide.hitTestable(), findsOneWidget);
+    expect(tester.getSize(hide).height, greaterThanOrEqualTo(48));
+    expect(tester.getRect(hide).top, greaterThanOrEqualTo(tester.getRect(board).top - 1));
+    expect(tester.getRect(hide).bottom, lessThanOrEqualTo(tester.getRect(board).bottom + 1));
+    await tester.tap(hide); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('store-analytics-detail-receiving')), findsNothing);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ANALYTICS STRONG primary KPI surfaces and truthful Stock ring', (tester) async {
     final work = storeViewFixture();
     final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
@@ -28607,9 +28666,11 @@ void main() {
                 ..workspaceStoreState = state
                 ..workspaceAcceptingOrders = state == WorkspaceStoreState.open
                 ..workspaceVisibleToCustomers = isPublic;
+              // Analytics intentionally has no operational status controls.
+              // Exercise the retained read-only control on the Orders header.
               await mount(
                 tester,
-                route: '/app/work/workspace/dashboard',
+                route: '/app/work/workspace/dashboard?section=orders',
                 work: work,
                 viewport: Size(display.width, display.height),
                 textScale: display.scale,
@@ -28627,10 +28688,19 @@ void main() {
               final headerBefore = tester.getRect(header);
               expect(control.hitTestable(), findsOneWidget);
               expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
-              expect(tester.getSize(control).width, 58);
+              expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+              final stateLabel = find.descendant(of: control, matching: find.text(opening));
+              expect(stateLabel, findsOneWidget);
+              final stateText = tester.renderObject<RenderParagraph>(stateLabel);
+              expect(stateText.size.width,
+                greaterThanOrEqualTo(stateText.getMaxIntrinsicWidth(double.infinity) - .1));
+              expect(tester.getRect(stateLabel).left,
+                greaterThanOrEqualTo(tester.getRect(control).left));
+              expect(tester.getRect(stateLabel).right,
+                lessThanOrEqualTo(tester.getRect(control).right));
               expect(
                 find.descendant(of: control, matching: find.byType(Icon)),
-                findsOneWidget,
+                findsNothing,
               );
               expect(
                 tester.getSemantics(control),

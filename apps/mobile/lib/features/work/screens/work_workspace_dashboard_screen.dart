@@ -4904,6 +4904,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
   Future<WorkspaceAnalyticsSnapshot>? _result;
   Object? _scopeIdentity;
   final _detailKey = GlobalKey();
+  final _reportHeadingKey = GlobalKey();
   final _viewportKey = GlobalKey();
   final _localScroll = ScrollController();
   ScrollController get _scroll => widget.scrollController ?? _localScroll;
@@ -5010,7 +5011,10 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     final viewport = _viewportKey.currentContext?.findRenderObject();
     if (detail is! RenderBox || viewport is! RenderBox || !detail.attached || !viewport.attached) return;
     final top = detail.localToGlobal(Offset.zero).dy - viewport.localToGlobal(Offset.zero).dy;
-    final show = _expanded != null && top < -1 && top + detail.size.height > 48;
+    final heading = _reportHeadingKey.currentContext?.findRenderObject();
+    final headingGone = heading is RenderBox && heading.attached &&
+      heading.localToGlobal(Offset(0, heading.size.height)).dy <= viewport.localToGlobal(Offset.zero).dy;
+    final show = _expanded != null && headingGone && top + detail.size.height > 48;
     if (show != _contextHeader && mounted) setState(() => _contextHeader = show);
   }
 
@@ -5239,7 +5243,8 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           decoration: BoxDecoration(gradient: _AnalyticsChartPalette.headerGradient(id),
             borderRadius: _AnalyticsChartPalette.radius,
             border: Border.all(color: _AnalyticsChartPalette.reportAccent(id).withValues(alpha: .35))),
-          child: LayoutBuilder(builder: (context, box) {
+          child: KeyedSubtree(key: compact ? null : _reportHeadingKey,
+            child: LayoutBuilder(builder: (context, box) {
             final heading = Row(children: [Icon(switch (id) {
               'public' => Icons.storefront_outlined, 'journey' => Icons.route_outlined,
               'supply' => Icons.local_shipping_outlined, 'receiving' => Icons.move_to_inbox_outlined,
@@ -5248,20 +5253,24 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
             }, size: 20, color: Colors.white), const SizedBox(width: 8),
               Expanded(child: Padding(padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(_analyticsReportTitle(id), style: TextStyle(fontSize: compact ? 14 : 16,
+                  Text(_analyticsReportTitle(id), semanticsLabel: compact
+                    ? '${_analyticsReportTitle(id)}. Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)} – ${MaterialLocalizations.of(context).formatShortDate(end)}'
+                    : null, style: TextStyle(fontSize: compact ? 14 : 16,
                     fontWeight: FontWeight.w700, color: Colors.white)),
-                  Text('Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
+                  if (!compact) Text('Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
                     key: Key(compact ? 'analytics-context-period-$id' : 'analytics-report-period-$id'),
                     style: const TextStyle(fontSize: 11, color: Color(0xFFE4EDF4))),
                 ])))]);
             final hide = Tooltip(message: compact ? 'Hide active report' : 'Collapse details', child: TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.white, minimumSize: const Size(48, 48)),
-              onPressed: () => _toggle(id), child: Row(mainAxisSize: MainAxisSize.min,
-                children: [const Text('Hide', style: TextStyle(fontSize: 11)), const Icon(Icons.expand_less, size: 18)])));
-            return box.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
+              onPressed: () => _toggle(id), child: compact
+                ? Semantics(label: 'Hide active report', child: const Icon(Icons.expand_less, size: 18))
+                : const Row(mainAxisSize: MainAxisSize.min,
+                  children: [Text('Hide', style: TextStyle(fontSize: 11)), Icon(Icons.expand_less, size: 18)])));
+            return compact || box.maxWidth >= 280 && MediaQuery.textScalerOf(context).scale(1) <= 1.3
               ? Row(children: [Expanded(child: heading), hide]) : Column(crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [heading, Align(alignment: Alignment.centerRight, child: hide)]);
-          }));
+          })));
         final detail = expanded == null ? const SizedBox.shrink() : Padding(key: _detailKey,
           padding: const EdgeInsets.symmetric(vertical: 12), child: Column(key: Key('store-analytics-detail-$expanded'),
             crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -5295,8 +5304,20 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               if (const {'orders', 'stock', 'sales', 'money'}.contains(expanded)) ...categoryDetail(expanded),
               if (expanded == 'money') ...categoryDetail('capital'),
             ]));
-        return Column(children: [
-          if (_contextHeader && expanded != null) reportHeading(expanded, compact: true),
+        return LayoutBuilder(builder: (context, available) {
+          // Keep at least60% of the actual analytics body scrollable. Native
+          // accessibility scaling is preserved; an over-budget title scrolls
+          // with the full heading instead of being clipped or shrunk.
+          final contextTitle = TextPainter(text: TextSpan(
+            text: expanded == null ? '' : _analyticsReportTitle(expanded),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            textDirection: Directionality.of(context), textScaler: MediaQuery.textScalerOf(context))
+            ..layout(maxWidth: (available.maxWidth - 88).clamp(1, double.infinity));
+          final contextHeight = (contextTitle.height + 16).clamp(50, double.infinity);
+          final pinContext = contextHeight <= available.maxHeight * .4;
+          contextTitle.dispose();
+          return Column(children: [
+          if (_contextHeader && expanded != null && pinContext) reportHeading(expanded, compact: true),
           Expanded(child: NotificationListener<ScrollNotification>(onNotification: (_) {
             WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _checkContextHeader(); });
             return false;
@@ -5445,6 +5466,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
           ]),
         )))),
         ]);
+        });
       });
   }
 }
