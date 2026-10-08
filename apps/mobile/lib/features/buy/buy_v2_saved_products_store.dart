@@ -1483,6 +1483,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 }
 
+enum BuyV2BusinessInvoiceRegistration { registered, unregistered }
+
 @immutable
 class BuyV2GstInvoiceProfileRecord {
   const BuyV2GstInvoiceProfileRecord({
@@ -1490,12 +1492,14 @@ class BuyV2GstInvoiceProfileRecord {
     required this.legalName,
     required this.gstin,
     required this.billingAddress,
+    this.registration = BuyV2BusinessInvoiceRegistration.registered,
   });
 
   final String id;
   final String legalName;
   final String gstin;
   final String billingAddress;
+  final BuyV2BusinessInvoiceRegistration registration;
 }
 
 @immutable

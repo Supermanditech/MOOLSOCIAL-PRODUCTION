@@ -26,6 +26,76 @@ void main() {
   _collectionCameraCases();
   _collectionOrdersReadabilityCases();
   _t09RequestReceiptCases();
+  testWidgets('T14 Close preserves an in-flight order request and late reply', (
+    tester,
+  ) async {
+    final reply = Completer<BuyV2OrderResolutionResult>();
+    final adapter = _AcceptedResolutionAdapter()
+      ..itemEligibility = [_eligible()]
+      ..pendingReply = reply.future;
+    final session = await _sessionWithOrder(adapter);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showBuyV2OrderResolutionSheet(
+                context,
+                session: session,
+                order: session.orders.single,
+                onOpenSupport: () {},
+              ),
+              child: const Text('Manage purchased order'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Manage purchased order'));
+    await tester.pumpAndSettle();
+    await _tapSheet(tester, 'buy-order-resolution-refund');
+    await _tapSheet(tester, 'buy-order-resolution-item-s-tomato');
+    await _tapSheet(tester, 'buy-order-resolution-reason-refund');
+    await tester.tap(find.text('Damaged item').last);
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('buy-order-resolution-submit'));
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit);
+    await tester.pump();
+    expect(session.orderResolutionBusy('order-policy'), isTrue);
+    await tester.ensureVisible(find.byTooltip('Close order options'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Close order options'));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage purchased order'), findsOneWidget);
+    expect(session.orderResolutionBusy('order-policy'), isTrue);
+    expect(
+      await session.submitOrderResolution(
+        orderId: 'order-policy',
+        kind: BuyV2OrderResolutionKind.refund,
+        reason: 'Damaged item',
+        itemQuantities: const {'s-tomato': 1},
+      ),
+      isFalse,
+    );
+    expect(adapter.submitCalls, 1);
+    reply.complete(
+      const BuyV2OrderResolutionResult(
+        accepted: true,
+        customerMessage: 'Review fixture request recorded',
+        reference: 'TEST-CLOSE-1',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Manage purchased order'), findsOneWidget);
+    expect(
+      session.orderResolutionResultFor('order-policy')?.reference,
+      'TEST-CLOSE-1',
+    );
+    expect(session.orderResolutionBusy('order-policy'), isFalse);
+    expect(tester.takeException(), isNull);
+  });
   for (var state = 0; state < 3; state++) {
     final stateName = [
       'normal Android',
@@ -681,6 +751,7 @@ Future<void> _t09Capture(WidgetTester tester, String label) async {
 }
 
 final class _AcceptedResolutionAdapter implements BuyV2OrderResolutionAdapter {
+  Future<BuyV2OrderResolutionResult>? pendingReply;
   int submitCalls = 0;
   bool accepted = true;
   BuyV2OrderResolutionKind kind = BuyV2OrderResolutionKind.refund;
@@ -717,6 +788,7 @@ final class _AcceptedResolutionAdapter implements BuyV2OrderResolutionAdapter {
   ) async {
     submitCalls += 1;
     requests.add(request);
+    if (pendingReply != null) return pendingReply!;
     return BuyV2OrderResolutionResult(
       accepted: accepted,
       customerMessage: accepted
@@ -1072,7 +1144,7 @@ void _collectionWidgetCases() {
     await tester.pumpAndSettle();
     expect(h.session.view, BuyV2View.catalogue);
     expect(h.session.destination, BuyV2Destination.orders);
-    expect(find.text('1 collection · ₹123.45'), findsOneWidget);
+    expect(find.text('₹123.45'), findsOneWidget);
     expect(find.text('1 delivery · ₹124'), findsNothing);
     final card = find.byKey(const ValueKey('buy-order-primary-collection-1'));
     await tester.ensureVisible(card);
@@ -1371,56 +1443,32 @@ void _collectionOrdersReadabilityCases() {
               matching: find.byType(Scrollable),
             )
             .first;
-        for (final tab in [BuyV2OrdersTab.delivered, BuyV2OrdersTab.active]) {
-          final target = find.byKey(ValueKey('buy-orders-tab-${tab.name}'));
-          await tester.scrollUntilVisible(
-            target,
-            100,
-            scrollable: ordersScroll,
-          );
-          await tester.pumpAndSettle();
-          expect(target.hitTestable(), findsOneWidget);
-          expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
-          await tester.tap(target);
-          await tester.pumpAndSettle();
-          expect(h.session.ordersTab, tab);
-          expect(
-            h.session.visibleOrders,
-            hasLength(tab == BuyV2OrdersTab.active ? 1 : 0),
-          );
-          if (tab == BuyV2OrdersTab.active) {
-            expect(find.text('1 collection · ₹123.45'), findsOneWidget);
-          }
-          for (final word in ['Active', 'Delivered']) {
-            final text = find.descendant(
-              of: find.byKey(const ValueKey('buy-orders-tabs')),
-              matching: find.text(word),
-            );
-            final paragraph = tester.renderObject<RenderParagraph>(text);
-            final origin = paragraph.localToGlobal(Offset.zero);
-            final bounds = tester.getRect(
-              find.byKey(
-                ValueKey(
-                  'buy-orders-tab-${word == 'Active' ? 'active' : 'delivered'}',
-                ),
-              ),
-            );
-            for (final box in paragraph.getBoxesForSelection(
-              TextSelection(baseOffset: 0, extentOffset: word.length),
-            )) {
-              expect(
-                bounds.contains(origin + Offset(box.left, box.top)),
-                isTrue,
-              );
-              expect(
-                bounds.contains(origin + Offset(box.right, box.bottom)),
-                isTrue,
-              );
-            }
-            expect(paragraph.didExceedMaxLines, isFalse);
-          }
-          await _captureCollection(tester, 'orders-$label-${tab.name}');
-        }
+        // Active and completed orders are visible together; no selector is needed.
+        expect(find.byKey(const ValueKey('buy-orders-tabs')), findsNothing);
+        final target = find.byKey(
+          const ValueKey('buy-order-primary-collection-1'),
+        );
+        await tester.scrollUntilVisible(target, 100, scrollable: ordersScroll);
+        await tester.pumpAndSettle();
+        expect(target.hitTestable(), findsOneWidget);
+        expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
+        expect(h.session.visibleOrders, hasLength(1));
+        final amount = tester.renderObject<RenderParagraph>(
+          find.text('₹123.45'),
+        );
+        expect(amount.didExceedMaxLines, isFalse);
+        expect(
+          amount.getMaxIntrinsicWidth(amount.size.height),
+          lessThanOrEqualTo(amount.size.width + .5),
+        );
+        await _captureCollection(tester, 'orders-$label-collection');
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+        expect(h.session.selectedOrderId, 'collection-1');
+        expect(h.session.view, BuyV2View.tracking);
+        expect(find.text('Paid ₹123.45'), findsOneWidget);
+        h.session.openOrders();
+        await tester.pumpAndSettle();
         final rail = find.byKey(const ValueKey('buy-orders-promotions'));
         await tester.scrollUntilVisible(rail, 150, scrollable: ordersScroll);
         await tester.pumpAndSettle();

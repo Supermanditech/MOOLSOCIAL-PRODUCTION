@@ -275,6 +275,14 @@ void main() {
         await tester.pumpWidget(app(session, textScale: scale));
         await tester.pumpAndSettle();
         if (offers) {
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('buy-local-tab-offers')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-local-tab-offers')).hitTestable(),
+            findsOneWidget,
+          );
           await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
         } else {
@@ -795,7 +803,13 @@ void main() {
           await tester.scrollUntilVisible(
             items,
             240,
-            scrollable: find.byType(Scrollable).last,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
           );
           await tester.tap(items);
           await tester.pumpAndSettle();
@@ -805,7 +819,13 @@ void main() {
             await tester.scrollUntilVisible(
               sku,
               160,
-              scrollable: find.byType(Scrollable).last,
+              scrollable: find
+                  .byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  )
+                  .first,
             );
             await tester.tap(sku);
             await tester.pumpAndSettle();

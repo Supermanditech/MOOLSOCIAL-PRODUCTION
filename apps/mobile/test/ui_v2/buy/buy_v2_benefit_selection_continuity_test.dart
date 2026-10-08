@@ -526,16 +526,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       final entry = find.byKey(const ValueKey('buy-cart-coupons'));
+      final cartScroll = find.descendant(
+        of: find.byKey(const ValueKey('buy-cart-scroll')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
+      );
+      expect(cartScroll, findsOneWidget);
       await tester.scrollUntilVisible(
         entry,
         420,
-        scrollable: find
-            .byWidgetPredicate(
-              (widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down,
-            )
-            .first,
+        scrollable: cartScroll,
         maxScrolls: 30,
       );
       await Scrollable.ensureVisible(tester.element(entry), alignment: .3);
@@ -558,13 +561,7 @@ void main() {
       await tester.scrollUntilVisible(
         select,
         180,
-        scrollable: find
-            .byWidgetPredicate(
-              (widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down,
-            )
-            .first,
+        scrollable: cartScroll,
         maxScrolls: 30,
       );
       await tester.ensureVisible(select);
@@ -615,9 +612,13 @@ void main() {
       final paymentChoice = find.byKey(
         const ValueKey('buy-checkout-confirm-payment'),
       );
-      final checkoutScroll = find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      final checkoutScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
       );
       expect(checkoutScroll, findsOneWidget);
       await tester.scrollUntilVisible(
@@ -635,9 +636,13 @@ void main() {
       await tester.tap(paymentChoice);
       await tester.pumpAndSettle();
       final pine = find.byKey(const ValueKey('buy-payment-Card'));
-      final paymentScroll = find.byWidgetPredicate(
-        (widget) =>
-            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      final paymentScroll = find.descendant(
+        of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        ),
       );
       expect(paymentScroll, findsOneWidget);
       await tester.scrollUntilVisible(
@@ -1067,37 +1072,33 @@ void main() {
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final semantics = tester.ensureSemantics();
         try {
-        final session = BuyV2Session(
-          core: BuySession(),
-          cartBenefitsAdapter: const ActiveTestCartBenefits(),
-        );
-        for (var i = 0; i < quantity; i++) {
-          session.addProduct('s-tomato');
-          session.addProduct('w-notebook');
-        }
-        session.openCart();
-        await openBenefitsPage(tester, session, textScale: scale);
-        final total = session.cartTotal;
-        for (final destination in ['shop', 'wholesale']) {
-          final selector = find.byKey(
-            ValueKey('buy-cart-benefit-destination-$destination'),
+          final session = BuyV2Session(
+            core: BuySession(),
+            cartBenefitsAdapter: const ActiveTestCartBenefits(),
           );
-          await tester.ensureVisible(selector);
-          await tester.pumpAndSettle();
-          final label = tester.getSemantics(selector).label;
-          final unit = destination == 'wholesale' ? 'pack' : 'item';
-          expect(
-            label,
-            contains('1 product, $quantity $unit${quantity == 1 ? '' : 's'},'),
-          );
-          await tester.tap(selector);
-          await tester.pumpAndSettle();
-          expect(session.quantityFor('s-tomato'), quantity);
-          expect(session.quantityFor('w-notebook'), quantity);
-          expect(session.cartTotal, total);
-          expect(session.view, BuyV2View.cart);
-          expect(tester.takeException(), isNull);
-        }
+          for (var i = 0; i < quantity; i++) {
+            session.addProduct('s-tomato');
+            session.addProduct('w-notebook');
+          }
+          session.openCart();
+          await openBenefitsPage(tester, session, textScale: scale);
+          final total = session.cartTotal;
+          for (final kind in ['coupon', 'payment']) {
+            final selector = find.byKey(
+              ValueKey('buy-cart-benefit-kind-$kind'),
+            );
+            await tester.ensureVisible(selector);
+            await tester.pumpAndSettle();
+            expect(selector.hitTestable(), findsOneWidget);
+            expect(tester.getSize(selector).height, greaterThanOrEqualTo(44));
+            await tester.tap(selector);
+            await tester.pumpAndSettle();
+            expect(session.quantityFor('s-tomato'), quantity);
+            expect(session.quantityFor('w-notebook'), quantity);
+            expect(session.cartTotal, total);
+            expect(session.view, BuyV2View.cart);
+            expect(tester.takeException(), isNull);
+          }
         } finally {
           semantics.dispose();
         }

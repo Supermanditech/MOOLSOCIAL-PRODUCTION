@@ -131,8 +131,8 @@ void main() {
               of: action,
               matching: find.text(
                 included
-                    ? 'Freight included · GST invoice at checkout'
-                    : 'Freight confirmed before payment · GST invoice at checkout',
+                    ? 'Freight included'
+                    : 'Freight confirmed before payment',
               ),
             ),
             findsOneWidget,
@@ -141,14 +141,14 @@ void main() {
             find.descendant(
               of: find.byKey(const ValueKey('buy-cart-action-bar')),
               matching: find.text(
-                '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total',
+                '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'pack' : 'packs'} selected · total',
               ),
             ),
             findsOneWidget,
           );
           if (!included) {
             expect(
-              find.text('Freight included · GST invoice at checkout'),
+              find.text('Freight included'),
               findsNothing,
             );
             expect(find.text('Landed cart total'), findsNothing);
@@ -202,13 +202,13 @@ void main() {
       find.descendant(
         of: find.byKey(const ValueKey('buy-cart-action-bar')),
         matching: find.text(
-          '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'item' : 'items'} selected · total',
+          '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'pack' : 'packs'} selected · total',
         ),
       ),
       findsOneWidget,
     );
     expect(
-      find.text('Freight included · GST invoice at checkout'),
+      find.text('Freight included'),
       findsOneWidget,
     );
     expect(find.text('Checkout'), findsOneWidget);
@@ -325,7 +325,25 @@ void main() {
     await tester.tap(find.text('Checkout'));
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.checkout);
-    expect(find.text('Receiving address'), findsOneWidget);
+    final receivingCard = find.byKey(
+      const ValueKey('buy-checkout-confirm-address'),
+    );
+    expect(receivingCard, findsOneWidget);
+    expect(
+      find.descendant(of: receivingCard, matching: find.text('Receive at')),
+      findsOneWidget,
+    );
+    final address = session.selectedAddressOrNull!;
+    expect(
+      find.descendant(
+        of: receivingCard,
+        matching: find.textContaining(address.line),
+      ),
+      findsOneWidget,
+    );
+    expect(session.quantityFor(product.id), product.minimumOrder);
+    expect(session.scopedPayableTotal, product.price * product.minimumOrder);
+    expect(session.checkoutPaymentAttempt, isNull);
     expect(
       find.byKey(const ValueKey('buy-scoped-purchase-owner')),
       findsNothing,

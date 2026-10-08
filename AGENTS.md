@@ -4,6 +4,26 @@ These instructions are mandatory for every Codex task in this repository.
 Repository evidence is the durable source of truth; do not depend on an earlier
 chat being available.
 
+## Founder-confirmed frontend/backend boundary — 5 October 2026
+
+- Frontend owns presentation, required-field and input-format validation,
+  navigation, accessibility, loading/unavailable states, retry/recovery guards
+  and calls to accepted integration contracts.
+- Backend, Store and provider authorities own business decisions and results:
+  inventory/serviceability, authoritative prices/fees/tax, order acceptance,
+  payment verification/holding, refunds, delivery events and supplier settlement.
+  Flutter must not implement these backend functions, duplicate their ledger or
+  manufacture successful business outcomes when integration is unavailable.
+- Implement only minimal frontend hooks justified by agreed contracts. Missing
+  contracts or authoritative implementations remain registered dependencies;
+  do not guess business transitions or expand a frontend ticket into backend work.
+- Keep isolated test fixtures clearly identified. Host fixtures and local
+  validation are not evidence of live payment, delivery or supplier settlement.
+- Before each affected change, identify its authoritative owner, inspect the
+  call path and test unavailable, stale and unknown-result behavior. Preserve
+  existing architecture, data and recovery protections. Continue actionable
+  frontend work while backend/third-party/Store dependencies remain deferred.
+
 ## Founder-confirmed Facebook and Instagram production state (2026-08-25)
 
 This is the durable, sanitized provider-console memory for the active Social

@@ -743,7 +743,7 @@ void main() {
           location: '/app/buy?sub=orders',
           title: 'Shop Chat',
           threadId: 'shop-order',
-          returnKey: 'buy-orders-tab-active',
+          returnKey: 'buy-orders-section-active',
         ),
         (
           location: '/app/buy?sub=offers',
@@ -903,31 +903,48 @@ void main() {
   testWidgets('retired Buy Account route resolves to global Profile entry', (
     tester,
   ) async {
-    final journey = await readyJourney();
-    final chat = ChatSession();
-    addTearDown(journey.dispose);
-    addTearDown(chat.dispose);
+    final semantics = tester.ensureSemantics();
+    try {
+      final journey = await readyJourney();
+      final chat = ChatSession();
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
 
-    await tester.pumpWidget(
-      MoolSocialApp(
-        session: journey,
-        chatSession: chat,
-        initialLocation: '/app/buy?sub=wholesale&view=account',
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/buy?sub=wholesale&view=account',
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('buy-account-hub')), findsNothing);
-    expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Open your MoolSocial profile'),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('buy-account-hub')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
+      final profile = find.byKey(const ValueKey('buy-open-account'));
+      expect(find.byTooltip('Open your MoolSocial profile'), findsOneWidget);
+      expect(tester.widget<IconButton>(profile).onPressed, isNotNull);
+      expect(
+        tester.getSemantics(profile).getSemanticsData().tooltip,
+        'Open your MoolSocial profile',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
+        findsOneWidget,
+      );
+      await tester.tap(profile);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   for (final id in ['s-dog-food', 'w-notebook']) {

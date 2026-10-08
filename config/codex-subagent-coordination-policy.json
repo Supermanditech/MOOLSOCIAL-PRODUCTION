@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4618,
-    "sha256": "3F6DD6944373945933EEAE28F38C75ED004D222AA505B22002C083AA16A621A1"
+    "sha256": "D3169C3D1674AF25F14B14E64EEF4447B454C825CAF504D9527F0B840CEFE9EA"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "AGENTS.md",
+        "docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md",
         "apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart",
         "apps/mobile/lib/app/moolsocial_app.dart",
         "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
@@ -83,6 +85,7 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/core/design/mool_design_system.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
@@ -104,6 +107,19 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-360x800-android.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-390x844-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-430x932-ios.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-android-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-360x800-android-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-390x844-ios-checkout.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-430x932-ios-cart.png",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-a11y140-reduced.png",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_location_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
         "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/REVIEW.md",
@@ -387,7 +403,16 @@
         "docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-1.jsonl",
         "docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-2.jsonl",
         "docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-3.jsonl",
-        "docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-EVIDENCE.zip"
+        "docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-EVIDENCE.zip",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-1.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-2.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-3.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-4.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-5.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-6.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-7.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-8.jsonl",
+        "docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-INDEX.json"
       ]
     },
     {

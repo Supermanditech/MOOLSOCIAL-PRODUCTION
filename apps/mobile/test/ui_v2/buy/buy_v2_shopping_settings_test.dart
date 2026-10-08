@@ -569,6 +569,7 @@ void main() {
                     matching: find.text(
                       buyV2BuyerDeliveryPromise(
                         session.productFactsFor(product),
+                        confirmAfterStoreAcceptance: true,
                       ),
                     ),
                   ),

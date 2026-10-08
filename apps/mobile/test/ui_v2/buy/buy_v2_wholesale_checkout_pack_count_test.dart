@@ -58,16 +58,52 @@ void main() {
   BuyV2Session checkoutSession({
     List<String> productIds = const ['w-onion'],
     BuyV2CartScope scope = BuyV2CartScope.wholesale,
+    bool selectWholesaleOnly = false,
   }) {
     final session = BuyV2Session(core: BuySession());
     for (final productId in productIds) {
       expect(session.addProduct(productId), isTrue, reason: productId);
     }
     session.openCart(scope: scope);
+    if (selectWholesaleOnly) {
+      for (final line in session.cartLines) {
+        session.selectCartProduct(
+          line.product.id,
+          line.product.destination == BuyV2Destination.wholesale,
+        );
+      }
+    }
     expect(session.openCheckout(), isTrue);
     expect(session.continueCheckoutFromAddress(), isTrue);
     expect(session.continueCheckoutFromPayment(), isTrue);
     return session;
+  }
+
+  void expectGroupCounts(BuyV2Session session) {
+    expect(session.checkoutFulfilmentGroups, isNotEmpty);
+    expect(
+      session.checkoutFulfilmentGroups.fold<int>(
+        0,
+        (total, group) => total + group.itemCount,
+      ),
+      session.checkoutItemCount,
+    );
+    for (final group in session.checkoutFulfilmentGroups) {
+      final productCount =
+          '${group.lines.length} ${group.lines.length == 1 ? 'product' : 'products'}';
+      final unit = group.destination == BuyV2Destination.wholesale
+          ? (group.itemCount == 1 ? 'pack' : 'packs')
+          : (group.itemCount == 1 ? 'item' : 'items');
+      expect(
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+          ),
+          matching: find.text('$productCount · ${group.itemCount} $unit'),
+        ),
+        findsOneWidget,
+      );
+    }
   }
 
   for (var route = 0; route < 3; route++) {
@@ -194,8 +230,8 @@ void main() {
       buyV2WholesaleCheckoutPackCountContractVersion,
       'buy-wholesale-checkout-pack-count-v1',
     );
-    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
-    expect(find.text('1 product · 2 packs'), findsOneWidget);
+    expectGroupCounts(session);
+    expect(find.text('1 product · 2 packs'), findsWidgets);
     expect(find.textContaining('2 products'), findsNothing);
     expect(find.text('Place order'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -224,7 +260,12 @@ void main() {
           '${group.itemCount} '
           '${group.itemCount == 1 ? 'pack' : 'packs'}';
       expect(
-        find.text('Shipment ${index + 1} · $products · $packs'),
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+          ),
+          matching: find.text('$products · $packs'),
+        ),
         findsOneWidget,
       );
     }
@@ -235,25 +276,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Wholesale Checkout excludes Shop quantities from its count', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.reset);
-    final session = checkoutSession(productIds: const ['s-tomato', 'w-onion']);
-    addTearDown(session.dispose);
+  testWidgets(
+    'Wholesale-only selection excludes Shop quantities from Checkout',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = checkoutSession(
+        productIds: const ['s-tomato', 'w-onion'],
+        selectWholesaleOnly: true,
+      );
+      addTearDown(session.dispose);
 
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
 
-    expect(session.checkoutScope, BuyV2CartScope.wholesale);
-    expect(session.checkoutLines, hasLength(1));
-    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
-    expect(find.text('1 product · 2 packs'), findsOneWidget);
-    expect(find.textContaining('3 packs'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      expect(session.checkoutScope, BuyV2CartScope.all);
+      expect(session.checkoutLines, hasLength(1));
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.cartProductSelected('s-tomato'), isFalse);
+      expectGroupCounts(session);
+      expect(find.text('1 product · 2 packs'), findsWidgets);
+      expect(find.textContaining('3 packs'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('non-Wholesale Checkout distinguishes item quantity', (
     tester,
@@ -270,7 +317,7 @@ void main() {
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
 
-    expect(find.text('Shipment 1 · 1 product · 1 item'), findsOneWidget);
+    expectGroupCounts(session);
     expect(find.text('1 item'), findsOneWidget);
     expect(find.textContaining('packs'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -290,19 +337,18 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expect(
-      find.text('1 product · 2 packs · Wholesale · Items subtotal ₹1,550'),
-      findsOneWidget,
-    );
+    expect(find.text('1 product · 2 packs'), findsOneWidget);
 
     await tester.tap(find.text('Checkout'));
+    expect(session.cartTotal, 1550);
+    expect(find.text(buyV2Money(session.scopedPayableTotal)), findsWidgets);
     await tester.pumpAndSettle();
     expect(session.continueCheckoutFromAddress(), isTrue);
     expect(session.continueCheckoutFromPayment(), isTrue);
     await tester.pumpAndSettle();
     expect(session.checkoutScope, BuyV2CartScope.all);
-    expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
-    expect(find.text('1 product · 2 packs'), findsOneWidget);
+    expectGroupCounts(session);
+    expect(find.text('1 product · 2 packs'), findsWidgets);
     expect(find.textContaining('2 products'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -319,10 +365,9 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expect(
-      find.text('2 products · 3 items · Shop + Wholesale · Items subtotal ₹1,587'),
-      findsOneWidget,
-    );
+    expect(find.text('2 products · 3 items'), findsOneWidget);
+    expect(session.cartTotal, 1587);
+    expect(find.text(buyV2Money(session.scopedPayableTotal)), findsWidgets);
     expect(find.textContaining('3 packs'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -348,6 +393,8 @@ void main() {
     for (final viewport in viewports) {
       tester.view.physicalSize = viewport.size;
       final session = checkoutSession();
+      final originalCartScope = session.cartScope;
+      final originalCartFilter = session.cartDisplayFilter;
       await tester.pumpWidget(
         app(
           session,
@@ -358,7 +405,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Shipment 1 · 1 product · 2 packs'), findsOneWidget);
+      expectGroupCounts(session);
       final actionBar = find.byKey(const ValueKey('buy-checkout-action-bar'));
       expect(actionBar, findsOneWidget);
       expect(
@@ -369,14 +416,9 @@ void main() {
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       expect(session.view, BuyV2View.cart);
-      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.cartScope, originalCartScope);
+      expect(session.cartDisplayFilter, originalCartFilter);
       expect(session.scopedItemCount, 2);
 
       await tester.pumpWidget(const SizedBox.shrink());

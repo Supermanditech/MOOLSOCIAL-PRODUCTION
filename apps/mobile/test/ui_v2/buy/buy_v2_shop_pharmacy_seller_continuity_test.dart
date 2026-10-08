@@ -114,6 +114,7 @@ void main() {
     final product = session.product('s-oil');
     final expectedPromise = buyV2BuyerDeliveryPromise(
       session.productFactsFor(product),
+      confirmAfterStoreAcceptance: true,
     );
 
     await tester.pumpWidget(app(session));

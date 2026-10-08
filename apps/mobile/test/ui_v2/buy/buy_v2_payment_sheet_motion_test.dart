@@ -12,7 +12,6 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_payment_sheet_motion.dart';
-import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'buy_v2_qualified_provider_fixture.dart';
@@ -509,36 +508,22 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final gst = find.widgetWithText(FilledButton, 'Add GST details');
-      expect(gst, findsOne);
-      final button = tester.widget<FilledButton>(gst);
-      expect(button.style!.foregroundColor!.resolve({}), BuyV2Colors.navy);
-      final request = find.byKey(const ValueKey('buy-gst-request-shop'));
-      final toggle = find.descendant(
-        of: request,
-        matching: find.byType(Switch),
-      );
-      var control = tester.widget<Switch>(toggle);
-      expect(control.value, isTrue);
-      expect(control.activeTrackColor, BuyV2Colors.navy);
-      expect(control.activeThumbColor, Colors.white);
-      expect(control.inactiveTrackColor, Colors.white);
-      expect(control.inactiveThumbColor, BuyV2Colors.navy);
-      expect(control.trackOutlineColor!.resolve({}), BuyV2Colors.line);
-      expect(
-        control.trackOutlineColor!.resolve({WidgetState.selected}),
-        Colors.transparent,
-      );
-      await tester.ensureVisible(request);
-      await tester.pumpAndSettle();
-      await tester.tap(request);
-      await tester.pumpAndSettle();
-      control = tester.widget<Switch>(toggle);
-      expect(control.value, isFalse);
-      expect(gstController.requestedFor(BuyV2Destination.shop), isFalse);
-      await tester.tap(request);
-      await tester.pumpAndSettle();
+      final change = find.byKey(const ValueKey('buy-invoice-change'));
       expect(gstController.requestedFor(BuyV2Destination.shop), isTrue);
+      expect(find.byKey(const ValueKey('buy-gst-request-shop')), findsNothing);
+      await tester.ensureVisible(change);
+      await tester.pumpAndSettle();
+      expect(change.hitTestable(), findsOneWidget);
+      expect(tester.getSize(change).height, greaterThanOrEqualTo(44));
+      await tester.tap(change);
+      await tester.pumpAndSettle();
+      final personal = find.byKey(const ValueKey('buy-invoice-personal'));
+      expect(personal.hitTestable(), findsOneWidget);
+      await tester.tap(personal);
+      await tester.pumpAndSettle();
+      expect(gstController.requestedFor(BuyV2Destination.shop), isFalse);
+      expect(find.text('Personal purchase'), findsOneWidget);
+      expect(gstController.savedProfiles, isEmpty);
       expect(session.cartLines, hasLength(1));
       expect(session.checkoutAmountDueNow, 37);
       expect(find.byKey(const ValueKey('buy-upi-use-qr')), findsNothing);

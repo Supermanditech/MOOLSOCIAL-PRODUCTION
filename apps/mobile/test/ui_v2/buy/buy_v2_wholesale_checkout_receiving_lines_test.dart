@@ -239,20 +239,12 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 300));
         expect(session.checkoutSubmissionState, state);
-        final scroll = find
-            .descendant(
-              of: find.byKey(const PageStorageKey('buy-checkout-unified')),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
-          find.byKey(
-            const ValueKey('buy-wholesale-checkout-receiving-line-w-onion'),
-          ),
-          140,
-          scrollable: scroll,
-          maxScrolls: 40,
-        );
+        // A pending state without the original request must show recovery,
+        // never reconstruct an editable agreement from today's Cart.
+        expect(session.cartChangesBlocked, isTrue);
+        if (state != BuyV2CheckoutSubmissionState.submitting) {
+          expect(session.checkoutRecoveryAmountKnown, isFalse);
+        }
         for (final id in ['s-tomato', 'w-onion']) {
           expect(
             find.byKey(ValueKey('buy-checkout-quantity-$id')),

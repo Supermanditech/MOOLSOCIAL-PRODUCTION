@@ -2886,6 +2886,129 @@ abstract interface class BuyV2DeliveryExceptionAdapter {
   });
 }
 
+/// Delivery evidence and customer product acceptance are separate facts.
+/// No state in this contract authorizes or proves a supplier payout.
+enum BuyV2ProductAcceptanceState {
+  unavailable,
+  ready,
+  pending,
+  accepted,
+  disputed,
+}
+
+String buyV2ProductReceiptKey(BuyV2ItemisedReceipt receipt) {
+  final lines =
+      receipt.lines
+          .map(
+            (line) => [
+              line.productId,
+              line.variant,
+              line.pack,
+              line.orderedQuantity,
+              line.receivedQuantity,
+            ],
+          )
+          .toList()
+        ..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+  return sha256
+      .convert(
+        utf8.encode(jsonEncode([receipt.orderId, receipt.purchaseId, lines])),
+      )
+      .toString();
+}
+
+String buyV2ProductAcceptanceKey(
+  String ownerScope,
+  BuyV2ItemisedReceipt receipt,
+) => sha256
+    .convert(
+      utf8.encode(
+        jsonEncode([
+          'product-acceptance-v1',
+          ownerScope,
+          buyV2ProductReceiptKey(receipt),
+        ]),
+      ),
+    )
+    .toString();
+
+@immutable
+class BuyV2ProductAcceptanceSnapshot {
+  const BuyV2ProductAcceptanceSnapshot({
+    required this.ownerScope,
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.revision,
+    required this.state,
+    required this.requestKey,
+    required this.receipt,
+  });
+  final String ownerScope;
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int revision;
+  final BuyV2ProductAcceptanceState state;
+  final String requestKey;
+  final BuyV2ItemisedReceipt receipt;
+
+  bool matchesOrder(BuyV2Order order, String owner) =>
+      owner.isNotEmpty &&
+      owner == ownerScope &&
+      order.status == BuyV2OrderStatus.delivered &&
+      orderId == order.id &&
+      purchaseId == order.purchaseId &&
+      sourceId.trim().isNotEmpty &&
+      revision >= 0 &&
+      receipt.matchesOrder(order) &&
+      requestKey == buyV2ProductAcceptanceKey(owner, receipt) &&
+      ((state != BuyV2ProductAcceptanceState.ready &&
+              state != BuyV2ProductAcceptanceState.accepted) ||
+          receipt.lines.every((line) => line.missingQuantity == 0));
+
+  String get reviewKey => jsonEncode([
+    ownerScope,
+    orderId,
+    purchaseId,
+    sourceId,
+    revision,
+    state.name,
+    requestKey,
+    buyV2ProductReceiptKey(receipt),
+  ]);
+}
+
+@immutable
+class BuyV2ProductAcceptanceRequest {
+  const BuyV2ProductAcceptanceRequest({required this.snapshot});
+  final BuyV2ProductAcceptanceSnapshot snapshot;
+  String get idempotencyKey => snapshot.requestKey;
+}
+
+/// Implementations must authenticate and authorize the actual account. Owner
+/// scope is correlation, not authentication. Cold load must reconcile ALL prior
+/// acceptance requests for this order before returning ready, including an
+/// earlier receipt/key not retained by this process. A ready response resolves
+/// unknown outcomes definitively; offline/timeout must throw, not return ready.
+/// The same key survives retry/restart. Accept must atomically check revision,
+/// receipt, dispute status and idempotency. Partial acceptance is unsupported.
+/// After restart, unresolvedRequest may be null while unresolvedRequestKey is
+/// known. Resolve the original server submission by that key; a pending status
+/// revision must never be reconstructed as the original submission revision.
+abstract interface class BuyV2ProductAcceptanceAdapter {
+  Future<BuyV2ProductAcceptanceSnapshot> load({
+    required String ownerScope,
+    required String orderId,
+    required String purchaseId,
+    required String? unresolvedRequestKey,
+    required BuyV2ProductAcceptanceRequest? unresolvedRequest,
+  });
+  Future<BuyV2ProductAcceptanceSnapshot> accept(
+    BuyV2ProductAcceptanceRequest request,
+  );
+}
+
 enum BuyV2LiveDeliveryState { ready, delivered, offline, unavailable }
 
 @immutable

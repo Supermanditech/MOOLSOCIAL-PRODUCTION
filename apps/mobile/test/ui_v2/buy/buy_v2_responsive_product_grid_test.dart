@@ -1329,7 +1329,7 @@ void main() {
         find
             .descendant(
               of: firstCard,
-              matching: find.textContaining('at checkout'),
+              matching: find.textContaining('after Store acceptance'),
             )
             .first,
       );
@@ -1349,6 +1349,7 @@ void main() {
       await tester.pumpAndSettle();
       final fullDeliveryText = buyV2BuyerDeliveryPromise(
         session.productFactsFor(products[2]),
+        confirmAfterStoreAcceptance: true,
       );
       final oneDayPromise = find.descendant(
         of: oneDayCard,

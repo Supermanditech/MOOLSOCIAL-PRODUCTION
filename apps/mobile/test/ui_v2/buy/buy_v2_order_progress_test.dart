@@ -1437,7 +1437,371 @@ void _t13ReceiptCases() {
   }
 }
 
+class _T14AcceptanceAdapter implements BuyV2ProductAcceptanceAdapter {
+  _T14AcceptanceAdapter(this.value);
+  BuyV2ProductAcceptanceSnapshot value;
+  bool failAccept = false;
+  bool failLoad = false;
+  int calls = 0;
+  BuyV2ProductAcceptanceRequest? lastRequest;
+  BuyV2ProductAcceptanceRequest? reconciled;
+  String? reconciledKey;
+  Completer<BuyV2ProductAcceptanceSnapshot>? pending;
+  @override
+  Future<BuyV2ProductAcceptanceSnapshot> load({
+    required String ownerScope,
+    required String orderId,
+    required String purchaseId,
+    required String? unresolvedRequestKey,
+    required BuyV2ProductAcceptanceRequest? unresolvedRequest,
+  }) async {
+    reconciled = unresolvedRequest;
+    reconciledKey = unresolvedRequestKey;
+    if (failLoad) throw StateError('offline');
+    return value;
+  }
+
+  @override
+  Future<BuyV2ProductAcceptanceSnapshot> accept(
+    BuyV2ProductAcceptanceRequest request,
+  ) async {
+    calls++;
+    lastRequest = request;
+    if (failAccept) throw StateError('unknown response');
+    return pending?.future ?? value;
+  }
+}
+
+BuyV2Order _t14AcceptedOrder() {
+  final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+  return BuyV2Order(
+    id: 'acceptance-order',
+    purchaseId: 'acceptance-purchase',
+    destination: BuyV2Destination.shop,
+    title: 'Shop order',
+    itemSummary: '1 product',
+    total: 37,
+    partner: 'Neighbourhood Store',
+    partnerType: 'Retailer',
+    promise: '',
+    destinationLabel: 'Home',
+    progress: 1,
+    status: BuyV2OrderStatus.delivered,
+    lines: [BuyV2CartLine(product: product, quantity: 1)],
+  );
+}
+
+BuyV2ProductAcceptanceSnapshot _t14Acceptance(
+  BuyV2Order order, {
+  BuyV2ProductAcceptanceState state = BuyV2ProductAcceptanceState.ready,
+  int revision = 1,
+  int received = 1,
+  String owner = 'tracking-owner-a',
+  String source = 'qualified-test-acceptance',
+}) {
+  final product = order.lines.single.product;
+  final receipt = BuyV2ItemisedReceipt(
+    orderId: order.id,
+    purchaseId: order.purchaseId!,
+    lines: [
+      BuyV2ReceiptLine(
+        productId: product.id,
+        variant: product.variant,
+        pack: product.pack,
+        orderedQuantity: 1,
+        receivedQuantity: received,
+      ),
+    ],
+  );
+  return BuyV2ProductAcceptanceSnapshot(
+    ownerScope: owner,
+    orderId: order.id,
+    purchaseId: order.purchaseId!,
+    sourceId: source,
+    revision: revision,
+    state: state,
+    requestKey: buyV2ProductAcceptanceKey(owner, receipt),
+    receipt: receipt,
+  );
+}
+
 void main() {
+  test(
+    'T14 acceptance cold pending keeps original receipt for reconciliation',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(
+        _t14Acceptance(order, state: BuyV2ProductAcceptanceState.pending),
+      );
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      expect(controller.canAccept, isFalse);
+      adapter.failLoad = true;
+      expect(await controller.refresh(), isFalse);
+      expect(adapter.reconciledKey, adapter.value.requestKey);
+      expect(adapter.reconciled, isNull);
+      expect(controller.unknownOutcome, isTrue);
+      expect(adapter.calls, 0);
+    },
+  );
+
+  test(
+    'T14 acceptance changed confirmation revision and malformed submit cannot record',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      final oldReview = controller.reviewKey!;
+      adapter.value = _t14Acceptance(order, revision: 2);
+      await controller.refresh();
+      expect(await controller.accept(oldReview), isFalse);
+      expect(adapter.calls, 0);
+      final currentReview = controller.reviewKey!;
+      adapter.value = _t14Acceptance(
+        order,
+        owner: 'other-account',
+        revision: 3,
+        state: BuyV2ProductAcceptanceState.accepted,
+      );
+      expect(await controller.accept(currentReview), isFalse);
+      expect(controller.unknownOutcome, isTrue);
+      expect(controller.canAccept, isFalse);
+      expect(controller.snapshot!.state, BuyV2ProductAcceptanceState.ready);
+      expect(await controller.accept(currentReview), isFalse);
+      expect(adapter.calls, 1);
+    },
+  );
+
+  test(
+    'T14 acceptance cold load and authoritative accepted response',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      expect(controller.canAccept, isFalse);
+      expect(await controller.accept('unreviewed'), isFalse);
+      expect(adapter.calls, 0);
+      expect(await controller.refresh(), isTrue);
+      final review = controller.reviewKey!;
+      adapter.value = _t14Acceptance(
+        order,
+        state: BuyV2ProductAcceptanceState.accepted,
+        revision: 2,
+      );
+      expect(await controller.accept(review), isTrue);
+      expect(controller.snapshot!.state, BuyV2ProductAcceptanceState.accepted);
+      expect(controller.canAccept, isFalse);
+      expect(adapter.lastRequest!.snapshot.receipt.matchesOrder(order), isTrue);
+    },
+  );
+
+  test(
+    'T14 acceptance unknown keeps original key through restart and checking',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      final reviewed = controller.reviewKey!;
+      adapter.failAccept = true;
+      expect(await controller.accept(reviewed), isFalse);
+      final key = adapter.lastRequest!.idempotencyKey;
+      expect(controller.unknownOutcome, isTrue);
+      expect(await controller.accept(reviewed), isFalse);
+      expect(adapter.calls, 1);
+      adapter.value = _t14Acceptance(
+        order,
+        state: BuyV2ProductAcceptanceState.pending,
+        revision: 2,
+      );
+      expect(await controller.refresh(), isTrue);
+      expect(adapter.reconciled!.idempotencyKey, key);
+      expect(controller.canAccept, isFalse);
+      final restarted = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(restarted.dispose);
+      expect(restarted.canAccept, isFalse);
+      await restarted.refresh();
+      expect(restarted.snapshot!.requestKey, key);
+      expect(restarted.canAccept, isFalse);
+      adapter.value = _t14Acceptance(
+        order,
+        state: BuyV2ProductAcceptanceState.accepted,
+        revision: 3,
+      );
+      expect(await restarted.refresh(), isTrue);
+      expect(restarted.snapshot!.state, BuyV2ProductAcceptanceState.accepted);
+    },
+  );
+
+  for (final invalid in [
+    'partial',
+    'owner',
+    'source',
+    'older',
+    'equal-conflict',
+    'offline',
+  ]) {
+    test(
+      'T14 acceptance rejects $invalid without stale ready action',
+      () async {
+        final order = _t14AcceptedOrder();
+        final adapter = _T14AcceptanceAdapter(
+          _t14Acceptance(order, revision: 2),
+        );
+        final controller = BuyV2ProductAcceptanceController(
+          adapter: adapter,
+          ownerScope: 'tracking-owner-a',
+          currentOrder: () => order,
+          ownerCurrent: () => true,
+        );
+        addTearDown(controller.dispose);
+        await controller.refresh();
+        adapter.value = _t14Acceptance(
+          order,
+          revision: invalid == 'older'
+              ? 1
+              : invalid == 'equal-conflict'
+              ? 2
+              : 3,
+          received: invalid == 'partial' ? 0 : 1,
+          owner: invalid == 'owner' ? 'other-account' : 'tracking-owner-a',
+          source: invalid == 'source'
+              ? 'unexpected-source'
+              : 'qualified-test-acceptance',
+          state: invalid == 'equal-conflict'
+              ? BuyV2ProductAcceptanceState.accepted
+              : BuyV2ProductAcceptanceState.ready,
+        );
+        adapter.failLoad = invalid == 'offline';
+        expect(await controller.refresh(), isFalse);
+        expect(controller.canAccept, isFalse);
+        expect(adapter.calls, 0);
+      },
+    );
+  }
+
+  test(
+    'T14 acceptance serializes duplicate and rejects old owner callback',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      var current = true;
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => current,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      final review = controller.reviewKey!;
+      adapter.pending = Completer();
+      final future = controller.accept(review);
+      expect(await controller.accept(review), isFalse);
+      expect(adapter.calls, 1);
+      current = false;
+      adapter.pending!.complete(
+        _t14Acceptance(
+          order,
+          state: BuyV2ProductAcceptanceState.accepted,
+          revision: 2,
+        ),
+      );
+      expect(await future, isFalse);
+      expect(controller.snapshot, isNull);
+    },
+  );
+
+  test(
+    'T14 acceptance changed receipt cannot replace unresolved request',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      adapter.failAccept = true;
+      await controller.accept(controller.reviewKey!);
+      final original = adapter.lastRequest!.idempotencyKey;
+      adapter.value = _t14Acceptance(
+        order,
+        received: 0,
+        state: BuyV2ProductAcceptanceState.pending,
+        revision: 2,
+      );
+      expect(await controller.refresh(), isFalse);
+      expect(controller.unknownOutcome, isTrue);
+      expect(adapter.reconciled!.idempotencyKey, original);
+      expect(controller.canAccept, isFalse);
+    },
+  );
+
+  test(
+    'T14 acceptance definitive ready retry uses original identity with new revision',
+    () async {
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final controller = BuyV2ProductAcceptanceController(
+        adapter: adapter,
+        ownerScope: 'tracking-owner-a',
+        currentOrder: () => order,
+        ownerCurrent: () => true,
+      );
+      addTearDown(controller.dispose);
+      await controller.refresh();
+      adapter.failAccept = true;
+      await controller.accept(controller.reviewKey!);
+      final original = adapter.lastRequest!.idempotencyKey;
+      adapter.failAccept = false;
+      adapter.value = _t14Acceptance(order, revision: 2);
+      expect(await controller.refresh(), isTrue);
+      expect(controller.canAccept, isTrue);
+      final review = controller.reviewKey!;
+      adapter.value = _t14Acceptance(
+        order,
+        state: BuyV2ProductAcceptanceState.accepted,
+        revision: 3,
+      );
+      expect(await controller.accept(review), isTrue);
+      expect(adapter.lastRequest!.idempotencyKey, original);
+      expect(adapter.lastRequest!.snapshot.revision, 2);
+    },
+  );
   _t13ReceiptCases();
   _t12SupplyCases();
   Future<
@@ -1773,6 +2137,74 @@ void main() {
     ),
   );
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T14 acceptance receipt review cancel and confirm at $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final order = _t14AcceptedOrder();
+      final adapter = _T14AcceptanceAdapter(_t14Acceptance(order));
+      final commerce = _R669DeliveryCommerce()..records = [order];
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        commerceAdapter: commerce,
+        customerStateStore: _R669TrackingOwnerStore(),
+        productAcceptanceAdapter: adapter,
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      await tester.pumpWidget(app(session, scale));
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpAndSettle();
+      final review = find.byKey(
+        const ValueKey('buy-product-acceptance-review'),
+      );
+      await tester.scrollUntilVisible(
+        review,
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await Scrollable.ensureVisible(tester.element(review), alignment: .35);
+      await tester.pumpAndSettle();
+      expect(review.hitTestable(), findsOneWidget);
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+      expect(find.text('Check received products'), findsOneWidget);
+      expect(
+        find.textContaining(order.lines.single.product.title),
+        findsWidgets,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(adapter.calls, 0);
+      expect(session.selectedOrder.total, 37);
+      await Scrollable.ensureVisible(tester.element(review), alignment: .35);
+      await tester.pumpAndSettle();
+      expect(review.hitTestable(), findsOneWidget);
+      await tester.tap(review);
+      await tester.pumpAndSettle();
+      adapter.value = _t14Acceptance(
+        order,
+        state: BuyV2ProductAcceptanceState.accepted,
+        revision: 2,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-product-acceptance-confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Products accepted'), findsOneWidget);
+      expect(adapter.calls, 1);
+      expect(session.selectedOrder.status, BuyV2OrderStatus.delivered);
+      expect(session.selectedOrder.total, 37);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   Future<void> capture(WidgetTester tester, String name) async {
     const currentDirectory = String.fromEnvironment(
       'BUY_R664_VISUAL_DIRECTORY',
@@ -1835,100 +2267,192 @@ void main() {
         testWidgets(
           'T14 completion hierarchy ${status.name} $estimate at $scale',
           (tester) async {
-            await tester.binding.setSurfaceSize(const Size(320, 800));
-            addTearDown(() => tester.binding.setSurfaceSize(null));
-            final core = BuySession();
-            final adapter = _R669DeliveryCommerce();
-            final order = BuyV2Order(
-              id: 'completion-hierarchy',
-              destination: BuyV2Destination.shop,
-              title: 'Shop order',
-              itemSummary: '1 product',
-              total: 37,
-              partner: 'Neighbourhood Store',
-              partnerType: 'Retailer',
-              promise: estimate == 'missing' ? '' : 'Delivery in 15 min',
-              updatedDeliveryEstimate:
-                  estimate == 'revised' ? 'Delivery in 30 min' : null,
-              destinationLabel: 'Home',
-              progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
-              status: status,
-            );
-            adapter.records = [order];
-            final session = BuyV2Session(
-              core: core,
-              commerceAdapter: adapter,
-              reviewDataEnabled: false,
-            );
-            addTearDown(core.dispose);
-            addTearDown(session.dispose);
-            await session.restoreCommerce();
-            await tester.pumpWidget(app(session, scale));
-            expect(session.openTracking(order.id), isTrue);
-            await tester.pumpAndSettle();
-            final complete = status == BuyV2OrderStatus.delivered;
-            final heading = find.byKey(
-              ValueKey(
-                'buy-tracking-${complete ? 'completion' : 'estimate'}-${order.id}',
-              ),
-            );
-            expect(heading, findsOneWidget);
-            expect(
-              tester.widget<Text>(heading).data,
-              complete ? 'Delivered' : buyV2OrderArrivalSummary(session, order),
-            );
-            expect(
-              tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
-              isFalse,
-            );
-            expect(tester.widget<Text>(heading).style!.fontSize, 13);
-            final header = find.ancestor(
-              of: heading,
-              matching: find.byType(Container),
-            ).first;
-            if (complete) {
-              expect(
-                find.descendant(of: header, matching: find.text('Delivered')),
-                findsOneWidget,
+            final semantics = tester.ensureSemantics();
+            try {
+              await tester.binding.setSurfaceSize(const Size(320, 800));
+              addTearDown(() => tester.binding.setSurfaceSize(null));
+              final core = BuySession();
+              final adapter = _R669DeliveryCommerce();
+              final order = BuyV2Order(
+                id: 'completion-hierarchy',
+                destination: BuyV2Destination.shop,
+                title: 'Shop order',
+                itemSummary: '1 product',
+                total: 37,
+                partner: 'Neighbourhood Store',
+                partnerType: 'Retailer',
+                promise: estimate == 'missing' ? '' : 'Delivery in 15 min',
+                updatedDeliveryEstimate: estimate == 'revised'
+                    ? 'Delivery in 30 min'
+                    : null,
+                destinationLabel: 'Home',
+                progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
+                status: status,
               );
-              expect(
-                find.descendant(
-                  of: header,
-                  matching: find.textContaining('estimate'),
-                ),
-                findsNothing,
+              adapter.records = [order];
+              final session = BuyV2Session(
+                core: core,
+                commerceAdapter: adapter,
+                reviewDataEnabled: false,
               );
-            } else {
-              adapter.state = BuyV2CommerceLoadState.offline;
-              expect(await session.refreshOrder(order.id), isFalse);
+              addTearDown(core.dispose);
+              addTearDown(session.dispose);
+              await session.restoreCommerce();
+              await tester.pumpWidget(app(session, scale));
+              expect(session.openTracking(order.id), isTrue);
               await tester.pumpAndSettle();
+              final complete = status == BuyV2OrderStatus.delivered;
+              final heading = find.byKey(
+                ValueKey(
+                  'buy-tracking-${complete ? 'completion' : 'estimate'}-${order.id}',
+                ),
+              );
+              expect(heading, findsOneWidget);
               expect(
                 tester.widget<Text>(heading).data,
-                contains('update unavailable'),
+                complete
+                    ? 'Delivered'
+                    : buyV2OrderArrivalSummary(session, order),
               );
-              if (estimate == 'revised') {
+              expect(
+                tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
+                isFalse,
+              );
+              expect(tester.widget<Text>(heading).style!.fontSize, 13);
+              final header = find
+                  .ancestor(of: heading, matching: find.byType(Container))
+                  .first;
+              if (complete) {
+                expect(
+                  find.descendant(of: header, matching: find.text('Delivered')),
+                  findsOneWidget,
+                );
                 expect(
                   find.descendant(
                     of: header,
-                    matching: find.textContaining('Delivery in 30 min'),
+                    matching: find.textContaining('estimate'),
                   ),
-                  findsOneWidget,
+                  findsNothing,
                 );
+              } else {
+                adapter.state = BuyV2CommerceLoadState.offline;
+                expect(await session.refreshOrder(order.id), isFalse);
+                await tester.pumpAndSettle();
+                expect(
+                  tester.widget<Text>(heading).data,
+                  contains('update unavailable'),
+                );
+                if (estimate == 'revised') {
+                  expect(
+                    find.descendant(
+                      of: header,
+                      matching: find.textContaining('Delivery in 30 min'),
+                    ),
+                    findsOneWidget,
+                  );
+                }
               }
+              expect(
+                find.byKey(ValueKey('buy-tracking-refresh-${order.id}')),
+                findsOneWidget,
+              );
+              expect(
+                find.byKey(const ValueKey('buy-tracking-return-orders')),
+                findsOneWidget,
+              );
+              expect(session.selectedOrderOrNull!.status, status);
+              expect(session.selectedOrderOrNull!.promise, order.promise);
+              final trackingScroll = find
+                  .descendant(
+                    of: find.byKey(PageStorageKey('buy-tracking-${order.id}')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first;
+              final originalScroll = tester
+                  .state<ScrollableState>(trackingScroll)
+                  .position
+                  .pixels;
+              await tester.scrollUntilVisible(
+                find.text('Item checking and packing'),
+                180,
+                scrollable: trackingScroll,
+                maxScrolls: 20,
+              );
+              await Scrollable.ensureVisible(
+                tester.element(find.text('Item checking and packing')),
+                alignment: .5,
+              );
+              await tester.pumpAndSettle();
+              expect(find.text('Item checking and packing'), findsOneWidget);
+              expect(
+                find.text('Journey to the delivery address'),
+                findsOneWidget,
+              );
+              expect(
+                find.text('Items are being checked and packed'),
+                findsNothing,
+              );
+              expect(
+                find.text('Delivery is travelling to the address'),
+                findsNothing,
+              );
+              expect(
+                tester
+                    .getSemantics(
+                      find
+                          .ancestor(
+                            of: find.text('Item checking and packing'),
+                            matching: find.byType(Semantics),
+                          )
+                          .first,
+                    )
+                    .getSemanticsData()
+                    .label,
+                contains(
+                  'Packing. Item checking and packing. '
+                  '${complete ? 'Complete' : 'Last recorded stage'}',
+                ),
+              );
+              await Scrollable.ensureVisible(
+                tester.element(find.text('Journey to the delivery address')),
+                alignment: .5,
+              );
+              await tester.pumpAndSettle();
+              expect(
+                tester
+                    .getSemantics(
+                      find
+                          .ancestor(
+                            of: find.text('Journey to the delivery address'),
+                            matching: find.byType(Semantics),
+                          )
+                          .first,
+                    )
+                    .getSemanticsData()
+                    .label,
+                contains(
+                  'Arriving. Journey to the delivery address. '
+                  '${complete ? 'Complete' : 'Upcoming'}',
+                ),
+              );
+              await capture(
+                tester,
+                't14-timeline-${status.name}-$estimate-$scale',
+              );
+              tester
+                  .state<ScrollableState>(trackingScroll)
+                  .position
+                  .jumpTo(originalScroll);
+              await tester.pumpAndSettle();
+              await capture(
+                tester,
+                't14-completion-${status.name}-$estimate-$scale',
+              );
+              expect(tester.takeException(), isNull);
+              await tester.pumpWidget(const SizedBox.shrink());
+            } finally {
+              semantics.dispose();
             }
-            expect(
-              find.byKey(ValueKey('buy-tracking-refresh-${order.id}')),
-              findsOneWidget,
-            );
-            expect(
-              find.byKey(const ValueKey('buy-tracking-return-orders')),
-              findsOneWidget,
-            );
-            expect(session.selectedOrderOrNull!.status, status);
-            expect(session.selectedOrderOrNull!.promise, order.promise);
-            await capture(tester, 't14-completion-${status.name}-$estimate-$scale');
-            expect(tester.takeException(), isNull);
-            await tester.pumpWidget(const SizedBox.shrink());
           },
         );
       }
@@ -2179,6 +2703,7 @@ void main() {
       }
       session.chooseFulfilmentMode(mode);
       session.query = 'retained supplier search';
+      session.selectedFilter = 'retained filter';
       await tester.pumpAndSettle();
       expect(session.destination, origin);
       await tapDelivery(tester, 'toggle');
@@ -2196,12 +2721,70 @@ void main() {
       expect(session.quantityFor('w-notebook'), quantity);
       await capture(tester, 'r669-rail-tracking-return-${origin.name}');
       session.openOrders();
+      session.increase('w-notebook');
+      final updatedQuantity = session.quantityFor('w-notebook');
       expect(session.openTracking('quick-1'), isTrue);
       session.goBack();
       expect(session.destination, BuyV2Destination.orders);
       expect(session.view, BuyV2View.catalogue);
+      session.showOrdersTab(BuyV2OrdersTab.delivered);
+      session.openOrders();
+      session.goBack();
+      expect(session.destination, origin);
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.query, 'retained supplier search');
+      expect(session.selectedFilter, 'retained filter');
+      expect(session.selectedFulfilmentMode, mode);
+      expect(session.quantityFor('w-notebook'), updatedQuantity);
+      session.openOrders();
+      final other = origin == BuyV2Destination.shop
+          ? BuyV2Destination.wholesale
+          : BuyV2Destination.shop;
+      session.openDestination(other);
+      session.openOrders();
+      session.goBack();
+      expect(session.destination, other);
+      session.openAccount();
+      session.openOrdersFromAccount();
+      session.goBack();
+      expect(session.view, BuyV2View.account);
+      session.closeAccount();
+      expect(session.destination, other);
+      expect(session.quantityFor('w-notebook'), updatedQuantity);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final changeIdentity in [false, true]) {
+    test('T14 Orders return rejects stale owner identity $changeIdentity', () {
+      final core = BuySession();
+      final store = _R669TrackingOwnerStore();
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'a'),
+      );
+      final session = BuyV2Session(
+        core: core,
+        customerStateStore: store,
+        collectionIdentity: identity,
+      );
+      addTearDown(core.dispose);
+      addTearDown(identity.dispose);
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.wholesale);
+      session.query = 'old owner search';
+      session.openOrders();
+      if (changeIdentity) {
+        identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'new-session',
+        );
+      } else {
+        store.ownerScope = 'tracking-owner-b';
+      }
+      session.goBack();
+      expect(session.destination, BuyV2Destination.shop);
+      expect(session.query, isNot('old owner search'));
     });
   }
 
@@ -2324,6 +2907,13 @@ void main() {
       final quickCard = find.byKey(const ValueKey('buy-order-card-quick-1'));
       Finder cardText(String text) =>
           find.descendant(of: quickCard, matching: find.textContaining(text));
+      expect(cardText('Last recorded estimate'), findsNothing);
+      final quickDetails = find.byKey(
+        const ValueKey('buy-order-details-quick-1'),
+      );
+      await tester.ensureVisible(quickDetails);
+      await tester.tap(quickDetails);
+      await tester.pumpAndSettle();
       expect(cardText('Last recorded estimate'), findsOneWidget);
       adapter.pending = Completer<BuyV2OrderRefreshResult>();
       final pending = session.refreshOrder('quick-1');
@@ -2349,6 +2939,16 @@ void main() {
       final scheduledCard = find.byKey(
         const ValueKey('buy-order-card-scheduled-2'),
       );
+      final scheduledDetails = find.byKey(
+        const ValueKey('buy-order-details-scheduled-2'),
+      );
+      await tester.scrollUntilVisible(
+        scheduledDetails,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(scheduledDetails);
+      await tester.pumpAndSettle();
       expect(
         find.descendant(
           of: scheduledCard,
@@ -3647,7 +4247,12 @@ void main() {
             await tester.scrollUntilVisible(
               route,
               220,
-              scrollable: find.byType(Scrollable).last,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(PageStorageKey('buy-tracking-${order.id}')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
             );
             expect(
               find.descendant(

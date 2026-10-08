@@ -127,8 +127,13 @@ void main() {
               ),
             );
             await tester.pumpAndSettle();
-            expect(find.text('$expected · Retailer'), findsOneWidget);
-            expect(find.text('Mool Market 000001 · Retailer'), findsNothing);
+            expect(find.text(expected), findsOneWidget);
+            expect(find.byTooltip(expected), findsOneWidget);
+            expect(find.text('Mool Market 000001'), findsNothing);
+            expect(
+              find.byKey(const ValueKey('buy-order-primary-R6634-NAME')),
+              findsOneWidget,
+            );
           } else {
             final journey = JourneySession(
               store: MemoryJourneyStore(

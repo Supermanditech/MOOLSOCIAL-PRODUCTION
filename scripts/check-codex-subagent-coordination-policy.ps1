@@ -1080,6 +1080,11 @@ $cursorReadyOwners = @(
   'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
 )
 $cursorStorefrontOwners = @(
+  # Founder-approved exact T14 rail regression test owner, 6 October 2026.
+  'apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart',
+  # Founder-confirmed frontend/backend boundary instructions, 5 October 2026.
+  'AGENTS.md',
+  'docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
@@ -1240,6 +1245,15 @@ $cursorStorefrontOwners = @(
   'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-3.jsonl',
   'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-EVIDENCE.zip',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-1.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-2.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-3.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-4.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-5.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-6.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-7.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-8.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-INDEX.json',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-EVIDENCE.zip',
   'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl',
@@ -1346,6 +1360,7 @@ $cursorStorefrontOwners = @(
   # Founder-authorized local-only 11-ticket Buy cutoff, 22 September.
   'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+  'apps/mobile/lib/core/design/mool_design_system.dart',
   'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
   'apps/mobile/lib/features/buy/buy_v2_models.dart',
   'apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart',
@@ -1399,6 +1414,18 @@ $cursorReviewQualificationOwners = @(
   'docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip',
   'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
   'apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_location_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
   'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
   # Exact successor candidate images for the founder-requested A04 quantity repair.
@@ -3303,6 +3330,19 @@ if ($ProductionLane -ceq 'baseline') {
         $effectiveOwner -cin $addProductBootstrapOwners
       )
       $allowedOwner = $false
+      # Founder-confirmed instruction maintenance only, 5 October 2026.
+      # Preserve historical bootstrap owners and every ordinary gate.
+      $cursorBoundaryInstructionOwner = (
+        $cursorReadyAdmission -and
+        $currentClaim[0].task -ceq '/root' -and
+        $currentClaim[0].role -ceq 'primary' -and
+        $branch -ceq $cursorReadyBinding.branch -and
+        $rootForward -ceq $cursorReadyBinding.worktreePath -and
+        $ProductionPhase -cin @('implementation','pre_commit','handoff') -and
+        [int]$policy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+        [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256 -and
+        $effectiveOwner -ceq 'AGENTS.md'
+      )
       # Separately founder-authorized primary maintenance; all ordinary checks run.
       # The expected authority hash is fixed independently in the helper.
       . (Join-Path $PSScriptRoot 'artifact-evidence-retention.ps1')
@@ -3364,7 +3404,7 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($retentionMaintenanceOwner -or $cursorReadyOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($retentionMaintenanceOwner -or $cursorReadyOwner -or $cursorBoundaryInstructionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or

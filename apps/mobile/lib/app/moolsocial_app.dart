@@ -139,7 +139,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
   Future<void> _authenticationBoundaryTail = Future<void>.value();
-  late GoRouter _router = _createRouter(widget.initialLocation);
+  late final GoRouter _router = _createRouter(widget.initialLocation);
 
   GoRouter _createRouter(String initialLocation) => createJourneyRouter(
     _session,
@@ -234,19 +234,6 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       case AppLifecycleState.inactive:
         break;
     }
-  }
-
-  @override
-  void reassemble() {
-    super.reassemble();
-    assert(() {
-      final location = _router.routeInformationProvider.value.uri.toString();
-      final previousRouter = _router;
-      _router = _createRouter(location);
-      previousRouter.dispose();
-      setState(() {});
-      return true;
-    }());
   }
 
   @override

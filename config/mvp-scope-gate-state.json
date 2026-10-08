@@ -1673,7 +1673,7 @@
     },
     "selectedTicketAssessment": {
       "ticketId": "BUY-ACTION-POLISH-20260926-01",
-      "customerOutcome": "Personal Buyer Checkout tests verify accurate payment action amounts, truthful single/mixed order copy and preservation of original payment on unavailable handoff; qualify the25 retained failed cases without weakening payment guards.",
+      "customerOutcome": "Personal Buyer has a coherent premium visual presentation from Product/Add through Cart, Checkout, payment recovery, Orders and Delivered, preserving existing architecture, authoritative data and transaction behavior. Existing scope5-7 qualification remains historical; visual acceptance and new-source tests are required. Backend, third-party and Store-side integration remains deferred.",
       "manifestPath": "docs/quality/CURSOR-BUY-READY-20260921.md",
       "manifestSha256": "C608ED625CE8294677DED359BACAF21EC56DD1A6C510842D8BB68D627B5389ED",
       "reuseInventoryComplete": true,
@@ -1685,14 +1685,20 @@
         "new_necessary_work"
       ],
       "sharedImplementationOwners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart"
       ],
       "newScreens": [],
       "newRoutes": [],
       "newBackendOwners": [],
-      "necessityProof": "Reuse existing unified Checkout UI, frozen legacy/grouped payment state, checkout-cart-return focused-test owner and existing host commerce/facts fixtures. Trace/reproduce retained25 failures at91c1f1b0 baseline. Repair stale copy/fixture/assertions only where confirmed; runtime change only for a demonstrated root defect. No new screen, route, state, backend or dependency. Historical receipts/archive immutable; fresh source evidence requires separate exact admission.",
+      "necessityProof": "Reuse current Buy Checkout, address form, delivery-estimate review, grouped/legacy payment session, UPI intent/QR painter, recovery and tracking. Audit actual existing contract wiring and fill demonstrated frontend gaps only; qualify supported frontend states with isolated host adapters and native non-transactional review. Card credentials remain in the selected secure provider flow; no disconnected card form or simulated live payment/delivery. No new screen, route, service or dependency.",
       "robustnessCoverage": [
         "correlation/quantities/currency/refund reference",
         "changed offer contents and expiry",
@@ -1719,7 +1725,12 @@
         "Exact25 retained Checkout failures reproduced at clean91c1f1b0 baseline",
         "Original payment identity and no duplicate handoff on leave/reconcile",
         "Valid original amount fixture at320360430 normal/200percent",
-        "Mixed order CTA and authoritative dispatch details reachable"
+        "Mixed order CTA and authoritative dispatch details reachable",
+        "Scope5 shared address edit and unavailable/loading/stale delivery review and retry",
+        "Scope6 seven isolated payment-to-Delivered frontend flows and exact original-payment recovery; native supported screens only",
+        "Scope7 truthful secure Card handoff, UPI intent/QR amount expiry and return/check-payment guards",
+        "Current Redmi VM source identity, screenshot review and child registration; no live charges or fabricated authoritative order",
+        "Repair seven stale address-selector/orphan-payment test assumptions using actual Change flow and retained orphan hold, preserving original first failure stream."
       ],
       "adjustments": [
         "Verify clean local/remote T06 checkpoint and use the already refreshed native baseline for a new bounded Redmi recovery audit",
@@ -1750,7 +1761,7 @@
       ],
       "timelineImpactDays": 0,
       "within60To75DayLock": true,
-      "implementationState": "authorized_T14_checkout_test_qualification_in_progress",
+      "implementationState": "authorized_T14_frontend_dependency_split_in_progress",
       "evidencePath": "docs/quality/CURSOR-BUY-READY-20260921.md"
     },
     "priorC34ISelectedTicketAssessment": {

@@ -80,7 +80,10 @@ void main() {
             BorderSide.none,
           );
           expect(tester.getSize(close).shortestSide, greaterThanOrEqualTo(44));
-          expect(tester.widget<IconButton>(close).tooltip, 'Close store');
+          expect(tester.widget<IconButton>(close).tooltip, 'Back to browsing');
+          final storeRoute = ModalRoute.of(tester.element(close));
+          expect(storeRoute, isA<PageRoute>());
+          expect(storeRoute!.settings.name, 'buy-public-store');
           final toolbar = find.byKey(
             const ValueKey('buy-store-catalogue-toolbar'),
           );
@@ -1013,6 +1016,18 @@ void main() {
                 const ValueKey('buy-order-card-MS-SKU-TEST'),
               );
               expect(card, findsOneWidget);
+              expect(
+                find.descendant(of: card, matching: find.text(archived.title)),
+                findsNothing,
+                reason: 'Compact Orders rows defer SKU snapshots to details',
+              );
+              final details = find.byKey(
+                const ValueKey('buy-order-details-MS-SKU-TEST'),
+              );
+              await tester.ensureVisible(details);
+              await tester.tap(details);
+              await tester.pumpAndSettle();
+              expect(find.byTooltip('Hide order details'), findsOneWidget);
               if (withLines) {
                 expect(
                   find.descendant(
@@ -1045,7 +1060,10 @@ void main() {
                 expect(order.lines.first.product.title, archived.title);
               } else {
                 expect(
-                  find.descendant(of: card, matching: find.text('Shop order')),
+                  find.descendant(
+                    of: card,
+                    matching: find.text(order.itemSummary),
+                  ),
                   findsOneWidget,
                 );
                 expect(
@@ -1062,6 +1080,10 @@ void main() {
                       .evaluate()) {
                 final render = element.renderObject;
                 if (render is RenderParagraph) {
+                  // The compact Store heading may wrap/ellipsize; the complete
+                  // name remains in its text/semantics. Expanded SKU and amount
+                  // content must still fit without clipping.
+                  if (render.text.toPlainText() == order.partner) continue;
                   expect(render.didExceedMaxLines, isFalse);
                   final natural = TextPainter(
                     text: render.text,
@@ -1083,9 +1105,23 @@ void main() {
               );
               final provider = find.descendant(
                 of: card,
-                matching: find.text('${order.partner} · ${order.partnerType}'),
+                matching: find.text(order.partner),
               );
               expect(provider, findsOneWidget);
+              expect(
+                find.descendant(
+                  of: card,
+                  matching: find.text(order.partnerType),
+                ),
+                findsOneWidget,
+              );
+              final semantics = tester.ensureSemantics();
+              expect(
+                tester.getSemantics(provider).getSemanticsData().label,
+                contains(order.partner),
+                reason: 'The complete Store name must remain accessible',
+              );
+              semantics.dispose();
               await tester.ensureVisible(provider);
               await tester.pumpAndSettle();
               expect(provider.hitTestable(), findsOneWidget);
@@ -1930,7 +1966,7 @@ void main() {
           tester.widget<Text>(pack).style?.fontSize,
           greaterThanOrEqualTo(11),
         );
-        void expectComplete(Finder owner) {
+        void expectComplete(Finder owner, {bool compactCartTitle = false}) {
           for (final element
               in find
                   .descendant(of: owner, matching: find.byType(RichText))
@@ -1945,6 +1981,12 @@ void main() {
             if (iconGlyph) continue;
             final paragraph = element.renderObject;
             if (paragraph is RenderParagraph) {
+              if (compactCartTitle &&
+                  paragraph.text.toPlainText() == product.customerTitle) {
+                expect(paragraph.maxLines, scale > 1.2 ? 3 : 2);
+                expect(paragraph.overflow, TextOverflow.ellipsis);
+                continue;
+              }
               expect(
                 paragraph.didExceedMaxLines,
                 isFalse,
@@ -1968,7 +2010,9 @@ void main() {
           }
         }
 
-        expectComplete(cartLine);
+        expectComplete(cartLine, compactCartTitle: true);
+        final cartTotal = session.cartTotal;
+        expect(session.checkoutPaymentAttempt, isNull);
         expect(session.quantityFor(product.id), product.minimumOrder);
         expect(tester.takeException(), isNull);
         await captureR66Visual(
@@ -1981,6 +2025,20 @@ void main() {
         final visibleTitle = find.descendant(
           of: details,
           matching: find.text(product.customerTitle),
+        );
+        expect(
+          find
+              .ancestor(of: visibleTitle, matching: find.byType(Semantics))
+              .evaluate()
+              .any((element) {
+                final properties = (element.widget as Semantics).properties;
+                return properties.button == true &&
+                    (properties.label?.contains(product.customerTitle) ??
+                        false);
+              }),
+          isTrue,
+          reason:
+              'The complete Cart title remains available as an accessible Product details action.',
         );
         await Scrollable.ensureVisible(
           tester.element(visibleTitle),
@@ -2050,6 +2108,12 @@ void main() {
         await tester.pumpAndSettle();
         expect(identity, findsNothing);
         expect(session.quantityFor(product.id), product.minimumOrder);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.quantityFor(product.id), product.minimumOrder);
+        expect(session.cartTotal, cartTotal);
+        expect(session.checkoutPaymentAttempt, isNull);
       });
     }
   }
@@ -3115,13 +3179,11 @@ void main() {
           AppLifecycleState.resumed,
         );
         await tester.pumpAndSettle();
-        final refresh = find.widgetWithText(TextButton, 'Refresh offers');
-        await reveal(refresh);
-        expect(find.byType(BuyV2ProductCard), findsNothing);
-        expect(find.text('Offers need refreshing'), findsOneWidget);
-        await capture('expired');
-        await tester.tap(refresh);
-        await tester.pumpAndSettle();
+        // Existing resume/expiry admission refreshes valid publications without
+        // asking a first-time or returning buyer to reveal offers manually.
+        expect(find.text('Offers need refreshing'), findsNothing);
+        expect(pager.message, isNull);
+        await capture('expiry-auto-refreshed');
         expect(
           pager.page!.items.every((offer) => offer.isCurrent(now: now)),
           isTrue,
@@ -4555,103 +4617,117 @@ void main() {
   }
 
   for (final firstId in ['s-eggs', 'w-notebook']) {
-    testWidgets('R66 Cart store continuation stays scoped after $firstId', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 844);
-      addTearDown(tester.view.reset);
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      addTearDown(session.dispose);
-      addTearDown(core.dispose);
-      session.addProduct('s-eggs');
-      session.addProduct('w-notebook');
-      final first = session.product(firstId);
-      final other = session.product(
-        firstId == 's-eggs' ? 'w-notebook' : 's-eggs',
-      );
-      expect(session.openProduct(first.id), isTrue);
-      await tester.pumpWidget(_app(session));
-      await tester.pumpAndSettle();
-
-      Future<void> visitAndClose(BuyV2Product product) async {
-        final prefix = product.destination == BuyV2Destination.shop
-            ? 'buy-shop-seller'
-            : 'buy-wholesale-supplier';
-        final action = find.byKey(
-          ValueKey(
-            '${product.destination == BuyV2Destination.shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
-          ),
+    testWidgets(
+      'R66 Cart store continuation preserves visit across filters after $firstId',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.addProduct('s-eggs');
+        session.addProduct('w-notebook');
+        final originalTotal = session.cartTotal;
+        final first = session.product(firstId);
+        final other = session.product(
+          firstId == 's-eggs' ? 'w-notebook' : 's-eggs',
         );
-        await _revealProductAction(tester, product.id, action);
-        await tester.tap(action);
+        expect(session.openProduct(first.id), isTrue);
+        await tester.pumpWidget(_app(session));
         await tester.pumpAndSettle();
-        expect(
-          find.byKey(ValueKey('$prefix-sheet-${product.id}')),
-          findsOneWidget,
-        );
-        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+
+        Future<void> visitAndClose(BuyV2Product product) async {
+          final prefix = product.destination == BuyV2Destination.shop
+              ? 'buy-shop-seller'
+              : 'buy-wholesale-supplier';
+          final action = find.byKey(
+            ValueKey(
+              '${product.destination == BuyV2Destination.shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${product.id}',
+            ),
+          );
+          await _revealProductAction(tester, product.id, action);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$prefix-sheet-${product.id}')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+          await tester.pumpAndSettle();
+        }
+
+        await visitAndClose(first);
+        session.openCart();
         await tester.pumpAndSettle();
-      }
-
-      await visitAndClose(first);
-      session.openCart();
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(ValueKey('buy-cart-scope-${other.destination.name}')),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-cart-continue-store')),
-        findsNothing,
-        reason: 'An unvisited scope must not offer the other scope store',
-      );
-
-      expect(session.openProduct(other.id), isTrue);
-      await tester.pumpAndSettle();
-      await visitAndClose(other);
-      session.openCart();
-      await tester.pumpAndSettle();
-      for (final product in [first, other]) {
+        final purchaseScope = session.cartScope;
         await tester.tap(
-          find.byKey(ValueKey('buy-cart-scope-${product.destination.name}')),
+          find.byKey(ValueKey('buy-cart-filter-${other.destination.name}')),
         );
         await tester.pumpAndSettle();
-        final action = find.byKey(const ValueKey('buy-cart-continue-store'));
-        expect(action, findsOneWidget);
+        expect(session.cartDisplayFilter, other.destination.name);
+        expect(session.cartScope, purchaseScope);
         expect(
-          find.descendant(of: action, matching: find.text(product.seller)),
+          find.descendant(
+            of: find.byKey(const ValueKey('buy-cart-continue-store')),
+            matching: find.text(first.customerSeller(first.seller)),
+          ),
           findsOneWidget,
+          reason: 'A display filter must not invent a visit to the other Store',
         );
-        await tester.ensureVisible(action);
-        await tester.tap(action);
+
+        expect(session.openProduct(other.id), isTrue);
         await tester.pumpAndSettle();
-        final prefix = product.destination == BuyV2Destination.shop
-            ? 'buy-shop-seller'
-            : 'buy-wholesale-supplier';
+        await visitAndClose(other);
+        session.openCart();
+        await tester.pumpAndSettle();
+        for (final product in [first, other]) {
+          await tester.tap(
+            find.byKey(ValueKey('buy-cart-filter-${product.destination.name}')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.cartDisplayFilter, product.destination.name);
+          final action = find.byKey(const ValueKey('buy-cart-continue-store'));
+          expect(action, findsOneWidget);
+          expect(
+            find.descendant(
+              of: action,
+              matching: find.text(other.customerSeller(other.seller)),
+            ),
+            findsOneWidget,
+            reason: 'Filtering items preserves the most recently visited Store',
+          );
+          await tester.ensureVisible(action);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final prefix = other.destination == BuyV2Destination.shop
+              ? 'buy-shop-seller'
+              : 'buy-wholesale-supplier';
+          expect(
+            find.byKey(ValueKey('$prefix-sheet-${other.id}')),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+        }
+        await tester.tap(find.byKey(const ValueKey('buy-cart-filter-all')));
+        await tester.pumpAndSettle();
         expect(
-          find.byKey(ValueKey('$prefix-sheet-${product.id}')),
+          find.descendant(
+            of: find.byKey(const ValueKey('buy-cart-continue-store')),
+            matching: find.text(other.customerSeller(other.seller)),
+          ),
           findsOneWidget,
+          reason: 'All-items display retains the most recently visited Store',
         );
-        await tester.tap(find.byKey(ValueKey('$prefix-sheet-close')));
-        await tester.pumpAndSettle();
-        expect(session.view, BuyV2View.cart);
-      }
-      await tester.tap(find.byKey(const ValueKey('buy-cart-scope-all')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('buy-cart-continue-store')),
-          matching: find.text(other.seller),
-        ),
-        findsOneWidget,
-        reason: 'All-scope Cart retains the most recently visited store',
-      );
-      expect(session.quantityFor('s-eggs'), 1);
-      expect(session.quantityFor('w-notebook'), 1);
-      expect(tester.takeException(), isNull);
-    });
+        expect(session.quantityFor('s-eggs'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(session.cartTotal, originalTotal);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   test(

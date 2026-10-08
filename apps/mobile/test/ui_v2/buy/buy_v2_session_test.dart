@@ -598,6 +598,9 @@ _openProductionCheckout({
     partnerType: product.partnerRole,
     promise: product.deliveryPromise,
     destinationLabel: address.shortLine,
+    recipient: address.recipient,
+    addressLine: address.line,
+    amountPaidNow: product.price,
     progress: .2,
     status: BuyV2OrderStatus.preparing,
     purchaseId: 'BUY-SERVER-1',
@@ -663,9 +666,11 @@ _openProductionCheckout({
     commerceAdapter: adapter,
     customerStateStore:
         customerStateStore ??
-        (productReviewAvailable
-            ? _MemoryCustomerStateStore('review-fixture-buyer')
-            : null),
+        _MemoryCustomerStateStore(
+          productReviewAvailable
+              ? 'review-fixture-buyer'
+              : 'checkout-fixture-buyer',
+        ),
     reviewDataEnabled: false,
   );
   await session.restoreCommerce();
@@ -12910,7 +12915,10 @@ void main() {
 
       expect(session.selectedAddressId, 'work');
       expect(session.selectedPayment, 'Card');
-      expect(session.notice, 'This payment method is not available.');
+      expect(
+        session.notice,
+        'This payment method is unavailable for this purchase.',
+      );
       expect(BuyV2Session.paymentMethods, {'UPI', 'Card'});
     });
 
@@ -13002,7 +13010,13 @@ void main() {
         expect(production.view, isNot(BuyV2View.confirmation));
         expect(
           production.checkoutSubmissionState,
-          BuyV2CheckoutSubmissionState.unavailable,
+          BuyV2CheckoutSubmissionState.idle,
+        );
+        expect(production.confirmedOrders, isEmpty);
+        expect(production.legacyCheckoutAttempt, isNull);
+        expect(
+          production.notice,
+          'This payment method is unavailable for this purchase.',
         );
       },
     );
@@ -13036,6 +13050,9 @@ void main() {
           partnerType: product.partnerRole,
           promise: product.deliveryPromise,
           destinationLabel: address.shortLine,
+          recipient: address.recipient,
+          addressLine: address.line,
+          amountPaidNow: product.price,
           progress: .2,
           status: BuyV2OrderStatus.preparing,
           purchaseId: 'BUY-SERVER-1',
@@ -13061,6 +13078,9 @@ void main() {
         final production = BuyV2Session(
           core: BuySession(),
           commerceAdapter: adapter,
+          customerStateStore: _MemoryCustomerStateStore(
+            'authoritative-checkout-fixture',
+          ),
           productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
@@ -13070,7 +13090,11 @@ void main() {
         production.openCart(scope: BuyV2CartScope.shop);
         expect(production.openCheckout(), isTrue);
 
-        expect(await production.submitOrder(), isTrue);
+        expect(
+          await production.submitOrder(),
+          isTrue,
+          reason: production.notice,
+        );
         expect(adapter.placementCalls, 1);
         expect(production.view, BuyV2View.confirmation);
         expect(production.confirmedOrders.single.id, order.id);
@@ -13325,6 +13349,9 @@ void main() {
           outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
           paymentActionUri: Uri.parse('upi://pay?pa=merchant@mool'),
           paymentReference: 'PAY-1',
+          customerStateStore: _MemoryCustomerStateStore(
+            'handoff-contract-test',
+          ),
         );
         addTearDown(fixture.session.dispose);
 
@@ -13332,6 +13359,7 @@ void main() {
         expect(
           fixture.session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.paymentActionRequired,
+          reason: fixture.session.notice,
         );
         final idempotencyKey = fixture.session.checkoutIdempotencyKey;
         expect(idempotencyKey, isNotEmpty);
@@ -13374,20 +13402,30 @@ void main() {
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.failed,
+          paymentReference: 'PAY-FAILED-1',
         );
         addTearDown(fixture.session.dispose);
 
         expect(await fixture.session.submitOrder(), isFalse);
         final firstKey = fixture.adapter.requests.single.idempotencyKey;
-        fixture.adapter.placement = BuyV2OrderPlacementResult(
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.requests, hasLength(1));
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
           outcome: BuyV2OrderPlacementOutcome.confirmed,
           customerMessage: 'Your order is confirmed.',
           purchaseReference: 'BUY-SERVER-1',
+          paymentReference: 'PAY-FAILED-1',
+          idempotencyKey: firstKey,
           orders: [fixture.order],
         );
 
-        expect(await fixture.session.submitOrder(), isTrue);
-        expect(fixture.adapter.requests, hasLength(2));
+        expect(
+          await fixture.session.reconcilePayment(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
+        expect(fixture.adapter.requests, hasLength(1));
+        expect(fixture.adapter.reconciliationCalls, 1);
         expect(fixture.adapter.requests.last.idempotencyKey, firstKey);
         expect(fixture.session.confirmedOrders, hasLength(1));
       },
@@ -13398,16 +13436,37 @@ void main() {
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.cancelled,
+          customerStateStore: _MemoryCustomerStateStore('cancel-contract-test'),
+          paymentReference: 'PAY-CANCEL-1',
         );
         addTearDown(fixture.session.dispose);
 
         expect(await fixture.session.submitOrder(), isFalse);
+        expect(
+          fixture.adapter.requests,
+          hasLength(1),
+          reason: fixture.session.notice,
+        );
         final cancelledKey = fixture.adapter.requests.single.idempotencyKey;
-        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(fixture.session.checkoutIdempotencyKey, cancelledKey);
         expect(
           fixture.session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.cancelled,
         );
+        expect(fixture.session.retryCheckoutPayment(), isFalse);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.requests, hasLength(1));
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.cancelled,
+          customerMessage: 'The original payment is closed.',
+          idempotencyKey: cancelledKey,
+          paymentReference: 'PAY-CANCEL-1',
+          retryAllowed: true,
+        );
+        expect(await fixture.session.reconcilePayment(), isFalse);
+        expect(fixture.session.checkoutRequiresResolution, isFalse);
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(fixture.session.retryCheckoutPayment(), isTrue);
         fixture.adapter.placement = BuyV2OrderPlacementResult(
           outcome: BuyV2OrderPlacementOutcome.confirmed,
           customerMessage: 'Your order is confirmed.',
@@ -13415,7 +13474,11 @@ void main() {
           orders: [fixture.order],
         );
 
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         expect(
           fixture.adapter.requests.last.idempotencyKey,
           isNot(cancelledKey),
@@ -13459,6 +13522,9 @@ void main() {
               title: fixture.order.title,
               itemSummary: fixture.order.itemSummary,
               total: currentLine.total,
+              amountPaidNow: currentLine.total,
+              recipient: fixture.order.recipient,
+              addressLine: fixture.order.addressLine,
               partner: fixture.order.partner,
               partnerType: fixture.order.partnerType,
               promise: fixture.order.promise,
@@ -13472,7 +13538,11 @@ void main() {
             ),
           ],
         );
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         expect(fixture.adapter.placementCalls, 1);
       },
     );
@@ -13614,7 +13684,11 @@ void main() {
       final fixture = await _openProductionCheckout(
         outcome: BuyV2OrderPlacementOutcome.confirmed,
       );
-      expect(await fixture.session.submitOrder(), isTrue);
+      expect(
+        await fixture.session.submitOrder(),
+        isTrue,
+        reason: fixture.session.notice,
+      );
       final original = fixture.session.orders.first;
       final gate = Completer<BuyV2OrderRefreshResult>();
       fixture.adapter.orderRefreshGate = gate;
@@ -13637,7 +13711,11 @@ void main() {
           outcome: BuyV2OrderPlacementOutcome.confirmed,
         );
         addTearDown(fixture.session.dispose);
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         final original = fixture.session.orders.first;
         fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
           state: BuyV2CommerceLoadState.ready,
@@ -13671,7 +13749,11 @@ void main() {
           outcome: BuyV2OrderPlacementOutcome.confirmed,
         );
         addTearDown(fixture.session.dispose);
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         final updated = BuyV2Order(
           id: fixture.order.id,
           destination: fixture.order.destination,
@@ -13816,7 +13898,11 @@ void main() {
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 0);
-        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.view,
+          BuyV2View.recovery,
+          reason: fixture.session.notice,
+        );
         expect(
           fixture.session.checkoutAvailabilityIssue?.productId,
           fixture.product.id,
@@ -13834,7 +13920,7 @@ void main() {
     );
 
     test(
-      'server stock rejection removes only its exact Cart product',
+      'server stock response after submission preserves original payment and Cart',
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.unavailable,
@@ -13849,37 +13935,47 @@ void main() {
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 1);
-        expect(fixture.session.view, BuyV2View.recovery);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutRequiresResolution, isTrue);
         expect(
-          fixture.session.checkoutAvailabilityIssue?.title,
-          fixture.product.title,
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
         );
-        expect(fixture.session.removeCheckoutIssueProduct(), isTrue);
-        expect(fixture.session.cartLines, isEmpty);
-        expect(fixture.session.view, BuyV2View.catalogue);
+        expect(fixture.session.removeCheckoutIssueProduct(), isFalse);
+        expect(fixture.session.quantityFor(fixture.product.id), 1);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
       },
     );
 
-    test('service-area rejection returns to exact Checkout address', () async {
-      final fixture = await _openProductionCheckout(
-        outcome: BuyV2OrderPlacementOutcome.unavailable,
-      );
-      addTearDown(fixture.session.dispose);
-      final addressId = fixture.session.selectedAddress.id;
-      fixture.adapter.placement = const BuyV2OrderPlacementResult(
-        outcome: BuyV2OrderPlacementOutcome.unavailable,
-        customerMessage: 'Delivery is unavailable at this address.',
-        failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
-      );
+    test(
+      'service-area response after submission retains exact address and original payment',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+        );
+        addTearDown(fixture.session.dispose);
+        final addressId = fixture.session.selectedAddress.id;
+        fixture.adapter.placement = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+          customerMessage: 'Delivery is unavailable at this address.',
+          failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
+        );
 
-      expect(await fixture.session.submitOrder(), isFalse);
-      expect(fixture.session.view, BuyV2View.recovery);
-      expect(fixture.session.canResolveCheckoutAddress, isTrue);
-      fixture.session.retryRecovery();
-      expect(fixture.session.view, BuyV2View.checkout);
-      expect(fixture.session.selectedAddress.id, addressId);
-      expect(fixture.session.cartLines, isNotEmpty);
-    });
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutRequiresResolution, isTrue);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.selectedAddress.id, addressId);
+        expect(fixture.session.cartLines, isNotEmpty);
+      },
+    );
 
     test('Shop sale type separates Quick delivery and Courier products', () {
       final core = BuySession();

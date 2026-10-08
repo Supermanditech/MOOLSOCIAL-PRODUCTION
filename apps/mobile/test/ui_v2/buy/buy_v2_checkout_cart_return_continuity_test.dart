@@ -13,6 +13,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
@@ -38,12 +39,14 @@ class _R66OrderCustomerStore implements BuyV2CustomerStateStore {
   String get ownerScope => 'r66-order-group-customer';
 
   BuyV2CustomerStateSnapshot? snapshot;
+  int writes = 0;
 
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    writes += 1;
     snapshot = value;
     return true;
   }
@@ -285,6 +288,7 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
 class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
   String? deadline;
   int? price;
+  bool unavailable = false;
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
@@ -296,6 +300,7 @@ class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
       deliveryPromise: 'Delivery time confirmed at checkout',
       promisedByLabel: deadline,
       price: price,
+      orderabilityLabel: unavailable ? 'Unavailable' : facts.orderabilityLabel,
       sourceId: 'r669-delivery-estimate-test-provider',
     );
   }
@@ -309,6 +314,9 @@ class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
   ) => const BuyV2CatalogueProductFactsAdapter()
       .snapshotFor(product)
       .copyWith(
+        orderabilityLabel: product.id == unavailableProductId
+            ? 'Unavailable'
+            : 'Available',
         deliveryPromise: product.id == unavailableProductId
             ? 'Delivery time confirmed at checkout'
             : product.deliveryPromise,
@@ -536,6 +544,8 @@ class _T08OrderSummarySession extends BuyV2Session {
   @override
   List<BuyV2Order> get visibleOrders => records;
   @override
+  List<BuyV2Order> get visibleOrderHistory => records;
+  @override
   bool get catalogueAvailable => true;
   @override
   BuyV2BalancePaymentResult? balancePaymentFor(String orderId) =>
@@ -623,13 +633,13 @@ void main() {
             .join('\n');
         switch (record.id) {
           case 'paid':
-            expect(texts, contains('Payment · Paid'));
+            expect(texts, contains('Paid'));
           case 'advance':
-            expect(texts, contains('Payment · Advance paid'));
-            expect(texts, contains('₹300 · at delivery'));
+            expect(texts, contains('Advance paid'));
+            expect(texts, contains('₹300 balance'));
           case 'pending':
-            expect(texts, contains('Payment · Payment pending'));
-            expect(texts, contains('₹300 · at delivery'));
+            expect(texts, contains('Payment pending'));
+            expect(texts, contains('₹300 balance'));
           case 'missing':
             expect(texts, contains('Payment status unavailable'));
             expect(texts, isNot(contains('Paid')));
@@ -649,6 +659,19 @@ void main() {
           ),
           findsNothing,
         );
+        final details = find.byKey(ValueKey('buy-order-details-${record.id}'));
+        await tester.ensureVisible(details);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        if (record.id == 'advance' || record.id == 'pending') {
+          expect(
+            find.descendant(
+              of: find.byKey(ValueKey('buy-order-card-${record.id}')),
+              matching: find.text('at delivery'),
+            ),
+            findsOneWidget,
+          );
+        }
         expect(tester.takeException(), isNull);
         await captureR66Visual(tester, 't08-${record.id}-$scale');
       }
@@ -832,6 +855,71 @@ void main() {
       ),
     );
   }
+
+  testWidgets('T14 ordinary reassembly preserves idle pending payment', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final adapter = prepaidCommerceFixture();
+    final store = _R66OrderCustomerStore();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      customerStateStore: store,
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
+    expect(await session.submitOrder(), isFalse);
+    session.openCart();
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final screen = find.byType(BuyV2Screen);
+    final state = tester.state(screen);
+    final attempt = session.legacyCheckoutAttempt;
+    expect(attempt, isNotNull);
+    final request = attempt!.payment.request;
+    final snapshot = store.snapshot;
+    final writes = store.writes;
+    final dynamic countedAdapter = adapter;
+    final placements = countedAdapter.placementCalls;
+    final reconciliations = countedAdapter.reconciliationCalls;
+    final total = session.checkoutPayableTotal;
+    final payment = session.selectedPayment;
+    expect(session.checkoutBusy, isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    // Rendering reassembly waits for endOfFrame; drive that frame in the test.
+    final reassembled = tester.binding.reassembleApplication();
+    await tester.pump();
+    await reassembled;
+    await tester.pumpAndSettle();
+    expect(tester.state(screen), same(state));
+    expect(tester.widget<BuyV2Screen>(screen).session, same(session));
+    expect(session.legacyCheckoutAttempt, same(attempt));
+    expect(session.legacyCheckoutAttempt!.payment.request, same(request));
+    expect(store.snapshot, same(snapshot));
+    expect(store.writes, writes);
+    expect(countedAdapter.placementCalls, placements);
+    expect(countedAdapter.reconciliationCalls, reconciliations);
+    expect(session.view, BuyV2View.cart);
+    expect(session.quantityFor('s-tomato'), 1);
+    expect(session.cartProductSelected('s-tomato'), isTrue);
+    expect(session.checkoutPayableTotal, total);
+    expect(session.selectedPayment, payment);
+    expect(session.checkoutBusy, isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(session.cartChangesBlocked, isTrue);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('buy-cart-empty')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
@@ -1059,6 +1147,11 @@ void main() {
             isTrue,
           );
           expect(tester.widget<TextButton>(productControl).onPressed, isNull);
+          final heldPill = tester.widget<DecoratedBox>(
+            find.byKey(const ValueKey('buy-compact-quantity-pill')),
+          ).decoration as BoxDecoration;
+          expect(heldPill.color, BuyV2Colors.canvas);
+          expect(heldPill.border, Border.all(color: BuyV2Colors.line));
           await tester.tap(productControl);
           await tester.pumpAndSettle();
           expect(session.view, BuyV2View.catalogue);
@@ -1098,6 +1191,45 @@ void main() {
           expect(session.notice, contains('payment'));
           expect(session.legacyCheckoutAttempt, same(attempt));
           await captureR66Visual(tester, 't10-held-add-disabled-$scale');
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-offers-payment-hold')), findsOneWidget);
+          session.openDestination(BuyV2Destination.shop);
+          session.openProduct('s-rice');
+          session.openProduct('s-tomato');
+          session.openDestination(BuyV2Destination.shop);
+          await tester.pumpAndSettle();
+          unawaited(showBuyV2RecentlyViewed(
+            tester.element(find.byType(BuyV2Screen)), session,
+          ));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const ValueKey('buy-recently-viewed-payment-hold')), findsOneWidget);
+          for (final id in ['s-rice', 's-tomato']) {
+            final action = find.byKey(ValueKey('buy-recently-viewed-add-$id'));
+            final recentScroll = find.descendant(
+              of: find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+              matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down),
+            );
+            expect(recentScroll, findsOneWidget);
+            // Fixture positioning: each lookup starts at the list's beginning.
+            final position = tester.state<ScrollableState>(recentScroll).position;
+            position.jumpTo(position.minScrollExtent);
+            await tester.pumpAndSettle();
+            await tester.scrollUntilVisible(action, 100, scrollable: recentScroll);
+            await tester.pumpAndSettle();
+            expect(action.hitTestable(), findsOneWidget);
+            final button = tester.widget<ButtonStyleButton>(action);
+            expect(button.onPressed, isNull);
+            await tester.ensureVisible(action);
+            await tester.pumpAndSettle();
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey('buy-recently-viewed-rejection-$id')), findsNothing);
+          }
+          expect(session.quantityFor('s-rice'), 0);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.legacyCheckoutAttempt, same(attempt));
           expect(tester.takeException(), isNull);
         } finally {
           semantics.dispose();
@@ -1144,7 +1276,9 @@ void main() {
           of: line,
           matching: find.byTooltip('Add one'),
         );
-        await tester.ensureVisible(plus);
+        await Scrollable.ensureVisible(tester.element(plus), alignment: 0.2);
+        await tester.pumpAndSettle();
+        expect(plus.hitTestable(), findsOneWidget);
         await tester.tap(plus);
         await tester.pumpAndSettle();
         expect(session.quantityFor('s-tomato'), 2);
@@ -1162,6 +1296,12 @@ void main() {
               )
               .first,
         );
+        await Scrollable.ensureVisible(
+          tester.element(instruction),
+          alignment: 0.2,
+        );
+        await tester.pumpAndSettle();
+        expect(instruction.hitTestable(), findsOneWidget);
         await tester.tap(instruction);
         await tester.pumpAndSettle();
         await tester.enterText(
@@ -1290,7 +1430,14 @@ void main() {
           final originalOrders = session.orders.length;
           await tester.pumpWidget(app(session, size: size, textScale: scale));
           await tester.pumpAndSettle();
-          expect(find.byKey(const ValueKey('buy-checkout-heading')), findsOne);
+          expect(
+            find.byKey(const ValueKey('buy-checkout-heading')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-checkout-return-cart')),
+            findsOne,
+          );
           expect(find.text('Continue to payment'), findsNothing);
           expect(find.text('Review order'), findsNothing);
 
@@ -1459,11 +1606,20 @@ void main() {
           await reveal(checkout);
           await tester.tap(checkout);
           await tester.pumpAndSettle();
-          expect(find.byKey(const ValueKey('buy-checkout-heading')), findsOne);
+          expect(
+            find.byKey(const ValueKey('buy-checkout-heading')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-checkout-return-cart')),
+            findsOne,
+          );
           expect(find.text('Continue to payment'), findsNothing);
           expect(find.text('Review order'), findsNothing);
           expect(session.checkoutItemCount, count);
-          final edit = find.text('Edit basket');
+          // The persistent Cart return is available on every idle Checkout.
+          // Edit basket is contextual recovery for unavailable eligibility.
+          final edit = find.byKey(const ValueKey('buy-checkout-return-cart'));
           await reveal(edit);
           await tester.tap(edit);
           await tester.pumpAndSettle();
@@ -1548,8 +1704,59 @@ void main() {
           expect(session.addresses.length, before);
           expect(session.itemCount, count);
         } else if (route == 3) {
-          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          final offers = find.byKey(const ValueKey('buy-local-tab-offers'));
+          await captureR66Visual(tester, 't14-c05-offers-navigation-$state');
+          if (offers.hitTestable().evaluate().isEmpty) {
+            final parkedViewport = find.byKey(
+              const PageStorageKey('buy-compact-cart-local-navigation-scroll'),
+            );
+            final localViewport = find.descendant(
+              of: find.byKey(const ValueKey('buy-local-destination-tabs')),
+              matching: find.byKey(
+                const Key('moolsocial-local-navigation-compact-overflow'),
+              ),
+            );
+            final overflow = parkedViewport.evaluate().isNotEmpty
+                ? parkedViewport
+                : localViewport;
+            expect(overflow, findsOneWidget);
+            // Reveal the control in the actual scroll owner, preserving real
+            // gesture progress and checking the whole target, not just its center.
+            for (var attempt = 0; attempt < 6; attempt++) {
+              final visible = tester.getRect(overflow);
+              final target = tester.getRect(offers);
+              final fullyVisible =
+                  target.left >= visible.left - .5 &&
+                  target.right <= visible.right + .5 &&
+                  target.top >= visible.top - .5 &&
+                  target.bottom <= visible.bottom + .5;
+              if (fullyVisible && offers.hitTestable().evaluate().isNotEmpty) {
+                break;
+              }
+              expect(fullyVisible, isFalse);
+              expect(target.width, lessThanOrEqualTo(visible.width + .5));
+              expect(target.top, greaterThanOrEqualTo(visible.top - .5));
+              expect(target.bottom, lessThanOrEqualTo(visible.bottom + .5));
+              final direction = target.left < visible.left ? 120.0 : -120.0;
+              await tester.drag(overflow, Offset(direction, 0));
+              await tester.pumpAndSettle();
+              expect(
+                (tester.getRect(offers).left - target.left).abs(),
+                greaterThan(.5),
+                reason: 'A real swipe must move toward the clipped Offers tab',
+              );
+            }
+            final viewport = tester.getRect(overflow);
+            final target = tester.getRect(offers);
+            expect(target.left, greaterThanOrEqualTo(viewport.left - .1));
+            expect(target.right, lessThanOrEqualTo(viewport.right + .1));
+            expect(target.top, greaterThanOrEqualTo(viewport.top - .1));
+            expect(target.bottom, lessThanOrEqualTo(viewport.bottom + .1));
+          }
+          expect(offers.hitTestable(), findsOneWidget);
+          await tester.tap(offers);
           await tester.pumpAndSettle();
+          await captureR66Visual(tester, 't14-c05-offers-before-switch-$state');
           for (var n = 0; n < 8; n++) {
             final mool = n.isEven;
             final target = find.byKey(
@@ -1650,6 +1857,16 @@ void main() {
       expect(session.addProduct(productFor(destination).id), isTrue);
     }
     return session;
+  }
+
+  Future<void> openInvoiceBusinessEditor(WidgetTester tester) async {
+    final change = find.byKey(const ValueKey('buy-invoice-change'));
+    await tester.ensureVisible(change);
+    await tester.pumpAndSettle();
+    await tester.tap(change);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-invoice-add-business')));
+    await tester.pumpAndSettle();
   }
 
   void advanceCheckoutToConfirm(BuyV2Session session) {
@@ -2042,9 +2259,12 @@ void main() {
         advanceCheckoutToConfirm(session);
         final orderCount = session.orders.length;
         final total = session.scopedPayableTotal;
+        facts.unavailable = true;
+        expect(session.refreshProductFacts('s-milk'), isTrue);
         expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
         expect(session.confirmOrder(), isFalse);
         expect(await session.submitOrder(), isFalse);
+        expect(session.openCheckout(), isTrue);
         expect(session.orders.length, orderCount);
         expect(session.quantityFor('s-milk'), 1);
         expect(session.quantityFor('w-notebook'), 1);
@@ -2061,14 +2281,24 @@ void main() {
         );
         await tester.pumpAndSettle();
         final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
-        final check = find.descendant(
-          of: dock,
-          matching: find.text('Check delivery'),
+        final check = find.byKey(
+          const ValueKey('buy-checkout-eligibility-retry'),
         );
+        await tester.scrollUntilVisible(
+          check,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
         expect(check.hitTestable(), findsOneWidget);
         expect(
           find.descendant(of: dock, matching: find.text('Place order')),
-          findsNothing,
+          findsOneWidget,
         );
         await tester.tap(check);
         await tester.pump(const Duration(seconds: 3));
@@ -2082,9 +2312,7 @@ void main() {
         );
         final unavailable = find.descendant(
           of: delivery,
-          matching: find.text(
-            'Unavailable · Check delivery before placing your order',
-          ),
+          matching: find.text('Delivery time confirmed after Store acceptance'),
         );
         await tester.scrollUntilVisible(
           unavailable,
@@ -2115,17 +2343,24 @@ void main() {
           'r669-checkout-estimate-unavailable-${size.width}-$scale',
         );
         facts.deadline = '11 September, 2–4 PM';
+        facts.unavailable = false;
+        await tester.scrollUntilVisible(
+          check,
+          -120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
         await tester.tap(check);
         await tester.pump(const Duration(seconds: 3));
         await tester.pumpAndSettle();
         expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
         expect(
-          find.descendant(
-            of: dock,
-            matching: find.text(
-              'Pay ${buyV2Money(session.checkoutAmountDueNow)} & place orders',
-            ),
-          ),
+          find.descendant(of: dock, matching: find.text('Place order')),
           findsOneWidget,
         );
         expect(
@@ -2154,6 +2389,34 @@ void main() {
       });
     }
   }
+
+  testWidgets('T14 orderable missing estimate keeps final Place order', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final facts = _R669PendingEstimateFacts();
+    final session = BuyV2Session(core: core, productFactsAdapter: facts);
+    final originalOrders = session.orders.length;
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-milk'), isTrue);
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+    expect(
+      find.descendant(of: dock, matching: find.text('Place order')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dock, matching: find.text('Check delivery')),
+      findsNothing,
+    );
+    expect(session.orders.length, originalOrders);
+    expect(session.quantityFor('s-milk'), 1);
+  });
 
   test('R669 missing estimate preserves required price review', () async {
     final core = BuySession();
@@ -2290,47 +2553,32 @@ void main() {
             expect(target.hitTestable(), findsOneWidget);
           }
 
-          final toggle = find.byKey(const ValueKey('buy-gst-request-shop'));
-          await reveal(toggle);
+          final change = find.byKey(const ValueKey('buy-invoice-change'));
+          await reveal(change);
           expect(
-            find.byKey(const ValueKey('buy-gst-request-wholesale')),
+            find.byKey(const ValueKey('buy-invoice-details')),
+            findsOneWidget,
+          );
+          expect(find.text('Invoice details'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-invoice-details')),
+              matching: find.byType(Switch),
+            ),
             findsNothing,
-          );
-          expect(find.text('Add GST details'), findsOneWidget);
-          expect(
-            tester.getSemantics(toggle).getSemanticsData().label,
-            'GST invoice. Add GST details',
-          );
-          final title = find.descendant(
-            of: toggle,
-            matching: find.text('Add GST details'),
-          );
-          expect(
-            tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
-            isFalse,
           );
           await captureR66Visual(
             tester,
-            'r669-gst-combined-${size.width}-$scale',
+            'r669-invoice-combined-${size.width}-$scale',
           );
-          await tester.tap(toggle);
+          await tester.tap(change);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-invoice-personal')));
           await tester.pumpAndSettle();
           expect(
-            find.byKey(const ValueKey('buy-gst-add-shop')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey('buy-gst-add-wholesale')),
+            find.byKey(const ValueKey('buy-gst-invoice-sheet')),
             findsNothing,
           );
-          await reveal(toggle, delta: -140);
-          expect(
-            tester.getSemantics(toggle).getSemanticsData().label,
-            'GST invoice. Remove GST details',
-          );
-          await tester.tap(toggle);
-          await tester.pumpAndSettle();
-          expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsNothing);
           final returnCart = find.byKey(
             const ValueKey('buy-checkout-return-cart'),
           );
@@ -2354,7 +2602,7 @@ void main() {
 
   for (final width in [320.0, 360.0, 430.0]) {
     for (final scale in [1.0, 2.0]) {
-      for (final amount in [1, 10000000]) {
+      for (final amount in [1, 1000000, 10000000]) {
         testWidgets(
           'R66 checkout complete action INR$amount at $width text$scale',
           (tester) async {
@@ -2368,7 +2616,8 @@ void main() {
             expect(
               session.addProduct('w-notebook'),
               isTrue,
-              reason: 'Amount fixture: ${session.notice}; ${session.commerceLoadState}',
+              reason:
+                  'Amount fixture: ${session.notice}; ${session.commerceLoadState}',
             );
             session.openCart(scope: BuyV2CartScope.wholesale);
             expect(session.openCheckout(), isTrue);
@@ -2387,7 +2636,14 @@ void main() {
             await tester.pumpAndSettle();
 
             void expectCompleteFooter(String label) {
-              final text = find.byKey(const ValueKey('buy-checkout-heading'));
+              expect(
+                find.byKey(const ValueKey('buy-checkout-heading')),
+                findsNothing,
+              );
+              final text = find.descendant(
+                of: find.byKey(const ValueKey('buy-checkout-return-cart')),
+                matching: find.text('Cart'),
+              );
               expect(text, findsOneWidget);
               final paragraph = tester.renderObject<RenderParagraph>(text);
               expect(paragraph.didExceedMaxLines, isFalse);
@@ -2459,7 +2715,7 @@ void main() {
             for (final step in BuyV2CheckoutStep.values) {
               expect(session.showCheckoutStep(step), isTrue);
               await tester.pumpAndSettle();
-              expectCompleteFooter('Pay ${buyV2Money(amount)} & place order');
+              expectCompleteFooter('Place order');
               expect(find.text('Continue to payment'), findsNothing);
               expect(find.text('Review order'), findsNothing);
               await _captureR66Checkout(
@@ -2649,6 +2905,97 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final provider in ['UPI', 'Card']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T14 $provider secure handoff return keeps original payment at $scale text',
+        (tester) async {
+          final opened = <Uri>[];
+          final session = await mountPaymentAction(
+            tester,
+            provider,
+            handoff: (uri) async {
+              opened.add(uri);
+              return true;
+            },
+          );
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              paymentHandoff: (uri) async {
+                opened.add(uri);
+                return true;
+              },
+            ),
+          );
+          await tester.pumpAndSettle();
+          final reference = session.paymentReference;
+          final attempt = session.checkoutIdempotencyKey;
+          final uri = session.paymentActionUri;
+          final scroll = find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            find.byKey(
+              const ValueKey(
+                'buy-checkout-payment-state-paymentActionRequired',
+              ),
+            ),
+            180,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
+          if (provider == 'Card') {
+            expect(
+              find.textContaining(
+                'Enter card details in the secure payment provider flow.',
+              ),
+              findsWidgets,
+            );
+          }
+          expect(find.byType(TextField), findsNothing);
+          await tester.tap(
+            find.byKey(const ValueKey('buy-checkout-primary-payment')),
+          );
+          await tester.pumpAndSettle();
+          expect(opened, [uri]);
+          expect(
+            session.checkoutSubmissionState,
+            BuyV2CheckoutSubmissionState.paymentPending,
+          );
+          await tester.scrollUntilVisible(
+            find.byKey(
+              const ValueKey('buy-checkout-payment-state-paymentPending'),
+            ),
+            180,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              'Return here and tap Check payment for an update. Do not pay again.',
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-checkout-primary-payment')),
+          );
+          await tester.pumpAndSettle();
+          expect(opened, [uri]);
+          expect(session.paymentReference, reference);
+          expect(session.checkoutIdempotencyKey, attempt);
+          expect(session.confirmedOrders, isEmpty);
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('R66 confirmed purchase opens only its own retained deliveries', (
     tester,
   ) async {
@@ -2672,6 +3019,8 @@ void main() {
     await tester.pump();
     earlier.dispose();
     earlierCore.dispose();
+    // Independent provider fixtures must issue distinct timestamp references.
+    await tester.pump(const Duration(milliseconds: 1));
 
     final core = BuySession();
     final session = BuyV2Session(
@@ -2740,12 +3089,11 @@ void main() {
       ValueKey('buy-purchase-group-$previousPurchase'),
     );
     expect(
-      find.descendant(
-        of: oldGroup,
-        matching: find.text('1 delivery · ${buyV2Money(previousOrder.total)}'),
-      ),
-      findsOneWidget,
+      oldGroup,
+      findsNothing,
+      reason: 'A single order keeps purchase identity in its details without a duplicate banner',
     );
+    expect(find.text(buyV2Money(previousOrder.total)), findsWidgets);
     final delivery = session.confirmedOrders.first;
     final track = find.byKey(ValueKey('buy-order-primary-${delivery.id}'));
     await tester.scrollUntilVisible(
@@ -2774,53 +3122,161 @@ void main() {
       BuyV2CartScope.wholesale,
       BuyV2CartScope.all,
     ]) {
-      testWidgets('T14 actual Cart viewport returns ${scope.name} text $scale', (
-        tester,
-      ) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(360, 800);
-        addTearDown(tester.view.reset);
-        final core = BuySession();
-        final session = BuyV2Session(core: core);
-        addTearDown(core.dispose);
-        addTearDown(session.dispose);
-        session.addProduct('s-tomato');
-        session.addProduct('w-notebook');
-        session.openCart(scope: scope);
-        await tester.pumpWidget(app(session, textScale: scale));
-        await tester.pumpAndSettle();
-        final cartScrollable = find.descendant(
-          of: find.byKey(const ValueKey('buy-cart-scroll')),
-          matching: find.byType(Scrollable),
-        ).first;
-        var position = tester.state<ScrollableState>(cartScrollable).position;
-        expect(position.maxScrollExtent, greaterThan(120));
-        position.jumpTo(120);
-        await tester.pumpAndSettle();
-        final offset = position.pixels;
-        final total = session.scopedPayableTotal;
-        final address = session.selectedAddress.id;
-        await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
-        await tester.pumpAndSettle();
-        expect(session.view, BuyV2View.checkout);
-        final returnCart = find.byKey(const ValueKey('buy-checkout-return-cart'));
-        await tester.ensureVisible(returnCart);
-        await tester.pumpAndSettle();
-        await tester.tap(returnCart);
-        await tester.pumpAndSettle();
-        position = tester.state<ScrollableState>(cartScrollable).position;
-        expect(position.pixels, closeTo(offset, 1));
-        expect(session.cartScope, scope);
-        expect(session.scopedPayableTotal, total);
-        expect(session.selectedAddress.id, address);
-        expect(session.quantityFor('s-tomato'), 1);
-        expect(session.quantityFor('w-notebook'), 1);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'T14 actual Cart viewport returns ${scope.name} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct('s-tomato');
+          session.addProduct('w-notebook');
+          session.openCart(scope: scope);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          final cartScrollable = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-cart-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          var position = tester.state<ScrollableState>(cartScrollable).position;
+          expect(position.maxScrollExtent, greaterThan(120));
+          position.jumpTo(120);
+          await tester.pumpAndSettle();
+          final offset = position.pixels;
+          final total = session.scopedPayableTotal;
+          final address = session.selectedAddress.id;
+          await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          final returnCart = find.byKey(
+            const ValueKey('buy-checkout-return-cart'),
+          );
+          await tester.ensureVisible(returnCart);
+          await tester.pumpAndSettle();
+          await tester.tap(returnCart);
+          await tester.pumpAndSettle();
+          position = tester.state<ScrollableState>(cartScrollable).position;
+          expect(position.pixels, closeTo(offset, 1));
+          expect(session.cartScope, scope);
+          expect(session.scopedPayableTotal, total);
+          expect(session.selectedAddress.id, address);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('T14 collapsed Cart preserves Checkout return text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      session.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final cartScroll = find
+          .descendant(
+            of: find.byKey(const ValueKey('buy-cart-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final collapse = find.byTooltip('Collapse coupons and offers');
+      await tester.scrollUntilVisible(collapse, 180, scrollable: cartScroll);
+      await Scrollable.ensureVisible(tester.element(collapse), alignment: .2);
+      await tester.pumpAndSettle();
+      await tester.tap(collapse);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-cart-coupons')), findsOneWidget);
+      expect(collapse, findsNothing);
+      var position = tester.state<ScrollableState>(cartScroll).position;
+      position.jumpTo(120);
+      await tester.pumpAndSettle();
+      final offset = position.pixels;
+      final total = session.scopedPayableTotal;
+      await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
+      await tester.ensureVisible(back);
+      await tester.tap(back);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      position = tester.state<ScrollableState>(cartScroll).position;
+      expect(position.pixels, closeTo(offset, 1));
+      final collapsedHeader = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(
+        collapsedHeader,
+        180,
+        scrollable: cartScroll,
+      );
+      expect(collapsedHeader, findsOneWidget);
+      expect(collapse, findsNothing);
+      expect(session.scopedPayableTotal, total);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+      // Another Cart scope starts expanded; returning to this scope retains
+      // its collapsed choice without leaking it to a fresh session.
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapse,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-cart-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(collapse, findsOneWidget);
+      session.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapsedHeader,
+        180,
+        scrollable: cartScroll,
+      );
+      expect(collapsedHeader, findsOneWidget);
+      expect(collapse, findsNothing);
+      final freshCore = BuySession();
+      final fresh = BuyV2Session(core: freshCore);
+      addTearDown(fresh.dispose);
+      addTearDown(freshCore.dispose);
+      fresh.addProduct('s-tomato');
+      fresh.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpWidget(app(fresh, textScale: scale));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapse,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-cart-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(collapse, findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('T14 Wholesale freight remains readable text $scale', (
       tester,
     ) async {
@@ -2835,8 +3291,9 @@ void main() {
       session.openCart(scope: BuyV2CartScope.wholesale);
       await tester.pumpWidget(app(session, textScale: scale));
       await tester.pumpAndSettle();
-      final freight = find.textContaining('GST invoice at checkout');
+      final freight = find.text('Freight included');
       expect(freight, findsOneWidget);
+      expect(find.textContaining('GST invoice at checkout'), findsNothing);
       final text = tester.widget<Text>(freight);
       expect(text.style!.fontSize, greaterThanOrEqualTo(10));
       expect(text.maxLines, isNull);
@@ -2942,17 +3399,17 @@ void main() {
     );
   });
 
+  // Historical founder-regression name retained for exact ledger selection.
+  // Current behavior is Profile-led recipient selection; tax is never optional.
   testWidgets('T01B adds optional GST details without buyer categories', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final gstStore = _MemoryGstInvoiceProfileStore();
-    final session = mixedSession(gstInvoiceProfileStore: gstStore);
+    final store = _MemoryGstInvoiceProfileStore();
+    final session = mixedSession(gstInvoiceProfileStore: store);
     addTearDown(session.dispose);
     session.openCart(scope: BuyV2CartScope.shop);
-    // The display filter preserves the mixed purchase selection. This test
-    // exercises one invoice destination, selected explicitly by the buyer.
     for (final line in session.cartLines.toList()) {
       session.selectCartProduct(
         line.product.id,
@@ -2961,21 +3418,17 @@ void main() {
     }
     expect(session.openCheckout(), isTrue);
     advanceCheckoutToConfirm(session);
-
+    final total = session.checkoutPayableTotal;
+    final quantities = {
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    };
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expect(find.text('Add GST details'), findsOneWidget);
-    expect(find.textContaining('Personal'), findsNothing);
-    expect(find.textContaining('Business purchase'), findsNothing);
-    expect(find.text('Pay ₹37 & place order'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
-    await tester.pumpAndSettle();
-    expect(find.text('Add GST details'), findsNWidgets(2));
-    expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
-    await tester.pumpAndSettle();
+    expect(find.text('Invoice details'), findsOneWidget);
+    expect(find.text('Personal purchase'), findsOneWidget);
+    expect(find.text('Place order'), findsOneWidget);
+    await openInvoiceBusinessEditor(tester);
+    expect(session.view, BuyV2View.account);
     await tester.enterText(
       find.byKey(const ValueKey('buy-gst-legal-name')),
       'Shree Balaji Retail',
@@ -2991,15 +3444,30 @@ void main() {
     await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
-
-    expect(find.text('GST details'), findsOneWidget);
-    expect(find.text('Shree Balaji Retail'), findsWidgets);
+    expect(session.view, BuyV2View.checkout);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
-    expect(find.text('Pay ₹37 & place order'), findsOneWidget);
+    expect(find.text('Review business invoice'), findsOneWidget);
+    expect(find.text('Place order'), findsNothing);
     expect(
-      find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
-      findsOneWidget,
+      store.snapshots['account-a']!.profiles.single.gstin,
+      '08ABCDE1234F1Z5',
     );
+    expect(session.checkoutPayableTotal, total);
+    expect({
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    }, quantities);
+    final change = find.byKey(const ValueKey('buy-invoice-change'));
+    await tester.ensureVisible(change);
+    await tester.tap(change);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-invoice-personal')));
+    await tester.pumpAndSettle();
+    expect(find.text('Place order'), findsOneWidget);
+    expect(
+      store.snapshots['account-a']!.profiles.single.gstin,
+      '08ABCDE1234F1Z5',
+    );
+    expect(session.checkoutPayableTotal, total);
     expect(tester.takeException(), isNull);
   });
 
@@ -3194,7 +3662,9 @@ void main() {
           of: find.byKey(
             ValueKey('buy-checkout-confirm-delivery-${affected.key}'),
           ),
-          matching: find.textContaining('Unavailable · Check delivery'),
+          matching: find.textContaining(
+            'Delivery time confirmed after Store acceptance',
+          ),
         ),
         findsOneWidget,
       );
@@ -3203,7 +3673,9 @@ void main() {
           of: find.byKey(
             ValueKey('buy-checkout-confirm-delivery-${unaffected.key}'),
           ),
-          matching: find.textContaining('Unavailable · Check delivery'),
+          matching: find.textContaining(
+            'Delivery time confirmed after Store acceptance',
+          ),
         ),
         findsNothing,
       );
@@ -4090,10 +4562,7 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
-    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
     await tester.enterText(
       find.byKey(const ValueKey('buy-gst-legal-name')),
       'Shree Balaji Retail',
@@ -4127,7 +4596,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsNothing);
-    expect(find.text('Shree Balaji Retail'), findsWidgets);
+    expect(find.textContaining('Shree Balaji Retail'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
@@ -4206,16 +4675,7 @@ void main() {
         ),
       );
       await tester.pump();
-      final request = find.byKey(const ValueKey('buy-gst-request-wholesale'));
-      await tester.ensureVisible(request);
-      await tester.pump();
-      await tester.tap(request);
-      await tester.pumpAndSettle();
-      final add = find.byKey(const ValueKey('buy-gst-add-wholesale'));
-      await tester.ensureVisible(add);
-      await tester.pump();
-      await tester.tap(add);
-      await tester.pumpAndSettle();
+      await openInvoiceBusinessEditor(tester);
 
       final save = find.byKey(const ValueKey('buy-gst-save'));
       expect(save, findsOneWidget, reason: viewport.label);
@@ -4255,7 +4715,7 @@ void main() {
       await tester.tap(save);
       await tester.pumpAndSettle();
       expect(
-        find.byKey(const ValueKey('buy-gst-profile-gst-profile-1')),
+        find.textContaining('08ABCDE1234F1Z5'),
         findsOneWidget,
         reason: viewport.label,
       );
@@ -4290,10 +4750,7 @@ void main() {
 
     await tester.pumpWidget(app(session, reducedMotion: true));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
-    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
 
     for (final target in const [
       (key: 'buy-gst-legal-name', label: 'Legal name'),
@@ -4343,7 +4800,7 @@ void main() {
     await tester.pump();
     expect(billingAddress.focusNode!.hasFocus, isFalse);
 
-    final save = find.bySemanticsLabel('Use GST details');
+    final save = find.bySemanticsLabel('Save details');
     expect(save, findsOneWidget);
     final saveData = tester.getSemantics(save).getSemanticsData();
     expect(saveData.flagsCollection.isButton, isTrue);
@@ -4476,7 +4933,8 @@ void main() {
         );
         expect(tester.takeException(), isNull, reason: viewport.label);
         expect(owner.hitTestable(), findsOneWidget, reason: viewport.label);
-        expect(find.text('Checkout'), findsOneWidget, reason: viewport.label);
+        expect(session.view, BuyV2View.checkout, reason: viewport.label);
+        expect(find.text('Checkout'), findsNothing, reason: viewport.label);
         expect(find.text('Review order'), findsNothing, reason: viewport.label);
         if (const bool.fromEnvironment('BUY_CHECKOUT_REVIEW_DRAFT_CAPTURE')) {
           final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -4508,13 +4966,426 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/cursor-t10-navigation-20261003/'
-            'buy-v2-t02-checkout-${viewport.label}.png',
+            'candidate_captures/cursor-t14-context-references-20261007/'
+            'public-checkout-${viewport.label}.png',
           ),
         );
       },
       tags: 'protected-reference',
     );
+  }
+  test(
+    'T14 invoice unregistered business restores explicit registration and personal preference',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final first = BuyV2GstInvoiceController(store: store);
+      addTearDown(first.dispose);
+      expect(
+        await first.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Unregistered Traders',
+          gstin: '',
+          billingAddress: '22 Market Road, Jaipur 302001',
+          remember: true,
+          registration: BuyV2BusinessInvoiceRegistration.unregistered,
+        ),
+        isTrue,
+      );
+      final restored = BuyV2GstInvoiceController(store: store);
+      addTearDown(restored.dispose);
+      await restored.restore();
+      expect(
+        restored.detailsFor(BuyV2Destination.shop)!.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
+      expect(restored.detailsFor(BuyV2Destination.shop)!.gstin, isEmpty);
+      restored.setRequested(BuyV2Destination.shop, false);
+      await restored.restore(force: true);
+      expect(restored.requestedFor(BuyV2Destination.shop), isFalse);
+      expect(
+        store.snapshots['account-a']!.profiles.single.legalName,
+        'Unregistered Traders',
+      );
+      expect(
+        await restored.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Invalid Registered',
+          gstin: '',
+          billingAddress: '22 Market Road, Jaipur 302001',
+          remember: true,
+        ),
+        isFalse,
+      );
+      expect(
+        store.snapshots['account-a']!.profiles.single.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
+    },
+  );
+
+  test(
+    'T14 invoice corrupt registered profile cannot become unregistered',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Broken Registered',
+            gstin: '',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+        ],
+      );
+      final controller = BuyV2GstInvoiceController(store: store);
+      addTearDown(controller.dispose);
+      await controller.restore();
+      expect(controller.loadFailed, isTrue);
+      expect(controller.savedProfiles, isEmpty);
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot();
+      await controller.restore(force: true);
+      expect(controller.loadFailed, isFalse);
+    },
+  );
+
+  test(
+    'T14 invoice multiple saved registrations require explicit recipient',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Business One',
+            gstin: '08ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-2',
+            legalName: 'Business Two',
+            gstin: '27ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Mumbai 400001',
+          ),
+        ],
+      );
+      final controller = BuyV2GstInvoiceController(store: store);
+      addTearDown(controller.dispose);
+      await controller.restore();
+      expect(controller.requestedFor(BuyV2Destination.shop), isTrue);
+      expect(controller.detailsFor(BuyV2Destination.shop), isNull);
+      expect(controller.applySavedBusinessProfile(), isFalse);
+      controller.selectSaved(
+        BuyV2Destination.shop,
+        controller.savedProfiles.last,
+      );
+      controller.useForDestinations(BuyV2Destination.shop, [
+        BuyV2Destination.wholesale,
+      ]);
+      expect(
+        controller.detailsFor(BuyV2Destination.wholesale)!.id,
+        'gst-profile-2',
+      );
+      store.ownerScope = 'account-b';
+      await controller.restore(force: true);
+      expect(controller.savedProfiles, isEmpty);
+      expect(controller.detailsFor(BuyV2Destination.shop), isNull);
+    },
+  );
+
+  for (final closeScale in [1.0, 2.0]) {
+    testWidgets(
+      closeScale == 1.0
+          ? 'T14 invoice cancel Profile preserves personal recipient and Cart'
+          : 'T14 invoice enlarged close preserves draft and Cart',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 711));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final store = _MemoryGstInvoiceProfileStore();
+        final session = mixedSession(gstInvoiceProfileStore: store);
+        addTearDown(session.dispose);
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        advanceCheckoutToConfirm(session);
+        final total = session.checkoutPayableTotal;
+        final quantities = {
+          for (final line in session.cartLines) line.product.id: line.quantity,
+        };
+        await tester.pumpWidget(
+          app(session, size: const Size(320, 711), textScale: closeScale),
+        );
+        await tester.pumpAndSettle();
+        await openInvoiceBusinessEditor(tester);
+        expect(session.view, BuyV2View.account);
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-gst-legal-name')),
+          'Unsaved business draft',
+        );
+        final close = find.byKey(const ValueKey('buy-invoice-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.getSize(close).width, greaterThanOrEqualTo(44));
+        expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+        expect(
+          tester.widget<IconButton>(close).tooltip,
+          'Close invoice details',
+        );
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        expect(find.text('Personal purchase'), findsOneWidget);
+        expect(store.snapshots, isEmpty);
+        expect(session.checkoutPayableTotal, total);
+        expect({
+          for (final line in session.cartLines) line.product.id: line.quantity,
+        }, quantities);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'T14 invoice unregistered business editor omits GSTIN and persists type',
+    (tester) async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final session = mixedSession(gstInvoiceProfileStore: store);
+      addTearDown(session.dispose);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      await openInvoiceBusinessEditor(tester);
+      await tester.tap(find.byKey(const ValueKey('buy-invoice-registration')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Business without GST registration').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-gst-gstin')), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Unregistered Traders',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '22 Market Road, Jaipur 302001',
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      expect(
+        store.snapshots['account-a']!.profiles.single.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
+      expect(find.textContaining('Not GST-registered'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'T14 invoice pending payment locks changes and retains original recipient',
+    (tester) async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final session = BuyV2Session(
+        core: BuySession(),
+        gstInvoiceProfileStore: store,
+        commerceAdapter: prepaidCommerceFixture(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
+      advanceCheckoutToConfirm(session);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      await session.submitOrder();
+      await tester.pumpAndSettle();
+      expect(session.checkoutRequiresResolution, isTrue);
+      final reference = session.checkoutIdempotencyKey;
+      final total = session.checkoutPaymentActionAmount;
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Future Business',
+            gstin: '08ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+        ],
+      );
+      session.refreshGstProfile();
+      await tester.pumpAndSettle();
+      final controller = tester
+          .widget<BuyV2CheckoutView>(find.byType(BuyV2CheckoutView))
+          .gstInvoiceController;
+      expect(controller.requestedFor(BuyV2Destination.shop), isFalse);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const ValueKey('buy-invoice-change')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(session.checkoutIdempotencyKey, reference);
+      expect(session.checkoutPaymentActionAmount, total);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('T14 invoice account change rejects stale Profile return', (
+    tester,
+  ) async {
+    final store = _MemoryGstInvoiceProfileStore();
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final quantities = {
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    };
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
+    store.ownerScope = 'account-b';
+    Navigator.of(
+      tester.element(find.byKey(const ValueKey('buy-gst-invoice-sheet'))),
+    ).pop();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.account);
+    expect(store.snapshots, isEmpty);
+    expect({
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    }, quantities);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('T14 invoice compact summary readable at 320px 200 percent', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _MemoryGstInvoiceProfileStore();
+    store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+      profiles: [
+        BuyV2GstInvoiceProfileRecord(
+          id: 'gst-profile-1',
+          legalName: 'Very Long Registered Business Name',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '22 Market Road, Jaipur 302001',
+        ),
+      ],
+    );
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    await tester.pumpWidget(
+      app(
+        session,
+        size: const Size(320, 568),
+        textScale: 2,
+        reducedMotion: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('buy-invoice-details'));
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: row, matching: find.byType(Switch)),
+      findsNothing,
+    );
+    final label = find.textContaining('Very Long Registered Business Name');
+    expect(
+      tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+      isFalse,
+    );
+    expect(tester.getRect(row).right, lessThanOrEqualTo(320));
+    expect(
+      tester.getSize(find.byKey(const ValueKey('buy-invoice-change'))).height,
+      greaterThanOrEqualTo(44),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 360.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final amount in [1000000, 10000000]) {
+        testWidgets(
+          'T14 billing strip Cart INR$amount width$width scale$scale',
+          (tester) async {
+            final size = Size(width, 800);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            addTearDown(core.dispose);
+            final session = _R66CheckoutAmountFixture(amount, core: core);
+            addTearDown(session.dispose);
+            expect(session.addProduct('w-notebook'), isTrue);
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 32),
+                reducedMotion: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final strip = find.byKey(const ValueKey('buy-cart-action-bar'));
+            final button = find.descendant(
+              of: strip,
+              matching: find.byType(FilledButton),
+            );
+            expect(button, findsOneWidget);
+            final stripRect = tester.getRect(strip);
+            final buttonRect = tester.getRect(button);
+            expect(stripRect.width, width);
+            expect(buttonRect.right, closeTo(stripRect.right - 14, .1));
+            expect(buttonRect.width, greaterThanOrEqualTo(44));
+            expect(buttonRect.height, greaterThanOrEqualTo(44));
+            expect(
+              find.descendant(
+                of: strip,
+                matching: find.text(buyV2Money(amount)),
+              ),
+              findsOneWidget,
+            );
+            for (final e
+                in find
+                    .descendant(of: strip, matching: find.byType(RichText))
+                    .evaluate()) {
+              final paragraph = e.renderObject as RenderParagraph;
+              expect(
+                paragraph.didExceedMaxLines,
+                isFalse,
+                reason: paragraph.text.toPlainText(),
+              );
+              expect(paragraph.text.toPlainText(), isNot(contains('…')));
+            }
+            if (scale == 1) {
+              final amountRect = tester.getRect(
+                find.descendant(
+                  of: strip,
+                  matching: find.text(buyV2Money(amount)),
+                ),
+              );
+              expect(amountRect.right, lessThanOrEqualTo(buttonRect.left - 9));
+              expect(amountRect.center.dy, lessThan(buttonRect.bottom));
+            }
+            await tester.tap(button);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.checkout);
+            expect(session.checkoutPayableTotal, amount);
+            expect(session.scopedItemCount, 1);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
   }
 }
 

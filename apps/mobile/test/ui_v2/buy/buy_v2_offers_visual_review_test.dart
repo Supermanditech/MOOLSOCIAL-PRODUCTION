@@ -13,6 +13,7 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
 class _Source extends BuyV2DevelopmentCatalogueSource {
   _Source(BuyV2Destination destination, {bool variants = false})
@@ -171,6 +172,24 @@ class _OffersSource implements BuyV2PublishedCatalogueSource {
   }
 }
 
+class _RefreshingOffersSource extends _OffersSource {
+  DateTime clock = DateTime.utc(2026, 9, 18);
+  int requests = 0;
+  bool offline = false;
+  @override
+  DateTime get now => clock;
+  @override
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    requests++;
+    if (offline) throw StateError('Review source offline');
+    return super.loadOffers(query, cursor: cursor, pageSize: pageSize);
+  }
+}
+
 class _SavedPagesSource extends _OffersSource {
   final cursors = <String?>[];
   final itemsByCursor = <String?, List<BuyV2PublishedCatalogueOffer>>{};
@@ -198,71 +217,188 @@ class _SavedPagesSource extends _OffersSource {
 }
 
 void main() {
+  for (final mool in [false, true]) {
+    for (final trigger in ['reentry', 'expiry', 'resume']) {
+      testWidgets('T14 Offers auto freshness $mool $trigger', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final source = _RefreshingOffersSource();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: _Source(BuyV2Destination.shop),
+          publishedCatalogueSource: source,
+          initialCatalogueRegionId: 'jodhpur',
+          catalogueNow: () => source.clock,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final query = session.catalogueOffersQuery(
+          publisher: mool ? BuyV2OfferPublisherType.moolSocial : null,
+          supplierOffersOnly: !mool,
+        );
+        Widget offers() => MaterialApp(
+          theme: MoolTheme.light(),
+          home: Scaffold(
+            body: BuyV2PagedProductCatalogue(
+              session: session,
+              query: query,
+              scopeKey: 't14-auto-offers',
+              publishedOffers: true,
+            ),
+          ),
+        );
+        final pager = session.acquireCatalogueOffers('t14-auto-offers');
+        addTearDown(() => session.releaseCatalogueOffers('t14-auto-offers'));
+        await tester.pumpWidget(offers());
+        await tester.pumpAndSettle();
+        expect(source.requests, 1);
+        final original = pager.page!;
+        final id = original.items.first.product.id;
+        expect(session.addProduct(id), isTrue);
+        final quantity = session.quantityFor(id);
+        final total = session.cartTotal;
+        // A fresh return retains the existing publication and paging context.
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(offers());
+        await tester.pumpAndSettle();
+        expect(source.requests, 1);
+        expect(identical(pager.page, original), isTrue);
+        if (trigger == 'reentry') {
+          await tester.pumpWidget(const SizedBox.shrink());
+          source.clock = source.clock.add(const Duration(hours: 1));
+          await tester.pumpWidget(offers());
+        } else {
+          source.clock = source.clock.add(const Duration(hours: 1));
+          if (trigger == 'expiry') {
+            await tester.pump(const Duration(hours: 1));
+          } else {
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.paused,
+            );
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.resumed,
+            );
+          }
+        }
+        await tester.pumpAndSettle();
+        expect(source.requests, 2);
+        expect(pager.page!.items, isNotEmpty);
+        expect(
+          pager.page!.items.every((o) => o.isCurrent(now: source.clock)),
+          isTrue,
+        );
+        expect(
+          pager.page!.items.every(
+            (o) =>
+                (o.publisherType == BuyV2OfferPublisherType.moolSocial) == mool,
+          ),
+          isTrue,
+        );
+        expect(find.text('Offers need refreshing'), findsNothing);
+        expect(session.quantityFor(id), quantity);
+        expect(session.cartTotal, total);
+        // Failed automatic refresh is bounded and never exposes stale Add.
+        source.offline = true;
+        source.clock = source.clock.add(const Duration(hours: 1));
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(source.requests, 3);
+        expect(pager.page, isNull);
+        expect(pager.message, isNotNull);
+        expect(find.byKey(ValueKey('buy-add-$id')), findsNothing);
+        await tester.pump(const Duration(hours: 2));
+        expect(source.requests, 3);
+        expect(session.quantityFor(id), quantity);
+        expect(session.cartTotal, total);
+        source.offline = false;
+        await pager.retry();
+        await tester.pumpAndSettle();
+        expect(source.requests, 4);
+        expect(pager.page!.items, isNotEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
   for (final scale in [1.0, 2.0]) {
-    testWidgets('Saved Offers empty page keeps pagination $scale', (
-      tester,
-    ) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(360, 800);
-      tester.platformDispatcher.textScaleFactorTestValue = scale;
-      addTearDown(tester.view.reset);
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final core = BuySession();
-      final source = _SavedPagesSource();
-      final session = BuyV2Session(
-        core: core,
-        reviewDataEnabled: true,
-        cataloguePageSource: _Source(BuyV2Destination.shop),
-        publishedCatalogueSource: source,
-        initialCatalogueRegionId: 'jodhpur',
-        catalogueNow: () => source.now,
-      );
-      addTearDown(session.dispose);
-      addTearDown(core.dispose);
-      await tester.pumpWidget(_app(session));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
-      await tester.pumpAndSettle();
-      final original = source.itemsByCursor[null]!.first.product.id;
-      expect(session.addProduct(original), isTrue);
-      await tester.pumpAndSettle();
-      final saved = find.byKey(const ValueKey('buy-offers-saved'));
-      await tester.tap(saved);
-      await tester.pumpAndSettle();
-      expect(find.text('No saved offers on this page'), findsOneWidget);
-      final next = find.byKey(const ValueKey('buy-page-next-published-offers'));
-      await tester.ensureVisible(next);
-      await tester.pumpAndSettle();
-      expect(tester.widget<IconButton>(next).onPressed, isNotNull);
-      await tester.tap(next);
-      await tester.pumpAndSettle();
-      expect(source.cursors, contains('second'));
-      final target = source.itemsByCursor['second']!.first.product.id;
-      await tester.tap(saved);
-      await tester.pumpAndSettle();
-      session.toggleSaved(target);
-      await tester.pumpAndSettle();
-      await tester.tap(saved);
-      await tester.pumpAndSettle();
-      expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
-      // Return through the existing grid swipe, then recover from its empty page.
-      final swipe = find.byKey(
-        const ValueKey('buy-page-swipe-published-offers'),
-      );
-      await tester.ensureVisible(swipe);
-      await tester.pumpAndSettle();
-      await tester.drag(swipe, const Offset(300, 0));
-      await tester.pumpAndSettle();
-      expect(find.text('No saved offers on this page'), findsOneWidget);
-      await tester.ensureVisible(next);
-      await tester.pumpAndSettle();
-      await tester.tap(next);
-      await tester.pumpAndSettle();
-      expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
-      expect(session.cartLines.single.product.id, original);
-      expect(session.quantityFor(original), 1);
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'Saved Offers uses cached saved scope without catalogue pagination $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final source = _SavedPagesSource();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: _Source(BuyV2Destination.shop),
+          publishedCatalogueSource: source,
+          initialCatalogueRegionId: 'jodhpur',
+          catalogueNow: () => source.now,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await tester.pumpWidget(_app(session));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+        await tester.pumpAndSettle();
+        final original = source.itemsByCursor[null]!.first.product.id;
+        expect(session.addProduct(original), isTrue);
+        await tester.pumpAndSettle();
+        final saved = find.byKey(const ValueKey('buy-offers-saved'));
+        final requestsBeforeSaved = List<String?>.of(source.cursors);
+        await tester.tap(saved);
+        await tester.pumpAndSettle();
+        expect(find.text('No saved offers to show'), findsOneWidget);
+        final next = find.byKey(
+          const ValueKey('buy-page-next-published-offers'),
+        );
+        expect(next, findsNothing);
+        expect(source.cursors, requestsBeforeSaved);
+        // Load another real page only in ordinary Offers, then save its item.
+        await tester.tap(saved);
+        await tester.pumpAndSettle();
+        final swipe = find.byKey(
+          const ValueKey('buy-page-swipe-published-offers'),
+        );
+        await tester.ensureVisible(swipe);
+        await tester.pumpAndSettle();
+        await tester.drag(swipe, const Offset(-300, 0));
+        await tester.pumpAndSettle();
+        expect(source.cursors, contains('second'));
+        final target = source.itemsByCursor['second']!.first.product.id;
+        session.toggleSaved(target);
+        await tester.pumpAndSettle();
+        await tester.tap(saved);
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
+        expect(next, findsNothing);
+        await tester.ensureVisible(swipe);
+        await tester.pumpAndSettle();
+        await tester.drag(swipe, const Offset(300, 0));
+        await tester.pumpAndSettle();
+        expect(find.byKey(ValueKey('buy-paged-card-$target')), findsOneWidget);
+        expect(find.text('No saved offers to show'), findsNothing);
+        session.toggleSaved(target);
+        await tester.pumpAndSettle();
+        expect(find.text('No saved offers to show'), findsOneWidget);
+        expect(next, findsNothing);
+        expect(session.cartLines.single.product.id, original);
+        expect(session.quantityFor(original), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final scale in [1.0, 2.0]) {
@@ -762,10 +898,10 @@ void main() {
             find.byKey(const ValueKey('buy-saved-products-info-sheet')),
             findsNothing,
           );
-          expect(find.text('No saved offers on this page'), findsOneWidget);
+          expect(find.text('No saved offers to show'), findsOneWidget);
           await tester.tap(find.byKey(const ValueKey('buy-offers-saved')));
           await tester.pumpAndSettle();
-          expect(find.text('No saved offers on this page'), findsNothing);
+          expect(find.text('No saved offers to show'), findsNothing);
         }
         expect(tester.takeException(), isNull);
       });

@@ -16,30 +16,156 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
-    show showBuyV2ShoppingHelp;
+    show showBuyV2ShoppingHelp, showBuyV2RecentlyViewed;
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart'
-    show buyV2BuyerDeliveryPromise, BuyV2ActionStyle;
+    show buyV2BuyerDeliveryPromise, BuyV2ActionStyle, BuyV2ThemeScope, BuyV2ThemeSpec;
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
-import 'buy_v2_qualified_provider_fixture.dart' show TestPaymentCommerce;
+import 'buy_v2_qualified_provider_fixture.dart'
+    show TestPaymentCommerce, TestPaymentQuote, testPaymentSnapshot;
 import 'buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
+// Isolated presentation facts; this does not supply live delivery evidence.
+class _RecentlyViewedDeliveryCopyFacts implements BuyV2ProductFactsAdapter {
+  const _RecentlyViewedDeliveryCopyFacts(this.promise);
+  final String promise;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+        deliveryPromise: promise,
+      );
+}
+
+class _ProcurementRecentCopySession extends BuyV2Session {
+  _ProcurementRecentCopySession() : super(
+    core: BuySession(),
+    procurementIdentity: ValueNotifier<BuyV2ProcurementContext?>(
+      const BuyV2ProcurementContext(accountId: 'isolated-copy-account',
+        storeId: 'isolated-copy-store', purpose: BuyV2ProcurementPurpose.restock,
+        originOperationId: 'isolated-copy-operation'),
+    ),
+  );
+  @override
+  List<BuyV2Product> recentlyViewedProductsFor(
+    BuyV2Destination destination, {int limit = 10}
+  ) =>
+      [BuyV2Catalogue.products.firstWhere((p) => p.id == 'w-rice')];
+  @override
+  BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) =>
+      const _RecentlyViewedDeliveryCopyFacts('Delivery time confirmed at checkout')
+          .snapshotFor(product);
+}
+
 void main() {
+  for (final refined in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final promise in ['Delivery time confirmed at checkout', 'Delivery in 2 hours']) {
+        testWidgets('T14 recent delivery copy caller$refined text$scale $promise', (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 800);
+          addTearDown(tester.view.reset);
+          final session = BuyV2Session(
+            core: BuySession(),
+            productFactsAdapter: _RecentlyViewedDeliveryCopyFacts(promise),
+          );
+          addTearDown(session.dispose);
+          session.openDestination(BuyV2Destination.wholesale);
+          expect(session.openProduct('w-rice'), isTrue);
+          session.goBack();
+          await tester.pumpWidget(MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: Scaffold(body: BuyV2ThemeScope(
+              spec: BuyV2ThemeSpec.resolve(BuyV2Destination.wholesale, BuyV2View.catalogue),
+              refinedCommerce: refined,
+              child: Builder(builder: (context) => TextButton(
+                onPressed: () => unawaited(showBuyV2RecentlyViewed(context, session)),
+                child: const Text('Open recently viewed'),
+              )),
+            )),
+          ));
+          await tester.tap(find.text('Open recently viewed'));
+          await tester.pumpAndSettle();
+          final label = tester.widget<Text>(find.byKey(
+            const ValueKey('buy-recently-viewed-availability-w-rice'),
+          ));
+          expect(label.data, promise.contains('at checkout')
+              ? 'Delivery time confirmed after Store acceptance' : promise);
+          expect(session.productFactsFor(session.product('w-rice')).deliveryPromise, promise);
+          expect(find.byKey(const ValueKey('buy-product-illustration-w-rice')),
+              findsOneWidget,
+              reason: 'Recently viewed must fit visible illustration disclosure.');
+          expect(find.byKey(const ValueKey('buy-product-photo-unavailable-w-rice')),
+              findsNothing);
+          expect(session.itemCount, 0);
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byTooltip('Close Recently viewed'));
+          await tester.pumpAndSettle();
+          expect(find.text('Open recently viewed'), findsOneWidget);
+        });
+      }
+    }
+  }
+
+  testWidgets('T14 recent delivery copy preserves procurement presentation', (tester) async {
+    final session = _ProcurementRecentCopySession();
+    addTearDown(session.dispose);
+    expect(session.procurementContext, isNotNull);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: BuyV2ThemeScope(
+      spec: BuyV2ThemeSpec.resolve(BuyV2Destination.wholesale, BuyV2View.catalogue),
+      refinedCommerce: true,
+      child: Builder(builder: (context) => TextButton(
+        onPressed: () => unawaited(showBuyV2RecentlyViewed(context, session)),
+        child: const Text('Open procurement history'),
+      )),
+    ))));
+    await tester.tap(find.text('Open procurement history'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(
+      const ValueKey('buy-recently-viewed-availability-w-rice'),
+    )).data, 'Delivery time confirmed at checkout');
+    expect(session.itemCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   group('supplier policy Add consent', () {
     late BuySession core;
     late BuyV2Session session;
     late _SupplierPolicyContent content;
     late _SupplierPolicyState store;
+    late TestPaymentQuote quote;
 
     setUp(() async {
       core = BuySession();
       content = _SupplierPolicyContent();
       store = _SupplierPolicyState();
+      quote = TestPaymentQuote();
       session = BuyV2Session(
         core: core,
         productContentAdapter: content,
         customerStateStore: store,
-        commerceAdapter: TestPaymentCommerce(),
+        commerceAdapter: TestPaymentCommerce()
+          ..snapshot = testPaymentSnapshot(
+            null,
+            addresses: const [
+              BuyV2Address(
+                id: 'isolated-policy-address',
+                kind: BuyV2AddressKind.home,
+                label: 'Home',
+                recipient: 'Test buyer',
+                phone: '9000000000',
+                line: 'Test address',
+                area: 'Jodhpur',
+                pinCode: '342003',
+                landmark: '',
+              ),
+            ],
+          ),
+        checkoutQuoteAdapter: quote,
         reviewDataEnabled: false,
         productFactsAdapter: const BuyTestEligibilityFacts(),
       );
@@ -58,6 +184,230 @@ void main() {
       expect(session.pendingSupplierPolicyAdd, isNull);
       expect(store.snapshot?.supplierPolicyAcceptances ?? {}, isEmpty);
     });
+
+    Future<void> acceptedCheckout() async {
+      expect(session.addProduct('s-milk', quantity: 2), isFalse);
+      expect(
+        await session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        ),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+    }
+
+    test(
+      'changed Checkout policy tick reviews without adding units or paying',
+      () async {
+        await acceptedCheckout();
+        content.body = 'Updated Store agreement after Add.';
+        expect(await session.submitOrder(), isFalse);
+        final intent = session.pendingSupplierPolicyAdd!;
+        expect(intent.quantity, 0);
+        expect(intent.checkoutFingerprint, isNotNull);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(await session.acceptSupplierPolicyAndAdd(intent), isTrue);
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(session.confirmedOrders, isEmpty);
+      },
+    );
+
+    test(
+      'known-required missing Checkout policy blocks without a consent bypass',
+      () async {
+        await acceptedCheckout();
+        content.mode = 'missing';
+        expect(await session.submitOrder(), isFalse);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+        expect(session.notice, contains('could not be confirmed'));
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(session.quantityFor('s-milk'), 2);
+      },
+    );
+
+    test(
+      'cancelled or failed Checkout consent remains blocked and preserves units',
+      () async {
+        await acceptedCheckout();
+        content.body = 'New required agreement.';
+        await session.submitOrder();
+        session.cancelSupplierPolicyAdd();
+        expect(await session.submitOrder(), isFalse);
+        store.reject = true;
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isFalse,
+        );
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(await session.submitOrder(), isFalse);
+      },
+    );
+
+    test(
+      'Checkout consent saved after leaving Checkout cannot add or pay',
+      () async {
+        await acceptedCheckout();
+        content.body = 'New agreement while checking out.';
+        await session.submitOrder();
+        store.pending = Completer<void>();
+        final accepted = session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        );
+        session.openCart();
+        store.pending!.complete();
+        expect(await accepted, isFalse);
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(session.confirmedOrders, isEmpty);
+      },
+    );
+
+    test('unchanged Checkout acceptance does not prompt again', () async {
+      await acceptedCheckout();
+      await session.submitOrder();
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      expect(session.quantityFor('s-milk'), 2);
+    });
+
+    test(
+      'pending payment retains its original attempt after Store policy changes',
+      () async {
+        await acceptedCheckout();
+        await session.refreshCheckoutQuote();
+        expect(await session.submitOrder(), isFalse);
+        expect(session.checkoutRequiresResolution, isTrue);
+        final key = session.checkoutIdempotencyKey;
+        expect(key, isNotNull);
+        final commerce = session.commerceAdapter as TestPaymentCommerce;
+        expect(commerce.requests, hasLength(1));
+        content.body = 'New Store policy while original payment is pending.';
+        expect(await session.submitOrder(), isFalse);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+        expect(session.checkoutIdempotencyKey, key);
+        expect(commerce.requests, hasLength(1));
+        expect(await session.reconcilePayment(), isFalse);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+        expect(session.checkoutIdempotencyKey, key);
+        expect(session.quantityFor('s-milk'), 2);
+      },
+    );
+
+    test(
+      'policy change during quote await is checked before reserving payment',
+      () async {
+        await acceptedCheckout();
+        await session.refreshCheckoutQuote();
+        quote.gate = Completer<void>();
+        final submission = session.submitOrder();
+        content.body = 'Store changed the agreement while quote was loading.';
+        quote.gate!.complete();
+        expect(await submission, isFalse);
+        expect(
+          session.pendingSupplierPolicyAdd,
+          isNotNull,
+          reason: session.notice,
+        );
+        expect(session.pendingSupplierPolicyAdd!.quantity, 0);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(session.quantityFor('s-milk'), 2);
+      },
+    );
+
+    testWidgets(
+      'Checkout reaccept popup has unchecked tick and no Add action',
+      (tester) async {
+        await acceptedCheckout();
+        content.body = 'Updated Store policy for existing Cart units.';
+        await session.submitOrder();
+        final intent = session.pendingSupplierPolicyAdd!;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showBuyV2SupplierPolicySheet(
+                    context,
+                    session,
+                    intent: intent,
+                  ),
+                  child: const Text('Review policy'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Review policy'));
+        await tester.pumpAndSettle();
+        final tick = find.byKey(
+          const ValueKey('buy-supplier-policy-accept-and-add'),
+        );
+        expect(tester.widget<CheckboxListTile>(tick).value, isFalse);
+        expect(
+          find.text('I agree to this Store’s updated policy'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('add 0'), findsNothing);
+        await tester.ensureVisible(tick);
+        await tester.tap(tick);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.legacyCheckoutAttempt, isNull);
+        expect(session.pendingSupplierPolicyAdd, isNull);
+      },
+    );
+
+    test(
+      'Checkout consent ignores unselected policies and rejects changed selection during save',
+      () async {
+        await acceptedCheckout();
+        session.openCart();
+        expect(session.addProduct('s-tomato'), isFalse);
+        expect(
+          await session.acceptSupplierPolicyAndAdd(
+            session.pendingSupplierPolicyAdd,
+          ),
+          isTrue,
+        );
+        session.selectCartProduct('s-tomato', false);
+        expect(session.openCheckout(), isTrue);
+        content.body = 'Changed Store terms for existing items.';
+        expect(await session.submitOrder(), isFalse);
+        final intent = session.pendingSupplierPolicyAdd!;
+        expect(intent.product.id, 's-milk');
+        store.pending = Completer<void>();
+        final accepted = session.acceptSupplierPolicyAndAdd(intent);
+        session.selectCartProduct('s-tomato', true);
+        store.pending!.complete();
+        expect(await accepted, isFalse);
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.legacyCheckoutAttempt, isNull);
+      },
+    );
+
+    test(
+      'changed owner during Checkout consent save cannot pay or add',
+      () async {
+        await acceptedCheckout();
+        content.body = 'New required Store agreement.';
+        await session.submitOrder();
+        store.pending = Completer<void>();
+        final accepted = session.acceptSupplierPolicyAndAdd(
+          session.pendingSupplierPolicyAdd,
+        );
+        store.ownerScope = 'buyer-b';
+        store.pending!.complete();
+        expect(await accepted, isFalse);
+        expect(session.quantityFor('s-milk'), 2);
+        expect(session.legacyCheckoutAttempt, isNull);
+      },
+    );
 
     test('required policy freezes quantity and cancel adds nothing', () {
       expect(session.addProduct('s-milk', quantity: 2), isFalse);
@@ -449,8 +799,38 @@ void main() {
             );
           }
           await tester.ensureVisible(disclosure);
+          await tester.pumpAndSettle();
+          final productScroll = find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          bool disclosureReachable() =>
+              disclosure.hitTestable().evaluate().length == 1 &&
+              tester.getRect(disclosure).bottom <=
+                  tester.getRect(find.byKey(const Key('mool-global-chat'))).top;
+          for (var step = 0; step < 8 && !disclosureReachable(); step++) {
+            final position = tester
+                .state<ScrollableState>(productScroll)
+                .position;
+            final before = position.pixels;
+            final bounds = tester.getRect(productScroll);
+            await tester.dragFrom(
+              Offset(bounds.center.dx, bounds.top + bounds.height * .3),
+              const Offset(0, -90),
+            );
+            await tester.pumpAndSettle();
+            expect(position.pixels, greaterThan(before + .5));
+          }
+          expect(disclosureReachable(), isTrue);
+          expect(disclosure.hitTestable(), findsOneWidget);
           await tester.tap(disclosure);
           await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-supplier-policy-sheet')),
+            findsOneWidget,
+          );
           expect(
             find.byKey(const ValueKey('buy-supplier-policy-accept-and-add')),
             findsNothing,
@@ -1472,7 +1852,10 @@ void main() {
       final card = find.byKey(
         const ValueKey('buy-product-continuation-similar-a'),
       );
-      expect(tester.getSize(card).width, 148);
+      expect(
+        tester.getSize(card).width,
+        closeTo(tester.getSize(rail).width, 1),
+      );
       expect(
         find.descendant(of: card, matching: find.textContaining('4.2 stars')),
         findsOneWidget,
@@ -1485,7 +1868,10 @@ void main() {
         find.descendant(
           of: card,
           matching: find.text(
-            buyV2BuyerDeliveryPromise(session.productFactsFor(alternative)),
+            buyV2BuyerDeliveryPromise(
+              session.productFactsFor(alternative),
+              confirmAfterStoreAcceptance: true,
+            ),
           ),
         ),
         findsOneWidget,
@@ -1659,6 +2045,10 @@ void main() {
       );
       expect(card(available.id), findsOneWidget);
       expect(card(sameTitle.id), findsOneWidget);
+      expect(
+        tester.getSize(card(available.id)).width * 2 + 8,
+        closeTo(tester.getSize(rail).width, 1),
+      );
       expect(card(unavailable.id), findsNothing);
       expect(card(duplicate.id), findsNothing);
       expect(card(sameFamily.id), findsNothing);
@@ -1807,6 +2197,7 @@ void main() {
       await revealProductControl(tester, session, card);
       final promise = buyV2BuyerDeliveryPromise(
         session.productFactsFor(alternative),
+        confirmAfterStoreAcceptance: true,
       );
       expect(
         find.descendant(of: card, matching: find.text(promise)),
@@ -1871,16 +2262,20 @@ void main() {
       await mountReferenceGallery(tester, session, current.id);
       final recent = find.byKey(ValueKey('buy-product-recents-${current.id}'));
       await revealProductControl(tester, session, recent);
-      for (final item in history) {
-        expect(
-          find.descendant(
-            of: recent,
-            matching: find.byKey(
-              ValueKey('buy-product-continuation-${item.id}'),
-            ),
-          ),
-          findsOneWidget,
+      for (final item in history.reversed) {
+        final recentItem = find.descendant(
+          of: recent,
+          matching: find.byKey(ValueKey('buy-product-continuation-${item.id}')),
         );
+        for (
+          var attempt = 0;
+          recentItem.evaluate().isEmpty && attempt < 4;
+          attempt++
+        ) {
+          await tester.drag(recent, const Offset(-180, 0));
+          await tester.pumpAndSettle();
+        }
+        expect(recentItem, findsOneWidget);
       }
       expect(
         find.descendant(
@@ -1935,10 +2330,8 @@ void main() {
       expect(second.left - first.right, closeTo(8, .1));
       expect(first.width, closeTo(second.width, .1));
       await captureR66Visual(tester, 'pdp06-more-grid');
-      final load = find.byKey(const ValueKey('buy-product-more-load-s-milk'));
-      await revealProductControl(tester, session, load);
-      await tester.tap(load.hitTestable());
-      await tester.pumpAndSettle();
+      expect(find.text('Show more products'), findsNothing);
+      await revealProductControl(tester, session, find.byWidget(cards.last));
       expect(tester.widget<Wrap>(grid).children, hasLength(16));
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -2231,23 +2624,20 @@ void main() {
       );
       expect(pager.page, isNotNull);
       expect(pager.page!.nextCursor, isNotNull);
-      final expand = find.byKey(const ValueKey('buy-product-more-load-s-milk'));
-      for (var i = 0; i < 6 && expand.evaluate().isNotEmpty; i++) {
-        await revealProductControl(tester, session, expand);
-        await tester.tap(expand.hitTestable());
-        await tester.pumpAndSettle();
-      }
       final initialPage = pager.page;
       final before = tester.widget<Wrap>(grid).children.length;
       expect(before, greaterThan(0));
-      final next = find.text('Next products');
-      await revealProductControl(tester, session, next);
       source.failNext = true;
-      await tester.tap(next.hitTestable());
-      await tester.pumpAndSettle();
+      for (var i = 0; i < 12 && pager.message == null; i++) {
+        final cards = tester.widget<Wrap>(grid).children;
+        await revealProductControl(tester, session, find.byWidget(cards.last));
+      }
+      expect(find.text('Show more products'), findsNothing);
+      expect(find.text('Next products'), findsNothing);
       expect(pager.page, same(initialPage));
       expect(pager.message, isNotNull);
-      expect(tester.widget<Wrap>(grid).children, hasLength(before));
+      final retainedBeforeRetry = tester.widget<Wrap>(grid).children.length;
+      expect(retainedBeforeRetry, greaterThanOrEqualTo(before));
       final retry = find.byTooltip('Retry more products');
       await revealProductControl(tester, session, retry);
       source.failNext = false;
@@ -2262,12 +2652,28 @@ void main() {
             .intersection(initialPage.items.map((p) => p.id).toSet()),
         isEmpty,
       );
-      expect(tester.widget<Wrap>(grid).children.length, inInclusiveRange(1, 8));
-      final previous = find.text('Previous products');
-      await revealProductControl(tester, session, previous);
-      await tester.tap(previous.hitTestable());
-      await tester.pumpAndSettle();
-      expect(pager.page!.startIndex, initialPage.startIndex);
+      expect(
+        tester.widget<Wrap>(grid).children.length,
+        greaterThanOrEqualTo(retainedBeforeRetry),
+      );
+      expect(find.text('Previous products'), findsNothing);
+      final retainedIds = tester
+          .widget<Wrap>(grid)
+          .children
+          .map((child) => child.key)
+          .toSet();
+      // Exercise request-cache eviction independently of the scroll threshold.
+      // The initial failure/retry above is triggered by actual section browsing.
+      for (var i = 0; i < 4 && pager.page!.nextCursor != null; i++) {
+        await pager.next();
+        await tester.pumpAndSettle();
+      }
+      expect(pager.page!.startIndex, greaterThanOrEqualTo(120));
+      expect(pager.cachedPageCount, lessThanOrEqualTo(3));
+      expect(
+        tester.widget<Wrap>(grid).children.map((child) => child.key).toSet(),
+        containsAll(retainedIds),
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -3286,7 +3692,7 @@ void main() {
           find.descendant(
             of: fulfilment,
             matching: find.textContaining(
-              'Delivery time confirmed at checkout',
+              'Delivery time confirmed after Store acceptance',
             ),
           ),
           findsOneWidget,
@@ -3817,12 +4223,8 @@ void main() {
     await mountReferenceGallery(tester, session, 's-milk');
     tester.view.physicalSize = const Size(320, 800);
     await tester.pumpAndSettle();
-    final expand = find.byKey(
-      const ValueKey('buy-product-highlights-expand-s-milk'),
-    );
-    await revealProductControl(tester, session, expand);
-    await tester.tap(expand.hitTestable());
-    await tester.pumpAndSettle();
+    expect(find.text('Show all highlights'), findsNothing);
+    await revealProductControl(tester, session, find.text('Supplied fact 5'));
     expect(find.text('Supplied fact 5'), findsOneWidget);
     final tab = find.byKey(const ValueKey('buy-product-details-tab-1-s-milk'));
     await revealProductControl(tester, session, tab);
@@ -3851,7 +4253,7 @@ void main() {
     await tester.pumpAndSettle();
     await revealProductControl(tester, session, tab);
     expect(find.text(adapter.description), findsOneWidget);
-    expect(find.text('Show less'), findsOneWidget);
+    expect(find.text('Show less'), findsNothing);
     expect(session.selectedProductId, 's-milk');
     expect(tester.takeException(), isNull);
   });
@@ -3927,12 +4329,8 @@ void main() {
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await mountReferenceGallery(tester, session, 's-milk');
-      final expand = find.byKey(
-        const ValueKey('buy-product-highlights-expand-s-milk'),
-      );
-      await revealProductControl(tester, session, expand);
-      await tester.tap(expand.hitTestable());
-      await tester.pumpAndSettle();
+      expect(find.text('Show all highlights'), findsNothing);
+      await revealProductControl(tester, session, find.text('Field 5'));
       final description = find.byKey(
         const ValueKey('buy-product-details-tab-1-s-milk'),
       );
@@ -3957,8 +4355,8 @@ void main() {
         find.byKey(const ValueKey('buy-product-details-tab-0-s-tomato')),
       );
       expect(find.text('Shelf life'), findsOneWidget);
-      expect(find.text('Show all highlights'), findsOneWidget);
-      expect(find.text('Field 5'), findsNothing);
+      expect(find.text('Show all highlights'), findsNothing);
+      expect(find.text('Field 5'), findsOneWidget);
       expect(find.text(adapter.description), findsNothing);
       session.goBack();
       await tester.pumpAndSettle();
@@ -3968,7 +4366,7 @@ void main() {
         closeTo(position, 1),
       );
       expect(find.text(adapter.description), findsOneWidget);
-      expect(find.text('Show less'), findsOneWidget);
+      expect(find.text('Show less'), findsNothing);
       expect(find.text('Field 5'), findsOneWidget);
       final selected = tester.widget<Ink>(
         find.descendant(of: description, matching: find.byType(Ink)).first,
@@ -4369,7 +4767,7 @@ final class _DiscoveryPagingSource extends BuyV2DevelopmentCatalogueSource {
     : super(
         destination: BuyV2Destination.shop,
         providerCount: 1,
-        skusPerStore: 90,
+        skusPerStore: 500,
       );
 
   bool failNext = false;

@@ -3705,13 +3705,13 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(
-            ValueKey(
-              offers ? 'buy-local-tab-offers' : 'buy-local-tab-wholesale',
-            ),
-          ),
+        final sourceTab = find.byKey(
+          ValueKey(offers ? 'buy-local-tab-offers' : 'buy-local-tab-wholesale'),
         );
+        await tester.ensureVisible(sourceTab);
+        await tester.pumpAndSettle();
+        expect(sourceTab.hitTestable(), findsOneWidget);
+        await tester.tap(sourceTab);
         await tester.pumpAndSettle();
         final sourceId = offers ? 'w-oil' : 'w-rice';
         final selectedId = offers ? 'w-oil-10l' : 'w-rice-50kg';

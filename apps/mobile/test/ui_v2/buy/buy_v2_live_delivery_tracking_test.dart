@@ -344,6 +344,76 @@ void main() {
     );
   }
 
+  for (final delivered in [true, false]) {
+    testWidgets('T14 tracking guidance names the available action $delivered', (
+      tester,
+    ) async {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final order = session.orders.firstWhere(
+        (order) => delivered
+            ? order.status == BuyV2OrderStatus.delivered
+            : order.status == BuyV2OrderStatus.preparing,
+      );
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: session.destination,
+            initialView: session.view,
+            orderId: order.id,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final label = delivered ? 'Return, replace or refund' : 'Manage order';
+      final scrollable = find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first;
+      if (delivered) {
+        await tester.scrollUntilVisible(
+          find.text('What happens next'),
+          250,
+          scrollable: scrollable,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Check your products and use $label'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Check your products and use Manage order'),
+          findsNothing,
+        );
+      }
+      final action = find.byKey(
+        ValueKey('buy-tracking-manage-order-${order.id}'),
+      );
+      await tester.scrollUntilVisible(action, 250, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: action, matching: find.text(label)),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      expect(action.hitTestable(), findsOneWidget);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.text(label), findsWidgets);
+      expect(session.selectedOrderOrNull?.id, order.id);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('completed orders do not request a live courier location', (
     tester,
   ) async {

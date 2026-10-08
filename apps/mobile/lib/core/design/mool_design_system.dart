@@ -1092,6 +1092,41 @@ class MoolLocalNavigationRail extends StatelessWidget {
   final List<MoolLocalNavigationAction> actions;
   final MoolLocalNavigationSurfaceTone surfaceTone;
 
+  /// Lets a containing rail provide enough width without nested scrolling.
+  double minimumWidth(BuildContext context) =>
+      _labelWidths(context).fold<double>(0, (sum, width) => sum + width);
+
+  List<double> _labelWidths(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(
+      context,
+    ).scale(1).clamp(1.0, MoolLocalNavigationTokens.maximumTextScale);
+    return actions
+        .map((action) {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: action.label,
+              style: DefaultTextStyle.of(context).style.merge(
+                const TextStyle(
+                  fontFamily: MoolLocalNavigationTokens.destinationFontFamily,
+                  fontSize: MoolLocalNavigationTokens.destinationLabelSize,
+                  fontWeight:
+                      MoolLocalNavigationTokens.destinationSelectedLabelWeight,
+                ),
+              ),
+            ),
+            textScaler: TextScaler.linear(textScale),
+            textDirection: Directionality.of(context),
+            locale: Localizations.maybeLocaleOf(context),
+          )..layout();
+          final width = math
+              .max(MoolMetrics.minimumTapTarget, painter.width + 8)
+              .toDouble();
+          painter.dispose();
+          return width;
+        })
+        .toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -1103,15 +1138,18 @@ class MoolLocalNavigationRail extends StatelessWidget {
         child: LayoutBuilder(
           key: const Key('moolsocial-local-navigation-adaptive-layout'),
           builder: (context, constraints) {
-            final minimumClusterWidth =
-                MoolMetrics.minimumTapTarget * actions.length;
+            final labelWidths = _labelWidths(context);
+            final minimumClusterWidth = labelWidths.fold<double>(
+              0,
+              (sum, width) => sum + width,
+            );
             final requiresOverflow = minimumClusterWidth > constraints.maxWidth;
-            final clusterWidth = requiresOverflow
-                ? minimumClusterWidth
-                : constraints.maxWidth;
-            final cellWidth = requiresOverflow
-                ? MoolMetrics.minimumTapTarget
-                : constraints.maxWidth / actions.length;
+            final clusterWidth = math.max(
+              minimumClusterWidth,
+              constraints.maxWidth,
+            );
+            final sparePerCell =
+                (clusterWidth - minimumClusterWidth) / actions.length;
             final cluster = SizedBox(
               key: const Key('moolsocial-local-navigation-compact-cluster'),
               width: clusterWidth,
@@ -1120,7 +1158,7 @@ class MoolLocalNavigationRail extends StatelessWidget {
                 children: [
                   for (var index = 0; index < actions.length; index++) ...[
                     SizedBox(
-                      width: cellWidth,
+                      width: labelWidths[index] + sparePerCell,
                       height: MoolLocalNavigationTokens.destinationRailHeight,
                       child: _MoolLocalNavigationCell(
                         familyId: familyId,

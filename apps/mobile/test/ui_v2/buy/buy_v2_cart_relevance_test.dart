@@ -137,30 +137,34 @@ void main() {
     },
   );
 
-  test('missing delivery estimate preserves cart and creates no order', () {
-    final session = BuyV2Session(
-      core: BuySession(),
-      productFactsAdapter: const QualificationDeliveryFacts(available: false),
-    );
-    addTearDown(session.dispose);
-    expect(session.addProduct('s-tomato'), isTrue);
-    expect(session.addProduct('w-oil'), isTrue);
-    final orderIds = session.orders.map((order) => order.id).toList();
-    final quantities = {
-      for (final line in session.cartLines) line.product.id: line.quantity,
-    };
-    final total = session.cartTotal;
-    expect(session.openCheckout(), isTrue);
-    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
-    expect(session.confirmOrder(), isFalse);
-    expect(session.notice, contains('Delivery estimate unavailable'));
-    expect(session.orders.map((order) => order.id), orderIds);
-    expect(session.confirmedOrders, isEmpty);
-    expect(session.cartTotal, total);
-    for (final entry in quantities.entries) {
-      expect(session.quantityFor(entry.key), entry.value);
-    }
-  });
+  test(
+    'public missing estimate preserves Cart until explicit order placement',
+    () {
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: const QualificationDeliveryFacts(available: false),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-oil'), isTrue);
+      final orderIds = session.orders.map((order) => order.id).toList();
+      final quantities = {
+        for (final line in session.cartLines) line.product.id: line.quantity,
+      };
+      final total = session.cartTotal;
+      expect(session.openCheckout(), isTrue);
+      expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+      expect(session.orders.map((order) => order.id), orderIds);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.cartTotal, total);
+      for (final entry in quantities.entries) {
+        expect(session.quantityFor(entry.key), entry.value);
+      }
+      // Explicit local review fixture: public estimates are not provider confirmation.
+      expect(session.confirmOrder(), isTrue);
+      expect(session.confirmedOrders, hasLength(2));
+    },
+  );
 
   group('R37 Cart relevance contracts', () {
     test('recommendations stay in-family and exclude Cart products', () async {
@@ -500,124 +504,128 @@ void main() {
       expect(paymentOffers, isEmpty);
     });
 
-    test('device-review seeds cover every vertical and stay total-neutral', () {
-      const adapter = BuyV2SeededCartBenefitsAdapter();
-      final session = BuyV2Session(
-        core: BuySession(),
-        cartBenefitsAdapter: adapter,
-      );
-      for (final destination in const [
-        BuyV2Destination.shop,
-        BuyV2Destination.wholesale,
-        BuyV2Destination.medicine,
-      ]) {
-        final product = BuyV2Catalogue.products.firstWhere(
-          (candidate) =>
-              candidate.destination == destination &&
-              !candidate.requiresPrescription,
+    test(
+      'device-review seeds cover active Buy verticals and stay total-neutral',
+      () {
+        const adapter = BuyV2SeededCartBenefitsAdapter();
+        final session = BuyV2Session(
+          core: BuySession(),
+          catalogueNow: () => DateTime(2026, 9, 28),
+          cartBenefitsAdapter: adapter,
         );
-        expect(session.addProduct(product.id), isTrue);
-        final coupons = adapter.benefitsFor(
-          kind: BuyV2CartBenefitKind.coupon,
-          destinations: {destination},
-          itemTotal: session.totalForDestination(destination),
-        );
-        final minimumSpend = coupons
-            .map((benefit) => benefit.minimumSpend!)
-            .reduce((left, right) => left > right ? left : right);
-        if (session.totalForDestination(destination) < minimumSpend) {
-          expect(
-            session.cartBenefits(
-              kind: BuyV2CartBenefitKind.coupon,
-              destination: destination,
-            ),
-            isEmpty,
-          );
-          expect(session.chooseCartBenefit(coupons.first), isFalse);
-          final quantity = (minimumSpend / product.price).ceil();
-          expect(session.setCartQuantity(product.id, '$quantity'), isTrue);
-        }
-        expect(
-          session.totalForDestination(destination),
-          greaterThanOrEqualTo(minimumSpend),
-        );
-      }
-      final originalTotal = session.cartTotal;
-
-      for (final destination in const [
-        BuyV2Destination.shop,
-        BuyV2Destination.wholesale,
-        BuyV2Destination.medicine,
-      ]) {
-        for (final kind in BuyV2CartBenefitKind.values) {
-          final benefits = session.cartBenefits(
-            kind: kind,
-            destination: destination,
-          );
-          expect(benefits, hasLength(3));
-          expect(
-            benefits.map((benefit) => benefit.id).toSet(),
-            hasLength(benefits.length),
-          );
-          for (final benefit in benefits) {
-            expect(benefit.destination, destination);
-            expect(benefit.kind, kind);
-            expect(benefit.sourceId, 'device-seed-v2');
-            expect(
-              '${benefit.title} ${benefit.detail}',
-              isNot(
-                matches(
-                  RegExp(r'(\bcode\b|\bunlock|\bredeem)', caseSensitive: false),
-                ),
-              ),
-            );
-          }
-          final benefit = benefits.first;
-          expect(benefit.destination, destination);
-          expect(benefit.kind, kind);
-          expect(session.chooseCartBenefit(benefit), isTrue);
-          expect(session.chooseCartBenefit(benefits[1]), isTrue);
-          final replaced = session.selectedCartBenefit(
-            kind: kind,
-            destination: destination,
-          );
-          expect(replaced?.id, benefits[1].id);
-          expect(replaced?.sourceId, benefits[1].sourceId);
-          expect(session.chooseCartBenefit(benefit), isTrue);
-        }
-      }
-
-      expect(
-        session.selectedCartBenefitsFor({
+        for (final destination in const [
           BuyV2Destination.shop,
           BuyV2Destination.wholesale,
-          BuyV2Destination.medicine,
-        }),
-        hasLength(6),
-      );
-      expect(session.cartTotal, originalTotal);
-      expect(session.scopedCouponSaving, greaterThan(0));
-      expect(
-        session.scopedPayableTotal,
-        originalTotal - session.scopedCouponSaving,
-      );
-      expect(
-        adapter.benefitsFor(
-          kind: BuyV2CartBenefitKind.coupon,
-          destinations: const {BuyV2Destination.shop},
-          itemTotal: 0,
-        ),
-        isEmpty,
-      );
-      expect(
-        adapter.benefitsFor(
-          kind: BuyV2CartBenefitKind.coupon,
-          destinations: const {BuyV2Destination.orders},
-          itemTotal: 100,
-        ),
-        isEmpty,
-      );
-    });
+        ]) {
+          final product = BuyV2Catalogue.products.firstWhere(
+            (candidate) =>
+                candidate.destination == destination &&
+                !candidate.requiresPrescription,
+          );
+          expect(session.addProduct(product.id), isTrue);
+          final coupons = adapter.benefitsFor(
+            kind: BuyV2CartBenefitKind.coupon,
+            destinations: {destination},
+            itemTotal: session.totalForDestination(destination),
+          );
+          final minimumSpend = coupons
+              .map((benefit) => benefit.minimumSpend!)
+              .reduce((left, right) => left > right ? left : right);
+          if (session.totalForDestination(destination) < minimumSpend) {
+            expect(
+              session.cartBenefits(
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: destination,
+              ),
+              isEmpty,
+            );
+            expect(session.chooseCartBenefit(coupons.first), isFalse);
+            final quantity = (minimumSpend / product.price).ceil();
+            expect(session.setCartQuantity(product.id, '$quantity'), isTrue);
+          }
+          expect(
+            session.totalForDestination(destination),
+            greaterThanOrEqualTo(minimumSpend),
+          );
+        }
+        final originalTotal = session.cartTotal;
+
+        for (final destination in const [
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+        ]) {
+          for (final kind in BuyV2CartBenefitKind.values) {
+            final benefits = session.cartBenefits(
+              kind: kind,
+              destination: destination,
+            );
+            expect(benefits, hasLength(3));
+            expect(
+              benefits.map((benefit) => benefit.id).toSet(),
+              hasLength(benefits.length),
+            );
+            for (final benefit in benefits) {
+              expect(benefit.destination, destination);
+              expect(benefit.kind, kind);
+              expect(benefit.sourceId, 'device-seed-v2');
+              expect(
+                '${benefit.title} ${benefit.detail}',
+                isNot(
+                  matches(
+                    RegExp(
+                      r'(\bcode\b|\bunlock|\bredeem)',
+                      caseSensitive: false,
+                    ),
+                  ),
+                ),
+              );
+            }
+            final benefit = benefits.first;
+            expect(benefit.destination, destination);
+            expect(benefit.kind, kind);
+            expect(session.chooseCartBenefit(benefit), isTrue);
+            expect(session.chooseCartBenefit(benefits[1]), isTrue);
+            final replaced = session.selectedCartBenefit(
+              kind: kind,
+              destination: destination,
+            );
+            expect(replaced?.id, benefits[1].id);
+            expect(replaced?.sourceId, benefits[1].sourceId);
+            expect(session.chooseCartBenefit(benefit), isTrue);
+          }
+        }
+
+        expect(
+          session.selectedCartBenefitsFor({
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+          }),
+          hasLength(4),
+        );
+        expect(session.cartTotal, originalTotal);
+        expect(session.scopedCouponSaving, greaterThan(0));
+        expect(
+          session.scopedPayableTotal,
+          originalTotal - session.scopedCouponSaving,
+        );
+        expect(
+          adapter.benefitsFor(
+            kind: BuyV2CartBenefitKind.coupon,
+            destinations: const {BuyV2Destination.shop},
+            itemTotal: 0,
+          ),
+          isEmpty,
+        );
+        expect(
+          adapter.benefitsFor(
+            kind: BuyV2CartBenefitKind.coupon,
+            destinations: const {BuyV2Destination.orders},
+            itemTotal: 100,
+          ),
+          isEmpty,
+        );
+      },
+    );
 
     test('normal test build defaults to fail-closed cart benefits', () {
       expect(buyV2DeviceReviewBenefitSeedsEnabled, isFalse);
@@ -1219,7 +1227,7 @@ void main() {
         final adapter = _LiveBenefitsAdapter(
           BuyV2CartBenefitsSnapshot(
             state: BuyV2CartBenefitsLoadState.ready,
-            evaluatedAt: DateTime.utc(2026, 8, 29, 12),
+            evaluatedAt: DateTime.now(),
             benefits: const [
               BuyV2CartBenefit(
                 id: 'manufacturer-load-saving',
@@ -1239,6 +1247,7 @@ void main() {
         );
         final session = BuyV2Session(
           core: BuySession(),
+          commerceAdapter: prepaidCommerceFixture(),
           cartBenefitsAdapter: adapter,
         );
         addTearDown(session.dispose);
@@ -1258,6 +1267,8 @@ void main() {
         expect(session.openCheckout(), isTrue);
         expect(session.continueCheckoutFromAddress(), isTrue);
         expect(session.choosePayment('Card'), isTrue);
+        // Resolve the published eligibility before the buyer consents to this amount.
+        await session.refreshCartBenefits();
         expect(session.continueCheckoutFromPayment(), isTrue);
         final expectedTotal = session.checkoutTotal - coupon.savingAmount;
 
@@ -1265,6 +1276,7 @@ void main() {
         expect(
           session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.paymentActionRequired,
+          reason: session.notice,
         );
         expect(await session.continuePayment((_) async => true), isTrue);
         final submitted = await session.reconcilePayment();

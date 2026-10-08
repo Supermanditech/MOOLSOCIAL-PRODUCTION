@@ -1024,7 +1024,10 @@ void main() {
       expect(signIn, findsNothing);
       expect(session.continueCheckoutFromAddress(), isFalse);
       expect(session.view, BuyV2View.checkout);
-      expect(session.checkoutScope, BuyV2CartScope.shop);
+      expect(session.checkoutScope, BuyV2CartScope.all);
+      expect(session.checkoutLines.map((line) => line.product.id), [
+        's-tomato',
+      ]);
       expect(session.collectionCheckoutSelected, isTrue);
       expect(session.quantityFor('s-tomato'), 1);
       expect(find.byKey(const Key('screen03-login-v5')), findsNothing);

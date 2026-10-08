@@ -467,12 +467,14 @@ Future<bool> _save(
   BuyV2Destination destination = BuyV2Destination.shop,
   String name = 'Market Buyer',
   bool remember = true,
+  bool createNew = false,
 }) => c.save(
   destination: destination,
   legalName: name,
   gstin: '08ABCDE1234F1Z5',
   billingAddress: '12 Market Road, Jodhpur',
   remember: remember,
+  createNew: createNew,
 );
 Widget _captureRoot(BuildContext context, Widget? child) => RepaintBoundary(
   key: const ValueKey('pending-native-capture'),
@@ -542,8 +544,12 @@ Future<void> _fillGst(
     find.byKey(const ValueKey('buy-gst-billing-address')),
     '12 Market Road, Jodhpur',
   );
-  await tester.ensureVisible(find.text('Use GST details'));
-  await tester.tap(find.text('Use GST details'));
+  expect(find.text('GST-registered business'), findsOneWidget);
+  final save = find.byKey(const ValueKey('buy-gst-save'));
+  await tester.ensureVisible(save);
+  await tester.pumpAndSettle();
+  expect(save.hitTestable(), findsOneWidget);
+  await tester.tap(save);
   await tester.pumpAndSettle();
 }
 
@@ -623,6 +629,24 @@ void main() {
     }
   });
 
+  test('T14 general Buy review does not require fixture supplier approval', () {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      reviewDataEnabled: true,
+      customerStateStore: _ReceiptReviewStateStore(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.addProduct('w-tomato', quantity: 2), isTrue);
+    expect(session.purchaseOrderLines, isNotEmpty);
+    expect(session.purchaseOrderAdapter, isNull);
+    expect(session.purchaseOrder, isNull);
+    expect(session.purchaseOrderRequired, isFalse);
+    expect(session.purchaseOrderReviewRequired, isFalse);
+    expect(session.confirmedOrders, isEmpty);
+  });
+
   test(
     'D17 device PO fixture is isolated and preserves exact approvals',
     () async {
@@ -630,12 +654,14 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
+        purchaseOrderReviewFixtureEnabled: true,
         reviewDataEnabled: true,
         customerStateStore: _ReceiptReviewStateStore(),
       );
       final otherCore = BuySession();
       final production = BuyV2Session(
         core: otherCore,
+        purchaseOrderReviewFixtureEnabled: true,
         reviewDataEnabled: false,
         customerStateStore: _ReceiptReviewStateStore(),
       );
@@ -1325,14 +1351,18 @@ void main() {
     await tester.pumpWidget(
       _app(BuyV2CheckoutGstDetails(controller: c, destinations: _destinations)),
     );
-    expect(find.text('Add GST details'), findsOneWidget);
+    expect(find.text('Invoice details'), findsOneWidget);
+    expect(find.text('Personal purchase'), findsOneWidget);
     await _save(c);
     await tester.pumpAndSettle();
     expect(
       c.detailsFor(_destinations.first),
       same(c.detailsFor(_destinations.last)),
     );
-    expect(find.text('GST details'), findsOneWidget);
+    expect(
+      find.textContaining('Market Buyer · 08ABCDE1234F1Z5'),
+      findsOneWidget,
+    );
     expect(find.text('Add GST details'), findsNothing);
   });
   for (final entry in [
@@ -1359,7 +1389,7 @@ void main() {
       expect(restored.requestedFor(entry.$2), isTrue);
       expect(restored.detailsFor(entry.$2)!.gstin, '08ABCDE1234F1Z5');
       expect(find.text('Add GST details'), findsNothing);
-      expect(find.text('Edit'), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-invoice-change')), findsOneWidget);
     });
   }
   testWidgets('R6634 C07-4 Combined checkout GST > payment > Back > review', (
@@ -1394,7 +1424,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final card = find.byKey(const ValueKey('buy-gst-invoice-shop'));
+    final card = find.byKey(const ValueKey('buy-invoice-details'));
     Future<void> reveal() async {
       await tester.scrollUntilVisible(
         card,
@@ -1408,10 +1438,7 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('buy-gst-invoice-wholesale')),
-        findsNothing,
-      );
+      expect(card, findsOneWidget);
       expect(find.text('Add GST details'), findsNothing);
       expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
     }
@@ -1431,23 +1458,43 @@ void main() {
   });
   testWidgets('R6634 C07-5 Combined checkout GST editing', (tester) async {
     final c = _controller(_AccountStore());
-    await _save(c, remember: false, name: 'Shop Buyer');
+    await _save(c, name: 'Shop Buyer');
     await _save(
       c,
       destination: BuyV2Destination.wholesale,
-      remember: false,
+      createNew: true,
       name: 'Wholesale Buyer',
     );
     await tester.pumpWidget(
       _app(BuyV2CheckoutGstDetails(controller: c, destinations: _destinations)),
     );
-    expect(find.text('Shop · GST details'), findsOneWidget);
-    expect(find.text('Wholesale · GST details'), findsOneWidget);
+    expect(
+      find.text('Choose one invoice recipient for this purchase'),
+      findsOneWidget,
+    );
     expect(c.detailsFor(BuyV2Destination.shop)!.legalName, 'Shop Buyer');
     expect(
       c.detailsFor(BuyV2Destination.wholesale)!.legalName,
       'Wholesale Buyer',
     );
+    final profiles = List.of(c.savedProfiles);
+    await tester.tap(find.byKey(const ValueKey('buy-invoice-change')));
+    await tester.pumpAndSettle();
+    for (final profile in profiles) {
+      expect(
+        find.byKey(ValueKey('buy-invoice-profile-${profile.id}')),
+        findsOneWidget,
+      );
+    }
+    final chosen = profiles.singleWhere(
+      (p) => p.legalName == 'Wholesale Buyer',
+    );
+    await tester.tap(find.byKey(ValueKey('buy-invoice-profile-${chosen.id}')));
+    await tester.pumpAndSettle();
+    for (final destination in _destinations) {
+      expect(c.detailsFor(destination), same(chosen));
+    }
+    expect(c.savedProfiles, orderedEquals(profiles));
   });
   test('R6634 C07-6 GST entry validation and recovery', () async {
     final store = _AccountStore()..failWrite = true;
@@ -1484,7 +1531,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      find.text('Add your GST details for future purchases. Optional.'),
+      find.text(
+        'Save your business name and billing address. Add a GSTIN if your business is registered.',
+      ),
       findsOneWidget,
     );
     await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
@@ -1507,7 +1556,9 @@ void main() {
       _app(BuyV2GstProfileSection(store: store, onChanged: () {})),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
+    await tester.tap(
+      find.byKey(ValueKey('profile-gst-edit-${historical.profiles.single.id}')),
+    );
     await tester.pumpAndSettle();
     await _fillGst(tester, name: 'Updated Buyer');
     expect(
@@ -1515,12 +1566,21 @@ void main() {
       'Updated Buyer',
     );
     expect(historical.profiles.single.legalName, 'Market Buyer');
-    await tester.tap(find.byKey(const ValueKey('profile-gst-remove')));
+    expect(store.snapshots[store.ownerScope]!.profiles, hasLength(1));
+    expect(
+      store.snapshots[store.ownerScope]!.profiles.single.id,
+      historical.profiles.single.id,
+    );
+    await tester.tap(
+      find.byKey(
+        ValueKey('profile-gst-remove-${historical.profiles.single.id}'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-gst-remove-confirm')));
     await tester.pumpAndSettle();
     expect(store.snapshots[store.ownerScope]!.profiles, isEmpty);
-    expect(find.text('Add GST details'), findsOneWidget);
+    expect(find.text('Add business details'), findsOneWidget);
   });
   test('R6634 C07-10 Next Shop Cart and next Wholesale Cart', () async {
     final store = _AccountStore();
@@ -1617,7 +1677,11 @@ void main() {
           _app(BuyV2GstProfileSection(store: store, onChanged: () {})),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
+        await tester.tap(
+          find.byKey(
+            ValueKey('profile-gst-edit-${controller.savedProfiles.single.id}'),
+          ),
+        );
         await tester.pumpAndSettle();
         final address = find.byKey(const ValueKey('buy-gst-billing-address'));
         await tester.ensureVisible(address);
@@ -1677,9 +1741,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add GST details'));
+    await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Use GST details'));
+    expect(find.text('GST-registered business'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
     const nameError = 'Enter a legal name with at least 3 characters.';
     expect(find.text(nameError), findsOneWidget);
@@ -1689,7 +1754,7 @@ void main() {
     );
     await tester.pump();
     expect(find.text(nameError), findsNothing);
-    await tester.tap(find.text('Use GST details'));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
     expect(find.text('Check the 15-character GSTIN format.'), findsOneWidget);
     await _fillGst(tester, name: 'Review Buyer');
@@ -1714,14 +1779,20 @@ void main() {
       _app(BuyV2GstProfileSection(store: store, onChanged: () {})),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Add GST details'), findsNothing);
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const ValueKey('profile-gst-edit')))
+          .onPressed,
+      isNull,
+    );
     expect(find.text('Try again'), findsOneWidget);
     store.failRead = false;
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
     expect(find.text('Market Buyer'), findsOneWidget);
     store.failWrite = true;
-    await tester.tap(find.byKey(const ValueKey('profile-gst-edit')));
+    final profileId = store.snapshots[store.ownerScope]!.profiles.single.id;
+    await tester.tap(find.byKey(ValueKey('profile-gst-edit-$profileId')));
     await tester.pumpAndSettle();
     await _fillGst(tester, name: 'Keep my input');
     expect(
@@ -1730,12 +1801,14 @@ void main() {
     );
     expect(find.text('Keep my input'), findsOneWidget);
     store.failWrite = false;
-    await tester.tap(find.text('Use GST details'));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
     expect(
       store.snapshots[store.ownerScope]!.profiles.single.legalName,
       'Keep my input',
     );
+    expect(store.snapshots[store.ownerScope]!.profiles, hasLength(1));
+    expect(store.snapshots[store.ownerScope]!.profiles.single.id, profileId);
   });
 
   for (final viewport in [
@@ -1765,7 +1838,14 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('GST details'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('buy-invoice-details')),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Market Buyer · 08ABCDE1234F1Z5'),
+          findsOneWidget,
+        );
         await _capture(tester, 'gst-combined-${viewport.$1.width}');
         final session = BuyV2Session(
           core: BuySession(),
@@ -1785,7 +1865,11 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+        final offers = find.byKey(const ValueKey('buy-local-tab-offers'));
+        await tester.ensureVisible(offers);
+        await tester.pumpAndSettle();
+        expect(offers.hitTestable(), findsOneWidget);
+        await tester.tap(offers);
         await tester.pumpAndSettle();
         expect(
           find.byKey(const ValueKey('buy-paged-scroll-published-offers')),
@@ -1861,7 +1945,7 @@ void main() {
     expect(buy.continueCheckoutFromPayment(), isTrue);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('buy-gst-invoice-shop')),
+      find.byKey(const ValueKey('buy-invoice-details')),
       180,
       maxScrolls: 40,
       scrollable: find

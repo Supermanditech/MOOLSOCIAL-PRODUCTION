@@ -627,7 +627,10 @@ class BuyV2AdaptiveIdentityRow extends StatelessWidget {
 /// Google route duration is only one upstream input. This presentation helper
 /// never calculates or guesses an ETA; it renders the complete promise already
 /// supplied through [BuyV2ProductFactsSnapshot].
-String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
+String buyV2BuyerDeliveryPromise(
+  BuyV2ProductFactsSnapshot facts, {
+  bool confirmAfterStoreAcceptance = false,
+}) {
   if (facts.stale) return 'Delivery time needs review';
 
   final orderability = facts.orderabilityLabel.trim().toLowerCase();
@@ -637,6 +640,13 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
     return 'Currently unavailable';
   }
 
+  // Normalize only the known missing-estimate placeholder for current public
+  // shopping. Supplier facts and recorded order promises stay unchanged.
+  final promise = facts.deliveryPromise.trim().toLowerCase();
+  if (confirmAfterStoreAcceptance &&
+      (promise.isEmpty || promise == 'delivery time confirmed at checkout')) {
+    return 'Delivery time confirmed after Store acceptance';
+  }
   return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
 }
 
@@ -1073,6 +1083,39 @@ abstract final class BuyV2ActionStyle {
           ),
         ),
         backgroundBuilder: background,
+      );
+
+  /// Primary personal Checkout action; the catalogue Add face is unchanged.
+  static ButtonStyle prominent([ButtonStyle? layout]) =>
+      button(layout).copyWith(
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : Colors.white,
+        ),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : Colors.white,
+        ),
+        backgroundBuilder: (context, states, child) => Ink(
+          decoration: BoxDecoration(
+            color: states.contains(WidgetState.disabled)
+                ? const Color(0xFFE9EDF5)
+                : states.contains(WidgetState.pressed)
+                ? BuyV2Colors.royal
+                : BuyV2Colors.navy,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: states.contains(WidgetState.focused)
+                  ? BuyV2Colors.orange
+                  : states.contains(WidgetState.disabled)
+                  ? BuyV2Colors.line
+                  : BuyV2Colors.navy,
+            ),
+          ),
+          child: child,
+        ),
       );
 }
 
@@ -1684,9 +1727,21 @@ class BuyV2ThemeSpec {
 }
 
 class BuyV2ThemeScope extends InheritedWidget {
-  const BuyV2ThemeScope({super.key, required this.spec, required super.child});
+  const BuyV2ThemeScope({
+    super.key,
+    required this.spec,
+    required super.child,
+    this.refinedCommerce = false,
+  });
 
   final BuyV2ThemeSpec spec;
+  final bool refinedCommerce;
+
+  static bool refinedOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<BuyV2ThemeScope>()
+          ?.refinedCommerce ??
+      false;
 
   static BuyV2ThemeSpec of(BuildContext context) {
     return context
@@ -1696,7 +1751,8 @@ class BuyV2ThemeScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(BuyV2ThemeScope oldWidget) => spec != oldWidget.spec;
+  bool updateShouldNotify(BuyV2ThemeScope oldWidget) =>
+      spec != oldWidget.spec || refinedCommerce != oldWidget.refinedCommerce;
 }
 
 class BuyV2IntentDepth extends StatefulWidget {
@@ -2502,16 +2558,31 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
 }
 
 BoxDecoration buyV2CardDecoration({
+  BuildContext? context,
   Color color = Colors.white,
   Color border = BuyV2Colors.line,
   double radius = BuyV2Metrics.radius,
   bool shadow = false,
 }) {
+  final refined = context != null && BuyV2ThemeScope.refinedOf(context);
   return BoxDecoration(
     color: color,
     borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: border),
-    boxShadow: shadow
+    border: Border.all(
+      color: refined && border == BuyV2Colors.line
+          ? const Color(0xFFE3E7ED)
+          : border,
+      width: 1,
+    ),
+    boxShadow: refined && color == Colors.white
+        ? const [
+            BoxShadow(
+              color: Color(0x080F2348),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ]
+        : shadow
         ? const [
             BoxShadow(
               color: Color(0x13000040),
@@ -2901,25 +2972,34 @@ extension BuyV2TextStyles on BuildContext {
     letterSpacing: .55,
   );
 
-  TextStyle get buyTitle => const TextStyle(
+  TextStyle get buyTitle => TextStyle(
     color: BuyV2Colors.ink,
     fontSize: 22,
     height: 1.08,
-    fontWeight: FontWeight.w900,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w800
+        : FontWeight.w900,
     letterSpacing: -.5,
   );
 
-  TextStyle get buyBody => const TextStyle(
+  TextStyle get buyBody => TextStyle(
+    fontFamily: BuyV2ThemeScope.refinedOf(this)
+        ? Theme.of(this).textTheme.bodyMedium?.fontFamily
+        : null,
     color: BuyV2Colors.ink,
     fontSize: 12,
     height: 1.25,
-    fontWeight: FontWeight.w600,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w500
+        : FontWeight.w600,
   );
 
-  TextStyle get buyMeta => const TextStyle(
+  TextStyle get buyMeta => TextStyle(
     color: BuyV2Colors.muted,
-    fontSize: 10,
+    fontSize: BuyV2ThemeScope.refinedOf(this) ? 11 : 10,
     height: 1.2,
-    fontWeight: FontWeight.w600,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w500
+        : FontWeight.w600,
   );
 }
