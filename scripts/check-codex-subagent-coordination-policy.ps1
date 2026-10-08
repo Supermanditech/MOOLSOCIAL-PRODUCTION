@@ -93,7 +93,7 @@ function Test-StoreRetentionMaintenanceOwner([hashtable]$Facts) {
     if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
   }
   return $Facts.GenerationVerified -eq $true -and $Facts.BaselineVerified -eq $true -and
-    $Facts.Phase -cin @('implementation','pre_commit','handoff') -and
+    $Facts.Phase -cin @('implementation','pre_commit','handoff','ticket_acceptance','ticket_close') -and
     $Facts.Owner -cin @(
       '.gitattributes',
       'docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json',

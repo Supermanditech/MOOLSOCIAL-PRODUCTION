@@ -4149,3 +4149,30 @@ Full broadened v2 terminal0:365 pass/0fail/0skip. Name-level comparison confirms
 all prior327 cases included, no omissions. Final two-owner analyzer v2 terminal0:
 no issues after test-only migration. Do not mark0f94 as containing this correction;
 new checkpoint and exact acceptance/closure/publication are still pending.
+
+## Store formal closure phase coverage — 8 October 2026
+
+Founder accepted exact application source854c40ab7f01a43676ed25765f33bfaac1657a95
+after current-source enlarged landscape and normal portrait verification. The
+two admitted evidence-only files were committed in cb8866a2ccd8dc97e85649c4d39203ce104f94cd,
+soleparent854c. Formal ticket_acceptance then rejected inherited .gitattributes:
+the already approved seven-owner, sealed retention exception covered implementation,
+pre_commit and handoff but not acceptance/close. This is a failed closure attempt,
+not publication or formal completion; both checkpoints and evidence remain.
+
+Under standing narrow blocker-repair authority, extend only that existing
+exception's phase list to ticket_acceptance and ticket_close. All exact primary
+role/task/root/branch/lane/work/ticket, admission/proof/helper/published repair
+hashes, generation and baseline checks remain; no owner or release permission
+is added. Whole ticket gates still require clean tree, admitted history, accepted
+SHA, exactly one two-evidence-only child, private-safe receipts and live remote
+equality. No app source, native configuration, Cursor tree or financial data change.
+
+Task-local AST-isolated harness work/test-store-retention-closure-phases-20261008.ps1
+failed before repair on ticket_acceptance exact owner. After the single phase-list
+change,103 checks pass: seven owners over all five allowed phases, both closure
+phases reject each wrong/missing identity/hash/owner, false generation/baseline,
+and eight still-unadmitted phases. This is helper qualification, not full closure,
+APK, device, backend or release acceptance. Full91-owner gate validation follows.
+REG4649 retains diagnostic/closure failures; no prior acceptance is reassigned.
+The metadata successor needs exact acceptance before refreshed two-JSON closure.
