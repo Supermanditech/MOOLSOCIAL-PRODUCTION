@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4608,
-    "sha256": "E9DB961EB1E34EF93C257B2AFD5E672A4E999356C42D181304BFFA400CEBA3EC"
+    "sha256": "9FBAA5A49E74BDCB27A9E1D1F1F9C8C3FC59867B5D7C38586A46E68DE2BB02D2"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -124,7 +124,9 @@
         "scripts/check-codex-development-regression-memory.ps1",
         "scripts/artifact-evidence-retention.ps1",
         "scripts/check-cleanup-artifact-retention.ps1",
-        "scripts/test-artifact-evidence-retention.ps1"
+        "scripts/test-artifact-evidence-retention.ps1",
+        "scripts/test-codex-integration-repair-coordination-policy.ps1",
+        "docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md"
       ]
     },
     {
@@ -132,8 +134,7 @@
       "role": "primary",
       "owners": [
         "docs/quality/STORE-BUY-V3-PRE-INTEGRATION-RECONCILIATION-20260904.md",
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
-        "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
       ]
     },
     {
@@ -1922,6 +1923,28 @@
           "config/codex-subagent-coordination-policy.json",
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_combined_20261008",
+        "state": "founder_authorized_2026_10_08",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-combined-20261008",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-COMBINED-20261008",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008",
+        "branch": "work/integration-repair/store-buy-combined-20261008",
+        "baselineHead": "8002e8cd740aaf613b75dc749212fb12ae4fddb7",
+        "bootstrapCommitSubject": "coordination(store-buy-combined-20261008): bind exact combined repair admission",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1",
+          "docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md"
         ],
         "cursorIndependent": false,
         "integrationRequiredBeforeSuccessorApk": true

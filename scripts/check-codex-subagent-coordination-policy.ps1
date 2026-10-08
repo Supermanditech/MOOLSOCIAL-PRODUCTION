@@ -740,6 +740,74 @@ function Test-ProductionWorktreeClean {
   return $worktreeStatus.Count -eq 0
 }
 
+function Test-OctoberIntegrationSelection([string[]]$Commits, [string[]]$Branches) {
+  return ($Commits.Count -eq 1 -and $Branches.Count -eq 1 -and
+    $Commits[0] -cmatch '^[0-9a-f]{40}$' -and
+    $Branches[0] -ceq 'work/integration-repair/store-buy-combined-20261008')
+}
+
+function Test-OctoberIntegrationMergeSubject([string]$Subject) {
+  return $Subject -ceq 'merge(store-buy-combined-baseline-20261008): integrate qualified Store and public Buy'
+}
+
+function Test-OctoberInheritedCursorDisposition([System.Collections.IDictionary]$Identity) {
+  $expected = [ordered]@{
+    Commit='0e90a6ca74b81e212f118995f7c4fab0d3b78620'
+    Parent='7a6e141f0731a643757127db4a6ea81c9b6264c0'
+    Tree='5289411c7015788f0548a73e6870579dbf9eca9c'
+    Subject='Fix Buy offer expiry and checkout preflight holds'
+    CursorTip='f32c17e1a3a41807564fe18f83c0520a66e0bfe6'
+  }
+  $expectedPaths = @(
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+    'config/buy-founder-regression.json','config/codex-development-regression-registry.json',
+    'config/codex-subagent-coordination-policy.json','config/mvp-scope-gate-state.json',
+    'docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md',
+    'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json',
+    'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl',
+    'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl',
+    'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-2.jsonl',
+    'scripts/check-codex-subagent-coordination-policy.ps1'
+  )
+  if ($Identity.Count -ne 7) { return $false }
+  foreach ($key in $expected.Keys) {
+    if (-not $Identity.Contains($key) -or $Identity[$key] -isnot [string] -or
+        $Identity[$key] -cne $expected[$key]) { return $false }
+  }
+  if (-not $Identity.Contains('IsAncestor') -or $Identity.IsAncestor -isnot [bool] -or
+      -not $Identity.IsAncestor -or -not $Identity.Contains('Paths')) { return $false }
+  $paths = @($Identity.Paths)
+  if ($paths.Count -ne 16 -or @($paths | Select-Object -Unique).Count -ne 16) { return $false }
+  foreach ($path in $paths) {
+    if ($path -isnot [string] -or $expectedPaths -cnotcontains $path) { return $false }
+  }
+  return $true
+}
+
+function Assert-OctoberSourceAdmission {
+  $commit = '0e90a6ca74b81e212f118995f7c4fab0d3b78620'
+  $identity = @{Commit=$commit; CursorTip=[string]$integrationRepair.requiredCursorCommit}
+  foreach ($field in @(@('Parent','%P'),@('Tree','%T'),@('Subject','%s'))) {
+    $value = @(& git -C $root show -s "--format=$($field[1])" $commit)
+    Assert-Coordination ($LASTEXITCODE -eq 0 -and $value.Count -eq 1) 'October inherited identity read failed.'
+    $identity[$field[0]] = [string]$value[0]
+  }
+  $identity.Paths = @(& git -C $root diff-tree --no-commit-id --name-only -r $commit)
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'October inherited owner read failed.'
+  & git -C $root merge-base --is-ancestor $commit $identity.CursorTip
+  $identity.IsAncestor = $LASTEXITCODE -eq 0
+  Assert-Coordination (Test-OctoberInheritedCursorDisposition $identity) 'October immutable inherited subject disposition changed.'
+  Assert-Coordination (
+    (Get-ProductionRemoteBranchHead $integrationRepair.requiredCodexBranch) -ceq $integrationRepair.requiredCodexCommit -and
+    (Get-ProductionRemoteBranchHead $integrationRepair.requiredCursorBranch) -ceq $integrationRepair.requiredCursorCommit
+  ) 'October sealed source remote readback changed.'
+}
+
 function Get-ProductionRemoteBranchHead([string]$BranchName) {
   Assert-Coordination (
     $BranchName -cmatch '^(?:work/(?:cursor-ui|codex-ui|codex-auth|codex-backend|integration-repair)/|integration/moolsocial/)[a-z0-9][a-z0-9-]{2,48}$'
@@ -804,7 +872,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq $(if ($storeBuySeptember12 -or $storeBuySkuSeptember18) { '/root' } else { '/root/repair_store_buy_conflict_v3_20260904' })
+    [string]$_.task -ceq $(if ($storeBuyCombinedOctober8 -or $storeBuySeptember12 -or $storeBuySkuSeptember18) { '/root' } else { '/root/repair_store_buy_conflict_v3_20260904' })
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -839,7 +907,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   ) 'qualified integration repair tip is unavailable.'
   $repairBinding = @($continuationBindings | Where-Object {
     [string]$_.lane -ceq 'integration_repair' -and
-    $(if ($storeBuySkuSeptember18) { [string]$_.id -ceq 'integration_repair_store_buy_sku_20260918' } else { [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904' })
+    $(if ($storeBuyCombinedOctober8) { [string]$_.id -ceq 'integration_repair_store_buy_combined_20261008' } elseif ($storeBuySkuSeptember18) { [string]$_.id -ceq 'integration_repair_store_buy_sku_20260918' } else { [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904' })
   })
   Assert-Coordination ($repairBinding.Count -eq 1) `
     'qualified integration repair continuation is missing or ambiguous.'
@@ -908,7 +976,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
     Assert-Coordination (
       $LASTEXITCODE -eq 0 -and $preMergeSubject.Count -eq 1 -and
       [string]$preMergeSubject[0] -cmatch
-        $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
+        $(if ($storeBuyCombinedOctober8) { '^repair\(store-buy-combined-20261008\): .+' } elseif ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
       @($preMergeCommitOwners | Where-Object {
         -not $preMergeAllowedKeys.Contains(([string]$_).ToLowerInvariant())
       }).Count -eq 0
@@ -920,7 +988,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
   Assert-Coordination (
     $LASTEXITCODE -eq 0 -and $repairMergeSubject.Count -eq 1 -and
     [string]$repairMergeSubject[0] -cmatch
-      $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' })
+      $(if ($storeBuyCombinedOctober8) { '^repair\(store-buy-combined-20261008\): .+' } elseif ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' })
   ) 'qualified integration repair merge subject changed.'
   $repairMergeTree = (& git -C $root show -s --format='%T' `
       $repairMergeCommit).Trim()
@@ -961,7 +1029,7 @@ function Assert-QualifiedIntegrationRepairTip([string]$RepairCommit) {
       Assert-Coordination (
         $LASTEXITCODE -eq 0 -and $postMergeSubject.Count -eq 1 -and
         [string]$postMergeSubject[0] -cmatch
-          $(if ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
+          $(if ($storeBuyCombinedOctober8) { '^repair\(store-buy-combined-20261008\): .+' } elseif ($storeBuySkuSeptember18) { '^repair\(store-buy-sku-20260918\): .+' } else { '^repair\(store-buy-conflict-repair-v3-20260904\): .+' }) -and
         @($postMergeCommitOwners | Where-Object {
           -not $postMergeAllowedKeys.Contains(
             ([string]$_).ToLowerInvariant()
@@ -1168,7 +1236,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 80) `
+Assert-Coordination ($continuationBindings.Count -eq 81) `
   'founder-authorized continuation binding inventory changed.'
 
 # Founder-authorized Screen 1 exception: a work checkpoint, never acceptance.
@@ -1300,6 +1368,8 @@ foreach ($continuationBinding in $continuationBindings) {
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_19') -or
       ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_13') -or
+      ([string]$continuationBinding.id -ceq 'integration_repair_store_buy_combined_20261008' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_10_08') -or
       [string]$continuationBinding.state -cin @(
       'founder_authorized_2026_08_25',
       'founder_authorized_2026_08_26',
@@ -1778,6 +1848,71 @@ if ($storeBuySkuSeptember18) {
   $integrationRepair.freshIntegrationBranch = 'integration/moolsocial/store-buy-sku-baseline-v2-20260918'
   $integrationRepair.freshIntegrationWorktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-v2-20260918'
   $integrationRepair.freshIntegrationMergeSubject = 'merge(store-buy-sku-baseline-v2-20260918): integrate reconciled Cursor and Codex'
+}
+# Exact October continuation: historical repair contracts above stay unchanged.
+$octoberRepairId = 'integration_repair_store_buy_combined_20261008'
+$octoberRepairBinding = @($continuationBindings | Where-Object { $_.id -ceq $octoberRepairId })
+$octoberExpectedBinding = @'
+{
+  "id":"integration_repair_store_buy_combined_20261008",
+  "state":"founder_authorized_2026_10_08",
+  "lane":"integration_repair","role":"primary","task":"/root",
+  "workId":"store-buy-combined-20261008",
+  "ticketId":"UAW-INTEGRATION-REPAIR-STORE-BUY-COMBINED-20261008",
+  "worktreePath":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008",
+  "branch":"work/integration-repair/store-buy-combined-20261008",
+  "baselineHead":"8002e8cd740aaf613b75dc749212fb12ae4fddb7",
+  "bootstrapCommitSubject":"coordination(store-buy-combined-20261008): bind exact combined repair admission",
+  "bootstrapOwners":["config/codex-development-regression-registry.json","config/codex-subagent-coordination-policy.json","scripts/check-codex-subagent-coordination-policy.ps1","scripts/test-codex-integration-repair-coordination-policy.ps1","docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md"],
+  "cursorIndependent":false,"integrationRequiredBeforeSuccessorApk":true
+}
+'@ | ConvertFrom-Json
+Assert-Coordination ($octoberRepairBinding.Count -eq 1) 'October repair binding is missing or duplicated.'
+foreach ($property in $octoberExpectedBinding.PSObject.Properties) {
+  $actualValue = $octoberRepairBinding[0].($property.Name)
+  if ($property.Name -ceq 'bootstrapOwners') {
+    Assert-Coordination ((@($actualValue | Sort-Object) -join '|') -ceq
+      (@($property.Value | Sort-Object) -join '|')) 'October bootstrap owners changed.'
+  } else {
+    Assert-Coordination ((ConvertTo-Json -InputObject $actualValue -Compress) -ceq
+      (ConvertTo-Json -InputObject $property.Value -Compress)) "October binding changed: $($property.Name)"
+  }
+}
+$storeBuyCombinedOctober8 = ($ProductionLane -ceq 'integration_repair' -and
+  $ProductionWorkId -ceq 'store-buy-combined-20261008') -or
+  ($ProductionLane -ceq 'integration' -and $ProductionWorkId -ceq 'store-buy-combined-baseline-20261008')
+if ($storeBuyCombinedOctober8) {
+  Assert-Coordination ($AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+    (($ProductionLane -ceq 'integration_repair' -and
+      $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-COMBINED-20261008' -and
+      (ConvertTo-ProductionForwardPath $root) -ceq $octoberExpectedBinding.worktreePath) -or
+     ($ProductionLane -ceq 'integration' -and
+      $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008' -and
+      (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'))) 'October integration identity changed.'
+  $integrationRepair = $integrationRepair.PSObject.Copy()
+  $integrationRepair.requiredCodexCommit = '8002e8cd740aaf613b75dc749212fb12ae4fddb7'
+  $integrationRepair.requiredCodexBranch = 'work/codex-ui/add-product-screen1-20260920'
+  $integrationRepair.requiredCursorCommit = 'f32c17e1a3a41807564fe18f83c0520a66e0bfe6'
+  $integrationRepair.requiredCursorBranch = 'work/cursor-ui/buy-ready-20260921'
+  $expectedRepairConflictOwners = @(
+    '.gitattributes','apps/mobile/.flutter-plugins-dependencies',
+    'apps/mobile/lib/features/journey01/journey_router.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+    'config/codex-development-regression-registry.json',
+    'config/codex-subagent-coordination-policy.json','scripts/check-approved-ui-locks.ps1',
+    'scripts/check-codex-subagent-coordination-policy.ps1','scripts/test-artifact-evidence-retention.ps1'
+  )
+  $expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.exactConflictOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md')
+  $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-COMBINED-REPAIR-20261008.md')
+  $integrationRepair.maximumPostMergeClosureCommits = 1
+  $integrationRepair.freshIntegrationWorkId = 'store-buy-combined-baseline-20261008'
+  $integrationRepair.freshIntegrationTicketId = 'UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008'
+  $integrationRepair.freshIntegrationBranch = 'integration/moolsocial/store-buy-combined-baseline-20261008'
+  $integrationRepair.freshIntegrationWorktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'
+  $integrationRepair.freshIntegrationMergeSubject = 'merge(store-buy-combined-baseline-20261008): integrate qualified Store and public Buy'
+  Assert-OctoberSourceAdmission
 }
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -2371,7 +2506,7 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $storeAddProductIntegration -or $AgentTask.StartsWith(
+      ($storeBuyCombinedOctober8 -or $storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $storeAddProductIntegration -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -3164,6 +3299,11 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
+      $octoberExactRepairOwner = $storeBuyCombinedOctober8 -and
+        $ProductionLane -ceq 'integration_repair' -and
+        $ProductionPhase -cin @('task_start','implementation','pre_commit','handoff','integration_admission_authorize') -and
+        @($expectedRepairConflictOwners) -ccontains $effectiveOwner
+      if ($octoberExactRepairOwner) { $allowedOwner = $true }
       # BEGIN Store closure owner lane 20261008
       $storeClosureEvidenceOwner = Test-StoreClosureEvidenceOwner @{
         Role=$AgentRole; Task=$AgentTask; ClaimTask=$currentClaim[0].task; ClaimRole=$currentClaim[0].role
@@ -3204,7 +3344,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $storeRetentionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
+          $octoberExactRepairOwner -or $storeRetentionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or $addProductApprovedFrontendOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
@@ -5825,7 +5965,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
           Get-CanonicalOwner ([string]$_)
         }
       )
-      if ($storeBuySeptember12 -or $storeBuySkuSeptember18) {
+      if ($storeBuyCombinedOctober8 -or $storeBuySeptember12 -or $storeBuySkuSeptember18) {
         Assert-Coordination (
           (@($effectiveOwners | Sort-Object) -join '|') -ceq
           (@($expectedBootstrapOwners | Sort-Object) -join '|')
@@ -6790,6 +6930,15 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Assert-Coordination ($approvedRemoteHead -ceq $approvedCommit) `
         "approved feature remote branch differs from its accepted commit: $approvedBranch"
     }
+    if ($storeBuyCombinedOctober8) {
+      Assert-Coordination (Test-OctoberIntegrationSelection -Commits $approvedCommits -Branches $approvedBranches) `
+        'October integration requires exactly one qualified repair commit and its exact branch.'
+      Assert-QualifiedIntegrationRepairTip -RepairCommit ([string]$approvedCommits[0])
+      Assert-Coordination ($integrationMerges.Count -eq 1) 'October integration must contain exactly one repair-tip merge.'
+      $octoberIntegrationSubject = @(& git -C $root show -s --format='%s' $integrationMerges[0])
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $octoberIntegrationSubject.Count -eq 1 -and
+        (Test-OctoberIntegrationMergeSubject ([string]$octoberIntegrationSubject[0]))) 'October exact integration merge subject changed.'
+    }
     if ($storeBuySkuSeptember18 -and $approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq 'work/codex-ui/store-buy-baseline-fixes-20260918') {
       $sealedRepair = '6e7e34c0e7aa15d4710b1132bf4371f7dddf65d3'
@@ -6801,9 +6950,9 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         (Get-ProductionRemoteBranchHead 'work/cursor-ui/redmi-v6-audit-20260913') -ceq 'ee42be0e21f1707e1cbf2ba3ad966579f118b209'
       ) 'Combined baseline sealed source branches moved.'
     }
-    if ($approvedBranches.Count -eq 1 -and
+    if (-not $storeBuyCombinedOctober8 -and $approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
-          $(if ($storeBuySkuSeptember18) { 'work/integration-repair/store-buy-sku-20260918' } else { 'work/integration-repair/store-buy-conflict-repair-v3-20260904' })) {
+          $(if ($storeBuyCombinedOctober8) { 'work/integration-repair/store-buy-combined-20261008' } elseif ($storeBuySkuSeptember18) { 'work/integration-repair/store-buy-sku-20260918' } else { 'work/integration-repair/store-buy-conflict-repair-v3-20260904' })) {
       $qualifiedRepairCommit = [string]$approvedCommits[0]
       Assert-QualifiedIntegrationRepairTip `
         -RepairCommit $qualifiedRepairCommit
