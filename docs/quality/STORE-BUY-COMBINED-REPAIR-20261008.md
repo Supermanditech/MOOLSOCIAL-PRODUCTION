@@ -126,3 +126,83 @@ The final existing repair test passed33 actual predicate cases (21 inherited,
 PowerShell version. These results do not qualify the future B/P/R/E graph or APK.
 Architect confirmed both dispatch and exact-subject guards in the final checker.
 No app delta; exactly the five admitted metadata owners are prepared for B.
+
+## P — pinned pre-merge reconciliation record
+
+B is committed as55b87b8a590a991fdec198d9386f964292bea047, sole parent Store8002,
+clean. Postcommit task_start and implementation gates passed with ten exact repair
+owners, registry4,608/9FBA. The founder-input Check passed for the existing37-source
+decision receipt; this is prerequisite coverage, not blanket app/build authority.
+Parked Store8002/CursorF32 stay untouched.
+
+Post-B merge-tree diagnostic reproduces the same nine exact conflict owners listed
+above, automatic diagnostic tree3263cf33b1adcc8d738f46e6240e4012c70bf6e3, exit1.
+That command did not merge the checkout. R must have P and exactF32 as its parents;
+reproduce its automatic tree at P and compare the final manual delta exactly.
+
+Registry sources: Store B4,608 entries; Cursor F324,618;4,623 unique full IDs.
+Three reused numeric prefixes require canonical relocation, not loss of records:
+
+| Source original Store ID | Combined canonical ID |
+|---|---|
+| REG-20261001-4633-PURCHASE-ORIGINAL-PREVIEW-LIFECYCLE | REG-20261001-4650-PURCHASE-ORIGINAL-PREVIEW-LIFECYCLE |
+| REG-20261001-4634-PURCHASE-PREVIEW-READING-AND-COMPARISON | REG-20261001-4651-PURCHASE-PREVIEW-READING-AND-COMPARISON |
+| REG-20261002-4635-PURCHASE-HISTORY-RESUME-PREFLIGHT | REG-20261002-4652-PURCHASE-HISTORY-RESUME-PREFLIGHT |
+
+Highest source number is4649;4650–4652 are allocated by the primary for these exact
+three records. Preserve original full IDs, complete source entries, source commits
+and explicit old-to-new map in reconciliation provenance; keep Cursor's earlier
+4633–4635 identities unchanged. Read-only exact full-ID reference lookup found only
+the Store registry, and none in pinned Cursor tracked ps1/dart/json/jsonl/md owners.
+No non-conflict application reference rewrite is needed from that lookup.
+
+49 shared entries differ. Core status/appliesTo do not conflict. Core differences
+are30 mistake strings,14 prevention strings,4 rootCause strings and one gates/one
+evidence array. Preserve both meaningful source versions; union required gates and
+evidence rather than losing either check. Preserve root metadata from both sources.
+Do not hide differing historical versions or claim source evidence is current APK
+evidence. Refresh merged count/hash consistently after resolution and freeze writers.
+
+Policy union is82 exact bindings:81 in B and81 in F32, with only October repair and
+Cursor buyer bindings source-exclusive. Retain both and all historical identities;
+admit exact82 only for the qualified merged state. Repair active ownership is scoped
+to these conflict files; do not import conflicting active claims as additional edit
+authority. Historical source claims remain recoverable in pinned source commits.
+
+Application decisions: retain both Router imports/guards; semantically review automatic
+catalogue/scanner/auth-test merges; reconcile medicine-parent versus Store Cart golden
+context without overwriting historical captures; union retention regressions and exact
+LF attributes; preserve native dependency provenance until guarded requalification.
+No backend substitution, runtime injection, data reset, production release or claimed
+combined APK pass. Finish R/E host/source qualification before publishing repair and
+performing separate merge-only integration.
+
+## Precommit occurrence evidence — REG-20261008-4649
+
+The first P pre_commit invocation exited1: `production pre-commit requires one
+fully staged atomic change set`. The reconciliation document was modified but
+unstaged. Detection was the unchanged strict gate; root cause was invoking the
+precommit phase before staging its exact document owner. No commit, application
+edit, merge, publication or APK followed that rejection. Prevention: stage only
+this P document, inspect the staged owner/parent delta, then retry the unchanged
+gate against the frozen generation.
+
+This is retained occurrence evidence under the existing REG-4649 diagnostic class,
+not a claim that the literal in-registry registration requirement is satisfied.
+Architect review confirmed a constraint conflict: direct registry correction in P
+would violate the document-only graph, while an evidence-only recurrence record
+has no explicit admission under the literal registration rule. Request an exact
+founder clarification allowing these occurrence details and the existing referenced
+TASK readiness evidence to record this recurrence under REG-4649 without changing
+registry bytes. Do not retry pre_commit before that clarification. Preserve B,
+P/R/E graph, registry generation, Store/Cursor tips and strict staging enforcement.
+
+Founder clarification on8October2026: the founder authorized proceeding with this
+exact evidence-only recurrence registration if production-grade, reaffirming standing
+combined-goal authority. Primary assessment: preserving the exact failure under
+existing REG4649 in its linked evidence, without registry-byte change, avoids an
+unauthorized source commit and retains every strict staging/graph/source check.
+This clarification applies only to this recorded P staging-error recurrence; it
+does not waive future registration, create a generic exception or relabel failure
+as success. Registration ordering is now resolved before pre_commit retry. Stage
+only this document, verify exact staged delta, and run the unchanged gate.
