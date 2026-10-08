@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+  "workId": "add-product-screen1-20260920",
+  "lane": "codex_ui",
+  "acceptedCommit": "854c40ab7f01a43676ed25765f33bfaac1657a95",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-10-08T15:25:02+05:30",
+  "privateValuesEmitted": false
+}
