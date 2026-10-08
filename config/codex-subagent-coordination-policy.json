@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4606,
-    "sha256": "45EE31DD3A35E3DC996AC0130AC900529404D23032EEDF3082532F35BD6510B0"
+    "sha256": "08DFEC8215458FCF1EFD4452FA7BDFC61F093F55ACEB814DCD09E949AB77A8B9"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -116,6 +116,8 @@
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
         "docs/quality/ADD-PRODUCT-SCREEN1-20260920-incremental.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-founder-acceptance-20261008.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-oppo-acceptance-20261008.json",
         ".gitattributes",
         "docs/quality/STORE-ARTIFACT-RETENTION-ADMISSION-20261002.json",
         "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json",

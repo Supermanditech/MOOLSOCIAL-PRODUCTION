@@ -55,6 +55,28 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+# BEGIN Store closure owner admission 20261008
+function Test-StoreClosureEvidenceOwner([hashtable]$Facts) {
+  # Founder admitted only these future evidence owners, not a passing result.
+  # JSON contents, exact accepted SHA, closure parent and clean-tree gates remain.
+  $expected = @{
+    Role='primary'; Task='/root'; ClaimTask='/root'; ClaimRole='primary'
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920'
+    Branch='work/codex-ui/add-product-screen1-20260920'; Lane='codex_ui'
+    WorkId='add-product-screen1-20260920'; TicketId='UAW-ADD-PRODUCT-SCREEN1-20260920'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Phase') -and $Facts.ContainsKey('Owner') -and
+    $Facts.Phase -cin @('implementation','pre_commit','handoff','ticket_acceptance','ticket_close') -and
+    $Facts.Owner -cin @(
+      'docs/quality/ADD-PRODUCT-SCREEN1-20260920-founder-acceptance-20261008.json',
+      'docs/quality/ADD-PRODUCT-SCREEN1-20260920-oppo-acceptance-20261008.json'
+    )
+}
+# END Store closure owner admission 20261008
+
 function Test-StoreRetentionMaintenanceOwner([hashtable]$Facts) {
   # Separately approved Store maintenance. Never mix Cursor and Store identities.
   $expected = @{
@@ -2139,12 +2161,21 @@ foreach ($claim in $claims) {
       (Get-Sha256 (Join-Path $root 'docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md')) -ceq
         '0A63C6D63BB9AACC65BBB86F4CDE8BB0E71E64D1AC339BC9B6B6B0699C9B593B'
     )
+    # BEGIN Store closure owner declaration 20261008
+    $predeclaredStoreClosureEvidenceOwner = Test-StoreClosureEvidenceOwner @{
+      Role=$AgentRole; Task=$AgentTask; ClaimTask=$claim.task; ClaimRole=$claim.role
+      Root=$root.Replace('\','/').TrimEnd('/'); Branch=$pendingEvidenceBranch
+      Lane=$ProductionLane; WorkId=$ProductionWorkId; TicketId=$ProductionTicketId
+      Phase=$ProductionPhase; Owner=$owner
+    }
+    # END Store closure owner declaration 20261008
     Assert-Coordination (
       $resolvedOwner.StartsWith(
         $root + [IO.Path]::DirectorySeparatorChar,
         [StringComparison]::OrdinalIgnoreCase
       ) -and
       ((Test-Path -LiteralPath $resolvedOwner -PathType Leaf) -or
+        $predeclaredStoreClosureEvidenceOwner -or
         $predeclaredR65FourEvidenceOwner -or
         $predeclaredR65FiveEvidenceOwner -or
         $predeclaredR65SixEvidenceOwner -or
@@ -3133,7 +3164,15 @@ if ($ProductionLane -ceq 'baseline') {
           break
         }
       }
-      if ($storeRetentionOwner -or $addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      # BEGIN Store closure owner lane 20261008
+      $storeClosureEvidenceOwner = Test-StoreClosureEvidenceOwner @{
+        Role=$AgentRole; Task=$AgentTask; ClaimTask=$currentClaim[0].task; ClaimRole=$currentClaim[0].role
+        Root=$rootForward; Branch=$branch; Lane=$ProductionLane
+        WorkId=$ProductionWorkId; TicketId=$ProductionTicketId
+        Phase=$ProductionPhase; Owner=$effectiveOwner
+      }
+      # END Store closure owner lane 20261008
+      if ($storeRetentionOwner -or $storeClosureEvidenceOwner -or $addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
