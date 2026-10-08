@@ -89,12 +89,22 @@ function Get-OctoberCompatibilityApplicationOwners {
   )
 }
 
+function Get-OctoberCompatibilityAmendmentOwners {
+  return @(
+    'scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/test-codex-integration-repair-coordination-policy.ps1',
+    'scripts/check-cross-agent-incremental-ticket-gate.ps1',
+    'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+  )
+}
+
 function Get-OctoberCompatibilityLayoutOwners {
   # Separate forward correction: current approved navigation tests and the
   # category-height calculation must agree with rendered text/viewport geometry.
   return @(
     'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
-    'apps/mobile/test/work_workspace_layout_safety_test.dart'
+    'apps/mobile/test/work_workspace_layout_safety_test.dart',
+    'apps/mobile/test/work_public_handoff_test.dart'
   )
 }
 
@@ -177,11 +187,12 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   Assert-Coordination ($LASTEXITCODE -eq 0) 'Compatibility HEAD must descend from exact E.'
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$e..$HeadCommit"))
   $firstParent=@(Get-OctoberCompatibilityGitLines @('rev-list','--first-parent','--reverse',"$e..$HeadCommit"))
-  Assert-Coordination ($commits.Count -le 4 -and
+  Assert-Coordination ($commits.Count -le 5 -and
     ($commits -join '|') -ceq ($firstParent -join '|')) 'Compatibility history contains an extra commit or merge.'
   $previous=$e
   $subjects=@($binding.bootstrapCommitSubject,
     'repair(store-buy-compatibility-20261008): align Store publication with sealed Buy contracts',
+    'coordination(store-buy-compatibility-20261008): admit exact handoff audit correction',
     'repair(store-buy-compatibility-20261008): align approved Store layout journeys',
     'repair(store-buy-compatibility-20261008): qualify publication compatibility')
   for($index=0;$index -lt $commits.Count;$index++) {
@@ -193,15 +204,22 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     $owners=@(Get-OctoberCompatibilityGitLines @('diff-tree','--no-commit-id','--name-only','-r',$commit))
     $expected=if($index -eq 0){@($binding.bootstrapOwners)}
       elseif($index -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
-      elseif($index -eq 2){@(Get-OctoberCompatibilityLayoutOwners)}
+      elseif($index -eq 2){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($index -eq 3){@(Get-OctoberCompatibilityLayoutOwners)}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-Coordination ((@($owners | Sort-Object) -join '|') -ceq
       (@($expected | Sort-Object) -join '|')) 'Compatibility successor changed unexpected owners.'
-    if($index -eq 0 -or $index -eq 3) {
+    if($index -eq 0 -or $index -eq 2 -or $index -eq 4) {
       $apps=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${commit}:apps","${previous}:apps"))
       Assert-Coordination ($apps.Count -eq 2 -and $apps[0] -ceq $apps[1]) 'Compatibility metadata commit changed apps.'
     }
     $previous=$commit
+  }
+  if($commits.Count -ge 1) {
+    Assert-Coordination ($commits[0] -ceq 'f376a80b9c4abb6bed42ebb40136de2dd884d346') 'Sealed compatibility G changed.'
+  }
+  if($commits.Count -ge 2) {
+    Assert-Coordination ($commits[1] -ceq '62e0a37d900f11c0c2d405e6559e54ef70ab9b43') 'Sealed compatibility C changed.'
   }
   Assert-Coordination ($previous -ceq $HeadCommit) 'Compatibility tip does not match complete successor history.'
   return @{ Stage=[int]$commits.Count; Commits=$commits; Base=$e; Head=$HeadCommit }
@@ -332,8 +350,8 @@ function Test-OctoberCompatibilityQualification([hashtable]$History, [switch]$Fr
   # Qualification comes from immutable machine logs, not a Markdown success word.
   # Missing, failed, interrupted or incompletely covered evidence fails closed.
   try {
-    if($History.Stage -lt 3) { return $false }
-    $source=[string]$History.Commits[2]
+    if($History.Stage -lt 4) { return $false }
+    $source=[string]$History.Commits[3]
     $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
     $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
       else{ @(Get-OctoberCompatibilityGitLines @('show',"$($History.Head):$owner")) -join "`n" }
@@ -471,7 +489,7 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
         $Facts[$key] -ne $true) { return $false }
   }
   if (-not $Facts.ContainsKey('Stage') -or $Facts.Stage -isnot [int] -or
-      $Facts.Stage -lt 0 -or $Facts.Stage -gt 4 -or
+      $Facts.Stage -lt 0 -or $Facts.Stage -gt 5 -or
       -not $Facts.ContainsKey('Phase') -or
       -not $Facts.ContainsKey('Owners')) { return $false }
   $expectedOwners=@()
@@ -484,8 +502,9 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
       switch ($Facts.Stage) {
         0 { $expectedOwners=@($binding.bootstrapOwners) }
         1 { $expectedOwners=@(Get-OctoberCompatibilityApplicationOwners) }
-        2 { $expectedOwners=@(Get-OctoberCompatibilityLayoutOwners) }
-        3 { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
+        2 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+        3 { $expectedOwners=@(Get-OctoberCompatibilityLayoutOwners) }
+        4 { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
         default { return $false }
       }
     }
@@ -496,12 +515,13 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
     }
     'implementation' {
       if ($Facts.Stage -eq 1) { $expectedOwners=@(Get-OctoberCompatibilityApplicationOwners) }
-      elseif ($Facts.Stage -eq 2) { $expectedOwners=@(Get-OctoberCompatibilityLayoutOwners) }
-      elseif ($Facts.Stage -eq 3) { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
+      elseif ($Facts.Stage -eq 2) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+      elseif ($Facts.Stage -eq 3) { $expectedOwners=@(Get-OctoberCompatibilityLayoutOwners) }
+      elseif ($Facts.Stage -eq 4) { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
       else { return $false }
     }
     'handoff' {
-      if ($Facts.Stage -ne 4 -or -not $Facts.ContainsKey('Clean') -or
+      if ($Facts.Stage -ne 5 -or -not $Facts.ContainsKey('Clean') -or
           $Facts.Clean -isnot [bool] -or -not $Facts.Clean -or
           -not $Facts.ContainsKey('HostQualificationPassed') -or
           $Facts.HostQualificationPassed -isnot [bool] -or
@@ -509,7 +529,7 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
       $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
     }
     'integration_admission_authorize' {
-      if ($Facts.Stage -ne 4 -or -not $Facts.ContainsKey('Clean') -or
+      if ($Facts.Stage -ne 5 -or -not $Facts.ContainsKey('Clean') -or
           $Facts.Clean -isnot [bool] -or -not $Facts.Clean -or
           -not $Facts.ContainsKey('HostQualificationPassed') -or
           $Facts.HostQualificationPassed -isnot [bool] -or
@@ -4395,7 +4415,8 @@ if ($ProductionLane -ceq 'baseline') {
       if ($octoberCompatibilityIdentity) {
         $compatibilityStageOwners=if($compatibilityHistory.Stage -eq 0){@((Get-OctoberCompatibilityBinding).bootstrapOwners)}
           elseif($compatibilityHistory.Stage -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
-          elseif($compatibilityHistory.Stage -eq 2){@(Get-OctoberCompatibilityLayoutOwners)}
+          elseif($compatibilityHistory.Stage -eq 2){@(Get-OctoberCompatibilityAmendmentOwners)}
+          elseif($compatibilityHistory.Stage -eq 3){@(Get-OctoberCompatibilityLayoutOwners)}
           else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
         $octoberCompatibilityOwner=$compatibilityStageOwners -ccontains $effectiveOwner
         if ($octoberCompatibilityOwner) { $allowedOwner=$true }
@@ -7183,7 +7204,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Assert-Coordination ((@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
         (@($effectiveOwners | Sort-Object) -join '|')) 'Compatibility precommit must stage the exact current stage owners.'
       Assert-Coordination (Test-OctoberCompatibilityStageFacts $compatibilityFacts) 'Compatibility precommit live facts rejected.'
-      if($compatibilityHistory.Stage -eq 3) {
+      if($compatibilityHistory.Stage -eq 4) {
         Assert-Coordination (Test-OctoberCompatibilityQualification $compatibilityHistory -FromWorkingTree) 'Compatibility Q requires complete verified host/source evidence before commit.'
       }
     } elseif ($ProductionLane -ceq 'integration_repair') {
@@ -7639,7 +7660,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
     if ($octoberCompatibilityIdentity) {
-      Assert-Coordination ($compatibilityHistory.Stage -eq 4 -and
+      Assert-Coordination ($compatibilityHistory.Stage -eq 5 -and
         (Test-OctoberCompatibilityQualification $compatibilityHistory) -and
         (Test-ProductionWorktreeClean) -and
         (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Compatibility admission requires clean, published, genuinely qualified Q.'
@@ -8099,7 +8120,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Assert-Coordination ($approvedCommits.Count -eq 1 -and $approvedBranches.Count -eq 1 -and
         $approvedBranches[0] -ceq (Get-OctoberCompatibilityBinding).branch) 'Final compatibility integration requires exactly the qualified successor branch.'
       $qualifiedHistory=Get-OctoberCompatibilityHistoryStage ([string]$approvedCommits[0])
-      Assert-Coordination ($qualifiedHistory.Stage -eq 4 -and
+      Assert-Coordination ($qualifiedHistory.Stage -eq 5 -and
         (Test-OctoberCompatibilityQualification $qualifiedHistory)) 'Final compatibility integration rejects E/G/C/L or incomplete source qualification.'
       Assert-Coordination ($integrationMerges.Count -eq 1) 'Final compatibility integration requires one automatic merge only.'
       $finalParents=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',[string]$integrationMerges[0]))

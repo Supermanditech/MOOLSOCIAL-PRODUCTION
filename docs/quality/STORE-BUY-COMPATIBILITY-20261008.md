@@ -257,6 +257,53 @@ unchanged apps versus E, no pending merge and fresh final bootstrap/memory/stric
 precommit checks. Actual L-source reports and subsequent qualification remain
 pending, not inferred from these preparation results.
 
+## Exact forward handoff-audit amendment — 9 October 2026
+
+This section supersedes G/C/L/Q sequencing only; historical evidence is retained.
+G f376a80b9c4abb6bed42ebb40136de2dd884d346 and C
+62e0a37d900f11c0c2d405e6559e54ef70ab9b43 are sealed, not rewritten. C is a local
+three-owner checkpoint, not qualified: the eight-suite run passed97 behavioral
+cases, skipped0 and failed1 in the handoff current-field inventory assertion.
+The immutable v1 export equality passes; its schema must not be expanded silently.
+Log apps/mobile/build/compat-publication-C-8837f92d013248f4bb35b87fd486c9f5.jsonl,
+SHA C6249E7A5754763E6606BF534D130AE5F248504580671D2FBE3E643F4DC29BCB.
+Static analysis and both-host strict C precommit passed; no push or APK result.
+
+Architect-reviewed forward ordering: G -> C -> A -> L -> Q. A is metadata-only,
+sole parent C, exact subject:
+coordination(store-buy-compatibility-20261008): admit exact handoff audit correction.
+A exact four owners are this document, coordination checker/test and incremental
+checker. Its apps equal C. Registry8092, policy,83 binding bodies, parked branches,
+sealed B/P/R/E and original G8/C3 remain unchanged. Live implementation/precommit
+requires this exact metadata claim at stage2; a failing gate is never permission.
+
+After A, L adds only apps/mobile/test/work_public_handoff_test.dart to the existing
+two layout owners. Split its stale equality into independent current-model audit
+coverage and exact v1 export coverage; preserve immutable JSON equality, original
+money/identity/recovery assertions and saved fixtures. Do not shrink current field
+bindings merely to satisfy an obsolete test. New product audit covers structured
+variants, pack terms, offer classification and review delivery options without
+inventing provider authority. Existing seven content dependencies remain unknown.
+
+Stage3 admits L's exact three owners; stage4 admits Q document only. Capture runs
+only from clean committed L at stage4. Q verifies source at history index3, not A
+or C, and its apps equal L. Qualified handoff and final integration require stage5
+plus all existing actual source-bound reports, remote/clean/native/secret gates.
+No additional merges/owners, evidence reuse or backend/native/build scope allowed.
+A is currently preparation, uncommitted; both-host positive/negative probes and
+operative precommit admission remain required. Actual handoff/layout corrections,
+combined qualification, final integration and fresh Redmi/OPPO APK remain pending.
+
+A preparation checks passed both hosts:80 stage,21 final identity,17 protocol,
+27 capture,11 aggregate,9 binding,3 native,5 sealed-history and2 missing-proof
+checks;22 incremental identity checks also passed. Operative implementation
+claim4 passed at exact C. All A4 and L3 owners are present in the existing primary
+claim; no claim/policy override is needed. Architect review supports the bounded
+sequence subject to exact final staged manifests, unchanged apps and fresh
+both-host operative precommit. The old capture-message mismatch is preserved
+under linked REG4649; correction checks the exact new refusal, not arbitrary errors.
+These are metadata/gate checks only, not passing application qualification.
+
 <!-- COMPATIBILITY_QUALIFICATION_JSON_BEGIN -->
 {"schemaVersion":1,"state":"pending","sourceCommit":null,"sourceTree":null,"registrySha256":"8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3","reports":[]}
 <!-- COMPATIBILITY_QUALIFICATION_JSON_END -->
