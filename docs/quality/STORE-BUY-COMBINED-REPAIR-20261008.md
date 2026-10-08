@@ -206,3 +206,53 @@ This clarification applies only to this recorded P staging-error recurrence; it
 does not waive future registration, create a generic exception or relabel failure
 as success. Registration ordering is now resolved before pre_commit retry. Stage
 only this document, verify exact staged delta, and run the unchanged gate.
+
+## R checkpoint and E disposition — unqualified, local only
+
+R is committed locally as6fc0cb5b, with first parent
+f27e25fdfa64453d119d81dcef51956a56120c19 and second parent
+f32c17e1a3a41807564fe18f83c0520a66e0bfe6. Tree:
+8ebeb477651a294d1a8f1d10175aa562f6cb6415. The manual resolved delta against
+the automatic P/F32 merge is exactly the nine admitted conflict owners. No
+nonconflict publication application correction was included; Store8002 and
+CursorF32 parked branches remain untouched. R is not published or accepted.
+
+Current registry4623 SHA256:
+920F2E84F6262068AB1201E6883CEA17E7A94479FC4D7E0F04D56818886B6055.
+PS5 and PS7 operative pre_commit checks passed, with33 actual predicate cases
+each (21 inherited disposition,9 integration selection,3 exact subject).
+General memory passed4623 entries using the retained archive. Independent
+source audit passed9226 source entries/66068 field comparisons,49 historical
+pairs,3 relocations,82 exact bindings and6 negative fixtures. These prove
+source preservation and admission, not a passing application regression suite.
+
+Host results remain distinct: initial combined973 passed/11 skipped;
+enabled-review recovery13 passed/1 skipped; correctly configured default
+contracts90 passed/0 skipped/2 failed; focused default layout7 passed/0 skipped/
+33 failed. The wide run was failed/interrupted; its final662/78/1082 counts
+include cascading child termination, not1082 diagnosed app defects. Complete
+machine logs remain in apps/mobile/build and are indexed in TASK readiness.
+
+The two exhaustive publication inventory failures expose new Buy contract
+fields without dispositions; no source loss was established. Founder standing
+approval now permits a separate narrowly admitted compatibility successor,
+limited to work_publication.dart and the two publication/content tests plus
+necessary gate/evidence records. Unsupported structured variants/pack terms,
+provider facts/history and supplier policy must stay explicit defaults/unavailable;
+unknown acceptance is not consent. Do not widen R or rewrite B/P/R.
+
+This E document is a recovery/base-graph checkpoint ONLY, explicitly unqualified
+for combined host, application, device, publication or integration acceptance.
+Keep E local; do not invoke the old E-as-qualified integration path. Proposed
+successor G/C/Q needs stage-aware exact bootstrap, direct-commit ownership,
+incremental-lane and native-lock admission, plus tests. G apps must equal E;
+combined integration must reject E/G/C and require genuinely qualified Q.
+Remaining33 layout failures need evidence-based classification and any genuine
+reachability correction through separately admitted owners; Q cannot document
+those obligations away. Fresh38-source founder decision Check passed before
+application work, but no compatibility app edit has occurred.
+
+No new combined APK was built or installed. OPPO/Redmi fresh candidate, native
+OCR, seven Cart combinations and Store/ad retained-data qualification remain
+pending. Backend/auth/provider obligations remain explicit and unavailable;
+no runtime records were injected, old evidence deleted or commerce performed.
