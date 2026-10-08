@@ -3,7 +3,7 @@
   "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
   "workId": "add-product-screen1-20260920",
   "lane": "codex_ui",
-  "acceptedCommit": "4ef603fa4aef498d34a6c50828bd6e4023ad876c",
+  "acceptedCommit": "6c613ba4510d43634efd551b641a68790808870c",
   "deviceClass": "OPPO",
   "ticketRequirementTested": true,
   "result": "passed",
