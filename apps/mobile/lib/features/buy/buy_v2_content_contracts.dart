@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 import '../work/scan_and_pick_contract.dart';
 import 'buy_v2_cart_contracts.dart';
@@ -15,6 +16,79 @@ export 'buy_v2_models.dart'
         BuyV2ProductMediaBinding;
 
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
+
+/// Optional capability of the existing resolution adapter. A receipt confirms
+/// only the choice; commerce refresh supplies fulfilment and refund outcomes.
+abstract interface class BuyV2ReplacementConsentAdapter {
+  Future<BuyV2ReplacementConsentResult> decideReplacement(
+    BuyV2ReplacementConsentRequest request,
+  );
+}
+
+/// Includes contents as well as IDs, so a reused version cannot retain consent
+/// to a changed price, quantity, expiry or delivery promise.
+String buyV2ReplacementReviewKey(BuyV2OrderSupplyProgress progress) {
+  final offer = progress.replacementOffer!;
+  return sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            progress.orderId,
+            progress.purchaseId,
+            progress.sourceId,
+            offer.id,
+            offer.revision,
+            offer.customerTotalMinor,
+            offer.deliveryCommitment,
+            offer.expiresAt.toUtc().toIso8601String(),
+            for (final line in offer.lines)
+              [
+                line.originalProductId,
+                line.originalVariant,
+                line.originalPack,
+                line.originalQuantity,
+                line.productTitle,
+                line.pack,
+                line.quantity,
+                line.unitPriceMinor,
+              ],
+          ]),
+        ),
+      )
+      .toString();
+}
+
+String buyV2SupplyProgressKey(BuyV2OrderSupplyProgress progress) => sha256
+    .convert(
+      utf8.encode(
+        jsonEncode([
+          progress.orderId,
+          progress.purchaseId,
+          progress.sourceId,
+          progress.revision,
+          progress.state.name,
+          progress.currency,
+          progress.refundState?.name,
+          progress.refundAmountMinor,
+          progress.refundRoute,
+          progress.refundReference,
+          if (progress.replacementOffer != null)
+            buyV2ReplacementReviewKey(progress),
+          for (final line in progress.lines)
+            [
+              line.productId,
+              line.variant,
+              line.pack,
+              line.orderedQuantity,
+              line.availableQuantity,
+              line.unavailableQuantity,
+              line.supplierId,
+              line.supplierName,
+            ],
+        ]),
+      ),
+    )
+    .toString();
 
 /// Public listing identity only; never include an account or procurement draft.
 Uri buyV2SharedProductUri(BuyV2Product product) => Uri.https(
@@ -78,6 +152,7 @@ class BuyV2CatalogueQuery {
   BuyV2CatalogueQuery({
     required this.destination,
     required this.regionId,
+    this.customerLocationKey = '',
     this.areaScope = BuyV2CatalogueAreaScope.regional,
     this.storeId,
     this.query = '',
@@ -94,11 +169,13 @@ class BuyV2CatalogueQuery {
     this.offersOnly = false,
     this.collectionOnly = false,
     this.offerPublisher,
+    this.supplierOffersOnly = false,
     this.procurementContext,
   }) : brands = Set.unmodifiable(brands);
 
   final BuyV2Destination destination;
   final String? regionId;
+  final String customerLocationKey;
   final BuyV2CatalogueAreaScope areaScope;
   final String? storeId;
   final String query;
@@ -115,12 +192,21 @@ class BuyV2CatalogueQuery {
   final bool offersOnly;
   final bool collectionOnly;
   final BuyV2OfferPublisherType? offerPublisher;
+
+  /// Applies before counting/paging; supplier publications exclude MoolSocial.
+  final bool supplierOffersOnly;
+
+  bool acceptsOfferPublisher(BuyV2OfferPublisherType publisher) =>
+      (!supplierOffersOnly ||
+          publisher != BuyV2OfferPublisherType.moolSocial) &&
+      (offerPublisher == null || offerPublisher == publisher);
   final BuyV2ProcurementContext? procurementContext;
 
   String get key => jsonEncode([
-    procurementContext == null ? 2 : 3,
+    customerLocationKey.isNotEmpty ? 4 : (procurementContext == null ? 2 : 3),
     destination.name,
     regionId,
+    if (customerLocationKey.isNotEmpty) customerLocationKey,
     areaScope.name,
     storeId,
     query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
@@ -144,6 +230,7 @@ class BuyV2CatalogueQuery {
         context.purpose.name,
         context.originOperationId,
       ],
+    if (supplierOffersOnly) 'supplierOffersOnly',
   ]);
 
   @override
@@ -176,6 +263,14 @@ class BuyV2StoreListing {
   final int? distanceMeters;
   final BuyV2StoreCollectionCapability? collection;
   final BuyV2Product? previewProduct;
+
+  /// Pickup is offered by every Store. Legacy opt-in capability metadata is
+  /// not an ordering gate; a real branch identity and collection address are.
+  bool get hasCollectionAddress =>
+      id.isNotEmpty &&
+      id.trim() == id &&
+      name.trim().isNotEmpty &&
+      address.trim().isNotEmpty;
 }
 
 /// Cursors belong to one query and snapshot. A previous cursor makes backward
@@ -220,6 +315,138 @@ abstract interface class BuyV2CataloguePageSource {
   /// Restore exact user-selected IDs after page eviction or process relaunch.
   /// Callers batch at most50 IDs; absent IDs remain unavailable, never guessed.
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds);
+}
+
+/// Complete dimension choices for one selected SKU, plus only its selectable
+/// neighbours. Providers resolve combinations; clients never build a Cartesian
+/// catalogue or infer missing choices from the current discovery page.
+abstract interface class BuyV2VariantFamilySource {
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+  );
+}
+
+class BuyV2VariantFamilySnapshot {
+  BuyV2VariantFamilySnapshot({
+    required this.productId,
+    required this.canonicalId,
+    required this.storeId,
+    required this.destination,
+    required this.queryKey,
+    required this.sourceId,
+    required this.revision,
+    required this.observedAt,
+    required this.validUntil,
+    required this.complete,
+    required this.selectedAvailable,
+    required Iterable<BuyV2VariantAttribute> options,
+    required Iterable<BuyV2Product> candidates,
+  }) : options = List.unmodifiable(options),
+       candidates = List.unmodifiable(candidates);
+
+  final String productId;
+  final String canonicalId;
+  final String storeId;
+  final BuyV2Destination destination;
+  final String queryKey;
+  final String sourceId;
+  final String revision;
+  final DateTime observedAt;
+  final DateTime validUntil;
+  final bool complete;
+
+  /// Publication membership, not a stock or delivery promise. Offer facts and
+  /// checkout still authorize availability for the selected location.
+  final bool selectedAvailable;
+  final List<BuyV2VariantAttribute> options;
+  final List<BuyV2Product> candidates;
+
+  bool isValidFor(
+    BuyV2Product selected,
+    BuyV2CatalogueQuery context,
+    DateTime now,
+  ) {
+    bool identity(String value) =>
+        value.trim().isNotEmpty && value.trim() == value;
+    if (!complete ||
+        !selected.hasStructuredVariants ||
+        !identity(productId) ||
+        !identity(canonicalId) ||
+        !identity(storeId) ||
+        productId != selected.id ||
+        canonicalId != selected.canonicalId ||
+        storeId != selected.storeId ||
+        destination != selected.destination ||
+        context.storeId != storeId ||
+        context.destination != destination ||
+        queryKey != context.key ||
+        !identity(sourceId) ||
+        !identity(revision) ||
+        observedAt.isAfter(now) ||
+        !now.isBefore(validUntil) ||
+        !observedAt.isBefore(validUntil)) {
+      return false;
+    }
+    final dimensions = {
+      for (final a in selected.variantAttributes) a.dimensionId: a,
+    };
+    final choices = <(String, String), BuyV2VariantAttribute>{};
+    for (final option in options) {
+      if (!option.isValid ||
+          dimensions[option.dimensionId]?.kind != option.kind ||
+          choices.containsKey((option.dimensionId, option.optionId))) {
+        return false;
+      }
+      choices[(option.dimensionId, option.optionId)] = option;
+    }
+    if (selectedAvailable &&
+        selected.variantAttributes.any(
+          (a) => !choices.containsKey((a.dimensionId, a.optionId)),
+        )) {
+      return false;
+    }
+    final ids = <String>{};
+    final combinations = <String>{};
+    for (final candidate in candidates) {
+      if (!identity(candidate.id) ||
+          !ids.add(candidate.id) ||
+          !candidate.hasStructuredVariants ||
+          !candidate.isFromSameStoreAs(selected) ||
+          candidate.destination != destination ||
+          candidate.canonicalId != canonicalId ||
+          candidate.categoryId != selected.categoryId ||
+          candidate.offerClass != selected.offerClass ||
+          !candidate.catalogueListing ||
+          candidate.variantAttributes.length != dimensions.length) {
+        return false;
+      }
+      var changed = 0;
+      final combination = <String, String>{};
+      for (final attribute in candidate.variantAttributes) {
+        final dimension = dimensions[attribute.dimensionId];
+        if (dimension == null ||
+            dimension.kind != attribute.kind ||
+            !choices.containsKey((attribute.dimensionId, attribute.optionId))) {
+          return false;
+        }
+        if (dimension.optionId != attribute.optionId) changed++;
+        combination[attribute.dimensionId] = attribute.optionId;
+      }
+      final ordered = combination.keys.toList()..sort();
+      if (changed > 1 ||
+          (candidate.id == selected.id && changed != 0) ||
+          (candidate.id != selected.id && changed == 0) ||
+          !combinations.add(
+            jsonEncode([
+              for (final id in ordered) [id, combination[id]],
+            ]),
+          )) {
+        return false;
+      }
+    }
+    return selectedAvailable == ids.contains(selected.id);
+  }
 }
 
 /// A published placement owns an exact Store listing and current source facts.
@@ -322,14 +549,149 @@ class BuyV2StoreCollectionCapability {
   );
 }
 
-BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
-  if (product.destination == BuyV2Destination.wholesale) {
-    return BuyV2FulfilmentMode.bulkFreight;
+/// Public provider contract v1. Never derive these grants from display copy,
+/// MOQ, Store switches alone, or the transport used for a different service.
+
+@immutable
+class BuyV2OfferEligibility {
+  BuyV2OfferEligibility({
+    required this.productId,
+    required this.storeId,
+    required this.sourceRevision,
+    required this.customerLocationKey,
+    required this.observedAt,
+    required this.expiresAt,
+    required this.offerClass,
+    required this.channelEnabled,
+    required this.storeReady,
+    required this.fleetAvailable,
+    required this.customerLocationConfirmed,
+    required Set<BuyV2DeliveryOption> options,
+    this.scheduledSlotId,
+    this.scheduledStart,
+    this.scheduledEnd,
+    this.reviewFixture = false,
+  }) : options = Set.unmodifiable(options);
+
+  static const schemaVersion = 1;
+  final String productId, storeId, sourceRevision, customerLocationKey;
+  final DateTime observedAt, expiresAt;
+  final BuyV2OfferClass offerClass;
+  final bool channelEnabled, storeReady, fleetAvailable, reviewFixture;
+  final bool customerLocationConfirmed;
+  final Set<BuyV2DeliveryOption> options;
+  final String? scheduledSlotId;
+  final DateTime? scheduledStart, scheduledEnd;
+
+  Set<BuyV2DeliveryOption> availableFor({
+    required BuyV2Product product,
+    required String locationKey,
+    required DateTime now,
+    bool allowReviewFixture = false,
+  }) {
+    if ((reviewFixture && !allowReviewFixture) ||
+        product.id != productId ||
+        product.storeId != storeId ||
+        storeId.trim().isEmpty ||
+        sourceRevision.trim().isEmpty ||
+        customerLocationKey.isEmpty ||
+        locationKey != customerLocationKey ||
+        product.offerClass != offerClass ||
+        !channelEnabled ||
+        !storeReady ||
+        observedAt.isAfter(now) ||
+        !expiresAt.isAfter(observedAt) ||
+        !now.isBefore(expiresAt)) {
+      return const {};
+    }
+    return Set.unmodifiable(
+      options.where(
+        (option) => switch (option) {
+          BuyV2DeliveryOption.quick =>
+            fleetAvailable && customerLocationConfirmed,
+          BuyV2DeliveryOption.scheduled =>
+            fleetAvailable &&
+                customerLocationConfirmed &&
+                scheduledSlotId?.trim().isNotEmpty == true &&
+                scheduledStart != null &&
+                scheduledEnd != null &&
+                scheduledStart!.isAfter(now) &&
+                scheduledEnd!.isAfter(scheduledStart!),
+          _ => true,
+        },
+      ),
+    );
   }
-  final promise = product.deliveryPromise.toLowerCase();
-  if (product.destination == BuyV2Destination.shop &&
-      RegExp(r'\d+\s*(?:min|minute)').hasMatch(promise)) {
+
+  Map<String, Object?> toJson() => {
+    'schemaVersion': schemaVersion,
+    'productId': productId,
+    'storeId': storeId,
+    'sourceRevision': sourceRevision,
+    'customerLocationKey': customerLocationKey,
+    'observedAt': observedAt.toUtc().toIso8601String(),
+    'expiresAt': expiresAt.toUtc().toIso8601String(),
+    'offerClass': offerClass.name,
+    'channelEnabled': channelEnabled,
+    'storeReady': storeReady,
+    'fleetAvailable': fleetAvailable,
+    'customerLocationConfirmed': customerLocationConfirmed,
+    'options': options.map((option) => option.name).toList()..sort(),
+    'scheduledSlotId': scheduledSlotId,
+    'scheduledStart': scheduledStart?.toUtc().toIso8601String(),
+    'scheduledEnd': scheduledEnd?.toUtc().toIso8601String(),
+    'reviewFixture': reviewFixture,
+  };
+
+  /// An incomplete/unknown payload provides no eligibility; callers must not
+  /// replace it with a permissive default or manufacture provider evidence.
+  static BuyV2OfferEligibility? fromJson(Map<String, dynamic> json) {
+    try {
+      if (json['schemaVersion'] != schemaVersion) return null;
+      DateTime date(Object? value) {
+        final text = value as String;
+        if (!text.endsWith('Z')) throw const FormatException('UTC required');
+        return DateTime.parse(text);
+      }
+
+      return BuyV2OfferEligibility(
+        productId: json['productId'] as String,
+        storeId: json['storeId'] as String,
+        sourceRevision: json['sourceRevision'] as String,
+        customerLocationKey: json['customerLocationKey'] as String,
+        observedAt: date(json['observedAt']),
+        expiresAt: date(json['expiresAt']),
+        offerClass: BuyV2OfferClass.values.byName(json['offerClass'] as String),
+        channelEnabled: json['channelEnabled'] as bool,
+        storeReady: json['storeReady'] as bool,
+        fleetAvailable: json['fleetAvailable'] as bool,
+        customerLocationConfirmed: json['customerLocationConfirmed'] as bool,
+        options: (json['options'] as List)
+            .map((value) => BuyV2DeliveryOption.values.byName(value as String))
+            .toSet(),
+        scheduledSlotId: json['scheduledSlotId'] as String?,
+        scheduledStart: json['scheduledStart'] == null
+            ? null
+            : date(json['scheduledStart']),
+        scheduledEnd: json['scheduledEnd'] == null
+            ? null
+            : date(json['scheduledEnd']),
+        reviewFixture: json['reviewFixture'] as bool? ?? false,
+      );
+    } on Object {
+      return null;
+    }
+  }
+}
+
+BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
+  // Legacy display grouping for review fixtures. Eligibility is a separate,
+  // location-bound provider contract and must be checked before ordering.
+  if (product.reviewDeliveryOptions.contains(BuyV2DeliveryOption.quick)) {
     return BuyV2FulfilmentMode.quickLocal;
+  }
+  if (product.reviewDeliveryOptions.contains(BuyV2DeliveryOption.freight)) {
+    return BuyV2FulfilmentMode.bulkFreight;
   }
   return BuyV2FulfilmentMode.standardCourier;
 }
@@ -348,6 +710,7 @@ class BuyV2ProductFactsSnapshot {
     this.deliveryProviderName,
     this.deliveryServiceLevel,
     this.fulfilmentMode,
+    this.eligibility,
     this.storeOperatingState = BuyV2StoreOperatingState.unknown,
     this.storeCollection,
     this.nextOpeningLabel,
@@ -371,6 +734,7 @@ class BuyV2ProductFactsSnapshot {
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
   final BuyV2FulfilmentMode? fulfilmentMode;
+  final BuyV2OfferEligibility? eligibility;
   final BuyV2StoreOperatingState storeOperatingState;
   final BuyV2StoreCollectionCapability? storeCollection;
   final String? nextOpeningLabel;
@@ -392,6 +756,8 @@ class BuyV2ProductFactsSnapshot {
     String? deliveryProviderName,
     String? deliveryServiceLevel,
     BuyV2FulfilmentMode? fulfilmentMode,
+    BuyV2OfferEligibility? eligibility,
+    bool clearEligibility = false,
     BuyV2StoreOperatingState? storeOperatingState,
     BuyV2StoreCollectionCapability? storeCollection,
     bool clearStoreCollection = false,
@@ -413,6 +779,7 @@ class BuyV2ProductFactsSnapshot {
       deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
       deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
       fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
+      eligibility: clearEligibility ? null : eligibility ?? this.eligibility,
       storeOperatingState: storeOperatingState ?? this.storeOperatingState,
       storeCollection: clearStoreCollection
           ? null
@@ -439,6 +806,7 @@ class BuyV2ProductFactsSnapshot {
         other.deliveryProviderName == deliveryProviderName &&
         other.deliveryServiceLevel == deliveryServiceLevel &&
         other.fulfilmentMode == fulfilmentMode &&
+        other.eligibility == eligibility &&
         other.storeOperatingState == storeOperatingState &&
         other.storeCollection == storeCollection &&
         other.nextOpeningLabel == nextOpeningLabel &&
@@ -462,6 +830,7 @@ class BuyV2ProductFactsSnapshot {
     deliveryServiceLevel,
     fulfilmentMode,
     storeOperatingState,
+    eligibility,
     storeCollection,
     nextOpeningLabel,
     orderCutoffLabel,
@@ -477,10 +846,155 @@ abstract interface class BuyV2ProductFactsAdapter {
 
 enum BuyV2ProductContentState { ready, loading, offline, unavailable }
 
+enum BuyV2AttributeType {
+  text,
+  number,
+  boolean,
+  measurement,
+  textList,
+  unknown,
+}
+
+/// Product information is separate from selectable options and seller terms.
+enum BuyV2AttributeScope { product, variant, offer, lot }
+
+class BuyV2CategoryAttribute {
+  const BuyV2CategoryAttribute({
+    required this.id,
+    required this.label,
+    required this.type,
+    this.value,
+    this.unit,
+    this.groupLabel,
+    this.categoryIds = const {},
+    this.scope = BuyV2AttributeScope.product,
+    this.isPublic = true,
+    this.requiredForDisplay = false,
+  });
+
+  final String id;
+  final String label;
+  final BuyV2AttributeType type;
+  final Object? value;
+  final String? unit;
+  final String? groupLabel;
+  final Set<String> categoryIds;
+  final BuyV2AttributeScope scope;
+  final bool isPublic;
+  final bool requiredForDisplay;
+
+  bool appliesTo(String categoryId) =>
+      isPublic &&
+      (scope == BuyV2AttributeScope.product ||
+          scope == BuyV2AttributeScope.variant) &&
+      (categoryIds.isEmpty || categoryIds.contains(categoryId));
+
+  bool get hasValidValue {
+    final supplied = value;
+    if (unit != null && (unit!.trim().isEmpty || unit != unit!.trim())) {
+      return false;
+    }
+    if (type != BuyV2AttributeType.measurement && unit != null) return false;
+    return switch (type) {
+      BuyV2AttributeType.text =>
+        supplied is String && supplied.trim().isNotEmpty,
+      BuyV2AttributeType.number => supplied is num && supplied.isFinite,
+      BuyV2AttributeType.boolean => supplied is bool,
+      BuyV2AttributeType.measurement =>
+        supplied is num && supplied.isFinite && unit != null,
+      BuyV2AttributeType.textList =>
+        supplied is List<String> &&
+            supplied.isNotEmpty &&
+            supplied.every((item) => item.trim().isNotEmpty),
+      BuyV2AttributeType.unknown => false,
+    };
+  }
+
+  BuyV2ProductSpecification get specification {
+    final supplied = value;
+    final display = switch (type) {
+      BuyV2AttributeType.boolean => supplied == true ? 'Yes' : 'No',
+      BuyV2AttributeType.measurement => '$supplied $unit',
+      BuyV2AttributeType.textList => (supplied as List<String>).join(', '),
+      _ => '$supplied',
+    };
+    return BuyV2ProductSpecification(
+      attributeId: id,
+      label: label,
+      value: display,
+      groupLabel: groupLabel,
+    );
+  }
+}
+
+/// An adapter supplies a versioned public schema for the selected category.
+/// Unknown optional fields stay hidden; invalid required facts reject readiness.
+class BuyV2CategoryFacts {
+  const BuyV2CategoryFacts({
+    required this.categoryId,
+    required this.fields,
+    this.schemaVersion = 1,
+  });
+
+  final String categoryId;
+  final int schemaVersion;
+  final List<BuyV2CategoryAttribute> fields;
+
+  bool isValidFor(BuyV2Product product) {
+    if (schemaVersion != 1 ||
+        categoryId != product.categoryId ||
+        categoryId.trim().isEmpty) {
+      return false;
+    }
+    final ids = <String>{};
+    for (final field in fields) {
+      if (field.id.trim().isEmpty ||
+          field.id != field.id.trim() ||
+          !ids.add(field.id)) {
+        return false;
+      }
+      if (!field.appliesTo(categoryId)) continue;
+      if (field.label.trim().isEmpty ||
+          (field.groupLabel != null && field.groupLabel!.trim().isEmpty) ||
+          (field.requiredForDisplay && !field.hasValidValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  List<BuyV2ProductSpecification> specificationsFor(BuyV2Product product) =>
+      !isValidFor(product)
+      ? const []
+      : List.unmodifiable(
+          fields
+              .where(
+                (field) => field.appliesTo(categoryId) && field.hasValidValue,
+              )
+              .map((field) => field.specification),
+        );
+}
+
 @immutable
 class BuyV2ProductSpecification {
-  const BuyV2ProductSpecification({required this.label, required this.value});
+  // Public legal attribute IDs consumed by the existing compliance owner:
+  // generic_name, manufacturer_name/address, packer_name/address,
+  // importer_name/address, country_of_origin, manufactured_or_packed_on,
+  // best_before_or_use_by, fssai_license_number and consumer_care.
+  // A supplied structured compliance value takes precedence for its field.
+  // net_quantity stays a technical attribute unless structured compliance owns
+  // it; pack_count is independent. Other IDs remain source-defined attributes.
+  const BuyV2ProductSpecification({
+    required this.label,
+    required this.value,
+    this.attributeId,
+    this.groupLabel,
+  });
 
+  /// Stable public schema field identity, shared across highlights/specifications.
+  /// Absent legacy identity must not be inferred from the displayed value.
+  final String? attributeId;
+  final String? groupLabel;
   final String label;
   final String value;
 }
@@ -650,6 +1164,166 @@ abstract final class BuyV2SupplierMediaPolicy {
   }
 }
 
+/// Public category data. The publishing workspace supplies labels and units;
+/// Buy never invents category conversions or measurement instructions.
+@immutable
+class BuyV2ProductSizeChart {
+  BuyV2ProductSizeChart({
+    required this.categoryId,
+    required this.sourceRevision,
+    required this.dimensionLabel,
+    required List<String> columns,
+    required List<List<String>> rows,
+    List<String> instructions = const [],
+  }) : columns = List.unmodifiable(columns),
+       rows = List.unmodifiable(
+         rows.map((row) => List<String>.unmodifiable(row)),
+       ),
+       instructions = List.unmodifiable(instructions);
+
+  final String categoryId;
+  final String sourceRevision;
+  final String dimensionLabel;
+  final List<String> columns;
+  final List<List<String>> rows;
+  final List<String> instructions;
+
+  bool appliesTo(BuyV2Product product) =>
+      categoryId == product.categoryId &&
+      categoryId.trim().isNotEmpty &&
+      sourceRevision.trim().isNotEmpty &&
+      dimensionLabel.trim().isNotEmpty &&
+      columns.isNotEmpty &&
+      columns.every((value) => value.trim().isNotEmpty) &&
+      columns.toSet().length == columns.length &&
+      rows.isNotEmpty &&
+      rows.every(
+        (row) =>
+            row.length == columns.length &&
+            row.every((value) => value.trim().isNotEmpty),
+      );
+}
+
+/// Comparable selling prices, not an MRP markdown. All amounts are minor INR
+/// units. Publication owns provenance, effective times and expiry; the consumer
+/// additionally matches the current Store, SKU, pack, offer and selling price.
+@immutable
+class BuyV2ProductPriceHistory {
+  const BuyV2ProductPriceHistory({
+    required this.storeId,
+    required this.canonicalProductId,
+    required this.skuId,
+    required this.pack,
+    required this.variant,
+    required this.sourceRevision,
+    required this.currency,
+    required this.previousSellingPriceMinor,
+    required this.currentSellingPriceMinor,
+    required this.previousEffectiveAt,
+    required this.currentEffectiveAt,
+    required this.validUntil,
+    this.offerId,
+  });
+
+  final String storeId;
+  final String canonicalProductId;
+  final String skuId;
+  final String pack;
+  final String variant;
+  final String sourceRevision;
+  final String currency;
+  final String? offerId;
+  final int previousSellingPriceMinor;
+  final int currentSellingPriceMinor;
+  final DateTime previousEffectiveAt;
+  final DateTime currentEffectiveAt;
+  final DateTime validUntil;
+
+  bool isCurrentFor(
+    BuyV2Product product, {
+    required BuyV2ProductFactsSnapshot facts,
+    required DateTime now,
+  }) =>
+      storeId.isNotEmpty &&
+      storeId == product.storeId &&
+      canonicalProductId == product.canonicalId &&
+      skuId == product.id &&
+      pack == product.pack &&
+      variant == product.variant &&
+      sourceRevision.trim().isNotEmpty &&
+      currency == 'INR' &&
+      (offerId == null || offerId!.trim().isNotEmpty) &&
+      offerId == product.procurementSupplierGrant?.offerId &&
+      facts.productId == product.id &&
+      !facts.stale &&
+      facts.price > 0 &&
+      facts.price <= 90071992547409 &&
+      previousSellingPriceMinor > 0 &&
+      previousSellingPriceMinor <= 9007199254740991 &&
+      currentSellingPriceMinor == facts.price * 100 &&
+      previousEffectiveAt.isBefore(currentEffectiveAt) &&
+      !currentEffectiveAt.isAfter(now) &&
+      validUntil.isAfter(now);
+}
+
+/// Published pre-purchase policy. This is separate from an order's price,
+/// advance, balance and due-date agreement; it grants no payment authority.
+@immutable
+class BuyV2SupplierPolicy {
+  BuyV2SupplierPolicy({
+    required this.id,
+    required this.storeId,
+    required this.revision,
+    required this.title,
+    required this.body,
+    required Set<String> productIds,
+    required this.requiresAcceptance,
+    this.validUntil,
+  }) : productIds = Set.unmodifiable(productIds);
+
+  final String id;
+  final String storeId;
+  final String revision;
+  final String title;
+  final String body;
+  final Set<String> productIds;
+  final bool requiresAcceptance;
+  final DateTime? validUntil;
+
+  bool appliesTo(BuyV2Product product, DateTime now) =>
+      id.trim().isNotEmpty &&
+      revision.trim().isNotEmpty &&
+      storeId.trim().isNotEmpty &&
+      storeId == product.storeId &&
+      productIds.contains(product.id) &&
+      productIds.every((id) => id.trim().isNotEmpty) &&
+      title.trim().isNotEmpty &&
+      body.trim().isNotEmpty &&
+      (validUntil == null || validUntil!.isAfter(now));
+
+  String get receiptKey => jsonEncode([storeId, id]);
+
+  // Content and applicability are bound too: reusing an ID/revision while
+  // changing the actual policy cannot silently reuse a previous acceptance.
+  String acceptanceFingerprint(String ownerScope) => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            ownerScope,
+            storeId,
+            id,
+            revision,
+            title,
+            body,
+            productIds.toList()..sort(),
+            requiresAcceptance,
+            validUntil?.toUtc().toIso8601String(),
+          ]),
+        ),
+      )
+      .toString();
+}
+
 @immutable
 class BuyV2ProductContentSnapshot {
   const BuyV2ProductContentSnapshot({
@@ -658,10 +1332,17 @@ class BuyV2ProductContentSnapshot {
     required this.sourceId,
     this.media = const [],
     this.highlights = const [],
+    this.highlightFields = const [],
     this.specifications = const [],
+    this.categoryFacts,
     this.description,
     this.customerMessage,
     this.observedAt,
+    this.sizeChart,
+    this.priceHistory,
+    this.supplierPolicy,
+    this.supplierPolicyAcceptanceRequired,
+    this.retryable = false,
   });
 
   final String productId;
@@ -669,10 +1350,44 @@ class BuyV2ProductContentSnapshot {
   final String sourceId;
   final List<BuyV2ProductMediaAsset> media;
   final List<String> highlights;
+  final List<BuyV2ProductSpecification> highlightFields;
   final List<BuyV2ProductSpecification> specifications;
+  final BuyV2CategoryFacts? categoryFacts;
+
+  /// Typed IDs own their fields, including unknown values: never revive an old
+  /// legacy value for the same ID when the current provider cannot confirm it.
+  List<BuyV2ProductSpecification> specificationsFor(BuyV2Product product) {
+    final facts = categoryFacts;
+    if (facts == null) return specifications;
+    if (!facts.isValidFor(product)) return const [];
+    final ownedIds = facts.fields.map((field) => field.id).toSet();
+    return [
+      ...facts.specificationsFor(product),
+      ...specifications.where((field) => !ownedIds.contains(field.attributeId)),
+    ];
+  }
+
+  List<BuyV2ProductSpecification> highlightsFor(BuyV2Product product) {
+    final facts = categoryFacts;
+    if (facts == null) return highlightFields;
+    if (!facts.isValidFor(product)) return const [];
+    final ownedIds = facts.fields.map((field) => field.id).toSet();
+    return highlightFields
+        .where((field) => !ownedIds.contains(field.attributeId))
+        .toList();
+  }
+
   final String? description;
   final String? customerMessage;
   final DateTime? observedAt;
+  final BuyV2ProductSizeChart? sizeChart;
+  final BuyV2ProductPriceHistory? priceHistory;
+  final BuyV2SupplierPolicy? supplierPolicy;
+
+  /// Publication can require consent while the policy body is unavailable.
+  /// Null means this producer has not supplied the decision, not new consent.
+  final bool? supplierPolicyAcceptanceRequired;
+  final bool retryable;
 }
 
 abstract interface class BuyV2ProductContentAdapter {
@@ -816,8 +1531,18 @@ class BuyV2CollectionBasket {
     required this.store,
     required Iterable<BuyV2CartLine> lines,
     required this.paymentMethod,
+    this.purchaseOrderRequestId,
+    this.purchaseOrderRevision,
+    this.purchaseOrderReference,
   }) : lines = List.unmodifiable(lines) {
-    if (!_collectionText(identity.accountId) ||
+    if ((purchaseOrderReference != null &&
+            (purchaseOrderRequestId == null ||
+                !_collectionText(purchaseOrderReference!))) ||
+        (purchaseOrderRequestId == null) != (purchaseOrderRevision == null) ||
+        (purchaseOrderRequestId != null &&
+            (!_collectionText(purchaseOrderRequestId!) ||
+                !_collectionText(purchaseOrderRevision!))) ||
+        !_collectionText(identity.accountId) ||
         !_collectionText(identity.sessionId) ||
         !_collectionText(store.id) ||
         store.name.trim().isEmpty ||
@@ -854,6 +1579,12 @@ class BuyV2CollectionBasket {
   final BuyV2StoreListing store;
   final List<BuyV2CartLine> lines;
   final String paymentMethod;
+  final String? purchaseOrderRequestId;
+  final String? purchaseOrderRevision;
+
+  /// Provider-issued display reference retained with the durable purchase intent.
+  /// It does not replace the request/revision authorization binding.
+  final String? purchaseOrderReference;
 
   /// Stable under row reordering, sensitive to account/session, branch, SKU,
   /// quantity, displayed price and payment changes. It is correlation, not auth.
@@ -869,6 +1600,11 @@ class BuyV2CollectionBasket {
               identity.sessionId,
               store.id,
               paymentMethod,
+              if (purchaseOrderRequestId != null) ...[
+                purchaseOrderRequestId,
+                purchaseOrderRevision,
+                if (purchaseOrderReference != null) purchaseOrderReference,
+              ],
               for (final line in ordered)
                 [
                   line.product.canonicalId,
@@ -885,8 +1621,7 @@ class BuyV2CollectionBasket {
         .toString();
   }
 
-  bool collectionAvailableAt(DateTime now) =>
-      store.collection?.isSupportedFor(store.id, now: now) == true;
+  bool collectionAvailableAt(DateTime now) => store.hasCollectionAddress;
 }
 
 @immutable
@@ -1122,6 +1857,60 @@ abstract interface class BuyV2CollectionPurchaseStore {
 bool _collectionText(String? value) =>
     value != null && value.isNotEmpty && value.trim() == value;
 
+/// Current payment-route publication from the authenticated commerce adapter.
+/// Bounds are inclusive INR minor units. A missing bound is unknown.
+@immutable
+class BuyV2PaymentCapability {
+  BuyV2PaymentCapability({
+    required this.method,
+    required this.sourceId,
+    required this.revision,
+    required Set<String> fulfilmentKeys,
+    required this.validFrom,
+    required this.validUntil,
+    this.currency = 'INR',
+    this.collectionStoreId,
+    this.recipientName,
+    this.minimumMinor,
+    this.maximumMinor,
+    this.remainingMinor,
+  }) : fulfilmentKeys = Set.unmodifiable(fulfilmentKeys);
+
+  final String method, sourceId, revision, currency;
+  final Set<String> fulfilmentKeys;
+  final DateTime validFrom, validUntil;
+  final String? collectionStoreId, recipientName;
+  final int? minimumMinor, maximumMinor, remainingMinor;
+
+  bool get valid =>
+      method.trim().isNotEmpty &&
+      sourceId.trim().isNotEmpty &&
+      revision.trim().isNotEmpty &&
+      currency == 'INR' &&
+      fulfilmentKeys.isNotEmpty &&
+      fulfilmentKeys.every((key) => key.trim().isNotEmpty) &&
+      validFrom.isBefore(validUntil) &&
+      (collectionStoreId == null || collectionStoreId!.trim().isNotEmpty) &&
+      (recipientName == null || recipientName!.trim().isNotEmpty) &&
+      [minimumMinor, maximumMinor, remainingMinor].every(
+        (bound) => bound == null || (bound >= 0 && bound <= 9007199254740991),
+      ) &&
+      (minimumMinor == null ||
+          maximumMinor == null ||
+          minimumMinor! <= maximumMinor!);
+}
+
+enum BuyV2PaymentEligibilityState { eligible, ineligible, unknown }
+
+@immutable
+class BuyV2PaymentEligibility {
+  const BuyV2PaymentEligibility(this.state, {this.reason, this.capability});
+  final BuyV2PaymentEligibilityState state;
+  final String? reason;
+  final BuyV2PaymentCapability? capability;
+  bool get selectable => state != BuyV2PaymentEligibilityState.ineligible;
+}
+
 @immutable
 class BuyV2CommerceSnapshot {
   const BuyV2CommerceSnapshot({
@@ -1130,11 +1919,14 @@ class BuyV2CommerceSnapshot {
     this.addresses = const [],
     this.orders = const [],
     this.paymentMethods = const {},
+    this.paymentCapabilities,
+    this.upiQrAvailable = false,
     this.selectedAddressId,
     this.businessVerified = false,
     this.businessVerificationState = BuyV2BusinessVerificationState.unavailable,
     this.productReportsAvailable = false,
     this.reviewableProductIds = const {},
+    this.ratingTargets = const [],
     this.customerMessage,
     this.procurementBuyerGrant,
   });
@@ -1144,13 +1936,132 @@ class BuyV2CommerceSnapshot {
   final List<BuyV2Address> addresses;
   final List<BuyV2Order> orders;
   final Set<String> paymentMethods;
+
+  /// Null retains legacy provider validation without claiming known limits.
+  /// An empty publication explicitly offers no current payment routes.
+  final List<BuyV2PaymentCapability>? paymentCapabilities;
+
+  /// True only when the authenticated merchant connector supports order QR.
+  final bool upiQrAvailable;
   final String? selectedAddressId;
   final bool businessVerified;
   final BuyV2BusinessVerificationState businessVerificationState;
   final bool productReportsAvailable;
   final Set<String> reviewableProductIds;
+
+  /// Authenticated, fulfilled purchase targets. The server must revalidate on save.
+  final List<BuyV2RatingTarget> ratingTargets;
   final String? customerMessage;
   final BuyV2ProcurementBuyerGrant? procurementBuyerGrant;
+}
+
+enum BuyV2RatingKind { product, store, delivery, purchase }
+
+/// Public projection of a server-authorized purchase, never a client grant.
+@immutable
+class BuyV2RatingTarget {
+  const BuyV2RatingTarget({
+    required this.id,
+    required this.ownerScope,
+    required this.orderId,
+    required this.orderLineId,
+    required this.storeId,
+    required this.productId,
+    required this.purchaseLabel,
+    this.kind = BuyV2RatingKind.product,
+    this.purchaseId,
+    this.orderStoreIds = const {},
+    this.shipmentId,
+    this.providerId,
+    this.reviewId,
+    this.version = 0,
+    this.rating,
+    this.comment = '',
+  });
+  final String id, ownerScope, orderId, orderLineId, storeId, productId;
+  final String purchaseLabel;
+  final BuyV2RatingKind kind;
+  final String? purchaseId;
+
+  /// Authoritative participating suborder -> Store mapping for overall feedback.
+  final Map<String, String> orderStoreIds;
+  final String? shipmentId, providerId, reviewId;
+  final int version;
+  final int? rating;
+  final String comment;
+
+  bool get valid =>
+      [
+        id,
+        ownerScope,
+        if (kind != BuyV2RatingKind.purchase) ...[
+          orderId,
+          orderLineId,
+          storeId,
+          productId,
+        ],
+        purchaseLabel,
+      ].every((value) => value.isNotEmpty && value.trim() == value) &&
+      (kind != BuyV2RatingKind.purchase ||
+          (purchaseId?.trim().isNotEmpty == true &&
+              purchaseId == purchaseId!.trim() &&
+              orderId.isEmpty &&
+              orderLineId.isEmpty &&
+              storeId.isEmpty &&
+              productId.isEmpty &&
+              shipmentId == null &&
+              providerId == null &&
+              orderStoreIds.isNotEmpty &&
+              orderStoreIds.entries.every(
+                (e) =>
+                    e.key.trim().isNotEmpty &&
+                    e.key == e.key.trim() &&
+                    e.value.trim().isNotEmpty &&
+                    e.value == e.value.trim(),
+              ))) &&
+      version >= 0 &&
+      comment.characters.length <= 8000 &&
+      (rating == null || (rating! >= 1 && rating! <= 5)) &&
+      ((reviewId == null && rating == null && version == 0) ||
+          (reviewId != null &&
+              reviewId!.trim().isNotEmpty &&
+              rating != null &&
+              version > 0)) &&
+      (kind != BuyV2RatingKind.delivery ||
+          (shipmentId?.trim().isNotEmpty == true &&
+              providerId?.trim().isNotEmpty == true));
+}
+
+@immutable
+class BuyV2RatingRequest {
+  const BuyV2RatingRequest({
+    required this.target,
+    required this.stars,
+    required this.comment,
+    required this.idempotencyKey,
+  });
+  final BuyV2RatingTarget target;
+  final int stars;
+
+  /// Null for a stars-only rating; never an invented customer review.
+  final String? comment;
+  final String idempotencyKey;
+}
+
+@immutable
+class BuyV2RatingResult {
+  const BuyV2RatingResult({required this.customerMessage, this.saved});
+  final String customerMessage;
+
+  /// Acknowledged, versioned record. Null means no successful save.
+  final BuyV2RatingTarget? saved;
+}
+
+/// Implement beside BuyV2CommerceAdapter when the backend is connected.
+/// Validate authenticated owner, fulfilment, Store/line and version atomically;
+/// deduplicate idempotencyKey, store centrally, and return the saved record.
+abstract interface class BuyV2VerifiedRatingAdapter {
+  Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request);
 }
 
 @immutable
@@ -1162,20 +2073,42 @@ class BuyV2OrderPlacementRequest {
     required this.total,
     required this.amountDueNow,
     required this.idempotencyKey,
+    this.useUpiQr = false,
     this.commercialPaymentTermIds = const {},
+    this.deliveryInstructionsByProductId = const {},
     this.checkoutQuoteId,
+    this.purchaseOrderRequestId,
+    this.purchaseOrderRevision,
     this.procurementContext,
+    this.checkoutAttemptId,
+    this.paymentGroupId,
   });
 
   final List<BuyV2CartLine> lines;
+
+  /// Optional buyer notes, keyed only by product IDs in this checkout.
+  /// The provider must copy each note to its matching fulfilment order and
+  /// expose it only to the fulfilling Store and assigned delivery partner.
+  /// Pickup instructions are for the fulfilling Store; never broadcast notes.
+  final Map<String, String> deliveryInstructionsByProductId;
   final BuyV2Address address;
   final String paymentMethod;
   final int total;
   final int amountDueNow;
   final String idempotencyKey;
+
+  /// Same UPI method and idempotent order; QR is a transport, not another charge.
+  final bool useUpiQr;
   final Map<String, String> commercialPaymentTermIds;
   final String? checkoutQuoteId;
+  final String? purchaseOrderRequestId;
+  final String? purchaseOrderRevision;
   final BuyV2ProcurementContext? procurementContext;
+
+  /// Present together only for an explicitly supported group-scoped placement.
+  /// Deduplicate the immutable key and authorize only these lines and amounts.
+  final String? checkoutAttemptId;
+  final String? paymentGroupId;
 }
 
 @immutable
@@ -1186,10 +2119,15 @@ class BuyV2OrderPlacementResult {
     this.purchaseReference,
     this.paymentReference,
     this.paymentActionUri,
+    this.upiQrAction,
     this.bankTransferInstructions,
     this.orders = const [],
     this.failureKind,
     this.affectedProductId,
+    this.checkoutAttemptId,
+    this.paymentGroupId,
+    this.idempotencyKey,
+    this.retryAllowed = false,
   });
 
   final BuyV2OrderPlacementOutcome outcome;
@@ -1197,10 +2135,76 @@ class BuyV2OrderPlacementResult {
   final String? purchaseReference;
   final String? paymentReference;
   final Uri? paymentActionUri;
+  final BuyV2UpiQrAction? upiQrAction;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
   final List<BuyV2Order> orders;
   final BuyV2OrderPlacementFailureKind? failureKind;
   final String? affectedProductId;
+
+  /// Group connectors echo all three identities for placement and recovery.
+  final String? checkoutAttemptId;
+  final String? paymentGroupId;
+  final String? idempotencyKey;
+
+  /// Trusted financial permission for a new payment, not order-status advice.
+  /// Accepted only from reconciliation of the original terminal attempt.
+  final bool retryAllowed;
+}
+
+/// Supplied by the authenticated MoolSocial merchant payment connector only.
+/// The gateway reference and UPI transaction reference can differ. The backend
+/// binds both to this exact attempt, amount and verified merchant beneficiary.
+@immutable
+class BuyV2UpiQrAction {
+  const BuyV2UpiQrAction({
+    required this.uri,
+    required this.paymentReference,
+    required this.transactionReference,
+    required this.expiresAt,
+  });
+
+  final Uri uri;
+  final String paymentReference, transactionReference;
+  final DateTime expiresAt;
+
+  bool validFor({
+    required String? reference,
+    required int amountMinor,
+    required DateTime now,
+  }) {
+    if (reference == null ||
+        reference.isEmpty ||
+        paymentReference != reference ||
+        transactionReference.isEmpty ||
+        amountMinor <= 0 ||
+        !now.isBefore(expiresAt) ||
+        uri.toString().length > 2048 ||
+        uri.scheme != 'upi' ||
+        uri.host != 'pay' ||
+        uri.path.isNotEmpty ||
+        uri.hasPort ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasFragment) {
+      return false;
+    }
+    final fields = uri.queryParametersAll;
+    if (fields.values.any((values) => values.length != 1)) return false;
+    final q = uri.queryParameters;
+    final amount = q['am'];
+    if (q['cu'] != 'INR' ||
+        q['tr'] != transactionReference ||
+        (q['pn']?.trim().isEmpty ?? true) ||
+        !RegExp(r'^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$').hasMatch(q['pa'] ?? '') ||
+        amount == null ||
+        !RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(amount)) {
+      return false;
+    }
+    final parts = amount.split('.');
+    final minor =
+        int.parse(parts[0]) * 100 +
+        int.parse(parts.length == 1 ? '00' : parts[1].padRight(2, '0'));
+    return minor == amountMinor;
+  }
 }
 
 @immutable
@@ -1254,6 +2258,185 @@ class BuyV2AddressRequestResult {
 }
 
 typedef BuyV2PaymentHandoff = Future<bool> Function(Uri uri);
+
+/// Supplier decisions are document states, never evidence of payment.
+enum BuyV2PurchaseOrderState {
+  draft,
+  awaitingSupplier,
+  accepted,
+  revised,
+  rejected,
+}
+
+@immutable
+class BuyV2PurchaseOrderLine {
+  const BuyV2PurchaseOrderLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.quantity,
+    required this.unitPriceMinor,
+    this.requestedQuantity,
+  });
+  final String productId;
+  final String variant;
+  final String pack;
+  final int quantity;
+
+  /// Original basket quantity, retained when the supplier proposes a change.
+  final int? requestedQuantity;
+  final int unitPriceMinor;
+  int get totalMinor => quantity * unitPriceMinor;
+}
+
+@immutable
+class BuyV2PurchaseOrderDocument {
+  BuyV2PurchaseOrderDocument({
+    required this.id,
+    required this.revision,
+    required this.supplierStoreId,
+    required this.supplierName,
+    required this.state,
+    required List<BuyV2PurchaseOrderLine> lines,
+    required this.itemSubtotalMinor,
+    required this.chargesMinor,
+    required this.totalMinor,
+    required this.terms,
+    this.reference,
+    this.decisionMessage,
+  }) : lines = List.unmodifiable(lines);
+
+  final String id;
+  final String revision;
+  final String supplierStoreId;
+  final String supplierName;
+  final BuyV2PurchaseOrderState state;
+  final List<BuyV2PurchaseOrderLine> lines;
+  final int itemSubtotalMinor;
+  final int chargesMinor;
+  final int totalMinor;
+  final String terms;
+  final String? reference;
+  final String? decisionMessage;
+
+  bool get valid {
+    bool text(String value) => value.trim().isNotEmpty;
+    final ids = <String>{};
+    return text(id) &&
+        text(revision) &&
+        text(supplierStoreId) &&
+        text(supplierName) &&
+        text(terms) &&
+        lines.isNotEmpty &&
+        (state == BuyV2PurchaseOrderState.draft ||
+            (reference != null && text(reference!))) &&
+        (state != BuyV2PurchaseOrderState.revised &&
+                state != BuyV2PurchaseOrderState.rejected ||
+            (decisionMessage != null && text(decisionMessage!))) &&
+        lines.every(
+          (line) =>
+              text(line.productId) &&
+              text(line.variant) &&
+              text(line.pack) &&
+              ids.add(line.productId) &&
+              line.quantity > 0 &&
+              (line.requestedQuantity == null || line.requestedQuantity! > 0) &&
+              line.unitPriceMinor >= 0 &&
+              line.totalMinor <= 9007199254740991,
+        ) &&
+        itemSubtotalMinor ==
+            lines.fold<int>(0, (sum, line) => sum + line.totalMinor) &&
+        chargesMinor >= 0 &&
+        totalMinor >= 0 &&
+        totalMinor <= 9007199254740991 &&
+        totalMinor == itemSubtotalMinor + chargesMinor;
+  }
+}
+
+@immutable
+class BuyV2PurchaseOrderReview {
+  BuyV2PurchaseOrderReview({
+    required this.requestId,
+    required this.revision,
+    required this.buyerAccountId,
+    required this.buyerName,
+    this.address,
+    this.collectionStore,
+    required this.validUntil,
+    required List<BuyV2PurchaseOrderDocument> documents,
+  }) : documents = List.unmodifiable(documents);
+
+  final String requestId;
+  final String revision;
+  final String buyerAccountId;
+  final String buyerName;
+  final BuyV2Address? address;
+  final BuyV2StoreListing? collectionStore;
+  final DateTime validUntil;
+  final List<BuyV2PurchaseOrderDocument> documents;
+
+  /// Match exact purchased SKU/store/quantity; a label is not an identity.
+  bool matches(List<BuyV2CartLine> basket, DateTime now) {
+    if (requestId.trim().isEmpty ||
+        revision.trim().isEmpty ||
+        buyerAccountId.trim().isEmpty ||
+        buyerName.trim().isEmpty ||
+        !now.isBefore(validUntil) ||
+        basket.isEmpty ||
+        documents.isEmpty ||
+        (address == null) == (collectionStore == null) ||
+        (collectionStore != null &&
+            (!collectionStore!.hasCollectionAddress ||
+                basket.any(
+                  (line) => line.product.storeId != collectionStore!.id,
+                )))) {
+      return false;
+    }
+    final expected = {for (final line in basket) line.product.id: line};
+    if (expected.length != basket.length) return false;
+    final seen = <String>{};
+    final documentsSeen = <String>{};
+    for (final document in documents) {
+      if (!document.valid || !documentsSeen.add(document.id)) return false;
+      for (final line in document.lines) {
+        final purchased = expected[line.productId];
+        if (purchased == null ||
+            !seen.add(line.productId) ||
+            purchased.product.destination != BuyV2Destination.wholesale ||
+            purchased.product.storeId != document.supplierStoreId ||
+            purchased.product.variant != line.variant ||
+            purchased.product.pack != line.pack ||
+            (purchased.quantity != (line.requestedQuantity ?? line.quantity) &&
+                !(document.state == BuyV2PurchaseOrderState.accepted &&
+                    purchased.quantity == line.quantity))) {
+          return false;
+        }
+      }
+    }
+    return seen.length == expected.length;
+  }
+}
+
+/// Authenticated provider operations. Repeating the same review revision must
+/// reconcile one issuance; implementations must not create a second PO.
+abstract interface class BuyV2PurchaseOrderAdapter {
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  });
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  });
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId});
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  });
+}
 
 enum BuyV2CommercialPaymentTermKind {
   retailAdvance,
@@ -1358,6 +2541,135 @@ class BuyV2CheckoutQuoteLine {
   final int total;
 }
 
+enum BuyV2CheckoutSubmissionState {
+  idle,
+  submitting,
+  paymentActionRequired,
+  paymentPending,
+  paymentUnknown,
+  cancelled,
+  confirmed,
+  failed,
+  unavailable,
+}
+
+@immutable
+class BuyV2CheckoutPaymentGroup {
+  const BuyV2CheckoutPaymentGroup({
+    required this.id,
+    required this.fulfilmentKeys,
+    required this.paymentMethod,
+    required this.total,
+    required this.amountDueNow,
+    this.currency = 'INR',
+  });
+
+  final String id;
+  final Set<String> fulfilmentKeys;
+  final String paymentMethod;
+  final int total;
+  final int amountDueNow;
+  final String currency;
+}
+
+/// Frozen progress in the existing account-scoped customer-state owner.
+/// A submitted request is historical evidence, never a fresh quote or grant.
+@immutable
+class BuyV2CheckoutFulfilmentObligation {
+  const BuyV2CheckoutFulfilmentObligation({
+    required this.fulfilmentKey,
+    required this.productIds,
+    required this.totalMinor,
+    required this.dueNowMinor,
+  });
+  final String fulfilmentKey;
+  final Set<String> productIds;
+  final int totalMinor;
+  final int dueNowMinor;
+}
+
+@immutable
+class BuyV2CheckoutGroupAttempt {
+  const BuyV2CheckoutGroupAttempt({
+    required this.request,
+    required this.fulfilmentKeys,
+    this.obligations = const [],
+    this.state = BuyV2CheckoutSubmissionState.idle,
+    this.paymentReference,
+    this.paymentActionUri,
+    this.bankTransferInstructions,
+    this.confirmedOrderIds = const [],
+    this.financiallyClosed = false,
+  });
+
+  final BuyV2OrderPlacementRequest request;
+  final Set<String> fulfilmentKeys;
+  final List<BuyV2CheckoutFulfilmentObligation> obligations;
+  final BuyV2CheckoutSubmissionState state;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
+  final BuyV2BankTransferInstructions? bankTransferInstructions;
+  final List<String> confirmedOrderIds;
+  final bool financiallyClosed;
+
+  bool get hasValidObligations {
+    final scopes = <String>{};
+    final products = <String>{};
+    return obligations.isNotEmpty &&
+        obligations.every(
+          (value) =>
+              scopes.add(value.fulfilmentKey) &&
+              value.productIds.isNotEmpty &&
+              value.productIds.every(products.add) &&
+              value.dueNowMinor >= 0 &&
+              value.totalMinor >= value.dueNowMinor &&
+              value.totalMinor <= 9007199254740991,
+        ) &&
+        setEquals(scopes, fulfilmentKeys) &&
+        setEquals(
+          products,
+          request.lines.map((line) => line.product.id).toSet(),
+        ) &&
+        obligations.fold<int>(0, (sum, value) => sum + value.totalMinor) ==
+            request.total * 100 &&
+        obligations.fold<int>(0, (sum, value) => sum + value.dueNowMinor) ==
+            request.amountDueNow * 100;
+  }
+}
+
+@immutable
+class BuyV2CheckoutPaymentAttempt {
+  const BuyV2CheckoutPaymentAttempt({
+    required this.id,
+    required this.ownerScope,
+    required this.quoteValidUntil,
+    required this.groups,
+    this.lateSettlementNeedsReview = false,
+  });
+
+  final String id;
+  final String ownerScope;
+  final DateTime quoteValidUntil;
+  final List<BuyV2CheckoutGroupAttempt> groups;
+  final bool lateSettlementNeedsReview;
+}
+
+/// A legacy payment retains its real request without invented group identities.
+/// Cached request facts authorize recovery only, never another placement.
+@immutable
+class BuyV2LegacyCheckoutAttempt {
+  const BuyV2LegacyCheckoutAttempt({
+    required this.ownerScope,
+    required this.payment,
+    this.purchaseOrderAccountId,
+    this.lateSettlementNeedsReview = false,
+  });
+  final String ownerScope;
+  final BuyV2CheckoutGroupAttempt payment;
+  final String? purchaseOrderAccountId;
+  final bool lateSettlementNeedsReview;
+}
+
 @immutable
 class BuyV2CheckoutQuote {
   const BuyV2CheckoutQuote({
@@ -1367,6 +2679,7 @@ class BuyV2CheckoutQuote {
     required this.validUntil,
     required this.lines,
     required this.total,
+    this.paymentGroups,
   });
 
   final String id;
@@ -1375,6 +2688,11 @@ class BuyV2CheckoutQuote {
   final DateTime validUntil;
   final List<BuyV2CheckoutQuoteLine> lines;
   final int total;
+
+  /// Authenticated compatible obligations, allocated from this exact quote.
+  /// Null retains legacy whole-basket placement. Empty/invalid is a hold.
+  /// Never infer groups by dividing an amount to bypass a payment limit.
+  final List<BuyV2CheckoutPaymentGroup>? paymentGroups;
 }
 
 @immutable
@@ -1462,6 +2780,68 @@ enum BuyV2DeliveryExceptionKind {
 }
 
 @immutable
+class BuyV2ReceiptLine {
+  const BuyV2ReceiptLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.receivedQuantity,
+  });
+
+  final String productId;
+  final String variant;
+  final String pack;
+  final int orderedQuantity;
+  final int receivedQuantity;
+
+  int get missingQuantity => orderedQuantity - receivedQuantity;
+}
+
+/// Authoritative quantities for the entire purchased order, not a shipment
+/// fragment. This is receipt evidence; it does not settle or refund payment.
+@immutable
+class BuyV2ItemisedReceipt {
+  BuyV2ItemisedReceipt({
+    required this.orderId,
+    required this.purchaseId,
+    required List<BuyV2ReceiptLine> lines,
+  }) : lines = List.unmodifiable(lines);
+
+  final String orderId;
+  final String purchaseId;
+  final List<BuyV2ReceiptLine> lines;
+
+  bool matchesOrder(BuyV2Order order) {
+    if (orderId != order.id ||
+        purchaseId.trim().isEmpty ||
+        purchaseId != order.purchaseId ||
+        lines.isEmpty ||
+        lines.length != order.lines.length) {
+      return false;
+    }
+    final matched = <int>{};
+    for (final line in lines) {
+      if (line.productId.trim().isEmpty ||
+          line.orderedQuantity <= 0 ||
+          line.receivedQuantity < 0 ||
+          line.receivedQuantity > line.orderedQuantity) {
+        return false;
+      }
+      final index = order.lines.indexWhere(
+        (purchased) =>
+            purchased.product.id == line.productId &&
+            purchased.product.variant == line.variant &&
+            purchased.product.pack == line.pack &&
+            purchased.quantity == line.orderedQuantity,
+      );
+      if (index < 0 || !matched.add(index)) return false;
+    }
+    return true;
+  }
+}
+
+@immutable
 class BuyV2DeliveryExceptionSnapshot {
   const BuyV2DeliveryExceptionSnapshot({
     required this.state,
@@ -1472,6 +2852,7 @@ class BuyV2DeliveryExceptionSnapshot {
     this.detail,
     this.rescheduleSlots = const [],
     this.proofReference,
+    this.itemisedReceipt,
   });
 
   final BuyV2CommerceLoadState state;
@@ -1482,6 +2863,7 @@ class BuyV2DeliveryExceptionSnapshot {
   final String? detail;
   final List<String> rescheduleSlots;
   final String? proofReference;
+  final BuyV2ItemisedReceipt? itemisedReceipt;
 }
 
 abstract interface class BuyV2DeliveryExceptionAdapter {
@@ -1502,6 +2884,129 @@ abstract interface class BuyV2DeliveryExceptionAdapter {
     required String exceptionId,
     required String proofReference,
   });
+}
+
+/// Delivery evidence and customer product acceptance are separate facts.
+/// No state in this contract authorizes or proves a supplier payout.
+enum BuyV2ProductAcceptanceState {
+  unavailable,
+  ready,
+  pending,
+  accepted,
+  disputed,
+}
+
+String buyV2ProductReceiptKey(BuyV2ItemisedReceipt receipt) {
+  final lines =
+      receipt.lines
+          .map(
+            (line) => [
+              line.productId,
+              line.variant,
+              line.pack,
+              line.orderedQuantity,
+              line.receivedQuantity,
+            ],
+          )
+          .toList()
+        ..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+  return sha256
+      .convert(
+        utf8.encode(jsonEncode([receipt.orderId, receipt.purchaseId, lines])),
+      )
+      .toString();
+}
+
+String buyV2ProductAcceptanceKey(
+  String ownerScope,
+  BuyV2ItemisedReceipt receipt,
+) => sha256
+    .convert(
+      utf8.encode(
+        jsonEncode([
+          'product-acceptance-v1',
+          ownerScope,
+          buyV2ProductReceiptKey(receipt),
+        ]),
+      ),
+    )
+    .toString();
+
+@immutable
+class BuyV2ProductAcceptanceSnapshot {
+  const BuyV2ProductAcceptanceSnapshot({
+    required this.ownerScope,
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.revision,
+    required this.state,
+    required this.requestKey,
+    required this.receipt,
+  });
+  final String ownerScope;
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int revision;
+  final BuyV2ProductAcceptanceState state;
+  final String requestKey;
+  final BuyV2ItemisedReceipt receipt;
+
+  bool matchesOrder(BuyV2Order order, String owner) =>
+      owner.isNotEmpty &&
+      owner == ownerScope &&
+      order.status == BuyV2OrderStatus.delivered &&
+      orderId == order.id &&
+      purchaseId == order.purchaseId &&
+      sourceId.trim().isNotEmpty &&
+      revision >= 0 &&
+      receipt.matchesOrder(order) &&
+      requestKey == buyV2ProductAcceptanceKey(owner, receipt) &&
+      ((state != BuyV2ProductAcceptanceState.ready &&
+              state != BuyV2ProductAcceptanceState.accepted) ||
+          receipt.lines.every((line) => line.missingQuantity == 0));
+
+  String get reviewKey => jsonEncode([
+    ownerScope,
+    orderId,
+    purchaseId,
+    sourceId,
+    revision,
+    state.name,
+    requestKey,
+    buyV2ProductReceiptKey(receipt),
+  ]);
+}
+
+@immutable
+class BuyV2ProductAcceptanceRequest {
+  const BuyV2ProductAcceptanceRequest({required this.snapshot});
+  final BuyV2ProductAcceptanceSnapshot snapshot;
+  String get idempotencyKey => snapshot.requestKey;
+}
+
+/// Implementations must authenticate and authorize the actual account. Owner
+/// scope is correlation, not authentication. Cold load must reconcile ALL prior
+/// acceptance requests for this order before returning ready, including an
+/// earlier receipt/key not retained by this process. A ready response resolves
+/// unknown outcomes definitively; offline/timeout must throw, not return ready.
+/// The same key survives retry/restart. Accept must atomically check revision,
+/// receipt, dispute status and idempotency. Partial acceptance is unsupported.
+/// After restart, unresolvedRequest may be null while unresolvedRequestKey is
+/// known. Resolve the original server submission by that key; a pending status
+/// revision must never be reconstructed as the original submission revision.
+abstract interface class BuyV2ProductAcceptanceAdapter {
+  Future<BuyV2ProductAcceptanceSnapshot> load({
+    required String ownerScope,
+    required String orderId,
+    required String purchaseId,
+    required String? unresolvedRequestKey,
+    required BuyV2ProductAcceptanceRequest? unresolvedRequest,
+  });
+  Future<BuyV2ProductAcceptanceSnapshot> accept(
+    BuyV2ProductAcceptanceRequest request,
+  );
 }
 
 enum BuyV2LiveDeliveryState { ready, delivered, offline, unavailable }
@@ -1557,6 +3062,28 @@ abstract interface class BuyV2LiveDeliveryAdapter {
   const BuyV2LiveDeliveryAdapter();
 
   Future<BuyV2LiveDeliverySnapshot> load({required String orderId});
+}
+
+/// Optional authenticated lookup for an interrupted placement whose first
+/// response never reached the buyer. This operation must not place or pay again.
+/// The provider resolves the original immutable attempt by its idempotency key;
+/// unavailable/unknown results are not proof of failure or permission to retry.
+abstract interface class BuyV2PendingOrderRecoveryAdapter {
+  Future<BuyV2OrderPlacementResult> recoverOrder({
+    required String idempotencyKey,
+  });
+}
+
+/// Opt in beside the existing commerce connector after workspace integration.
+/// Each request is one immutable obligation within the disclosed commitment.
+/// Reconciliation/recovery use the existing operations and echo group identity;
+/// success of one group does not imply atomic checkout or supplier acceptance.
+abstract interface class BuyV2GroupedOrderPlacementAdapter {
+  /// Confirmation returns one independent order for each original quoted
+  /// fulfilment, preserving its complete lines and agreed total/due allocation.
+  Future<BuyV2OrderPlacementResult> placePaymentGroup(
+    BuyV2OrderPlacementRequest request,
+  );
 }
 
 abstract interface class BuyV2CommerceAdapter {
@@ -1629,12 +3156,88 @@ final class BuyV2CatalogueProductFactsAdapter
 
 final class BuyV2CatalogueProductContentAdapter
     implements BuyV2ProductContentAdapter {
-  const BuyV2CatalogueProductContentAdapter();
+  const BuyV2CatalogueProductContentAdapter({
+    this.includeVariantReviewFixtures = false,
+    this.now = DateTime.now,
+  });
+  final bool includeVariantReviewFixtures;
+  final DateTime Function() now;
 
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
     final returnDetail = product.returnPolicy;
     final supplierMedia = BuyV2SupplierMediaPolicy.admittedAssets(product);
+    if (includeVariantReviewFixtures &&
+        product.canonicalId == 'review-phone-16' &&
+        product.mediaAssets.any(
+          (asset) =>
+              asset.binding?.supplierWorkspaceId == 'review-phone-workspace',
+        ) &&
+        product.hasStructuredVariants &&
+        product.storeId != null) {
+      final storage = product.variantAttributes
+          .where((value) => value.dimensionId == 'storage')
+          .firstOrNull;
+      final bundle = switch (storage?.optionId) {
+        '512' => 'Studio review kit',
+        '256' => 'Extended review kit',
+        _ => 'Basic review kit',
+      };
+      final observed = now();
+      return BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'device-review-variant-content',
+        observedAt: observed,
+        media: supplierMedia,
+        highlightFields: [
+          BuyV2ProductSpecification(
+            attributeId: 'review_bundle',
+            label: 'Review bundle',
+            value: bundle,
+          ),
+        ],
+        specifications: [
+          for (final value in product.variantAttributes)
+            BuyV2ProductSpecification(
+              attributeId: value.dimensionId,
+              label: value.dimensionLabel,
+              value: value.optionLabel,
+              groupLabel: 'Selected configuration',
+            ),
+          BuyV2ProductSpecification(
+            attributeId: 'review_bundle',
+            label: 'Review bundle',
+            value: bundle,
+            groupLabel: 'In the box',
+          ),
+        ],
+        description: switch (storage?.optionId) {
+          '512' =>
+            'Review description: expanded offline-library use case. Synthetic content for interface testing.',
+          '256' =>
+            'Review description: everyday media-library use case. Synthetic content for interface testing.',
+          _ =>
+            'Review description: lightweight everyday use case. Synthetic content for interface testing.',
+        },
+        priceHistory: BuyV2ProductPriceHistory(
+          storeId: product.storeId!,
+          canonicalProductId: product.canonicalId,
+          skuId: product.id,
+          pack: product.pack,
+          variant: product.variant,
+          sourceRevision: 'review-history-20260925',
+          currency: 'INR',
+          previousSellingPriceMinor:
+              (product.price + (storage?.optionId == '512' ? 2000 : 1000)) *
+              100,
+          currentSellingPriceMinor: product.price * 100,
+          previousEffectiveAt: observed.subtract(const Duration(days: 7)),
+          currentEffectiveAt: observed.subtract(const Duration(hours: 1)),
+          validUntil: observed.add(const Duration(hours: 1)),
+        ),
+      );
+    }
     return BuyV2ProductContentSnapshot(
       productId: product.id,
       state: BuyV2ProductContentState.ready,
@@ -1656,13 +3259,25 @@ final class BuyV2CatalogueProductContentAdapter
           : null,
       highlights: [product.variant, product.unitPrice, ?returnDetail],
       specifications: [
-        BuyV2ProductSpecification(label: 'Brand', value: product.brandLabel),
-        BuyV2ProductSpecification(label: 'Pack', value: product.pack),
-        BuyV2ProductSpecification(label: 'Variant', value: product.variant),
+        BuyV2ProductSpecification(
+          attributeId: 'brand',
+          label: 'Brand',
+          value: product.brandLabel,
+        ),
+        BuyV2ProductSpecification(
+          attributeId: 'pack',
+          label: 'Pack',
+          value: product.pack,
+        ),
+        BuyV2ProductSpecification(
+          attributeId: 'variant',
+          label: 'Variant',
+          value: product.variant,
+        ),
       ],
-      description:
-          '${product.title} · ${product.variant}. '
-          '${product.pack} at ${product.unitPrice}.',
+      // A catalogue identity/price summary is not a supplied description.
+      // Leave this absent until the content provider publishes actual copy.
+      description: null,
     );
   }
 }

@@ -8,20 +8,47 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show showBuyV2CatalogueArea;
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_qualified_provider_fixture.dart';
 import 'buy_v2_discovery_refinement_test.dart'
-    show R669BrandCommerce, r669BrandedSession;
+    show R669BrandCommerce, r669BrandedSession, BuyTestEligibilityFacts;
 
-final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
+final class _R669NoRecoveryCommerce implements BuyV2CommerceAdapter {
+  _R669NoRecoveryCommerce(this.delegate);
+  final BuyV2CommerceAdapter delegate;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() => delegate.refresh();
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) => delegate.placeOrder(request);
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) => delegate.reconcileOrder(
+    idempotencyKey: idempotencyKey,
+    paymentReference: paymentReference,
+  );
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected legacy commerce operation');
+}
+
+final class _R669ProcurementCommerce
+    implements BuyV2CommerceAdapter, BuyV2PendingOrderRecoveryAdapter {
   _R669ProcurementCommerce(this.snapshot);
   BuyV2CommerceSnapshot snapshot;
   Completer<BuyV2CommerceSnapshot>? refreshGate;
@@ -30,6 +57,9 @@ final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
   Completer<BuyV2OrderPlacementResult>? reconciliationGate;
   final placements = <BuyV2OrderPlacementRequest>[];
   int reconciliations = 0;
+  final recoveryKeys = <String>[];
+  bool recoveryUnavailable = false;
+  final recoveryStarted = Completer<void>();
   BuyV2OrderPlacementResult placement = const BuyV2OrderPlacementResult(
     outcome: BuyV2OrderPlacementOutcome.paymentPending,
     customerMessage: 'Payment confirmation is pending.',
@@ -51,6 +81,18 @@ final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
     required String paymentReference,
   }) {
     reconciliations++;
+    return reconciliationGate?.future ?? Future.value(placement);
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> recoverOrder({
+    required String idempotencyKey,
+  }) {
+    recoveryKeys.add(idempotencyKey);
+    if (!recoveryStarted.isCompleted) recoveryStarted.complete();
+    if (recoveryUnavailable) {
+      return Future.error(StateError('Recovery unavailable'));
+    }
     return reconciliationGate?.future ?? Future.value(placement);
   }
 
@@ -119,6 +161,9 @@ final class _R669OrderReadyFacts implements BuyV2ProductFactsAdapter {
           .copyWith(
             promisedByLabel: '11 September, 2–4 PM',
             sourceId: 'r669-order-ready-fixture',
+            eligibility: const BuyTestEligibilityFacts()
+                .snapshotFor(product)
+                .eligibility,
           );
 }
 
@@ -134,6 +179,7 @@ BuyV2Session _r669OrderReadySession() {
 }
 
 final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
+  VoidCallback? beforeRead;
   final promises = <BuyV2Destination, (String, String)>{
     BuyV2Destination.shop: ('within 5 min', 'by 6:35 PM'),
     BuyV2Destination.wholesale: ('within 1 day', 'by tomorrow 4:00 PM'),
@@ -149,6 +195,7 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    beforeRead?.call();
     final quote = promises[product.destination];
     return const BuyV2CatalogueProductFactsAdapter()
         .snapshotFor(product)
@@ -160,7 +207,112 @@ final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   }
 }
 
-final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
+class _T04CartBenefits extends BuyV2SeededCartBenefitsAdapter {
+  const _T04CartBenefits();
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) =>
+      kind == BuyV2CartBenefitKind.coupon &&
+          destinations.contains(BuyV2Destination.shop)
+      ? [
+          for (final saving in [5, 7])
+            BuyV2CartBenefit(
+              id: 't04-coupon-$saving',
+              kind: kind,
+              destination: BuyV2Destination.shop,
+              title: 'Test coupon $saving',
+              detail: 'Isolated payment-hold fixture.',
+              sourceId: 't04-test-source',
+              savingAmount: saving,
+            ),
+        ]
+      : const [];
+}
+
+class _T07TimedCoupon extends BuyV2SeededCartBenefitsAdapter {
+  _T07TimedCoupon(this.until);
+  final DateTime until;
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => kind == BuyV2CartBenefitKind.coupon
+      ? [
+          BuyV2CartBenefit(
+            id: 'pending-expiry',
+            kind: kind,
+            destination: BuyV2Destination.shop,
+            title: 'Isolated timed coupon',
+            detail: 'Original amount recovery fixture',
+            sourceId: 't07-expiry-test',
+            savingAmount: 5,
+            validUntil: until,
+          ),
+        ]
+      : const [];
+}
+
+class _T04LiveBenefits extends _T04CartBenefits
+    implements BuyV2LiveCartBenefitsAdapter {
+  Completer<BuyV2CartBenefitsSnapshot>? gate;
+
+  BuyV2CartBenefitsSnapshot get snapshot => BuyV2CartBenefitsSnapshot(
+    state: BuyV2CartBenefitsLoadState.ready,
+    evaluatedAt: DateTime.now(),
+    benefits: benefitsFor(
+      kind: BuyV2CartBenefitKind.coupon,
+      destinations: {BuyV2Destination.shop},
+      itemTotal: 37,
+    ),
+  );
+
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) => gate?.future ?? Future.value(snapshot);
+}
+
+BuyV2CommerceAdapter prepaidCommerceFixture() {
+  final reference = 'TEST-PREPAID-${DateTime.now().microsecondsSinceEpoch}';
+  return _ShopCommerceAdapter(
+      snapshot: BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        products: BuyV2Catalogue.allProducts,
+        paymentMethods: const {'UPI', 'Card'},
+      ),
+      placement: BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+        customerMessage: 'Test payment handoff requested.',
+        paymentReference: reference,
+        paymentActionUri: Uri.https('payments.example.test', '/prepaid'),
+      ),
+    )
+    ..reconciliation = BuyV2OrderPlacementResult(
+      outcome: BuyV2OrderPlacementOutcome.confirmed,
+      customerMessage: 'Test payment receipt confirmed.',
+      purchaseReference: reference,
+    );
+}
+
+const _instructionAddress = BuyV2Address(
+  id: 'instruction-home',
+  kind: BuyV2AddressKind.home,
+  label: 'Home',
+  recipient: 'Aarav Sharma',
+  phone: '9000000000',
+  line: '12, Central Avenue',
+  area: 'Sardarpura, Jodhpur',
+  pinCode: '342003',
+  landmark: 'Near the market',
+);
+
+final class _ShopCommerceAdapter
+    implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   _ShopCommerceAdapter({required this.snapshot, required this.placement});
 
   final BuyV2CommerceSnapshot snapshot;
@@ -173,6 +325,7 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   int orderRefreshCalls = 0;
   Completer<BuyV2OrderRefreshResult>? orderRefreshGate;
   final requests = <BuyV2OrderPlacementRequest>[];
+  Completer<BuyV2OrderPlacementResult>? placementGate;
   BuyV2MutationResult reviewResult = const BuyV2MutationResult(
     accepted: true,
     customerMessage: 'Review added.',
@@ -200,7 +353,7 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   ) async {
     placementCalls += 1;
     requests.add(request);
-    return placement;
+    return placementGate == null ? placement : await placementGate!.future;
   }
 
   @override
@@ -254,6 +407,30 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   }
 
   @override
+  Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request) async {
+    reviewCalls++;
+    final t = request.target;
+    return BuyV2RatingResult(
+      customerMessage: reviewResult.customerMessage,
+      saved: !reviewResult.accepted
+          ? null
+          : BuyV2RatingTarget(
+              id: t.id,
+              ownerScope: t.ownerScope,
+              orderId: t.orderId,
+              orderLineId: t.orderLineId,
+              storeId: t.storeId,
+              productId: t.productId,
+              purchaseLabel: t.purchaseLabel,
+              reviewId: t.reviewId ?? 'server-rating',
+              version: t.version + 1,
+              rating: request.stars,
+              comment: request.comment ?? '',
+            ),
+    );
+  }
+
+  @override
   Future<BuyV2MutationResult> submitProductReview({
     required BuyV2Product product,
     required int rating,
@@ -267,11 +444,14 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
 final class _R669PreferenceWriteState {
   Completer<void>? hold;
   int started = 0;
+  bool failWrites = false;
 }
 
 final class _R669StringPreferences implements SharedPreferencesAsync {
   final Map<String, String> values = {};
   final _writeState = _R669PreferenceWriteState();
+  bool get failWrites => _writeState.failWrites;
+  set failWrites(bool value) => _writeState.failWrites = value;
   Completer<void>? get holdNextWrite => _writeState.hold;
   set holdNextWrite(Completer<void>? value) => _writeState.hold = value;
   int get writesStarted => _writeState.started;
@@ -281,6 +461,7 @@ final class _R669StringPreferences implements SharedPreferencesAsync {
 
   @override
   Future<void> setString(String key, String value) async {
+    if (failWrites) throw StateError('Storage unavailable');
     final hold = holdNextWrite;
     holdNextWrite = null;
     _writeState.started++;
@@ -304,6 +485,7 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
   Completer<void>? pendingWrite;
   int writeCalls = 0;
   bool rejectWrites = false;
+  void Function(BuyV2CustomerStateSnapshot)? onSaved;
 
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async =>
@@ -315,7 +497,42 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
     if (pendingWrite case final pending?) await pending.future;
     if (rejectWrites) return false;
     this.snapshot = snapshot;
+    onSaved?.call(snapshot);
     return true;
+  }
+}
+
+final class _AssignedDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
+  final Map<String, String> providers = {};
+  final Map<String, String> services = {};
+  String timing = 'Tomorrow, 10 am to 12 pm';
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final now = DateTime.now();
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          deliveryPromise: timing,
+          promisedByLabel: timing,
+          deliveryProviderName: providers[product.id] ?? 'Local delivery',
+          deliveryServiceLevel: services[product.id] ?? 'Scheduled delivery',
+          sourceId: 'assigned-delivery-fixture',
+          eligibility: BuyV2OfferEligibility(
+            productId: product.id,
+            storeId: product.storeId!,
+            sourceRevision: 'fixture-r1',
+            customerLocationKey: '||0',
+            observedAt: now.subtract(const Duration(seconds: 1)),
+            expiresAt: now.add(const Duration(hours: 1)),
+            offerClass: BuyV2OfferClass.retail,
+            channelEnabled: true,
+            storeReady: true,
+            fleetAvailable: true,
+            customerLocationConfirmed: true,
+            options: {BuyV2DeliveryOption.quick},
+          ),
+        );
   }
 }
 
@@ -357,9 +574,9 @@ _openProductionCheckout({
   BuyV2BusinessVerificationState businessVerificationState =
       BuyV2BusinessVerificationState.unavailable,
 }) async {
-  final product = BuyV2Catalogue.products.firstWhere(
-    (candidate) => candidate.destination == BuyV2Destination.shop,
-  );
+  final product = BuyV2Catalogue.products
+      .firstWhere((candidate) => candidate.destination == BuyV2Destination.shop)
+      .copyWith(storeId: 'test-checkout-store');
   const address = BuyV2Address(
     id: 'server-home',
     kind: BuyV2AddressKind.home,
@@ -381,6 +598,9 @@ _openProductionCheckout({
     partnerType: product.partnerRole,
     promise: product.deliveryPromise,
     destinationLabel: address.shortLine,
+    recipient: address.recipient,
+    addressLine: address.line,
+    amountPaidNow: product.price,
     progress: .2,
     status: BuyV2OrderStatus.preparing,
     purchaseId: 'BUY-SERVER-1',
@@ -421,15 +641,36 @@ _openProductionCheckout({
       businessVerificationState: businessVerificationState,
       productReportsAvailable: productReportsAvailable,
       reviewableProductIds: productReviewAvailable ? {product.id} : const {},
+      ratingTargets: productReviewAvailable
+          ? [
+              BuyV2RatingTarget(
+                id: 'delivered-rating',
+                ownerScope:
+                    customerStateStore?.ownerScope ?? 'review-fixture-buyer',
+                orderId: 'prior-delivered-order',
+                orderLineId: 'delivered-line',
+                storeId: product.storeId!,
+                productId: product.id,
+                purchaseLabel: 'Delivered purchase',
+              ),
+            ]
+          : [],
     ),
     placement: placement,
   );
   final session = BuyV2Session(
     core: BuySession(),
-    productFactsAdapter:
-        factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    productFactsAdapter: BuyTestEligibilityFacts(
+      delegate: factsAdapter ?? const BuyV2CatalogueProductFactsAdapter(),
+    ),
     commerceAdapter: adapter,
-    customerStateStore: customerStateStore,
+    customerStateStore:
+        customerStateStore ??
+        _MemoryCustomerStateStore(
+          productReviewAvailable
+              ? 'review-fixture-buyer'
+              : 'checkout-fixture-buyer',
+        ),
     reviewDataEnabled: false,
   );
   await session.restoreCommerce();
@@ -571,7 +812,8 @@ class _CollectionPurchaseHarness
     implements
         BuyV2CollectionCheckoutGateway,
         BuyV2CollectionPurchaseStore,
-        ScanPickGateway {
+        ScanPickGateway,
+        BuyV2PurchaseOrderAdapter {
   final identity = ValueNotifier<BuyV2CollectionIdentity?>(
     const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'session-a'),
   );
@@ -584,17 +826,141 @@ class _CollectionPurchaseHarness
   bool wrongOperation = false;
   String paidOrderId = 'order-a';
   String quoteFault = '';
+  String legacyCollection = 'enabled';
+  bool collectionAddressAvailable = true;
   BuyV2CollectionPurchaseState outcome = BuyV2CollectionPurchaseState.paid;
   Completer<bool>? reservationGate;
   Completer<void>? placementGate;
   Future<bool>? _reservation;
   void Function(Map<String, Object?>)? mutateSnapshot;
 
+  List<BuyV2CartLine> poLines = const [];
+  BuyV2StoreListing? poStore;
+  BuyV2Address? poAddress;
+  BuyV2PurchaseOrderState poState = BuyV2PurchaseOrderState.draft;
+  int poIssues = 0;
+  String poResponseRequestId = 'collection-po-request';
+  String poResponseRevision = 'po-revision-1';
+  bool poRefreshUnavailable = false;
+  final approvedPoDocuments = <String>[];
+  final poSupplierStates = <String, BuyV2PurchaseOrderState>{};
+  BuyV2PurchaseOrderReview poSnapshot() {
+    final groups = <String, List<BuyV2CartLine>>{};
+    for (final line in poLines) {
+      groups.putIfAbsent(line.product.storeId!, () => []).add(line);
+    }
+    return BuyV2PurchaseOrderReview(
+      requestId: poResponseRequestId,
+      revision: poResponseRevision,
+      buyerAccountId: identity.value!.accountId,
+      buyerName: 'Buyer A',
+      address: poAddress,
+      collectionStore: poStore,
+      validUntil: clock.add(const Duration(minutes: 10)),
+      documents: [
+        for (final group in groups.entries)
+          (() {
+            final state = poSupplierStates[group.key] ?? poState;
+            final subtotal = group.value.fold<int>(
+              0,
+              (sum, line) => sum + line.total * 100,
+            );
+            return BuyV2PurchaseOrderDocument(
+              id: poStore != null
+                  ? 'collection-po-document'
+                  : 'po-${group.key}',
+              revision: 'terms-1',
+              supplierStoreId: group.key,
+              supplierName: poStore?.name ?? group.value.first.product.seller,
+              state: state,
+              reference: state == BuyV2PurchaseOrderState.draft
+                  ? null
+                  : poStore != null
+                  ? 'PO-COLLECTION'
+                  : 'PO-${group.key}',
+              decisionMessage:
+                  state == BuyV2PurchaseOrderState.revised ||
+                      state == BuyV2PurchaseOrderState.rejected
+                  ? 'Supplier terms changed'
+                  : null,
+              lines: [
+                for (final line in group.value)
+                  BuyV2PurchaseOrderLine(
+                    productId: line.product.id,
+                    variant: line.product.variant,
+                    pack: line.product.pack,
+                    quantity: line.quantity,
+                    unitPriceMinor: line.product.price * 100,
+                  ),
+              ],
+              itemSubtotalMinor: subtotal,
+              chargesMinor: 0,
+              totalMinor: subtotal,
+              terms: poStore != null
+                  ? 'Collect after confirmed payment'
+                  : 'Deliver after confirmed payment',
+            );
+          })(),
+      ],
+    );
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  }) async {
+    poLines = List.unmodifiable(lines);
+    poAddress = address;
+    poStore = collectionStore;
+    return poSnapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  }) async {
+    expect(requestId, 'collection-po-request');
+    expect(expectedRevision, 'po-revision-1');
+    poIssues++;
+    poState = BuyV2PurchaseOrderState.awaitingSupplier;
+    return poSnapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId}) async {
+    if (poRefreshUnavailable) throw StateError('Provider unavailable');
+    return poSnapshot();
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  }) async {
+    final review = poSnapshot();
+    expect(requestId, review.requestId);
+    expect(expectedRevision, review.revision);
+    final document = review.documents.singleWhere(
+      (doc) => doc.id == documentId,
+    );
+    expect(documentRevision, document.revision);
+    expect(document.state, BuyV2PurchaseOrderState.revised);
+    approvedPoDocuments.add(documentId);
+    poSupplierStates[document.supplierStoreId] =
+        BuyV2PurchaseOrderState.accepted;
+    return poSnapshot();
+  }
+
   BuyV2CollectionBasket basket({
     int quantity = 1,
     String storeId = 'store-a',
     String? sku,
-    String payment = 'PhonePe',
+    String payment = 'UPI',
   }) {
     final product = BuyV2Catalogue.allProducts
         .firstWhere((p) => p.destination == BuyV2Destination.shop)
@@ -622,27 +988,34 @@ class _CollectionPurchaseHarness
           _ => '12 Market Road',
         },
         regionId: 'jodhpur',
-        collection: BuyV2StoreCollectionCapability(
-          storeId: storeId,
-          supportsCollection: true,
-          sourceId: 'store-capability',
-          observedAt: clock.subtract(const Duration(minutes: 1)),
-          validUntil: clock.add(const Duration(minutes: 15)),
-        ),
+        collection: legacyCollection == 'missing'
+            ? null
+            : BuyV2StoreCollectionCapability(
+                storeId: storeId,
+                supportsCollection: legacyCollection != 'disabled',
+                sourceId: 'store-capability',
+                observedAt: clock.subtract(const Duration(minutes: 1)),
+                validUntil: legacyCollection == 'expired'
+                    ? clock.subtract(const Duration(seconds: 1))
+                    : clock.add(const Duration(minutes: 15)),
+              ),
       ),
       lines: [BuyV2CartLine(product: product, quantity: quantity)],
     );
   }
 
-  BuyV2CollectionCheckoutController controller({Duration? timeout}) =>
-      BuyV2CollectionCheckoutController(
-        identity: identity,
-        gateway: this,
-        pendingStore: this,
-        collectionGateway: this,
-        now: () => clock,
-        timeout: timeout ?? const Duration(seconds: 15),
-      );
+  BuyV2CollectionCheckoutController controller({
+    Duration? timeout,
+    bool Function(BuyV2CollectionPurchaseIntent)? canSubmitPayment,
+  }) => BuyV2CollectionCheckoutController(
+    identity: identity,
+    gateway: this,
+    pendingStore: this,
+    collectionGateway: this,
+    now: () => clock,
+    canSubmitPayment: canSubmitPayment,
+    timeout: timeout ?? const Duration(seconds: 15),
+  );
 
   @override
   Future<BuyV2CollectionCheckoutQuote> quote(
@@ -863,7 +1236,18 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
     return BuyV2CataloguePage(
       queryKey: query.key,
       snapshotId: 'checkout-stores',
-      items: ids.map((id) => harness.basket(storeId: id).store),
+      items: ids.map((id) {
+        final store = harness.basket(storeId: id).store;
+        if (harness.collectionAddressAvailable) return store;
+        return BuyV2StoreListing(
+          id: store.id,
+          name: store.name,
+          area: store.area,
+          address: '',
+          regionId: store.regionId,
+          collection: store.collection,
+        );
+      }),
       startIndex: 0,
       totalCount: ids.length,
     );
@@ -950,6 +1334,7 @@ Future<BuyV2Session> _openOrderSearchFixture({
 final class _R669ShoppingAreas implements BuyV2ShoppingAreaSource {
   List<BuyV2ShoppingArea> areas = [];
   Object? failure;
+  Completer<BuyV2ShoppingArea?>? pendingLocation;
   final queries = <String>[];
   final pending = <String, Completer<List<BuyV2ShoppingArea>>>{};
   @override
@@ -962,7 +1347,9 @@ final class _R669ShoppingAreas implements BuyV2ShoppingAreaSource {
   @override
   Future<BuyV2ShoppingArea?> locate() async {
     if (failure case final error?) throw error;
-    return areas.firstOrNull;
+    return pendingLocation == null
+        ? areas.firstOrNull
+        : await pendingLocation!.future;
   }
 
   @override
@@ -1197,18 +1584,97 @@ void r669ShoppingAreaTests() {
     );
     for (final size in [const Size(320, 568), const Size(568, 320)]) {
       for (final scale in [1.0, 2.0]) {
-        testWidgets('area failure visible without scrolling $size $scale', (
-          tester,
-        ) async {
+        testWidgets(
+          'area failure and retry remain reachable with insets $size $scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final session = makeSession(null);
+            final originalRegion = session.catalogueRegionId;
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (_, child) => r66VisualCaptureRoot(child!),
+                home: Scaffold(
+                  body: Builder(
+                    builder: (context) => TextButton(
+                      onPressed: () => showBuyV2CatalogueArea(context, session),
+                      child: const Text('Choose shopping area'),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.tap(find.text('Choose shopping area'));
+            await tester.pumpAndSettle();
+            final failure = find.byKey(
+              const ValueKey('buy-area-lookup-failure'),
+            );
+            final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+            final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
+            final scroll = find
+                .descendant(of: list, matching: find.byType(Scrollable))
+                .first;
+            expect(
+              find.byKey(const ValueKey('buy-catalogue-area-search')),
+              findsNothing,
+            );
+            for (final inset in [0.0, 120.0]) {
+              tester.view.viewInsets = FakeViewPadding(bottom: inset);
+              await tester.pumpAndSettle();
+              await tester.scrollUntilVisible(failure, 80, scrollable: scroll);
+              await Scrollable.ensureVisible(
+                tester.element(failure),
+                alignment: .4,
+              );
+              await tester.pumpAndSettle();
+              expect(failure.hitTestable(), findsOneWidget);
+              await tester.scrollUntilVisible(retry, 80, scrollable: scroll);
+              await tester.pumpAndSettle();
+              expect(retry.hitTestable(), findsOneWidget);
+              expect(
+                tester.getRect(retry).bottom,
+                lessThanOrEqualTo(size.height - inset),
+              );
+              await captureR66Visual(
+                tester,
+                'r669-area-failure-${size.width}-$scale-$inset',
+              );
+              await tester.tap(retry);
+              await tester.pumpAndSettle();
+              expect(failure, findsOneWidget);
+              expect(session.catalogueRegionId, originalRegion);
+            }
+            tester.view.viewInsets = const FakeViewPadding();
+            await tester.pumpAndSettle();
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(find.text('Shopping area'), findsNothing);
+            expect(session.catalogueRegionId, originalRegion);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'current location inset retry confirmation and late Back $scale',
+        (tester) async {
           tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = size;
+          tester.view.physicalSize = const Size(320, 568);
           tester.platformDispatcher.textScaleFactorTestValue = scale;
           addTearDown(tester.view.reset);
           addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          final session = makeSession(null);
-          final originalRegion = session.catalogueRegionId;
+          final source = _R669ShoppingAreas()..areas = [area];
+          final session = makeSession(source);
           await tester.pumpWidget(
             MaterialApp(
+              debugShowCheckedModeBanner: false,
               theme: MoolTheme.light(),
               builder: (_, child) => r66VisualCaptureRoot(child!),
               home: Scaffold(
@@ -1223,189 +1689,78 @@ void r669ShoppingAreaTests() {
           );
           await tester.tap(find.text('Choose shopping area'));
           await tester.pumpAndSettle();
-          final locate = find.byKey(
-            const ValueKey('buy-catalogue-current-area'),
+          expect(source.queries, isEmpty);
+          expect(
+            find.byKey(const ValueKey('buy-catalogue-area-search')),
+            findsNothing,
           );
-          await tester.ensureVisible(locate);
-          await tester.tap(locate);
-          await tester.pumpAndSettle();
-          final failure = find.byKey(const ValueKey('buy-area-lookup-failure'));
+          final result = find.byKey(
+            const ValueKey('buy-current-location-result'),
+          );
+          final confirm = find.byKey(
+            const ValueKey('buy-current-location-confirm'),
+          );
           final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
-          final visible = tester.getRect(list);
-          final message = tester.getRect(failure);
-          expect(message.top, greaterThanOrEqualTo(visible.top));
-          expect(message.bottom, lessThanOrEqualTo(visible.bottom));
-          final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
-          expect(retry.hitTestable(), findsOneWidget);
-          await captureR66Visual(
-            tester,
-            'r669-area-failure-${size.width.toInt()}-$scale',
-          );
-          await tester.tap(retry);
-          await tester.pumpAndSettle();
-          expect(failure.hitTestable(), findsOneWidget);
-          expect(session.catalogueRegionId, originalRegion);
-          final search = find.byKey(
-            const ValueKey('buy-catalogue-area-search'),
-          );
-          await tester.ensureVisible(search);
-          await tester.enterText(search, '221005');
-          tester.view.viewInsets = const FakeViewPadding(bottom: 120);
-          await tester.pump(const Duration(milliseconds: 400));
-          await tester.pumpAndSettle();
-          final keyboardViewport = tester.getRect(list);
-          final keyboardMessage = tester.getRect(failure);
+          Future<void> reveal(Finder target) async {
+            await tester.scrollUntilVisible(
+              target,
+              100,
+              scrollable: find
+                  .descendant(of: list, matching: find.byType(Scrollable))
+                  .first,
+            );
+            await Scrollable.ensureVisible(
+              tester.element(target),
+              alignment: .4,
+            );
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+          }
+
+          expect(result, findsOneWidget);
           expect(
-            keyboardMessage.top,
-            greaterThanOrEqualTo(keyboardViewport.top),
+            find.descendant(of: result, matching: find.text(area.label)),
+            findsOneWidget,
           );
           expect(
-            keyboardMessage.bottom,
-            lessThanOrEqualTo(keyboardViewport.bottom),
+            find.byKey(const ValueKey('buy-current-location-map')),
+            findsOneWidget,
           );
-          expect(retry.hitTestable(), findsOneWidget);
-          await captureR66Visual(
-            tester,
-            'r669-area-failure-keyboard-${size.width.toInt()}-$scale',
-          );
-          await tester.scrollUntilVisible(
-            search,
-            100,
-            scrollable: find
-                .descendant(of: list, matching: find.byType(Scrollable))
-                .first,
-          );
+          tester.view.viewInsets = const FakeViewPadding(bottom: 230);
           await tester.pumpAndSettle();
-          expect(find.text('221005'), findsOneWidget);
+          await reveal(confirm);
+          expect(tester.getRect(confirm).bottom, lessThanOrEqualTo(568 - 230));
+          await captureR66Visual(tester, 'r669-current-location-inset-$scale');
+          await tester.tap(confirm);
           tester.view.viewInsets = const FakeViewPadding();
           await tester.pumpAndSettle();
+          expect(session.catalogueRegionId, area.regionId);
+          expect(list, findsNothing);
+          source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
+          await tester.tap(find.text('Choose shopping area'));
+          await tester.pumpAndSettle();
+          final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+          await reveal(retry);
+          expect(session.catalogueRegionId, area.regionId);
+          source.failure = null;
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(result, findsOneWidget);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(find.text('Shopping area'), findsNothing);
-          expect(session.catalogueRegionId, originalRegion);
-          expect(tester.takeException(), isNull);
-        });
-      }
-    }
-    for (final scale in [1.0, 2.0]) {
-      testWidgets('sheet search keyboard retry selection and Back $scale', (
-        tester,
-      ) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 568);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final source = _R669ShoppingAreas()..areas = [area];
-        final session = makeSession(source);
-        await tester.pumpWidget(
-          MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: MoolTheme.light(),
-            builder: (_, child) => r66VisualCaptureRoot(child!),
-            home: Scaffold(
-              body: Builder(
-                builder: (context) => TextButton(
-                  onPressed: () => showBuyV2CatalogueArea(context, session),
-                  child: const Text('Choose shopping area'),
-                ),
-              ),
-            ),
-          ),
-        );
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        final search = find.byKey(const ValueKey('buy-catalogue-area-search'));
-        await tester.enterText(search, '221005');
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.pumpAndSettle();
-        expect(source.queries, ['221005']);
-        await captureR66Visual(tester, 'r669-location-search-$scale');
-        await tester.scrollUntilVisible(
-          find.text('Google Maps'),
-          140,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('Google Maps'), findsOneWidget);
-        final result = find.byKey(
-          ValueKey('buy-google-area-${area.googlePlaceId}'),
-        );
-        Future<void> revealResult() async {
-          final scrollable = find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first;
-          await tester.scrollUntilVisible(
-            find.text('Shopping area'),
-            -180,
-            scrollable: scrollable,
-          );
-          await tester.scrollUntilVisible(result, 100, scrollable: scrollable);
+          source.pendingLocation = Completer<BuyV2ShoppingArea?>();
+          await tester.tap(find.text('Choose shopping area'));
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(find.text('Finding your current location...'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pump(const Duration(milliseconds: 500));
+          source.pendingLocation!.complete(area);
           await tester.pumpAndSettle();
-        }
-
-        tester.view.viewInsets = const FakeViewPadding(bottom: 230);
-        await tester.pumpAndSettle();
-        await revealResult();
-        expect(tester.takeException(), isNull);
-        await captureR66Visual(tester, 'r669-location-keyboard-$scale');
-        tester.view.viewInsets = const FakeViewPadding();
-        await tester.pumpAndSettle();
-        await revealResult();
-        await tester.tap(result);
-        await tester.pumpAndSettle();
-        expect(session.catalogueRegionId, area.regionId);
-        expect(find.text('Shopping area'), findsNothing);
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
-        final locate = find.byKey(const ValueKey('buy-catalogue-current-area'));
-        await tester.ensureVisible(locate);
-        await tester.tap(locate);
-        await tester.pumpAndSettle();
-        final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
-        await tester.ensureVisible(retry);
-        await tester.pumpAndSettle();
-        await captureR66Visual(tester, 'r669-location-permission-$scale');
-        expect(session.catalogueRegionId, area.regionId);
-        source.failure = null;
-        await tester.tap(retry);
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.text('Google Maps'),
-          120,
-          scrollable: find
-              .descendant(
-                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
-        expect(find.text('Google Maps'), findsOneWidget);
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(session.catalogueRegionId, area.regionId);
-        source.pending['700001'] = Completer<List<BuyV2ShoppingArea>>();
-        await tester.tap(find.text('Choose shopping area'));
-        await tester.pumpAndSettle();
-        await tester.enterText(search, '700001');
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.binding.handlePopRoute();
-        await tester.pump(const Duration(milliseconds: 500));
-        source.pending['700001']!.complete([area]);
-        await tester.pumpAndSettle();
-        expect(find.text('Shopping area'), findsNothing);
-        expect(session.catalogueRegionId, area.regionId);
-        expect(tester.takeException(), isNull);
-      });
+          expect(list, findsNothing);
+          expect(session.catalogueRegionId, area.regionId);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   });
 }
@@ -1678,49 +2033,3707 @@ void r669SharedProductTests() {
 }
 
 void main() {
-  test('R669 review draft codec relaunch keeps cart and isolates customer', () async {
-    final preferences = _R669StringPreferences();
-    BuyV2Session make(String owner) {
+  Future<(BuyV2Session, TestLegacyRecoveryCommerce, _MemoryCustomerStateStore)>
+  legacyRecoveryFixture({
+    bool manualDispose = false,
+    ValueNotifier<BuyV2CollectionIdentity?>? identity,
+  }) async {
+    final core = BuySession();
+    final commerce = TestLegacyRecoveryCommerce()
+      ..snapshot = testPaymentSnapshot(
+        null,
+        addresses: const [_instructionAddress],
+      );
+    final store = _MemoryCustomerStateStore('test-t07-buyer');
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      customerStateStore: store,
+      collectionIdentity: identity,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      checkoutQuoteAdapter: TestPaymentQuote(),
+    );
+    if (!manualDispose) {
+      addTearDown(session.dispose);
+    }
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+    session.openCart();
+    expect(session.openCheckout(), isTrue, reason: session.notice);
+    await session.refreshCheckoutQuote();
+    return (session, commerce, store);
+  }
+
+  BuyV2OrderPlacementResult legacyResult(
+    BuyV2OrderPlacementRequest request, {
+    BuyV2OrderPlacementOutcome outcome = BuyV2OrderPlacementOutcome.confirmed,
+    bool retryAllowed = false,
+  }) => testGroupedPlacement(
+    request,
+    outcome: outcome,
+    retryAllowed: retryAllowed,
+    reference: 'test-legacy-${request.idempotencyKey}',
+  );
+
+  test('T07 pending expiry preserves submitted amount', () async {
+    var now = DateTime.now();
+    final core = BuySession();
+    final commerce = TestLegacyRecoveryCommerce()
+      ..snapshot = testPaymentSnapshot(
+        null,
+        addresses: const [_instructionAddress],
+      );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      cartBenefitsAdapter: _T07TimedCoupon(now.add(const Duration(minutes: 1))),
+      catalogueNow: () => now,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    expect(
+      session.chooseCartBenefit(
+        session.cartBenefits(kind: BuyV2CartBenefitKind.coupon).single,
+      ),
+      isTrue,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests.single.total, 32);
+    now = now.add(const Duration(minutes: 2));
+    expect(session.checkoutPayableTotal, 32);
+    expect(session.checkoutAmountDueNow, 32);
+    expect(session.checkoutPaymentActionAmount, 32);
+    expect(session.legacyCheckoutAttempt!.payment.request.total, 32);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, hasLength(1));
+  });
+
+  test('T07 freezes complete request before delayed durable write', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    session.setCustomDeliveryInstruction(
+      destination: BuyV2Destination.shop,
+      text: 'Call on arrival',
+    );
+    await Future<void>.delayed(Duration.zero);
+    store.pendingWrite = Completer<void>();
+    final pending = session.submitOrder();
+    for (var i = 0; i < 50 && session.legacyCheckoutAttempt == null; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    final original = session.legacyCheckoutAttempt!.payment.request;
+    expect(commerce.requests, isEmpty);
+    expect(session.checkoutBusy, isTrue);
+    expect(await session.submitOrder(), isFalse);
+    session.selectedPayment = 'Card';
+    expect(session.chooseAddress(_instructionAddress.id), isFalse);
+    store.pendingWrite!.complete();
+    expect(await pending, isFalse);
+    expect(commerce.requests.single, same(original));
+    expect(commerce.requests.single.paymentMethod, 'UPI');
+    expect(
+      commerce.requests.single.deliveryInstructionsByProductId['s-tomato'],
+      'Call on arrival',
+    );
+    expect(original.checkoutAttemptId, isNull);
+    expect(original.paymentGroupId, isNull);
+  });
+
+  test('T07 failed initial storage prevents placement', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    store.rejectWrites = true;
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+    expect(session.legacyCheckoutAttempt, isNull);
+    expect(session.quantityFor('s-tomato'), 1);
+    expect(session.checkoutRequiresResolution, isFalse);
+  });
+
+  for (final outcome in [
+    BuyV2OrderPlacementOutcome.failed,
+    BuyV2OrderPlacementOutcome.cancelled,
+    BuyV2OrderPlacementOutcome.unavailable,
+  ]) {
+    test('T07 submitted $outcome never authorizes a fresh payment', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) =>
+          legacyResult(request, outcome: outcome, retryAllowed: true);
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(session.quantityFor('s-tomato'), 1);
+    });
+  }
+
+  test('T07 local exit and handoff failure retain original payment', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    commerce.onPlace = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+    );
+    await session.submitOrder();
+    final key = commerce.requests.single.idempotencyKey;
+    expect(await session.continuePayment((_) async => false), isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(store.snapshot!.checkoutIdempotencyKey, key);
+    commerce.onReconcile = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+    );
+    await session.reconcilePayment();
+    expect(session.cancelPaymentAttempt(), isTrue);
+    expect(store.snapshot!.checkoutIdempotencyKey, key);
+    commerce.onReconcile = legacyResult;
+    expect(await session.reconcilePayment(), isTrue);
+    expect(commerce.reconciledKeys, [key, key]);
+    expect(commerce.requests, hasLength(1));
+    expect(session.orders, hasLength(1));
+    expect(session.quantityFor('s-tomato'), 0);
+  });
+
+  test(
+    'T07 trusted original financial closure is saved before choosing again',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final key = commerce.requests.single.idempotencyKey;
+      commerce.onReconcile = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.checkoutRequiresResolution, isFalse);
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .financiallyClosed,
+        isTrue,
+      );
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .request
+            .idempotencyKey,
+        key,
+      );
+      expect(session.retryCheckoutPayment(), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(2));
+      expect(commerce.requests.last.idempotencyKey, isNot(key));
+    },
+  );
+
+  test('T07 financial closure write failure keeps the original hold', () async {
+    final (session, commerce, store) = await legacyRecoveryFixture();
+    await session.submitOrder();
+    final key = commerce.requests.single.idempotencyKey;
+    store.rejectWrites = true;
+    commerce.onReconcile = (request) => legacyResult(
+      request,
+      outcome: BuyV2OrderPlacementOutcome.cancelled,
+      retryAllowed: true,
+    );
+    await session.reconcilePayment();
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(session.legacyCheckoutAttempt!.payment.request.idempotencyKey, key);
+    expect(session.retryCheckoutPayment(), isFalse);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, hasLength(1));
+    expect(store.snapshot!.retainedLegacyCheckoutAttempts, isEmpty);
+  });
+
+  for (final mismatch in ['key', 'missing permission', 'orders']) {
+    test('T07 rejects financial retry authorization with $mismatch', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      commerce.onReconcile = (request) => BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        customerMessage: 'Isolated closure response',
+        idempotencyKey: mismatch == 'key'
+            ? 'other-attempt'
+            : request.idempotencyKey,
+        retryAllowed: mismatch != 'missing permission',
+        orders: mismatch == 'orders' ? legacyResult(request).orders : const [],
+      );
+      await session.reconcilePayment();
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+    });
+  }
+
+  test(
+    'T07 confirmation save failure preserves Cart then reconciles once',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) {
+        store.rejectWrites = true;
+        return legacyResult(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      store.rejectWrites = false;
+      commerce.onReconcile = legacyResult;
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .payment
+            .confirmedOrderIds,
+        hasLength(1),
+      );
+    },
+  );
+
+  for (final mismatch in ['quantity', 'supplier', 'price', 'amount']) {
+    test('T07 frozen confirmation rejects mismatched $mismatch', () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      commerce.onPlace = (request) {
+        final line = request.lines.single;
+        final changed = BuyV2OrderPlacementRequest(
+          lines: [
+            line.copyWith(
+              quantity: mismatch == 'quantity' ? line.quantity + 1 : null,
+              product: line.product.copyWith(
+                storeId: mismatch == 'supplier'
+                    ? 'other-store'
+                    : line.product.storeId,
+                price: mismatch == 'price'
+                    ? line.product.price + 1
+                    : line.product.price,
+              ),
+            ),
+          ],
+          address: request.address,
+          paymentMethod: request.paymentMethod,
+          total: request.total + (mismatch == 'amount' ? 1 : 0),
+          amountDueNow: request.amountDueNow,
+          idempotencyKey: request.idempotencyKey,
+        );
+        return legacyResult(changed);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.orders, isEmpty);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.retryCheckoutPayment(), isFalse);
+    });
+  }
+
+  test(
+    'T07 catalogue replacement cannot change the submitted item or amount',
+    () async {
+      final (session, commerce, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final original = commerce.requests.single;
+      commerce.snapshot = BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        products: [
+          for (final product in testPaymentProducts)
+            if (product.id != 's-tomato') product,
+        ],
+        paymentMethods: const {'UPI', 'Card'},
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+      );
+      await session.restoreCommerce();
+      expect(
+        session.checkoutLines.single.product.price,
+        original.lines.single.product.price,
+      );
+      expect(session.checkoutAmountDueNow, original.amountDueNow);
+      commerce.onReconcile = legacyResult;
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders.single.lines.single.product.id, 's-tomato');
+    },
+  );
+
+  test(
+    'T07 key-only historical recovery never substitutes current Cart agreement',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final original = BuyV2CustomerStateSnapshot(
+        cartQuantities: {'s-tomato': 1},
+        checkoutIdempotencyKey: 'original-old-key',
+        checkoutSubmissionState: 'paymentPending',
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+      );
       final core = BuySession();
-      final session = BuyV2Session(core: core, customerStateStore:
-        BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner));
+      addTearDown(core.dispose);
+      store.snapshot = original;
+      final restored = BuyV2Session(
+        core: core,
+        customerStateStore: store,
+        commerceAdapter: commerce,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRecoveryAmountKnown, isFalse);
+      expect(restored.checkoutRequiresResolution, isTrue);
+      expect(await restored.reconcilePayment(), isFalse);
+      expect(commerce.recoveredKeys, ['original-old-key']);
+      expect(commerce.requests, isEmpty);
+      expect(restored.quantityFor('s-tomato'), 1);
+      expect(restored.orders, isEmpty);
+      expect(restored.retryCheckoutPayment(), isFalse);
+      expect(session.orders, isEmpty);
+    },
+  );
+
+  test(
+    'T07 malformed retained attempt keeps original key and recovery hold',
+    () async {
+      final (_, commerce, memory) = await legacyRecoveryFixture();
+      final first = (await legacyRecoveryFixture()).$1;
+      await first.submitOrder();
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: 'test-t07-buyer',
+      );
+      final payment = first.legacyCheckoutAttempt!;
+      await store.write(
+        BuyV2CustomerStateSnapshot(
+          cartQuantities: {'s-tomato': 1},
+          checkoutIdempotencyKey: payment.payment.request.idempotencyKey,
+          legacyCheckoutAttempt: payment,
+          checkoutSubmissionState: 'paymentPending',
+        ),
+      );
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      encoded['legacyCheckoutAttempt']['payment']['request']['total'] =
+          'invalid';
+      preferences.values[key] = jsonEncode(encoded);
+      memory.snapshot = await store.read();
+      expect(memory.snapshot!.paymentRecoveryIncomplete, isTrue);
+      expect(
+        memory.snapshot!.checkoutIdempotencyKey,
+        payment.payment.request.idempotencyKey,
+      );
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final restored = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        customerStateStore: memory,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRecoveryBlocked, isTrue);
+      expect(restored.checkoutRecoveryAmountKnown, isFalse);
+      expect(await restored.submitOrder(), isFalse);
+      expect(commerce.requests, isEmpty);
+    },
+  );
+
+  test(
+    'T07 released earlier settlement never overwrites a newer payment',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final earlier = commerce.requests.single;
+      expect(await pending, isFalse);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      commerce.onReconcile = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.retryCheckoutPayment(), isTrue);
+      commerce.onPlace = (request) => legacyResult(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      );
+      await session.submitOrder();
+      final newer = commerce.requests.last;
+      response.complete(legacyResult(earlier));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      expect(
+        session.legacyCheckoutAttempt!.payment.request.idempotencyKey,
+        newer.idempotencyKey,
+      );
+      expect(session.checkoutRecoveryBlocked, isTrue);
+      expect(session.orders, isEmpty);
+      expect(
+        store
+            .snapshot!
+            .retainedLegacyCheckoutAttempts
+            .single
+            .lateSettlementNeedsReview,
+        isTrue,
+      );
+      expect(commerce.requests, hasLength(2));
+    },
+  );
+
+  test(
+    'T07 original bank and supplier request facts survive cold retention',
+    () async {
+      final (session, _, _) = await legacyRecoveryFixture();
+      await session.submitOrder();
+      final original = session.legacyCheckoutAttempt!.payment;
+      final context = BuyV2ProcurementContext(
+        accountId: 'test-buyer',
+        storeId: 'test-store',
+        purpose: BuyV2ProcurementPurpose.values.first,
+        originOperationId: 'test-operation',
+      );
+      final owner = context.customerStateOwnerScope;
+      final request = BuyV2OrderPlacementRequest(
+        lines: original.request.lines,
+        address: original.request.address,
+        paymentMethod: 'Bank transfer',
+        total: original.request.total,
+        amountDueNow: original.request.amountDueNow,
+        idempotencyKey: original.request.idempotencyKey,
+        commercialPaymentTermIds: const {'original-supplier': 'original-term'},
+        deliveryInstructionsByProductId: const {'s-tomato': 'Receiving desk'},
+        purchaseOrderRequestId: 'original-po',
+        purchaseOrderRevision: 'original-revision',
+        procurementContext: context,
+      );
+      const bank = BuyV2BankTransferInstructions(
+        beneficiaryName: 'Isolated merchant',
+        bankName: 'Test bank',
+        accountNumber: '000012345678',
+        ifsc: 'TEST0000001',
+        transferReference: 'original-bank-reference',
+      );
+      final retained = BuyV2LegacyCheckoutAttempt(
+        ownerScope: owner,
+        purchaseOrderAccountId: 'test-buyer',
+        payment: BuyV2CheckoutGroupAttempt(
+          request: request,
+          fulfilmentKeys: original.fulfilmentKeys,
+          obligations: original.obligations,
+          state: BuyV2CheckoutSubmissionState.submitting,
+          paymentReference: 'original-bank-reference',
+          bankTransferInstructions: bank,
+        ),
+      );
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: owner,
+      );
+      expect(
+        await store.write(
+          BuyV2CustomerStateSnapshot(
+            cartQuantities: {'s-tomato': 1},
+            legacyCheckoutAttempt: retained,
+            checkoutIdempotencyKey: request.idempotencyKey,
+            paymentReference: 'original-bank-reference',
+            bankTransferInstructions: bank,
+            checkoutSubmissionState: 'submitting',
+          ),
+        ),
+        isTrue,
+      );
+      final read = (await store.read())!;
+      final restored = read.legacyCheckoutAttempt!;
+      expect(
+        read.bankTransferInstructions!.transferReference,
+        'original-bank-reference',
+      );
+      expect(
+        restored.payment.state,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      expect(
+        restored.payment.bankTransferInstructions!.accountNumber,
+        bank.accountNumber,
+      );
+      expect(restored.payment.request.purchaseOrderRequestId, 'original-po');
+      expect(
+        restored.payment.request.purchaseOrderRevision,
+        'original-revision',
+      );
+      expect(restored.purchaseOrderAccountId, 'test-buyer');
+      expect(
+        restored.payment.request.procurementContext!.originOperationId,
+        context.originOperationId,
+      );
+      expect(
+        restored.payment.request.commercialPaymentTermIds,
+        request.commercialPaymentTermIds,
+      );
+      expect(
+        restored.payment.request.deliveryInstructionsByProductId,
+        request.deliveryInstructionsByProductId,
+      );
+      expect(restored.payment.request.checkoutAttemptId, isNull);
+      expect(restored.payment.request.paymentGroupId, isNull);
+    },
+  );
+
+  for (final change in ['account', 'session']) {
+    test('T07 changed $change rejects an original late response', () async {
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      addTearDown(identity.dispose);
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        identity: identity,
+      );
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final request = commerce.requests.single;
+      identity.value = BuyV2CollectionIdentity(
+        accountId: change == 'account' ? 'buyer-b' : 'buyer-a',
+        sessionId: 'session-b',
+      );
+      response.complete(legacyResult(request));
+      expect(await pending, isFalse);
+      expect(session.orders, isEmpty);
+      expect(store.snapshot!.orders, isEmpty);
+      expect(session.quantityFor('s-tomato'), 1);
+    });
+  }
+
+  test(
+    'T07 disposed original response cannot mutate retained orders',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        manualDispose: true,
+      );
+      final response = Completer<BuyV2OrderPlacementResult>();
+      commerce.onPlace = (_) => response.future;
+      final pending = session.submitOrder();
+      for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      final request = commerce.requests.single;
+      session.dispose();
+      response.complete(legacyResult(request));
+      expect(await pending, isFalse);
+      expect(store.snapshot!.orders, isEmpty);
+    },
+  );
+
+  Future<
+    (
+      BuyV2Session,
+      TestGroupedPaymentCommerce,
+      _MemoryCustomerStateStore,
+      TestPaymentQuote,
+    )
+  >
+  groupedFixture({
+    bool credit = false,
+    bool allCredit = false,
+    bool manualDispose = false,
+    DateTime Function()? clock,
+  }) async {
+    final core = BuySession();
+    final commerce = TestGroupedPaymentCommerce();
+    final store = _MemoryCustomerStateStore('test-t06-buyer');
+    final quote = TestPaymentQuote();
+    final terms = TestGroupedPaymentTerms()..credit = credit;
+    final products = testPaymentProducts
+        .map(
+          (product) => product.id == 's-rice' || product.id == 'w-rice'
+              ? product.copyWith(storeId: 'test-second-store')
+              : product,
+        )
+        .toList();
+    commerce.snapshot = BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      products: products,
+      paymentMethods: const {'UPI', 'Card'},
+      businessVerified: true,
+      addresses: const [_instructionAddress],
+      selectedAddressId: _instructionAddress.id,
+    );
+    quote.groupsFor = (lines, method) => [
+      for (var i = 0; i < lines.length; i++)
+        BuyV2CheckoutPaymentGroup(
+          id: 'test-group-$i',
+          fulfilmentKeys: {lines[i].fulfilmentKey},
+          paymentMethod: method,
+          total: lines[i].total,
+          amountDueNow: credit && lines[i].fulfilmentKey.startsWith('wholesale')
+              ? 0
+              : lines[i].total,
+        ),
+    ];
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      customerStateStore: store,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      catalogueNow: clock ?? DateTime.now,
+      checkoutQuoteAdapter: quote,
+      commercialPaymentTermsAdapter: credit ? terms : null,
+    );
+    if (!manualDispose) addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(
+      session.addProduct(allCredit ? 'w-notebook' : 's-tomato'),
+      isTrue,
+      reason: session.notice,
+    );
+    expect(
+      session.addProduct(
+        allCredit
+            ? 'w-rice'
+            : credit
+            ? 'w-notebook'
+            : 's-rice',
+      ),
+      isTrue,
+      reason: session.notice,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCheckoutQuote();
+    if (credit) {
+      await session.refreshCommercialPaymentTerms();
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(
+          session.chooseCommercialPaymentTerm(
+            session.commercialPaymentTermsFor(group.key).single,
+          ),
+          isTrue,
+        );
+      }
+    }
+    expect(session.checkoutPaymentGroups, hasLength(2));
+    return (session, commerce, store, quote);
+  }
+
+  test(
+    'T07 confirmed save has one cleanup owner across repeated taps',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final saved = Completer<void>();
+      commerce.onPlace = (request) {
+        store.pendingWrite = saved;
+        return legacyResult(request);
+      };
+      final submission = session.submitOrder();
+      for (var i = 0; i < 100 && !session.orders.any((_) => true); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(session.checkoutBusy, isTrue);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(await session.reconcilePayment(), isFalse);
+      expect(await session.submitOrder(), isFalse);
+      expect(session.addProduct('s-tomato'), isFalse);
+      saved.complete();
+      expect(await submission, isTrue);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+      expect(commerce.recoveredKeys, isEmpty);
+    },
+  );
+
+  test(
+    'T07 cold confirmed snapshot rechecks original key before cleanup',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture(
+        manualDispose: true,
+      );
+      store.onSaved = (snapshot) {
+        if (snapshot.legacyCheckoutAttempt?.payment.state ==
+            BuyV2CheckoutSubmissionState.confirmed) {
+          session.dispose();
+        }
+      };
+      commerce.onPlace = (request) => legacyResult(request);
+      expect(await session.submitOrder(), isFalse);
+      store.onSaved = null;
+      final original = commerce.requests.single;
+      expect(store.snapshot!.cartQuantities['s-tomato'], 1);
+      expect(
+        store.snapshot!.legacyCheckoutAttempt!.payment.confirmedOrderIds,
+        hasLength(1),
+      );
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final restored = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        customerStateStore: store,
+        reviewDataEnabled: false,
+      );
+      addTearDown(restored.dispose);
+      await restored.restoreCommerce();
+      await restored.restoreCustomerState();
+      expect(restored.checkoutRequiresResolution, isTrue);
+      expect(restored.quantityFor('s-tomato'), 1);
+      expect(restored.checkoutPayableTotal, original.total);
+      commerce.onReconcile = (request) => legacyResult(request);
+      expect(await restored.reconcilePayment(), isTrue);
+      expect(restored.quantityFor('s-tomato'), 0);
+      expect(restored.orders, hasLength(1));
+      expect(await restored.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(commerce.reconciledKeys, [original.idempotencyKey]);
+    },
+  );
+
+  test(
+    'T07 timed out confirmed write stays ordered before later reconciliation',
+    () async {
+      final (session, commerce, store) = await legacyRecoveryFixture();
+      final saved = Completer<void>();
+      commerce.onPlace = (request) {
+        store.pendingWrite = saved;
+        return legacyResult(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.checkoutRequiresResolution, isTrue);
+      commerce.onReconcile = (request) => legacyResult(request);
+      final checking = session.reconcilePayment();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      expect(session.checkoutBusy, isTrue);
+      expect(session.retryCheckoutPayment(), isFalse);
+      saved.complete();
+      expect(await checking, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(session.quantityFor('s-tomato'), 0);
+      expect(store.snapshot!.cartQuantities.containsKey('s-tomato'), isFalse);
+      expect(store.snapshot!.checkoutIdempotencyKey, isNull);
+      expect(store.snapshot!.legacyCheckoutAttempt, isNull);
+      expect(store.snapshot!.retainedLegacyCheckoutAttempts, hasLength(1));
+      expect(store.snapshot!.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 grouped financial closure save failure cannot release payment',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      await session.submitOrder();
+      commerce.onReconcile = (request) {
+        store.rejectWrites = true;
+        return testGroupedPlacement(
+          request,
+          outcome: BuyV2OrderPlacementOutcome.failed,
+          retryAllowed: true,
+        );
+      };
+      expect(await session.reconcilePayment(), isFalse);
+      expect(session.currentCheckoutPaymentGroup!.financiallyClosed, isFalse);
+      expect(session.reviewRemainingGroupedCheckout(), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('s-rice'), 1);
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 closed payment requires an explicit empty retained order list',
+    () async {
+      for (final grouped in [false, true]) {
+        late BuyV2CustomerStateSnapshot snapshot;
+        late String owner;
+        late String originalKey;
+        if (grouped) {
+          final (session, commerce, memory, _) = await groupedFixture();
+          commerce.onGroup = (request) => testGroupedPlacement(
+            request,
+            outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          );
+          expect(await session.submitOrder(), isFalse);
+          snapshot = memory.snapshot!;
+          owner = memory.ownerScope;
+          originalKey = commerce.requests.single.idempotencyKey;
+        } else {
+          final (session, commerce, memory) = await legacyRecoveryFixture();
+          expect(await session.submitOrder(), isFalse);
+          snapshot = memory.snapshot!;
+          owner = memory.ownerScope;
+          originalKey = commerce.requests.single.idempotencyKey;
+        }
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: owner,
+        );
+        expect(await store.write(snapshot), isTrue);
+        final storageKey = preferences.values.keys.single;
+        final original = preferences.values[storageKey]!;
+        for (final variant in [
+          'empty',
+          'missing',
+          'null',
+          'object',
+          'blank',
+          'null-item',
+          'order',
+        ]) {
+          final encoded = jsonDecode(original) as Map<String, dynamic>;
+          final payment = grouped
+              ? encoded['checkoutPaymentAttempt']['groups'][0]
+              : encoded['legacyCheckoutAttempt']['payment'];
+          payment['state'] = 'failed';
+          payment['financiallyClosed'] = true;
+          if (variant == 'missing') {
+            payment.remove('confirmedOrderIds');
+          } else {
+            payment['confirmedOrderIds'] = switch (variant) {
+              'empty' => <Object?>[],
+              'null' => null,
+              'object' => <String, Object?>{},
+              'blank' => <Object?>[''],
+              'null-item' => <Object?>[null],
+              _ => <Object?>['existing-order'],
+            };
+          }
+          preferences.values[storageKey] = jsonEncode(encoded);
+          final recovered = (await store.read())!;
+          expect(
+            recovered.paymentRecoveryIncomplete,
+            variant != 'empty',
+            reason: 'grouped=$grouped variant=$variant',
+          );
+          expect(recovered.checkoutIdempotencyKey, originalKey);
+          if (variant != 'empty') {
+            expect(recovered.legacyCheckoutAttempt, isNull);
+            expect(recovered.checkoutPaymentAttempt, isNull);
+          }
+        }
+      }
+    },
+  );
+
+  test(
+    'T07 corrupt grouped financial closure restores a recovery hold',
+    () async {
+      final (session, commerce, memory, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      );
+      await session.submitOrder();
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: memory.ownerScope,
+      );
+      await store.write(memory.snapshot!);
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      encoded['checkoutPaymentAttempt']['groups'][0]['financiallyClosed'] =
+          true;
+      preferences.values[key] = jsonEncode(encoded);
+      final recovered = (await store.read())!;
+      expect(recovered.paymentRecoveryIncomplete, isTrue);
+      expect(recovered.checkoutPaymentAttempt, isNull);
+      expect(
+        recovered.checkoutIdempotencyKey,
+        commerce.requests.single.idempotencyKey,
+      );
+    },
+  );
+
+  test(
+    'T07 group confirmation save failure retains original Cart and key',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) {
+        store.rejectWrites = true;
+        return testGroupedPlacement(request);
+      };
+      expect(await session.submitOrder(), isFalse);
+      final request = commerce.requests.single;
+      expect(session.quantityFor(request.lines.single.product.id), 1);
+      expect(
+        session.currentCheckoutPaymentGroup!.request.idempotencyKey,
+        request.idempotencyKey,
+      );
+      expect(session.checkoutRequiresResolution, isTrue);
+      store.rejectWrites = false;
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.quantityFor(request.lines.single.product.id), 0);
+      expect(session.orders, hasLength(1));
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  test(
+    'T07 group financial closure preserves completed orders in retained history',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      await session.submitOrder();
+      final completed = session.orders.single.id;
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      await session.submitOrder();
+      expect(session.reviewRemainingGroupedCheckout(), isFalse);
+      commerce.onReconcile = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        retryAllowed: true,
+      );
+      await session.reconcilePayment();
+      expect(session.currentCheckoutPaymentGroup!.financiallyClosed, isTrue);
+      expect(session.reviewRemainingGroupedCheckout(), isTrue);
+      expect(session.orders.single.id, completed);
+      await Future<void>.delayed(Duration.zero);
+      final retained = store.snapshot!.retainedCheckoutPaymentAttempts.single;
+      expect(retained.groups.first.confirmedOrderIds, [completed]);
+      expect(retained.groups.last.financiallyClosed, isTrue);
+      expect(commerce.requests, hasLength(2));
+    },
+  );
+
+  test(
+    'T06 paid groups require separate commitments and retain completed orders',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture();
+      final firstAmount = session.checkoutPaymentActionAmount;
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      final first = commerce.requests.single;
+      expect(first.lines, hasLength(1));
+      expect(first.amountDueNow, firstAmount);
+      expect(session.orders, hasLength(1));
+      expect(session.quantityFor(first.lines.single.product.id), 0);
+      expect(session.checkoutPaymentNumber, 2);
+      expect(
+        store.snapshot!.checkoutPaymentAttempt!.groups.first.state,
+        BuyV2CheckoutSubmissionState.confirmed,
+      );
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: BuyV2OrderPlacementOutcome.failed,
+      );
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(2));
+      final second = commerce.requests.last;
+      expect(second.checkoutAttemptId, first.checkoutAttemptId);
+      expect(second.idempotencyKey, isNot(first.idempotencyKey));
+      expect(second.paymentGroupId, isNot(first.paymentGroupId));
+      expect(session.orders, hasLength(1));
+      expect(
+        session.quantityFor(second.lines.single.product.id),
+        greaterThan(0),
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(2));
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.reconciledKeys, [second.idempotencyKey]);
+      expect(session.orders, hasLength(2));
+      expect(session.checkoutHasGroupedCommitment, isFalse);
+      expect(session.confirmedOrders, hasLength(2));
+    },
+  );
+
+  test('T06 persists before placement and rejects repeated taps', () async {
+    final (session, commerce, store, _) = await groupedFixture();
+    final response = Completer<BuyV2OrderPlacementResult>();
+    commerce.onGroup = (request) {
+      expect(
+        store
+            .snapshot!
+            .checkoutPaymentAttempt!
+            .groups
+            .first
+            .request
+            .idempotencyKey,
+        request.idempotencyKey,
+      );
+      return response.future;
+    };
+    final first = session.submitOrder();
+    for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(commerce.requests, hasLength(1));
+    expect(await session.submitOrder(), isFalse);
+    response.complete(
+      testGroupedPlacement(
+        commerce.requests.single,
+        outcome: BuyV2OrderPlacementOutcome.paymentPending,
+      ),
+    );
+    expect(await first, isFalse);
+    expect(commerce.requests, hasLength(1));
+    expect(
+      session.checkoutPaymentActionAmount,
+      commerce.requests.single.amountDueNow,
+    );
+  });
+
+  test('T06 durable write failure prevents any connector placement', () async {
+    final (session, commerce, store, _) = await groupedFixture();
+    store.rejectWrites = true;
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+    expect(session.orders, isEmpty);
+    expect(session.checkoutPaymentAttempt, isNotNull);
+    expect(
+      session.currentCheckoutPaymentGroup!.state,
+      BuyV2CheckoutSubmissionState.idle,
+    );
+  });
+
+  for (final invalid in [
+    'empty',
+    'duplicate',
+    'scope',
+    'total',
+    'due',
+    'currency',
+    'method',
+  ]) {
+    test('T06 rejects authoritative invalid group plan $invalid', () async {
+      final (session, commerce, _, quote) = await groupedFixture();
+      quote.groupsFor = (lines, method) => invalid == 'empty'
+          ? []
+          : [
+              for (var i = 0; i < lines.length; i++)
+                BuyV2CheckoutPaymentGroup(
+                  id: invalid == 'duplicate' ? 'same' : 'group-$i',
+                  fulfilmentKeys: {
+                    invalid == 'scope' ? 'unknown' : lines[i].fulfilmentKey,
+                  },
+                  paymentMethod: invalid == 'method' ? 'Card' : method,
+                  total: lines[i].total + (invalid == 'total' ? 1 : 0),
+                  amountDueNow: lines[i].total + (invalid == 'due' ? 1 : 0),
+                  currency: invalid == 'currency' ? 'USD' : 'INR',
+                ),
+            ];
+      await session.refreshCheckoutQuote();
+      expect(session.checkoutPaymentGroupReviewRequired, isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
+  for (final mismatch in ['group', 'paid']) {
+    test(
+      'T06 mismatched $mismatch response holds original payment and Cart',
+      () async {
+        final (session, commerce, _, _) = await groupedFixture();
+        commerce.onGroup = (request) => testGroupedPlacement(
+          request,
+          groupId: mismatch == 'group' ? 'other-group' : null,
+          paidNow: mismatch == 'paid' ? request.amountDueNow + 1 : null,
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(session.orders, isEmpty);
+        expect(
+          session.quantityFor(commerce.requests.single.lines.single.product.id),
+          1,
+        );
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(
+          session.checkoutPaymentActionAmount,
+          commerce.requests.single.amountDueNow,
+        );
+      },
+    );
+  }
+
+  test(
+    'T06 credit group completes once before paid group and survives payment failure',
+    () async {
+      final (session, commerce, store, _) = await groupedFixture(credit: true);
+      commerce.onGroup = (request) => testGroupedPlacement(
+        request,
+        outcome: request.amountDueNow == 0
+            ? BuyV2OrderPlacementOutcome.confirmed
+            : BuyV2OrderPlacementOutcome.failed,
+      );
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        commerce.requests,
+        hasLength(2),
+        reason:
+            '${session.notice}; state=${session.checkoutSubmissionState}; '
+            'dues=${commerce.requests.map((request) => request.amountDueNow)}; '
+            'orders=${session.orders.length}; current=${session.currentCheckoutPaymentGroup?.state}',
+      );
+      expect(commerce.requests.first.amountDueNow, 0);
+      expect(commerce.requests.last.amountDueNow, greaterThan(0));
+      expect(session.orders, hasLength(1));
+      expect(session.orders.single.balanceDue, commerce.requests.first.total);
+      expect(session.orders.single.status, BuyV2OrderStatus.preparing);
+      expect(
+        store.snapshot!.checkoutPaymentAttempt!.groups.first.state,
+        BuyV2CheckoutSubmissionState.confirmed,
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(2));
+    },
+  );
+
+  for (final allocation in ['valid', 'totals', 'due']) {
+    test(
+      'T06 compatible two-Store payment validates supplier allocation $allocation',
+      () async {
+        final credit = allocation == 'due';
+        final (session, commerce, _, quote) = await groupedFixture(
+          credit: credit,
+        );
+        quote.groupsFor = (lines, method) => [
+          BuyV2CheckoutPaymentGroup(
+            id: 'compatible',
+            fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(),
+            paymentMethod: method,
+            total: lines.fold(0, (sum, line) => sum + line.total),
+            amountDueNow: lines.fold(
+              0,
+              (sum, line) =>
+                  sum +
+                  (credit && line.fulfilmentKey.startsWith('wholesale')
+                      ? 0
+                      : line.total),
+            ),
+          ),
+        ];
+        await session.refreshCheckoutQuote();
+        if (credit) await session.refreshCommercialPaymentTerms();
+        commerce.onGroup = (request) {
+          final first = request.lines.first;
+          final last = request.lines.last;
+          final dueForFirst =
+              first.product.destination == BuyV2Destination.wholesale && credit
+              ? 0
+              : first.total;
+          final dueForLast =
+              last.product.destination == BuyV2Destination.wholesale && credit
+              ? 0
+              : last.total;
+          return testGroupedPlacement(
+            request,
+            allocations: {
+              first.product.id: (
+                allocation == 'totals' ? last.total : first.total,
+                allocation == 'totals'
+                    ? last.total
+                    : allocation == 'due'
+                    ? dueForLast
+                    : dueForFirst,
+              ),
+              last.product.id: (
+                allocation == 'totals' ? first.total : last.total,
+                allocation == 'totals'
+                    ? first.total
+                    : allocation == 'due'
+                    ? dueForFirst
+                    : dueForLast,
+              ),
+            },
+          );
+        };
+        expect(await session.submitOrder(), allocation == 'valid');
+        expect(commerce.requests, hasLength(1));
+        if (allocation == 'valid') {
+          expect(session.confirmedOrders, hasLength(2));
+          expect(session.cartLines, isEmpty);
+        } else {
+          expect(session.orders, isEmpty);
+          expect(session.cartLines, hasLength(2));
+          expect(
+            session.checkoutSubmissionState,
+            BuyV2CheckoutSubmissionState.paymentUnknown,
+          );
+          expect(
+            session.currentCheckoutPaymentGroup!.request.idempotencyKey,
+            commerce.requests.single.idempotencyKey,
+          );
+        }
+      },
+    );
+  }
+
+  test(
+    'T06 original obligation allocations and absent URI survive persistence',
+    () async {
+      final (session, _, memory, _) = await groupedFixture();
+      await session.submitOrder();
+      final original = memory.snapshot!;
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: memory.ownerScope,
+      );
+      expect(await store.write(original), isTrue);
+      final restored = (await store.read())!.checkoutPaymentAttempt!;
+      expect(restored.groups, hasLength(2));
+      for (var i = 0; i < restored.groups.length; i++) {
+        final group = restored.groups[i];
+        expect(group.hasValidObligations, isTrue);
+        expect(
+          group.request.idempotencyKey,
+          original.checkoutPaymentAttempt!.groups[i].request.idempotencyKey,
+        );
+        expect(group.paymentActionUri, isNull);
+        expect(group.obligations.single.totalMinor, group.request.total * 100);
+        expect(
+          group.request.lines.single.product.storeId,
+          original
+              .checkoutPaymentAttempt!
+              .groups[i]
+              .request
+              .lines
+              .single
+              .product
+              .storeId,
+        );
+      }
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      final groups = encoded['checkoutPaymentAttempt']['groups'] as List;
+      groups.first['obligations'].first['dueNowMinor'] += 1;
+      preferences.values[key] = jsonEncode(encoded);
+      expect(
+        (await store.read())!
+            .checkoutPaymentAttempt!
+            .groups
+            .first
+            .hasValidObligations,
+        isFalse,
+      );
+      groups[1]['request']['idempotencyKey'] =
+          groups[0]['request']['idempotencyKey'];
+      preferences.values[key] = jsonEncode(encoded);
+      expect((await store.read())!.checkoutPaymentAttempt, isNull);
+    },
+  );
+
+  test('T06 all credit obligations submit once without a payment', () async {
+    final (session, commerce, _, _) = await groupedFixture(
+      credit: true,
+      allCredit: true,
+    );
+    commerce.onGroup = (request) => testGroupedPlacement(request);
+    expect(session.checkoutPaymentCount, 0);
+    expect(await session.submitOrder(), isTrue);
+    expect(commerce.requests, hasLength(2));
+    expect(
+      commerce.requests.every((request) => request.amountDueNow == 0),
+      isTrue,
+    );
+    expect(session.confirmedOrders, hasLength(2));
+    expect(
+      session.confirmedOrders.every(
+        (order) => order.amountPaidNow == 0 && order.balanceDue == order.total,
+      ),
+      isTrue,
+    );
+    await session.submitOrder();
+    expect(commerce.requests, hasLength(2));
+  });
+
+  test(
+    'T06 network loss recovers original key without another placement',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      commerce.onGroup = (_) => throw StateError('Isolated network loss');
+      expect(await session.submitOrder(), isFalse);
+      final original = commerce.requests.single;
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      await session.submitOrder();
+      expect(commerce.requests, hasLength(1));
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.recoveredKeys, [original.idempotencyKey]);
+      expect(session.orders, hasLength(1));
+    },
+  );
+
+  test('T06 late disposed response cannot place an order locally', () async {
+    final (session, commerce, _, _) = await groupedFixture(manualDispose: true);
+    var disposed = false;
+    addTearDown(() {
+      if (!disposed) session.dispose();
+    });
+    final gate = Completer<BuyV2OrderPlacementResult>();
+    commerce.onGroup = (_) => gate.future;
+    final pending = session.submitOrder();
+    for (var i = 0; i < 50 && commerce.requests.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(commerce.requests, hasLength(1));
+    session.dispose();
+    disposed = true;
+    gate.complete(testGroupedPlacement(commerce.requests.single));
+    expect(await pending, isFalse);
+    expect(session.orders, isEmpty);
+  });
+
+  test(
+    'T06 expired unfinished group reviews without repaying completed group',
+    () async {
+      var now = DateTime.now();
+      final (session, commerce, _, _) = await groupedFixture(clock: () => now);
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      now = now.add(const Duration(hours: 2));
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders, hasLength(1));
+      expect(session.reviewRemainingGroupedCheckout(), isTrue);
+      expect(session.orders, hasLength(1));
+      expect(
+        session.quantityFor(commerce.requests.single.lines.single.product.id),
+        0,
+      );
+    },
+  );
+
+  test(
+    'T06 malformed confirmation retains provider reference for original recovery',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      commerce.onGroup = (request) =>
+          testGroupedPlacement(request, paidNow: request.amountDueNow + 1);
+      expect(await session.submitOrder(), isFalse);
+      final original = commerce.requests.single;
+      expect(
+        session.currentCheckoutPaymentGroup!.paymentReference,
+        'test-${original.paymentGroupId}',
+      );
+      commerce.onReconcile = (request) => testGroupedPlacement(request);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(commerce.reconciledKeys, [original.idempotencyKey]);
+      expect(commerce.recoveredKeys, isEmpty);
+      expect(commerce.requests, hasLength(1));
+      expect(session.orders, hasLength(1));
+    },
+  );
+
+  test(
+    'T06 published payment limit applies per explicit group with original scope',
+    () async {
+      final (session, commerce, _, _) = await groupedFixture();
+      final maximum = session.checkoutPaymentGroups
+          .map((group) => group.amountDueNow)
+          .reduce((a, b) => a > b ? a : b);
+      final before = commerce.snapshot;
+      commerce.snapshot = BuyV2CommerceSnapshot(
+        state: before.state,
+        products: before.products,
+        paymentMethods: before.paymentMethods,
+        paymentCapabilities: [
+          testPaymentCapability(session, maximumMinor: maximum * 100),
+        ],
+        businessVerified: true,
+        addresses: before.addresses,
+        selectedAddressId: before.selectedAddressId,
+      );
+      await session.restoreCommerce();
+      await session.refreshCheckoutQuote();
+      expect(session.checkoutAmountDueNow, greaterThan(maximum));
+      expect(session.paymentEligibilityFor('UPI').selectable, isTrue);
+      commerce.onGroup = (request) => testGroupedPlacement(request);
+      expect(await session.submitOrder(), isFalse);
+      expect(commerce.requests, hasLength(1));
+      expect(await session.submitOrder(), isTrue);
+      expect(commerce.requests, hasLength(2));
+      expect(
+        commerce.requests.every((request) => request.amountDueNow <= maximum),
+        isTrue,
+      );
+      expect(session.confirmedOrders, hasLength(2));
+    },
+  );
+
+  Future<(BuyV2Session, TestPaymentCommerce)> paymentFixture({
+    TestPaymentQuote? quote,
+  }) async {
+    final core = BuySession();
+    final commerce = TestPaymentCommerce();
+    commerce.snapshot = testPaymentSnapshot(
+      null,
+      addresses: [_instructionAddress],
+    );
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: commerce,
+      productFactsAdapter: BuyTestEligibilityFacts(
+        delegate: _T01CDeliveryFactsAdapter(),
+      ),
+      reviewDataEnabled: false,
+      checkoutQuoteAdapter: quote,
+      customerStateStore: _MemoryCustomerStateStore('test-payment-eligibility'),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(session.commerceLoadState, BuyV2CommerceLoadState.ready);
+    expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    return (session, commerce);
+  }
+
+  test('T06 group publication needs explicit connector opt-in', () async {
+    final quote = TestPaymentQuote()
+      ..groupsFor = (lines, method) => [
+        BuyV2CheckoutPaymentGroup(
+          id: 'unsupported',
+          fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(),
+          paymentMethod: method,
+          total: lines.single.total,
+          amountDueNow: lines.single.total,
+        ),
+      ];
+    final (session, commerce) = await paymentFixture(quote: quote);
+    await session.refreshCheckoutQuote();
+    expect(session.checkoutPaymentGroupReviewRequired, isTrue);
+    expect(await session.submitOrder(), isFalse);
+    expect(commerce.requests, isEmpty);
+  });
+
+  Future<void> publishPayments(
+    BuyV2Session session,
+    TestPaymentCommerce commerce,
+    List<BuyV2PaymentCapability>? caps, {
+    Set<String> methods = const {'UPI', 'Card'},
+  }) async {
+    commerce.snapshot = testPaymentSnapshot(
+      caps,
+      methods: methods,
+      addresses: [_instructionAddress],
+    );
+    await session.restoreCommerce();
+  }
+
+  for (final boundary in <(String, int?, int?, int?, bool)>[
+    ('minimum below', 3701, null, null, false),
+    ('minimum equal', 3700, null, null, true),
+    ('maximum above', null, 3699, null, false),
+    ('maximum equal', null, 3700, null, true),
+    ('remaining above', null, null, 3699, false),
+    ('remaining equal', null, null, 3700, true),
+    ('closed range equal', 3700, 3700, null, true),
+  ]) {
+    test('T05 inclusive amount boundary ${boundary.$1}', () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, [
+        testPaymentCapability(
+          session,
+          minimumMinor: boundary.$2,
+          maximumMinor: boundary.$3,
+          remainingMinor: boundary.$4,
+        ),
+      ]);
+      final eligibility = session.paymentEligibilityFor('UPI');
+      expect(session.checkoutPaymentAmountMinor, 3700);
+      expect(eligibility.selectable, boundary.$5);
+      expect(session.choosePayment('UPI'), boundary.$5);
+      expect(session.continueCheckoutFromPayment(), boundary.$5);
+      if (!boundary.$5) expect(commerce.requests, isEmpty);
+    });
+  }
+
+  test(
+    'T05 unknown legacy limits and explicit empty publication differ',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, null);
+      expect(
+        session.paymentEligibilityFor('UPI').state,
+        BuyV2PaymentEligibilityState.unknown,
+      );
+      expect(session.choosePayment('Card'), isTrue);
+      expect(session.currentPaymentChargeMinor, isNull);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, method: 'Card'),
+      ]);
+      expect(
+        session.paymentEligibilityFor('Card').state,
+        BuyV2PaymentEligibilityState.unknown,
+      );
+      expect(session.choosePayment('Card'), isTrue);
+      await publishPayments(session, commerce, []);
+      expect(session.selectedPayment, 'Card');
+      expect(session.choosePayment('Card'), isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+    },
+  );
+
+  for (final invalid in [
+    'currency',
+    'expired',
+    'future',
+    'scope',
+    'duplicate',
+    'revision',
+    'negative',
+    'inverted',
+    'collection',
+  ]) {
+    test('T05 rejects invalid payment publication $invalid', () async {
+      final (session, commerce) = await paymentFixture();
+      final cap = testPaymentCapability(
+        session,
+        currency: invalid == 'currency' ? 'USD' : 'INR',
+        validUntil: invalid == 'expired' ? session.catalogueNow() : null,
+        validFrom: invalid == 'future'
+            ? session.catalogueNow().add(const Duration(minutes: 1))
+            : null,
+        fulfilmentKeys: invalid == 'scope' ? {'another-purchase'} : null,
+        revision: invalid == 'revision' ? '' : 'test-current-v2',
+        minimumMinor: invalid == 'negative'
+            ? -1
+            : invalid == 'inverted'
+            ? 5000
+            : 0,
+        maximumMinor: invalid == 'inverted' ? 4000 : 1000000,
+        collectionStoreId: invalid == 'collection' ? 'another-store' : null,
+      );
+      await publishPayments(session, commerce, [
+        cap,
+        if (invalid == 'duplicate') cap,
+      ]);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
+  test(
+    'T05 newest refresh wins and invalid preference requires a new choice',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, maximumMinor: 10000),
+      ]);
+      final earlier = Completer<BuyV2CommerceSnapshot>();
+      commerce.refreshGate = earlier;
+      final first = session.restoreCommerce();
+      final latest = Completer<BuyV2CommerceSnapshot>();
+      commerce.refreshGate = latest;
+      final second = session.restoreCommerce();
+      latest.complete(
+        testPaymentSnapshot(
+          [
+            testPaymentCapability(
+              session,
+              revision: 'test-v2',
+              maximumMinor: 100,
+            ),
+            testPaymentCapability(
+              session,
+              method: 'Card',
+              minimumMinor: 0,
+              maximumMinor: 10000,
+            ),
+          ],
+          addresses: [_instructionAddress],
+        ),
+      );
+      await second;
+      earlier.complete(
+        testPaymentSnapshot([
+          testPaymentCapability(session, maximumMinor: 10000),
+        ]),
+      );
+      await first;
+      expect(session.selectedPayment, 'UPI');
+      expect(session.paymentEligibilityFor('UPI').selectable, isFalse);
+      expect(session.continueCheckoutFromPayment(), isFalse);
+      expect(session.choosePayment('Card'), isTrue);
+      commerce.refreshGate = null;
+      await publishPayments(session, commerce, [
+        testPaymentCapability(
+          session,
+          method: 'Card',
+          revision: 'test-v3',
+          maximumMinor: 10000,
+        ),
+      ]);
+      expect(session.selectedPayment, 'Card');
+      expect(session.paymentEligibilityFor('Card').selectable, isTrue);
+    },
+  );
+
+  test(
+    'T05 public trade methods require scoped wholesale capability and exclude mixed retail COD',
+    () async {
+      final (session, commerce) = await paymentFixture();
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer', 'Cash on Delivery'},
+      );
+      expect(session.choosePayment('Bank transfer'), isFalse);
+      expect(session.choosePayment('Cash on Delivery'), isFalse);
+      session.openCart();
+      session.remove('s-tomato');
+      expect(
+        session.addProduct('w-notebook'),
+        isTrue,
+        reason:
+            '${session.notice}; ${session.product('w-notebook').offerClass}; ${session.productFactsFor(session.product('w-notebook')).eligibility?.toJson()}',
+      );
+      session.openCart(scope: BuyV2CartScope.all);
+      expect(session.openCheckout(), isTrue);
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer'},
+      );
+      expect(session.choosePayment('Bank transfer'), isTrue);
+      session.openCart();
+      session.addProduct('s-tomato');
+      session.openCart(scope: BuyV2CartScope.all);
+      session.openCheckout();
+      await publishPayments(
+        session,
+        commerce,
+        [testPaymentCapability(session, method: 'Bank transfer')],
+        methods: {'Bank transfer'},
+      );
+      expect(session.choosePayment('Bank transfer'), isFalse);
+    },
+  );
+
+  test(
+    'T05 refreshed quoted fee rechecks final due amount before placement',
+    () async {
+      final quote = TestPaymentQuote();
+      final (session, commerce) = await paymentFixture(quote: quote);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, maximumMinor: 3800),
+        testPaymentCapability(session, method: 'Card', maximumMinor: 10000),
+      ]);
+      await session.refreshCheckoutQuote();
+      expect(session.currentPaymentChargeMinor, 0);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      quote.charge = 2;
+      expect(await session.submitOrder(), isFalse);
+      expect(session.checkoutPaymentAmountMinor, 3900);
+      expect(session.currentPaymentChargeMinor, 200);
+      expect(commerce.requests, isEmpty);
+      expect(session.cartLines, hasLength(1));
+      expect(session.choosePayment('Card'), isTrue);
+      await session.refreshCheckoutQuote();
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        commerce.requests,
+        hasLength(1),
+        reason:
+            '${session.notice}; ${session.eligibilityLocationKey}; ${session.productFactsFor(session.checkoutLines.first.product).eligibility?.toJson()}; ${session.checkoutLines.first.product.offerClass}',
+      );
+      expect(commerce.requests.single.amountDueNow, 39);
+      expect(session.checkoutRequiresResolution, isTrue);
+      await publishPayments(session, commerce, [
+        testPaymentCapability(session, method: 'Card', maximumMinor: 100),
+      ]);
+      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.paymentEligibilityFor('Card').selectable, isFalse);
+      expect(commerce.requests.single.amountDueNow, 39);
+      expect(commerce.requests, hasLength(1));
+    },
+  );
+
+  for (final increase in [false, true]) {
+    test(
+      'T05 fee amount review and same total retry increase $increase',
+      () async {
+        final quote = TestPaymentQuote()..charge = increase ? 0 : 2;
+        final (session, commerce) = await paymentFixture(quote: quote);
+        await publishPayments(session, commerce, [
+          testPaymentCapability(session, minimumMinor: 0, maximumMinor: 10000),
+        ]);
+        await session.refreshCheckoutQuote();
+        expect(session.continueCheckoutFromPayment(), isTrue);
+        quote.charge = 1;
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests, isEmpty);
+        expect(session.checkoutBusy, isFalse);
+        expect(session.checkoutAmountDueNow, 38);
+        expect(
+          session.notice,
+          'The amount due now changed. Review the updated total before paying.',
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests, hasLength(1), reason: session.notice);
+        expect(commerce.requests.single.amountDueNow, 38);
+        expect(session.checkoutRequiresResolution, isTrue);
+      },
+    );
+  }
+
+  for (final amount in [199999, 200000, 10000000]) {
+    test('T05 RTGS statutory minimum and crore route amount $amount', () async {
+      final core = BuySession();
+      final commerce = TestPaymentCommerce();
+      final product = testPaymentProducts
+          .firstWhere((p) => p.id == 'w-notebook')
+          .copyWith(price: amount);
+      BuyV2CommerceSnapshot publication(List<BuyV2PaymentCapability>? caps) =>
+          BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [product],
+            businessVerified: true,
+            paymentMethods: const {'RTGS'},
+            paymentCapabilities: caps,
+          );
+      commerce.snapshot = publication(null);
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        reviewDataEnabled: false,
+        productFactsAdapter: const QualifiedTestProductFacts({'w-notebook'}),
+      );
       addTearDown(session.dispose);
       addTearDown(core.dispose);
-      return session;
-    }
-    final session = make('draft-customer-a');
-    await session.restoreCustomerState();
-    session.addProduct('s-milk');
-    final quantity = session.quantityFor('s-milk');
-    session.retainProductReviewDraft(productId: 's-milk', rating: 4,
-      comment: 'Keep my unsent review.', ownerScope: session.reviewDraftOwnerScope);
-    session.retainProductReviewDraft(productId: 's-tomato', rating: 2,
-      comment: 'A separate product.', ownerScope: session.reviewDraftOwnerScope);
-    await Future<void>.delayed(Duration.zero);
-    final restarted = make('draft-customer-a');
-    await restarted.restoreCustomerState();
-    expect(restarted.productReviewDraft('s-milk')?.rating, 4);
-    expect(restarted.productReviewDraft('s-milk')?.comment, 'Keep my unsent review.');
-    expect(restarted.productReviewDraft('s-tomato')?.comment, 'A separate product.');
-    expect(restarted.customerReviewFor('s-milk'), isNull);
-    expect(restarted.quantityFor('s-milk'), quantity);
-    final other = make('draft-customer-b');
-    await other.restoreCustomerState();
-    expect(other.productReviewDraft('s-milk'), isNull);
-    other.retainProductReviewDraft(productId: 's-milk', rating: 5,
-      comment: 'Stale owner edit', ownerScope: 'draft-customer-a');
-    expect(other.productReviewDraft('s-milk'), isNull);
-    expect(restarted.submitProductReview(productId: 's-milk', rating: 0, comment: ''), isFalse);
-    expect(restarted.productReviewDraft('s-milk'), isNotNull);
-    expect(restarted.submitProductReview(productId: 's-milk', rating: 4, comment: 'Keep my unsent review.'), isTrue);
-    expect(restarted.productReviewDraft('s-milk'), isNull);
-    expect(restarted.productReviewDraft('s-tomato'), isNotNull);
-    await Future<void>.delayed(Duration.zero);
-    final afterSubmission = make('draft-customer-a');
-    await afterSubmission.restoreCustomerState();
-    expect(afterSubmission.productReviewDraft('s-milk'), isNull);
-    expect(afterSubmission.productReviewDraft('s-tomato'), isNotNull);
+      await session.restoreCommerce();
+      expect(session.addProduct(product.id), isTrue, reason: session.notice);
+      session.openCart(scope: BuyV2CartScope.all);
+      session.openCheckout();
+      commerce.snapshot = publication([
+        testPaymentCapability(
+          session,
+          method: 'RTGS',
+          minimumMinor: 0,
+          maximumMinor: 1000000000,
+        ),
+      ]);
+      await session.restoreCommerce();
+      expect(session.checkoutPaymentAmountMinor, amount * 100);
+      expect(session.choosePayment('RTGS'), amount >= 200000);
+      if (amount < 200000) {
+        expect(session.notice, 'RTGS requires at least ₹2,00,000.');
+      }
+      expect(commerce.requests, isEmpty);
+    });
+  }
+
+  final qrClock = DateTime.utc(2026, 10, 1, 10);
+  final validQrUri = Uri.parse(
+    'upi://pay?pa=test-merchant%40bank&pn=Test%20merchant&cu=INR&am=37.00&tr=txn-1',
+  );
+  for (final invalid in <String, Uri>{
+    'amount': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '38.00'),
+    ),
+    'reference': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('txn-1', 'other'),
+    ),
+    'currency': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('INR', 'USD'),
+    ),
+    'duplicate amount': Uri.parse('$validQrUri&am=37.00'),
+    'missing payee': validQrUri.replace(
+      query: 'pn=Merchant&am=37&tr=txn-1&cu=INR',
+    ),
+    'missing name': validQrUri.replace(
+      query: 'pa=test%40bank&am=37&tr=txn-1&cu=INR',
+    ),
+    'fraction': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '37.001'),
+    ),
+    'negative': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '-37'),
+    ),
+    'exponent': validQrUri.replace(
+      query: validQrUri.query.replaceFirst('37.00', '3.7e1'),
+    ),
+    'https': validQrUri.replace(scheme: 'https'),
+    'host': validQrUri.replace(host: 'other'),
+    'fragment': validQrUri.replace(fragment: 'redirect'),
+  }.entries) {
+    test('UPI QR rejects ${invalid.key}', () {
+      final qr = BuyV2UpiQrAction(
+        uri: invalid.value,
+        paymentReference: 'gateway-1',
+        transactionReference: 'txn-1',
+        expiresAt: qrClock.add(const Duration(minutes: 5)),
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: qrClock),
+        isFalse,
+      );
+    });
+  }
+  test(
+    'UPI QR accepts exact minor amount and distinct gateway reference only before expiry',
+    () {
+      final expires = qrClock.add(const Duration(minutes: 5));
+      final qr = BuyV2UpiQrAction(
+        uri: validQrUri,
+        paymentReference: 'gateway-1',
+        transactionReference: 'txn-1',
+        expiresAt: expires,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: qrClock),
+        isTrue,
+      );
+      expect(
+        qr.validFor(reference: 'other', amountMinor: 3700, now: qrClock),
+        isFalse,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3701, now: qrClock),
+        isFalse,
+      );
+      expect(
+        qr.validFor(reference: 'gateway-1', amountMinor: 3700, now: expires),
+        isFalse,
+      );
+    },
+  );
+  for (final invalid in [false, true]) {
+    testWidgets(
+      'UPI QR ${invalid ? 'invalid' : 'issued'} attempt retains Cart and reconciles without a second order',
+      (tester) async {
+        final seed = BuyV2Session(core: BuySession());
+        addTearDown(seed.dispose);
+        var now = qrClock;
+        final store = _MemoryCustomerStateStore('upi-qr-tests');
+        final commerce = _ShopCommerceAdapter(
+          snapshot: BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [
+              BuyV2Catalogue.products
+                  .firstWhere((p) => p.id == 's-tomato')
+                  .copyWith(storeId: 'upi-test-store'),
+            ],
+            addresses: seed.addresses,
+            selectedAddressId: seed.selectedAddressId,
+            paymentMethods: const {'UPI', 'Card'},
+            upiQrAvailable: true,
+          ),
+          placement: const BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.unavailable,
+            customerMessage: 'Test setup',
+          ),
+        );
+        final session = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: commerce,
+          customerStateStore: store,
+          catalogueNow: () => now,
+          reviewDataEnabled: false,
+          productFactsAdapter: BuyTestEligibilityFacts(now: () => now),
+        );
+        addTearDown(session.dispose);
+        await session.restoreCommerce();
+        await session.restoreCustomerState();
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(session.chooseUpiQr(true), isTrue);
+        final qr = BuyV2UpiQrAction(
+          uri: validQrUri.replace(
+            queryParameters: {
+              ...validQrUri.queryParameters,
+              'am': '${session.checkoutAmountDueNow + (invalid ? 1 : 0)}.00',
+            },
+          ),
+          paymentReference: 'gateway-1',
+          transactionReference: 'txn-1',
+          expiresAt: now.add(const Duration(minutes: 5)),
+        );
+        commerce.placement = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
+          customerMessage: 'Scan to pay',
+          paymentReference: 'gateway-1',
+          upiQrAction: qr,
+        );
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.requests.single.useUpiQr, isTrue);
+        expect(commerce.requests.single.paymentMethod, 'UPI');
+        expect(
+          session.checkoutSubmissionState,
+          invalid
+              ? BuyV2CheckoutSubmissionState.paymentUnknown
+              : BuyV2CheckoutSubmissionState.paymentPending,
+        );
+        expect(session.upiQrAction, invalid ? isNull : same(qr));
+        final gst = BuyV2GstInvoiceController();
+        addTearDown(gst.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: AnimatedBuilder(
+              animation: session,
+              builder: (context, _) => Scaffold(
+                body: BuyV2CheckoutView(
+                  session: session,
+                  gstInvoiceController: gst,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (!invalid) {
+          await tester.scrollUntilVisible(
+            find.byKey(const ValueKey('buy-upi-order-qr')),
+            180,
+            scrollable: find.descendant(
+              of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+        }
+        expect(
+          find.byKey(const ValueKey('buy-upi-order-qr')),
+          invalid ? findsNothing : findsOne,
+        );
+        final key = session.checkoutIdempotencyKey;
+        expect(session.cancelPaymentAttempt(), isFalse);
+        expect(session.choosePayment('Card'), isFalse);
+        expect(session.chooseUpiQr(false), isFalse);
+        expect(await session.submitOrder(), isFalse);
+        expect(commerce.placementCalls, 1);
+        now = qr.expiresAt;
+        expect(session.upiQrAction, isNull);
+        await tester.pump(const Duration(minutes: 5));
+        expect(find.byKey(const ValueKey('buy-upi-order-qr')), findsNothing);
+        expect(session.checkoutRequiresResolution, isTrue);
+        commerce.reconciliation = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          customerMessage: 'Checking same payment',
+          paymentReference: 'gateway-1',
+        );
+        expect(await session.reconcilePayment(), isFalse);
+        expect(session.checkoutIdempotencyKey, key);
+        expect(commerce.reconciliationCalls, 1);
+        expect(session.upiQrAction, isNull);
+        expect(session.cartLines, hasLength(1));
+        expect(session.confirmedOrders, isEmpty);
+        commerce.reconciliation = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+          customerMessage: 'Forged different payment',
+          paymentReference: 'other-payment',
+        );
+        expect(await session.reconcilePayment(), isFalse);
+        expect(session.paymentReference, 'gateway-1');
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(session.confirmedOrders, isEmpty);
+        await tester.pump();
+        final restored = BuyV2Session(
+          core: BuySession(),
+          commerceAdapter: commerce,
+          customerStateStore: store,
+          catalogueNow: () => now,
+          reviewDataEnabled: false,
+          productFactsAdapter: BuyTestEligibilityFacts(now: () => now),
+        );
+        addTearDown(restored.dispose);
+        await restored.restoreCommerce();
+        await restored.restoreCustomerState();
+        expect(restored.paymentReference, 'gateway-1');
+        expect(restored.checkoutIdempotencyKey, key);
+        expect(restored.checkoutRequiresResolution, isTrue);
+        expect(restored.upiQrAction, isNull);
+        expect(restored.retryCheckoutPayment(), isFalse);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+  test(
+    'T01 filters preserve mixed purchase and explicit exclusion survives codec',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final session = make('t01-buyer');
+      await session.restoreCustomerState();
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      final initialTotal = session.scopedPayableTotal;
+      expect(session.cartLines.length, 2);
+      for (final filter in ['shop', 'wholesale', 'bulk', 'all']) {
+        session.chooseCartDisplayFilter(filter);
+        expect(session.cartLines.length, 2);
+        expect(session.scopedPayableTotal, initialTotal);
+      }
+      session.selectCartProduct('w-notebook', false);
+      expect(session.cartLines.single.product.id, 's-tomato');
+      expect(session.visibleCartLines.length, 2);
+      expect(session.openCheckout(), isTrue);
+      expect(session.checkoutLines.single.product.id, 's-tomato');
+      await Future<void>.delayed(Duration.zero);
+      final restored = make('t01-buyer');
+      await restored.restoreCustomerState();
+      expect(restored.cartProductSelected('w-notebook'), isFalse);
+      expect(restored.quantityFor('w-notebook'), greaterThan(0));
+      restored.selectCartProduct('w-notebook', true);
+      expect(restored.cartLines.length, 2);
+      final other = make('t01-other');
+      await other.restoreCustomerState();
+      expect(other.cartLines, isEmpty);
+    },
+  );
+
+  test(
+    'custom delivery note codec restores only its customer and basket',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final first = make('delivery-note-a');
+      await first.restoreCustomerState();
+      first.addProduct('s-tomato');
+      first.addProduct('w-notebook');
+      expect(
+        first.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Use side entrance',
+        ),
+        isTrue,
+      );
+      expect(
+        first.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'Warehouse gate 2',
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final restored = make('delivery-note-a');
+      await restored.restoreCustomerState();
+      expect(
+        restored.customDeliveryInstructionFor(BuyV2Destination.shop),
+        'Warehouse gate 2',
+      );
+      expect(
+        restored.customDeliveryInstructionFor(BuyV2Destination.wholesale),
+        'Warehouse gate 2',
+      );
+      final other = make('delivery-note-b');
+      await other.restoreCustomerState();
+      expect(other.customDeliveryInstructionFor(BuyV2Destination.shop), isNull);
+      expect(
+        restored.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: ' ',
+        ),
+        isTrue,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final cleared = make('delivery-note-a');
+      await cleared.restoreCustomerState();
+      expect(cleared.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
+      expect(
+        cleared.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+        isNull,
+      );
+    },
+  );
+  test(
+    'delivery note placement binds only submitted product identities',
+    () async {
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.failed,
+        customerStateStore: _MemoryCustomerStateStore(
+          'delivery-note-placement',
+        ),
+      );
+      addTearDown(fixture.session.dispose);
+      final destination = fixture.session.cartLines.first.product.destination;
+      expect(
+        fixture.session.setCustomDeliveryInstruction(
+          destination: destination,
+          text: 'Use side entrance',
+        ),
+        isTrue,
+      );
+      expect(await fixture.session.submitOrder(), isFalse);
+      final request = fixture.adapter.requests.single;
+      expect(request.deliveryInstructionsByProductId, isNotEmpty);
+      expect(
+        request.deliveryInstructionsByProductId.keys.toSet(),
+        request.lines.map((line) => line.product.id).toSet(),
+      );
+      expect(request.deliveryInstructionsByProductId.values.toSet(), {
+        'Use side entrance',
+      });
+    },
+  );
+
+  test(
+    'T03 shared instruction reaches Shop Wholesale and Bulk orders',
+    () async {
+      final core = BuySession();
+      final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: adapter,
+        productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Use the side entrance',
+        ),
+        isTrue,
+      );
+      expect(session.addProduct('w-notebook'), isTrue);
+      expect(session.addProduct('w-rice'), isTrue);
+      expect(session.product('w-rice').offerClass, BuyV2OfferClass.bulk);
+      expect(
+        session.product('w-notebook').offerClass,
+        BuyV2OfferClass.wholesale,
+      );
+      expect(
+        session.deliveryInstructionTextFor(BuyV2Destination.wholesale),
+        'Use the side entrance',
+      );
+      session.openCart(scope: BuyV2CartScope.all);
+      expect(session.openCheckout(), isTrue);
+      expect(session.continueCheckoutFromAddress(), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
+      expect(session.continueCheckoutFromPayment(), isTrue);
+      adapter.placementGate = Completer<BuyV2OrderPlacementResult>();
+      final submission = session.submitOrder();
+      await Future<void>.delayed(Duration.zero);
+      expect(session.checkoutBusy, isTrue);
+      session.clearCart();
+      session.remove('s-tomato');
+      expect(session.cartLines.map((line) => line.product.id).toSet(), {
+        's-tomato',
+        'w-notebook',
+        'w-rice',
+      });
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'During submission',
+        ),
+        isFalse,
+      );
+      expect(session.publicDeliveryInstruction, 'Use the side entrance');
+      adapter.placementGate!.complete(adapter.placement);
+      expect(await submission, isFalse);
+      final request = adapter.requests.single;
+      expect(request.lines.map((line) => line.product.id).toSet(), {
+        's-tomato',
+        'w-notebook',
+        'w-rice',
+      });
+      expect(
+        request.deliveryInstructionsByProductId.keys.toSet(),
+        request.lines.map((line) => line.product.id).toSet(),
+      );
+      expect(request.deliveryInstructionsByProductId.values.toSet(), {
+        'Use the side entrance',
+      });
+      expect(request.address.id, session.selectedAddressId);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.wholesale,
+          text: 'Changed during payment',
+        ),
+        isFalse,
+      );
+      expect(
+        session.chooseDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          instructionId: 'shop-call-arrival',
+        ),
+        isFalse,
+      );
+      expect(session.publicDeliveryInstruction, 'Use the side entrance');
+      expect(await session.continuePayment((_) async => true), isTrue);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.confirmedOrders, isNotEmpty);
+      expect(
+        session.confirmedOrders.expand((order) => order.productIds).toSet(),
+        {'s-tomato', 'w-notebook', 'w-rice'},
+      );
+      expect(
+        session.confirmedOrders
+            .map((order) => order.deliveryInstruction)
+            .toSet(),
+        {'Use the side entrance'},
+      );
+      expect(session.addProduct('s-tomato'), isTrue);
+      expect(
+        session.setCustomDeliveryInstruction(
+          destination: BuyV2Destination.shop,
+          text: 'Next purchase instruction',
+        ),
+        isTrue,
+      );
+      expect(
+        session.confirmedOrders
+            .map((order) => order.deliveryInstruction)
+            .toSet(),
+        {'Use the side entrance'},
+      );
+    },
+  );
+
+  for (final remove in [false, true]) {
+    test(
+      'T04 benefit ${remove ? 'removal' : 'choice'} holds actual payment',
+      () async {
+        final core = BuySession();
+        final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: adapter,
+          productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          cartBenefitsAdapter: const _T04CartBenefits(),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        final coupons = session.cartBenefits(kind: BuyV2CartBenefitKind.coupon);
+        expect(session.chooseCartBenefit(coupons.first), isTrue);
+        expect(session.chooseCartBenefit(coupons.first), isTrue);
+        expect(session.scopedCouponSaving, 5);
+        session.openCart(scope: BuyV2CartScope.all);
+        expect(session.openCheckout(), isTrue);
+        expect(session.continueCheckoutFromAddress(), isTrue);
+        expect(session.choosePayment('Card'), isTrue);
+        expect(session.continueCheckoutFromPayment(), isTrue);
+        final agreedTotal = session.checkoutAmountDueNow;
+        expect(agreedTotal, 32);
+        adapter.placementGate = Completer<BuyV2OrderPlacementResult>();
+        final submission = session.submitOrder();
+        await Future<void>.delayed(Duration.zero);
+        expect(session.checkoutBusy, isTrue);
+        void attemptEdit() {
+          if (remove) {
+            session.removeCartBenefit(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+            );
+          } else {
+            session.chooseCartBenefit(coupons.last);
+          }
+        }
+
+        String? selectedId() => session
+            .selectedCartBenefit(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+            )
+            ?.id;
+        attemptEdit();
+        final duringPlacement = selectedId();
+        final duringPlacementTotal = session.checkoutAmountDueNow;
+        adapter.placementGate!.complete(adapter.placement);
+        expect(await submission, isFalse);
+        expect(session.checkoutRequiresResolution, isTrue);
+        attemptEdit();
+        final duringResolution = selectedId();
+        final duringResolutionTotal = session.checkoutAmountDueNow;
+        expect(await session.continuePayment((_) async => true), isTrue);
+        expect(await session.reconcilePayment(), isTrue);
+        expect(adapter.placementCalls, 1);
+        expect(adapter.requests.single.total, agreedTotal);
+        expect(adapter.requests.single.amountDueNow, agreedTotal);
+        expect(duringPlacement, coupons.first.id);
+        expect(duringResolution, coupons.first.id);
+        expect(duringPlacementTotal, agreedTotal);
+        expect(duringResolutionTotal, agreedTotal);
+        expect(session.confirmedOrders.single.total, agreedTotal);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.chooseCartBenefit(coupons.last), isTrue);
+        session.removeCartBenefit(
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+        );
+        expect(selectedId(), isNull);
+      },
+    );
+  }
+
+  test('T04 delayed preflight holds edits and duplicate submission', () async {
+    final core = BuySession();
+    final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+    final benefits = _T04LiveBenefits();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+      cartBenefitsAdapter: benefits,
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    await session.refreshCartBenefits();
+    final coupon = session
+        .cartBenefits(kind: BuyV2CartBenefitKind.coupon)
+        .first;
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    session.openCart();
+    session.openCheckout();
+    session.continueCheckoutFromAddress();
+    session.choosePayment('Card');
+    await session.refreshCartBenefits();
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    benefits.gate = Completer<BuyV2CartBenefitsSnapshot>();
+    final submission = session.submitOrder();
+    final heldDuringPreflight = session.checkoutBusy;
+    final choiceAccepted = session.chooseCartBenefit(coupon);
+    session.removeCartBenefit(
+      kind: coupon.kind,
+      destination: coupon.destination,
+    );
+    final quantityChanged = session.setCartQuantity('s-tomato', '2');
+    final duplicate = session.submitOrder();
+    benefits.gate!.complete(benefits.snapshot);
+    final firstResult = await submission;
+    final duplicateResult = await duplicate;
+    expect(heldDuringPreflight, isTrue);
+    expect(choiceAccepted, isFalse);
+    expect(quantityChanged, isFalse);
+    expect(firstResult, isFalse);
+    expect(duplicateResult, isFalse);
+    expect(adapter.placementCalls, 1);
+    expect(adapter.requests.single.total, 32);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(await session.continuePayment((_) async => true), isTrue);
+    expect(await session.reconcilePayment(), isTrue);
+    session.addProduct('s-tomato');
+    benefits.gate = null;
+    await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    session.openCart();
+    session.openCheckout();
+    session.continueCheckoutFromAddress();
+    session.choosePayment('Card');
+    await session.refreshCartBenefits();
+    session.continueCheckoutFromPayment();
+    benefits.gate = Completer<BuyV2CartBenefitsSnapshot>();
+    final failedPreflight = session.submitOrder();
+    expect(session.checkoutBusy, isTrue);
+    benefits.gate!.complete(
+      BuyV2CartBenefitsSnapshot(
+        state: BuyV2CartBenefitsLoadState.unavailable,
+        evaluatedAt: DateTime.now(),
+      ),
+    );
+    expect(await failedPreflight, isFalse);
+    expect(session.checkoutBusy, isFalse);
+    expect(adapter.placementCalls, 1);
+    benefits.gate = null;
+    await session.refreshCartBenefits();
+    expect(session.chooseCartBenefit(coupon), isTrue);
   });
+
+  for (final conflicting in [false, true]) {
+    test(
+      'T03 shared instruction recovers legacy notes conflict $conflicting',
+      () async {
+        final store = _MemoryCustomerStateStore('legacy-delivery-$conflicting')
+          ..snapshot = BuyV2CustomerStateSnapshot(
+            cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+            customDeliveryInstructions: {
+              BuyV2Destination.shop: 'Use side entrance',
+              BuyV2Destination.wholesale: conflicting
+                  ? 'Call at the gate'
+                  : 'Use side entrance',
+            },
+          );
+        final core = BuySession();
+        final session = BuyV2Session(core: core, customerStateStore: store);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await session.restoreCustomerState();
+        expect(session.publicDeliveryInstructionReviewRequired, conflicting);
+        expect(
+          session.publicDeliveryInstruction,
+          conflicting ? null : 'Use side entrance',
+        );
+        if (conflicting) {
+          expect(session.previousPublicDeliveryInstructions, [
+            'Use side entrance',
+            'Call at the gate',
+          ]);
+          expect(session.confirmOrder(), isFalse);
+          expect(
+            session.notice,
+            'Review and save one delivery instruction for this address.',
+          );
+          expect(
+            session.setCustomDeliveryInstruction(
+              destination: BuyV2Destination.shop,
+              text: 'x' * 201,
+            ),
+            isFalse,
+          );
+          expect(session.previousPublicDeliveryInstructions, [
+            'Use side entrance',
+            'Call at the gate',
+          ]);
+        }
+        if (!conflicting) {
+          session.remove('s-tomato');
+          expect(session.publicDeliveryInstruction, 'Use side entrance');
+          session.addAddress(_instructionAddress);
+          expect(session.publicDeliveryInstruction, 'Use side entrance');
+        }
+        expect(
+          session.setCustomDeliveryInstruction(
+            destination: BuyV2Destination.wholesale,
+            text: 'Use side entrance; call at the gate',
+          ),
+          isTrue,
+        );
+        expect(session.publicDeliveryInstructionReviewRequired, isFalse);
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Use side entrance; call at the gate',
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          store.snapshot!.publicDeliveryInstruction,
+          'Use side entrance; call at the gate',
+        );
+        expect(store.snapshot!.customDeliveryInstructions, isEmpty);
+        expect(
+          session.setCustomDeliveryInstruction(
+            destination: BuyV2Destination.shop,
+            text: '',
+          ),
+          isTrue,
+        );
+        await Future<void>.delayed(Duration.zero);
+        final restoredCore = BuySession();
+        final restored = BuyV2Session(
+          core: restoredCore,
+          customerStateStore: store,
+        );
+        addTearDown(restoredCore.dispose);
+        addTearDown(restored.dispose);
+        await restored.restoreCustomerState();
+        expect(restored.publicDeliveryInstruction, isNull);
+        expect(restored.publicDeliveryInstructionReviewRequired, isFalse);
+        expect(restored.previousPublicDeliveryInstructions, isEmpty);
+      },
+    );
+  }
+
+  testWidgets('T03 conflicting instruction review opens lossless composer', (
+    tester,
+  ) async {
+    final first = 'a' * 150;
+    final second = 'b' * 150;
+    final store = _MemoryCustomerStateStore('instruction-review')
+      ..snapshot = BuyV2CustomerStateSnapshot(
+        addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id,
+        selectedPayment: 'Card',
+        cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+        customDeliveryInstructions: {
+          BuyV2Destination.shop: first,
+          BuyV2Destination.wholesale: second,
+        },
+      );
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: store,
+      productFactsAdapter: _T01CDeliveryFactsAdapter(),
+    );
+    final gst = BuyV2GstInvoiceController();
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    addTearDown(gst.dispose);
+    await session.restoreCustomerState();
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: BuyV2CheckoutView(session: session, gstInvoiceController: gst),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Review delivery instructions'));
+    await tester.pumpAndSettle();
+    final field = find.byKey(
+      const ValueKey('buy-cart-instruction-note-delivery'),
+    );
+    final save = find.byKey(
+      const ValueKey('buy-cart-instruction-save-delivery'),
+    );
+    expect(tester.widget<TextField>(field).controller!.text, '$first\n$second');
+    expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(session.publicDeliveryInstructionReviewRequired, isTrue);
+    expect(tester.widget<TextField>(field).controller!.text, '$first\n$second');
+    final composer = find.byKey(
+      const ValueKey('buy-cart-instruction-composer-delivery'),
+    );
+    await tester.tap(
+      find.descendant(of: composer, matching: find.text('Cancel')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.previousPublicDeliveryInstructions, [first, second]);
+    expect(session.confirmOrder(), isFalse);
+    await tester.ensureVisible(find.text('Review delivery instructions'));
+    await tester.tap(find.text('Review delivery instructions'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field, 'Use one shared entrance');
+    await tester.ensureVisible(save);
+    await tester.pumpAndSettle();
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(session.publicDeliveryInstruction, 'Use one shared entrance');
+    expect(session.publicDeliveryInstructionReviewRequired, isFalse);
+    expect(
+      find.byKey(const ValueKey('buy-instruction-context-shop')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final shared in [false, true]) {
+    for (final secondNote in [false, true]) {
+      test(
+        'T03 pending instructions survive restart shared $shared second note $secondNote',
+        () async {
+          final groupingCore = BuySession();
+          final grouping = BuyV2Session(
+            core: groupingCore,
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(grouping.dispose);
+          addTearDown(groupingCore.dispose);
+          for (final id in ['s-tomato', 'w-notebook']) {
+            expect(grouping.addProduct(id), isTrue);
+          }
+          grouping.openCart(scope: BuyV2CartScope.all);
+          final groups = grouping.scopedCartFulfilmentGroups;
+          final lines = groups.expand((group) => group.lines).toList();
+          // Older submitted instructions are retained facts, not a new checkout.
+          final request = BuyV2OrderPlacementRequest(
+            lines: lines,
+            address: _instructionAddress,
+            paymentMethod: 'Card',
+            total: lines.fold<int>(0, (sum, line) => sum + line.total),
+            amountDueNow: lines.fold<int>(0, (sum, line) => sum + line.total),
+            idempotencyKey: 'pending-instructions-1',
+            deliveryInstructionsByProductId: {
+              's-tomato': shared ? 'Shared gate' : 'Side entrance',
+              if (shared || secondNote)
+                'w-notebook': shared ? 'Shared gate' : 'Warehouse gate',
+            },
+          );
+          final store = _MemoryCustomerStateStore('pending-instructions')
+            ..snapshot = BuyV2CustomerStateSnapshot(
+              addresses: const [_instructionAddress],
+              selectedAddressId: _instructionAddress.id,
+              cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+              customDeliveryInstructions: {
+                BuyV2Destination.shop: 'Side entrance',
+                if (secondNote) BuyV2Destination.wholesale: 'Warehouse gate',
+              },
+              publicDeliveryInstruction: shared ? 'Shared gate' : null,
+              selectedPayment: 'Card',
+              checkoutIdempotencyKey: request.idempotencyKey,
+              paymentReference: 'payment-instructions-1',
+              checkoutSubmissionState: 'paymentPending',
+              legacyCheckoutAttempt: BuyV2LegacyCheckoutAttempt(
+                ownerScope: 'pending-instructions',
+                payment: BuyV2CheckoutGroupAttempt(
+                  request: request,
+                  fulfilmentKeys: groups.map((group) => group.key).toSet(),
+                  obligations: [
+                    for (final group in groups)
+                      BuyV2CheckoutFulfilmentObligation(
+                        fulfilmentKey: group.key,
+                        productIds: group.productIds.toSet(),
+                        totalMinor: group.total * 100,
+                        dueNowMinor: group.total * 100,
+                      ),
+                  ],
+                  state: BuyV2CheckoutSubmissionState.paymentPending,
+                  paymentReference: 'payment-instructions-1',
+                ),
+              ),
+            );
+          final persisted = BuyV2SharedPreferencesCustomerStateStore(
+            _R669StringPreferences(),
+            ownerScope: store.ownerScope,
+          );
+          expect(await persisted.write(store.snapshot!), isTrue);
+          store.snapshot = await persisted.read();
+          expect(store.snapshot!.paymentRecoveryIncomplete, isFalse);
+          final adapter = prepaidCommerceFixture() as _ShopCommerceAdapter;
+          adapter.reconciliation = BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.confirmed,
+            customerMessage: 'Original instruction payment confirmed.',
+            idempotencyKey: request.idempotencyKey,
+            purchaseReference: 'pending-instructions-purchase',
+            paymentReference: 'payment-instructions-1',
+            orders: [
+              for (final line in request.lines)
+                BuyV2Order(
+                  id: 'instruction-order-${line.product.id}',
+                  destination: line.product.destination,
+                  title: line.product.title,
+                  itemSummary: 'Original submitted product',
+                  total: line.total,
+                  partner: line.product.seller,
+                  partnerType: line.product.partnerRole,
+                  promise: line.product.deliveryPromise,
+                  destinationLabel: request.address.shortLine,
+                  recipient: request.address.recipient,
+                  addressLine: request.address.line,
+                  progress: 0,
+                  status: BuyV2OrderStatus.preparing,
+                  purchaseId: 'pending-instructions-purchase',
+                  productIds: [line.product.id],
+                  lines: [line],
+                  paymentMethod: request.paymentMethod,
+                  amountPaidNow: line.total,
+                  deliveryInstruction:
+                      request.deliveryInstructionsByProductId[line.product.id],
+                ),
+            ],
+          );
+          final keyOnlyStore = _MemoryCustomerStateStore(store.ownerScope)
+            ..snapshot = BuyV2CustomerStateSnapshot(
+              addresses: const [_instructionAddress],
+              selectedAddressId: _instructionAddress.id,
+              cartQuantities: const {'s-tomato': 1, 'w-notebook': 1},
+              customDeliveryInstructions: {
+                BuyV2Destination.shop: 'Side entrance',
+                if (secondNote) BuyV2Destination.wholesale: 'Warehouse gate',
+              },
+              publicDeliveryInstruction: shared ? 'Shared gate' : null,
+              selectedPayment: 'Card',
+              checkoutIdempotencyKey: request.idempotencyKey,
+              paymentReference: 'payment-instructions-1',
+              checkoutSubmissionState: 'paymentPending',
+            );
+          final keyOnlyCore = BuySession();
+          final keyOnly = BuyV2Session(
+            core: keyOnlyCore,
+            customerStateStore: keyOnlyStore,
+            commerceAdapter: adapter,
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(keyOnly.dispose);
+          addTearDown(keyOnlyCore.dispose);
+          await keyOnly.restoreCustomerState();
+          expect(await keyOnly.reconcilePayment(), isFalse);
+          expect(keyOnly.checkoutRequiresResolution, isTrue);
+          expect(keyOnly.checkoutIdempotencyKey, request.idempotencyKey);
+          expect(keyOnly.confirmedOrders, isEmpty);
+          expect(
+            keyOnlyStore.snapshot!.customDeliveryInstructions,
+            store.snapshot!.customDeliveryInstructions,
+          );
+          expect(
+            keyOnlyStore.snapshot!.publicDeliveryInstruction,
+            store.snapshot!.publicDeliveryInstruction,
+          );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            customerStateStore: store,
+            commerceAdapter: adapter,
+            productFactsAdapter: _T01CDeliveryFactsAdapter(),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCustomerState();
+          expect(session.checkoutRequiresResolution, isTrue);
+          expect(
+            session.setCustomDeliveryInstruction(
+              destination: BuyV2Destination.shop,
+              text: '',
+            ),
+            isFalse,
+          );
+          expect(await session.reconcilePayment(), isTrue);
+          final shop = session.confirmedOrders.singleWhere(
+            (o) => o.destination == BuyV2Destination.shop,
+          );
+          final wholesale = session.confirmedOrders.singleWhere(
+            (o) => o.destination == BuyV2Destination.wholesale,
+          );
+          expect(
+            shop.deliveryInstruction,
+            shared ? 'Shared gate' : 'Side entrance',
+          );
+          expect(
+            wholesale.deliveryInstruction,
+            shared
+                ? 'Shared gate'
+                : secondNote
+                ? 'Warehouse gate'
+                : null,
+          );
+          expect(session.cartLines, isEmpty);
+        },
+      );
+    }
+  }
+
+  test(
+    'review comparison cart restores through exact catalogue resolver',
+    () async {
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final source = BuyV2DevelopmentCatalogueSource(
+          destination: destination,
+          providerCount: 2,
+          skusPerStore: 24,
+          includeVariantReviewFixtures: true,
+        );
+        final page = await source.loadProducts(
+          BuyV2CatalogueQuery(destination: destination, regionId: 'jodhpur'),
+          pageSize: 1,
+        );
+        final origin = page.items.single;
+        final listings = [
+          for (var index = 0; index < 3; index++)
+            BuyV2ReviewComparisonSource.listing(origin, index),
+        ];
+        final snapshot = BuyV2CustomerStateSnapshot(
+          cartQuantities: {for (final item in listings) item.id: 2},
+          savedProductKeys: {},
+          recentlyViewedProductIds: [listings.first.id],
+        );
+        final store = _MemoryCustomerStateStore(
+          'comparison-restore-${destination.name}',
+        )..snapshot = snapshot;
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+            destination: destination,
+            providerCount: 2,
+            skusPerStore: 24,
+            includeVariantReviewFixtures: true,
+          ),
+          customerStateStore: store,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCustomerState();
+        expect(session.customerStateRecoveryPending, isFalse);
+        expect(session.cartLines, hasLength(3));
+        for (final listing in listings) {
+          final restored = session.product(listing.id);
+          expect(restored.storeId, listing.storeId);
+          expect(restored.canonicalId, origin.canonicalId);
+          expect(restored.variant, origin.variant);
+          expect(restored.pack, origin.pack);
+          expect(restored.price, listing.price);
+          expect(session.quantityFor(listing.id), 2);
+        }
+        expect(store.snapshot, same(snapshot));
+        expect(
+          await source.resolveProducts({
+            'review-compare-${origin.id}-0',
+            'review-compare-${origin.id}-4',
+            'review-compare-unknown-1',
+            'review-compare-${listings.first.id}-1',
+          }),
+          isEmpty,
+        );
+      }
+    },
+  );
+
+  test(
+    'phone review cohort is explicit and binds six unique media variants',
+    () async {
+      final count = BuyV2Catalogue.products
+          .where((p) => p.destination == BuyV2Destination.shop)
+          .length;
+      final normal = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        providerCount: 1,
+      );
+      final review = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        providerCount: 1,
+        includeVariantReviewFixtures: true,
+      );
+      final ids = {
+        for (var i = count; i < count + 6; i++) review.productIdAt(0, i),
+      };
+      expect(
+        (await normal.resolveProducts(
+          ids,
+        )).every((p) => !p.hasStructuredVariants),
+        isTrue,
+      );
+      for (final mode in BuyV2ShopSaleType.values) {
+        final query = BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          query: 'phone',
+          shopSaleType: mode,
+        );
+        expect(
+          (await review.loadProducts(query, pageSize: 20)).items,
+          hasLength(6),
+        );
+        expect((await normal.loadProducts(query, pageSize: 20)).items, isEmpty);
+      }
+      final phones = await review.resolveProducts(ids);
+      final contentClock = DateTime.utc(2026, 9, 25, 6);
+      final reviewContent = BuyV2CatalogueProductContentAdapter(
+        includeVariantReviewFixtures: true,
+        now: () => contentClock,
+      );
+      expect(
+        const BuyV2CatalogueProductContentAdapter()
+            .snapshotFor(phones.first)
+            .priceHistory,
+        isNull,
+      );
+      expect(
+        const BuyV2CatalogueProductContentAdapter()
+            .snapshotFor(phones.first)
+            .description,
+        isNull,
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        cataloguePageSource: review,
+        productContentAdapter: reviewContent,
+        reviewDataEnabled: false,
+        productFactsAdapter: const BuyTestEligibilityFacts(locationKey: '||0'),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final pager = session.acquireCatalogueProducts('variant-review-search');
+      await pager.open(
+        BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          query: 'phone',
+          shopSaleType: BuyV2ShopSaleType.quickDelivery,
+        ),
+      );
+      expect(session.openProduct(phones.first.id), isTrue);
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      final firstChoices = session.productVariantsFor(session.selectedProduct!);
+      expect(firstChoices, hasLength(4));
+      final reachable = firstChoices.map((p) => p.id).toSet();
+      expect(session.selectProductVariant(phones[3].id), isTrue);
+      expect(
+        await session.refreshVariantFamily(session.selectedProduct!),
+        isTrue,
+      );
+      final nextChoices = session.productVariantsFor(session.selectedProduct!);
+      expect(nextChoices, hasLength(4));
+      reachable.addAll(nextChoices.map((p) => p.id));
+      expect(reachable, ids);
+      expect(
+        session.selectedProduct!.mediaAssets.first.source,
+        phones[3].mediaAssets.first.source,
+      );
+      expect(session.selectedProduct!.price, phones[3].price);
+      expect(phones, hasLength(6));
+      expect(phones.map((p) => p.price).toSet(), hasLength(6));
+      for (final phone in phones) {
+        final content = reviewContent.snapshotFor(phone);
+        expect(content.productId, phone.id);
+        expect(content.sourceId, 'device-review-variant-content');
+        expect(content.description, contains('Synthetic content'));
+        expect(content.priceHistory!.skuId, phone.id);
+        expect(
+          content.priceHistory!.currentSellingPriceMinor,
+          phone.price * 100,
+        );
+        expect(
+          content.priceHistory!.validUntil,
+          contentClock.add(const Duration(hours: 1)),
+        );
+        expect(phone.title, contains('Review only'));
+        expect(phone.variantAttributes, hasLength(2));
+        expect(BuyV2SupplierMediaPolicy.admittedAssets(phone), hasLength(2));
+        expect(
+          phone.mediaAssets.every((a) => a.binding!.skuId == phone.id),
+          isTrue,
+        );
+        expect(
+          phone.mediaAssets.every((a) => a.binding!.storeId == phone.storeId),
+          isTrue,
+        );
+      }
+      expect(
+        reviewContent.snapshotFor(phones.first).description,
+        isNot(reviewContent.snapshotFor(phones[2]).description),
+      );
+      expect(
+        phones.first.purchaseProtection!.warrantyLabel,
+        isNot(phones[2].purchaseProtection!.warrantyLabel),
+      );
+      expect(
+        phones.first.compliance!.manufacturerAddress,
+        isNot(phones[2].compliance!.manufacturerAddress),
+      );
+      expect(session.selectProductVariant(phones[2].id), isTrue);
+      final selectedContent = session.productContentFor(
+        session.selectedProduct!,
+      );
+      expect(
+        selectedContent.specifications
+            .singleWhere((field) => field.attributeId == 'storage')
+            .value,
+        '512 GB',
+      );
+      expect(selectedContent.description, contains('expanded offline-library'));
+      expect(selectedContent.priceHistory!.skuId, phones[2].id);
+      expect(
+        phones.first.resolveVariantOption(phones, 'colour', 'ultramarine')?.id,
+        phones[3].id,
+      );
+      expect(
+        phones.first.resolveVariantOption(phones, 'storage', '256')?.id,
+        phones[1].id,
+      );
+      expect(
+        phones.first.mediaAssets.first.source,
+        isNot(phones[3].mediaAssets.first.source),
+      );
+      expect(
+        // Six phone variants plus the explicit pack-composition review SKU.
+        await review.resolveProducts({review.productIdAt(0, count * 2 + 7)}),
+        isEmpty,
+      );
+      final pack = (await review.resolveProducts({
+        review.productIdAt(0, count + 6),
+      })).single;
+      expect(pack.title, 'Amul Calci+ Milk');
+      expect(pack.pack, '4 × 1 L · Case');
+      expect(pack.hasValidPackTerms, isTrue);
+      expect(pack.quantityStep, 3);
+      expect(pack.seller, startsWith('Test supplier'));
+      expect(
+        await review.resolveProducts({review.productIdAt(0, count * 2 + 13)}),
+        isEmpty,
+      );
+    },
+  );
+  test(
+    'development catalogue keeps template families and unique Store listings',
+    () async {
+      final source = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        providerCount: 2,
+        skusPerStore: 90,
+      );
+      final ids = [
+        for (var sku = 0; sku < 90; sku++) source.productIdAt(0, sku),
+        source.productIdAt(1, 0),
+      ];
+      final products = <BuyV2Product>[];
+      for (var offset = 0; offset < ids.length; offset += 25) {
+        products.addAll(
+          await source.resolveProducts(ids.skip(offset).take(25).toSet()),
+        );
+      }
+      expect(products, hasLength(91));
+      expect(products.map((p) => p.id).toSet(), hasLength(91));
+      expect(products.map((p) => p.canonicalId).toSet().length, lessThan(90));
+      final first = products.firstWhere(
+        (p) => p.id == source.productIdAt(0, 0),
+      );
+      final otherStore = products.firstWhere(
+        (p) => p.id == source.productIdAt(1, 0),
+      );
+      expect(first.canonicalId, otherStore.canonicalId);
+      expect(
+        first.title,
+        BuyV2Catalogue.allProducts
+            .firstWhere(
+              (p) =>
+                  p.canonicalId == first.canonicalId &&
+                  p.destination == first.destination,
+            )
+            .title,
+      );
+      expect(first.storeId, isNot(otherStore.storeId));
+      expect(products.every((p) => !p.variant.contains('SKU ')), isTrue);
+    },
+  );
+  group('D09 A02 purchased-line persistence', () {
+    BuyV2Order purchasedOrder(BuyV2Product product) => BuyV2Order(
+      id: 'retained-order',
+      destination: product.destination,
+      title: 'Shop order',
+      itemSummary: '1 product',
+      total: product.price * 3,
+      partner: product.seller,
+      partnerType: product.sellerType,
+      promise: 'Delivery awaiting confirmation',
+      destinationLabel: 'Buyer address',
+      progress: .2,
+      status: BuyV2OrderStatus.confirmed,
+      purchaseId: 'retained-purchase',
+      productIds: [product.id],
+      lines: [BuyV2CartLine(product: product, quantity: 3)],
+    );
+    for (final providerOnly in [false, true]) {
+      test(
+        'preserves exact purchased snapshot providerOnly=$providerOnly',
+        () async {
+          final preferences = _R669StringPreferences();
+          final store = BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: 'receipt-buyer',
+          );
+          final base = BuyV2Catalogue.products.first;
+          final product = base.copyWith(
+            id: providerOnly ? 'provider-only-purchased-sku' : base.id,
+            canonicalId: 'purchased-family',
+            variantAttributes: const [
+              BuyV2VariantAttribute(
+                dimensionId: 'colour',
+                dimensionLabel: 'Colour',
+                optionId: 'blue',
+                optionLabel: 'Blue',
+                kind: BuyV2VariantDimensionKind.colour,
+                swatchArgb: 0xff3366aa,
+              ),
+              BuyV2VariantAttribute(
+                dimensionId: 'storage',
+                dimensionLabel: 'Storage',
+                optionId: '256',
+                optionLabel: '256 GB',
+                kind: BuyV2VariantDimensionKind.storage,
+              ),
+            ],
+            storeId: 'purchased-store',
+            title: 'Purchased title',
+            variant: 'Blue 256 GB',
+            pack: 'One sealed unit',
+            price: 12345,
+            unitPrice: '12345 per unit',
+            seller: 'Purchased seller',
+          );
+          expect(
+            await store.write(
+              BuyV2CustomerStateSnapshot(orders: [purchasedOrder(product)]),
+            ),
+            isTrue,
+          );
+          final order = (await store.read())!.orders.single;
+          expect(order.lines, hasLength(1));
+          final line = order.lines.single;
+          expect(line.product.id, product.id);
+          expect(line.product.canonicalId, product.canonicalId);
+          expect(line.product.storeId, product.storeId);
+          expect(line.product.title, product.title);
+          expect(line.product.variant, product.variant);
+          expect(line.product.pack, product.pack);
+          expect(line.product.price, product.price);
+          expect(line.product.seller, product.seller);
+          expect(line.product.hasStructuredVariants, isTrue);
+          expect(
+            line.product.variantAttributes.map((value) => value.optionId),
+            ['blue', '256'],
+          );
+          expect(line.product.variantAttributes.first.swatchArgb, 0xff3366aa);
+          expect(
+            line.product.variantAttributes.last.kind,
+            BuyV2VariantDimensionKind.storage,
+          );
+          expect(line.product.catalogueListing, isFalse);
+          expect(line.product.procurementSupplierGrant, isNull);
+          expect(line.quantity, 3);
+          expect(order.total, product.price * 3);
+          expect(order.purchaseId, 'retained-purchase');
+        },
+      );
+    }
+    for (final corruption in [
+      'fractional quantity',
+      'negative price',
+      'identity mismatch',
+      'missing pack',
+      'future version',
+    ]) {
+      test('rejects $corruption without losing retained order', () async {
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: 'receipt-buyer',
+        );
+        final product = BuyV2Catalogue.products.first;
+        await store.write(
+          BuyV2CustomerStateSnapshot(orders: [purchasedOrder(product)]),
+        );
+        final key = preferences.values.keys.single;
+        final encoded =
+            jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+        final line =
+            (encoded['orders'] as List).single['lines'][0]
+                as Map<String, dynamic>;
+        final snapshot = line['purchasedProduct'] as Map<String, dynamic>;
+        switch (corruption) {
+          case 'fractional quantity':
+            line['quantity'] = 1.5;
+          case 'negative price':
+            snapshot['price'] = -1;
+          case 'identity mismatch':
+            snapshot['id'] = 'another-sku';
+          case 'missing pack':
+            snapshot.remove('pack');
+          case 'future version':
+            snapshot['version'] = 999;
+        }
+        preferences.values[key] = jsonEncode(encoded);
+        final order = (await store.read())!.orders.single;
+        expect(order.id, 'retained-order');
+        expect(order.lines, isEmpty);
+        expect(order.productIds, contains(product.id));
+        expect(order.total, product.price * 3);
+      });
+    }
+    test(
+      'variant draft persistence preserves metadata without restoring authority',
+      () async {
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(
+          preferences,
+          ownerScope: 'receipt-buyer',
+        );
+        final product = BuyV2Catalogue.allProducts
+            .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+            .copyWith(
+              variantAttributes: const [
+                BuyV2VariantAttribute(
+                  dimensionId: 'size',
+                  dimensionLabel: 'Size',
+                  optionId: 'large',
+                  optionLabel: 'Large',
+                  kind: BuyV2VariantDimensionKind.size,
+                ),
+              ],
+            );
+        expect(
+          await store.write(
+            BuyV2CustomerStateSnapshot(
+              procurementDraft: BuyV2ProcurementDraftSnapshot(
+                ownerScope: 'receipt-buyer',
+                cartProducts: {product.id: product},
+              ),
+            ),
+          ),
+          isTrue,
+        );
+        final restored =
+            (await store.read())!.procurementDraft!.cartProducts[product.id]!;
+        expect(restored.variantAttributes.single.optionId, 'large');
+        expect(restored.variantAttributes.single.dimensionLabel, 'Size');
+        expect(restored.procurementSupplierGrant!.approved, isFalse);
+        expect(restored.procurementSupplierGrant!.published, isFalse);
+      },
+    );
+
+    for (final invalid in ['duplicate', 'unknown kind', 'fractional swatch']) {
+      test(
+        'invalid variant metadata $invalid retains purchased SKU honestly',
+        () async {
+          final preferences = _R669StringPreferences();
+          final store = BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: 'receipt-buyer',
+          );
+          final product = BuyV2Catalogue.products.first;
+          await store.write(
+            BuyV2CustomerStateSnapshot(orders: [purchasedOrder(product)]),
+          );
+          final key = preferences.values.keys.single;
+          final encoded =
+              jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+          final value = <String, Object?>{
+            'dimensionId': 'colour',
+            'dimensionLabel': 'Colour',
+            'optionId': 'blue',
+            'optionLabel': 'Blue',
+            'kind': 'colour',
+            'swatchArgb': 0xff3366aa,
+          };
+          if (invalid == 'unknown kind') value['kind'] = 'unknown';
+          if (invalid == 'fractional swatch') value['swatchArgb'] = 1.5;
+          (encoded['orders'] as List)
+              .single['lines'][0]['purchasedProduct']['variantAttributes'] = [
+            value,
+            if (invalid == 'duplicate') value,
+          ];
+          preferences.values[key] = jsonEncode(encoded);
+          final restored =
+              (await store.read())!.orders.single.lines.single.product;
+          expect(restored.id, product.id);
+          expect(restored.price, product.price);
+          expect(restored.variantAttributes, isEmpty);
+          expect(restored.hasStructuredVariants, isFalse);
+        },
+      );
+    }
+    test('legacy ID-only records do not invent purchased prices', () async {
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: 'receipt-buyer',
+      );
+      final product = BuyV2Catalogue.products.first;
+      await store.write(
+        BuyV2CustomerStateSnapshot(orders: [purchasedOrder(product)]),
+      );
+      final key = preferences.values.keys.single;
+      final encoded =
+          jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      (encoded['orders'] as List).single['lines'] = [
+        {'productId': product.id, 'quantity': 3},
+      ];
+      preferences.values[key] = jsonEncode(encoded);
+      final order = (await store.read())!.orders.single;
+      expect(order.lines, isEmpty);
+      expect(order.productIds, contains(product.id));
+      expect(order.total, product.price * 3);
+    });
+  });
+  for (final difference in ['provider', 'service', 'none']) {
+    test(
+      'D08 assignment grouping preserves independent timing $difference',
+      () async {
+        final core = BuySession();
+        final facts = _AssignedDeliveryFactsAdapter();
+        final first = BuyV2Catalogue.products
+            .firstWhere((p) => p.id == 's-tomato')
+            .copyWith(
+              storeId: 'assignment-store',
+              offerClass: BuyV2OfferClass.retail,
+            );
+        final second = first.copyWith(
+          id: 'assigned-second-sku',
+          title: 'Second purchased product',
+        );
+        final commerce = _ShopCommerceAdapter(
+          snapshot: BuyV2CommerceSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            products: [first, second],
+          ),
+          placement: const BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.unavailable,
+            customerMessage: 'Placement is outside this fixture.',
+          ),
+        );
+        final session = BuyV2Session(
+          core: core,
+          productFactsAdapter: facts,
+          commerceAdapter: commerce,
+          reviewDataEnabled: false,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await session.restoreCommerce();
+        if (difference == 'provider') {
+          facts.providers[second.id] = 'Other delivery';
+        }
+        if (difference == 'service') {
+          facts.services[second.id] = 'Cold-chain delivery';
+        }
+        expect(session.addProduct(first.id), isTrue);
+        expect(session.addProduct(second.id), isTrue);
+        session.openCart(scope: BuyV2CartScope.shop);
+        final groups = session.scopedCartFulfilmentGroups;
+        expect(groups.length, difference == 'none' ? 1 : 2);
+        expect(groups.every((group) => group.promise == facts.timing), isTrue);
+        expect(
+          groups.every((group) => !group.deliveryProviderName!.contains(' · ')),
+          isTrue,
+        );
+        expect(
+          groups.every((group) => !group.deliveryServiceLevel!.contains(' · ')),
+          isTrue,
+        );
+        expect(groups.map((group) => group.key).toSet().length, groups.length);
+      },
+    );
+  }
+  testWidgets(
+    'Cursor delivery rail follows active orders not retained selection',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      BuyV2Order order(
+        String id,
+        BuyV2OrderStatus status, {
+        BuyV2Destination destination = BuyV2Destination.shop,
+      }) => BuyV2Order(
+        id: id,
+        destination: destination,
+        title: 'Placed order',
+        itemSummary: '1 item',
+        total: 100,
+        partner: 'Verified store',
+        partnerType: 'Retailer',
+        promise: 'Confirmed delivery',
+        destinationLabel: 'Home',
+        progress: status == BuyV2OrderStatus.delivered ? 1 : .5,
+        status: status,
+      );
+      final adapter = _R669ProcurementCommerce(
+        const BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready),
+      );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        commerceAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      Future<void> showOrders(List<BuyV2Order> orders) async {
+        adapter.snapshot = BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready,
+          orders: orders,
+        );
+        await session.restoreCommerce();
+        await tester.pumpAndSettle();
+      }
+
+      await showOrders([]);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final delivery = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
+      expect(delivery, findsNothing);
+      await captureR66Visual(tester, "cursor-delivery-empty");
+      await showOrders([
+        order(
+          'care-only',
+          BuyV2OrderStatus.dispatched,
+          destination: BuyV2Destination.medicine,
+        ),
+      ]);
+      expect(delivery, findsNothing);
+      await showOrders([
+        order('one', BuyV2OrderStatus.dispatched),
+        order('two', BuyV2OrderStatus.arriving),
+      ]);
+      expect(delivery, findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-expand')));
+      await tester.pumpAndSettle();
+      await showOrders([
+        order('one', BuyV2OrderStatus.delivered),
+        order('two', BuyV2OrderStatus.arriving),
+      ]);
+      expect(session.activeDeliveryOrders.map((o) => o.id), ['two']);
+      expect(delivery, findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-delivery-count')), findsNothing);
+      await showOrders([
+        order('one', BuyV2OrderStatus.delivered),
+        order('two', BuyV2OrderStatus.delivered),
+      ]);
+      expect(delivery, findsNothing);
+      expect(session.orders.length, 2);
+      await captureR66Visual(
+        tester,
+        "cursor-delivery-completed-history-retained",
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(delivery, findsNothing);
+      await showOrders([order('new', BuyV2OrderStatus.confirmed)]);
+      expect(delivery, findsOneWidget);
+      await showOrders([]);
+      expect(delivery, findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  test(
+    'Cursor store search and filters never broaden to home catalogue',
+    () async {
+      expect(
+        buyV2MatchesStoreSearch('rice', 'Self-adhesive price labels'),
+        isFalse,
+      );
+      expect(buyV2MatchesStoreSearch('ric', 'Premium basmati rice'), isTrue);
+      expect(buyV2MatchesStoreSearch('गेहूँ', 'ताज़ा गेहूँ आटा'), isTrue);
+      final source = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+      );
+      Future<BuyV2CataloguePage<BuyV2Product>> search(
+        String text, {
+        int? price,
+        String category = 'all',
+      }) => source.loadProducts(
+        BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          storeId: source.storeIdAt(0),
+          query: text,
+          maximumPrice: price,
+          categoryId: category,
+          sort: BuyV2ProductSort.priceLowToHigh,
+        ),
+        pageSize: 50,
+      );
+      for (final text in ['rice', 'ric', 'basmati rice', 'rice basmati']) {
+        final page = await search(text);
+        expect(page.items, isNotEmpty);
+        expect(
+          page.items.every((p) => p.storeId == source.storeIdAt(0)),
+          isTrue,
+        );
+        expect(
+          page.items.any((p) => p.title.toLowerCase().contains('price labels')),
+          isFalse,
+        );
+        expect(
+          page.items.every((p) => p.title.toLowerCase().contains('rice')),
+          isTrue,
+        );
+      }
+      final labels = await search('price labels');
+      expect(labels.items, isNotEmpty);
+      expect(
+        labels.items.every(
+          (p) => p.title.toLowerCase().contains('price labels'),
+        ),
+        isTrue,
+      );
+      final all = await search('');
+      final category = all.items.first.categoryId;
+      final filtered = await search('', price: 100, category: category);
+      expect(filtered.items, isNotEmpty);
+      expect(
+        filtered.items.every(
+          (p) =>
+              p.storeId == source.storeIdAt(0) &&
+              p.price <= 100 &&
+              p.categoryId == category,
+        ),
+        isTrue,
+      );
+      final prices = filtered.items.map((p) => p.price).toList();
+      expect(prices, orderedEquals([...prices]..sort()));
+      expect((await search('no-such-sku-xyz')).items, isEmpty);
+      expect(
+        (await search(
+          'sku 4999',
+        )).items.any((p) => p.id == source.productIdAt(0, 4998)),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'R669 review draft codec relaunch keeps cart and isolates customer',
+    () async {
+      final preferences = _R669StringPreferences();
+      BuyV2Session make(String owner) {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+            preferences,
+            ownerScope: owner,
+          ),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        return session;
+      }
+
+      final session = make('draft-customer-a');
+      await session.restoreCustomerState();
+      session.addProduct('s-milk');
+      final quantity = session.quantityFor('s-milk');
+      session.retainProductReviewDraft(
+        productId: 's-milk',
+        rating: 4,
+        comment: 'Keep my unsent review.',
+        ownerScope: session.reviewDraftOwnerScope,
+      );
+      session.retainProductReviewDraft(
+        productId: 's-tomato',
+        rating: 2,
+        comment: 'A separate product.',
+        ownerScope: session.reviewDraftOwnerScope,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final restarted = make('draft-customer-a');
+      await restarted.restoreCustomerState();
+      expect(restarted.productReviewDraft('s-milk')?.rating, 4);
+      expect(
+        restarted.productReviewDraft('s-milk')?.comment,
+        'Keep my unsent review.',
+      );
+      expect(
+        restarted.productReviewDraft('s-tomato')?.comment,
+        'A separate product.',
+      );
+      expect(restarted.customerReviewFor('s-milk'), isNull);
+      expect(restarted.quantityFor('s-milk'), quantity);
+      final other = make('draft-customer-b');
+      await other.restoreCustomerState();
+      expect(other.productReviewDraft('s-milk'), isNull);
+      other.retainProductReviewDraft(
+        productId: 's-milk',
+        rating: 5,
+        comment: 'Stale owner edit',
+        ownerScope: 'draft-customer-a',
+      );
+      expect(other.productReviewDraft('s-milk'), isNull);
+      expect(
+        restarted.submitProductReview(
+          productId: 's-milk',
+          rating: 0,
+          comment: '',
+        ),
+        isFalse,
+      );
+      expect(restarted.productReviewDraft('s-milk'), isNotNull);
+      expect(
+        restarted.submitProductReview(
+          productId: 's-milk',
+          rating: 4,
+          comment: 'Keep my unsent review.',
+        ),
+        isTrue,
+      );
+      expect(restarted.productReviewDraft('s-milk'), isNull);
+      expect(restarted.productReviewDraft('s-tomato'), isNotNull);
+      await Future<void>.delayed(Duration.zero);
+      final afterSubmission = make('draft-customer-a');
+      await afterSubmission.restoreCustomerState();
+      expect(afterSubmission.productReviewDraft('s-milk'), isNull);
+      expect(afterSubmission.productReviewDraft('s-tomato'), isNotNull);
+    },
+  );
 
   r669SharedProductTests();
   r669ShoppingAreaTests();
@@ -1815,7 +5828,7 @@ void main() {
       orders: orders,
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
-      paymentMethods: const {'Cash on Delivery', 'PhonePe', 'UPI'},
+      paymentMethods: const {'Cash on Delivery', 'UPI'},
       addresses: const [
         BuyV2Address(
           id: 'receiving-store',
@@ -2972,7 +6985,10 @@ void main() {
       expect(session.openCheckout(), isTrue);
       expect(session.choosePayment('UPI'), isTrue);
       expect(await session.refreshCommercialPaymentTerms(), isFalse);
-      expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.ready);
+      expect(
+        session.commercialPaymentTermsLoadState,
+        BuyV2CommerceLoadState.ready,
+      );
       expect(session.checkoutPaymentTermsReviewRequired, isTrue);
       for (final group in session.checkoutFulfilmentGroups) {
         expect(
@@ -2994,7 +7010,9 @@ void main() {
         final gate = Completer<BuyV2OrderPlacementResult>();
         fixture.adapter.placementGate = gate;
         final pending = session.submitOrder();
-        await fixture.adapter.placementStarted.future.timeout(const Duration(seconds: 5));
+        await fixture.adapter.placementStarted.future.timeout(
+          const Duration(seconds: 5),
+        );
         expect(fixture.adapter.placements, hasLength(1));
         expect(
           fixture.adapter.placements.single.procurementContext,
@@ -3578,9 +7596,11 @@ void main() {
         expect(find.text('NOW'), findsNothing);
         expect(
           tester.widget<Text>(estimate).data,
-          startsWith(updateUnavailable
-              ? 'Last recorded estimate (update unavailable) · '
-              : 'Last recorded estimate · '),
+          startsWith(
+            updateUnavailable
+                ? 'Last recorded estimate (update unavailable) · '
+                : 'Last recorded estimate · ',
+          ),
         );
         expect(session.selectedOrder, same(original));
       }
@@ -3627,7 +7647,10 @@ void main() {
       await tester.tap(refresh);
       await tester.pumpAndSettle();
       expect(find.text('UPDATED'), findsOneWidget);
-      expect(tester.widget<Text>(estimate).data, 'Updated estimate · Delivery in 12 min');
+      expect(
+        tester.widget<Text>(estimate).data,
+        'Updated estimate · Delivery in 12 min',
+      );
       expect(
         find.byKey(const ValueKey('buy-tracking-refresh-unavailable')),
         findsNothing,
@@ -3936,6 +7959,38 @@ void main() {
     },
   );
 
+  test(
+    'CAT04 plus uses quantity validation for numeric and wholesale limits',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const id = 'w-notebook';
+      expect(session.addProduct(id), isTrue);
+      final price = session.product(id).price;
+      final maximum =
+          (BigInt.from(9007199254740991) ~/
+                  (BigInt.from(price) * BigInt.from(10000)))
+              .toInt();
+      expect(session.setCartQuantity(id, '$maximum'), isTrue);
+      session.increase(id);
+      expect(session.quantityFor(id), maximum);
+      expect(session.notice, contains('too large'));
+      expect(session.setCartQuantity(id, '1000'), isTrue);
+      session.businessVerified = false;
+      session.increase(id);
+      expect(session.quantityFor(id), 1000);
+      expect(session.notice, contains('business profile'));
+      session.decrease(id);
+      expect(session.quantityFor(id), 999);
+      session.businessVerified = true;
+      session.increase(id);
+      expect(session.quantityFor(id), 1000);
+      expect(session.cartLines.single.product.id, id);
+    },
+  );
+
   test('R669 quantity entry respects prescription approval limits', () {
     final core = BuySession();
     final session = BuyV2Session(core: core);
@@ -4006,9 +8061,43 @@ void main() {
       harness.identity.dispose();
     });
 
+    test(
+      'T05 collection validates exact quote before and after reservation',
+      () async {
+        checkout.dispose();
+        var allowed = false;
+        final checkedAmounts = <int>[];
+        checkout = harness.controller(
+          canSubmitPayment: (intent) {
+            checkedAmounts.add(intent.quote.totalMinor);
+            return allowed;
+          },
+        );
+        final basket = harness.basket();
+        expect(await checkout.prepare(basket), isTrue);
+        final expectedMinor =
+            basket.lines.fold(0, (total, line) => total + line.total * 100) +
+            25;
+        expect(await checkout.place(basket), isFalse);
+        expect(harness.pending, isNull);
+        allowed = true;
+        harness.reservationGate = Completer<bool>();
+        final placing = checkout.place(basket);
+        await Future<void>.delayed(Duration.zero);
+        allowed = false;
+        harness.reservationGate!.complete(true);
+        expect(await placing, isFalse);
+        expect(harness.placements, 0);
+        expect(checkout.unresolved, isTrue);
+        expect(harness.pending!.quote.totalMinor, expectedMinor);
+        expect(checkedAmounts, [expectedMinor, expectedMinor, expectedMinor]);
+      },
+    );
+
     Future<BuyV2Session> checkoutSession({
       bool openCheckout = true,
       bool purchaseServices = true,
+      BuyV2PurchaseOrderAdapter? purchaseOrderAdapter,
     }) async {
       final core = BuySession();
       final session = BuyV2Session(
@@ -4017,6 +8106,7 @@ void main() {
         cataloguePageSource: _CollectionPurchaseCatalogueSource(harness),
         catalogueNow: () => harness.clock,
         collectionIdentity: harness.identity,
+        purchaseOrderAdapter: purchaseOrderAdapter,
         collectionGateway: harness,
         collectionPendingStore: _CollectionScannerPending(),
         collectionCheckoutGateway: purchaseServices ? harness : null,
@@ -4083,6 +8173,657 @@ void main() {
       addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     }
 
+    for (final confirmation in [
+      'valid',
+      'restart',
+      'restart-account',
+      'restart-overlap',
+      'restart-request',
+      'restart-revision',
+      'restart-unavailable',
+      'restart-before-response',
+      'restart-before-response-unavailable',
+      'restart-before-response-error',
+      'restart-before-response-session',
+      'restart-before-response-missing',
+      'persistence-failure',
+      'persistence-held',
+      'persistence-revoked',
+      'persistence-missing',
+      'revoked',
+      'wrong-po',
+      'wrong-lines',
+      'wrong-store',
+    ]) {
+      final revokeApproval = confirmation == 'revoked';
+      test(
+        'D17 delivery requires every supplier approval and carries exact PO binding revoke=$revokeApproval confirmation=$confirmation',
+        () async {
+          final base = _CollectionPurchaseCatalogueSource(
+            harness,
+          ).products.last;
+          final products = [
+            base,
+            base.copyWith(
+              id: 'wholesale-second',
+              canonicalId: 'second-product',
+              storeId: 'store-d',
+              seller: 'Second Supplier',
+            ),
+          ];
+          const address = BuyV2Address(
+            id: 'delivery-address',
+            kind: BuyV2AddressKind.work,
+            label: 'Work',
+            recipient: 'Buyer A',
+            phone: '9000000000',
+            line: 'Receiving address',
+            area: 'Jodhpur',
+            pinCode: '342003',
+            landmark: '',
+          );
+          final commerce = _R669ProcurementCommerce(
+            BuyV2CommerceSnapshot(
+              state: BuyV2CommerceLoadState.ready,
+              products: products,
+              addresses: const [address],
+              selectedAddressId: address.id,
+              businessVerificationState:
+                  BuyV2BusinessVerificationState.verified,
+              paymentMethods: const {'UPI'},
+            ),
+          );
+          final deliveryFacts = _T01CDeliveryFactsAdapter();
+          final preferences = _R669StringPreferences();
+          final retainedState = confirmation == 'persistence-missing'
+              ? null
+              : BuyV2SharedPreferencesCustomerStateStore(
+                  preferences,
+                  ownerScope: 'd17-buyer-a',
+                );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: false,
+            commerceAdapter: commerce,
+            customerStateStore: retainedState,
+            collectionIdentity: harness.identity,
+            purchaseOrderAdapter: harness,
+            catalogueNow: () => harness.clock,
+            productFactsAdapter: BuyTestEligibilityFacts(
+              now: () => harness.clock,
+              delegate: deliveryFacts,
+            ),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          await session.restoreCustomerState();
+          for (final product in products) {
+            expect(
+              session.addProduct(product.id),
+              isTrue,
+              reason: session.notice,
+            );
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          expect(session.openCheckout(), isTrue);
+          session.continueCheckoutFromAddress();
+          expect(session.choosePayment('UPI'), isTrue);
+          session.continueCheckoutFromPayment();
+          expect(await session.reviewPurchaseOrder(), isTrue);
+          expect(session.purchaseOrder!.review!.documents, hasLength(2));
+          expect(await session.issuePurchaseOrder(), isTrue);
+          harness.poSupplierStates['store-c'] =
+              BuyV2PurchaseOrderState.accepted;
+          expect(await session.purchaseOrder!.refresh(), isTrue);
+          expect(session.purchaseOrderReviewRequired, isTrue);
+          expect(await session.submitOrder(), isFalse);
+          expect(commerce.placements, isEmpty);
+          harness.poSupplierStates['store-d'] = BuyV2PurchaseOrderState.revised;
+          expect(await session.purchaseOrder!.refresh(), isTrue);
+          expect(session.purchaseOrderReviewRequired, isTrue);
+          expect(
+            await session.approvePurchaseOrderRevision('unrelated-document'),
+            isFalse,
+          );
+          expect(harness.approvedPoDocuments, isEmpty);
+          expect(
+            await session.approvePurchaseOrderRevision('po-store-d'),
+            isTrue,
+          );
+          expect(harness.approvedPoDocuments, ['po-store-d']);
+          expect(
+            session.purchaseOrder!.review!.documents
+                .singleWhere((doc) => doc.supplierStoreId == 'store-c')
+                .state,
+            BuyV2PurchaseOrderState.accepted,
+          );
+          expect(session.purchaseOrderReviewRequired, isFalse);
+          if (revokeApproval) {
+            deliveryFacts.beforeRead = () {
+              deliveryFacts.beforeRead = null;
+              harness.identity.value = null;
+            };
+            expect(await session.submitOrder(), isFalse);
+            expect(
+              commerce.placements,
+              isEmpty,
+              reason:
+                  'Revoked PO identity must prevent placement during preflight',
+            );
+            return;
+          }
+
+          if (confirmation == 'persistence-failure') {
+            await Future<void>.delayed(Duration.zero);
+            preferences.failWrites = true;
+            expect(await session.submitOrder(), isFalse);
+            expect(
+              commerce.placements,
+              isEmpty,
+              reason: 'Payment must wait for durable recovery details',
+            );
+            preferences.failWrites = false;
+            await Future<void>.delayed(Duration.zero);
+          }
+
+          if (confirmation == 'persistence-missing') {
+            expect(await session.submitOrder(), isFalse);
+            expect(commerce.placements, isEmpty);
+            return;
+          }
+          Future<bool>? heldSubmission;
+          if (confirmation == 'persistence-held' ||
+              confirmation == 'persistence-revoked') {
+            await Future<void>.delayed(Duration.zero);
+            final writeHold = Completer<void>();
+            preferences.holdNextWrite = writeHold;
+            heldSubmission = session.submitOrder();
+            await Future<void>.delayed(Duration.zero);
+            expect(commerce.placements, isEmpty);
+            if (confirmation == 'persistence-revoked') {
+              harness.identity.value = null;
+            }
+            writeHold.complete();
+            if (confirmation == 'persistence-revoked') {
+              expect(await heldSubmission, isFalse);
+              expect(commerce.placements, isEmpty);
+              return;
+            }
+          }
+          if (confirmation.startsWith('restart-before-response')) {
+            commerce.placementGate = Completer<BuyV2OrderPlacementResult>();
+            unawaited(session.submitOrder());
+            await commerce.placementStarted.future;
+          } else {
+            expect(await (heldSubmission ?? session.submitOrder()), isFalse);
+          }
+          // Payment is still pending.
+          expect(commerce.placements, hasLength(1), reason: session.notice);
+          final request = commerce.placements.single;
+          expect(request.purchaseOrderRequestId, 'collection-po-request');
+          expect(request.purchaseOrderRevision, 'po-revision-1');
+          expect(request.paymentMethod, 'UPI');
+          expect(request.lines.map((line) => line.product.storeId).toSet(), {
+            'store-c',
+            'store-d',
+          });
+          expect(
+            confirmation.startsWith('restart-before-response')
+                ? session.checkoutBusy
+                : session.checkoutRequiresResolution,
+            isTrue,
+          );
+          expect(await session.submitOrder(), isFalse);
+          expect(commerce.placements, hasLength(1));
+          final documents = harness.poSnapshot().documents;
+          List<BuyV2Order> confirmedOrdersFor(String resultCase) => [
+            for (final line in request.lines)
+              BuyV2Order(
+                id: 'order-${line.product.storeId}',
+                destination: BuyV2Destination.wholesale,
+                title: line.product.seller,
+                itemSummary: line.product.title,
+                total: line.total,
+                partner: line.product.seller,
+                partnerType: line.product.partnerRole,
+                promise: 'Within 1 day',
+                destinationLabel: address.shortLine,
+                recipient: request.address.recipient,
+                addressLine: request.address.line,
+                amountPaidNow: line.total,
+                progress: 0,
+                status: BuyV2OrderStatus.preparing,
+                purchaseId: 'delivery-purchase',
+                productIds: [line.product.id],
+                lines: [
+                  resultCase == 'wrong-lines'
+                      ? line.copyWith(quantity: line.quantity + 1)
+                      : resultCase == 'wrong-store'
+                      ? line.copyWith(
+                          product: line.product.copyWith(
+                            storeId: 'other-store',
+                          ),
+                        )
+                      : line,
+                ],
+                paymentMethod: 'UPI',
+                paymentStatusLabel: 'Paid',
+                purchaseOrderReference: resultCase == 'wrong-po'
+                    ? 'UNRELATED-PO'
+                    : documents
+                          .singleWhere(
+                            (doc) =>
+                                doc.supplierStoreId == line.product.storeId,
+                          )
+                          .reference,
+              ),
+          ];
+          final confirmedOrders = confirmedOrdersFor(confirmation);
+          commerce.placement = BuyV2OrderPlacementResult(
+            outcome: BuyV2OrderPlacementOutcome.confirmed,
+            customerMessage: 'Confirmed',
+            purchaseReference: 'delivery-purchase',
+            paymentReference: 'procurement-payment',
+            orders: confirmedOrders,
+          );
+          if (confirmation.startsWith('restart')) {
+            await Future<void>.delayed(Duration.zero);
+            final saved = await retainedState!.read();
+            expect(
+              saved!.paymentReference,
+              confirmation.startsWith('restart-before-response')
+                  ? isNull
+                  : isNotNull,
+            );
+            expect(saved.addresses.single.landmark, isEmpty);
+            expect(saved.selectedAddressId, address.id);
+            expect(
+              saved.pendingPurchaseOrderRequestId,
+              'collection-po-request',
+            );
+            expect(saved.pendingPurchaseOrderRevision, 'po-revision-1');
+            final restoredCore = BuySession();
+            final restored = BuyV2Session(
+              core: restoredCore,
+              reviewDataEnabled: false,
+              commerceAdapter: confirmation == 'restart-before-response-missing'
+                  ? _R669NoRecoveryCommerce(commerce)
+                  : commerce,
+              customerStateStore: BuyV2SharedPreferencesCustomerStateStore(
+                preferences,
+                ownerScope: 'd17-buyer-a',
+              ),
+              collectionIdentity: harness.identity,
+              purchaseOrderAdapter: harness,
+              catalogueNow: () => harness.clock,
+              productFactsAdapter: BuyTestEligibilityFacts(
+                now: () => harness.clock,
+                delegate: deliveryFacts,
+              ),
+            );
+            addTearDown(restored.dispose);
+            addTearDown(restoredCore.dispose);
+            await restored.restoreCommerce();
+            await restored.restoreCustomerState();
+            expect(restored.checkoutRequiresResolution, isTrue);
+            expect(restored.cartLines, hasLength(2));
+            if (confirmation == 'restart-before-response-missing') {
+              expect(await restored.reconcilePayment(), isFalse);
+              expect(restored.checkoutRequiresResolution, isTrue);
+              expect(await restored.submitOrder(), isFalse);
+              expect(commerce.placements, hasLength(1));
+              expect(commerce.recoveryKeys, isEmpty);
+              expect(restored.cartLines, hasLength(2));
+              return;
+            }
+            if (confirmation == 'restart-account') {
+              harness.identity.value = const BuyV2CollectionIdentity(
+                accountId: 'other-buyer',
+                sessionId: 'other-session',
+              );
+              expect(await restored.reconcilePayment(), isFalse);
+              expect(commerce.reconciliations, 0);
+              expect(commerce.placements, hasLength(1));
+              expect(restored.cartLines, hasLength(2));
+              return;
+            }
+            if (confirmation == 'restart-request' ||
+                confirmation == 'restart-revision' ||
+                confirmation == 'restart-unavailable') {
+              if (confirmation == 'restart-request') {
+                harness.poResponseRequestId = 'unrelated-request';
+              } else if (confirmation == 'restart-revision') {
+                harness.poResponseRevision = 'unapproved-revision';
+              } else {
+                harness.poRefreshUnavailable = true;
+              }
+              expect(await restored.reconcilePayment(), isFalse);
+              expect(commerce.reconciliations, 0);
+              expect(restored.cartLines, hasLength(2));
+              expect(restored.checkoutRequiresResolution, isTrue);
+              expect(commerce.placements, hasLength(1));
+              harness.poResponseRequestId = 'collection-po-request';
+              harness.poResponseRevision = 'po-revision-1';
+              harness.poRefreshUnavailable = false;
+            }
+            if (confirmation == 'restart-before-response-unavailable' ||
+                confirmation == 'restart-before-response-error') {
+              final confirmed = commerce.placement;
+              commerce.recoveryUnavailable = confirmation.endsWith('error');
+              commerce.placement = const BuyV2OrderPlacementResult(
+                outcome: BuyV2OrderPlacementOutcome.unavailable,
+                customerMessage: 'Recovery unavailable',
+              );
+              expect(await restored.reconcilePayment(), isFalse);
+              expect(restored.checkoutRequiresResolution, isTrue);
+              expect(await restored.submitOrder(), isFalse);
+              expect(restored.cartLines, hasLength(2));
+              expect(commerce.placements, hasLength(1));
+              commerce.recoveryUnavailable = false;
+              commerce.placement = confirmed;
+            }
+            if (confirmation == 'restart-before-response-session') {
+              commerce.reconciliationGate =
+                  Completer<BuyV2OrderPlacementResult>();
+            }
+            final recovering = restored.reconcilePayment();
+            if (confirmation == 'restart-before-response-session') {
+              await commerce.recoveryStarted.future;
+              harness.identity.value = BuyV2CollectionIdentity(
+                accountId: harness.identity.value!.accountId,
+                sessionId: 'changed-session',
+              );
+              commerce.reconciliationGate!.complete(commerce.placement);
+              expect(await recovering, isFalse);
+              expect(restored.checkoutRequiresResolution, isTrue);
+              expect(restored.cartLines, hasLength(2));
+              expect(commerce.placements, hasLength(1));
+              expect(restored.orders, isEmpty);
+              return;
+            }
+            if (confirmation == 'restart-overlap') {
+              expect(await restored.reconcilePayment(), isFalse);
+            }
+            expect(
+              await recovering,
+              isTrue,
+              reason: 'Restart must recover the existing approved payment',
+            );
+            if (confirmation.startsWith('restart-before-response')) {
+              expect(commerce.reconciliations, 0);
+              expect(
+                commerce.recoveryKeys,
+                List.filled(
+                  confirmation.endsWith('unavailable') ||
+                          confirmation.endsWith('error')
+                      ? 2
+                      : 1,
+                  request.idempotencyKey,
+                ),
+              );
+            } else {
+              expect(commerce.reconciliations, 1);
+              expect(commerce.recoveryKeys, isEmpty);
+            }
+            expect(commerce.placements, hasLength(1));
+            expect(harness.poIssues, 1);
+            expect(restored.cartLines, isEmpty);
+            expect(
+              restored.orders.where(
+                (order) => order.purchaseId == 'delivery-purchase',
+              ),
+              hasLength(2),
+            );
+            return;
+          }
+          if (confirmation.startsWith('wrong-')) {
+            expect(
+              await session.reconcilePayment(),
+              isFalse,
+              reason: 'Mismatched $confirmation must not confirm the purchase',
+            );
+            expect(session.cartLines, hasLength(2));
+            expect(session.checkoutRequiresResolution, isTrue);
+            expect(
+              session.orders.where(
+                (order) => order.purchaseId == 'delivery-purchase',
+              ),
+              isEmpty,
+            );
+            expect(commerce.placements, hasLength(1));
+            commerce.placement = BuyV2OrderPlacementResult(
+              outcome: BuyV2OrderPlacementOutcome.confirmed,
+              customerMessage: 'Confirmed after reconciliation',
+              purchaseReference: 'delivery-purchase',
+              paymentReference: 'procurement-payment',
+              orders: confirmedOrdersFor('valid'),
+            );
+            expect(
+              await session.reconcilePayment(),
+              isTrue,
+              reason: session.notice,
+            );
+            expect(commerce.placements, hasLength(1));
+            expect(commerce.reconciliations, 2);
+            expect(session.cartLines, isEmpty);
+            expect(
+              session.orders.where(
+                (order) => order.purchaseId == 'delivery-purchase',
+              ),
+              hasLength(2),
+            );
+            return;
+          }
+          expect(
+            await session.reconcilePayment(),
+            isTrue,
+            reason: session.notice,
+          );
+          expect(commerce.placements, hasLength(1));
+          expect(commerce.reconciliations, 1);
+          expect(session.cartLines, isEmpty);
+          for (final order in confirmedOrders) {
+            final retained = session.orders.singleWhere(
+              (value) => value.id == order.id,
+            );
+            expect(
+              retained.purchaseOrderReference,
+              order.purchaseOrderReference,
+            );
+            final invoice = BuyV2InvoiceDocument(order: retained);
+            expect(invoice.hasExactLines, isTrue);
+            expect(
+              invoice.order.purchaseOrderReference,
+              order.purchaseOrderReference,
+            );
+            expect(session.openOrderItems(order.id), isTrue);
+            session.openAssist();
+            expect(session.assistOrder.id, order.id);
+            expect(
+              session.assistOrder.purchaseOrderReference,
+              order.purchaseOrderReference,
+            );
+            session.closeAssist();
+            expect(session.view, BuyV2View.orderItems);
+          }
+        },
+      );
+    }
+
+    for (final recover in [false, true]) {
+      test(
+        'D17 PO collection requires requote then places once with exact references recovery=$recover',
+        () async {
+          var session = await checkoutSession(purchaseOrderAdapter: harness);
+          expect(
+            session.chooseCheckoutCollection(true, storeId: 'store-c'),
+            isTrue,
+          );
+          session.continueCheckoutFromAddress();
+          expect(await session.prepareCollectionCheckout(), isTrue);
+          final previousQuote = session.collectionCheckoutQuote!;
+          expect(await session.submitOrder(), isFalse);
+          expect(harness.placements, 0);
+          expect(await session.reviewPurchaseOrder(), isTrue);
+          expect(await session.issuePurchaseOrder(), isTrue);
+          expect(session.purchaseOrderReviewRequired, isTrue);
+          harness.poState = BuyV2PurchaseOrderState.accepted;
+          expect(await session.purchaseOrder!.refresh(), isTrue);
+          expect(session.purchaseOrderReviewRequired, isFalse);
+          final approvedBasket = session.currentCollectionBasket!;
+          expect(
+            approvedBasket.purchaseOrderRequestId,
+            'collection-po-request',
+          );
+          expect(approvedBasket.purchaseOrderRevision, 'po-revision-1');
+          expect(previousQuote.matches(approvedBasket), isFalse);
+          expect(await session.submitOrder(), isFalse);
+          expect(harness.placements, 0);
+          expect(await session.prepareCollectionCheckout(), isTrue);
+          if (recover) {
+            harness.outcome = BuyV2CollectionPurchaseState.unknown;
+            expect(await session.submitOrder(), isFalse);
+            expect(
+              harness.pending!.basket.purchaseOrderReference,
+              'PO-COLLECTION',
+            );
+            session = await checkoutSession(purchaseOrderAdapter: harness);
+            expect(session.purchaseOrder!.review, isNull);
+            harness.outcome = BuyV2CollectionPurchaseState.paid;
+            expect(await session.reconcileCollectionPurchase(), isTrue);
+          } else {
+            expect(await session.submitOrder(), isTrue);
+          }
+          expect(
+            session.orders
+                .singleWhere((order) => order.id == 'order-a')
+                .purchaseOrderReference,
+            'PO-COLLECTION',
+          );
+          expect(harness.placements, 1);
+          expect(harness.poIssues, 1);
+          expect(
+            harness.lastRequest!.basket.purchaseOrderRequestId,
+            'collection-po-request',
+          );
+          expect(
+            harness.lastRequest!.basket.purchaseOrderRevision,
+            'po-revision-1',
+          );
+          expect(session.quantityFor('wholesale-sku'), 0);
+          expect(session.quantityFor('sku-a'), 1);
+          expect(session.quantityFor('sku-b'), 1);
+          expect(
+            session.orders.where((order) => order.id == 'order-a'),
+            hasLength(1),
+          );
+        },
+      );
+    }
+
+    for (final metadata in ['missing', 'disabled', 'expired']) {
+      test('all stores pickup accepts $metadata legacy metadata', () async {
+        harness.legacyCollection = metadata;
+        final session = await checkoutSession();
+        expect(
+          session.collectionCheckoutStores.map((s) => s.id),
+          containsAll(['store-a', 'store-b', 'store-c']),
+        );
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-a'),
+          isTrue,
+        );
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.checkoutLines.single.product.id, 'sku-a');
+        expect(session.chooseCheckoutCollection(false), isTrue);
+        expect(session.checkoutLines, hasLength(3));
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-a'),
+          isTrue,
+        );
+        session.continueCheckoutFromAddress();
+        expect(await session.prepareCollectionCheckout(), isTrue);
+        expect(await session.submitOrder(), isTrue);
+        expect(harness.placements, 1);
+        expect(session.quantityFor('sku-a'), 0);
+        expect(session.quantityFor('sku-b'), 1);
+        expect(session.quantityFor('wholesale-sku'), 2);
+        expect(session.orders.where((o) => o.id == 'order-a'), hasLength(1));
+      });
+    }
+
+    for (final profile in [(390.0, 1.0), (320.0, 2.0)]) {
+      testWidgets('all stores pickup tick choice ${profile.$1} ${profile.$2}', (
+        tester,
+      ) async {
+        harness.legacyCollection = 'missing';
+        final session = await checkoutSession();
+        await mountCheckout(
+          tester,
+          session,
+          size: Size(profile.$1, 844),
+          scale: profile.$2,
+        );
+        final delivery = find.byKey(
+          const ValueKey('buy-checkout-delivery-choice'),
+        );
+        final pickup = find.byKey(
+          const ValueKey('buy-checkout-collection-choice'),
+        );
+        await tester.ensureVisible(pickup);
+        await tester.pumpAndSettle();
+        expect(tester.widget<ChoiceChip>(delivery).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(delivery).showCheckmark, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).selected, isFalse);
+        await captureR66Visual(
+          tester,
+          'all-stores-delivery-${profile.$1}-${profile.$2}',
+        );
+        await tester.tap(pickup);
+        await tester.pumpAndSettle();
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(pickup).showCheckmark, isTrue);
+        expect(tester.widget<ChoiceChip>(delivery).selected, isFalse);
+        await captureR66Visual(
+          tester,
+          'all-stores-pickup-${profile.$1}-${profile.$2}',
+        );
+        await tester.ensureVisible(delivery);
+        await tester.pumpAndSettle();
+        expect(delivery.hitTestable(), findsOneWidget);
+        await tester.tap(delivery);
+        await tester.pumpAndSettle();
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.checkoutLines, hasLength(3));
+        expect(harness.placements, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    test(
+      'collection browsing works but missing address blocks purchase',
+      () async {
+        harness.collectionAddressAvailable = false;
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.collectionCheckoutStore, isNull);
+        expect(
+          session.collectionCheckoutMessage,
+          'Choose the store where you will collect.',
+        );
+        expect(await session.prepareCollectionCheckout(), isFalse);
+        expect(harness.quotes, 0);
+        expect(harness.placements, 0);
+        expect(session.quantityFor('sku-a'), 1);
+        expect(session.quantityFor('sku-b'), 1);
+      },
+    );
+
     test(
       'R669 collection discovery preserves branch and explicit delivery choice',
       () async {
@@ -4095,10 +8836,14 @@ void main() {
         expect(session.quantityFor('sku-b'), 1);
         expect(session.quantityFor('wholesale-sku'), 2);
         expect(harness.placements, 0);
+        session.selectCartProduct('sku-a', false);
+        session.selectCartProduct('sku-b', false);
         session.openCart(scope: BuyV2CartScope.wholesale);
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isFalse);
         expect(session.checkoutLines.single.product.id, 'wholesale-sku');
+        session.selectCartProduct('sku-a', true);
+        session.selectCartProduct('sku-b', true);
         session.openCart();
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isTrue);
@@ -4112,7 +8857,7 @@ void main() {
     );
 
     test(
-      'R669 collection discovery expiry cannot silently become delivery',
+      'pickup remains selected after legacy opt-in expiry and needs a fresh quote',
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('sku-a'), isTrue);
@@ -4120,8 +8865,9 @@ void main() {
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isTrue);
         expect(session.collectionCheckoutStore!.id, 'store-a');
-        expect(session.collectionCheckoutMessage, contains('availability'));
-        expect(await session.prepareCollectionCheckout(), isFalse);
+        expect(await session.prepareCollectionCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(harness.quotes, 1);
         expect(session.quantityFor('sku-a'), 1);
         expect(harness.placements, 0);
       },
@@ -4132,6 +8878,8 @@ void main() {
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('sku-a'), isTrue);
+        session.selectCartProduct('sku-a', false);
+        session.selectCartProduct('sku-b', false);
         session.openCart(scope: BuyV2CartScope.wholesale);
         expect(session.openCheckout(), isTrue);
         expect(session.collectionCheckoutSelected, isFalse);
@@ -4141,19 +8889,19 @@ void main() {
     );
 
     test(
-      'R669 collection discovery refuses invalid identity and capability',
+      'collection discovery rejects unknown products but ignores legacy opt-in expiry',
       () async {
         final session = await checkoutSession(openCheckout: false);
         expect(session.beginStoreCollection('missing-sku'), isFalse);
         harness.clock = harness.clock.add(const Duration(days: 2));
-        expect(session.beginStoreCollection('sku-a'), isFalse);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
         expect(session.openCheckout(), isTrue);
-        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.collectionCheckoutSelected, isTrue);
         expect(harness.placements, 0);
       },
     );
 
-    for (final fault in ['services', 'identity', 'capability', 'quote']) {
+    for (final fault in ['services', 'identity', 'quote']) {
       testWidgets('checkout failure recovery visual $fault', (tester) async {
         final session = await checkoutSession(
           purchaseServices: fault != 'services',
@@ -4185,7 +8933,8 @@ void main() {
         final expectedMessage = switch (fault) {
           'services' =>
             'Store collection is unavailable right now. Your Cart has not changed.',
-          'identity' => 'Sign in to place a store collection order.',
+          'identity' =>
+            'Your account could not be verified for collection. Your Cart is saved.',
           'capability' =>
             'Check this store’s collection availability to continue.',
           _ =>
@@ -4199,14 +8948,14 @@ void main() {
         expect(harness.pending, isNull);
         expect(session.orders.length, orderCount);
         await captureR66Visual(tester, 'r5-collection-checkout-failure-$fault');
-        final back = find.byKey(const ValueKey('buy-checkout-back'));
+        final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
         if (back.evaluate().isEmpty) {
           await tester.scrollUntilVisible(
             back,
             -180,
             scrollable: find
                 .descendant(
-                  of: find.byKey(const PageStorageKey('buy-checkout-payment')),
+                  of: find.byKey(const PageStorageKey('buy-checkout-unified')),
                   matching: find.byType(Scrollable),
                 )
                 .first,
@@ -4217,13 +8966,6 @@ void main() {
         await tester.pumpAndSettle();
         expect(back.hitTestable(), findsOneWidget);
         await tester.tap(back);
-        await tester.pumpAndSettle();
-        expect(session.checkoutStep, BuyV2CheckoutStep.address);
-        final cart = find.byKey(const ValueKey('buy-checkout-return-cart'));
-        await tester.ensureVisible(cart);
-        await tester.pumpAndSettle();
-        expect(cart.hitTestable(), findsOneWidget);
-        await tester.tap(cart);
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         expect(session.quantityFor('sku-a'), 1);
@@ -4322,8 +9064,27 @@ void main() {
           final session = await checkoutSession(openCheckout: false);
           await mountCheckout(tester, session, size: size, scale: scale);
           Future<void> tap(Finder target) async {
+            if (target.evaluate().isEmpty) {
+              await tester.scrollUntilVisible(
+                target,
+                160,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(
+                        const PageStorageKey('buy-checkout-unified'),
+                      ),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+                maxScrolls: 40,
+              );
+              await tester.pumpAndSettle();
+            }
             expect(target, findsOneWidget);
-            await tester.ensureVisible(target);
+            await Scrollable.ensureVisible(
+              tester.element(target),
+              alignment: .2,
+            );
             await tester.pumpAndSettle();
             expect(target.hitTestable(), findsOneWidget);
             await tester.tap(target);
@@ -4341,7 +9102,7 @@ void main() {
 
           final cartReview = find.descendant(
             of: find.byKey(const ValueKey('buy-cart-action-bar')),
-            matching: find.widgetWithText(FilledButton, 'Review order'),
+            matching: find.widgetWithText(FilledButton, 'Checkout'),
           );
           if (cartReview.evaluate().isEmpty) {
             final cartScroll = find
@@ -4382,13 +9143,13 @@ void main() {
           );
           expect(session.collectionCheckoutStore!.id, 'store-a');
           await capture('store-choice');
-          await tap(find.byKey(const ValueKey('buy-checkout-primary-address')));
-          await tap(find.byKey(const ValueKey('buy-payment-Paytm')));
-          expect(session.selectedPayment, 'Paytm');
+          await tap(find.byKey(const ValueKey('buy-checkout-confirm-payment')));
+          await tap(find.byKey(const ValueKey('buy-payment-Card')));
+          expect(session.selectedPayment, 'Card');
           await capture('payment-choice');
           expect(find.text('Cash on Delivery'), findsNothing);
           expect(find.text('Purchase order'), findsNothing);
-          await tap(find.byKey(const ValueKey('buy-checkout-primary-payment')));
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-address')));
           expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
           expect(find.text('₹100.25'), findsWidgets);
           await capture('review');
@@ -4407,7 +9168,7 @@ void main() {
           expect(harness.placements, 0);
           expect(harness.pending, isNull);
           expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
-          expect(find.text('Update total'), findsOneWidget);
+          expect(find.text('Check total'), findsOneWidget);
           final expiredNotice = find.text(
             'Your total needs updating. Review it before paying.',
           );
@@ -4416,28 +9177,24 @@ void main() {
           expect(expiredNotice.hitTestable(), findsOneWidget);
           await capture('expired-total');
           await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
-          expect(find.text('Place order'), findsOneWidget);
+          expect(find.text('Pay ₹100.25 & place order'), findsOneWidget);
           expect(harness.quotes, 2);
           harness.outcome = BuyV2CollectionPurchaseState.unknown;
           await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
           expect(session.quantityFor('sku-a'), 1);
           expect(session.checkoutStep, BuyV2CheckoutStep.payment);
           await capture('payment-pending');
-          expect(
-            find.byKey(const ValueKey('buy-payment-PhonePe')),
-            findsNothing,
-          );
-          expect(find.byKey(const ValueKey('buy-payment-Paytm')), findsNothing);
-          expect(
-            find.byKey(const ValueKey('buy-payment-Pine Labs')),
-            findsNothing,
-          );
+          expect(find.byKey(const ValueKey('buy-payment-UPI')), findsNothing);
+          expect(find.byKey(const ValueKey('buy-payment-Card')), findsNothing);
+          expect(find.byKey(const ValueKey('buy-payment-Card')), findsNothing);
           final recoveryText = find.descendant(
             of: find.byKey(const ValueKey('buy-checkout-collection-notice')),
             matching: find.byType(Text),
           );
+          await tester.ensureVisible(recoveryText);
+          await tester.pumpAndSettle();
           final recoveryViewport = tester.getRect(
-            find.byKey(const PageStorageKey('buy-checkout-payment-recovery')),
+            find.byKey(const PageStorageKey('buy-checkout-unified')),
           );
           final recoveryRect = tester.getRect(recoveryText);
           expect(recoveryRect.top, greaterThanOrEqualTo(recoveryViewport.top));
@@ -4454,7 +9211,7 @@ void main() {
           expect(session.quantityFor('sku-b'), 1);
           expect(session.quantityFor('wholesale-sku'), 2);
           expect(harness.placements, 1);
-          expect(harness.lastRequest!.basket.paymentMethod, 'Paytm');
+          expect(harness.lastRequest!.basket.paymentMethod, 'Card');
           await capture('same-paid-order');
           await tester.ensureVisible(find.text('Paid ₹100.25'));
           await tester.pumpAndSettle();
@@ -4505,7 +9262,7 @@ void main() {
           session.chooseCheckoutCollection(true, storeId: 'store-b'),
           isFalse,
         );
-        expect(session.choosePayment('Paytm'), isFalse);
+        expect(session.choosePayment('Card'), isFalse);
         expect(session.addProduct('sku-b'), isFalse);
         expect(session.confirmOrder(), isFalse);
         expect(session.quantityFor('sku-a'), 1);
@@ -4662,7 +9419,7 @@ void main() {
           harness.basket(quantity: 2),
           harness.basket(storeId: 'b'),
           harness.basket(sku: 'sku-b'),
-          harness.basket(payment: 'Paytm'),
+          harness.basket(payment: 'Card'),
         ]) {
           expect(changed.fingerprint, isNot(first.fingerprint));
         }
@@ -4889,9 +9646,108 @@ void main() {
   });
 
   group('R5 published catalogue', () {
+    test(
+      'D06-B-A02 review publication and retained catalogue identities agree',
+      () async {
+        final now = DateTime.utc(2026, 9, 25);
+        final publications = BuyV2DevelopmentPublishedCatalogueSource(
+          includeVariantReviewFixtures: true,
+          providerCount: 4,
+          skusPerStore: 120,
+          now: () => now,
+        );
+        final sources = {
+          for (final destination in [
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+          ])
+            destination: BuyV2DevelopmentCatalogueSource(
+              destination: destination,
+              providerCount: 4,
+              skusPerStore: 120,
+              includeVariantReviewFixtures: true,
+              now: () => now,
+            ),
+        };
+        final page = await publications.loadOffers(
+          BuyV2CatalogueQuery(
+            destination: BuyV2Destination.shop,
+            regionId: 'jodhpur',
+            offersOnly: true,
+          ),
+          pageSize: 40,
+        );
+        for (final offer in page.items) {
+          final resolved = await sources[offer.product.destination]!
+              .resolveProducts({offer.product.id});
+          expect(resolved, hasLength(1), reason: offer.product.id);
+          final retained = resolved.single;
+          expect(
+            retained.canonicalId,
+            offer.product.canonicalId,
+            reason: offer.product.id,
+          );
+          expect(retained.price, offer.product.price, reason: offer.product.id);
+          expect(retained.pack, offer.product.pack, reason: offer.product.id);
+          expect(
+            retained.variant,
+            offer.product.variant,
+            reason: offer.product.id,
+          );
+        }
+        final phoneQuery = BuyV2CatalogueQuery(
+          destination: BuyV2Destination.shop,
+          regionId: 'jodhpur',
+          offersOnly: true,
+          query: 'phone',
+        );
+        final phones = await publications.loadOffers(phoneQuery, pageSize: 40);
+        // Four providers span four regions: only one Store per destination
+        // serves this regional query, each publishing six unique variants.
+        expect(phones.items, hasLength(12));
+        for (final destination in sources.keys) {
+          final variants = phones.items
+              .where((offer) => offer.product.destination == destination)
+              .map((offer) => offer.product);
+          expect(variants, hasLength(6));
+          expect(variants.map((product) => product.id).toSet(), hasLength(6));
+          expect(
+            variants.map((product) => product.storeId).toSet(),
+            hasLength(1),
+          );
+        }
+        expect(
+          phones.items.every((o) => o.product.hasStructuredVariants),
+          isTrue,
+        );
+        final ordinary = BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 4,
+          skusPerStore: 120,
+          now: () => now,
+        );
+        expect(
+          (await ordinary.loadOffers(phoneQuery, pageSize: 40)).items,
+          isEmpty,
+        );
+        expect(page.nextCursor, isNotNull);
+        await expectLater(
+          ordinary.loadOffers(
+            BuyV2CatalogueQuery(
+              destination: BuyV2Destination.shop,
+              regionId: 'jodhpur',
+              offersOnly: true,
+            ),
+            cursor: page.nextCursor,
+            pageSize: 40,
+          ),
+          throwsFormatException,
+        );
+      },
+    );
     final now = DateTime.utc(2026, 9, 8);
     BuyV2CatalogueQuery query({
       BuyV2OfferPublisherType? publisher,
+      bool suppliersOnly = false,
       String? region = 'jodhpur',
       BuyV2CatalogueAreaScope scope = BuyV2CatalogueAreaScope.regional,
       String text = '',
@@ -4905,8 +9761,86 @@ void main() {
       categoryId: category,
       offersOnly: true,
       offerPublisher: publisher,
+      supplierOffersOnly: suppliersOnly,
       storeId: storeId,
     );
+
+    test(
+      'D06-B-A01 suppliers scope filters before paging and isolates cursors',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 20,
+          skusPerStore: 500,
+          now: () => now,
+        );
+        final all = await source.loadOffers(query(), pageSize: 40);
+        final suppliers = query(suppliersOnly: true);
+        final first = await source.loadOffers(suppliers, pageSize: 40);
+        final mool = await source.loadOffers(
+          query(publisher: BuyV2OfferPublisherType.moolSocial),
+          pageSize: 40,
+        );
+        expect(
+          all.items.every(
+            (o) => o.publisherType == BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        expect(first.items, hasLength(40));
+        expect(first.totalCount, isNotNull);
+        expect(mool.totalCount, isNotNull);
+        expect(first.totalCount! + mool.totalCount!, all.totalCount);
+        expect(
+          first.items.every(
+            (o) => o.publisherType != BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        final next = await source.loadOffers(
+          suppliers,
+          cursor: first.nextCursor,
+          pageSize: 40,
+        );
+        expect(next.startIndex, 40);
+        expect(
+          next.items.every(
+            (o) => o.publisherType != BuyV2OfferPublisherType.moolSocial,
+          ),
+          isTrue,
+        );
+        expect({
+          ...first.items.map((o) => o.publicationId),
+          ...next.items.map((o) => o.publicationId),
+        }, hasLength(80));
+        expect(suppliers.key, isNot(query().key));
+        await expectLater(
+          source.loadOffers(query(), cursor: first.nextCursor, pageSize: 40),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test('D06-B-A01 rejects MoolSocial response in supplier scope', () async {
+      final source = _PublishedFixtureSource(now: () => now)
+        ..rewrite = (offer) => _copyPublication(
+          offer,
+          publisher: BuyV2OfferPublisherType.moolSocial,
+        );
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        publishedCatalogueSource: source,
+        catalogueNow: () => now,
+        reviewDataEnabled: false,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      final pager = session.acquireCatalogueOffers('supplier-validation');
+      await pager.open(query(suppliersOnly: true));
+      expect(pager.page, isNull);
+      expect(pager.message, isNotNull);
+      expect(session.pagedProductCount, 0);
+    });
 
     test(
       'unsupported channel filters cannot silently broaden Offers',
@@ -4985,7 +9919,8 @@ void main() {
             expect(product.storeId, offer.product.storeId);
             expect(product.pack, offer.product.pack);
             expect(product.price, offer.product.price);
-            if (product.destination == BuyV2Destination.wholesale) {
+            if (product.destination == BuyV2Destination.wholesale &&
+                offer.publisherType != BuyV2OfferPublisherType.moolSocial) {
               expect(
                 product.sellerType,
                 offer.publisherType == BuyV2OfferPublisherType.manufacturer
@@ -5014,15 +9949,17 @@ void main() {
             pageSize: 40,
           );
           expect(page.totalCount, switch (publisher) {
-            BuyV2OfferPublisherType.retailer => 20,
-            BuyV2OfferPublisherType.moolSocial => 0,
-            _ => 10,
+            BuyV2OfferPublisherType.retailer => 10,
+            BuyV2OfferPublisherType.moolSocial => 20,
+            BuyV2OfferPublisherType.manufacturer => 0,
+            BuyV2OfferPublisherType.wholesaler => 10,
           });
           if (publisher == BuyV2OfferPublisherType.moolSocial) {
             expect(
               page.items,
-              isEmpty,
-              reason: 'The review generator must not invent admin publications',
+              isNotEmpty,
+              reason:
+                  'Explicit review mode now includes controlled MoolSocial publications',
             );
           }
           expect(page.items.every((o) => o.publisherType == publisher), isTrue);
@@ -5045,10 +9982,11 @@ void main() {
           expect(
             page.items.every(
               (o) =>
+                  publisher == BuyV2OfferPublisherType.moolSocial ||
                   o.product.destination ==
-                  (publisher == BuyV2OfferPublisherType.retailer
-                      ? BuyV2Destination.shop
-                      : BuyV2Destination.wholesale),
+                      (publisher == BuyV2OfferPublisherType.retailer
+                          ? BuyV2Destination.shop
+                          : BuyV2Destination.wholesale),
             ),
             isTrue,
           );
@@ -5326,6 +10264,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5370,6 +10311,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5397,6 +10341,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
           customerStateStore: store,
@@ -5414,6 +10361,9 @@ void main() {
         final nextCore = BuySession();
         final next = BuyV2Session(
           core: nextCore,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: _PagingRecoverySource(),
           customerStateStore: store,
@@ -5439,6 +10389,7 @@ void main() {
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
+        productFactsAdapter: const BuyTestEligibilityFacts(locationKey: '||0'),
         reviewDataEnabled: false,
         cataloguePageSource: source,
       );
@@ -5472,6 +10423,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5495,6 +10449,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5536,6 +10493,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -5566,6 +10526,9 @@ void main() {
         final core = BuySession();
         final session = BuyV2Session(
           core: core,
+          productFactsAdapter: const BuyTestEligibilityFacts(
+            locationKey: '||0',
+          ),
           reviewDataEnabled: false,
           cataloguePageSource: source,
         );
@@ -6584,7 +11547,7 @@ void main() {
         final store = _MemoryCustomerStateStore('old-refinement-account')
           ..snapshot = const BuyV2CustomerStateSnapshot(
             cartQuantities: {'s-milk': 1},
-            selectedPayment: 'Paytm',
+            selectedPayment: 'Card',
             selectedBrands: {'UNAVAILABLE OLD BRAND'},
             maximumPrice: 1,
             packFilter: 'bulk',
@@ -6601,7 +11564,7 @@ void main() {
         expect(restored.activeDiscoveryRefinementCount, 0);
         expect(restored.catalogueSaleTypeProducts, isNotEmpty);
         expect(restored.quantityFor('s-milk'), 1);
-        expect(restored.selectedPayment, 'Paytm');
+        expect(restored.selectedPayment, 'Card');
         expect(
           restored
               .recentlyViewedProductsFor(BuyV2Destination.shop)
@@ -6910,42 +11873,49 @@ void main() {
       }
     });
 
-    test(
-      'product continuations are deterministic, local and same-catalogue',
-      () {
-        final current = BuyV2Catalogue.products.firstWhere((product) {
-          if (product.destination != BuyV2Destination.shop) return false;
-          return BuyV2Catalogue.products
-              .where(
-                (candidate) =>
-                    candidate.destination == product.destination &&
-                    candidate.categoryId == product.categoryId &&
-                    candidate.id != product.id,
-              )
-              .isNotEmpty;
-        });
+    test('product continuations are deterministic, local and same-catalogue', () {
+      final current = BuyV2Catalogue.products.firstWhere((product) {
+        if (product.destination != BuyV2Destination.shop) return false;
+        return BuyV2Catalogue.products
+            .where(
+              (candidate) =>
+                  candidate.destination == product.destination &&
+                  candidate.categoryId == product.categoryId &&
+                  candidate.id != product.id,
+            )
+            .isNotEmpty;
+      });
 
-        final first = session.productContinuationsFor(current);
-        final second = session.productContinuationsFor(current);
+      final first = session.productContinuationsFor(current);
+      final second = session.productContinuationsFor(current);
 
-        expect(first, isNotEmpty);
-        expect(first, hasLength(6));
-        expect(first.map((product) => product.id), second.map((p) => p.id));
-        expect(first, everyElement(isNot(same(current))));
-        expect(
-          first,
-          everyElement(
-            predicate<BuyV2Product>(
-              (product) =>
-                  product.destination == current.destination &&
-                  product.id != current.id,
-            ),
+      expect(first, isNotEmpty);
+      expect(
+        first,
+        hasLength(3),
+        reason:
+            'Only same-category alternatives qualify; do not pad with unrelated products',
+      );
+      expect(
+        session.productContinuationsFor(current, limit: 1),
+        orderedEquals([first.first]),
+      );
+      expect(first.map((product) => product.id), second.map((p) => p.id));
+      expect(first, everyElement(isNot(same(current))));
+      expect(
+        first,
+        everyElement(
+          predicate<BuyV2Product>(
+            (product) =>
+                product.destination == current.destination &&
+                product.categoryId == current.categoryId &&
+                product.id != current.id,
           ),
-        );
-        expect(first.first.categoryId, current.categoryId);
-        expect(session.productContinuationsFor(current, limit: 0), isEmpty);
-      },
-    );
+        ),
+      );
+      expect(first.first.categoryId, current.categoryId);
+      expect(session.productContinuationsFor(current, limit: 0), isEmpty);
+    });
 
     test('a product chain retains its original query and return depth', () {
       session.updateQuery('tomato');
@@ -7091,7 +12061,7 @@ void main() {
     });
 
     test(
-      'scope checkout confirms only that family and preserves other cart lines',
+      'explicit Cart selection confirms only selected lines and preserves others',
       () {
         final session = _r669OrderReadySession();
         final shop = BuyV2Catalogue.products.firstWhere(
@@ -7104,6 +12074,7 @@ void main() {
         session.addProduct(wholesale.id);
 
         session.openCart(scope: BuyV2CartScope.wholesale);
+        session.selectCartProduct(shop.id, false);
         session.openCheckout();
         session.confirmOrder();
 
@@ -7230,7 +12201,7 @@ void main() {
           );
           expect(order.total, group.total);
           expect(order.partnerType, group.partnerType);
-          expect(order.paymentMethod, 'PhonePe');
+          expect(order.paymentMethod, 'UPI');
           expect(order.recipient, session.selectedAddress.recipient);
           expect(order.addressLine, contains(session.selectedAddress.pinCode));
         }
@@ -7847,40 +12818,31 @@ void main() {
     test('saved address and payment selections change independently', () {
       session.chooseAddress('work');
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'PhonePe');
+      expect(session.selectedPayment, 'UPI');
 
-      expect(session.choosePayment('Paytm'), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Paytm');
+      expect(session.selectedPayment, 'Card');
 
       session.chooseAddress('home');
       expect(session.selectedAddressId, 'home');
-      expect(session.selectedPayment, 'Paytm');
+      expect(session.selectedPayment, 'Card');
     });
 
-    test('staged Checkout Back returns Confirm Payment Address then Cart', () {
+    test('Checkout Back returns directly to Cart from every legacy step', () {
       final product = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.shop,
       );
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.shop);
-      expect(session.openCheckout(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
-
-      expect(session.continueCheckoutFromAddress(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-      expect(session.continueCheckoutFromPayment(), isTrue);
-      expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
-
-      session.goBack();
-      expect(session.view, BuyV2View.checkout);
-      expect(session.checkoutStep, BuyV2CheckoutStep.payment);
-      session.goBack();
-      expect(session.view, BuyV2View.checkout);
-      expect(session.checkoutStep, BuyV2CheckoutStep.address);
-      session.goBack();
-      expect(session.view, BuyV2View.cart);
-      expect(session.cartScope, BuyV2CartScope.shop);
+      for (final step in BuyV2CheckoutStep.values) {
+        expect(session.openCheckout(), isTrue);
+        expect(session.showCheckoutStep(step), isTrue);
+        session.goBack();
+        expect(session.view, BuyV2View.cart);
+        expect(session.cartScope, BuyV2CartScope.shop);
+        expect(session.quantityFor(product.id), 1);
+      }
     });
 
     test('saved address update preserves identity count and selection', () {
@@ -7944,22 +12906,20 @@ void main() {
 
     test('unsupported payment identifiers fail closed', () {
       session.chooseAddress('work');
-      expect(session.choosePayment('Purchase order'), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
 
+      expect(session.choosePayment('Purchase order'), isFalse);
       expect(session.choosePayment('Card<script>'), isFalse);
-      expect(session.choosePayment('UPI'), isFalse);
+      expect(session.choosePayment('PhonePe'), isFalse);
       expect(session.choosePayment('Bank transfer'), isFalse);
 
       expect(session.selectedAddressId, 'work');
-      expect(session.selectedPayment, 'Purchase order');
-      expect(session.notice, 'This payment method is not available.');
-      expect(BuyV2Session.paymentMethods, {
-        'PhonePe',
-        'Paytm',
-        'Pine Labs',
-        'Cash on Delivery',
-        'Purchase order',
-      });
+      expect(session.selectedPayment, 'Card');
+      expect(
+        session.notice,
+        'This payment method is unavailable for this purchase.',
+      );
+      expect(BuyV2Session.paymentMethods, {'UPI', 'Card'});
     });
 
     test('Orders search filters only the current order tab', () {
@@ -8050,7 +13010,13 @@ void main() {
         expect(production.view, isNot(BuyV2View.confirmation));
         expect(
           production.checkoutSubmissionState,
-          BuyV2CheckoutSubmissionState.unavailable,
+          BuyV2CheckoutSubmissionState.idle,
+        );
+        expect(production.confirmedOrders, isEmpty);
+        expect(production.legacyCheckoutAttempt, isNull);
+        expect(
+          production.notice,
+          'This payment method is unavailable for this purchase.',
         );
       },
     );
@@ -8058,9 +13024,11 @@ void main() {
     test(
       'authoritative commerce snapshot and order result own production success',
       () async {
-        final product = BuyV2Catalogue.products.firstWhere(
-          (candidate) => candidate.destination == BuyV2Destination.shop,
-        );
+        final product = BuyV2Catalogue.products
+            .firstWhere(
+              (candidate) => candidate.destination == BuyV2Destination.shop,
+            )
+            .copyWith(storeId: 'test-checkout-store');
         const address = BuyV2Address(
           id: 'server-home',
           kind: BuyV2AddressKind.home,
@@ -8082,6 +13050,9 @@ void main() {
           partnerType: product.partnerRole,
           promise: product.deliveryPromise,
           destinationLabel: address.shortLine,
+          recipient: address.recipient,
+          addressLine: address.line,
+          amountPaidNow: product.price,
           progress: .2,
           status: BuyV2OrderStatus.preparing,
           purchaseId: 'BUY-SERVER-1',
@@ -8107,6 +13078,10 @@ void main() {
         final production = BuyV2Session(
           core: BuySession(),
           commerceAdapter: adapter,
+          customerStateStore: _MemoryCustomerStateStore(
+            'authoritative-checkout-fixture',
+          ),
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
 
@@ -8115,7 +13090,11 @@ void main() {
         production.openCart(scope: BuyV2CartScope.shop);
         expect(production.openCheckout(), isTrue);
 
-        expect(await production.submitOrder(), isTrue);
+        expect(
+          await production.submitOrder(),
+          isTrue,
+          reason: production.notice,
+        );
         expect(adapter.placementCalls, 1);
         expect(production.view, BuyV2View.confirmation);
         expect(production.confirmedOrders.single.id, order.id);
@@ -8131,10 +13110,12 @@ void main() {
           core: BuySession(),
           customerStateStore: store,
           commerceAdapter: R669BrandCommerce(),
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
         await first.restoreCommerce();
         final product = first.visibleProducts.first;
+        final brand = first.discoveryBrands.first;
         first.addProduct(product.id);
         first.toggleSaved(product.id);
         first.addAddress(
@@ -8150,8 +13131,9 @@ void main() {
             landmark: 'Near the park',
           ),
         );
-        first.choosePayment('Paytm');
-        final brand = first.discoveryBrands.first;
+        first.choosePayment('Card');
+        expect(first.deliveryOptionsFor(product), isEmpty);
+        expect(first.quantityFor(product.id), product.minimumOrder);
         first.toggleDiscoveryBrand(brand);
         first.chooseMaximumProductPrice(500);
         first.choosePackFilter(BuyV2PackFilter.standard);
@@ -8164,6 +13146,7 @@ void main() {
           core: BuySession(),
           customerStateStore: store,
           commerceAdapter: R669BrandCommerce(),
+          productFactsAdapter: const BuyTestEligibilityFacts(),
           reviewDataEnabled: false,
         );
         await restored.restoreCommerce();
@@ -8172,7 +13155,7 @@ void main() {
         expect(restored.quantityFor(product.id), product.minimumOrder);
         expect(restored.isSaved(product.id), isTrue);
         expect(restored.selectedAddressId, 'family');
-        expect(restored.selectedPayment, 'Paytm');
+        expect(restored.selectedPayment, 'Card');
         expect(restored.selectedBrands, isEmpty);
         expect(restored.maximumProductPrice, isNull);
         expect(restored.selectedPackFilter, isNull);
@@ -8184,7 +13167,11 @@ void main() {
 
     test('confirmed order survives a customer-session restart', () async {
       final store = _MemoryCustomerStateStore('account-orders');
-      final first = BuyV2Session(core: BuySession(), customerStateStore: store);
+      final first = BuyV2Session(
+        core: BuySession(),
+        customerStateStore: store,
+        commerceAdapter: prepaidCommerceFixture(),
+      );
       addTearDown(first.dispose);
       final product = first.product('s-tomato');
 
@@ -8192,9 +13179,15 @@ void main() {
       first.openCart(scope: BuyV2CartScope.shop);
       expect(first.openCheckout(), isTrue);
       expect(first.continueCheckoutFromAddress(), isTrue);
-      expect(first.choosePayment('Cash on Delivery'), isTrue);
+      expect(first.choosePayment('Card'), isTrue);
       expect(first.continueCheckoutFromPayment(), isTrue);
-      expect(await first.submitOrder(), isTrue);
+      expect(await first.submitOrder(), isFalse);
+      expect(
+        first.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(await first.continuePayment((_) async => true), isTrue);
+      expect(await first.reconcilePayment(), isTrue);
       expect(first.confirmedOrders, isNotEmpty);
       final orderId = first.confirmedOrders.first.id;
       await Future<void>.delayed(Duration.zero);
@@ -8256,18 +13249,13 @@ void main() {
             }
             expect(session.openCheckout(), isTrue);
             expect(session.continueCheckoutFromAddress(), isTrue);
-            expect(
-              session.choosePayment(
-                wholesale ? 'Purchase order' : 'Cash on Delivery',
-              ),
-              isTrue,
-            );
-            if (wholesale) session.purchaseOrderReference = 'R66-LOCAL-PO';
+            expect(session.choosePayment('Card'), isTrue);
             expect(session.continueCheckoutFromPayment(), isTrue);
             final groups = session.checkoutFulfilmentGroups;
             expect(groups, hasLength(wholesale ? 1 : 2));
             final total = session.checkoutPayableTotal;
-            expect(await session.submitOrder(), isTrue);
+            // This test isolates retained local order identities, not live payment settlement.
+            expect(session.confirmOrder(), isTrue);
             final purchaseId = session.confirmedPurchaseId!;
             expect(
               purchases.containsKey(purchaseId),
@@ -8361,6 +13349,9 @@ void main() {
           outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
           paymentActionUri: Uri.parse('upi://pay?pa=merchant@mool'),
           paymentReference: 'PAY-1',
+          customerStateStore: _MemoryCustomerStateStore(
+            'handoff-contract-test',
+          ),
         );
         addTearDown(fixture.session.dispose);
 
@@ -8368,6 +13359,7 @@ void main() {
         expect(
           fixture.session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.paymentActionRequired,
+          reason: fixture.session.notice,
         );
         final idempotencyKey = fixture.session.checkoutIdempotencyKey;
         expect(idempotencyKey, isNotEmpty);
@@ -8410,20 +13402,30 @@ void main() {
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.failed,
+          paymentReference: 'PAY-FAILED-1',
         );
         addTearDown(fixture.session.dispose);
 
         expect(await fixture.session.submitOrder(), isFalse);
         final firstKey = fixture.adapter.requests.single.idempotencyKey;
-        fixture.adapter.placement = BuyV2OrderPlacementResult(
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.requests, hasLength(1));
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
           outcome: BuyV2OrderPlacementOutcome.confirmed,
           customerMessage: 'Your order is confirmed.',
           purchaseReference: 'BUY-SERVER-1',
+          paymentReference: 'PAY-FAILED-1',
+          idempotencyKey: firstKey,
           orders: [fixture.order],
         );
 
-        expect(await fixture.session.submitOrder(), isTrue);
-        expect(fixture.adapter.requests, hasLength(2));
+        expect(
+          await fixture.session.reconcilePayment(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
+        expect(fixture.adapter.requests, hasLength(1));
+        expect(fixture.adapter.reconciliationCalls, 1);
         expect(fixture.adapter.requests.last.idempotencyKey, firstKey);
         expect(fixture.session.confirmedOrders, hasLength(1));
       },
@@ -8434,16 +13436,37 @@ void main() {
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.cancelled,
+          customerStateStore: _MemoryCustomerStateStore('cancel-contract-test'),
+          paymentReference: 'PAY-CANCEL-1',
         );
         addTearDown(fixture.session.dispose);
 
         expect(await fixture.session.submitOrder(), isFalse);
+        expect(
+          fixture.adapter.requests,
+          hasLength(1),
+          reason: fixture.session.notice,
+        );
         final cancelledKey = fixture.adapter.requests.single.idempotencyKey;
-        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(fixture.session.checkoutIdempotencyKey, cancelledKey);
         expect(
           fixture.session.checkoutSubmissionState,
           BuyV2CheckoutSubmissionState.cancelled,
         );
+        expect(fixture.session.retryCheckoutPayment(), isFalse);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.requests, hasLength(1));
+        fixture.adapter.reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.cancelled,
+          customerMessage: 'The original payment is closed.',
+          idempotencyKey: cancelledKey,
+          paymentReference: 'PAY-CANCEL-1',
+          retryAllowed: true,
+        );
+        expect(await fixture.session.reconcilePayment(), isFalse);
+        expect(fixture.session.checkoutRequiresResolution, isFalse);
+        expect(fixture.session.checkoutIdempotencyKey, isNull);
+        expect(fixture.session.retryCheckoutPayment(), isTrue);
         fixture.adapter.placement = BuyV2OrderPlacementResult(
           outcome: BuyV2OrderPlacementOutcome.confirmed,
           customerMessage: 'Your order is confirmed.',
@@ -8451,7 +13474,11 @@ void main() {
           orders: [fixture.order],
         );
 
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         expect(
           fixture.adapter.requests.last.idempotencyKey,
           isNot(cancelledKey),
@@ -8495,6 +13522,9 @@ void main() {
               title: fixture.order.title,
               itemSummary: fixture.order.itemSummary,
               total: currentLine.total,
+              amountPaidNow: currentLine.total,
+              recipient: fixture.order.recipient,
+              addressLine: fixture.order.addressLine,
               partner: fixture.order.partner,
               partnerType: fixture.order.partnerType,
               promise: fixture.order.promise,
@@ -8508,7 +13538,11 @@ void main() {
             ),
           ],
         );
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         expect(fixture.adapter.placementCalls, 1);
       },
     );
@@ -8646,6 +13680,68 @@ void main() {
       },
     );
 
+    test('D09 late order refresh ignores a disposed session', () async {
+      final fixture = await _openProductionCheckout(
+        outcome: BuyV2OrderPlacementOutcome.confirmed,
+      );
+      expect(
+        await fixture.session.submitOrder(),
+        isTrue,
+        reason: fixture.session.notice,
+      );
+      final original = fixture.session.orders.first;
+      final gate = Completer<BuyV2OrderRefreshResult>();
+      fixture.adapter.orderRefreshGate = gate;
+      final pending = fixture.session.refreshOrder(original.id);
+      fixture.session.dispose();
+      gate.complete(
+        BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Updated',
+          order: original,
+        ),
+      );
+      expect(await pending, isFalse);
+    });
+
+    test(
+      'D09 refresh rejects another purchase under the same order ID',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.confirmed,
+        );
+        addTearDown(fixture.session.dispose);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
+        final original = fixture.session.orders.first;
+        fixture.adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.ready,
+          customerMessage: 'Updated',
+          order: BuyV2Order(
+            id: original.id,
+            destination: original.destination,
+            title: original.title,
+            itemSummary: original.itemSummary,
+            total: original.total,
+            partner: original.partner,
+            partnerType: original.partnerType,
+            promise: original.promise,
+            destinationLabel: original.destinationLabel,
+            progress: original.progress,
+            status: original.status,
+            purchaseId: 'unrelated-purchase',
+            productIds: original.productIds,
+            lines: original.lines,
+          ),
+        );
+        expect(await fixture.session.refreshOrder(original.id), isFalse);
+        expect(fixture.session.orders.first, same(original));
+      },
+    );
+
     test(
       'order refresh accepts exact identity and preserves last known failure',
       () async {
@@ -8653,7 +13749,11 @@ void main() {
           outcome: BuyV2OrderPlacementOutcome.confirmed,
         );
         addTearDown(fixture.session.dispose);
-        expect(await fixture.session.submitOrder(), isTrue);
+        expect(
+          await fixture.session.submitOrder(),
+          isTrue,
+          reason: fixture.session.notice,
+        );
         final updated = BuyV2Order(
           id: fixture.order.id,
           destination: fixture.order.destination,
@@ -8798,7 +13898,11 @@ void main() {
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 0);
-        expect(fixture.session.view, BuyV2View.recovery);
+        expect(
+          fixture.session.view,
+          BuyV2View.recovery,
+          reason: fixture.session.notice,
+        );
         expect(
           fixture.session.checkoutAvailabilityIssue?.productId,
           fixture.product.id,
@@ -8816,7 +13920,7 @@ void main() {
     );
 
     test(
-      'server stock rejection removes only its exact Cart product',
+      'server stock response after submission preserves original payment and Cart',
       () async {
         final fixture = await _openProductionCheckout(
           outcome: BuyV2OrderPlacementOutcome.unavailable,
@@ -8831,37 +13935,47 @@ void main() {
 
         expect(await fixture.session.submitOrder(), isFalse);
         expect(fixture.adapter.placementCalls, 1);
-        expect(fixture.session.view, BuyV2View.recovery);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutRequiresResolution, isTrue);
         expect(
-          fixture.session.checkoutAvailabilityIssue?.title,
-          fixture.product.title,
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
         );
-        expect(fixture.session.removeCheckoutIssueProduct(), isTrue);
-        expect(fixture.session.cartLines, isEmpty);
-        expect(fixture.session.view, BuyV2View.catalogue);
+        expect(fixture.session.removeCheckoutIssueProduct(), isFalse);
+        expect(fixture.session.quantityFor(fixture.product.id), 1);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
       },
     );
 
-    test('service-area rejection returns to exact Checkout address', () async {
-      final fixture = await _openProductionCheckout(
-        outcome: BuyV2OrderPlacementOutcome.unavailable,
-      );
-      addTearDown(fixture.session.dispose);
-      final addressId = fixture.session.selectedAddress.id;
-      fixture.adapter.placement = const BuyV2OrderPlacementResult(
-        outcome: BuyV2OrderPlacementOutcome.unavailable,
-        customerMessage: 'Delivery is unavailable at this address.',
-        failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
-      );
+    test(
+      'service-area response after submission retains exact address and original payment',
+      () async {
+        final fixture = await _openProductionCheckout(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+        );
+        addTearDown(fixture.session.dispose);
+        final addressId = fixture.session.selectedAddress.id;
+        fixture.adapter.placement = const BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.unavailable,
+          customerMessage: 'Delivery is unavailable at this address.',
+          failureKind: BuyV2OrderPlacementFailureKind.serviceAreaUnavailable,
+        );
 
-      expect(await fixture.session.submitOrder(), isFalse);
-      expect(fixture.session.view, BuyV2View.recovery);
-      expect(fixture.session.canResolveCheckoutAddress, isTrue);
-      fixture.session.retryRecovery();
-      expect(fixture.session.view, BuyV2View.checkout);
-      expect(fixture.session.selectedAddress.id, addressId);
-      expect(fixture.session.cartLines, isNotEmpty);
-    });
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.checkoutRequiresResolution, isTrue);
+        expect(
+          fixture.session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentUnknown,
+        );
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.adapter.placementCalls, 1);
+        expect(fixture.session.view, BuyV2View.checkout);
+        expect(fixture.session.selectedAddress.id, addressId);
+        expect(fixture.session.cartLines, isNotEmpty);
+      },
+    );
 
     test('Shop sale type separates Quick delivery and Courier products', () {
       final core = BuySession();
@@ -9698,7 +14812,9 @@ void r669ComparisonContractTests() {
           );
           expect(productList, findsOneWidget);
           await tester.scrollUntilVisible(
-            find.text('Compare'),
+            find.byKey(
+              ValueKey('buy-product-action-compare-${fixture.product.id}'),
+            ),
             240,
             maxScrolls: 80,
             scrollable: find
@@ -9706,10 +14822,27 @@ void r669ComparisonContractTests() {
                 .first,
           );
           await tester.pumpAndSettle();
-          expect(find.text('Compare').hitTestable(), findsOneWidget);
-          await tester.tap(find.text('Compare'));
+          expect(
+            find
+                .byKey(
+                  ValueKey('buy-product-action-compare-${fixture.product.id}'),
+                )
+                .hitTestable(),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(
+              ValueKey('buy-product-action-compare-${fixture.product.id}'),
+            ),
+          );
           await tester.pumpAndSettle();
-          expect(find.text('Compare prices'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-product-comparison-sheet')),
+              matching: find.text('Compare prices'),
+            ),
+            findsOneWidget,
+          );
           expect(fixture.calls.last.query.sort, BuyV2ComparisonSort.itemPrice);
           for (final id in ['comparison-a', 'comparison-b', 'comparison-c']) {
             expect(
@@ -9733,7 +14866,7 @@ void r669ComparisonContractTests() {
           await tester.ensureVisible(priceC);
           await tester.pumpAndSettle();
           expect(
-            find.text('₹${90 * viewport.quantity} item price'),
+            find.text('Items: ₹${90 * viewport.quantity}'),
             findsOneWidget,
           );
           expect(find.text('Delivery: ₹30'), findsOneWidget);
@@ -9770,7 +14903,13 @@ void r669ComparisonContractTests() {
           expect(session.quantityFor('comparison-c'), viewport.quantity);
           expect(session.quantityFor(fixture.product.id), retained);
           expect(session.selectedProductId, fixture.product.id);
-          expect(find.text('Compare prices'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-product-comparison-sheet')),
+              matching: find.text('Compare prices'),
+            ),
+            findsOneWidget,
+          );
           expect(
             find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
             findsOneWidget,
@@ -9817,7 +14956,13 @@ void r669ComparisonContractTests() {
           expect(session.quantityFor('comparison-c'), viewport.quantity + 2);
           expect(session.quantityFor(fixture.product.id), retained);
           expect(session.selectedProductId, fixture.product.id);
-          expect(find.text('Compare prices'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-product-comparison-sheet')),
+              matching: find.text('Compare prices'),
+            ),
+            findsOneWidget,
+          );
           expect(tester.takeException(), isNull);
 
           await tester.ensureVisible(find.text('Store C'));
@@ -9843,7 +14988,13 @@ void r669ComparisonContractTests() {
           );
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(find.text('Compare prices'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-product-comparison-sheet')),
+              matching: find.text('Compare prices'),
+            ),
+            findsOneWidget,
+          );
           expect(session.selectedProductId, fixture.product.id);
           expect(
             fixture.calls
@@ -9949,7 +15100,53 @@ void r669ComparisonContractTests() {
           'snapshot-a',
           'snapshot-a',
         ]);
-        expect(calls.every((value) => value.pageSize == 20), isTrue);
+        expect(calls.every((value) => value.pageSize == 40), isTrue);
+      },
+    );
+    test(
+      'controller shows each Store once across pages and resets on refresh',
+      () async {
+        final request = query();
+        final rows = List.generate(
+          4,
+          (i) => offer(
+            request,
+            id: 'offer-$i',
+            store: i < 3 ? 'store-a' : 'store-b',
+            listing: product.copyWith(storeId: i < 3 ? 'store-a' : 'store-b'),
+          ),
+        );
+        final source = _R669ComparisonSource(
+          identity(),
+          (load) async => load.cursor == 'second'
+              ? page(
+                  request,
+                  rows.skip(2).toList(),
+                  start: 2,
+                  previous: 'first',
+                  total: 4,
+                )
+              : page(request, rows.take(2).toList(), next: 'second', total: 4),
+        );
+        final controller = BuyV2ComparisonController(
+          source: source,
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.page!.offers, hasLength(2));
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.next();
+        expect(controller.page!.offers, hasLength(2));
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-b']);
+        await controller.previous();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.refresh();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-a']);
+        await controller.next();
+        expect(controller.storeOffers.map((o) => o.storeId), ['store-b']);
       },
     );
     test(

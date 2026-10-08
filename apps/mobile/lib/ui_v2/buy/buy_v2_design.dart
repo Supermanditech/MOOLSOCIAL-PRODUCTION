@@ -6,7 +6,10 @@ import 'package:intl/intl.dart';
 
 import '../../core/design/mool_motion_primitives.dart';
 import '../../features/buy/buy_v2_content_contracts.dart';
+import '../../features/buy/buy_v2_customer_copy.dart';
 import '../../features/buy/buy_v2_models.dart';
+
+export '../../features/buy/buy_v2_customer_copy.dart';
 
 final NumberFormat _buyV2Currency = NumberFormat.currency(
   locale: 'en_IN',
@@ -15,69 +18,6 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 );
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
-
-String buyV2CustomerStoreName(String name, String? storeId) {
-  final match = RegExp(
-    r'^buy-catalogue-dev-v1-(shop|wholesale|medicine)-store-([0-9]{6})$',
-  ).firstMatch(storeId ?? '');
-  if (match == null || name != 'Mool Market ${match.group(2)}') return name;
-  final number = int.parse(match.group(2)!);
-  if (number < 1 || number > 100000) return name;
-  return 'Mool Market $number';
-}
-
-/// Presentation only: development catalogue bookkeeping is not a product name.
-/// Require the complete generated identity and matching decoration so genuine
-/// model numbers, pack sizes and all non-fixture supplier content stay intact.
-extension BuyV2CustomerProductCopy on BuyV2Product {
-  String customerSeller(String name) => buyV2CustomerStoreName(name, storeId);
-
-  String? get _developmentSku {
-    final match = RegExp(
-      r'^buy-catalogue-dev-v1-(shop|wholesale|medicine)-store-([0-9]{6})-sku-([0-9]{4})$',
-    ).firstMatch(id);
-    if (match == null || match.group(1) != destination.name) return null;
-    final sku = int.parse(match.group(3)!);
-    if (sku < 1 ||
-        sku > 5000 ||
-        storeId !=
-            'buy-catalogue-dev-v1-${destination.name}-store-${match.group(2)}' ||
-        canonicalId !=
-            'buy-catalogue-dev-v1-${destination.name}-product-$sku') {
-      return null;
-    }
-    return '$sku';
-  }
-
-  String get customerTitle {
-    final sku = _developmentSku;
-    final suffix = ' $sku';
-    return sku != null && title.endsWith(suffix)
-        ? title.substring(0, title.length - suffix.length)
-        : title;
-  }
-
-  /// Normalize only complete, known generated field values, never substrings
-  /// inside supplier prose or genuine model numbers.
-  String customerContent(String value) {
-    if (_developmentSku == null) return value;
-    if (value == title) return customerTitle;
-    if (value == variant) return customerVariant;
-    final generatedDescription = '$title \u00b7 $variant. $pack at $unitPrice.';
-    if (value == generatedDescription) {
-      return '$customerTitle \u00b7 $customerVariant. $pack at $unitPrice.';
-    }
-    return customerSeller(value);
-  }
-
-  String get customerVariant {
-    final sku = _developmentSku;
-    final suffix = ' · SKU $sku';
-    return sku != null && variant.endsWith(suffix)
-        ? variant.substring(0, variant.length - suffix.length)
-        : variant;
-  }
-}
 
 /// Mode artwork is illustrative, never evidence of a vehicle assignment.
 enum BuyV2DeliveryArtwork { quick, wholesale, bulk, courier }
@@ -88,7 +28,7 @@ BuyV2DeliveryArtwork buyV2DeliveryArtworkFor(
 }) {
   if (product.destination == BuyV2Destination.wholesale) {
     // Match the existing Wholesale/Bulk catalogue buckets, not basket quantity.
-    return product.minimumOrder <= 2
+    return product.offerClass != BuyV2OfferClass.bulk
         ? BuyV2DeliveryArtwork.wholesale
         : BuyV2DeliveryArtwork.bulk;
   }
@@ -335,14 +275,6 @@ class _BuyV2VerticalScrollPainter extends CustomPainter {
     final x = size.width - 6;
     const inset = 6.0;
     final bottom = size.height - inset;
-    canvas.drawLine(
-      Offset(x, inset),
-      Offset(x, bottom),
-      Paint()
-        ..color = const Color(0xFF8993A2)
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
     canvas.drawCircle(
       Offset(x, inset + (bottom - inset) * fraction),
       5,
@@ -695,7 +627,10 @@ class BuyV2AdaptiveIdentityRow extends StatelessWidget {
 /// Google route duration is only one upstream input. This presentation helper
 /// never calculates or guesses an ETA; it renders the complete promise already
 /// supplied through [BuyV2ProductFactsSnapshot].
-String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
+String buyV2BuyerDeliveryPromise(
+  BuyV2ProductFactsSnapshot facts, {
+  bool confirmAfterStoreAcceptance = false,
+}) {
   if (facts.stale) return 'Delivery time needs review';
 
   final orderability = facts.orderabilityLabel.trim().toLowerCase();
@@ -705,11 +640,21 @@ String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
     return 'Currently unavailable';
   }
 
+  // Normalize only the known missing-estimate placeholder for current public
+  // shopping. Supplier facts and recorded order promises stay unchanged.
+  final promise = facts.deliveryPromise.trim().toLowerCase();
+  if (confirmAfterStoreAcceptance &&
+      (promise.isEmpty || promise == 'delivery time confirmed at checkout')) {
+    return 'Delivery time confirmed after Store acceptance';
+  }
   return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
 }
 
 String buyV2BuyerDeliveryPromiseSource(String value) {
-  final source = value.trim();
+  final source = value.trim().replaceAll(
+    RegExp(r'\bdelivered(?=\s+(?:in|within|by)\b)', caseSensitive: false),
+    'Delivery',
+  );
   final normalized = source.toLowerCase();
   if (normalized.startsWith('delivered ')) {
     return source.replaceFirst(
@@ -744,7 +689,10 @@ String buyV2DeliveryPromiseSummary({
   String? promisedByLabel,
 }) {
   final relative = buyV2BuyerDeliveryPromiseSource(promise);
-  final deadline = promisedByLabel?.trim();
+  final deadline = promisedByLabel?.trim().replaceAll(
+    RegExp(r'\bdelivered(?=\s+(?:in|within|by)\b)', caseSensitive: false),
+    'Delivery',
+  );
   return deadline == null || deadline.isEmpty
       ? relative
       : '$relative · $deadline';
@@ -768,7 +716,14 @@ String buyV2OrderEstimateSummary(
   bool revised = false,
 }) {
   final summary = revised
-      ? order.updatedDeliveryEstimate ?? buyV2OrderPromiseSummary(order)
+      ? order.updatedDeliveryEstimate?.replaceAll(
+              RegExp(
+                r'\bdelivered(?=\s+(?:in|within|by)\b)',
+                caseSensitive: false,
+              ),
+              'Delivery',
+            ) ??
+            buyV2OrderPromiseSummary(order)
       : buyV2OrderPromiseSummary(order);
   if (order.status == BuyV2OrderStatus.delivered) {
     if (!revised &&
@@ -818,16 +773,16 @@ String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
     };
 
 String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
-  BuyV2FulfilmentMode.quickLocal => 'Quick local delivery',
-  BuyV2FulfilmentMode.standardCourier => 'Standard/courier delivery',
-  BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+  BuyV2FulfilmentMode.quickLocal => 'MoolSocial Quick Delivery',
+  BuyV2FulfilmentMode.standardCourier => 'MoolSocial Courier Delivery',
+  BuyV2FulfilmentMode.bulkFreight => 'MoolSocial Scheduled Delivery',
 };
 
 String buyV2CompactFulfilmentModeLabel(BuyV2FulfilmentMode mode) =>
     switch (mode) {
-      BuyV2FulfilmentMode.quickLocal => 'Quick local',
+      BuyV2FulfilmentMode.quickLocal => 'Quick delivery',
       BuyV2FulfilmentMode.standardCourier => 'Courier',
-      BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+      BuyV2FulfilmentMode.bulkFreight => 'Scheduled delivery',
     };
 
 const buyV2ProductOfferDecisionContractVersion =
@@ -947,6 +902,7 @@ class BuyV2ProductOfferDecision {
 BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
   required BuyV2Product product,
   required BuyV2ProductFactsSnapshot facts,
+  int quantity = 0,
 }) {
   final orderability = facts.orderabilityLabel.trim().toLowerCase();
   final partner = facts.partner.trim().toLowerCase();
@@ -992,12 +948,19 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
           'We’re confirming current stock and delivery before you add this product.',
     );
   }
-  if (facts.price != product.price) {
+  final packQuantity = quantity < product.minimumOrder
+      ? product.minimumOrder
+      : quantity;
+  final expectedPrice = product.hasValidPackTerms
+      ? product.packTerms?.priceForQuantity(packQuantity, product.price) ??
+            product.price
+      : product.price;
+  if (facts.price != expectedPrice) {
     return BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.changedPrice,
       statusLabel: 'Price changed',
       detail:
-          'The price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
+          'The price changed from ${buyV2Money(expectedPrice)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
     );
   }
   if (automaticFulfilment &&
@@ -1032,6 +995,128 @@ abstract final class BuyV2Colors {
   static const softOrange = Color(0xFFFFF0DE);
   static const softGreen = Color(0xFFEAF7E8);
   static const softBlue = Color(0xFFEDECFF);
+}
+
+/// Shared public commerce action palette; geometry and callbacks stay with
+/// the existing controls. Action faces use the founder's pure white without a coloured gradient.
+abstract final class BuyV2ActionStyle {
+  static const gradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE5EAFB), Color(0xFFE5F3F0)],
+  );
+  static const primaryFill = Color(0xFFFFFFFF);
+  static const pressedFill = Color(0xFFF7F9FA);
+  static const disabledFill = primaryFill;
+  static const primaryForeground = Color(0xFF25252A);
+  static const primaryBorder = Color(0xFFDEE4E8);
+  static const foreground = BuyV2Colors.navy;
+  static const border = Color(0x66000080);
+
+  static BoxDecoration selectionSurface({
+    required bool selected,
+    double radius = 12,
+  }) => BoxDecoration(
+    color: selected ? pressedFill : primaryFill,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(
+      color: selected ? primaryForeground : primaryBorder,
+      width: selected ? 1.4 : 1,
+    ),
+  );
+
+  static Widget background(
+    BuildContext context,
+    Set<WidgetState> states,
+    Widget? child,
+  ) => Ink(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(
+        color: states.contains(WidgetState.disabled)
+            ? BuyV2Colors.line
+            : states.contains(WidgetState.focused)
+            ? primaryForeground
+            : primaryBorder,
+      ),
+      color: states.contains(WidgetState.disabled)
+          ? disabledFill
+          : states.contains(WidgetState.pressed)
+          ? pressedFill
+          : primaryFill,
+    ),
+    child: child,
+  );
+
+  static ButtonStyle button([ButtonStyle? layout]) =>
+      (layout ?? const ButtonStyle()).copyWith(
+        minimumSize:
+            layout?.minimumSize ?? const WidgetStatePropertyAll(Size(44, 44)),
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : primaryForeground,
+        ),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : primaryForeground,
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        elevation: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? 0
+              : states.contains(WidgetState.pressed)
+              ? 1
+              : 1,
+        ),
+        shadowColor: const WidgetStatePropertyAll(Color(0x185C5C68)),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStateProperty.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.disabled)
+                ? BuyV2Colors.line
+                : primaryBorder,
+          ),
+        ),
+        backgroundBuilder: background,
+      );
+
+  /// Primary personal Checkout action; the catalogue Add face is unchanged.
+  static ButtonStyle prominent([ButtonStyle? layout]) =>
+      button(layout).copyWith(
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : Colors.white,
+        ),
+        iconColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.disabled)
+              ? BuyV2Colors.muted
+              : Colors.white,
+        ),
+        backgroundBuilder: (context, states, child) => Ink(
+          decoration: BoxDecoration(
+            color: states.contains(WidgetState.disabled)
+                ? const Color(0xFFE9EDF5)
+                : states.contains(WidgetState.pressed)
+                ? BuyV2Colors.royal
+                : BuyV2Colors.navy,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: states.contains(WidgetState.focused)
+                  ? BuyV2Colors.orange
+                  : states.contains(WidgetState.disabled)
+                  ? BuyV2Colors.line
+                  : BuyV2Colors.navy,
+            ),
+          ),
+          child: child,
+        ),
+      );
 }
 
 abstract final class BuyV2Metrics {
@@ -1642,9 +1727,21 @@ class BuyV2ThemeSpec {
 }
 
 class BuyV2ThemeScope extends InheritedWidget {
-  const BuyV2ThemeScope({super.key, required this.spec, required super.child});
+  const BuyV2ThemeScope({
+    super.key,
+    required this.spec,
+    required super.child,
+    this.refinedCommerce = false,
+  });
 
   final BuyV2ThemeSpec spec;
+  final bool refinedCommerce;
+
+  static bool refinedOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<BuyV2ThemeScope>()
+          ?.refinedCommerce ??
+      false;
 
   static BuyV2ThemeSpec of(BuildContext context) {
     return context
@@ -1654,7 +1751,8 @@ class BuyV2ThemeScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(BuyV2ThemeScope oldWidget) => spec != oldWidget.spec;
+  bool updateShouldNotify(BuyV2ThemeScope oldWidget) =>
+      spec != oldWidget.spec || refinedCommerce != oldWidget.refinedCommerce;
 }
 
 class BuyV2IntentDepth extends StatefulWidget {
@@ -2050,6 +2148,19 @@ class BuyV2ProductPackshot extends StatelessWidget {
   }
 
   static BuyV2ProductMediaSource? resolveMedia(BuyV2Product product) {
+    // Generated review listings retain their template's supplied presentation.
+    // Require the validated generated identity and exact title/pack/category;
+    // real supplier listings never inherit another product's illustration.
+    if (product.customerTitle != product.title) {
+      for (final template in BuyV2Catalogue.products) {
+        if (template.destination == product.destination &&
+            template.title == product.customerTitle &&
+            template.pack == product.pack &&
+            template.categoryId == product.categoryId) {
+          return resolveMedia(template);
+        }
+      }
+    }
     final medicineCell = switch (product.id) {
       'm-paracetamol-500' => 0,
       'm-pain-relief-gel' => 1,
@@ -2090,7 +2201,11 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
 
-    final categoryId = product.categoryId.toLowerCase();
+    return categoryMedia(product.categoryId);
+  }
+
+  static BuyV2ProductMediaSource? categoryMedia(String id) {
+    final categoryId = id.toLowerCase();
     final categorySource = switch (categoryId) {
       'fruits-vegetables' => (categoryAtlasAPath, 0),
       'dairy-bakery' => (categoryAtlasAPath, 1),
@@ -2135,6 +2250,72 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
     return null;
+  }
+}
+
+/// Existing category artwork, never presented as a supplier product photograph.
+class BuyV2CategoryThumbnail extends StatelessWidget {
+  const BuyV2CategoryThumbnail({
+    super.key,
+    required this.category,
+    this.size = 36,
+  });
+  final BuyV2Category category;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = BuyV2ProductPackshot.categoryMedia(category.id);
+    final fallback = Icon(
+      category.id == 'all' ? Icons.apps_rounded : Icons.category_outlined,
+      color: BuyV2Colors.navy,
+      size: 20,
+    );
+    return Semantics(
+      image: true,
+      label: '${category.label} category illustration',
+      excludeSemantics: true,
+      child: SizedBox.square(
+        dimension: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(9),
+          child: ColoredBox(
+            color: BuyV2Colors.softBlue,
+            child: source == null
+                ? fallback
+                : Stack(
+                    clipBehavior: Clip.hardEdge,
+                    children: [
+                      Positioned(
+                        left:
+                            -source.sourceRect.left *
+                            size /
+                            source.sourceRect.width,
+                        top:
+                            -source.sourceRect.top *
+                            size /
+                            source.sourceRect.height,
+                        width:
+                            source.atlasSize.width *
+                            size /
+                            source.sourceRect.width,
+                        height:
+                            source.atlasSize.height *
+                            size /
+                            source.sourceRect.height,
+                        child: Image.asset(
+                          source.assetPath,
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, _, _) =>
+                              SizedBox.square(dimension: size, child: fallback),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -2377,16 +2558,31 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
 }
 
 BoxDecoration buyV2CardDecoration({
+  BuildContext? context,
   Color color = Colors.white,
   Color border = BuyV2Colors.line,
   double radius = BuyV2Metrics.radius,
   bool shadow = false,
 }) {
+  final refined = context != null && BuyV2ThemeScope.refinedOf(context);
   return BoxDecoration(
     color: color,
     borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: border),
-    boxShadow: shadow
+    border: Border.all(
+      color: refined && border == BuyV2Colors.line
+          ? const Color(0xFFE3E7ED)
+          : border,
+      width: 1,
+    ),
+    boxShadow: refined && color == Colors.white
+        ? const [
+            BoxShadow(
+              color: Color(0x080F2348),
+              blurRadius: 16,
+              offset: Offset(0, 4),
+            ),
+          ]
+        : shadow
         ? const [
             BoxShadow(
               color: Color(0x13000040),
@@ -2776,25 +2972,34 @@ extension BuyV2TextStyles on BuildContext {
     letterSpacing: .55,
   );
 
-  TextStyle get buyTitle => const TextStyle(
+  TextStyle get buyTitle => TextStyle(
     color: BuyV2Colors.ink,
     fontSize: 22,
     height: 1.08,
-    fontWeight: FontWeight.w900,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w800
+        : FontWeight.w900,
     letterSpacing: -.5,
   );
 
-  TextStyle get buyBody => const TextStyle(
+  TextStyle get buyBody => TextStyle(
+    fontFamily: BuyV2ThemeScope.refinedOf(this)
+        ? Theme.of(this).textTheme.bodyMedium?.fontFamily
+        : null,
     color: BuyV2Colors.ink,
     fontSize: 12,
     height: 1.25,
-    fontWeight: FontWeight.w600,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w500
+        : FontWeight.w600,
   );
 
-  TextStyle get buyMeta => const TextStyle(
+  TextStyle get buyMeta => TextStyle(
     color: BuyV2Colors.muted,
-    fontSize: 10,
+    fontSize: BuyV2ThemeScope.refinedOf(this) ? 11 : 10,
     height: 1.2,
-    fontWeight: FontWeight.w600,
+    fontWeight: BuyV2ThemeScope.refinedOf(this)
+        ? FontWeight.w500
+        : FontWeight.w600,
   );
 }

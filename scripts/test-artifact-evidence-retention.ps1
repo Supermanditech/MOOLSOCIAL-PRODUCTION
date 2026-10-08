@@ -164,7 +164,14 @@ foreach ($owner in @('apps/mobile/lib/features/work/work_session.dart',
   if (Test-StoreRetentionMaintenanceOwner $changed) { throw 'Store admitted unrelated or escaping owner.' }
   $passed++; Write-Output "PASS Store rejects unrelated owner $owner"
 }
-foreach ($phase in @('build','device','ticket_close','founder_acceptance','task_start')) {
+# Preserve the exact phases already approved in Store closure successor4ef603fa.
+# Identity, proof, generation and literal-owner restrictions remain mandatory.
+foreach ($phase in @('implementation','pre_commit','handoff','ticket_acceptance','ticket_close')) {
+  $changed = $storeFacts.Clone(); $changed.Phase = $phase
+  if (-not (Test-StoreRetentionMaintenanceOwner $changed)) { throw "Approved Store maintenance rejected $phase." }
+  $passed++; Write-Output "PASS Store maintenance admits exact approved phase $phase"
+}
+foreach ($phase in @('build','device','founder_acceptance','task_start','unlisted')) {
   $changed = $storeFacts.Clone(); $changed.Phase = $phase
   if (Test-StoreRetentionMaintenanceOwner $changed) { throw "Maintenance admitted $phase." }
   $passed++; Write-Output "PASS Store maintenance rejects phase $phase"

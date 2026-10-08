@@ -38,23 +38,59 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final cta = find.byWidgetPredicate(
+      final promotions = find.byWidgetPredicate(
         (widget) =>
             widget.key is ValueKey<String> &&
             (widget.key! as ValueKey<String>).value.startsWith(
               'buy-offer-promotion-cta-',
             ),
       );
+      expect(promotions, findsWidgets);
+      final visibleColumn = promotions.evaluate().firstWhere((element) {
+        final box = element.renderObject! as RenderBox;
+        final center = box.localToGlobal(box.size.center(Offset.zero));
+        return center.dx > 0 && center.dx < 320;
+      });
+      final promotionKey = visibleColumn.widget.key!;
+      final cta = find.byKey(promotionKey);
       Future<void> openOffer() async {
-        await tester.ensureVisible(cta);
+        expect(cta, findsOneWidget);
+        // Scroll vertically without moving the carousel to a prefetched card.
+        await Scrollable.of(
+          tester.element(cta),
+          axis: Axis.vertical,
+        ).position.ensureVisible(tester.renderObject(cta), alignment: .5);
         await tester.pumpAndSettle();
+        expect(cta.hitTestable(), findsOneWidget);
         await tester.tap(cta);
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.product);
       }
 
+      await captureR66Visual(tester, 'cursor-offers-brand-$scale');
+      final themedCards = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith(
+              'buy-offer-theme-card-',
+            ),
+      );
+      expect(themedCards, findsWidgets);
+      for (final card in tester.widgetList<Container>(themedCards)) {
+        final decoration = card.decoration! as BoxDecoration;
+        expect((decoration.gradient! as LinearGradient).colors, [
+          Colors.white,
+          BuyV2Colors.softBlue,
+        ]);
+        expect(
+          (card.foregroundDecoration! as BoxDecoration).border,
+          Border.all(color: BuyV2Colors.line),
+        );
+      }
       await openOffer();
       final productId = session.selectedProductId!;
+      final publicationId = session.featuredOfferPublicationId;
       ScrollableState productScroll() => tester.state<ScrollableState>(
         find
             .descendant(
@@ -76,6 +112,7 @@ void main() {
       expect(productScroll().position.pixels, closeTo(retainedOffset, 1));
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(session.featuredOfferPublicationId, publicationId);
       await openOffer();
       expect(session.selectedProductId, productId);
       expect(

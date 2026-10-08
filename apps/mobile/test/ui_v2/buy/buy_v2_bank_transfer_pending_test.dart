@@ -46,7 +46,7 @@ void main() {
       addTearDown(session.dispose);
       await openCheckout(tester, session);
       expect(session.choosePayment('Bank transfer'), isFalse);
-      expect(session.selectedPayment, 'PhonePe');
+      expect(session.selectedPayment, 'UPI');
       expect(session.availablePaymentMethods, isNot(contains('Bank transfer')));
       expect(
         find.byKey(const ValueKey('buy-payment-Bank transfer')),
@@ -110,7 +110,7 @@ void main() {
       'legacy-bank-transfer-1',
     );
     expect(restored.availablePaymentMethods, isNot(contains('Bank transfer')));
-    expect(restored.choosePayment('PhonePe'), isFalse);
+    expect(restored.choosePayment('UPI'), isFalse);
     expect(restored.confirmOrder(), isFalse);
     expect(await restored.submitOrder(), isFalse);
     expect(restored.confirmedOrders, isEmpty);
@@ -143,7 +143,7 @@ void main() {
           }.contains(state);
           expect(
             session.selectedPayment,
-            unresolved ? method : 'PhonePe',
+            unresolved ? method : 'UPI',
             reason: '$method/${state.name}',
           );
           expect(session.availablePaymentMethods, isNot(contains(method)));

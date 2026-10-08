@@ -19,6 +19,7 @@ import '../features/pay/pay_session.dart';
 import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
+import '../features/shared/social_create_draft_repository.dart';
 import '../features/work/work_session.dart';
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
@@ -44,6 +45,7 @@ class MoolSocialApp extends StatefulWidget {
     this.workSession,
     this.launchInterruptionGuard,
     this.onAuthenticatedBoundary,
+    @visibleForTesting this.createDraftStateCache,
     this.initialLocation = '/boot',
     this.uiReviewOnly = false,
     this.legacyPresentationForTestsOnly = false,
@@ -80,6 +82,7 @@ class MoolSocialApp extends StatefulWidget {
   final WorkSession? workSession;
   final LaunchInterruptionGuard? launchInterruptionGuard;
   final Future<void> Function()? onAuthenticatedBoundary;
+  final SocialCreateDraftStateCache? createDraftStateCache;
   final String initialLocation;
   final bool uiReviewOnly;
 
@@ -136,7 +139,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
   Future<void> _authenticationBoundaryTail = Future<void>.value();
-  late GoRouter _router = _createRouter(widget.initialLocation);
+  late final GoRouter _router = _createRouter(widget.initialLocation);
 
   GoRouter _createRouter(String initialLocation) => createJourneyRouter(
     _session,
@@ -157,6 +160,9 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     launchInterruptionGuard: _launchInterruptionGuard,
     initialLocation: initialLocation,
     uiReviewOnly: widget.uiReviewOnly,
+    // Forward the test-only override; production leaves it null.
+    // ignore: invalid_use_of_visible_for_testing_member
+    createDraftStateCache: widget.createDraftStateCache,
     legacyPresentationForTestsOnly: widget.legacyPresentationForTestsOnly,
   );
 
@@ -228,19 +234,6 @@ class _MoolSocialAppState extends State<MoolSocialApp>
       case AppLifecycleState.inactive:
         break;
     }
-  }
-
-  @override
-  void reassemble() {
-    super.reassemble();
-    assert(() {
-      final location = _router.routeInformationProvider.value.uri.toString();
-      final previousRouter = _router;
-      _router = _createRouter(location);
-      previousRouter.dispose();
-      setState(() {});
-      return true;
-    }());
   }
 
   @override

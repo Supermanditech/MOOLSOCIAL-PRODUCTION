@@ -20,10 +20,10 @@ const destinations = <DestinationCase>[
     name: 'Social',
     familyId: 'social',
     route: '/app/social?sub=feed',
-    sourceOwner: Key('screen04-feed-thumb-composer'),
+    sourceOwner: Key('screen04-universal-v2'),
     localNavigationOwner: Key('screen04-context-tabs'),
     localAction: Key('screen04-rail-create'),
-    destinationOwner: Key('screen04-create-workbench'),
+    destinationOwner: ValueKey('social-creator-gateway'),
     retiredRailOwner: ValueKey(
       'moolsocial-social-translucent-subaction-family-rail',
     ),

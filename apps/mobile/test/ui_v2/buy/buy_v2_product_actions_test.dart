@@ -1,16 +1,20 @@
 import 'dart:async';
 
+import 'buy_v2_qualified_provider_fixture.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
@@ -69,9 +73,27 @@ final class _R669PhotoContentAdapter implements BuyV2ProductContentAdapter {
       );
 }
 
-final class _R669ReviewCommerce implements BuyV2CommerceAdapter {
+final class _RatingMemoryStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'rating-test-buyer';
+  BuyV2CustomerStateSnapshot? snapshot;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
+
+final class _R669ReviewCommerce
+    implements BuyV2CommerceAdapter, BuyV2VerifiedRatingAdapter {
   bool eligible = false;
+  bool overall = false;
+  bool incompleteOrder = false;
   bool reject = false;
+  String? acknowledgedStoreOverride;
+  Completer<void>? submissionGate;
   int submissions = 0;
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   Completer<void>? refreshGate;
@@ -81,11 +103,74 @@ final class _R669ReviewCommerce implements BuyV2CommerceAdapter {
     await refreshGate?.future;
     return BuyV2CommerceSnapshot(
       state: state,
-      products: BuyV2Catalogue.allProducts,
+      // This review test's background basket has an explicit simulated
+      // listing identity; a missing Store id must never receive eligibility.
+      products: BuyV2Catalogue.allProducts
+          .map(
+            (p) => p.id == 'w-notebook'
+                ? p.copyWith(
+                    storeId: 'simulated-review-notebook-store',
+                    offerClass: BuyV2OfferClass.wholesale,
+                  )
+                : p.id == 's-milk'
+                ? p.copyWith(storeId: 'rating-store')
+                : p,
+          )
+          .toList(),
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
       productReportsAvailable: true,
+      orders: overall
+          ? [
+              for (var i = 0; i < 10; i++)
+                BuyV2Order(
+                  id: 'order-$i',
+                  purchaseId: 'purchase-ten',
+                  destination: BuyV2Destination.shop,
+                  title: 'Store $i order',
+                  itemSummary: '1 item',
+                  total: 100,
+                  partner: 'Store $i',
+                  partnerType: 'Retailer',
+                  promise: 'Delivered',
+                  destinationLabel: 'Home',
+                  progress: 1,
+                  productIds: const ['s-milk'],
+                  status: incompleteOrder && i == 9
+                      ? BuyV2OrderStatus.preparing
+                      : BuyV2OrderStatus.delivered,
+                ),
+            ]
+          : const [],
       reviewableProductIds: eligible ? {'s-milk'} : {},
+      ratingTargets: eligible
+          ? [
+              if (overall)
+                BuyV2RatingTarget(
+                  id: 'overall-ten',
+                  ownerScope: 'rating-test-buyer',
+                  orderId: '',
+                  orderLineId: '',
+                  storeId: '',
+                  productId: '',
+                  kind: BuyV2RatingKind.purchase,
+                  purchaseId: 'purchase-ten',
+                  purchaseLabel: 'Your purchase from 10 stores',
+                  orderStoreIds: {
+                    for (var i = 0; i < 10; i++) 'order-$i': 'store-$i',
+                  },
+                ),
+              const BuyV2RatingTarget(
+                id: 'rating-milk-1',
+                ownerScope: 'rating-test-buyer',
+                orderId: 'rating-order',
+                orderLineId: 'milk-line',
+                storeId: 'rating-store',
+                productId: 's-milk',
+                purchaseLabel: 'Milk · Delivered 28 September',
+              ),
+            ]
+          : [],
     );
   }
 
@@ -112,6 +197,38 @@ final class _R669ReviewCommerce implements BuyV2CommerceAdapter {
     );
   }
 
+  final requests = <BuyV2RatingRequest>[];
+  @override
+  Future<BuyV2RatingResult> submitRating(BuyV2RatingRequest request) async {
+    requests.add(request);
+    submissions++;
+    await submissionGate?.future;
+    final t = request.target;
+    return BuyV2RatingResult(
+      customerMessage: reject
+          ? 'Review could not be saved. Try again.'
+          : 'Review saved.',
+      saved: reject
+          ? null
+          : BuyV2RatingTarget(
+              id: t.id,
+              kind: t.kind,
+              purchaseId: t.purchaseId,
+              orderStoreIds: t.orderStoreIds,
+              ownerScope: t.ownerScope,
+              orderId: t.orderId,
+              orderLineId: t.orderLineId,
+              storeId: acknowledgedStoreOverride ?? t.storeId,
+              productId: t.productId,
+              purchaseLabel: t.purchaseLabel,
+              reviewId: t.reviewId ?? 'saved-review',
+              version: t.version + 1,
+              rating: request.stars,
+              comment: request.comment ?? '',
+            ),
+    );
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnsupportedError('Unexpected review fixture operation');
@@ -133,6 +250,8 @@ Future<BuyV2Session> _mountR669Review(
   final session = BuyV2Session(
     core: core,
     commerceAdapter: adapter,
+    customerStateStore: _RatingMemoryStore(),
+    productFactsAdapter: const QualifiedTestProductFacts({'w-notebook'}),
     reviewDataEnabled: false,
   );
   addTearDown(core.dispose);
@@ -173,12 +292,188 @@ Future<void> _openR669Review(WidgetTester tester) async {
   );
   await tester.ensureVisible(action);
   await tester.pumpAndSettle();
-  expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+  expect(tester.widget<ButtonStyleButton>(action).onPressed, isNotNull);
   await tester.tap(action);
   await tester.pumpAndSettle();
 }
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Rating stars only saves acknowledged exact purchase $scale', (
+      tester,
+    ) async {
+      final adapter = _R669ReviewCommerce()..eligible = true;
+      final session = await _mountR669Review(tester, adapter, scale: scale);
+      final total = session.cartTotal;
+      final submit = find.byKey(const ValueKey('buy-submit-review-s-milk'));
+      expect(tester.widget<FilledButton>(submit).onPressed, isNull);
+      final stars = find.byKey(const ValueKey('buy-review-rating-s-milk-4'));
+      await tester.ensureVisible(stars);
+      await tester.pumpAndSettle();
+      await tester.tap(stars);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(submit).onPressed, isNotNull);
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(adapter.requests.single.comment, isNull);
+      expect(adapter.requests.single.stars, 4);
+      expect(adapter.requests.single.target.orderLineId, 'milk-line');
+      expect(session.customerReviewFor('s-milk')?.rating, 4);
+      expect(session.customerReviewFor('s-milk')?.comment, isEmpty);
+      expect(
+        find.byKey(const ValueKey('buy-product-review-sheet')),
+        findsNothing,
+      );
+      expect(session.cartTotal, total);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Rating retry preserves stars and deduplicates request key', (
+    tester,
+  ) async {
+    final adapter = _R669ReviewCommerce()
+      ..eligible = true
+      ..reject = true;
+    final session = await _mountR669Review(tester, adapter);
+    final stars = find.byKey(const ValueKey('buy-review-rating-s-milk-3'));
+    await tester.ensureVisible(stars);
+    await tester.pumpAndSettle();
+    await tester.tap(stars);
+    await tester.pumpAndSettle();
+    final submit = find.byKey(const ValueKey('buy-submit-review-s-milk'));
+    await tester.ensureVisible(submit);
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(session.customerReviewFor('s-milk'), isNull);
+    expect(
+      session.productReviewDraft('s-milk', targetId: 'rating-milk-1')?.rating,
+      3,
+    );
+    adapter.reject = false;
+    await tester.tap(submit);
+    await tester.pumpAndSettle();
+    expect(adapter.requests, hasLength(2));
+    expect(
+      adapter.requests.first.idempotencyKey,
+      adapter.requests.last.idempotencyKey,
+    );
+    expect(session.customerReviewFor('s-milk')?.rating, 3);
+  });
+
+  testWidgets('Rating rejects acknowledgement for another Store', (
+    tester,
+  ) async {
+    final adapter = _R669ReviewCommerce()
+      ..eligible = true
+      ..acknowledgedStoreOverride = 'another-store';
+    final session = await _mountR669Review(tester, adapter);
+    final saved = await session.submitProductReviewOnline(
+      productId: 's-milk',
+      rating: 5,
+      comment: '',
+    );
+    expect(saved, isFalse);
+    expect(session.customerReviewFor('s-milk'), isNull);
+    expect(session.notice, 'Your rating could not be saved. Try again.');
+  });
+
+  testWidgets(
+    'Rating blocks concurrent submit and withdrawn purchase response',
+    (tester) async {
+      final adapter = _R669ReviewCommerce()
+        ..eligible = true
+        ..submissionGate = Completer<void>();
+      final session = await _mountR669Review(tester, adapter);
+      final pending = session.submitProductReviewOnline(
+        productId: 's-milk',
+        rating: 5,
+        comment: '',
+      );
+      expect(
+        await session.submitProductReviewOnline(
+          productId: 's-milk',
+          rating: 5,
+          comment: '',
+        ),
+        isFalse,
+      );
+      expect(adapter.submissions, 1);
+      adapter.eligible = false;
+      await session.restoreCommerce();
+      adapter.submissionGate!.complete();
+      expect(await pending, isFalse);
+      expect(session.customerReviewFor('s-milk'), isNull);
+      expect(session.notice, isNot('Thank you for your rating.'));
+    },
+  );
+
+  testWidgets(
+    'Purchase rating uses one entry for ten stores without product attribution',
+    (tester) async {
+      final adapter = _R669ReviewCommerce()
+        ..eligible = true
+        ..overall = true;
+      final session = await _mountR669Review(tester, adapter);
+      await tester.tap(find.byKey(const ValueKey('buy-cancel-product-review')));
+      await tester.pumpAndSettle();
+      session.openDestination(BuyV2Destination.orders);
+      session.showOrdersTab(BuyV2OrdersTab.delivered);
+      await tester.pumpAndSettle();
+      final entry = find.byKey(
+        const ValueKey('buy-rate-purchase-purchase-ten'),
+      );
+      expect(entry, findsOneWidget);
+      await tester.ensureVisible(entry);
+      await tester.tap(entry);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Your overall feedback is shared with the stores in this order.',
+        ),
+        findsOneWidget,
+      );
+      final star = find.byKey(
+        const ValueKey('buy-review-rating-purchase:purchase-ten-4'),
+      );
+      await tester.ensureVisible(star);
+      await tester.tap(star);
+      await tester.pumpAndSettle();
+      final submit = find.byKey(
+        const ValueKey('buy-submit-review-purchase:purchase-ten'),
+      );
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+      expect(adapter.requests, hasLength(1));
+      expect(adapter.requests.single.target.orderStoreIds, hasLength(10));
+      expect(adapter.requests.single.target.kind, BuyV2RatingKind.purchase);
+      expect(adapter.requests.single.comment, isNull);
+      expect(session.purchaseRatingTarget('purchase-ten')?.rating, 4);
+      expect(session.customerReviewFor('s-milk'), isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Purchase rating rejects partial fulfilment', (tester) async {
+    final adapter = _R669ReviewCommerce()
+      ..eligible = true
+      ..overall = true
+      ..incompleteOrder = true;
+    final session = await _mountR669Review(tester, adapter);
+    expect(session.purchaseRatingTarget('purchase-ten'), isNull);
+    expect(
+      await session.submitPurchaseRating(
+        purchaseId: 'purchase-ten',
+        rating: 5,
+        comment: '',
+      ),
+      isFalse,
+    );
+    expect(adapter.submissions, 0);
+  });
+
   for (final size in [const Size(360, 800), const Size(800, 600)]) {
     testWidgets(
       'R669 Fresh picks disclosure clears Add and retained quantity $size',
@@ -229,6 +524,13 @@ void main() {
           of: card,
           matching: find.byKey(const ValueKey('buy-quantity-s-tomato')),
         );
+        final quantityPill = find.descendant(
+          of: quantity,
+          matching: find.byKey(const ValueKey('buy-compact-quantity-pill')),
+        );
+        expect(tester.getSize(quantityPill).width, lessThanOrEqualTo(132));
+        expect(tester.getSize(quantityPill).height, 32);
+
         expect(
           tester.getRect(photo).overlaps(tester.getRect(quantity)),
           isFalse,
@@ -349,7 +651,10 @@ void main() {
       tester.widget<TextFormField>(comment).controller!.text,
       'Keep this unsent review.',
     );
-    expect(session.productReviewDraft('s-milk')?.rating, 4);
+    expect(
+      session.productReviewDraft('s-milk', targetId: 'rating-milk-1')?.rating,
+      4,
+    );
     expect(adapter.submissions, 0);
     expect(tester.takeException(), isNull);
   });
@@ -379,7 +684,9 @@ void main() {
               ),
             ),
             matching: find.text(
-              eligible ? 'Write a review' : 'Review your purchase',
+              eligible
+                  ? 'Rate your MoolSocial experience'
+                  : 'Rate your purchase',
             ),
           );
           final heading = tester.renderObject<RenderParagraph>(title);
@@ -389,7 +696,10 @@ void main() {
               find.byKey(const ValueKey('buy-product-review-eligibility')),
               findsOneWidget,
             );
-            expect(find.textContaining('No eligible purchase'), findsOneWidget);
+            expect(
+              find.textContaining('after delivery or collection'),
+              findsOneWidget,
+            );
             expect(
               find.byKey(const ValueKey('buy-product-review-sheet')),
               findsNothing,
@@ -417,7 +727,7 @@ void main() {
                 of: find.byKey(
                   const ValueKey('buy-product-review-eligibility'),
                 ),
-                matching: find.textContaining('No eligible purchase'),
+                matching: find.textContaining('after delivery or collection'),
               ),
               findsOneWidget,
             );
@@ -524,7 +834,7 @@ void main() {
         find.text(session.productReviewUnavailableReason('s-milk')!),
         findsOneWidget,
       );
-      expect(find.textContaining('No eligible purchase'), findsNothing);
+      expect(find.textContaining('after delivery or collection'), findsNothing);
       expect(
         await session.submitProductReviewOnline(
           productId: 's-milk',
@@ -580,7 +890,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-product-review-sheet')),
-          matching: find.textContaining('No eligible purchase'),
+          matching: find.textContaining('after delivery or collection'),
         ),
         findsOneWidget,
       );
@@ -934,7 +1244,13 @@ void main() {
           );
           expect(image.fit, BoxFit.contain);
         } else {
-          expect(find.text('Photo unavailable'), findsOneWidget);
+          expect(find.text('Image unavailable'), findsOneWidget);
+          expect(
+            find.byKey(
+              const ValueKey('buy-product-image-retry-s-milk-supplied'),
+            ),
+            findsOneWidget,
+          );
           expect(
             find.bySemanticsLabel(RegExp('Fixture supplied SKU photo')),
             findsNothing,
@@ -977,7 +1293,18 @@ void main() {
         );
         await tester.pumpAndSettle();
         final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
-        await tester.ensureVisible(edit);
+        await tester.scrollUntilVisible(
+          edit,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-product-w-rice')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(edit.hitTestable(), findsOneWidget);
         await tester.tap(edit);
         await tester.pumpAndSettle();
         final input = find.byKey(const ValueKey('buy-quantity-input'));
@@ -1052,7 +1379,16 @@ void main() {
         );
         await tester.pumpAndSettle();
         final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
-        await tester.ensureVisible(edit);
+        await tester.scrollUntilVisible(
+          edit,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$id')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(edit);
         await tester.pumpAndSettle();
@@ -1092,24 +1428,39 @@ void main() {
 
         session.openCart();
         await tester.pumpAndSettle();
-        final cartEdit = find.byKey(ValueKey('buy-cart-edit-quantity-$id'));
-        await tester.ensureVisible(cartEdit);
+        final cartQuantity = find.byKey(ValueKey('buy-cart-quantity-$id'));
+        await tester.ensureVisible(cartQuantity);
         await tester.pumpAndSettle();
-        expect(cartEdit.hitTestable(), findsOneWidget);
-        await tester.tap(cartEdit);
+        expect(cartQuantity.hitTestable(), findsOneWidget);
+        await tester.tap(cartQuantity);
         await tester.pumpAndSettle();
-        await tester.enterText(input, '1000');
-        await tester.ensureVisible(find.text('Cancel'));
-        await tester.tap(find.text('Cancel'));
+        expect(input, findsNothing);
+        expect(
+          find.byKey(ValueKey('buy-cart-edit-quantity-$id')),
+          findsNothing,
+        );
+        expect(session.quantityFor(id), 28736);
+        final controls = find.descendant(
+          of: find.ancestor(of: cartQuantity, matching: find.byType(Row)).first,
+          matching: find.byType(IconButton),
+        );
+        expect(controls, findsNWidgets(2));
+        await tester.tap(controls.last);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), 28736 + product.quantityStep);
+        expect(session.cartLines.single.product.pack, product.pack);
+        expect(
+          session.cartLines.single.product.minimumOrder,
+          product.minimumOrder,
+        );
+        expect(
+          session.cartLines.single.product.quantityStep,
+          product.quantityStep,
+        );
+        await tester.tap(controls.first);
         await tester.pumpAndSettle();
         expect(session.quantityFor(id), 28736);
-        await tester.tap(cartEdit);
-        await tester.pumpAndSettle();
-        await tester.enterText(input, '1000');
-        await tester.ensureVisible(save);
-        await tester.tap(save);
-        await tester.pumpAndSettle();
-        expect(session.quantityFor(id), 1000);
+        expect(input, findsNothing);
         expect(session.view, BuyV2View.cart);
         session.goBack();
         await tester.pumpAndSettle();
@@ -1215,7 +1566,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(add, findsOneWidget);
-      expect(find.text('Buy now'), findsNothing);
+      expect(
+        find.text(
+          entry.destination == BuyV2Destination.wholesale
+              ? 'Review order'
+              : 'Buy now',
+        ),
+        findsNothing,
+      );
       expect(
         tester
             .getSemantics(add)
@@ -1230,6 +1588,68 @@ void main() {
       core.dispose();
     }
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Comparison compact header controls and large prices $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session
+          .product('s-milk')
+          .copyWith(
+            seller:
+                'Long neighbourhood supplier and grocery distribution centre',
+          );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: BuyV2ProductCard(
+                  session: session,
+                  product: product,
+                  comparisonTotal: '₹1,00,00,000 delivered',
+                  comparisonSummary: const Text('Delivery: ₹0'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final seller = find.text('₹1,00,00,000 delivered');
+      final add = find.byKey(ValueKey('buy-add-${product.id}'));
+      if (scale == 1) {
+        expect(
+          (tester.getCenter(seller).dy - tester.getCenter(add).dy).abs(),
+          lessThan(25),
+        );
+      }
+      final price = find.text('₹1,00,00,000 delivered');
+      await tester.ensureVisible(price);
+      await tester.pumpAndSettle();
+      expect(
+        tester.renderObject<RenderParagraph>(price).didExceedMaxLines,
+        isFalse,
+      );
+      expect(find.text(product.customerSeller(product.seller)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('product actions fit, compare and retain exact Back at 320', (
     tester,
@@ -1273,63 +1693,91 @@ void main() {
     final actions = find.byKey(
       const ValueKey('buy-product-quick-actions-s-milk'),
     );
-    await tester.scrollUntilVisible(actions, 180, scrollable: productScroll);
-    expect(actions, findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('buy-product-action-save-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-share-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-product-action-ask-seller-s-milk')),
-      findsOneWidget,
-    );
-    for (final label in const ['Save', 'Share', 'Compare', 'Ask seller']) {
-      final semanticAction = find.descendant(
-        of: actions,
-        matching: find.bySemanticsLabel(label),
-      );
-      expect(semanticAction, findsOneWidget);
+    final save = find.byKey(const ValueKey('buy-product-action-save-s-milk'));
+    await tester.scrollUntilVisible(save, -180, scrollable: productScroll);
+    await tester.pumpAndSettle();
+    for (final label in const ['Save', 'Share']) {
+      final action = find.byTooltip(label);
+      expect(action, findsOneWidget);
       expect(
         tester
-            .getSemantics(semanticAction)
+            .getSemantics(action)
             .getSemanticsData()
             .hasAction(SemanticsAction.tap),
         isTrue,
       );
     }
-
-    final save = find.byKey(const ValueKey('buy-product-action-save-s-milk'));
-    await tester.ensureVisible(save);
-    await tester.drag(productScroll, const Offset(0, -160));
-    await tester.pumpAndSettle();
-    await tester.tap(save);
+    await tester.tap(save.hitTestable());
     await tester.pumpAndSettle();
     expect(session.isSaved('s-milk'), isTrue);
     expect(
       find.byKey(const ValueKey('buy-product-action-saved-s-milk')),
       findsOneWidget,
     );
-
+    await tester.scrollUntilVisible(actions, 180, scrollable: productScroll);
+    await tester.pumpAndSettle();
+    for (final label in const ['Compare prices', 'Ask seller']) {
+      final action = find.descendant(
+        of: actions,
+        matching: find.bySemanticsLabel(label),
+      );
+      expect(action, findsOneWidget);
+      expect(
+        tester
+            .getSemantics(action)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    }
     await tester.ensureVisible(
       find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
     );
+    await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Compare prices'), findsOneWidget);
     expect(
-      find.text(
-        'Prices from other suppliers are unavailable right now. Try again.',
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text('Compare prices'),
       ),
+      findsOneWidget,
+    );
+    final comparisonSheet = find.byKey(
+      const ValueKey('buy-product-comparison-sheet'),
+    );
+    expect(tester.getRect(find.byType(BottomSheet)).height, 700);
+    expect(tester.getRect(find.byType(BottomSheet)).top, 0);
+    expect(
+      find.descendant(
+        of: comparisonSheet,
+        matching: find.text(session.product('s-milk').customerTitle),
+      ),
+      findsOneWidget,
+      reason: 'Product identity belongs to one shared comparison header.',
+    );
+    expect(
+      find.descendant(of: comparisonSheet, matching: find.byType(Image)),
+      findsNothing,
+      reason: 'Supplier comparison must not repeat the product photo.',
+    );
+    final comparisonCard = find.byKey(
+      const ValueKey('buy-comparison-card-review-compare-s-milk-1'),
+    );
+    expect(comparisonCard, findsOneWidget);
+    expect(
+      tester.getSize(comparisonCard).width,
+      greaterThanOrEqualTo(tester.getSize(comparisonSheet).width - 32),
+      reason: 'Supplier facts use a full-width compact row.',
+    );
+    expect(
+      find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-compare-review-compare-s-milk-1')),
       findsOneWidget,
     );
     expect(
@@ -1340,12 +1788,14 @@ void main() {
       find.byKey(const ValueKey('buy-product-compare-s-milk-500ml')),
       findsNothing,
     );
-    await tester.tap(find.text('Refresh comparison'));
+    await tester.tap(find.byKey(const ValueKey('buy-comparison-refresh')));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Prices from other suppliers are unavailable right now. Try again.',
-      ),
+      find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-product-compare-review-compare-s-milk-1')),
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();
@@ -1514,6 +1964,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     final add = find.byKey(const ValueKey('buy-product-primary-w-rice-50kg'));
+    await tester.scrollUntilVisible(
+      add,
+      180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-product-w-rice-50kg')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
     expect(add, findsOneWidget);
     await tester.tap(add);
     await tester.pumpAndSettle();
@@ -1578,7 +2039,8 @@ void main() {
       find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
       findsOneWidget,
     );
-    expect(find.text('Store products'), findsOneWidget);
+    expect(find.text(product.customerSeller(product.seller)), findsWidgets);
+    expect(find.text('Store products'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),

@@ -14,6 +14,7 @@ import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
 import '../work/work_publication.dart';
+import '../shared/social_create_draft_repository.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../buy/buy_v2_session.dart';
@@ -117,10 +118,10 @@ import '../../ui_v2/social/social_v2_creator.dart';
 import '../../ui_v2/social/social_v2_plans_promotion.dart';
 import '../../ui_v2/social/social_v2_youtube_creator_upload.dart';
 import '../../ui_v2/buy/buy_v2_screen.dart';
+import '../../ui_v2/buy/buy_v2_views.dart';
 import '../../ui_v2/universal/legacy_route_containment_screen_v2.dart';
 import '../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
-import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
 import 'journey_services.dart';
 import 'screens/universal_shell.dart';
@@ -254,6 +255,7 @@ GoRouter createJourneyRouter(
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
   bool uiReviewOnly = false,
+  @visibleForTesting SocialCreateDraftStateCache? createDraftStateCache,
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
@@ -346,9 +348,15 @@ GoRouter createJourneyRouter(
       context.pop();
       return;
     }
-    router.go(
-      session.buyExitRoute(requestedRoute: state.uri.queryParameters['return']),
+    final returnRoute = session.buyExitRoute(
+      requestedRoute: state.uri.queryParameters['return'],
     );
+    if (Uri.parse(returnRoute).path == '/app/mool') {
+      // The retired main-actions page must not become a Back/redirect loop.
+      SystemNavigator.pop();
+      return;
+    }
+    router.go(returnRoute);
   };
   VoidCallback careMedicineExit(BuildContext context) => () {
     if (context.canPop()) {
@@ -380,6 +388,9 @@ GoRouter createJourneyRouter(
       launchInterruptionGuard,
     ]),
     redirect: (context, state) async {
+      buyV2Session.synchronizeReviewGstOwner(
+        session.isAuthenticated ? (session.accountIdentity ?? session) : null,
+      );
       final location = state.uri.path;
       final careMedicineRedirect = _careMedicineRedirect(state.uri);
       if (careMedicineRedirect != null) return careMedicineRedirect;
@@ -1695,6 +1706,11 @@ GoRouter createJourneyRouter(
         path: '/app/account/identity',
         builder: (context, state) => GlobalPersonalProfileV2(
           session: session,
+          gstDetails: BuyV2GstProfileSection(
+            key: ValueKey(session.accountIdentity),
+            store: buyV2Session.gstInvoiceProfileStore,
+            onChanged: buyV2Session.refreshGstProfile,
+          ),
           surfaceTone: state.uri.queryParameters['surface'] == 'social'
               ? GlobalProfileSurfaceTone.socialDark
               : GlobalProfileSurfaceTone.light,
@@ -1843,8 +1859,10 @@ GoRouter createJourneyRouter(
       GoRoute(
         path: '/app/:section',
         redirect: (context, state) {
-          if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
+          // Retained links resolve to the approved commerce home.
+          if (section == 'mool') return '/app/buy?sub=shop';
+          if (legacyPresentationForTestsOnly) return null;
           if (section == 'work') return '/app/work/earn';
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
@@ -1854,67 +1872,6 @@ GoRouter createJourneyRouter(
         },
         pageBuilder: (context, state) {
           final section = state.pathParameters['section'] ?? 'social';
-          final requestedOrigin = state.uri.queryParameters['from'];
-          final moolOrigin =
-              section == 'mool' &&
-                  const {
-                    'social',
-                    'buy',
-                    'eat',
-                    'ride',
-                    'book',
-                    'work',
-                  }.contains(requestedOrigin)
-              ? requestedOrigin
-              : null;
-          if (moolOrigin != null) {
-            session.openMoolFrom(moolOrigin);
-          }
-          if (!legacyPresentationForTestsOnly && section == 'mool') {
-            void leaveMool() {
-              if (context.canPop()) {
-                context.pop();
-              } else if (moolOrigin != null) {
-                context.go('/app/$moolOrigin');
-              } else {
-                SystemNavigator.pop();
-              }
-            }
-
-            return moolMainDestinationPage(
-              state: state,
-              child: PersonalMoolRootV2(
-                onBack: leaveMool,
-                onOpenAction: (action) => context.go(action.route),
-                onOpenRoute: (route) {
-                  if (moolOrigin == null) {
-                    context.push(route);
-                  } else {
-                    context.pushReplacement(route);
-                  }
-                },
-                onOpenChat: () =>
-                    context.push('/app/chat/inbox?return=/app/mool'),
-                onSignOut: () async {
-                  final signedOut = await session.signOut();
-                  if (!context.mounted) return;
-                  if (signedOut || !session.isAuthenticated) {
-                    context.go('/sign-in');
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          session.errorMessage ??
-                              'Sign-out could not be completed. Please try again.',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                areaLabel: session.currentAreaLabel ?? session.manualArea,
-              ),
-            );
-          }
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (legacyPresentationForTestsOnly && actionChoiceRoot != null) {
             void leaveActionChoiceRoot() {
@@ -1955,6 +1912,12 @@ GoRouter createJourneyRouter(
                 'pay',
                 'work',
               }.contains(section)) {
+            final requestedState =
+                state.uri.queryParameters['state'] ??
+                state.uri.queryParameters['mode'];
+            final createEntry =
+                section == 'social' &&
+                state.uri.queryParameters['sub'] == 'create';
             return moolMainDestinationPage(
               state: state,
               child: SocialUniversalV2(
@@ -1963,14 +1926,34 @@ GoRouter createJourneyRouter(
                 retailerSession: retailerSession,
                 sharedSession: sharedSession,
                 initialWorld: section,
+                // Preserve the existing test-only seam through composition.
+                // Production uses the default authenticated global cache.
+                // ignore: invalid_use_of_visible_for_testing_member
+                createDraftStateCache: createDraftStateCache,
                 initialSubAction: state.uri.queryParameters['sub'],
+                // The retired Create landing now renders the post editor.
+                // Use its editor state so system Back saves before leaving.
                 initialState:
-                    state.uri.queryParameters['state'] ??
-                    state.uri.queryParameters['mode'] ??
-                    (section == 'social' &&
-                            state.uri.queryParameters['sub'] == 'create'
-                        ? 'home'
-                        : null),
+                    createEntry &&
+                        !const {
+                          'post',
+                          'text',
+                          'image',
+                          'reel-source',
+                          'reel-camera',
+                          'reel-edit',
+                          'carousel',
+                          'image-poll',
+                          'quick-poll',
+                          'quiz',
+                          'shared-post',
+                          'drafts',
+                          'publishing',
+                          'failure',
+                          'success',
+                        }.contains(requestedState)
+                    ? 'post'
+                    : requestedState,
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],

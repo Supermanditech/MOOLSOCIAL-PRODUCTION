@@ -306,10 +306,10 @@ class _BuyV2ProductVideoState extends State<BuyV2ProductVideo>
                               'buy-product-video-retry-${widget.media.id}',
                             ),
                             onPressed: _initialize,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.white),
-                              minimumSize: const Size(120, 44),
+                            style: BuyV2ActionStyle.button(
+                              OutlinedButton.styleFrom(
+                                minimumSize: const Size(120, 44),
+                              ),
                             ),
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('Try again'),

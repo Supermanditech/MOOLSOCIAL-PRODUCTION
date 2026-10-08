@@ -12,11 +12,13 @@ const _profileGreen = Color(0xFF138808);
 class GlobalPersonalProfileV2 extends StatelessWidget {
   const GlobalPersonalProfileV2({
     required this.session,
+    this.gstDetails,
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     super.key,
   });
 
   final JourneySession session;
+  final Widget? gstDetails;
   final GlobalProfileSurfaceTone surfaceTone;
 
   @override
@@ -162,6 +164,10 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: MoolSpacing.md),
+                      if (gstDetails != null) ...[
+                        gstDetails!,
+                        const SizedBox(height: MoolSpacing.md),
+                      ],
                       _ProfileSection(
                         title: 'Preferences',
                         children: [

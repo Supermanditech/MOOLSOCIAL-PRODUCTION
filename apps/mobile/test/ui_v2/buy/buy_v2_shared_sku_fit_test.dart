@@ -131,7 +131,27 @@ void main() {
             final action = tester.getRect(
               find.byKey(ValueKey('buy-add-shell-${p.id}')),
             );
-            expect(rects[i].bottom - action.bottom, inInclusiveRange(0, 4));
+            final card = find.byKey(ValueKey('buy-product-${p.id}'));
+            final price = tester.getRect(
+              find.byKey(ValueKey('buy-price-highlight-${p.id}')),
+            );
+            final row = tester.getRect(
+              find.byKey(ValueKey('buy-price-action-row-${p.id}')),
+            );
+            expect(action.left, greaterThanOrEqualTo(price.right));
+            expect(action.center.dy, closeTo(row.center.dy, .1));
+            expect(action.height, 44);
+            var contentBottom = action.bottom;
+            for (final element
+                in find
+                    .descendant(of: card, matching: find.byType(Text))
+                    .evaluate()) {
+              final box = element.renderObject! as RenderBox;
+              final bottom = box.localToGlobal(Offset(0, box.size.height)).dy;
+              if (bottom > contentBottom) contentBottom = bottom;
+            }
+            // Final line padding + body padding + one-pixel card border.
+            expect(rects[i].bottom - contentBottom, inInclusiveRange(0, 5));
             final below =
                 rects
                     .where(

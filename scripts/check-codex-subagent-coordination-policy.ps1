@@ -579,6 +579,35 @@ function Test-RedmiV6HistoricalEvidenceCommit([string]$Commit, [string]$Subject)
 }
 # END founder RV6 historical evidence label exception 20260914
 
+function Test-CursorBuyReadyHistoricalSubject([string]$Commit, [string]$Subject) {
+  # Preserve these exact founder-authorized commits during the 22 Sep handoff.
+  # The bootstrap has its own exact parent/subject/owner validation. This only
+  # reconciles eight subsequent labels; no future subject or safety gate changes.
+  if ($root.Replace('\','/').TrimEnd('/') -cne
+        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' -or
+      $AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
+      $ProductionLane -cne 'cursor_ui' -or $ProductionPhase -cne 'handoff' -or
+      $ProductionWorkId -cne 'buy-ready-20260921' -or
+      $ProductionTicketId -cne 'UAW-CURSOR-BUY-READY-20260921' -or
+      $branch -cne 'work/cursor-ui/buy-ready-20260921' -or
+      $baseCommit -cne '635ab9810ba8805104642f8f78512c80fe1b20f5') {
+    return $false
+  }
+  $historicalSubjects = @{
+    '5dc6885ada1fe0cd23f3d5d0a2bc62fe56cc0abd' = 'docs(buy): define connected product page and provider contracts'
+    '19127ea6a7c389eeda000016af672409f2defcff' = 'feat(buy): qualify public storefront and all-store pickup choices'
+    'd5279222466211f0526c625e58b8da5dc0d78218' = 'fix(buy): reserve full Saved action clearance in SKU cards'
+    'eb7a14e9f984fa322e8a6468a97249104fe28776' = 'fix(buy): qualify exact storefront source for Redmi review'
+    '432befc4c7be1b36170588e57b2eb331c45021fc' = 'fix(buy): bind inherited arrival cue to exact review source'
+    'd278c18b9400e2950a54a443964a8e6085638cc0' = 'docs(buy): record first full pass and fresh Redmi qualification inputs'
+    'd73d609d8389101d5981c3c8929b7ac745bf059b' = 'docs(buy): seal both full regression passes for Redmi build'
+    '6ba7dc3f2b2d75be7ffdcdb3bfce6ca3090b3ed8' = 'docs(buy): record Redmi installation and Store device defects'
+  }
+  return ($Commit -cmatch '^[0-9a-f]{40}$' -and
+    $historicalSubjects.ContainsKey($Commit) -and
+    [string]$historicalSubjects[$Commit] -ceq $Subject)
+}
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
   # BEGIN founder RV6 historical evidence label call 20260914
   if (Test-RedmiV6HistoricalEvidenceCommit $Commit $Subject) { return $true }
@@ -1236,8 +1265,527 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 81) `
-  'founder-authorized continuation binding inventory changed.'
+$octoberEstateRoot = ConvertTo-ProductionForwardPath $root
+$octoberEstate = $octoberEstateRoot -cin @(
+  'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008',
+  'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'
+)
+if ($octoberEstate) {
+  # Detect merged state independently of caller identity and supplied binding
+  # count: dropping one historical binding must never select bootstrap81.
+  $octoberMergeStatePath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'October merge-state lookup failed.'
+  $octoberAnyMergePending = Test-Path -LiteralPath $octoberMergeStatePath -PathType Leaf
+  & git -C $root merge-base --is-ancestor 'f32c17e1a3a41807564fe18f83c0520a66e0bfe6' HEAD
+  $octoberAncestryExit = $LASTEXITCODE
+  Assert-Coordination ($octoberAncestryExit -in @(0,1)) 'October source ancestry lookup failed.'
+  if ($octoberAnyMergePending -or $octoberAncestryExit -eq 0) {
+    Assert-Coordination ($continuationBindings.Count -eq 82) 'October merged policy must retain the exact82 binding union.'
+  }
+}
+if ($continuationBindings.Count -eq 82) {
+  # The post-merge union is exact, not a permissive 81-or-82 minimum. Retain
+  # bootstrap81; admit82 only in the sealed October repair/integration context.
+  $unionRoot = ConvertTo-ProductionForwardPath $root
+  $unionBranch = (& git -C $root rev-parse --abbrev-ref HEAD).Trim()
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Combined policy branch lookup failed.'
+  $unionRepairIdentity = $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+    $ProductionLane -ceq 'integration_repair' -and
+    $ProductionWorkId -ceq 'store-buy-combined-20261008' -and
+    $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-COMBINED-20261008' -and
+    $unionRoot -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008' -and
+    $unionBranch -ceq 'work/integration-repair/store-buy-combined-20261008' -and
+    $ProductionPhase -cin @('task_start','implementation','pre_commit','handoff','integration_admission_authorize')
+  $unionIntegrationIdentity = $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+    $ProductionLane -ceq 'integration' -and
+    $ProductionWorkId -ceq 'store-buy-combined-baseline-20261008' -and
+    $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008' -and
+    $unionRoot -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008' -and
+    $unionBranch -ceq 'integration/moolsocial/store-buy-combined-baseline-20261008' -and
+    $ProductionPhase -cin @('integration_start','integration_verify','integration_close','candidate_preflight')
+  Assert-Coordination ($unionRepairIdentity -or $unionIntegrationIdentity) 'Combined82 policy is outside its exact October identity/phase.'
+  $unionCursor = 'f32c17e1a3a41807564fe18f83c0520a66e0bfe6'
+  & git -C $root merge-base --is-ancestor $unionCursor HEAD
+  $unionCursorCommitted = $LASTEXITCODE -eq 0
+  $unionPendingPath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+  $unionPending = $false
+  if ($unionRepairIdentity -and (Test-Path -LiteralPath $unionPendingPath -PathType Leaf)) {
+    $unionMergeHeads = @(Get-Content -LiteralPath $unionPendingPath)
+    $unionPending = $unionMergeHeads.Count -eq 1 -and $unionMergeHeads[0] -ceq $unionCursor
+  }
+  Assert-Coordination ($unionCursorCommitted -or $unionPending) 'Combined82 requires the exact Cursor parent, pending or committed.'
+  $unionExpected = @{}
+  foreach ($source in @('55b87b8a590a991fdec198d9386f964292bea047',$unionCursor)) {
+    $sourceLines = @(& git -C $root show "${source}:config/codex-subagent-coordination-policy.json")
+    Assert-Coordination ($LASTEXITCODE -eq 0) 'Combined policy source unavailable.'
+    $sourcePolicy = ($sourceLines -join "`n") | ConvertFrom-Json
+    $sourceBindings = @($sourcePolicy.productionGitDiscipline.continuationBindings)
+    Assert-Coordination ($sourceBindings.Count -eq 81) 'Pinned source binding count changed.'
+    foreach ($binding in $sourceBindings) {
+      if ($unionExpected.ContainsKey([string]$binding.id)) {
+        Assert-Coordination ((ConvertTo-Json -InputObject $unionExpected[[string]$binding.id] -Depth 100 -Compress) -ceq
+          (ConvertTo-Json -InputObject $binding -Depth 100 -Compress)) 'Pinned shared binding contracts differ.'
+      } else { $unionExpected[[string]$binding.id] = $binding }
+    }
+  }
+  Assert-Coordination ($unionExpected.Count -eq 82 -and
+    (@($continuationBindings.id | Sort-Object) -join '|') -ceq (@($unionExpected.Keys | Sort-Object) -join '|')) 'Combined policy lost or substituted a source binding.'
+  foreach ($binding in $continuationBindings) {
+    Assert-Coordination ((ConvertTo-Json -InputObject $binding -Depth 100 -Compress) -ceq
+      (ConvertTo-Json -InputObject $unionExpected[[string]$binding.id] -Depth 100 -Compress)) 'Combined source binding contract changed.'
+  }
+} else {
+  Assert-Coordination ($continuationBindings.Count -eq 81) `
+    'founder-authorized continuation binding inventory changed.'
+}
+
+# Exact capture bootstrap, followed by founder-selected public storefront UI.
+$cursorReadyOwners = @(
+  'config/codex-development-regression-registry.json',
+  'config/codex-subagent-coordination-policy.json',
+  'scripts/check-codex-subagent-coordination-policy.ps1',
+  'scripts/check-approved-ui-locks.ps1',
+  'docs/quality/CURSOR-BUY-READY-20260921.md',
+  'apps/mobile/test/cursor_buy_store_baseline_capture_test.dart'
+)
+$cursorStorefrontOwners = @(
+  # Founder-approved exact T14 rail regression test owner, 6 October 2026.
+  'apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart',
+  # Founder-confirmed frontend/backend boundary instructions, 5 October 2026.
+  'AGENTS.md',
+  'docs/quality/CODEX-DEVELOPMENT-REGRESSION-MEMORY.md',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-pure-white-20260927/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  # Versioned T01 Cart references; prior approved images remain immutable.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-t01-20260930/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-t01-20260930/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-child-20260930/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-cart-child-20260930/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-COMPOSER-REVEAL-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-COMPOSER-REVEAL-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-SELECTED-2.jsonl',
+  # T02 draft Checkout fixtures; historical accepted references stay immutable.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-unified-checkout-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-unified-checkout-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-unified-checkout-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-unified-checkout-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-unified-checkout-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-SELECTED-2.jsonl',
+  # T02 founder-review follow-up draft fixtures and closed proof receipts.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-checkout-review-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-2.jsonl',
+  # Exact founder-authorized unified UPI/QR follow-up owners.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-upi-checkout-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-gst-toggle-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json',
+  # Exact founder-authorized T04 contract; receipts are admitted when closed.
+  # Exact T05 frontend contract; future proofs remain unclaimed.
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl',
+  # Exact current T06 contract; future receipts are admitted only when closed.
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl',
+  # Exact authorized T07 contract; receipts are admitted only after closing.
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003.md',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003.json',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.md',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.json',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-T12-T13.jsonl',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-CART.jsonl',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-3.jsonl',
+  # Exact new receipts for the authorized offer-count accessibility repair.
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T14-OFFER-COUNT-20261004-EVIDENCE.zip',
+  # Exact durable evidence for the founder-selected bounded Cart sweep.
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T14-BOUNDED-SWEEP-20261004-EVIDENCE.zip',
+  # Exact durable evidence for the Delivered hierarchy child.
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T14-DELIVERED-HIERARCHY-20261004-EVIDENCE.zip',
+  # Exact durable evidence for the Checkout test qualification child.
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T14-CHECKOUT-QUALIFICATION-20261004-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-1.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-2.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-3.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-4.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-5.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-6.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-7.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-8.jsonl',
+  'docs/quality/CURSOR-BUY-PREINTEGRATION-QUALIFICATION-20261008-1-INDEX.json',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-EVIDENCE.zip',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-cart-back-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-3.jsonl',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.json',
+  'docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.zip',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  # Exact founder-authorized artifact-retention maintenance, primary serialized.
+  'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json',
+  'scripts/check-codex-development-regression-memory.ps1',
+  'scripts/artifact-evidence-retention.ps1',
+  'scripts/check-cleanup-artifact-retention.ps1',
+  'scripts/test-artifact-evidence-retention.ps1',
+  'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T04-OFFERS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-CONTRACT.json',
+  'docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-LEGACY-ORIGIN.jsonl',
+  'docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T03-SHARED-INSTRUCTIONS-20261002-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-FOCUSED.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-T03-20261001-SELECTED-2.jsonl',
+  'apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_benefits_preview_test.dart',
+  'docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-CHILD-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-CHILD-20260930-SELECTED-2.jsonl',
+  'docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-1.jsonl',
+  'docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-2.jsonl',
+  # Founder-selected public button colour inventory: exact additional owners.
+  'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shared_sku_fit_test.dart',
+        'apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart',
+        'apps/mobile/lib/app/moolsocial_app.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_dock_projection_parity_fix1_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_direct_default_subaction_landing_c13_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c07_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r03_personal_mool_root_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart',
+        'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
+
+  # Founder-authorized pending Buy corrections and exact Profile integration.
+  'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
+  'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart',
+  'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c02_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart',
+  # Founder-selected C12/C13 right-side Add: migrate the old bottom-row assertion.
+  'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart',
+  'docs/quality/CURSOR-BUY-PENDING-LOCAL-SCOPE-20260923.json',
+  # Founder-authorized C06 retirement of the legacy main-actions route only.
+  'apps/mobile/lib/features/journey01/journey_router.dart',
+  'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
+  'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
+  'apps/mobile/lib/features/chat/widgets/chat_widgets.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
+  'apps/mobile/lib/features/buy/buy_v2_customer_copy.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_discovery_refinement_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_post_redmi_fixes_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_decision_glance_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/REVIEW.md',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-redmi-r6632-20260922/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'docs/quality/CURSOR-BUY-POST-REDMI-FIXES-20260922.md',
+  'docs/quality/CURSOR-BUY-R6632-APK.json',
+  'docs/quality/CURSOR-BUY-R6632-DEVICE-RETEST-20260922.md',
+  'docs/quality/CURSOR-BUY-REDMI-AUDIT-20260922.md',
+  'docs/quality/CURSOR-BUY-REDMI-R6632-RECONCILIATION-20260922.md',
+  # Founder-authorized local-only 11-ticket Buy cutoff, 22 September.
+  'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+  'apps/mobile/lib/core/design/mool_design_system.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+  'apps/mobile/lib/features/buy/buy_v2_models.dart',
+  'apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart',
+  'docs/quality/CURSOR-BUY-LOCAL-CUTOFF-20260922.md',
+  'docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md',
+  'docs/quality/CURSOR-BUY-INTEGRATION-INVENTORY-20260922.json',
+  'docs/quality/CURSOR-BUY-INTEGRATION-EVIDENCE-20260922.zip',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_content_contracts_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
+  # Founder explicitly authorized all-store pickup after shared scope disclosure.
+  'apps/mobile/lib/features/buy/buy_v2_session.dart',
+  # D17-A04: existing customer-state codec retains pending PO identity.
+  'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
+  'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+  'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+  'apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+  'docs/quality/CURSOR-BUY-READY-20260921-APK.json',
+  'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/ACCEPTANCE.json'
+)
+# Exact founder-authorized source admission for the isolated Redmi review.
+$cursorReviewQualificationOwners = @(
+  'config/mvp-scope-gate-state.json',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t03-20261001/buy-v2-t02-checkout-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart',
+  '.gitignore',
+  'docs/quality/CURSOR-BUY-SOURCE-RECOVERY-20260926.json',
+  '.gitattributes',
+  'docs/quality/CURSOR-BUY-LFS-MIGRATION-20260926.json',
+  'docs/quality/CURSOR-BUY-RESUME-EVIDENCE-20260926.zip',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/public-checkout-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t14-context-references-20261007/medicine-parent-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_location_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-r6635-approved-unboxed-save-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  # Exact successor candidate images for the founder-requested A04 quantity repair.
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-a04-compact-quantity-review-20260925/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260926/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_marketplace_trust_test.dart',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-approved-cool-grey-20260927/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'scripts/test-public-auth-sideload-build-controls.ps1',
+  'scripts/check-buy-founder-regression.py',
+  'scripts/test-buy-founder-regression.py',
+  'config/buy-founder-regression.json',
+  'scripts/build-buy-device-review.ps1',
+  'docs/quality/CURSOR-BUY-R6634-EVIDENCE-20260923.zip',
+  'docs/quality/CURSOR-BUY-REDMI-CHILD-FIXES-20260924.zip',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+  'apps/mobile/test/ui_v2/buy/candidate_captures/cursor-post-r6633-20260923/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+  'apps/mobile/test/ui_v2/buy/buy_v2_benefit_selection_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
+  # Exact Buy regression owners needed to qualify the approved layouts.
+  'apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_prescription_match_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_compact_action_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_shopping_settings_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+  'apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart',
+  # Generated Flutter plugin path must reference this admitted worktree.
+  'apps/mobile/.flutter-plugins-dependencies',
+  'scripts/check-brand-integrity.ps1',
+  'scripts/check-buy-protected-baseline.ps1',
+  'scripts/check-buy-data-egress-boundary.ps1',
+  'scripts/check-buy-backend-contract-boundary.ps1'
+)
+$cursorReadyBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_buy_ready_20260921' })
+Assert-Coordination ($cursorReadyBindings.Count -eq 1) 'Cursor baseline capture binding missing or duplicated.'
+$cursorReadyBinding = $cursorReadyBindings[0]
+$cursorReadyExpected = @{
+  state = 'founder_authorized_2026_09_21'; lane = 'cursor_ui'; role = 'primary'; task = '/root'
+  workId = 'buy-ready-20260921'; ticketId = 'UAW-CURSOR-BUY-READY-20260921'
+  worktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921'
+  branch = 'work/cursor-ui/buy-ready-20260921'
+  baselineHead = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+  bootstrapCommitSubject = 'coordination(buy-ready-20260921): admit independent baseline capture'
+}
+foreach ($field in $cursorReadyExpected.Keys) {
+  Assert-Coordination ([string]$cursorReadyBinding.$field -ceq [string]$cursorReadyExpected[$field]) "Cursor baseline capture binding changed: $field"
+}
+Assert-Coordination (
+  (@($cursorReadyBinding.bootstrapOwners | Sort-Object) -join '|') -ceq (@($cursorReadyOwners | Sort-Object) -join '|') -and
+  $cursorReadyBinding.cursorIndependent -eq $true -and $cursorReadyBinding.integrationRequiredBeforeSuccessorApk -eq $true
+) 'Cursor baseline capture owners or integration boundary changed.'
+$cursorReadyAdmission = (
+  $root.Replace('\','/').TrimEnd('/') -ceq $cursorReadyBinding.worktreePath -and
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  $ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq $cursorReadyBinding.workId -and
+  $ProductionTicketId -ceq $cursorReadyBinding.ticketId
+)
+if ($cursorReadyAdmission) {
+  Assert-Coordination ($ProductionPhase -cin @('coordination_bootstrap','task_start','implementation','pre_commit','handoff')) 'Cursor setup cannot authorize acceptance, APK or release.'
+  $cursorRuntimeChanges = @(& git -C $root diff --name-only $cursorReadyBinding.baselineHead -- 'apps/mobile/lib' 'apps/mobile/android' 'apps/mobile/ios' 'apps/mobile/pubspec.yaml' 'apps/mobile/pubspec.lock' 'backend' 'contracts' 'packages')
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Cursor runtime preservation inventory failed.'
+  $cursorAllowedRuntime = if ($ProductionPhase -ceq 'coordination_bootstrap') { @() } else { @($cursorStorefrontOwners | Where-Object { $_.StartsWith('apps/mobile/lib/') }) }
+  Assert-Coordination (@($cursorRuntimeChanges | Where-Object { $_ -cnotin $cursorAllowedRuntime }).Count -eq 0) 'Cursor must preserve all application owners outside the exact storefront and founder-authorized pickup extension.'
+  $cursorClaimOwners = if ($ProductionPhase -ceq 'coordination_bootstrap') { $cursorReadyOwners } else { @($cursorReadyOwners) + @($cursorStorefrontOwners) + @($cursorReviewQualificationOwners) }
+  $cursorReadyClaim = @($policy.activeClaims | Where-Object { $_.task -ceq '/root' })
+  Assert-Coordination ($cursorReadyClaim.Count -eq 1 -and (@($cursorReadyClaim[0].owners | Sort-Object) -join '|') -ceq (@($cursorClaimOwners | Sort-Object) -join '|')) 'Cursor claim must contain only its exact setup and selected storefront owners.'
+}
 
 # Founder-authorized Screen 1 exception: a work checkpoint, never acceptance.
 $addProductBindings = @($continuationBindings | Where-Object { $_.id -ceq 'codex_add_product_screen1_20260920' })
@@ -1364,6 +1912,8 @@ foreach ($continuationBinding in $continuationBindings) {
     (
       ([string]$continuationBinding.id -ceq 'codex_add_product_screen1_20260920' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_20') -or
+      ([string]$continuationBinding.id -ceq 'cursor_buy_ready_20260921' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_21') -or
       ([string]$continuationBinding.id -ceq 'codex_counter_sale_20260919' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_19') -or
       ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
@@ -2098,7 +2648,6 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart',
         'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
         'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
@@ -2505,8 +3054,8 @@ if ($ProductionLane -ceq 'baseline') {
     ) 'continuation bootstrap requires the primary coordination owner.'
   } else {
     Assert-Coordination (
-      [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuyCombinedOctober8 -or $storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $storeAddProductIntegration -or $AgentTask.StartsWith(
+      ($cursorReadyAdmission -or [string]$selectedLane.agentRole -ceq $AgentRole) -and
+      ($cursorReadyAdmission -or $storeBuyCombinedOctober8 -or $storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $counterSaleIntegration -or $storeAddProductIntegration -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -2653,6 +3202,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $cursorReadyOwner = $cursorReadyAdmission -and $effectiveOwner -cin (@($cursorReadyOwners) + @($cursorReviewQualificationOwners) + @('apps/mobile/lib/features/journey01/journey_router.dart'))
       $storeProcurementBridgeOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -3164,6 +3714,34 @@ if ($ProductionLane -ceq 'baseline') {
             [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256)
         }
       }
+      # Founder-confirmed instruction maintenance only, 5 October 2026.
+      # Preserve historical bootstrap owners and every ordinary gate.
+      $cursorBoundaryInstructionOwner = (
+        $cursorReadyAdmission -and
+        $currentClaim[0].task -ceq '/root' -and
+        $currentClaim[0].role -ceq 'primary' -and
+        $branch -ceq $cursorReadyBinding.branch -and
+        $rootForward -ceq $cursorReadyBinding.worktreePath -and
+        $ProductionPhase -cin @('implementation','pre_commit','handoff') -and
+        [int]$policy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+        [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256 -and
+        $effectiveOwner -ceq 'AGENTS.md'
+      )
+      # Separately founder-authorized primary maintenance; all ordinary checks run.
+      # The expected authority hash is fixed independently in the helper.
+      . (Join-Path $PSScriptRoot 'artifact-evidence-retention.ps1')
+      $retentionAuthorityPath = Join-Path $root 'docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json'
+      $retentionAuthoritySha = if (Test-Path -LiteralPath $retentionAuthorityPath -PathType Leaf) {
+        (Get-FileHash -LiteralPath $retentionAuthorityPath -Algorithm SHA256).Hash
+      } else { '' }
+      $retentionMaintenanceOwner = Test-ArtifactRetentionMaintenanceOwner @{
+        Role=$AgentRole; Task=$AgentTask; ClaimTask=$currentClaim[0].task; ClaimRole=$currentClaim[0].role
+        Root=$rootForward; Branch=$branch; Lane=$ProductionLane; WorkId=$ProductionWorkId
+        TicketId=$ProductionTicketId; Phase=$ProductionPhase; Owner=$effectiveOwner
+        AuthoritySha256=$retentionAuthoritySha
+        GenerationVerified=([int]$policy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+          [string]$policy.registryBinding.sha256 -ceq $ExpectedRegistrySha256)
+      }
       # Founder requested completion of dialog-free Stock downloads, frontend only.
       # Admit exactly its bridge and registration; no auth, manifest or release changes.
       $addProductStockDownloadOwner = (
@@ -3312,7 +3890,7 @@ if ($ProductionLane -ceq 'baseline') {
         Phase=$ProductionPhase; Owner=$effectiveOwner
       }
       # END Store closure owner lane 20261008
-      if ($storeRetentionOwner -or $storeClosureEvidenceOwner -or $addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
+      if ($retentionMaintenanceOwner -or $cursorReadyOwner -or $cursorBoundaryInstructionOwner -or $storeRetentionOwner -or $storeClosureEvidenceOwner -or $addProductApprovedFrontendOwner -or $storeAddProductInheritedOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or $addProductPhotoRouteOwner -or $addProductScreen1Owner -or $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
@@ -3344,7 +3922,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         "production lane claims an owner outside its allowlist: $effectiveOwner"
       foreach ($forbiddenRoot in @($selectedLane.forbiddenOwnerRoots)) {
         Assert-Coordination (
-          $octoberExactRepairOwner -or $storeRetentionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
+          $retentionMaintenanceOwner -or $cursorReadyOwner -or $octoberExactRepairOwner -or $storeRetentionOwner -or $addProductStockDownloadOwner -or $addProductExportDependencyOwner -or
           $addProductPhotoRouteOwner -or $addProductApprovedFrontendOwner -or
           $shopCursorReviewAndroidOwner -or
           $retainedBuyCandidateEvidenceOwner -or
@@ -6426,6 +7004,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         ([string]$subjectOutput[0] -cmatch $subjectPattern -or
           $r6610EvidenceAdmission -or
           (Test-StoreHistoricalAdmissionSubject $featureCommit ([string]$subjectOutput[0])) -or
+          (Test-CursorBuyReadyHistoricalSubject $featureCommit ([string]$subjectOutput[0])) -or
           (Test-R66HistoricalCommitSubject $featureCommit ([string]$subjectOutput[0])))
       ) "production feature commit subject is not atomic: $featureCommit"
     }
@@ -6991,6 +7570,19 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         'integration remote branch does not equal its clean verified HEAD.'
     }
   }
+}
+
+# Founder-authorized Buy evidence gate; other worktrees keep their existing gates.
+if ($ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq 'buy-ready-20260921') {
+  $buyPhase = switch ($ProductionPhase) {
+    'implementation' { 'implementation' }
+    'pre_commit' { 'pre_commit' }
+    'ticket_close' { 'close' }
+    'founder_acceptance' { 'close' }
+    default { 'setup' }
+  }
+  & python -B (Join-Path $root 'scripts/check-buy-founder-regression.py') --root $root --phase $buyPhase
+  Assert-Coordination ($LASTEXITCODE -eq 0) 'Buy founder scenario/evidence gate failed.'
 }
 
 $resultLine = (

@@ -50,12 +50,26 @@ void main() {
 
       session.openDestination(BuyV2Destination.wholesale);
       await tester.pumpAndSettle();
-      expect(find.text('Search bulk products'), findsOneWidget);
+      expect(find.text('Find wholesale products'), findsOneWidget);
       expect(
-        find.bySemanticsLabel(RegExp('Search bulk products and suppliers')),
+        find.bySemanticsLabel(
+          RegExp('Search wholesale products and suppliers'),
+        ),
         findsOneWidget,
       );
 
+      session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+      await tester.pumpAndSettle();
+      expect(find.text('Find bulk products'), findsOneWidget);
+      expect(session.query, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(
+        find.byKey(const ValueKey('buy-search-field')),
+      );
+      expect(field.controller!.text, isEmpty);
+      expect(field.decoration!.border, InputBorder.none);
+      expect(field.decoration!.filled, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
       session.dispose();

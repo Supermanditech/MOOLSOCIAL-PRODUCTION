@@ -79,7 +79,7 @@ void main() {
     tester,
   ) async {
     await mountRoute(tester, '/app/buy?sub=wholesale');
-    expect(find.text('Search bulk products'), findsOneWidget);
+    expect(find.text('Find wholesale products'), findsOneWidget);
 
     await tapConnectedAction(tester, 'buy', 'orders');
     expect(find.text('PURCHASES'), findsOneWidget);

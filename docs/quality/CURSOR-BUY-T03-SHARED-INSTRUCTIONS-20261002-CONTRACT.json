@@ -1,0 +1,58 @@
+{
+  "ticketId": "BUY-ACTION-POLISH-20260926-01",
+  "laneTicketId": "UAW-CURSOR-BUY-READY-20260921",
+  "capability": "T03 shared public delivery instruction correction",
+  "actor": "Public Shop, Wholesale and Bulk buyers with one selected receiving address",
+  "customerOutcome": "One optional instruction composer in Cart and Checkout applies the same saved instruction to every selected delivery order at the receiving address, including Bulk. Different older notes are shown for review without losing them or silently sending category-specific instructions.",
+  "classification": "mvp_required",
+  "classificationReason": "Correct delivery instructions and retained-state recovery are required for the selected public commerce journey.",
+  "founderAuthorization": "Founder identified the category-scoping regression and explicitly instructed the agent to decide and fix it. Use one standard composer for the one receiving address.",
+  "baseline": "1c62542036900fb815af4b0e184d7570654c2303",
+  "priorContract": "docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json",
+  "owners": [
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"
+  ],
+  "reuse": [
+    "Existing customer-owned snapshot/codec, note validation, Cart/Checkout composer and keyboard reveal",
+    "Existing order request per-product instruction map and confirmed order deliveryInstruction",
+    "Existing Bulk offer class inside Wholesale destination; no third destination or composer",
+    "Existing Checkout disclosure storage, reduced motion and pending-payment guards"
+  ],
+  "minimumCompleteScope": [
+    "Remove public Shop/Wholesale instruction contexts; keep one stable composer independent of display filters and selected categories",
+    "Retain one public instruction in the existing customer snapshot and apply it to all submitted delivery products and resulting orders",
+    "Reuse existing choices without duplicate labels; typed notes and empty notes retain the 200-character bound",
+    "Migrate an unambiguous older note; show differing older notes in the same composer for explicit review before ordering",
+    "Keep Clear only inside the composer; Clear edits draft, Cancel preserves saved text, empty Save removes the shared instruction",
+    "Keep instructions frozen during unresolved/submitting payments and preserve Store procurement and historical order notes"
+  ],
+  "acceptance": [
+    "Mixed Shop, Wholesale and Bulk receive the same instruction in actual placement requests and confirmed orders",
+    "Category filters and adding/removing another category never switch the public draft or saved instruction",
+    "Customer-specific codec round trip, legacy same/differing notes, empty Save and invalid length preserve correct recovery",
+    "One public composer, no category contexts, one attached Clear, saved preset editing, Cancel and Cart/Checkout return",
+    "Normal/200-percent keyboard and compact/reduced-motion fitment; existing selected Buy regressions and changed-owner analysis",
+    "Current local native review screens and truthful remaining provider/founder acceptance boundaries"
+  ],
+  "motionAssessment": "Reuse existing finite transitions, immediate reduced-motion disclosure and existing keyboard reveal; no new animation or dependency.",
+  "dependenciesAndApprovals": [
+    "Existing open T03 parent and qualified checkpoint 1c625420",
+    "Exclusive Buy source/test ownership and current instruction correction authorization",
+    "Founder visual review remains distinct from local tests; T11 provider integration remains deferred"
+  ],
+  "explicitExclusions": [
+    "No new screen, route, state service, dependency, backend, Store procurement or Bulk delivery workspace implementation",
+    "No change to supplier agreement consent, GST, pricing, payment/provider authority or historical orders",
+    "No APK build/install, data clear, live payment, cloud deployment or supplier messaging",
+    "No screenbook mutation or unrelated worktree edits"
+  ],
+  "timelineImpactDays": 0,
+  "timelineReason": "Correction of the existing founder-selected T03 scope; no new launch milestone or external readiness claim."
+}

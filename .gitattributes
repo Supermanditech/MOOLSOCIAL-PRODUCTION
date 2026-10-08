@@ -30,3 +30,92 @@ scripts/artifact-evidence-retention.ps1 text eol=lf
 scripts/check-cleanup-artifact-retention.ps1 text eol=lf
 scripts/check-codex-development-regression-memory.ps1 text eol=lf
 scripts/test-artifact-evidence-retention.ps1 text eol=lf
+
+# Preserve checksum-bound Cart machine evidence across Windows checkouts.
+docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-T01-20260930-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-CHILD-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-CHILD-20260930-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-DISCOVERY-20260930-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-POLISH-CATEGORY-20260930-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-INSTRUCTION-CUE-20260930-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-EXPLORE-DEALS-20260930-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-EXPLORE-REVIEW-20260930-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-COMPOSER-REVEAL-20260930-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-COMPOSER-REVEAL-20260930-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-VALUE-CUE-20261001-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CART-QUANTITY-VALUE-20261001-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UNIFIED-CHECKOUT-20261001-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-CHECKOUT-REVIEW-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-UPI-CHECKOUT-20261001-INDEXED-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-GST-TOGGLE-20261001-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T03-20261001-CONTRACT.json text eol=lf
+docs/quality/CURSOR-BUY-T03-20261001-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T03-20261001-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T03-20261001-SELECTED-2.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-CONTRACT.json text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T05-PAYMENTS-20261002-SELECTED-3.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-T06-GROUPS-20261002-CONTRACT.json text eol=lf
+docs/quality/CURSOR-BUY-T06-GROUPS-20261002-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T06-GROUPS-20261002-SELECTED-3.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T07-RECOVERY-20261002-CONTRACT.json text eol=lf
+
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-3.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-CONTRACT.json text eol=lf
+docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.json text eol=lf
+
+docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003.json text eol=lf
+docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T11-ORDER-REFRESH-20261003-SELECTED-3.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003.json text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-T12-T13.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-CART.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-3.jsonl text eol=lf
+
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.md text eol=lf
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004.json text eol=lf
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-FOCUSED.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-1.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-2.jsonl text eol=lf
+docs/quality/CURSOR-BUY-T14-SEVEN-JOURNEY-20261004-SELECTED-3.jsonl text eol=lf

@@ -108,7 +108,7 @@ void main() {
         find.textContaining(session.product('w-oil').seller),
         findsWidgets,
       );
-      expect(find.text('Surya Oils India · Manufacturer'), findsWidgets);
+      expect(find.text('Store · Manufacturer'), findsOneWidget);
       expect(find.textContaining('Surya Oils India'), findsWidgets);
       await tester.tap(supplier);
       await tester.pumpAndSettle();
@@ -160,7 +160,7 @@ void main() {
     expect(session.selectedFilter, isNull);
 
     await tester.scrollUntilVisible(
-      find.text('More for business restocking'),
+      find.text('Similar products'),
       220,
       scrollable: find.byType(Scrollable).first,
     );
@@ -188,10 +188,16 @@ void main() {
       find.byKey(const ValueKey('buy-wholesale-open-workspace')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('buy-wholesale-verify-business-w-oil')),
-      findsOneWidget,
+    final inlineVerification = find.byKey(
+      const ValueKey('buy-wholesale-verify-business-w-oil'),
     );
+    await tester.scrollUntilVisible(
+      inlineVerification,
+      -180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(inlineVerification.hitTestable(), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-product-primary-w-oil')),
       findsNothing,

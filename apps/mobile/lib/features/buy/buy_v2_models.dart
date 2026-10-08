@@ -281,8 +281,11 @@ class BuyV2ProductCompliance {
     this.genericName,
     this.netQuantity,
     this.manufacturerName,
+    this.manufacturerAddress,
     this.packerName,
+    this.packerAddress,
     this.importerName,
+    this.importerAddress,
     this.countryOfOrigin,
     this.manufacturedOrPackedOnLabel,
     this.bestBeforeOrUseByLabel,
@@ -293,8 +296,11 @@ class BuyV2ProductCompliance {
   final String? genericName;
   final String? netQuantity;
   final String? manufacturerName;
+  final String? manufacturerAddress;
   final String? packerName;
+  final String? packerAddress;
   final String? importerName;
+  final String? importerAddress;
   final String? countryOfOrigin;
   final String? manufacturedOrPackedOnLabel;
   final String? bestBeforeOrUseByLabel;
@@ -388,6 +394,188 @@ class BuyV2ProductMediaAsset {
   final BuyV2ProductMediaBinding? binding;
 }
 
+enum BuyV2OfferClass { retail, wholesale, bulk }
+
+enum BuyV2DeliveryOption { quick, scheduled, courier, freight, collection }
+
+enum BuyV2VariantDimensionKind { colour, size, storage, pack, other }
+
+/// Published option identity for one SKU, never inferred from its title.
+class BuyV2VariantAttribute {
+  const BuyV2VariantAttribute({
+    required this.dimensionId,
+    required this.dimensionLabel,
+    required this.optionId,
+    required this.optionLabel,
+    this.kind = BuyV2VariantDimensionKind.other,
+    this.swatchArgb,
+  });
+  final String dimensionId;
+  final String dimensionLabel;
+  final String optionId;
+  final String optionLabel;
+  final BuyV2VariantDimensionKind kind;
+  final int? swatchArgb;
+
+  bool get isValid =>
+      [
+        dimensionId,
+        dimensionLabel,
+        optionId,
+        optionLabel,
+      ].every((value) => value.trim().isNotEmpty && value.trim() == value) &&
+      (swatchArgb == null ||
+          (kind == BuyV2VariantDimensionKind.colour &&
+              swatchArgb! >= 0 &&
+              swatchArgb! <= 0xffffffff));
+}
+
+/// Provider definition of one sellable SKU, independent of order quantity.
+/// Net content describes each contained unit, never the entire outer case.
+class BuyV2PackPriceTier {
+  const BuyV2PackPriceTier({required this.minimumPacks, required this.price});
+
+  final int minimumPacks;
+
+  /// Uses the same currency unit as BuyV2Product.price.
+  final int price;
+}
+
+class BuyV2PackTerms {
+  const BuyV2PackTerms({
+    required this.skuId,
+    required this.revision,
+    required this.sellUnit,
+    this.containedUnits = 1,
+    this.netContentMilli,
+    this.contentUnit,
+    this.quantityStep = 1,
+    this.requiresMeasurement = false,
+    this.unitPriceLabel,
+    this.priceTiers = const [],
+    this.pricingStoreId,
+    this.priceObservedAt,
+    this.priceValidUntil,
+    this.pricesIncludeTax,
+    this.pricesIncludeFreight,
+  });
+
+  final String skuId;
+  final String revision;
+  final String sellUnit;
+  final int containedUnits;
+  final int? netContentMilli;
+  final String? contentUnit;
+  final int quantityStep;
+  final bool requiresMeasurement;
+  final String? unitPriceLabel;
+  final List<BuyV2PackPriceTier> priceTiers;
+  final String? pricingStoreId;
+  final DateTime? priceObservedAt;
+  final DateTime? priceValidUntil;
+  final bool? pricesIncludeTax;
+  final bool? pricesIncludeFreight;
+
+  bool validPricingFor(String? storeId, int minimumOrder) {
+    if (priceTiers.isEmpty) {
+      return pricingStoreId == null &&
+          priceObservedAt == null &&
+          priceValidUntil == null &&
+          pricesIncludeTax == null &&
+          pricesIncludeFreight == null;
+    }
+    // A single converted-unit label cannot describe several changing prices.
+    // Until per-tier unit quotes are supplied, show the exact pack basis only.
+    if (unitPriceLabel != null ||
+        storeId == null ||
+        storeId.trim().isEmpty ||
+        pricingStoreId != storeId ||
+        priceObservedAt == null ||
+        priceValidUntil == null ||
+        !priceValidUntil!.isAfter(priceObservedAt!) ||
+        priceTiers.first.minimumPacks != minimumOrder) {
+      return false;
+    }
+    var previousMinimum = 0;
+    int? previousPrice;
+    for (final tier in priceTiers) {
+      if (tier.minimumPacks <= previousMinimum ||
+          tier.minimumPacks > 9007199254740991 ||
+          tier.price < 0 ||
+          tier.price > 9007199254740991 ||
+          (previousPrice != null && tier.price > previousPrice)) {
+        return false;
+      }
+      previousMinimum = tier.minimumPacks;
+      previousPrice = tier.price;
+    }
+    return true;
+  }
+
+  bool pricingCurrentAt(DateTime now) =>
+      priceTiers.isEmpty ||
+      (priceObservedAt != null &&
+          !priceObservedAt!.isAfter(now) &&
+          priceValidUntil != null &&
+          now.isBefore(priceValidUntil!));
+
+  int priceForQuantity(int quantity, int fallback) {
+    var result = fallback;
+    for (final tier in priceTiers) {
+      if (quantity < tier.minimumPacks) break;
+      result = tier.price;
+    }
+    return result;
+  }
+
+  bool isValidFor(String id) =>
+      skuId == id &&
+      [
+        skuId,
+        revision,
+        sellUnit,
+      ].every((value) => value.trim().isNotEmpty && value.trim() == value) &&
+      containedUnits > 0 &&
+      quantityStep > 0 &&
+      containedUnits <= 9007199254740991 &&
+      quantityStep <= 9007199254740991 &&
+      ((netContentMilli == null && contentUnit == null) ||
+          (netContentMilli != null &&
+              netContentMilli! > 0 &&
+              {
+                'g',
+                'kg',
+                'mL',
+                'L',
+                'mm',
+                'cm',
+                'm',
+                'piece',
+              }.contains(contentUnit) &&
+              (contentUnit != 'piece' || netContentMilli! % 1000 == 0) &&
+              BigInt.from(netContentMilli!) * BigInt.from(containedUnits) <=
+                  BigInt.from(9007199254740991))) &&
+      (unitPriceLabel == null ||
+          (unitPriceLabel!.trim().isNotEmpty &&
+              unitPriceLabel!.trim() == unitPriceLabel));
+
+  String get label {
+    final amount = netContentMilli;
+    if (amount == null) {
+      return containedUnits == 1
+          ? sellUnit
+          : '$containedUnits units · $sellUnit';
+    }
+    final fraction = (amount % 1000)
+        .toString()
+        .padLeft(3, '0')
+        .replaceFirst(RegExp(r'0+$'), '');
+    final number = '${amount ~/ 1000}${fraction.isEmpty ? '' : '.$fraction'}';
+    final content = '$number $contentUnit';
+    return '${containedUnits == 1 ? content : '$containedUnits × $content'} · $sellUnit';
+  }
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -411,12 +599,16 @@ class BuyV2Product {
     this.merchandisingLabel = '',
     this.procurementSupplierGrant,
     this.mediaAssets = const [],
+    this.variantAttributes = const [],
     this.storeId,
     this.mrp,
     this.requiresPrescription = false,
     this.composition,
     this.regulatoryNote,
     this.minimumOrder = 1,
+    this.packTerms,
+    this.offerClass,
+    this.reviewDeliveryOptions = const {},
     this.returnPolicy,
     this.purchaseProtection,
     this.compliance,
@@ -438,11 +630,70 @@ class BuyV2Product {
   final String merchandisingLabel;
   final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
   final List<BuyV2ProductMediaAsset> mediaAssets;
+  final List<BuyV2VariantAttribute> variantAttributes;
+
+  bool get hasStructuredVariants =>
+      variantAttributes.isNotEmpty &&
+      variantAttributes.every((attribute) => attribute.isValid) &&
+      variantAttributes
+              .map((attribute) => attribute.dimensionId)
+              .toSet()
+              .length ==
+          variantAttributes.length;
+
+  /// Resolve a unique SKU without silently changing the other selected options.
+  BuyV2Product? resolveVariantOption(
+    Iterable<BuyV2Product> family,
+    String dimensionId,
+    String optionId,
+  ) {
+    if (!hasStructuredVariants ||
+        !variantAttributes.any((value) => value.dimensionId == dimensionId)) {
+      return null;
+    }
+    final matches = family
+        .where(
+          (candidate) =>
+              candidate.canonicalId == canonicalId &&
+              candidate.destination == destination &&
+              candidate.isFromSameStoreAs(this) &&
+              candidate.hasStructuredVariants &&
+              candidate.variantAttributes.length == variantAttributes.length &&
+              variantAttributes.every(
+                (selected) => candidate.variantAttributes.any(
+                  (value) =>
+                      value.dimensionId == selected.dimensionId &&
+                      value.kind == selected.kind &&
+                      value.optionId ==
+                          (selected.dimensionId == dimensionId
+                              ? optionId
+                              : selected.optionId),
+                ),
+              ),
+        )
+        .toList(growable: false);
+    return matches.length == 1 ? matches.single : null;
+  }
+
   String get brandLabel =>
       brand.trim().isEmpty ? 'Brand not provided' : brand.trim();
   final String title;
   final String variant;
   final String pack;
+  final BuyV2PackTerms? packTerms;
+  bool get hasValidPackTerms =>
+      packTerms == null ||
+      (packTerms!.isValidFor(id) &&
+          packTerms!.validPricingFor(storeId, minimumOrder) &&
+          pack == packTerms!.label &&
+          unitPrice == (packTerms!.unitPriceLabel ?? ''));
+  int get quantityStep => packTerms?.quantityStep ?? 1;
+  int minimumOrderTotal(int currentPrice) =>
+      (hasValidPackTerms
+          ? packTerms?.priceForQuantity(minimumOrder, currentPrice) ??
+                currentPrice
+          : currentPrice) *
+      minimumOrder;
   final int price;
   final String unitPrice;
   final String badge;
@@ -458,6 +709,12 @@ class BuyV2Product {
   final String? composition;
   final String? regulatoryNote;
   final int minimumOrder;
+
+  /// Explicit public offer classification, independent of MOQ and freight.
+  final BuyV2OfferClass? offerClass;
+
+  /// Screenbook fixtures only, never authoritative provider eligibility.
+  final Set<BuyV2DeliveryOption> reviewDeliveryOptions;
   final String? returnPolicy;
   final BuyV2PurchaseProtection? purchaseProtection;
   final BuyV2ProductCompliance? compliance;
@@ -473,6 +730,7 @@ class BuyV2Product {
     String? merchandisingLabel,
     BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
     List<BuyV2ProductMediaAsset>? mediaAssets,
+    List<BuyV2VariantAttribute>? variantAttributes,
     String? title,
     String? origin,
     String? variant,
@@ -485,6 +743,9 @@ class BuyV2Product {
     String? sellerType,
     String? confirmedOn,
     int? minimumOrder,
+    BuyV2PackTerms? packTerms,
+    BuyV2OfferClass? offerClass,
+    Set<BuyV2DeliveryOption>? reviewDeliveryOptions,
     bool? catalogueListing,
     BuyV2PurchaseProtection? purchaseProtection,
     BuyV2ProductCompliance? compliance,
@@ -499,11 +760,15 @@ class BuyV2Product {
     procurementSupplierGrant:
         procurementSupplierGrant ?? this.procurementSupplierGrant,
     mediaAssets: mediaAssets ?? this.mediaAssets,
+    variantAttributes: variantAttributes ?? this.variantAttributes,
     title: title ?? this.title,
     variant: variant ?? this.variant,
-    pack: pack ?? this.pack,
+    pack: packTerms?.label ?? pack ?? this.pack,
+    packTerms: packTerms ?? this.packTerms,
     price: price ?? this.price,
-    unitPrice: unitPrice ?? this.unitPrice,
+    unitPrice: packTerms != null
+        ? packTerms.unitPriceLabel ?? ''
+        : unitPrice ?? this.unitPrice,
     badge: badge ?? this.badge,
     seller: seller ?? this.seller,
     sellerType: sellerType ?? this.sellerType,
@@ -517,6 +782,8 @@ class BuyV2Product {
     composition: composition,
     regulatoryNote: regulatoryNote,
     minimumOrder: minimumOrder ?? this.minimumOrder,
+    offerClass: offerClass ?? this.offerClass,
+    reviewDeliveryOptions: reviewDeliveryOptions ?? this.reviewDeliveryOptions,
     returnPolicy: returnPolicy,
     purchaseProtection: purchaseProtection ?? this.purchaseProtection,
     compliance: compliance ?? this.compliance,
@@ -751,6 +1018,254 @@ class BuyV2CollectionOrderReference {
   final String purchaserAccountId;
 }
 
+enum BuyV2SupplyState {
+  awaitingSupply,
+  partiallyAvailable,
+  replacementOffered,
+  ready,
+  unavailable,
+}
+
+enum BuyV2SupplyRefundState { pending, processing, refunded, failed }
+
+class BuyV2SupplyLine {
+  const BuyV2SupplyLine({
+    required this.productId,
+    required this.variant,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.availableQuantity,
+    required this.unavailableQuantity,
+    this.supplierId,
+    this.supplierName,
+  });
+  final String productId;
+  final String variant;
+  final String pack;
+  final int orderedQuantity;
+  final int availableQuantity;
+  final int unavailableQuantity;
+  final String? supplierId;
+  final String? supplierName;
+  int get awaitingQuantity =>
+      orderedQuantity - availableQuantity - unavailableQuantity;
+}
+
+class BuyV2ReplacementLine {
+  const BuyV2ReplacementLine({
+    required this.originalProductId,
+    required this.originalVariant,
+    required this.originalPack,
+    required this.originalQuantity,
+    required this.productTitle,
+    required this.pack,
+    required this.quantity,
+    required this.unitPriceMinor,
+  });
+  final String originalProductId;
+  final String originalVariant;
+  final String originalPack;
+  final int originalQuantity;
+  final String productTitle;
+  final String pack;
+  final int quantity;
+  final int unitPriceMinor;
+}
+
+class BuyV2ReplacementOffer {
+  BuyV2ReplacementOffer({
+    required this.id,
+    required this.revision,
+    required List<BuyV2ReplacementLine> lines,
+    required this.customerTotalMinor,
+    required this.deliveryCommitment,
+    required this.expiresAt,
+  }) : lines = List.unmodifiable(lines);
+  final String id;
+  final int revision;
+  final List<BuyV2ReplacementLine> lines;
+  final int customerTotalMinor;
+  final String deliveryCommitment;
+  final DateTime expiresAt;
+}
+
+/// Optional provider facts. Absence is unknown, never allocation or settlement.
+/// This Retail Shop delivery contract does not define wholesale/collection rules.
+class BuyV2OrderSupplyProgress {
+  BuyV2OrderSupplyProgress({
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.revision,
+    required this.state,
+    required List<BuyV2SupplyLine> lines,
+    this.replacementOffer,
+    this.refundState,
+    this.refundAmountMinor,
+    this.refundRoute,
+    this.refundReference,
+    this.currency = 'INR',
+  }) : lines = List.unmodifiable(lines);
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int revision;
+  final BuyV2SupplyState state;
+  final List<BuyV2SupplyLine> lines;
+  final BuyV2ReplacementOffer? replacementOffer;
+  final BuyV2SupplyRefundState? refundState;
+  final int? refundAmountMinor;
+  final String? refundRoute;
+  final String? refundReference;
+  final String currency;
+
+  bool matchesOrder(BuyV2Order order) {
+    if (order.destination != BuyV2Destination.shop ||
+        order.collection != null ||
+        orderId != order.id ||
+        purchaseId.trim().isEmpty ||
+        purchaseId != order.purchaseId ||
+        sourceId.trim().isEmpty ||
+        revision <= 0 ||
+        currency != 'INR' ||
+        lines.isEmpty ||
+        lines.length != order.lines.length) {
+      return false;
+    }
+    final matched = <int>{};
+    for (final line in lines) {
+      final index = order.lines.indexWhere(
+        (original) =>
+            original.product.id == line.productId &&
+            original.product.variant == line.variant &&
+            original.product.pack == line.pack &&
+            original.quantity == line.orderedQuantity,
+      );
+      if (index < 0 ||
+          !matched.add(index) ||
+          line.orderedQuantity <= 0 ||
+          line.availableQuantity < 0 ||
+          line.unavailableQuantity < 0 ||
+          line.awaitingQuantity < 0 ||
+          (line.availableQuantity > 0 &&
+              (line.supplierId?.trim().isNotEmpty != true ||
+                  line.supplierName?.trim().isNotEmpty != true))) {
+        return false;
+      }
+    }
+    final available = lines.fold<int>(
+      0,
+      (sum, line) => sum + line.availableQuantity,
+    );
+    final ordered = lines.fold<int>(
+      0,
+      (sum, line) => sum + line.orderedQuantity,
+    );
+    if (state == BuyV2SupplyState.ready && available != ordered) return false;
+    if (state == BuyV2SupplyState.awaitingSupply &&
+        lines.any(
+          (line) =>
+              line.availableQuantity != 0 || line.unavailableQuantity != 0,
+        )) {
+      return false;
+    }
+    if (state == BuyV2SupplyState.partiallyAvailable &&
+        (available <= 0 || available >= ordered)) {
+      return false;
+    }
+    if (state == BuyV2SupplyState.unavailable &&
+        lines.any((line) => line.unavailableQuantity != line.orderedQuantity)) {
+      return false;
+    }
+    final offer = replacementOffer;
+    if ((state == BuyV2SupplyState.replacementOffered) != (offer != null)) {
+      return false;
+    }
+    if (offer != null) {
+      if (offer.id.trim().isEmpty ||
+          offer.revision <= 0 ||
+          offer.lines.isEmpty ||
+          offer.deliveryCommitment.trim().isEmpty ||
+          offer.customerTotalMinor != (order.totalMinor ?? order.total * 100)) {
+        return false;
+      }
+      final replaced = <int>{};
+      for (final proposed in offer.lines) {
+        final index = lines.indexWhere(
+          (original) =>
+              original.productId == proposed.originalProductId &&
+              original.variant == proposed.originalVariant &&
+              original.pack == proposed.originalPack,
+        );
+        if (index < 0 ||
+            !replaced.add(index) ||
+            proposed.originalQuantity <= 0 ||
+            proposed.originalQuantity > lines[index].unavailableQuantity ||
+            proposed.productTitle.trim().isEmpty ||
+            proposed.pack.trim().isEmpty ||
+            proposed.quantity <= 0 ||
+            proposed.unitPriceMinor < 0) {
+          return false;
+        }
+      }
+    }
+    if (refundState != null) {
+      final amount = refundAmountMinor;
+      if (amount == null ||
+          amount <= 0 ||
+          amount > (order.totalMinor ?? order.total * 100) ||
+          refundRoute?.trim().isNotEmpty != true) {
+        return false;
+      }
+      if (refundState == BuyV2SupplyRefundState.refunded &&
+          (order.amountPaidNow == null ||
+              amount > order.amountPaidNow! * 100 ||
+              refundReference?.trim().isNotEmpty != true)) {
+        return false;
+      }
+    } else if (refundAmountMinor != null ||
+        refundRoute != null ||
+        refundReference != null) {
+      return false;
+    }
+    return true;
+  }
+}
+
+class BuyV2ReplacementConsentRequest {
+  const BuyV2ReplacementConsentRequest({
+    required this.orderId,
+    required this.purchaseId,
+    required this.sourceId,
+    required this.supplyRevision,
+    required this.offerId,
+    required this.offerRevision,
+    required this.reviewKey,
+    required this.accept,
+    required this.idempotencyKey,
+  });
+  final String orderId;
+  final String purchaseId;
+  final String sourceId;
+  final int supplyRevision;
+  final String offerId;
+  final int offerRevision;
+  final String reviewKey;
+  final bool accept;
+  final String idempotencyKey;
+}
+
+class BuyV2ReplacementConsentResult {
+  const BuyV2ReplacementConsentResult({
+    required this.request,
+    required this.recorded,
+    this.reference,
+  });
+  final BuyV2ReplacementConsentRequest request;
+  final bool recorded;
+  final String? reference;
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -800,6 +1315,7 @@ class BuyV2Order {
     this.platformTaxInvoiceDetails,
     this.invoiceAvailable = true,
     this.receiptReference,
+    this.supplyProgress,
   });
 
   final String id;
@@ -852,6 +1368,7 @@ class BuyV2Order {
   final BuyV2TaxInvoiceDetails? platformTaxInvoiceDetails;
   final bool invoiceAvailable;
   final String? receiptReference;
+  final BuyV2OrderSupplyProgress? supplyProgress;
 }
 
 class _BuyV2CommerceSeed {
@@ -1239,6 +1756,18 @@ abstract final class BuyV2Catalogue {
       visualKind: _visualKind(
         wholesale ? seed.wholesaleCategory : seed.shopCategory,
       ),
+      reviewDeliveryOptions: wholesale
+          ? const {BuyV2DeliveryOption.freight}
+          : _reviewQuickProducts.contains(seed.id)
+          ? const {BuyV2DeliveryOption.quick}
+          : const {BuyV2DeliveryOption.scheduled, BuyV2DeliveryOption.courier},
+      // Existing review fixtures only; Store/provider projections must supply
+      // their own explicit classification. Quantity never grants a channel.
+      offerClass: !wholesale
+          ? BuyV2OfferClass.retail
+          : seed.id == 'rice'
+          ? BuyV2OfferClass.bulk
+          : BuyV2OfferClass.wholesale,
       minimumOrder: wholesale ? _minimumOrder(seed.id) : 1,
       returnPolicy: _returnPolicy(seed, wholesale: wholesale),
       freightIncluded: wholesale,
@@ -1333,6 +1862,53 @@ abstract final class BuyV2Catalogue {
     }
     return 'Jodhpur';
   }
+
+  // Explicit legacy screenbook scenarios. No runtime display-text inference.
+  // These do not grant production eligibility or assert fleet/slot availability.
+  static const _reviewQuickProducts = {
+    'tomato',
+    'rice',
+    'soap',
+    'onion',
+    'bread',
+    'chicken',
+    'turmeric',
+    'poha',
+    'noodles',
+    'biscuits',
+    'tea',
+    'peas',
+    'toothpaste',
+    'face-wash',
+    'toilet-cleaner',
+    'dishwash',
+    'baby-wipes',
+    'protein',
+    'cat-food',
+    'paper-cups',
+    'price-labels',
+    'banana',
+    'curd',
+    'fish-fillet',
+    'toor-dal',
+    'mustard-oil',
+    'red-chilli',
+    'corn-flakes',
+    'ketchup',
+    'potato-chips',
+    'coffee',
+    'frozen-fries',
+    'toothbrush',
+    'moisturizer',
+    'garbage-bags',
+    'fabric-conditioner',
+    'baby-lotion',
+    'glucose',
+    'dog-treats',
+    'tissues',
+    'barcode-labels',
+    'printer-paper',
+  };
 
   static int _minimumOrder(String canonicalId) => switch (canonicalId) {
     'rice' => 4,

@@ -1,0 +1,76 @@
+{
+  "ticketId": "BUY-ACTION-POLISH-20260926-01",
+  "laneTicketId": "UAW-CURSOR-BUY-READY-20260921",
+  "capability": "T05 payment methods, amount limits and collection destination",
+  "actor": "Public Shop, Wholesale and Bulk direct buyers in the existing mixed Cart",
+  "customerOutcome": "Choose a supported payment method using truthful published amount limits and scoped collection details; retain a valid preference and explain unavailable choices before commitment. Recheck the final quoted due-now amount without editing an unresolved attempt.",
+  "classification": "mvp_required",
+  "classificationReason": "Safe payment eligibility and truthful destination/charges are necessary for the selected commerce journey.",
+  "founderAuthorization": "Founder next on 2 October 2026 selects T05 as a bounded frontend subworkflow under the existing open Buy parent and standing lane ticket; audit Git/Redmi, register actual defects, scoped fixes/tests/native retest, verified scope or unresolved child, safe prefixed feature checkpoint, then stop. Existing formal handoff failure remains open. Backend execution deferred; workspace mapping Codex after integration; Google dependencies listed.",
+  "baseline": "74b70873a89b72b785f6e3184f1c9f50476e29aa",
+  "baselineSourceSha256": "6be76c28e49ced605b064672ad8d790a79122d348ee6a43647a1bac309fa1fe9",
+  "priorContract": "docs/quality/CURSOR-BUY-T04-OFFERS-20261002-CONTRACT.json",
+  "owners": [
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_qualified_provider_fixture.dart"
+  ],
+  "reuse": [
+    "Existing customer payment chooser, session support/availability, quote refresh, commercial terms and payment hold",
+    "Existing CommerceSnapshot trusted adapter boundary; optional scoped capability model in the same contract owner",
+    "Existing quoted paymentCharge and collection quote minor units; no fee calculator",
+    "Existing collection identity/current basket and prepare action",
+    "Existing session, payment-sheet motion, collection visual and shared isolated provider fixtures"
+  ],
+  "minimumCompleteScope": [
+    "Inspect synchronized existing Redmi Checkout/payment choices before runtime changes",
+    "Add only necessary versioned, time/currency/fulfilment-scoped per-method capability metadata and shared evaluation",
+    "Preserve legacy authorized availability as unknown metadata through existing provider checks; do not fabricate limits, remaining balance, recipient or free transfer",
+    "New trade methods require current explicit scoped capabilities; retail COD stays excluded",
+    "Use the same decision for choice, continuation and final post-quote preflight; pending attempts remain held, including A09",
+    "Bind recipient to the actual scoped payment destination, fee to the current applicable quote, and retain post-placement bank instructions separately",
+    "Repair A08 missing collection identity action eligibility within this destination scope; show its existing truthful recovery reason",
+    "Guard capability refresh against stale responses and preserve valid method preference",
+    "Test boundaries, scope/currency/expiry/refresh, unknown metadata, fees, pending hold and responsive large amounts; re-hot-refresh native and record actual scope",
+    "Preserve normal correctly prefixed feature checkpoint, known handoff failure/open children, then stop before T06"
+  ],
+  "acceptance": [
+    "Published minimum/maximum and supplied remaining limits use inclusive minor-unit boundaries; absent bounds remain unknown",
+    "RTGS observes the authoritative RBI INR minimum and any stricter published bank limit; no universal UPI/Card ceiling or automatic split is invented",
+    "Currency, fulfilment scope, duplicate/invalid metadata and expiry cannot authorize a choice or submitted request",
+    "A valid previous method survives refresh; stale callback/removed capability cannot silently change an in-flight method or revive old eligibility",
+    "Final quote/term changes re-evaluate due-now before placement; no request is placed for a newly ineligible amount",
+    "Current quoted payment fees and actual scoped recipient are disclosed; unavailable values are truthful and unknowns are not zero/free/verified",
+    "Missing collection identity disables preparation with the existing saved-Cart reason; successful current identity remains usable",
+    "Payment chooser, large INR values through one crore, 200% text, reduced motion and keyboard/dock continuity are tested locally; actual native versus isolated capability fixture evidence is separate",
+    "Required affected and selected Buy checks close successfully against final unchanged source, or actual unresolved children are linked"
+  ],
+  "motionAssessment": "Reuse existing finite radio and modal motion/reduced-motion paths; no new animation, screen or route.",
+  "dependenciesAndApprovals": [
+    "Existing root Buy ownership; optional shared contract handoff is recorded before source changes, no Store/backend producer mutation",
+    "Workspace method capability, quote, recipient and payment adapter mappings: Codex after integration; authenticated publication and live acceptance require separate evidence",
+    "Backend execution remains deferred; T11-T13 frontend contracts/states may proceed with isolated fixtures",
+    "Google shopping area/current-location and separately gated delivery Maps source/key/permission work stay listed",
+    "Existing Redmi TG8HCYTGGQT885OF / com.moolsocial.app.cursorreview synchronization only; no new APK authority",
+    "A09 pending display drift and the preserved 0e90a6ca naming handoff blocker remain open; neither becomes new payment authority"
+  ],
+  "explicitExclusions": [
+    "No new screen, route, service, dependency, fee calculator or payment splitting",
+    "No Store/Counter Sale/CSV/backend/Google/authentication/release configuration changes or other-worktree mutation",
+    "No new APK/install/uninstall/data clear/live payment/supplier contact or screenbook edit",
+    "No T03 supplier-policy popup, T06 grouping or T07 pending amount snapshot repair in this pass",
+    "No history rewriting, baseline advance, new historical subject exception, formal ticket_close or integrated acceptance claim"
+  ],
+  "officialSourceBasis": {
+    "RTGS": "https://www.rbi.org.in/scripts/FS_FAQs.aspx?Id=65",
+    "UPI": "https://www.npci.org.in/what-we-do/upi/faqs",
+    "UPICategoryUpdates": "https://www.npci.org.in/circulars/upi",
+    "interpretation": "RTGS INR floor is publicly established. Actual UPI category/bank limits, remaining allowance and customer charges must come from applicable trusted capability/quote data; no generic ceiling or fee-free claim follows from these links."
+  },
+  "timelineImpactDays": 0,
+  "timelineReason": "Next already planned frontend subworkflow; production integration and the known handoff failure are separately unresolved."
+}

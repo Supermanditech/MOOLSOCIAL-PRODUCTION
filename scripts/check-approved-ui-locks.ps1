@@ -133,6 +133,9 @@ function Get-CursorAccessibilityNativeProjection {
   # REG4608: admit only the exact merged accessibility + PDF composition in
   # this correction lane and its single fresh final-admission destination.
   $combinedBranch = switch ($actualRoot.Replace('\','/')) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' {
+      'work/cursor-ui/buy-ready-20260921'
+    }
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
       'work/codex-ui/store-procurement-bridge-20260912'
     }
@@ -166,6 +169,12 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921' {
       'integration/moolsocial/store-add-product-20260921'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008' {
+      'work/integration-repair/store-buy-combined-20261008'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008' {
+      'integration/moolsocial/store-buy-combined-baseline-20261008'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -188,6 +197,44 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  $octoberUIComposition = $requiredBranch -cin @(
+    'work/integration-repair/store-buy-combined-20261008',
+    'integration/moolsocial/store-buy-combined-baseline-20261008'
+  )
+  if ($octoberUIComposition) {
+    # Exact inherited Store printing/download native composition, not authority
+    # for new Android edits. All original reference/accessibility hashes run.
+    $storeSource = '8002e8cd740aaf613b75dc749212fb12ae4fddb7'
+    $cursorSource = 'f32c17e1a3a41807564fe18f83c0520a66e0bfe6'
+    & git -C $root merge-base --is-ancestor $storeSource HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'October UI projection requires the published Store ancestor.' }
+    & git -C $root merge-base --is-ancestor $cursorSource HEAD
+    $cursorCommitted = $LASTEXITCODE -eq 0
+    if (-not $cursorCommitted) {
+      $mergeStatePath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+      if ($LASTEXITCODE -ne 0 -or $requiredBranch -cne 'work/integration-repair/store-buy-combined-20261008' -or
+          -not (Test-Path -LiteralPath $mergeStatePath -PathType Leaf)) {
+        throw 'October UI projection requires the exact committed or pending Cursor source.'
+      }
+      $mergeHeads = @(Get-Content -LiteralPath $mergeStatePath)
+      if ($mergeHeads.Count -ne 1 -or $mergeHeads[0] -cne $cursorSource) { throw 'October UI projection pending source changed.' }
+    }
+    & git -C $root diff --quiet $storeSource -- 'apps/mobile/android' 'approved-references'
+    if ($LASTEXITCODE -ne 0) { throw 'October inherited native/reference owners differ from the sealed Store source.' }
+    $nativeExtras = @(& git -C $root ls-files --others --exclude-standard -- 'apps/mobile/android' 'approved-references')
+    if ($LASTEXITCODE -ne 0 -or $nativeExtras.Count -ne 0) { throw 'October projection rejects untracked native/reference owners.' }
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    $cursorReadyBaseline = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+    & git -C $root merge-base --is-ancestor $cursorReadyBaseline HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture requires the complete assigned baseline.' }
+    & git -C $root diff --quiet $cursorReadyBaseline -- 'apps/mobile/android' 'approved-references'
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture changed native owners or approved references.' }
+    $cursorNativeExtras = @(& git -C $root ls-files --others --exclude-standard -- 'apps/mobile/android' 'approved-references')
+    if ($LASTEXITCODE -ne 0 -or $cursorNativeExtras.Count -ne 0) {
+      throw 'Cursor native projection rejects untracked native or reference owners.'
+    }
   }
   if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2', 'integration/moolsocial/counter-sale-20260919-v3', 'integration/moolsocial/counter-sale-20260919-v4', 'integration/moolsocial/counter-sale-20260919-v5')) {
     # REG4631: this ticket inherits the accepted combined native implementation.
@@ -278,7 +325,9 @@ function Get-CursorAccessibilityNativeProjection {
   $utf8 = [Text.UTF8Encoding]::new($false)
   if ($requiredBranch -cin @(
       'work/codex-ui/add-product-screen1-20260920',
-      'integration/moolsocial/store-add-product-20260921'
+      'integration/moolsocial/store-add-product-20260921',
+      'work/integration-repair/store-buy-combined-20261008',
+      'integration/moolsocial/store-buy-combined-baseline-20261008'
     )) {
     # Founder-authorized r66.37 review: exact download bridge only. Project its
     # three registration/lifecycle blocks back to the unchanged combined native
@@ -305,7 +354,7 @@ function Get-CursorAccessibilityNativeProjection {
     # isolated Store lane and preserved pre-extension checkpoint. This does not
     # admit changed MainActivity, other native sources, or integration/Cursor.
     $printBridgeHash = '4e7bd5a468849e67f9d1654dde6e422eca769f6a6e4a753b4b91f45b0c3f9aa3'
-    if ($requiredBranch -ceq 'work/codex-ui/add-product-screen1-20260920' -and
+    if (($requiredBranch -ceq 'work/codex-ui/add-product-screen1-20260920' -or $octoberUIComposition) -and
         (Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -ceq $printBridgeHash) {
       & git -C $root merge-base --is-ancestor 'd99b6c0f9c40da5b88f2a479371ae9589d9ec263' HEAD
       if ($LASTEXITCODE -ne 0) { throw 'Store printing requires the original Downloads ancestor.' }
@@ -326,6 +375,29 @@ function Get-CursorAccessibilityNativeProjection {
         throw 'Store download projection requires one exact registration/lifecycle block.'
       }
       $Source = $Source.Replace($registration, '')
+    }
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    # REG4640: exact inherited Stock bridge composition, not a new native edit.
+    # The earlier baseline/Android equality check remains mandatory. Pin both
+    # full owners before projecting only the five known integration lines.
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+        'aebb6246f8e040840efe029557293d202e8b3a822d53752fadac0fc2743ecb56') {
+      throw 'Cursor Stock composition rejects changed native implementation.'
+    }
+    $stockBridgePath = Join-Path $root 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+    $stockBridge = [IO.File]::ReadAllText($stockBridgePath).Replace("`r`n", "`n")
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($stockBridge)) -cne
+        '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd') {
+      throw 'Cursor Stock composition rejects changed download bridge.'
+    }
+    foreach ($line in @(
+      '    private var storeStockDownload: StoreStockDownloadBridge? = null',
+      '        storeStockDownload?.close()',
+      '        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)',
+      '        storeStockDownload = null'
+    )) {
+      $Source = $Source.Replace($line + "`n", '')
     }
   }
   $expectedSourceHash = if ($combined) {

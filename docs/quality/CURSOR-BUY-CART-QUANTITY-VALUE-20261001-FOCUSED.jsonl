@@ -1,0 +1,40 @@
+{"protocolVersion":"0.1.1","runnerVersion":"1.31.0","pid":20296,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":3}
+{"count":3,"time":14,"type":"allSuites"}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":6181}
+{"group":{"id":2,"suiteID":0,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":1,"line":null,"column":null,"url":null},"type":"group","time":6185}
+{"group":{"id":3,"suiteID":0,"parentID":2,"name":"R37 Cart relevance contracts","metadata":{"skip":false,"skipReason":null},"testCount":1,"line":164,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"group","time":6186}
+{"test":{"id":4,"name":"R37 Cart relevance contracts recommendations stay in-family and exclude Cart products","suiteID":0,"groupIDs":[2,3],"metadata":{"skip":false,"skipReason":null},"line":165,"column":5,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"testStart","time":6186}
+{"testID":4,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":6440}
+{"suite":{"id":5,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"suite","time":6486}
+{"test":{"id":6,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart","suiteID":5,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":6486}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":6,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":8762}
+{"group":{"id":7,"suiteID":5,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":5,"line":null,"column":null,"url":null},"type":"group","time":8762}
+{"test":{"id":8,"name":"C07 Cart quantity choice confirms BuyV2OfferClass.wholesale at 1.0","suiteID":5,"groupIDs":[7],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2195,"root_column":7,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":8762}
+{"testID":8,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":12339}
+{"test":{"id":9,"name":"C07 Cart quantity choice confirms BuyV2OfferClass.bulk at 1.0","suiteID":5,"groupIDs":[7],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2195,"root_column":7,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":12339}
+{"testID":9,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":13353}
+{"test":{"id":10,"name":"C07 Cart quantity choice confirms BuyV2OfferClass.wholesale at 2.0","suiteID":5,"groupIDs":[7],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2195,"root_column":7,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":13354}
+{"testID":10,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":14231}
+{"test":{"id":11,"name":"C07 Cart quantity choice confirms BuyV2OfferClass.bulk at 2.0","suiteID":5,"groupIDs":[7],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2195,"root_column":7,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":14232}
+{"testID":11,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":15136}
+{"test":{"id":12,"name":"R37 Cart sections fit compact Android and iOS-size viewports","suiteID":5,"groupIDs":[7],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2307,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":15137}
+{"testID":12,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":19042}
+{"suite":{"id":13,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"},"type":"suite","time":19101}
+{"test":{"id":14,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart","suiteID":13,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":19101}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":14,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":21226}
+{"group":{"id":15,"suiteID":13,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":3,"line":null,"column":null,"url":null},"type":"group","time":21226}
+{"test":{"id":16,"name":"CAT04 tiers reprice complete Cart line in both directions","suiteID":13,"groupIDs":[15],"metadata":{"skip":false,"skipReason":null},"line":847,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"},"type":"testStart","time":21227}
+{"testID":16,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":21322}
+{"test":{"id":17,"name":"CAT04 invalid and expired tiers cannot authorize Add or checkout","suiteID":13,"groupIDs":[15],"metadata":{"skip":false,"skipReason":null},"line":870,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"},"type":"testStart","time":21322}
+{"testID":17,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":21332}
+{"test":{"id":18,"name":"CAT04 restored Cart uses exact pack tier and preserves Saved identity","suiteID":13,"groupIDs":[15],"metadata":{"skip":false,"skipReason":null},"line":1004,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart"},"type":"testStart","time":21332}
+{"testID":18,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":21351}
+{"success":true,"type":"done","time":21413}

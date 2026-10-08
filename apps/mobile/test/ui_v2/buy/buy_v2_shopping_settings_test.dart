@@ -541,8 +541,12 @@ void main() {
                       : 'buy-settings-recently-viewed-product-$productId',
                 ),
               );
-              await tester.ensureVisible(open);
+              await Scrollable.ensureVisible(
+                tester.element(open),
+                alignment: .4,
+              );
               await tester.pumpAndSettle();
+              expect(open.hitTestable(), findsOneWidget);
               expectCollectionText(tester, open);
               expect(
                 find.descendant(of: open, matching: find.text(product.title)),
@@ -565,6 +569,7 @@ void main() {
                     matching: find.text(
                       buyV2BuyerDeliveryPromise(
                         session.productFactsFor(product),
+                        confirmAfterStoreAcceptance: true,
                       ),
                     ),
                   ),
@@ -615,10 +620,13 @@ void main() {
                 expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
                 expect(tester.getSize(add).width, greaterThanOrEqualTo(44));
                 expectCollectionText(tester, add);
-                final label = tester.renderObject<RenderParagraph>(
-                  find.descendant(of: add, matching: find.text('Add')),
+                expect(
+                  find.descendant(
+                    of: add,
+                    matching: find.byIcon(Icons.add_rounded),
+                  ),
+                  findsOneWidget,
                 );
-                expect(label.text.style?.fontFamily, 'Inter');
                 await tester.tap(add);
                 await tester.pumpAndSettle();
                 expect(session.quantityFor(productId), 1);
@@ -688,8 +696,12 @@ void main() {
               }
               await tester.tap(entry);
               await tester.pumpAndSettle();
-              await tester.ensureVisible(open);
+              await Scrollable.ensureVisible(
+                tester.element(open),
+                alignment: .4,
+              );
               await tester.pumpAndSettle();
+              expect(open.hitTestable(), findsOneWidget);
               expect(tester.getSize(open).height, greaterThanOrEqualTo(44));
               await tester.tap(open);
               await tester.pumpAndSettle();

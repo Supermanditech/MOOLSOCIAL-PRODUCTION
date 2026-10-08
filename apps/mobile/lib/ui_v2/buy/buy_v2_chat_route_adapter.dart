@@ -87,7 +87,7 @@ class BuyV2ChatRouteAdapter {
             destination: order.destination,
             supplier: order.partner,
           ),
-          'supplier': order.partner,
+          'supplier': order.customerPartner,
           'supplierType': order.partnerType,
           'orderId': order.id,
           'purchaseId': ?_clean(order.purchaseId),
@@ -136,12 +136,13 @@ class BuyV2ChatRouteAdapter {
         supplier: anchor.seller,
       ),
       queryParameters: {
-        'draft': 'I have a question for ${anchor.seller}.',
+        'draft':
+            'I have a question for ${anchor.customerSeller(anchor.seller)}.',
         'return': returnRoute,
         'directReturn': 'true',
         'context': 'supplier-store',
         'conversationKey': _supplierConversationKey(anchor),
-        'supplier': anchor.seller,
+        'supplier': anchor.customerSeller(anchor.seller),
         'supplierType': anchor.sellerType,
         'supplierRole': anchor.partnerRole,
         'storeAnchorSku': anchor.id,
@@ -181,15 +182,15 @@ class BuyV2ChatRouteAdapter {
             ? 'care-pharmacy-product'
             : 'supplier-product',
         'conversationKey': _supplierConversationKey(product),
-        'supplier': product.seller,
+        'supplier': product.customerSeller(product.seller),
         'supplierType': product.sellerType,
         'supplierRole': product.partnerRole,
         'productId': product.canonicalId,
         'skuId': product.id,
-        'productTitle': product.title,
+        'productTitle': product.customerTitle,
         'brand': product.brand,
         'categoryId': product.categoryId,
-        'variant': product.variant,
+        'variant': product.customerVariant,
         'pack': product.pack,
         'price': product.price.toString(),
         'unitPrice': product.unitPrice,
@@ -238,15 +239,15 @@ class BuyV2ChatRouteAdapter {
     return <String, Object?>{
       'productId': product.canonicalId,
       'skuId': product.id,
-      'title': product.title,
+      'title': product.customerTitle,
       'brand': product.brand,
       'categoryId': product.categoryId,
-      'variant': product.variant,
+      'variant': product.customerVariant,
       'pack': product.pack,
       'price': product.price,
       'unitPrice': product.unitPrice,
       'mrp': product.mrp,
-      'supplier': product.seller,
+      'supplier': product.customerSeller(product.seller),
       'supplierType': product.sellerType,
       'supplierRole': product.partnerRole,
       'delivery': product.deliveryPromise,
@@ -292,11 +293,11 @@ class BuyV2ChatRouteAdapter {
     final protection = product.purchaseProtection;
     final remedies = _cleanValues(protection?.remedies ?? const []);
     return [
-      'Hello ${product.seller},',
-      'I have a question about ${product.title}.',
-      'SKU: ${product.id}',
-      'Brand: ${product.brand}',
-      'Variant: ${product.variant}',
+      'Hello ${product.customerSeller(product.seller)},',
+      'I have a question about ${product.customerTitle}.',
+      if (product.brand.trim().isNotEmpty) 'Brand: ${product.brand}',
+      if (product.customerVariant.trim().isNotEmpty)
+        'Variant: ${product.customerVariant}',
       'Pack: ${product.pack}',
       'Quantity: $quantity',
       'Price: ${buyV2Money(product.price)}',
@@ -327,25 +328,9 @@ class BuyV2ChatRouteAdapter {
       buyV2SharedProductUri(product).toString();
 
   String _orderHelpDraft(BuyV2Order order, {String? deliverySummary}) {
-    return [
-      'Hello ${order.partner},',
-      'Help with order ${order.id}.',
-      if (_clean(order.purchaseId) case final purchaseId?)
-        'Purchase: $purchaseId',
-      'Items: ${order.itemSummary}',
-      for (final line in order.lines)
-        '${line.product.title} · SKU ${line.product.id} · '
-            'Quantity ${line.quantity} · '
-            '${buyV2Money(line.product.price * line.quantity)}',
-      if (order.lines.isEmpty && order.productIds.isNotEmpty)
-        'Product references: ${order.productIds.join(', ')}',
-      'Order total: ${buyV2Money(order.total)}',
-      'Delivery: ${deliverySummary ?? buyV2OrderEstimateSummary(order)}',
-      if (_clean(order.paymentMethod) case final paymentMethod?)
-        'Payment: $paymentMethod',
-      if (_clean(order.paymentTermLabel) case final paymentTerms?)
-        'Payment terms: $paymentTerms',
-    ].join('\n');
+    // Structured order facts already travel with the conversation context.
+    // Keep the editable message short rather than duplicating that document.
+    return 'Hello, I need help with order ${order.id}.';
   }
 
   String? _clean(String? value) {

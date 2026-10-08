@@ -1,0 +1,27 @@
+{"protocolVersion":"0.1.1","runnerVersion":"1.31.0","pid":15076,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":2}
+{"count":2,"time":7,"type":"allSuites"}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":2872}
+{"group":{"id":2,"suiteID":0,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":2,"line":null,"column":null,"url":null},"type":"group","time":2875}
+{"group":{"id":3,"suiteID":0,"parentID":2,"name":"R37 Cart relevance contracts","metadata":{"skip":false,"skipReason":null},"testCount":1,"line":164,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"group","time":2875}
+{"test":{"id":4,"name":"R37 Cart relevance contracts bill savings derive only from current MRP and quantities","suiteID":0,"groupIDs":[2,3],"metadata":{"skip":false,"skipReason":null},"line":404,"column":5,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"testStart","time":2876}
+{"testID":4,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":2939}
+{"group":{"id":5,"suiteID":0,"parentID":2,"name":"R37 Saved purchase-intent contracts","metadata":{"skip":false,"skipReason":null},"testCount":1,"line":808,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"group","time":2940}
+{"test":{"id":6,"name":"R37 Saved purchase-intent contracts live coupon eligibility applies only authoritative current savings","suiteID":0,"groupIDs":[2,5],"metadata":{"skip":false,"skipReason":null},"line":885,"column":5,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart"},"type":"testStart","time":2940}
+{"testID":6,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":2977}
+{"suite":{"id":7,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"suite","time":3002}
+{"test":{"id":8,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart","suiteID":7,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":3003}
+
+[{"event":"test.startedProcess","params":{"vmServiceUri":null}}]
+{"testID":8,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":4308}
+{"group":{"id":9,"suiteID":7,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":3,"line":null,"column":null,"url":null},"type":"group","time":4308}
+{"test":{"id":10,"name":"R37 Cart sections fit compact Android and iOS-size viewports","suiteID":7,"groupIDs":[9],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2189,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":4309}
+{"testID":10,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":9341}
+{"test":{"id":11,"name":"validated coupon selects, removes and projects its saving into Checkout","suiteID":7,"groupIDs":[9],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2311,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":9342}
+{"testID":11,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":10606}
+{"test":{"id":12,"name":"live coupon shows eligibility, saving and offline retry","suiteID":7,"groupIDs":[9],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":2399,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"},"type":"testStart","time":10606}
+{"testID":12,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":11446}
+{"success":true,"type":"done","time":11496}

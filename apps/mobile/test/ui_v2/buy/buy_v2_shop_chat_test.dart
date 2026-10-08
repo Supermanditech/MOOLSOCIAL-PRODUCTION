@@ -57,7 +57,10 @@ void main() {
         ),
       );
       expect(uri.queryParameters['delivery'], summary);
-      expect(uri.queryParameters['draft'], contains('Delivery: $summary'));
+      expect(
+        uri.queryParameters['draft'],
+        'Hello, I need help with order ${freshnessOrder.id}.',
+      );
       expect(uri.queryParameters['orderId'], freshnessOrder.id);
       expect(uri.queryParameters['return'], contains('order=RV6-D003'));
       final thread = BuyV2ShopChatThreadFactory.fromOrder(
@@ -387,11 +390,11 @@ void main() {
     expect(orderLine['lineTotal'], product.price * 3);
     expect(orderLine['returnPolicy'], product.returnPolicy);
     expect(uri.queryParameters['paymentTerms'], 'Pay now');
-    expect(uri.queryParameters['draft'], contains('SKU ${product.id}'));
-    expect(uri.queryParameters['draft'], contains('Quantity 3'));
-    expect(uri.queryParameters['draft'], contains('Items: ${product.title}'));
-    expect(uri.queryParameters['draft'], contains('Order total:'));
-    expect(uri.queryParameters['draft'], contains('Payment terms: Pay now'));
+    expect(
+      uri.queryParameters['draft'],
+      'Hello, I need help with order ${order.id}.',
+    );
+    expect(uri.queryParameters['draft'], isNot(contains('Order total:')));
     expect(uri.queryParameters['adminVisible'], 'true');
     expect(uri.queryParameters['escalationReason'], 'supplier-non-response');
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
@@ -430,7 +433,8 @@ void main() {
     expect(uri.queryParameters['callAuthority'], 'moolsocial-admin-only');
     expect(uri.queryParameters['draft'], contains(product.seller));
     expect(uri.queryParameters['draft'], contains(product.title));
-    expect(uri.queryParameters['draft'], contains('SKU: ${product.id}'));
+    expect(uri.queryParameters['draft'], isNot(contains('SKU:')));
+    expect(uri.queryParameters['skuId'], product.id);
     expect(uri.queryParameters['draft'], contains('Quantity: 3'));
     expect(uri.queryParameters['draft'], contains('Price:'));
     final snapshot =
@@ -739,7 +743,7 @@ void main() {
           location: '/app/buy?sub=orders',
           title: 'Shop Chat',
           threadId: 'shop-order',
-          returnKey: 'buy-orders-tab-active',
+          returnKey: 'buy-orders-section-active',
         ),
         (
           location: '/app/buy?sub=offers',
@@ -823,6 +827,13 @@ void main() {
       final profile = find.byKey(const ValueKey('buy-open-account'));
       final chatAction = find.byKey(const ValueKey('mool-global-chat-tap'));
       expect(tester.getSize(profile), const Size(44, 44));
+      expect(profile.hitTestable(), findsOneWidget);
+      expect(find.byTooltip('Open your MoolSocial profile'), findsOneWidget);
+      await tester.longPress(profile);
+      await tester.pumpAndSettle();
+      expect(find.text('Open your MoolSocial profile'), findsOneWidget);
+      Tooltip.dismissAllToolTips();
+      await tester.pumpAndSettle();
       expect(tester.getSize(chatAction).width, greaterThanOrEqualTo(44));
       await tester.tap(profile);
       await tester.pumpAndSettle();
@@ -892,31 +903,48 @@ void main() {
   testWidgets('retired Buy Account route resolves to global Profile entry', (
     tester,
   ) async {
-    final journey = await readyJourney();
-    final chat = ChatSession();
-    addTearDown(journey.dispose);
-    addTearDown(chat.dispose);
+    final semantics = tester.ensureSemantics();
+    try {
+      final journey = await readyJourney();
+      final chat = ChatSession();
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
 
-    await tester.pumpWidget(
-      MoolSocialApp(
-        session: journey,
-        chatSession: chat,
-        initialLocation: '/app/buy?sub=wholesale&view=account',
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: '/app/buy?sub=wholesale&view=account',
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('buy-account-hub')), findsNothing);
-    expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('Open your MoolSocial profile'),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('buy-account-hub')), findsNothing);
+      expect(find.byKey(const ValueKey('buy-open-account')), findsOneWidget);
+      final profile = find.byKey(const ValueKey('buy-open-account'));
+      expect(find.byTooltip('Open your MoolSocial profile'), findsOneWidget);
+      expect(tester.widget<IconButton>(profile).onPressed, isNotNull);
+      expect(
+        tester.getSemantics(profile).getSemanticsData().tooltip,
+        'Open your MoolSocial profile',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
+        findsOneWidget,
+      );
+      await tester.tap(profile);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-catalogue-motion-tween-wholesale')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   for (final id in ['s-dog-food', 'w-notebook']) {
@@ -1183,7 +1211,7 @@ void main() {
       expect(field, findsOneWidget);
       final draft = tester.widget<TextField>(field).controller?.text ?? '';
       expect(draft, contains(product.seller));
-      expect(draft, contains('SKU: ${product.id}'));
+      expect(draft, isNot(contains('SKU:')));
       expect(draft, contains('Quantity: ${product.minimumOrder}'));
       expect(draft, contains('Price:'));
 
@@ -1271,13 +1299,7 @@ void main() {
             .widget<TextField>(find.byKey(const Key('chat-message-field')))
             .controller
             ?.text;
-        expect(orderDraft, contains('Help with order PO-240783'));
-        expect(orderDraft, contains('Marwar Foods Distribution'));
-        expect(orderDraft, contains('Items:'));
-        expect(
-          orderDraft,
-          contains('Last recorded estimate (update unavailable)'),
-        );
+        expect(orderDraft, 'Hello, I need help with order PO-240783.');
         final expand = find.byKey(const Key('chat-commerce-context-expand'));
         await tester.ensureVisible(expand);
         await tester.tap(expand);

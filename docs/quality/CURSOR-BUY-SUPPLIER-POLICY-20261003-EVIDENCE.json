@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "ticket": "UAW-CURSOR-BUY-READY-20260921",
+  "parent": "BUY-ACTION-POLISH-20260926-01",
+  "state": "frontend_qualified_integration_pending",
+  "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+  "baselineCommit": "34122f2950758476c86719f07684fe42773712fe",
+  "contract": {
+    "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+    "sha256": "ca39d72592a86151dc152e6d3b747b77ae5010998fd9066850a0fa66dde58e0d"
+  },
+  "analysis": {
+    "exitCode": 0,
+    "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+    "unchangedSource": true,
+    "logSha256": "25a399dc69d5c7d14f7371be77aedfdadc15594c7a79ea6634039d7abe8bc6b5",
+    "sha256": "25a399dc69d5c7d14f7371be77aedfdadc15594c7a79ea6634039d7abe8bc6b5",
+    "terminalSuccess": true,
+    "failed": 0,
+    "warnings": 0
+  },
+  "affected": {
+    "exitCode": 0,
+    "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+    "unchangedSource": true,
+    "sha256": "c2a60c7e337bbad99dec5c1cc0c0088e08dffebe99125662fc8e86a15c1d1c3d",
+    "passed": 141,
+    "failed": 0,
+    "warnings": 0,
+    "terminalSuccess": true
+  },
+  "selected": [
+    {
+      "batch": 1,
+      "exitCode": 0,
+      "passed": 431,
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "d8fdce90ed055660842f4f7679580c557000680cd490bba6936dc563984423ee"
+    },
+    {
+      "batch": 2,
+      "exitCode": 0,
+      "passed": 488,
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "fc0201cf0f48f39a328e47870e382c9b5ea19b0002d9382a40f77a840a09b78a"
+    },
+    {
+      "batch": 3,
+      "exitCode": 0,
+      "passed": 64,
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "58071870f1c4f8156c6c58a170f4c02cc34b18cac1592b9ce557c70b34ff8211"
+    }
+  ],
+  "distinctSelectedCases": 983,
+  "selectedReferences": 1043,
+  "consent": {
+    "path": "apps/mobile/build/supplier-policy-20261003/consent-tests-9.log",
+    "passed": 18,
+    "sha256": "f83f7b6f42f09ecbe7c61cbce709a690e9f36700d465f4bdec0f25d6b526af86",
+    "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+    "exitCode": 0
+  },
+  "financial": {
+    "path": "apps/mobile/build/supplier-policy-20261003/financial-panel-tests-3.log",
+    "passed": 26,
+    "sha256": "4249c4a20bb3ad0504512bfd27a1fcc3fd2ef7980eb837f001e52878b2a4634c",
+    "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19",
+    "exitCode": 0,
+    "uiPassed": 6,
+    "controllerPassed": 20
+  },
+  "closedReceipts": [
+    {
+      "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+      "sha256": "c2a60c7e337bbad99dec5c1cc0c0088e08dffebe99125662fc8e86a15c1d1c3d",
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+      "sha256": "d8fdce90ed055660842f4f7679580c557000680cd490bba6936dc563984423ee",
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+      "sha256": "fc0201cf0f48f39a328e47870e382c9b5ea19b0002d9382a40f77a840a09b78a",
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+      "sha256": "58071870f1c4f8156c6c58a170f4c02cc34b18cac1592b9ce557c70b34ff8211",
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+    }
+  ],
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip",
+    "sha256": "9b99f4d350a9e2777cf7763bef0d77770219a665cb4fb9cc834d7f7fb738548e",
+    "members": 200
+  },
+  "native": {
+    "identity": {
+      "device": "TG8HCYTGGQT885OF",
+      "model": "23106RN0DA",
+      "package": "com.moolsocial.app.cursorreview",
+      "version": "1.0.0-r66.36-cursorreview",
+      "versionCode": "2026092701",
+      "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+      "fontScale": "1.0",
+      "sourceSha256": "6716bfc67ba6a9b22c9f3770e9a3ec02e369a13ddd00987ad1fc5839113bbd19"
+    },
+    "captures": [
+      {
+        "label": "final-cart-settled",
+        "xmlSha256": "b04865139614b9865542c4060a681d95fe56f730465e21dcaf62e4b09a03f122",
+        "pngSha256": "9af943bc3455b80db9fb7ea3a09f17f41720a8880b873e86bf31bbffa884f803"
+      },
+      {
+        "label": "final-checkout-settled",
+        "xmlSha256": "4e7788dfc36a24e2336f6dcb4cd4e93071d3720ed4feac30c8230218a3ef6959",
+        "pngSha256": "2c6c6d2b68a63474d54cff82dc2574f0d5db4cb1ecfa1740fafb8600d2bfb53f"
+      },
+      {
+        "label": "final-review-normal",
+        "xmlSha256": "f722d298e99d4e58dc20bae57708db121b8a2f4411962f46ada265dde9d40488",
+        "pngSha256": "a63052663e972cef162304c38cf7efa33456669ef2f7a632f9b2c5084cae2e64"
+      },
+      {
+        "label": "final-review-large",
+        "xmlSha256": "2f7201020a540e5e600afaee0b5ecb9f164aff297587b3f3fabff28d5376b94b",
+        "pngSha256": "f0f2fa1181a1025ab3e5e381b477e3ad1c63ad1f9ea4dc531d72b1a0c15d291c"
+      },
+      {
+        "label": "final-checkout-return",
+        "xmlSha256": "4e7788dfc36a24e2336f6dcb4cd4e93071d3720ed4feac30c8230218a3ef6959",
+        "pngSha256": "2429085713c5e90bfc3707f442f0f1c7cf7a2db73950a9f90073fe5a6c852c48"
+      }
+    ],
+    "hotRestartExitCode": 0,
+    "normalAnd200PercentOrderReviewVerified": true,
+    "publishedPolicyConsentVerified": false,
+    "livePayment": false,
+    "apkBuiltOrInstalled": false
+  },
+  "architect": {
+    "review": "Supplied exact concurrency and modal excerpts, not seven-file diff; found stale callback binding and confirmed required displayed-intent fix after regression pass."
+  },
+  "deferred": {
+    "backend": "deferred",
+    "workspace": "Codex after integration: authoritative Store publication/receipt enforcement and original-key recovery",
+    "liveProviderRecovery": "deferred until integration",
+    "google": "separately listed",
+    "inheritedT10": "Wholesale minimum-order trailing separator",
+    "formalTicketClose": "Historic0e90a6ca subject-prefix blocker retained; no acceptance/closure/promotion claimed",
+    "evidenceCheckout": "Open integration child: core.autocrlf checkout conversion changes existing JSONL raw hashes. Original bytes remain in verified Git blobs and ZIP manifest. Codex after integration must correct checkout evidence handling without weakening byte/hash checks; no shared Git settings or historical files changed here."
+  },
+  "next": "T08 order status and later balances; founder-authorized frontend continuation after checkpoint",
+  "checkpoint": "Pre_commit and exact commit/push/readback must close separately; not pre-claimed by this artifact"
+}

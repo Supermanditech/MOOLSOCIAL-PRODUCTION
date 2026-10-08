@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4608,
-    "sha256": "9FBAA5A49E74BDCB27A9E1D1F1F9C8C3FC59867B5D7C38586A46E68DE2BB02D2"
+    "entryCount": 4623,
+    "sha256": "920F2E84F6262068AB1201E6883CEA17E7A94479FC4D7E0F04D56818886B6055"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -1986,6 +1986,29 @@
           "config/codex-subagent-coordination-policy.json",
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "cursor_buy_ready_20260921",
+        "state": "founder_authorized_2026_09_21",
+        "lane": "cursor_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "buy-ready-20260921",
+        "ticketId": "UAW-CURSOR-BUY-READY-20260921",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921",
+        "branch": "work/cursor-ui/buy-ready-20260921",
+        "baselineHead": "79d5401338881f55e65b08c0e7843cbac016fcfb",
+        "bootstrapCommitSubject": "coordination(buy-ready-20260921): admit independent baseline capture",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/check-approved-ui-locks.ps1",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "apps/mobile/test/cursor_buy_store_baseline_capture_test.dart"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true

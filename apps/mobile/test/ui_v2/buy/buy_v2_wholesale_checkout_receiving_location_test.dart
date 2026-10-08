@@ -50,6 +50,15 @@ void main() {
     return session;
   }
 
+  Future<void> chooseAddress(WidgetTester tester) async {
+    final summary = find.byKey(const ValueKey('buy-checkout-confirm-address'));
+    final change = find.descendant(of: summary, matching: find.text('Change'));
+    await tester.ensureVisible(change);
+    await tester.pumpAndSettle();
+    await tester.tap(change);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('Wholesale-only Checkout names the receiving location', (
     tester,
   ) async {
@@ -61,6 +70,10 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+
+    expect(find.text('Receive at'), findsOneWidget);
+    expect(find.text('Receiving address'), findsNothing);
+    await chooseAddress(tester);
 
     expect(
       buyV2WholesaleCheckoutReceivingLocationContractVersion,
@@ -90,6 +103,8 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+    final total = session.checkoutTotal;
+    await chooseAddress(tester);
     await tester.tap(
       find.byKey(const ValueKey('buy-checkout-address-edit-home')),
     );
@@ -101,6 +116,11 @@ void main() {
     );
     expect(session.view, BuyV2View.checkout);
     expect(session.checkoutItemCount, 2);
+    await tester.tap(find.byKey(const ValueKey('buy-address-add-form-close')));
+    await tester.pumpAndSettle();
+    expect(session.checkoutTotal, total);
+    expect(session.checkoutItemCount, 2);
+    expect(session.view, BuyV2View.checkout);
     expect(tester.takeException(), isNull);
   });
 
@@ -119,6 +139,10 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
 
+      expect(find.text('Deliver to'), findsOneWidget);
+      expect(find.text('Receive at'), findsNothing);
+      final total = session.checkoutTotal;
+      await chooseAddress(tester);
       expect(find.text('Delivery address'), findsOneWidget);
       expect(find.text('Receiving address'), findsNothing);
       expect(
@@ -129,6 +153,10 @@ void main() {
         find.byKey(const ValueKey('buy-wholesale-checkout-receiving-location')),
         findsNothing,
       );
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-address-cancel')));
+      await tester.pumpAndSettle();
+      expect(session.checkoutTotal, total);
+      expect(find.text('Deliver to'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -156,10 +184,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Receive at'), findsOneWidget);
+    await chooseAddress(tester);
     expect(find.text('Receiving address'), findsOneWidget);
     final edit = find.byKey(const ValueKey('buy-checkout-address-edit-home'));
     expect(edit, findsOneWidget);
-    expect(tester.getSize(edit).height, greaterThan(0));
+    await tester.ensureVisible(edit);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(edit).height, greaterThanOrEqualTo(44));
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-address-add-form-route')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-address-add-form-close')));
+    await tester.pumpAndSettle();
+    expect(session.checkoutItemCount, 2);
+    expect(session.view, BuyV2View.checkout);
     expect(tester.takeException(), isNull);
   });
 }

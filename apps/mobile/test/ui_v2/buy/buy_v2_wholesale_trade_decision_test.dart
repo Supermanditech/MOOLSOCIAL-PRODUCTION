@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -15,6 +15,30 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> reveal(
+    WidgetTester tester,
+    BuyV2Product product,
+    Finder target, {
+    double delta = 180,
+  }) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        target,
+        delta,
+        scrollable: find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+    } else {
+      await tester.ensureVisible(target);
+    }
+    // Loading-state assertions deliberately keep the progress indicator active.
+    await tester.pump();
+  }
 
   Widget app(
     BuyV2Session session,
@@ -95,18 +119,22 @@ void main() {
       buyV2WholesaleTradeDecisionContractVersion,
       'buy-wholesale-trade-decision-v1',
     );
-    expect(find.text('WHOLESALE PRICE'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-wholesale-price-summary-${product.id}')),
+      findsOneWidget,
+    );
     expect(find.text(buyV2Money(product.price)), findsWidgets);
     expect(
-      find.text('Minimum order ${product.minimumOrder} packs'),
+      find.textContaining('Minimum ${product.minimumOrder} packs'),
       findsWidgets,
     );
     expect(
       find.text(
-        '${buyV2Money(product.price * product.minimumOrder)} minimum total',
+        'Minimum ${product.minimumOrder} packs · ${buyV2Money(product.price * product.minimumOrder)}',
       ),
       findsOneWidget,
     );
+    await reveal(tester, product, find.text('Jodhpur market insight'));
     expect(find.text('Jodhpur market insight'), findsOneWidget);
     expect(find.text('Steady local restocking'), findsOneWidget);
     expect(
@@ -114,37 +142,41 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Current through 6:00 pm today'), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.textContaining(product.seller).first,
+      delta: -180,
+    );
     expect(find.textContaining(product.seller), findsWidgets);
 
     final gallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
     final imageViewport = find.byKey(
       ValueKey('buy-product-gallery-${product.id}'),
     );
-    expect(tester.getSize(imageViewport).height, lessThanOrEqualTo(238));
+    await reveal(tester, product, imageViewport, delta: -180);
+    expect(tester.getSize(imageViewport).height, closeTo(240, .1));
     expect(
       tester.getRect(imageViewport).bottom,
       lessThanOrEqualTo(tester.getRect(gallery).bottom),
     );
-    final badge = find.byKey(
-      ValueKey('buy-product-gallery-badge-${product.id}'),
-    );
-    expect(
-      tester.getRect(badge).bottom,
-      lessThanOrEqualTo(tester.getRect(imageViewport).top),
-    );
+    final save = find.byKey(ValueKey('buy-product-action-save-${product.id}'));
+    await reveal(tester, product, save, delta: -180);
+    expect(save, findsOneWidget);
     await captureR66Visual(tester, 'r669-trade-gallery-and-decision');
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
+    await reveal(tester, product, add);
     expect(add, findsOneWidget);
-    expect(tester.getSize(add).height, greaterThanOrEqualTo(50));
+    expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
     final facts = session.productFactsFor(product);
     final deliveryDecision =
         '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
         '${buyV2BuyerDeliveryPromise(facts)}';
     expect(
-      find.byKey(ValueKey('buy-wholesale-dock-delivery-${product.id}')),
+      find.byKey(ValueKey('buy-product-inline-action-${product.id}')),
       findsOneWidget,
     );
-    expect(find.text(deliveryDecision), findsWidgets);
+    expect(find.textContaining(buyV2BuyerDeliveryPromise(facts)), findsWidgets);
     final actionLabel =
         'Add minimum order of ${product.minimumOrder} packs of '
         '${product.title} to Cart for '
@@ -166,7 +198,10 @@ void main() {
     tester.semantics.tap(find.semantics.byLabel(actionLabel));
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder);
-    expect(find.text('${product.minimumOrder} packs in Cart'), findsOneWidget);
+    expect(
+      find.byKey(ValueKey('buy-product-quantity-${product.id}')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(ValueKey('buy-product-quantity-${product.id}')),
       findsOneWidget,
@@ -205,15 +240,29 @@ void main() {
       findsNothing,
     );
     expect(find.textContaining('retailers bought'), findsNothing);
+    await reveal(tester, product, find.text(product.confirmedOn));
     expect(find.text(product.confirmedOn), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
     );
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-hero-store-${product.id}')),
+    );
     expect(
       find.descendant(
-        of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
-        matching: find.text('Seller'),
+        of: find.byKey(ValueKey('buy-product-hero-store-${product.id}')),
+        matching: find.textContaining(
+          product.customerSeller(session.productFactsFor(product).partner),
+        ),
       ),
       findsOneWidget,
     );
@@ -239,8 +288,15 @@ void main() {
 
     await tester.pumpWidget(app(session, adapter));
     await tester.pump();
+    await reveal(tester, product, find.text('Checking local market insight'));
     expect(find.text('Checking local market insight'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
@@ -248,6 +304,11 @@ void main() {
 
     pending.completeError(StateError('service unavailable'));
     await tester.pumpAndSettle();
+    await reveal(
+      tester,
+      product,
+      find.text('Local market insight could not be loaded'),
+    );
     expect(
       find.text('Local market insight could not be loaded'),
       findsOneWidget,
@@ -257,6 +318,12 @@ void main() {
     );
     expect(retry, findsOneWidget);
     expect(tester.getSize(retry).height, greaterThanOrEqualTo(44));
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-product-primary-${product.id}')),
+      delta: -180,
+    );
     expect(
       find.byKey(ValueKey('buy-product-primary-${product.id}')),
       findsOneWidget,
@@ -299,7 +366,12 @@ void main() {
       ValueKey('buy-wholesale-retry-offer-${product.id}'),
     );
     expect(tester.getSize(dockRetry).height, greaterThanOrEqualTo(48));
-    expect(tester.widget<FilledButton>(dockRetry).onPressed, isNotNull);
+    expect(tester.widget<TextButton>(dockRetry).onPressed, isNotNull);
+    await reveal(
+      tester,
+      product,
+      find.byKey(ValueKey('buy-offer-retry-${product.id}')),
+    );
     expect(
       find.byKey(ValueKey('buy-offer-retry-${product.id}')),
       findsOneWidget,
@@ -377,112 +449,51 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final dock = find.byKey(
-        ValueKey('buy-wholesale-action-dock-${product.id}'),
+      final inline = find.byKey(
+        ValueKey('buy-product-inline-action-${product.id}'),
       );
       final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-      expect(dock, findsOneWidget, reason: '${viewport.size} dock');
-      expect(add, findsOneWidget, reason: '${viewport.size} action');
+      final productScroll = find
+          .descendant(
+            of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       expect(
-        tester.getSize(add).height,
-        greaterThanOrEqualTo(50),
-        reason: '${viewport.size} action height',
+        find.byKey(ValueKey('buy-wholesale-action-dock-${product.id}')),
+        findsNothing,
       );
+      await tester.scrollUntilVisible(add, 160, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      expect(tester.getSize(add).width, 44);
+      expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
+      expect(find.descendant(of: inline, matching: add), findsOneWidget);
       expect(
-        tester.getBottomRight(dock).dy,
+        tester.getBottomRight(add).dy,
         lessThanOrEqualTo(viewport.size.height - viewport.padding.bottom),
-        reason: '${viewport.size} bottom inset',
       );
-      expect(tester.takeException(), isNull, reason: '${viewport.size}');
-
-      if (viewport.size.width < viewport.size.height) {
-        final delivery = find.byKey(
-          ValueKey('buy-wholesale-dock-delivery-${product.id}'),
-        );
-        await captureR66Visual(
-          tester,
-          'sku-dock-complete-${viewport.size.width}-${viewport.scale}',
-        );
-        final paragraph = tester.renderObject<RenderParagraph>(delivery);
-        expect(paragraph.didExceedMaxLines, isFalse);
-        final text = tester.widget<Text>(delivery).data!;
-        // A selection including a line-end space may extend beyond the
-        // paragraph even when all painted glyphs fit. Check every visible word
-        // and the unrestricted paragraph height instead of trailing whitespace.
-        final natural = TextPainter(
-          text: paragraph.text,
-          textDirection: paragraph.textDirection,
-          textScaler: paragraph.textScaler,
-        )..layout(maxWidth: paragraph.size.width);
-        expect(natural.height, lessThanOrEqualTo(paragraph.size.height + 1));
-        natural.dispose();
-        for (final match in RegExp(r'\S+').allMatches(text)) {
-          final wordBoxes = paragraph.getBoxesForSelection(
-            TextSelection(baseOffset: match.start, extentOffset: match.end),
-          );
-          expect(wordBoxes, isNotEmpty);
-          expect(
-            wordBoxes.map((box) => box.top).toSet(),
-            hasLength(1),
-            reason: 'Keep ${match.group(0)} intact',
-          );
-          for (final box in wordBoxes) {
-            expect(box.left, greaterThanOrEqualTo(-1));
-            expect(box.right, lessThanOrEqualTo(paragraph.size.width + 1));
-            expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 1));
-          }
-        }
-        expect(add.hitTestable(), findsOneWidget);
-      }
-
-      if (viewport.size.width > viewport.size.height) {
-        expect(add.hitTestable(), findsOneWidget);
-        await captureR66Visual(
-          tester,
-          'r669-trade-compact-${viewport.scale}-minimum',
-        );
-        await tester.tap(add);
-        await tester.pumpAndSettle();
-        expect(session.quantityFor(product.id), product.minimumOrder);
-        final bulkQuantity = (100000000 / product.price).ceil();
-        expect(session.setCartQuantity(product.id, '$bulkQuantity'), isTrue);
-        await tester.pump(const Duration(seconds: 3));
-        await tester.pumpAndSettle();
-        final total = find.byKey(const ValueKey('buy-wholesale-dock-total'));
-        final amount = buyV2Money(product.price * bulkQuantity);
-        expect(tester.widget<Text>(total).data, amount);
-        final paragraph = tester.renderObject<RenderParagraph>(total);
-        expect(paragraph.didExceedMaxLines, isFalse);
-        final boxes = paragraph.getBoxesForSelection(
-          TextSelection(baseOffset: 0, extentOffset: amount.length),
-        );
-        expect(
-          boxes,
-          hasLength(1),
-          reason: 'Nine-figure total remains on one complete line',
-        );
-        expect(
-          boxes.single.right,
-          lessThanOrEqualTo(paragraph.size.width + 1),
-          reason:
-              'Allow fractional glyph-edge overhang without a clipped digit',
-        );
-        expect(total.hitTestable(), findsOneWidget);
-        expect(tester.getSize(dock).height, lessThanOrEqualTo(104));
-        final productScroll = find
-            .descendant(
-              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        expect(tester.getSize(productScroll).height, greaterThanOrEqualTo(120));
-        expect(session.quantityFor(product.id), bulkQuantity);
-        await captureR66Visual(
-          tester,
-          'r669-trade-compact-${viewport.scale}-nine-figure',
-        );
-        expect(tester.takeException(), isNull);
-      }
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor(product.id), product.minimumOrder);
+      final bulkQuantity = (100000000 / product.price).ceil();
+      expect(session.setCartQuantity(product.id, '$bulkQuantity'), isTrue);
+      await tester.pumpAndSettle();
+      final quantity = find.byKey(
+        ValueKey('buy-product-quantity-${product.id}'),
+      );
+      await tester.scrollUntilVisible(quantity, 120, scrollable: productScroll);
+      expect(quantity.hitTestable(), findsOneWidget);
+      expect(session.cartTotal, product.price * bulkQuantity);
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: '${viewport.size}, scale ${viewport.scale}',
+      );
+      await captureR66Visual(
+        tester,
+        'r6634-trade-inline-${viewport.size.width}-${viewport.scale}',
+      );
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();

@@ -105,7 +105,7 @@ void main() {
     expect(session.sellerContinuationsFor(shopOil, limit: 0), isEmpty);
   });
 
-  testWidgets('Shop exposes automatic fulfilment without seller continuation', (
+  testWidgets('Shop groups delivery facts and exposes Store continuation', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -114,6 +114,7 @@ void main() {
     final product = session.product('s-oil');
     final expectedPromise = buyV2BuyerDeliveryPromise(
       session.productFactsFor(product),
+      confirmAfterStoreAcceptance: true,
     );
 
     await tester.pumpWidget(app(session));
@@ -134,9 +135,10 @@ void main() {
     expect(automatic, findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
-      findsNothing,
+      findsOneWidget,
     );
-    expect(find.text('Fulfilment arranged by MoolSocial'), findsOneWidget);
+    expect(find.text('Delivery & seller'), findsOneWidget);
+    expect(find.text('Fulfilment arranged by MoolSocial'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -168,7 +170,7 @@ void main() {
     await tester.tap(action);
     await tester.pumpAndSettle();
     expect(find.text('Sardarpura Health Pharmacy'), findsWidgets);
-    expect(find.text('Store products'), findsOneWidget);
+    expect(find.text('Store products'), findsNothing);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
       find.byKey(const ValueKey('buy-product-m-metformin-500')),
@@ -211,7 +213,7 @@ void main() {
     expect(automatic, findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
-      findsNothing,
+      findsOneWidget,
     );
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);

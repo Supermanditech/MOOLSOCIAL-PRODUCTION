@@ -173,6 +173,10 @@ void main() {
     final orderSearch = find.byKey(const ValueKey('buy-shopping-help-search'));
     await tester.ensureVisible(orderSearch);
     await tester.pumpAndSettle();
+    final searchField = tester.widget<TextField>(orderSearch);
+    expect(searchField.decoration!.border, InputBorder.none);
+    expect(searchField.decoration!.filled, isFalse);
+    expect(searchField.controller!.text, isEmpty);
     await tester.tap(orderSearch);
     await tester.enterText(orderSearch, 'Unmatched order search');
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);

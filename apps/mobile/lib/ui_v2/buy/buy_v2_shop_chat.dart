@@ -815,8 +815,8 @@ class BuyV2ShopChatViewState extends State<BuyV2ShopChatView> {
                           key: const ValueKey('buy-shop-chat-new'),
                           heroTag: 'buy-shop-chat-new',
                           elevation: 5,
-                          backgroundColor: BuyV2Colors.navy,
-                          foregroundColor: Colors.white,
+                          backgroundColor: BuyV2ActionStyle.primaryFill,
+                          foregroundColor: BuyV2ActionStyle.primaryForeground,
                           onPressed: _showNewConversationPicker,
                           child: const Icon(Icons.add_comment_outlined),
                         ),
@@ -1258,7 +1258,7 @@ class _ShopChatSearch extends StatelessWidget {
           textInputAction: TextInputAction.search,
           style: context.buyBody.copyWith(fontSize: 13),
           decoration: InputDecoration(
-            hintText: 'Search $originLabel conversations',
+            hintText: 'Find $originLabel chats',
             hintStyle: context.buyMeta.copyWith(fontSize: 12),
             prefixIcon: const Icon(Icons.search_rounded, size: 22),
             suffixIcon: controller.text.isEmpty
@@ -1269,17 +1269,14 @@ class _ShopChatSearch extends StatelessWidget {
                     onPressed: onClear,
                     icon: const Icon(Icons.close_rounded, size: 20),
                   ),
-            filled: true,
-            fillColor: Colors.white,
+            filled: false,
             contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: BuyV2Colors.line),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: BuyV2Colors.navy, width: 1.5),
-            ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
           ),
         ),
       ),
@@ -1322,12 +1319,12 @@ class _ShopChatFilters extends StatelessWidget {
               showCheckmark: false,
               onSelected: active ? null : (_) => onSelected(filter.id),
               labelStyle: TextStyle(
-                color: active ? Colors.white : BuyV2Colors.ink,
+                color: BuyV2ActionStyle.primaryForeground,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
               ),
-              selectedColor: BuyV2Colors.navy,
-              backgroundColor: Colors.white,
+              selectedColor: BuyV2ActionStyle.pressedFill,
+              backgroundColor: BuyV2ActionStyle.primaryFill,
               side: BorderSide(
                 color: active ? BuyV2Colors.navy : BuyV2Colors.line,
               ),
@@ -1670,10 +1667,8 @@ class _ShopChatLoadRecoveryState extends StatelessWidget {
                 FilledButton.icon(
                   key: ValueKey(retryKey),
                   onPressed: onRetry,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 44),
-                    backgroundColor: BuyV2Colors.navy,
-                    foregroundColor: Colors.white,
+                  style: BuyV2ActionStyle.button(
+                    FilledButton.styleFrom(minimumSize: const Size(0, 44)),
                   ),
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Try again'),
@@ -1787,10 +1782,8 @@ class _ShopChatEmptyState extends StatelessWidget {
             FilledButton(
               key: ValueKey(actionKey),
               onPressed: action,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                backgroundColor: BuyV2Colors.navy,
-                foregroundColor: Colors.white,
+              style: BuyV2ActionStyle.button(
+                FilledButton.styleFrom(minimumSize: const Size(0, 44)),
               ),
               child: Text(actionLabel),
             ),
@@ -2064,10 +2057,8 @@ class _ShopChatNewConversationEmptyState extends StatelessWidget {
             FilledButton.icon(
               key: const ValueKey('buy-shop-chat-new-open-all'),
               onPressed: onOpenAll,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                backgroundColor: BuyV2Colors.navy,
-                foregroundColor: Colors.white,
+              style: BuyV2ActionStyle.button(
+                FilledButton.styleFrom(minimumSize: const Size(0, 44)),
               ),
               icon: const Icon(Icons.forum_outlined),
               label: const Text('Open all chats'),
@@ -3047,7 +3038,7 @@ class _ShopChatMessageSearch extends StatelessWidget {
           onChanged: onChanged,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Search $threadTitle',
+            hintText: 'Find in $threadTitle',
             prefixIcon: const Icon(Icons.search_rounded),
             suffixIcon: IconButton(
               key: const ValueKey('buy-shop-chat-message-search-close'),
@@ -3055,13 +3046,14 @@ class _ShopChatMessageSearch extends StatelessWidget {
               onPressed: onClose,
               icon: const Icon(Icons.close_rounded),
             ),
-            filled: true,
-            fillColor: const Color(0xFFF4F5FA),
+            filled: false,
             contentPadding: EdgeInsets.zero,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
-            ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
           ),
         ),
       ),
@@ -3331,7 +3323,7 @@ class _ShopChatQuickReplies extends StatelessWidget {
               avatar: const Icon(Icons.auto_awesome_outlined, size: 15),
               label: Text(value),
               onPressed: () => onSelected(value),
-              backgroundColor: Colors.white.withValues(alpha: .96),
+              backgroundColor: BuyV2ActionStyle.primaryFill,
               side: const BorderSide(color: BuyV2Colors.line),
               labelStyle: context.buyMeta.copyWith(
                 color: BuyV2Colors.navy,
@@ -3529,8 +3521,8 @@ class _ShopChatComposer extends StatelessWidget {
                         ),
                         heroTag: null,
                         elevation: 0,
-                        backgroundColor: BuyV2Colors.navy,
-                        foregroundColor: Colors.white,
+                        backgroundColor: BuyV2ActionStyle.primaryFill,
+                        foregroundColor: BuyV2ActionStyle.primaryForeground,
                         onPressed: primaryEnabled
                             ? canSend
                                   ? onSend
@@ -3542,7 +3534,7 @@ class _ShopChatComposer extends StatelessWidget {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: BuyV2Colors.muted,
                                 ),
                               )
                             : Icon(
@@ -4483,11 +4475,12 @@ class _ShopChatInfoAction extends StatelessWidget {
         child: OutlinedButton(
           key: ValueKey('buy-shop-chat-info-$keyName'),
           onPressed: onTap,
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            side: const BorderSide(color: BuyV2Colors.line),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          style: BuyV2ActionStyle.button(
+            OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           ),
           child: Column(

@@ -1,0 +1,54 @@
+{
+  "ticketId": "BUY-ACTION-POLISH-20260926-01",
+  "capability": "T03 contextual Checkout terms, receiving details and optional instructions",
+  "laneTicketId": "UAW-CURSOR-BUY-READY-20260921",
+  "actor": "Public Retail, Wholesale and Bulk buyers, including mixed Store baskets",
+  "customerOutcome": "Checkout retains each unchanged accepted supplier agreement, requires a fresh choice when its financial or eligibility conditions change, presents compact terms with Change, keeps Retail prepaid, reuses saved receiving/GST details and permits optional instructions without blocking payment.",
+  "classification": "mvp_required",
+  "classificationReason": "Correct consent, payment eligibility and recoverable Checkout are required for the founder-selected commerce launch journey.",
+  "founderAuthorization": "Founder approved the GST amendment subject to technical testing and instructed the next cart ticket, then explicitly requested do needful as needed for T03 including the annotated changed-agreement consent risk.",
+  "baseline": "a0067a637339bf3fd4e248e0dbb2aa4252b31b93",
+  "owners": [
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+    "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart"
+  ],
+  "reuse": [
+    "Existing commercial terms adapter, validated supplier/group identities and placement request",
+    "Existing Checkout view, group terms controls, prepaid gateway flow and pending-payment recovery",
+    "Existing saved address/GST controllers, receiving validation and per-product delivery facts",
+    "Existing destination instruction composer and optional saved instruction state",
+    "Existing payment attribution, receiving-location and Checkout continuity regression suites"
+  ],
+  "minimumCompleteScope": [
+    "Compare accepted agreement contents rather than only its ID; reject stale agreement objects and exclude unselected groups from placement terms",
+    "Keep unaffected supplier choices and require a new choice only for a changed or unavailable agreement",
+    "Show compact accepted public terms with an accessible Change action; Retail has no business-term chooser",
+    "Reject new public Retail COD selections and retain truthful prepaid payment/recovery behavior",
+    "Expose optional Checkout instruction review/edit through the existing composer and preserve address/GST validation"
+  ],
+  "acceptance": [
+    "Changed amount, balance, due date or eligibility under the same ID needs new consent; equivalent unchanged agreements retain consent",
+    "Stale term objects cannot silently consent to refreshed conditions; supplier/group identities remain isolated",
+    "Retail prepaid and mixed-basket totals remain correct; legacy pending-payment recovery is preserved",
+    "Compact terms support Change, Retry, small screens, enlarged text and reduced motion",
+    "Empty instructions are optional, saved instructions survive Cart/Checkout interruption, and invalid receiving facts identify affected items",
+    "Focused behavioral checks, existing selected Buy matrix, analysis and actual installed review-app screens"
+  ],
+  "motionAssessment": "Reuse existing finite sheet/expansion transitions and reduced-motion behavior; add no animation controller, dependency, decorative motion or simulated liveness.",
+  "dependenciesAndApprovals": [
+    "Technically qualified and founder-approved GST checkpoint a0067a63",
+    "Existing T02 unified Checkout and exclusive registered Buy source/test ownership",
+    "T11 authoritative supplier/customer eligibility and provider terms remain required for integrated acceptance",
+    "Founder visual approval of the new T03 screens remains separate from technical acceptance"
+  ],
+  "explicitExclusions": [
+    "No new screen, route, state owner, dependency, backend, Store or delivery implementation",
+    "No invented supplier terms, credit eligibility, provider quote, payment success or cross-Store credit transfer",
+    "No new APK, install, data clear, real payment, cloud deployment, secret access or external messaging",
+    "No screenbook HTML mutation or unrelated product expansion"
+  ],
+  "timelineImpactDays": 0,
+  "timelineReason": "This is the already selected next cart scope; no additional launch milestone or provider completion is claimed. The founder's 20 September commerce launch decision supersedes older planning dates."
+}

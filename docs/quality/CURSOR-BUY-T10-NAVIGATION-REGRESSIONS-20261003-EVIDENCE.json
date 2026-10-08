@@ -1,0 +1,1545 @@
+{
+  "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+  "contract": {
+    "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-CONTRACT.json",
+    "sha256": "709db2501147ffaeec8740010aeb3338c9e025e4ba8beb4e40f0de27d07f9ce9"
+  },
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-EVIDENCE.zip",
+    "sha256": "4b90e13b193027dc7af6d4a89de399c6702f98d3b008b04282a11f88b2bceeca",
+    "members": 788,
+    "memberHashesVerified": true,
+    "privateAttachVmAndRawCustomerStateExcluded": true
+  },
+  "closedReceipts": {
+    "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+    "evidence": [
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-FOCUSED.jsonl",
+        "sha256": "cff74ab35fc7ececbfdbe16e9fd3e2e3ee54cf3d01689c998bab1c2017345490",
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-1.jsonl",
+        "sha256": "8073ef6124faf892548d7db8e7c0afba628109014c70384a4fc3cf7e004ab986",
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-2.jsonl",
+        "sha256": "46410e0baac63c7bf8589d98e0293c87857393623c8247f38969fe1ea2b4d44c",
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-NAVIGATION-REGRESSIONS-20261003-SELECTED-3.jsonl",
+        "sha256": "c06617fd4d50318a4a10d6a1746399c24d42287145b1029f6581de7affbc79d7",
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700"
+      }
+    ],
+    "analysis": {
+      "exitCode": 0,
+      "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-analysis-5.log",
+      "sha256": "fd4fbe93a0cf222037e92be64d291da65e994707648f992158eece6f5c31c7f1",
+      "passed": 0,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "focused": {
+      "exitCode": 0,
+      "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-focused-5.jsonl",
+      "sha256": "cff74ab35fc7ececbfdbe16e9fd3e2e3ee54cf3d01689c998bab1c2017345490",
+      "passed": 10,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "selected": [
+      {
+        "batch": 1,
+        "exitCode": 0,
+        "passed": 366,
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "8073ef6124faf892548d7db8e7c0afba628109014c70384a4fc3cf7e004ab986"
+      },
+      {
+        "batch": 2,
+        "exitCode": 0,
+        "passed": 362,
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "46410e0baac63c7bf8589d98e0293c87857393623c8247f38969fe1ea2b4d44c"
+      },
+      {
+        "batch": 3,
+        "exitCode": 0,
+        "passed": 275,
+        "sourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "c06617fd4d50318a4a10d6a1746399c24d42287145b1029f6581de7affbc79d7"
+      }
+    ],
+    "selectedReferences": 1063
+  },
+  "defects": [
+    {
+      "report": "a",
+      "finding": "Payment-held blanket opacity changes accepted Add face",
+      "fix": "Removed blanket opacity; existing white44x32 Add face, border and radius unchanged"
+    },
+    {
+      "report": "b",
+      "finding": "Original held payment rejects Add silently; fresh Add increments Cart",
+      "fix": "Blocked pointer routes through existing central guard to explain reason, never changes original payment; fresh actual Add checked"
+    },
+    {
+      "report": "c/e",
+      "finding": "Cart/Checkout hides Cart target and selects discovery origin",
+      "fix": "Public Buy keeps Cart target, current Cart semantics and no origin-tab selection; repeated Cart taps preserve scope and Product Back"
+    },
+    {
+      "report": "d",
+      "finding": "Missing Cart under discovery tabs reported by founder; baseline held Shop/Wholesale/Orders/Offers all had target",
+      "fix": "Fresh actual Add and each-tab target assertions added; native repeat determines qualification"
+    },
+    {
+      "report": "child-empty",
+      "finding": "Disabled Empty retains red icon",
+      "fix": "Disabled icon uses existing muted color; guard unchanged"
+    },
+    {
+      "report": "child-scroll",
+      "finding": "Fresh native Cart captured at recommendations hiding selected item",
+      "fix": "Existing new-Add scroll reset passes host; latest settled native Cart starts with selected items; original cause unproven, no speculative runtime change"
+    },
+    {
+      "report": "child-mixed-target",
+      "finding": "Mixed Cart target reported Wholesale2/1160 while basket3/1197",
+      "fix": "Active mixed Cart/Checkout target summarizes full basket; discovery targets retain current scope"
+    },
+    {
+      "report": "child-native-glyph",
+      "finding": "Intermittent Cart navigation blue face lacked visible glyph in warm reload captures",
+      "fix": "Visible white glyph and quantity badge inspected with selected state and tap destinations in both repeated mixed route sweeps and fresh journey, normal/200% text. Earlier intermittent warm-reload missing-glyph observation did not recur after full Dart restart; original cause not proven, no speculative paint edit."
+    }
+  ],
+  "native": {
+    "sourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+    "facts": [
+      {
+        "label": "t10-regression-fresh-final-initial-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-start-shop-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-existing-fresh-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-empty-confirmation-0-20261003",
+        "cart": [],
+        "selected": [],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-empty-start-shop-0-20261003",
+        "cart": [],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-fresh-actual-add-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-wholesale-0-20261003",
+        "cart": [
+          {
+            "label": "All carts, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Wholesale",
+          "Wholesale, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-cart-from-wholesale-0-20261003",
+        "cart": [
+          {
+            "label": "All carts, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "All carts, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-repeat-cart-from-wholesale-0-20261003",
+        "cart": [
+          {
+            "label": "All carts, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "All carts, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-orders-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Active orders\nActive",
+          "Orders, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-cart-from-orders-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-repeat-cart-from-orders-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-offers-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Suppliers",
+          "Offers, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-cart-from-offers-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-repeat-cart-from-offers-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-shop-after-tabs-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-product-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-product-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-product-cart-repeat-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-back-product-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-product-cart-for-checkout-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-bottom-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-bottom-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-bottom-2-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-return-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-cart-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-checkout-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-back-cart-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-fresh-final-final-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "",
+          "Cart, 1 item ready, ₹37. View cart"
+        ],
+        "held": false
+      }
+    ],
+    "fontRestored": true,
+    "noPaymentSubmission": true,
+    "noRealOrderOrSupportSubmission": true,
+    "actualFreshAddVerified": true,
+    "tabCartAccessVerified": true,
+    "currentCartSelectionVerified": true,
+    "repeatedCartStable": true,
+    "productBackVerified": true,
+    "checkoutReturnVerified": true,
+    "normalAnd200Percent": true,
+    "supplierPolicyNativePublishedRequirement": "Unavailable in review content; host conditional policy tests only",
+    "scrollObservation": "Settled fresh and mixed Cart start with selected items at top; host new-Add reset independently passes. Earlier recommendation-offset cause unproven; no runtime scroll edit.",
+    "lastAvailableFrontend": "Checkout review at bottom; stopped before Pay/order submission. Post-payment live-provider/order journey deferred.",
+    "heldOriginal": "Original37 exact snapshot preserved separately, host held guard proof; native held restoration/replay not yet performed",
+    "founderApproval": false,
+    "mixedFullBasketTargetVerified": true,
+    "mixedCount": 3,
+    "mixedAmount": 1197,
+    "twoRepeatedMixedRouteSweeps": true,
+    "mixedFacts": [
+      {
+        "label": "t10-regression-final-after-full-restart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-shop-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-shop-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-shop-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-wholesale-0-1-20261003",
+        "cart": [
+          {
+            "label": "Cart, 2 items ready, ₹1,160. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Wholesale",
+          "Wholesale, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-wholesale-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Wholesale offers, 1 product, 2 packs, ₹1,160\nWholesale · ₹1,160",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-wholesale-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Wholesale offers, 1 product, 2 packs, ₹1,160\nWholesale · ₹1,160",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-orders-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Active orders\nActive",
+          "Orders, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-orders-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-orders-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-offers-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Suppliers",
+          "Offers, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-offers-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-offers-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-shop-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-shop-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-shop-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-wholesale-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 2 items ready, ₹1,160. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Wholesale",
+          "Wholesale, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-wholesale-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Wholesale offers, 1 product, 2 packs, ₹1,160\nWholesale · ₹1,160",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-wholesale-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Wholesale offers, 1 product, 2 packs, ₹1,160\nWholesale · ₹1,160",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-orders-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Active orders\nActive",
+          "Orders, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-orders-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-orders-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-offers-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Suppliers",
+          "Offers, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-from-offers-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-repeat-cart-offers-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-product-start-shop-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Quick",
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-product-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-product-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-product-repeat-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-back-product-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 1 item ready, ₹37. View cart",
+            "selected": "false",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Shop home, current"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-to-checkout-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-bottom-0-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-bottom-1-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-bottom-2-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-return-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-cart-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-checkout-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-return-cart-large-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      },
+      {
+        "label": "t10-regression-final-final-cart-0-20261003",
+        "cart": [
+          {
+            "label": "Cart, 3 items ready, ₹1,197. View cart",
+            "selected": "true",
+            "bounds": "[529,1364][617,1438]"
+          }
+        ],
+        "selected": [
+          "All",
+          "Shop offers, 1 product, 1 items, ₹37\nShop · ₹37",
+          "Cart, 3 items ready, ₹1,197. View cart"
+        ],
+        "held": false
+      }
+    ],
+    "sourceBoundCaptureCount": 70,
+    "visualGlyphStatus": "Visible white glyph and quantity badge inspected with selected state and tap destinations in both repeated mixed route sweeps and fresh journey, normal/200% text. Earlier intermittent warm-reload missing-glyph observation did not recur after full Dart restart; original cause not proven, no speculative paint edit.",
+    "identity": {
+      "package": "com.moolsocial.app.cursorreview",
+      "versionName": "1.0.0-r66.36-cursorreview",
+      "versionCode": "2026092701",
+      "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+      "fontScale": "1.0",
+      "sourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+      "apkUnchanged": true,
+      "noInstallOrSubmission": true
+    },
+    "closedFullDartRestart": {
+      "sourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+      "fullDartRestartResponseCode": 0,
+      "detachResponse": true,
+      "processExitCode": 0,
+      "closedProcessObserved": true,
+      "originalAndFreshSnapshotsPreserved": true,
+      "noPreferenceMutation": true,
+      "noBuildInstall": true,
+      "privateLogExcluded": true
+    },
+    "evidence": [
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-native-final-result-20261003.json",
+        "sha256": "df9e2caa1e004554dd7322531abd258a7b57d3587ef0022399804857418b8eb9"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-native-fresh-final-result-20261003.json",
+        "sha256": "53ac64f44340faa3075af3acd8ae21ca6087bd360c7538f02eea9a6cb8f0cd69"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t10-regression-full-restart-closed-proof-20261003.json",
+        "sha256": "8177536620b105a60d952cbfc5f78f606537a1648c10ade0f0f26d8d75edd0b4"
+      },
+      {
+        "path": "apps/mobile/build/t06-t07-cart-20261002/t08-native/t10-regression-identity-final.json",
+        "sha256": "fed7ec09a9815ff335ae17dd11a4485d0cb3708a8c1753d962c1a10e8c575acb"
+      }
+    ],
+    "visualReview": "All70 whole-screen contact-sheet captures inspected, plus full-resolution Cart, mixed Checkout bottom,200% Checkout and actual Add screens.",
+    "observations": [
+      "Small blue right-edge marker appears on Catalogue/Offers before and after this sweep; provenance/production relevance unverified, retained for scoped follow-up."
+    ],
+    "qualificationSourceSha256": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+    "runtimeReferenceMapping": {
+      "nativeActivationFullFingerprint": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+      "finalQualificationFullFingerprint": "611eb5916fc050425c2a44286f906f993828ef4a9bde87f64bd7fef68e7c5700",
+      "reconstructedBeforeFingerprint": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+      "allOtherTrackedInputsRawBytesUnchanged": true,
+      "runtimeCodeAssetsAndroidAndPubspecUnchanged": true,
+      "onlyChangesSinceNativeActivation": {
+        "testPath": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "replacements": 2,
+        "newStagedDraftImages": [
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-a11y140-reduced.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-android.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-360x800-android.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-390x844-ios.png",
+          "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-430x932-ios.png"
+        ]
+      },
+      "runtimeHashes": {
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart": "2616ca73b3f8484224601e3c2b460a902545663e1eda036c1178be28b2f91ed4",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "d3c0212cc4fdb12d153e7fa836c0ae94287202d858b3c0372410c8bbe4a9e538",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "4c106d7b9450f770d73817bf28cc7a898bbe58787000e251dba6789abeb9b963"
+      },
+      "draftHashes": {
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-android.png": "e229cbbe86cf8a0d0e0ae8720b4d574e3ec1ea8c8da7e46a3ae416fb41721a4a",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-360x800-android.png": "352c8063908f5daf1b3ab40e7da80a82dfdaa5285ba6331e4604ccc50c2252c0",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-390x844-ios.png": "b0945631a2f40478beb6a2a4b1b3dfdd125aceda0175c0c0ec42e2133517f52c",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-430x932-ios.png": "f9110e0711c682d311f2050b7a994b295a7ecf688325a3a13a33fada9695413f",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-t02-checkout-320x568-a11y140-reduced.png": "20358be4d67a4cc48e33e92ae8e7a5ac0e9ebe89d9b91d2eee3ebdef674fde4c",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-360x800-android-cart.png": "d33cc7a8112defae1409f3a082f3b3839ff4d41b18f875621a39c84cb0dc0026",
+        "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-t10-navigation-20261003/buy-v2-r58-8-7-c24f-430x932-ios-cart.png": "0dad6df344796680185e93e1fe3aee37ee5b3f3e73308f06550895b06130f308"
+      },
+      "noAdditionalDeviceActionRequired": true
+    },
+    "composer": {
+      "sourceSha256": "fa0816989c400d50a71ccdc1e4966cf656206533bc9f567804b2bbb3af6114ae",
+      "facts": [
+        {
+          "label": "t10-regression-composer-before-0-20261003",
+          "sha256": "accb1b5105ac45bb94cee57263db2bba11eb5967dd5bf6c27911f1a5136872c5",
+          "clearCount": 0,
+          "cancelCount": 0,
+          "cartSelected": true,
+          "supplierTerms": false
+        },
+        {
+          "label": "t10-regression-composer-open-0-20261003",
+          "sha256": "02c816c5cc1444f8ef26501bee8a0deb66d5c4f27fce540efbd12613913adadd",
+          "clearCount": 1,
+          "cancelCount": 1,
+          "cartSelected": true,
+          "supplierTerms": false
+        },
+        {
+          "label": "t10-regression-composer-back-0-0-20261003",
+          "sha256": "02c816c5cc1444f8ef26501bee8a0deb66d5c4f27fce540efbd12613913adadd",
+          "clearCount": 1,
+          "cancelCount": 1,
+          "cartSelected": true,
+          "supplierTerms": false
+        },
+        {
+          "label": "t10-regression-composer-cancelled-20261003",
+          "sha256": "87f78a3f8fb91db62766ad9a4e4eb4d938ef597c5176f4130a453783dacf01b7",
+          "clearCount": 0,
+          "cancelCount": 0,
+          "cartSelected": true,
+          "supplierTerms": false
+        }
+      ],
+      "publicClearAbsent": true,
+      "composerClearCount": 1,
+      "singleSharedComposer": true,
+      "inlineComposer": true,
+      "noTextMutation": true,
+      "returnedToCart": true,
+      "noPaymentSubmission": true,
+      "verificationCorrection": "Initial helper expected Back to close composer; Back correctly dismissed keyboard only. Observed Cancel closed inline composer without edits.",
+      "visualInspection": "Keyboard and composer at full resolution inspected; existing Clear/Save/Cancel only inside shared editor."
+    },
+    "latestObservedScreen": {
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t08-native/t10-regression-founder-review-cart-20261003.png",
+      "sha256": "c81e0c535ae6e40e0e26c6323e8e2dc6f1f262e7a0b2c1b9a28f2eb649995680",
+      "actualView": "Checkout",
+      "count": 2,
+      "total": 97,
+      "qualification": "Changed after verified fresh1/37 composer cancellation; origin of transition awaiting founder clarification. Device actions stopped; no inferred user action or app defect."
+    }
+  },
+  "gitAudit": {
+    "windowIst": "2026-10-03 00:35 to 14:35",
+    "windowUtc": [
+      "2026-10-02T19:05:00Z",
+      "2026-10-03T09:05:00Z"
+    ],
+    "branch": "work/cursor-ui/buy-ready-20260921",
+    "head": "c11229924b0df99f1940a1dc8c95cfa616797b07",
+    "remoteHead": "c11229924b0df99f1940a1dc8c95cfa616797b07",
+    "exactRemoteReadback": true,
+    "statusDigest": {
+      "bytes": 103,
+      "records": 2,
+      "sha256": "90376639bbd18a3df7645b5b03de0f9d18f5aa6f2e7347346f39cc4f8b9c5e40",
+      "stderrBytes": 0,
+      "exitCode": 0
+    },
+    "dirtyOwnedMetadata": [
+      " M config/codex-development-regression-registry.json",
+      " M config/codex-subagent-coordination-policy.json"
+    ],
+    "commits": [
+      {
+        "commit": "c11229924b0df99f1940a1dc8c95cfa616797b07",
+        "date": "2026-10-03T13:49:59+05:30",
+        "subject": "ui(buy-ready-20260921): explain held Cart and disable guarded edits",
+        "paths": [
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "config/buy-founder-regression.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.json",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-2.jsonl",
+          "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ]
+      },
+      {
+        "commit": "30961fa92fd7f7f8ca619a6d8b27755cdad8335c",
+        "date": "2026-10-03T11:15:29+05:30",
+        "subject": "ui(buy-ready-20260921): retain replacement and refund request receipts",
+        "paths": [
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_order_resolution_test.dart",
+          "config/buy-founder-regression.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-CONTRACT.json",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.json",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-EVIDENCE.zip",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-2.jsonl",
+          "docs/quality/CURSOR-BUY-T09-REFUNDS-20261003-SELECTED-3.jsonl",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ]
+      },
+      {
+        "commit": "c4959047e8eb918c52816ef60c7ba1c489c5bbf8",
+        "date": "2026-10-03T09:18:36+05:30",
+        "subject": "ui(buy-ready-20260921): show per-order payment status and balances",
+        "paths": [
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "config/buy-founder-regression.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-CONTRACT.json",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.json",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-EVIDENCE.zip",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-2.jsonl",
+          "docs/quality/CURSOR-BUY-T08-ORDERS-20261003-SELECTED-3.jsonl",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ]
+      },
+      {
+        "commit": "8499799adc06bd224687efa685d1cc50a93d3919",
+        "date": "2026-10-03T03:01:20+05:30",
+        "subject": "ui(buy-ready-20260921): move supplier policy consent to Add",
+        "paths": [
+          "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+          "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+          "apps/mobile/lib/features/buy/buy_v2_session.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+          "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+          "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+          "config/buy-founder-regression.json",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+          "docs/quality/CURSOR-BUY-READY-20260921.md",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-CONTRACT.json",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.json",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-EVIDENCE.zip",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-FOCUSED.jsonl",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-1.jsonl",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-2.jsonl",
+          "docs/quality/CURSOR-BUY-SUPPLIER-POLICY-20261003-SELECTED-3.jsonl",
+          "scripts/check-codex-subagent-coordination-policy.ps1"
+        ]
+      }
+    ],
+    "reflog": [
+      "c11229924b0df99f1940a1dc8c95cfa616797b07|HEAD@{2026-10-03T13:49:59+05:30}|commit: ui(buy-ready-20260921): explain held Cart and disable guarded edits",
+      "30961fa92fd7f7f8ca619a6d8b27755cdad8335c|HEAD@{2026-10-03T11:15:29+05:30}|commit: ui(buy-ready-20260921): retain replacement and refund request receipts",
+      "c4959047e8eb918c52816ef60c7ba1c489c5bbf8|HEAD@{2026-10-03T09:18:36+05:30}|commit: ui(buy-ready-20260921): show per-order payment status and balances",
+      "8499799adc06bd224687efa685d1cc50a93d3919|HEAD@{2026-10-03T03:01:20+05:30}|commit: ui(buy-ready-20260921): move supplier policy consent to Add"
+    ],
+    "limits": "Assigned worktree only; no other lane or outside-workspace session logs; ignored device evidence remains local, not Git-qualified runtime."
+  },
+  "gitLineage": {
+    "checkpoints": [
+      {
+        "commit": "ee258a5e0dea49bf5d62286e6cc8c21f9ae416cd",
+        "ancestorOfCurrentHead": true
+      },
+      {
+        "commit": "34122f2950758476c86719f07684fe42773712fe",
+        "ancestorOfCurrentHead": true
+      },
+      {
+        "commit": "8499799adc06bd224687efa685d1cc50a93d3919",
+        "ancestorOfCurrentHead": true
+      },
+      {
+        "commit": "c4959047e8eb918c52816ef60c7ba1c489c5bbf8",
+        "ancestorOfCurrentHead": true
+      },
+      {
+        "commit": "30961fa92fd7f7f8ca619a6d8b27755cdad8335c",
+        "ancestorOfCurrentHead": true
+      },
+      {
+        "commit": "c11229924b0df99f1940a1dc8c95cfa616797b07",
+        "ancestorOfCurrentHead": true
+      }
+    ],
+    "handoffs": [
+      {
+        "path": "docs/quality/CURSOR-BUY-READY-20260921.md",
+        "workingSha256": "8e6788c5d7268b92d1a6a60ed32d304e2ae0f66903e5bb4182311ef97dc9507b",
+        "headBlobSha256": "4aa73d8ac01b55b8ec7d61f90f8e3840fb4246c6803ea69f8b779cd9a61b832b",
+        "exactHeadBytes": false,
+        "gitDiffEmpty": true,
+        "newlineNormalizedContentEqual": true
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+        "workingSha256": "37d0959d62a5e2673d816038ede810ebf25e1c5fdfb3c0ff20db3129065ed32b",
+        "headBlobSha256": "37d0959d62a5e2673d816038ede810ebf25e1c5fdfb3c0ff20db3129065ed32b",
+        "exactHeadBytes": true,
+        "gitDiffEmpty": true,
+        "newlineNormalizedContentEqual": true
+      }
+    ],
+    "ignoredRuntimeTestSource": [],
+    "preservation": "Current ignored build evidence remains local. No outside-workspace session logs or other-worktree audit.",
+    "supersession": "Historical native-activation limitations in committed T10 evidence remain immutable; new sweep will bind new runtime verification separately."
+  },
+  "children": [
+    "Backend and live-provider recovery deferred; workspace Codex after integration; Google/Maps separate.",
+    "Supplier policies Product/Add only, never Cart; standard shared-address instructions and Clear only in composer.",
+    "Original37 frozen payment preserved in exact isolated review backup. Fresh review reset uses only verified review-owner key, no app-wide clear or real financial action. Native held-payment replay and conditional supplier-popup fixtures are not qualified by fresh native evidence.",
+    "Inherited25 legacy Checkout failures and formal closure/historic0e90a6ca remain open; selected tests are not full-suite acceptance.",
+    "Inherited raw-evidence newline conversion remains open. Six literal LF rules protect only new sweep evidence; staged and checkout-filter hash verification required.",
+    "Seven Cart/Checkout golden references are draft, original founder references preserved; founder visual acceptance and final integration pending.",
+    "Earlier intermittent glyph missing on warm reload did not recur across70 final-source captures after full restart; original cause remains unproven.",
+    "Catalogue/Offers blue right-edge marker provenance remains a scoped follow-up, observed before and after edits.",
+    "Process correction: draft references predated final aggregation change; both generations and failures retained, twelve critical checks including all ten active selected golden cases passed before final selection; original historical failure images restored only after preserving generated versions. Unexplained later Checkout2/97 transition remains unresolved.",
+    "Unexplained transition after verified composer cancellation: Cart1/37 to Checkout2/97. Device actions stopped; origin awaiting founder clarification. No defect-free journey or latest-state preservation claimed."
+  ],
+  "qualification": "Closed frontend source-bound tests; native journey result recorded separately",
+  "checkpoint": "Actual memory/precommit/scoped ordinary commit/push/readback still required"
+}

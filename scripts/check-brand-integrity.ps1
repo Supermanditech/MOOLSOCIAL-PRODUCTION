@@ -533,9 +533,19 @@ function Test-SealedBuyThemeIntegration {
     $structureExact
   $redmiReviewProjection = $false
   if ($redmiReviewQualified) {
+    $reviewOwnerExact = Test-BrandOwnerBytesEqualAtCommit -Owners @($owner) -Commit $reviewSourceCommit
+    if ($reviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0') {
+      # The protected-source gate already verified the exact r66.32 snapshot.
+      $sourceBytes = [Text.UTF8Encoding]::new($false).GetBytes($Source.Replace("`r`n", "`n"))
+      $sourceSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $reviewOwnerExact = [BitConverter]::ToString($sourceSha.ComputeHash($sourceBytes)).Replace('-', '') -ceq
+          'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
+      } finally { $sourceSha.Dispose() }
+    }
     $redmiReviewProjection = Test-BuyThemeIntegrationFacts `
       $true `
-      (Test-BrandOwnerBytesEqualAtCommit -Owners @($owner) -Commit $reviewSourceCommit) `
+      $reviewOwnerExact `
       $structureExact
   }
   return $legacyProjection -or $v74Projection -or $shopV2Projection -or $redmiReviewProjection

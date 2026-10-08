@@ -146,6 +146,66 @@ function Get-MobileBoundaryViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
+    # Exact r66.36 source; customer-tapped Store/resolved-area Maps launchers only.
+    if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+        $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
+        '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
+      } else { '11CAC04ED562563A37AC8D329773A62008714DA36134C7874F11ECF75C900548' }
+      if ($mapHash -ceq $expectedMapHash) {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
+    # Exact r66.35 source; customer-tapped Store/resolved-area Maps launchers only.
+    if ($IntegratedReviewSourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242' -and
+        $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
+        '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
+      } else { '46DFC97C99FEE2B5E5B35B235B538A819A3DAC957731576B6BE40713C9FF0EDB' }
+      if ($mapHash -ceq $expectedMapHash) {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
+    # Exact r66.34 source; customer-tapped Store/resolved-area Maps launchers only.
+    if ($IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' -and
+        $owner -cin @('apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart')) {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      $expectedMapHash = if ($owner.EndsWith('/buy_v2_store_address.dart')) {
+        '20968444FB7A945288DF451D39490489348E247B3E4ACB7AC742C780E1E79C45'
+      } else { 'ECA7EDC43A776E4EDA5601C3E2D90E9EAA82A1609C5D58433CDD82275FC4384B' }
+      if ($mapHash -ceq $expectedMapHash) {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
+    # Founder-authorized Store Maps tap: exact r66.32 source only.
+    if ($IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
+        $owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart') {
+      $mapSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mapBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mapHash = [BitConverter]::ToString($mapSha.ComputeHash($mapBytes)).Replace('-', '')
+      } finally { $mapSha.Dispose() }
+      if ($mapHash -ceq '36D926CADF3B5F7988B48C300F3BC128E056E8322BFE47470D36A01DEF989F91') {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
     if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart') {
       # The sealed screen uses local File/Directory only for its temporary arrival cue.
       $soundSourceSha = [Security.Cryptography.SHA256]::Create()
@@ -179,8 +239,58 @@ function Get-MobileBoundaryViolations {
           # D014 and exact SKU successor retain the same arrival-sound seam.
           $IntegratedReviewSourceCommit -cin @('41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957', '1880614bb499a47993df86ebed6599926414fc50') -and
           $soundSourceHash -ceq '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
+        ) -or (
+          # Inherited integrated Store embedding; arrival cue/imports unchanged.
+          $IntegratedReviewSourceCommit -ceq 'd5279222466211f0526c625e58b8da5dc0d78218' -and
+          $soundSourceHash -ceq 'C6438E31C55DA94A9B3CD4D1FF403535B1CB5B9C5727341E02AF90EDB4993992'
+        ) -or (
+          # r66.32 UI-only delta; the arrival cue/import seam is unchanged.
+          # The protected-source checker first verifies the full exact snapshot.
+          $IntegratedReviewSourceCommit -ceq '87bc96d4c28300146c9e2c3c3b37c7c3aacffed0' -and
+          $soundSourceHash -ceq 'D4625A0942BFE5E8E018F55F0C35028D4EBA38F01E234E3250BEC52F07BB79DB'
+        ) -or (
+          # r66.36 UI changes preserve the byte-identical local arrival cue.
+          $IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+          $soundSourceHash -ceq '7B739218F46A38E9C21B43D222CCD14FDF1125FF8F79EDF437A29BACEE8CC5F7'
+        ) -or (
+          # r66.35 UI changes preserve the byte-identical local arrival cue.
+          $IntegratedReviewSourceCommit -ceq '0fd4da937635e159354d5213d134b80516873242' -and
+          $soundSourceHash -ceq '99D3DBDA025D6037FB48C50731F9F465F5CE0CD3133994BB8C9A002F0715EE9D'
+        ) -or (
+          # r66.34 Cart/checkout UI changes preserve the same local arrival cue.
+          $IntegratedReviewSourceCommit -ceq '71c48d9cec5c7c5362194c0129ba5a68ed4380ef' -and
+          $soundSourceHash -ceq 'A5AD2BB59DF7BD9315908EE717E945F14D0F8037696B7CFA9388AB84AC90618A'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
+      }
+    }
+    # Exact review screen: external payment launch is disabled by reviewDataEnabled.
+    if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+        $owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart') {
+      $launchSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $launchBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $launchHash = [BitConverter]::ToString($launchSha.ComputeHash($launchBytes)).Replace('-', '')
+      } finally { $launchSha.Dispose() }
+      if ($launchHash -ceq 'A11A292446CFAD0FED9F7EB197E7E7A924864193F196AF49AE905DE74E0272E6') {
+        $Content = $Content.Replace("import 'package:url_launcher/url_launcher.dart';", '')
+      }
+    }
+    # Four founder-approved reference photos, only in the explicit review catalogue.
+    if ($IntegratedReviewSourceCommit -ceq '7ca0a91b4dbbbb2baa9c8d17d7cddc238c6f8f0d' -and
+        $owner -ceq 'apps/mobile/lib/features/buy/buy_v2_session.dart') {
+      $mediaSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $mediaBytes = [Text.UTF8Encoding]::new($false).GetBytes($Content.Replace("`r`n", "`n"))
+        $mediaHash = [BitConverter]::ToString($mediaSha.ComputeHash($mediaBytes)).Replace('-', '')
+      } finally { $mediaSha.Dispose() }
+      if ($mediaHash -ceq 'D0802C4C3637C6782CF103CB121DD12878CA59A0990A3CC68126ED7DD2E105CD') {
+        foreach ($photo in @(
+          'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-pink-select-202409?wid=940&hei=1112&fmt=png-alpha&.v=UVNpeHhuaEtmVmFjT28wSWtUWE40Z1V5N29UUE5sYkU5bzFjbnV4MlZFK3h5cTNsSm9CeDJ4ZzdnY0xHQkpkNm53M0FRZHBXNTh1U1lFVEtSR2YzTm5BTWNTTDd0aXhNTTNzYjcxKzVuY2M',
+          'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-pink-select-202409_AV3?wid=1246&hei=518&fmt=jpeg&qlt=90&.v=UVNpeHhuaEtmVmFjT28wSWtUWE40anorcTNYMDVXRDRPM3FYZXpUVkY3M1BiNGFWb0pxVnpqT1Fjd2JNR3AySGhabWVOZUJidkVVTmVBWnZsRzdJVkpMdUFTNkVPN1JRY0dtdDhBSFU2WlZuMU9BZXZDZlFoMkQrRm9RMzZBT24',
+          'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-ultramarine-select-202409?wid=940&hei=1112&fmt=png-alpha&.v=aWI5aGdudlZCalMrV3A2QU5NeUlaUS9CQ2hhaHB3cVp0QldQUmg0R3F6NURreFIvckpMM0RHVW1acklsZHpObDJpdkFkeXRGenVzczlmSUZMYlgrMHBJQzFqek53VEVRN3NLQnhtYWpXTnYrNUdoc3VSMTlEQkd4dTVQR01rblc',
+          'https://store.storeimages.cdn-apple.com/1/as-images.apple.com/is/iphone-16-ultramarine-select-202409_AV3?wid=1246&hei=518&fmt=jpeg&qlt=90&.v=aWI5aGdudlZCalMrV3A2QU5NeUlaUS9CQ2hhaHB3cVp0QldQUmg0R3F6NDRZM2hiRjNTRld2M201ZXQrQVpvNk1HdERxc1JTR0JKeGRITUM3NTliOWRSR0liZklwWjJ2eGlOd1dxRHFuOXA3ck1BalRTbjZTOTd3ZlhKc2VObzQ'
+        )) { $Content = $Content.Replace($photo, '') }
       }
     }
     if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart') {

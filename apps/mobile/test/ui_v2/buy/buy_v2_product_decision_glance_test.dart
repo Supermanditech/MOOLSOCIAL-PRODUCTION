@@ -10,11 +10,35 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> reveal(
+    WidgetTester tester,
+    String id,
+    Finder target, {
+    double delta = 180,
+  }) async {
+    if (target.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        target,
+        delta,
+        scrollable: find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-$id')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+    } else {
+      await tester.ensureVisible(target);
+    }
+    await tester.pumpAndSettle();
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
@@ -68,12 +92,13 @@ void main() {
           findsOneWidget,
         );
         expect(find.descendant(of: hero, matching: primary), findsOneWidget);
-        expect(find.descendant(of: hero, matching: store), findsOneWidget);
+
+        await reveal(tester, product.id, primary);
         _expectParagraphsFit(hero);
         if (scale == 1) {
           expect(tester.getRect(primary).bottom, lessThanOrEqualTo(752));
           expect(primary.hitTestable(), findsOneWidget);
-          expect(store.hitTestable(), findsOneWidget);
+
           await _captureR66Product(tester, '$scale-summary');
         }
         await Scrollable.ensureVisible(tester.element(primary), alignment: .3);
@@ -89,6 +114,13 @@ void main() {
         await tester.tap(primary);
         await tester.pumpAndSettle();
         expect(session.quantityFor(product.id), 1);
+        final quantityPill = find.descendant(
+          of: hero,
+          matching: find.byKey(
+            const ValueKey('buy-compact-product-quantity-pill'),
+          ),
+        );
+        expect(tester.getSize(quantityPill).height, 32);
         final plus = find.descendant(
           of: hero,
           matching: find.byTooltip('Add one'),
@@ -97,6 +129,14 @@ void main() {
         await tester.tap(plus);
         await tester.pumpAndSettle();
         expect(session.quantityFor(product.id), 2);
+        await reveal(tester, product.id, store);
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+            matching: store,
+          ),
+          findsOneWidget,
+        );
         await Scrollable.ensureVisible(tester.element(store), alignment: .3);
         await tester.pumpAndSettle();
         await tester.tap(store);
@@ -134,6 +174,181 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [
+      1000,
+      10000,
+      50000,
+      100000,
+      1000000,
+      10000000,
+      10000001,
+    ]) {
+      testWidgets('A04 product price $amount complete at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        for (final id in ['s-tomato', 'w-oil']) {
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            productFactsAdapter: _ProductDetailFacts(price: amount),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.openProduct(id), isTrue);
+          await tester.pumpWidget(
+            app(session, size: const Size(320, 844), textScale: scale),
+          );
+          await tester.pumpAndSettle();
+          for (final added in [false, true]) {
+            if (added) {
+              expect(session.addProduct(id), isTrue);
+              await tester.pumpAndSettle();
+            }
+            final price = find.byKey(ValueKey('buy-product-hero-price-$id'));
+            await reveal(tester, id, price);
+            expect(tester.widget<Text>(price).data, buyV2Money(amount));
+            final rich = find.descendant(
+              of: price,
+              matching: find.byType(RichText),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(rich);
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(
+              boxes.map((b) => b.top).toSet(),
+              hasLength(1),
+              reason: '$id added=$added',
+            );
+            for (final box in boxes) {
+              expect(box.right, lessThanOrEqualTo(paragraph.size.width + .5));
+            }
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final amount in [
+      1000,
+      10000,
+      50000,
+      100000,
+      1000000,
+      10000000,
+      10000001,
+    ]) {
+      testWidgets('A04 Offers to cart price $amount complete at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        for (final id in ['s-tomato', 'w-oil']) {
+          final core = BuySession();
+          final product = BuyV2Catalogue.products
+              .firstWhere((p) => p.id == id)
+              .copyWith(
+                price: amount,
+                storeId: 'product-detail-test-store',
+                offerClass: id == 'w-oil'
+                    ? BuyV2OfferClass.wholesale
+                    : BuyV2OfferClass.retail,
+              );
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: false,
+            commerceAdapter: _ProductDetailCommerce(product),
+            productFactsAdapter: _ProductDetailFacts(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await session.restoreCommerce();
+          expect(session.product(id).price, amount);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: BuyV2Screen(
+                session: session,
+                initialOffersActive: true,
+                offersSource: _LargePriceOffers(id),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final add = find.byKey(ValueKey('buy-add-$id'));
+          await tester.scrollUntilVisible(
+            add,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          final price = find.byKey(ValueKey('buy-price-highlight-$id'));
+          void expectOneLine(Finder owner) {
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: owner, matching: find.byType(RichText)).first,
+            );
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(boxes, isNotEmpty);
+            expect(boxes.map((b) => b.top).toSet(), hasLength(1));
+            expect(paragraph.didExceedMaxLines, isFalse);
+            for (final box in boxes) {
+              expect(box.right, lessThanOrEqualTo(paragraph.size.width + .5));
+            }
+          }
+
+          expectOneLine(price);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          expectOneLine(price);
+          session.openCart(scope: BuyV2CartScope.all);
+          await tester.pumpAndSettle();
+          final line = find.byKey(ValueKey('buy-cart-line-total-motion-$id'));
+          await tester.ensureVisible(line);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: line,
+              matching: find.text(buyV2Money(amount * product.minimumOrder)),
+            ),
+            findsOneWidget,
+          );
+          expectOneLine(line);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }
+      });
+    }
+  }
+
   for (final id in ['w-oil', 'm-paracetamol-500']) {
     testWidgets('R665 O04 one purchase summary retains distinct facts $id', (
       tester,
@@ -151,6 +366,7 @@ void main() {
       await tester.pumpWidget(app(session, size: size, textScale: 2));
       await tester.pumpAndSettle();
       final hero = find.byKey(ValueKey('buy-product-purchase-hero-$id'));
+      await reveal(tester, id, hero);
       expect(
         find.descendant(
           of: hero,
@@ -175,24 +391,48 @@ void main() {
         final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
         await tester.scrollUntilVisible(details, 180, scrollable: scroll);
         await tester.pumpAndSettle();
-        for (final label in [
-          'Freight',
-          'Tax invoice',
-          'Seller',
-          'Delivery mode',
-        ]) {
+        for (final label in ['Delivery', 'Method']) {
           expect(
             find.descendant(of: details, matching: find.text(label)),
             findsOneWidget,
           );
         }
+        expect(
+          find.descendant(
+            of: details,
+            matching: find.textContaining('Deliver to '),
+          ),
+          findsOneWidget,
+        );
+        final terms = find.byKey(
+          ValueKey('buy-wholesale-commercial-terms-$id'),
+        );
+        await tester.scrollUntilVisible(terms, 180, scrollable: scroll);
+        await tester.pumpAndSettle();
+        for (final label in ['Freight', 'Tax invoice']) {
+          expect(
+            find.descendant(of: terms, matching: find.text(label)),
+            findsOneWidget,
+          );
+        }
+        final store = find.byKey(ValueKey('buy-product-hero-store-$id'));
+        await tester.scrollUntilVisible(store, -180, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: store,
+            matching: find.textContaining(
+              product.customerSeller(session.productFactsFor(product).partner),
+            ),
+          ),
+          findsOneWidget,
+        );
         for (final repeated in [
           'Unit economics',
           'Trade pack',
           'Minimum total',
           'Stock',
           'Availability',
-          'Delivery',
         ]) {
           expect(
             find.descendant(of: details, matching: find.text(repeated)),
@@ -232,6 +472,8 @@ void main() {
           .firstWhere((item) => item.destination == BuyV2Destination.shop)
           .copyWith(
             brand: 'Test packaged brand',
+            storeId: 'product-detail-test-store',
+            offerClass: BuyV2OfferClass.retail,
             purchaseProtection: const BuyV2PurchaseProtection(
               summary: 'Supplier reviews eligible requests',
               remedies: ['Replacement', 'Repair'],
@@ -284,18 +526,22 @@ void main() {
           .first;
       Future<void> read(String value) async {
         final target = find.text(value);
-        await tester.scrollUntilVisible(
-          target.first,
-          350,
-          scrollable: scroll,
-          maxScrolls: 70,
-        );
+        if (target.evaluate().isNotEmpty) {
+          await tester.ensureVisible(target.first);
+        } else {
+          await tester.scrollUntilVisible(
+            target,
+            350,
+            scrollable: scroll,
+            maxScrolls: 70,
+          );
+        }
         await tester.pumpAndSettle();
         expect(target, findsWidgets);
       }
 
       for (final value in [
-        'Fulfilment arranged by MoolSocial',
+        'Delivery & seller',
         'Order by 14:30',
         'Delivery fee ₹19',
         'Dispatched after packing',
@@ -305,8 +551,15 @@ void main() {
         await read(value);
       }
       final protection = product.purchaseProtection!;
+      final returns = find.byKey(
+        ValueKey('buy-product-assurance-returns-${product.id}'),
+      );
+      await tester.ensureVisible(returns);
+      await tester.pumpAndSettle();
+      await tester.tap(returns.hitTestable());
+      await tester.pumpAndSettle();
       for (final value in [
-        if (protection.remedies.isNotEmpty) protection.remedies.join(' · '),
+        ...protection.remedies,
         protection.windowLabel,
         protection.conditionsLabel,
         protection.verificationLabel,
@@ -320,10 +573,29 @@ void main() {
         protection.policyVersion,
         protection.effectiveFromLabel,
       ].whereType<String>().where((value) => value.trim().isNotEmpty)) {
-        await read(value);
+        final fact = find.textContaining(value);
+        expect(fact, findsWidgets);
+        await tester.ensureVisible(fact.first);
+        await tester.pumpAndSettle();
       }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      Future<void> selectDetails(int index) async {
+        final tab = find.byKey(
+          ValueKey('buy-product-details-tab-$index-${product.id}'),
+        );
+        if (tab.evaluate().isEmpty) {
+          await tester.scrollUntilVisible(tab, 220, scrollable: scroll);
+        }
+        await tester.ensureVisible(tab);
+        await tester.pumpAndSettle();
+        await tester.tap(tab.hitTestable());
+        await tester.pumpAndSettle();
+      }
+
       final compliance = product.compliance;
       if (compliance != null) {
+        await selectDetails(2);
         for (final value in [
           compliance.genericName,
           compliance.netQuantity,
@@ -339,14 +611,16 @@ void main() {
           await read(value);
         }
       }
+      await selectDetails(0);
       for (final value in [
         'Keep away from direct sunlight',
         'Store in a cool place',
         '${product.brand} special edition',
-        'A distinct supplier description.',
       ]) {
         await read(value);
       }
+      await selectDetails(1);
+      await read('A distinct supplier description.');
       final content = find.byKey(
         ValueKey('buy-product-content-ready-${product.id}'),
       );
@@ -445,7 +719,10 @@ void main() {
       );
       expect(find.text(buyV2Money(product.price)), findsOneWidget);
       expect(
-        find.text(session.productFactsFor(product).orderabilityLabel),
+        find.descendant(
+          of: summary,
+          matching: find.byKey(ValueKey('buy-product-primary-${product.id}')),
+        ),
         findsOneWidget,
       );
       expect(
@@ -454,6 +731,13 @@ void main() {
       );
       expect(
         find.descendant(of: summary, matching: find.text(buyerPromise)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('buy-automatic-fulfilment-${product.id}')),
+          matching: find.text(buyerPromise),
+        ),
         findsOneWidget,
       );
       expect(find.text('Automatic Mool Partner assignment'), findsNothing);
@@ -486,7 +770,7 @@ void main() {
       ValueKey('buy-product-purchase-hero-${product.id}'),
     );
     expect(summary, findsOneWidget);
-    expect(tester.getSize(summary).width, greaterThanOrEqualTo(300));
+    expect(tester.getSize(summary).width, equals(288));
     expect(tester.takeException(), isNull);
   });
 
@@ -586,16 +870,37 @@ Future<void> _captureR66Product(WidgetTester tester, String label) async {
 }
 
 final class _ProductDetailFacts implements BuyV2ProductFactsAdapter {
+  _ProductDetailFacts({this.price});
+  final int? price;
   bool available = true;
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
       const BuyV2CatalogueProductFactsAdapter()
           .snapshotFor(product)
           .copyWith(
+            price: price,
             orderabilityLabel: available
                 ? 'Available now'
                 : 'Currently unavailable',
             sourceId: 'r66-product-detail-test',
+            eligibility: product.storeId != null && product.offerClass != null
+                ? BuyV2OfferEligibility(
+                    productId: product.id,
+                    storeId: product.storeId!,
+                    sourceRevision: 'product-detail-test-1',
+                    customerLocationKey: '||0',
+                    observedAt: DateTime.now().subtract(
+                      const Duration(minutes: 1),
+                    ),
+                    expiresAt: DateTime.now().add(const Duration(hours: 1)),
+                    offerClass: product.offerClass!,
+                    channelEnabled: true,
+                    storeReady: true,
+                    fleetAvailable: false,
+                    customerLocationConfirmed: true,
+                    options: const {BuyV2DeliveryOption.courier},
+                  )
+                : null,
             orderCutoffLabel: 'Order by 14:30',
             deliveryFeeLabel: 'Delivery fee ₹19',
             dispatchPromise: 'Dispatched after packing',
@@ -640,9 +945,29 @@ final class _ProductDetailCommerce implements BuyV2CommerceAdapter {
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,
     products: [product],
+    businessVerified: true,
   );
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError(
     'Unexpected commerce mutation in product detail test',
   );
+}
+
+final class _LargePriceOffers implements BuyV2LivePublishedOffersSource {
+  _LargePriceOffers(this.productId);
+  final String productId;
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers => [
+    BuyV2PublishedOffer(
+      productId: productId,
+      publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Store offer',
+    ),
+  ];
+  @override
+  Future<BuyV2PublishedOffersSnapshot> load() async =>
+      BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.ready,
+        offers: publishedOffers,
+      );
 }

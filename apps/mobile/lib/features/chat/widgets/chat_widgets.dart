@@ -131,6 +131,7 @@ class ChatPageScaffold extends StatelessWidget {
     this.showMessageBanner = true,
     this.boundMessageText = false,
     this.prominentTitle = false,
+    this.compactOrderHeader = false,
     this.titleIcon,
     this.titleAccent,
     this.onTitleTap,
@@ -154,6 +155,7 @@ class ChatPageScaffold extends StatelessWidget {
   final bool showMessageBanner;
   final bool boundMessageText;
   final bool prominentTitle;
+  final bool compactOrderHeader;
   final IconData? titleIcon;
   final Color? titleAccent;
   final VoidCallback? onTitleTap;
@@ -197,7 +199,11 @@ class ChatPageScaffold extends StatelessWidget {
               backgroundColor: backgroundColor,
               appBar: AppBar(
                 automaticallyImplyLeading: false,
-                toolbarHeight: prominentTitle
+                toolbarHeight: compactOrderHeader
+                    ? (MediaQuery.textScalerOf(context).scale(14) > 20
+                          ? 96
+                          : 64)
+                    : prominentTitle
                     ? 76
                     : trailing != null
                     ? 82
@@ -264,11 +270,13 @@ class ChatPageScaffold extends StatelessWidget {
                                     Text(
                                       key: const Key('chat-page-title'),
                                       title,
-                                      maxLines: compact ? 2 : 1,
+                                      maxLines: compact || compactOrderHeader
+                                          ? 2
+                                          : 1,
                                       overflow: compact
                                           ? TextOverflow.clip
                                           : TextOverflow.ellipsis,
-                                      softWrap: compact,
+                                      softWrap: compact || compactOrderHeader,
                                       style: TextStyle(
                                         color: MoolColors.ink,
                                         fontSize: compact

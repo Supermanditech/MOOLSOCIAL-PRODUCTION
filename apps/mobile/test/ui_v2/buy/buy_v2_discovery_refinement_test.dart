@@ -15,6 +15,47 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+/// Explicit simulated eligibility for tests only. This fixture is never linked
+/// into the application or passed off as Store/provider integration evidence.
+class BuyTestEligibilityFacts implements BuyV2ProductFactsAdapter {
+  const BuyTestEligibilityFacts({
+    this.delegate = const BuyV2CatalogueProductFactsAdapter(),
+    this.locationKey = '||0',
+    this.now = DateTime.now,
+  });
+  final BuyV2ProductFactsAdapter delegate;
+  final String locationKey;
+  final DateTime Function() now;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final facts = delegate.snapshotFor(product);
+    if (product.storeId == null || product.offerClass == null) return facts;
+    final instant = now();
+    return facts.copyWith(
+      eligibility: BuyV2OfferEligibility(
+        productId: product.id,
+        storeId: product.storeId!,
+        sourceRevision: 'explicit-test-eligibility-v1',
+        customerLocationKey: locationKey,
+        observedAt: instant.subtract(const Duration(seconds: 1)),
+        expiresAt: instant.add(const Duration(minutes: 10)),
+        offerClass: product.offerClass!,
+        channelEnabled: true,
+        storeReady: true,
+        fleetAvailable: true,
+        customerLocationConfirmed: true,
+        options: {
+          ...product.reviewDeliveryOptions,
+          BuyV2DeliveryOption.courier,
+        },
+        scheduledSlotId: 'test-slot',
+        scheduledStart: instant.add(const Duration(hours: 1)),
+        scheduledEnd: instant.add(const Duration(hours: 2)),
+      ),
+    );
+  }
+}
+
 // Explicit supplier-brand fixtures, never replacement production seed data.
 class R669BrandCommerce implements BuyV2CommerceAdapter {
   @override
@@ -25,13 +66,14 @@ class R669BrandCommerce implements BuyV2CommerceAdapter {
         product.destination == BuyV2Destination.medicine
             ? product
             : product.copyWith(
+                storeId: 'test-brand-store-${product.seller}',
                 brand: index ~/ 3 % 2 == 0
                     ? 'Cedar Foods'
                     : 'Riverstone Household Essentials',
               ),
     ],
     orders: const [],
-    paymentMethods: const {'PhonePe', 'Paytm', 'Pine Labs', 'Cash on Delivery'},
+    paymentMethods: const {'UPI', 'Card', 'Cash on Delivery'},
     businessVerified: true,
     businessVerificationState: BuyV2BusinessVerificationState.verified,
   );
@@ -53,6 +95,7 @@ Future<BuyV2Session> r669BrandedSession(BuySession core) async {
   final session = BuyV2Session(
     core: core,
     commerceAdapter: R669BrandCommerce(),
+    productFactsAdapter: const BuyTestEligibilityFacts(),
     reviewDataEnabled: false,
   );
   await session.restoreCommerce();
@@ -213,6 +256,16 @@ void main() {
           final boundary = find.byKey(
             const ValueKey('buy-category-sheet-repaint-boundary'),
           );
+          // The approved sheet expands first; then its content scrolls.
+          await tester.drag(
+            find.byKey(const ValueKey('buy-category-drag-handle')),
+            const Offset(0, -800),
+          );
+          await tester.pumpAndSettle();
+          final sheet = tester.widget<DraggableScrollableSheet>(
+            find.byType(DraggableScrollableSheet),
+          );
+          expect(sheet.controller!.size, closeTo(sheet.maxChildSize, .01));
           final top = await readScrollBall(
             tester,
             boundary,
@@ -662,17 +715,25 @@ void main() {
         (product) =>
             product.destination == BuyV2Destination.shop &&
             product.catalogueListing &&
+            buyV2CatalogueFulfilmentModeFor(product) ==
+                BuyV2FulfilmentMode.quickLocal &&
             product.price <= 250,
       );
       final expensive = BuyV2Catalogue.products.firstWhere(
         (product) =>
             product.destination == BuyV2Destination.shop &&
             product.catalogueListing &&
+            buyV2CatalogueFulfilmentModeFor(product) ==
+                BuyV2FulfilmentMode.quickLocal &&
             product.price > 250,
       );
       session.toggleSaved(cheap.id);
       session.toggleSaved(expensive.id);
       session.showSavedProducts(true);
+      expect(
+        session.visibleSavedProducts.map((p) => p.id),
+        containsAll([cheap.id, expensive.id]),
+      );
       await tester.pumpWidget(
         MaterialApp(
           theme: MoolTheme.light(),
@@ -822,7 +883,7 @@ void main() {
           matching: find.text(brand),
         );
         final paragraph = tester.renderObject<RenderParagraph>(label);
-        expect(paragraph.text.style?.color, Colors.white);
+        expect(paragraph.text.style?.color, BuyV2ActionStyle.primaryForeground);
         expect(paragraph.didExceedMaxLines, isFalse);
       }
       expect(session.quantityFor('w-rice'), otherQuantity);
@@ -939,7 +1000,10 @@ void main() {
             );
             final paragraph = tester.renderObject<RenderParagraph>(label);
             expect(paragraph.text.style?.fontFamily, 'Inter');
-            expect(paragraph.text.style?.color, Colors.white);
+            expect(
+              paragraph.text.style?.color,
+              BuyV2ActionStyle.primaryForeground,
+            );
             expect(paragraph.didExceedMaxLines, isFalse);
             final natural = TextPainter(
               text: paragraph.text,
@@ -1061,7 +1125,10 @@ void main() {
             final paragraph = tester.renderObject<RenderParagraph>(
               find.descendant(of: find.byKey(key), matching: find.text(brand)),
             );
-            expect(paragraph.text.style?.color, Colors.white);
+            expect(
+              paragraph.text.style?.color,
+              BuyV2ActionStyle.primaryForeground,
+            );
             expect(paragraph.didExceedMaxLines, isFalse);
             for (final word in brand.split(' ')) {
               final natural = TextPainter(

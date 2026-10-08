@@ -27,6 +27,43 @@ permit deleting the historical regression.
 
 ## Current mandatory lessons
 
+- When native replay crosses discovery origins, inspect the current exact-SKU
+  control: an existing Cart quantity replaces Add with a stepper. Scope the
+  observed control to its product card and verify actual quantity/total/line
+  continuity. A successful Android dump exit is insufficient: require a fresh,
+  parseable hierarchy and foreground/PID/signature checks before any tap. Retry
+  failed reads only, with bounded unique evidence; never repeat a tap or fall
+  back to an older tree. See the existing Buy parent's
+  nativeReplayGuardRootCauses20261006 child and its fail-closed native helpers.
+
+- When Product opens from Cart, its recorded return origin takes precedence over
+  a retained Offers presentation flag. Test actual Android Back through
+  Offers -> Cart -> Product -> Cart -> Offers, plus direct Offers product return.
+  Selected rail semantics must match that context. Do not clear Offers globally
+  or infer navigation origin from visible wording; use existing structured state.
+- When qualifying Buy hot reload, keep the existing router and mounted screen
+  context. Recreating a router from `/app/buy` loses session-owned Cart state
+  even when saved items survive. Exercise the real app-root lifecycle, explicit
+  route changes and native screen/session identity; saved-data equality alone
+  is insufficient. See the existing Buy parent, boundedNavigationRootCause20261006.
+- When attaching for source activation, invalidate every changed runtime owner
+  after compiler initialization, preserve source bytes and restore timestamps
+  conditionally. Verify every affected VM source afterward; a successful SDK
+  reload message does not qualify a partially loaded change. Retain failed
+  receipts and independently establish the saved/business baseline before retry.
+- When a selected tab wraps a Material button, test the actionable semantic node
+  and its semantic tap. Merge each tab's selected state with its own button;
+  never merge separate tabs into one node. Native XML and normal/enlarged tests
+  must agree. Explore and benefit tabs share this regression pattern.
+
+- When implementing a frontend journey, identify the authoritative backend,
+  Store or provider owner before editing. Keep Flutter to presentation, input
+  validation, navigation, recovery and accepted integration hooks. Never add
+  server business functions, duplicate financial authority, inferred acceptance,
+  payout or successful fallback outcomes. Missing contracts remain deferred
+  children; isolated host fixtures do not prove live integration. Recheck
+  unavailable, stale and unknown-result paths before reporting qualification.
+
 - Mool must remain an operable main-action launcher on root, chooser and
   downstream rails; dismissing it must preserve the exact current step.
 - Chat return routes must retain exact Ride type, including Cab.

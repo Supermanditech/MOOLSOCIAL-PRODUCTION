@@ -1,0 +1,198 @@
+{
+  "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+  "contract": {
+    "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-CONTRACT.json",
+    "sha256": "847be494b9cc24b65c4c90de89ff2e96c5142e5a1132632e59eb931c7488cae1"
+  },
+  "archive": {
+    "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-EVIDENCE.zip",
+    "sha256": "1e8d2cfe2cb77ffc40690ec4a66647596260799c3b0debcb56b6ade072cbd47b",
+    "members": 192,
+    "memberHashesVerified": true
+  },
+  "defects": [
+    {
+      "id": "T10-local-01",
+      "finding": "Cart quantity and Empty Cart looked enabled during payment hold",
+      "fix": "Shared existing mutation guard disables controls"
+    },
+    {
+      "id": "T10-local-02",
+      "finding": "Catalogue Add looked enabled but session rejected it",
+      "fix": "Featured/grid/product-sheet Add and quantity controls disabled and dimmed"
+    },
+    {
+      "id": "T10-local-03",
+      "finding": "Ordinary Cart Checkout hid saved payment recovery",
+      "fix": "Persistent reason and Review payment navigation to existing attempt"
+    },
+    {
+      "id": "T10-local-04",
+      "finding": "Instruction entry/presets looked editable despite hold",
+      "fix": "Guarded editing and saving disabled; Cancel remains available"
+    },
+    {
+      "id": "T10-local-05",
+      "finding": "Benefit/tip UI callbacks looked available despite mutation guard",
+      "fix": "Existing offer/tip actions use same hold, browsing remains available; technical/host boundary"
+    },
+    {
+      "id": "T10-local-06",
+      "finding": "Disabled catalogue actions passed pointer to surrounding card",
+      "fix": "Standard pointer interception with handler excluded from semantics; Add has no semantic tap and stays on catalogue"
+    }
+  ],
+  "closedReceipts": {
+    "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+    "evidence": [
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-FOCUSED.jsonl",
+        "sha256": "260c31cc2e6f2d4ae13add9ae136221e04aa53c71ed1dce74781f5a972594752",
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-1.jsonl",
+        "sha256": "cc3ccd5b1bab1a57084d55544d1485366aaa670f36bccef7044ed93d28c36487",
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-2.jsonl",
+        "sha256": "1958d1b4c6742982c0c4ba695fb70a9dae1829620732b13f5a571ca35dac6e4d",
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd"
+      },
+      {
+        "path": "docs/quality/CURSOR-BUY-T10-CART-AUDIT-20261003-SELECTED-3.jsonl",
+        "sha256": "6b3ce80a41c52c6f95c4f5bd6a9342c3eedb34e7ad4cc503caea7d20dcf75906",
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd"
+      }
+    ],
+    "analysis": {
+      "exitCode": 0,
+      "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t10-final-analysis-20261003.log",
+      "sha256": "d04fc115e3f370591f937aec781cc2eb6fc1ea9a2a9a0b2fbe4ed30eaad3bc25",
+      "passed": 0,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "focused": {
+      "exitCode": 0,
+      "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+      "unchangedSource": true,
+      "path": "apps/mobile/build/t06-t07-cart-20261002/t10-final-focused-20261003.jsonl",
+      "sha256": "260c31cc2e6f2d4ae13add9ae136221e04aa53c71ed1dce74781f5a972594752",
+      "passed": 4,
+      "failures": 0,
+      "warnings": 0,
+      "terminalSuccess": true
+    },
+    "selected": [
+      {
+        "batch": 1,
+        "exitCode": 0,
+        "passed": 366,
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "cc3ccd5b1bab1a57084d55544d1485366aaa670f36bccef7044ed93d28c36487"
+      },
+      {
+        "batch": 2,
+        "exitCode": 0,
+        "passed": 356,
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "1958d1b4c6742982c0c4ba695fb70a9dae1829620732b13f5a571ca35dac6e4d"
+      },
+      {
+        "batch": 3,
+        "exitCode": 0,
+        "passed": 275,
+        "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+        "unchangedSource": true,
+        "terminalSuccess": true,
+        "failures": 0,
+        "warnings": 0,
+        "sha256": "6b3ce80a41c52c6f95c4f5bd6a9342c3eedb34e7ad4cc503caea7d20dcf75906"
+      }
+    ],
+    "selectedReferences": 1057
+  },
+  "native": {
+    "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+    "labels": [
+      "t10-native-blocker-cart-20261003",
+      "t10-native-blocker-original-payment-20261003",
+      "t10-native-blocker-review-cart-20261003"
+    ],
+    "fontRestored": true,
+    "noSubmission": true,
+    "attemptPreserved": true,
+    "attemptIdentityQualification": "Existing original payment screen and amount retained; no reset, full restart, build or install; live attempt correlation deferred.",
+    "originalAmount": 37,
+    "nativeActivationVerified": false,
+    "normalAnd200Percent": false,
+    "nativeFreshMixedQualified": false,
+    "reason": "Both cold and bounded warm reload reported zero libraries; new Cart markers absent. Native fixed-source journey remains unqualified.",
+    "reviewScreen": "Existing held Cart at normal text",
+    "status": "unresolved_child_native_source_activation",
+    "capturedRuntimeSourceSha256": null,
+    "sourceBindingQualification": "sourceSha256 identifies tested local source only. It was NOT activated. Captures show inherited running code; unchanged installed APK hash is not a Dart runtime source fingerprint."
+  },
+  "nativeIdentity": {
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.36-cursorreview",
+    "versionCode": "2026092701",
+    "installedSha256": "7d2e95b6a3d7be9136457d9103dbf262ceca306788c904e4170e85f16f70c4d5",
+    "fontScale": "1.0",
+    "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+    "apkUnchanged": true,
+    "noInstallOrSubmission": true
+  },
+  "finalRefreshProof": {
+    "sourceSha256": "6c35cbaec4bc375014f9bc4f6eb1ffb878032f84be105a1ad4383a36afba7bfd",
+    "attachExit": 0,
+    "responses": [
+      {
+        "id": 1,
+        "code": 0,
+        "message": "Reloaded 0 libraries",
+        "error": false
+      },
+      {
+        "id": 2,
+        "code": 0,
+        "message": "Reloaded 0 libraries",
+        "error": false
+      }
+    ],
+    "fullRestart": false,
+    "detached": true,
+    "unchangedSource": true,
+    "mtimesRestored": true,
+    "rawSessionSpecificLogExcluded": true,
+    "noBuildOrInstall": true,
+    "nativeActivationVerified": false
+  },
+  "integrationChildren": [
+    "Native source activation unresolved: cold and one bounded warm mtime-only reload each reported zero libraries; new Cart markers absent. Fixed-source native normal/200percent/fresh journey unqualified. Source bytes unchanged and mtimes restored. Stop retries; establish supported activation and authentic original-attempt persistence before any full restart or newly authorized candidate.",
+    "Backend/live-provider recovery deferred; workspace Codex after integration; Google separate.",
+    "Redmi retained original unresolved payment and one tomato/37 rupees. Native fresh/mixed/empty journey unqualified until authentic recovery; never clear attempt or inject fixtures to manufacture evidence.",
+    "New host fresh mixed journey covers Shop plus Wholesale. Existing selected cases cover other Cart/selection/offer/payment states. Host fixtures are not live payment or backend qualification.",
+    "Before live recovery enablement verify authoritative original attempt, account ownership/correlation, unknown/pending reconciliation and duplicate prevention, late callback/identity clearing, fresh quantity/price/availability and correct current terms.",
+    "Inherited25 legacy Checkout failures remain open; no full Checkout suite qualification claimed.",
+    "Existing undeclared protected-reference tag warnings retained; runner zero-warning claim is limited to layout/hit-test warnings, not all textual warnings.",
+    "Some host capture labels render as glyph rectangles; native screenshots/XML determine device visual evidence. No unsupported claim that all host rendering is production-identical.",
+    "Disabled Empty Cart has no callback, but its explicitly red delete icon remains a visual-polish follow-up; final held host captures obscure the header with an inherited notice. Verify disabled appearance on correctly activated native source before visual approval.",
+    "T08 live balance, T09 live refund/replacement and accepted request history, raw-evidence fresh-checkout conversion, historic0e90a6ca formal closure and founder visual approval remain open."
+  ],
+  "qualification": "Frontend source-bound focused/selected tests qualified. Existing held Redmi original-payment readback only; fixed-source native activation unresolved. No formal closure/release/live integration.",
+  "checkpoint": "Fresh staged-byte readback, memory/pre_commit, ordinary scoped commit/push and clean remote equality required; no success pre-claimed"
+}
