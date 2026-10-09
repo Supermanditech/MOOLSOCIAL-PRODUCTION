@@ -134,7 +134,7 @@ if($compatibilityIncremental) {
   $ast=[System.Management.Automation.Language.Parser]::ParseFile($checkerPath,[ref]$tokens,[ref]$errors)
   Assert-IncrementalTicket ($errors.Count -eq 0) 'compatibility graph checker has parse errors.'
   foreach($name in @('Assert-Coordination','Get-OctoberCompatibilityBinding',
-      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Test-OctoberCompatibilityBindingInventory',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage')) {
     $functions=@($ast.FindAll({param($node)
       $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name
@@ -150,10 +150,10 @@ if($compatibilityIncremental) {
     -Bindings @($compatibilityPolicy.productionGitDiscipline.continuationBindings) `
     -BaseBindings @($basePolicy.productionGitDiscipline.continuationBindings)) 'compatibility binding inventory changed.'
   Assert-IncrementalTicket ($Phase -cne 'ticket_start' -or $compatibilityHistory.Stage -eq 1) 'compatibility start must be clean at exact G, not unqualified E.'
-  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6)) 'compatibility implementation requires exact G/C/A/H/J/L.'
+  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6,7)) 'compatibility implementation requires exact G/C/A/H/J/K/L5.'
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
-  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 7) 'compatibility handoff requires exact Q after amended L.'
+  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 8) 'compatibility handoff requires exact Q after amended L5.'
 }
 
 $baselineTag = [string]$state.baselineTag

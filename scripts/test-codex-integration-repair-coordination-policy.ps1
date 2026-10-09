@@ -7,7 +7,9 @@ param(
   [switch]$RequireCompatibilityStageProbes,
   [switch]$RequireCompatibilityLiveAdmissionProbes,
   [ValidateSet('publication_contracts','impacted_store_buy','store_layout_and_recovery','enabled_review_fixture')]
-  [string]$CaptureCompatibilityReport
+  [string]$CaptureCompatibilityReport,
+  [ValidateSet('default','localstock_review','workspace_capture','historical_store_review','historical_store_capture','store_live_capture','founder_capture')]
+  [string]$CaptureExecutionId = 'default'
 )
 
 Set-StrictMode -Version Latest
@@ -23,20 +25,64 @@ function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
 }
 
+function Invoke-OctoberCompatibilityVisualEnvironment {
+  param([hashtable]$Values,[scriptblock]$Invocation)
+  $keys=@('MOOLSOCIAL_COMPAT_VISUAL_MANIFEST','MOOLSOCIAL_COMPAT_EXECUTION_LOG',
+    'MOOLSOCIAL_COMPAT_SOURCE_COMMIT','MOOLSOCIAL_COMPAT_SOURCE_TREE','MOOLSOCIAL_COMPAT_EXECUTION_ID')
+  if($null -eq $Values -or $null -eq $Invocation -or $Values.Count -notin @(0,5)){throw 'Recorder environment requires empty or complete literal bindings.'}
+  foreach($name in $Values.Keys) {
+    if($keys -cnotcontains $name -or $Values[$name] -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($Values[$name])){throw 'Recorder environment rejects unknown or invalid bindings.'}
+  }
+  $previous=@{}
+  foreach($name in $keys){$previous[$name]=[Environment]::GetEnvironmentVariable($name,'Process')}
+  try {
+    foreach($name in $keys){
+      if($Values.ContainsKey($name)){[Environment]::SetEnvironmentVariable($name,$Values[$name],'Process')}
+      else{[Environment]::SetEnvironmentVariable($name,[NullString]::Value,'Process')}
+    }
+    & $Invocation
+  } finally {
+    foreach($name in $keys){
+      if($null -eq $previous[$name]){[Environment]::SetEnvironmentVariable($name,[NullString]::Value,'Process')}
+      else{[Environment]::SetEnvironmentVariable($name,$previous[$name],'Process')}
+    }
+  }
+}
+
+function Invoke-OctoberCompatibilityComparatorBoundCapture {
+  param([hashtable]$Receipt,[scriptblock]$Invocation)
+  if($null -eq $Receipt -or $Receipt.Count -ne 0 -or $null -eq $Invocation){throw 'Comparator capture requires a fresh receipt and invocation.'}
+  $before=Get-OctoberCompatibilityComparatorIdentity
+  $Receipt.comparatorImplementationSha256Before=$before
+  $Receipt.comparatorSdkCommitBefore=if($null -ne $before){'ee80f08bbf97172ec030b8751ceab557177a34a6'}else{$null}
+  $Receipt.comparatorCheckedBeforeAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
+  Assert-RepairContract ($before -ceq 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA') 'comparator SDK unavailable before capture.'
+  try {& $Invocation} finally {
+    $after=Get-OctoberCompatibilityComparatorIdentity
+    $Receipt.comparatorImplementationSha256After=$after
+    $Receipt.comparatorSdkCommitAfter=if($null -ne $after){'ee80f08bbf97172ec030b8751ceab557177a34a6'}else{$null}
+    $Receipt.comparatorCheckedAfterAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
+    Assert-RepairContract ($after -ceq 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA') 'comparator SDK changed/unavailable after capture.'
+  }
+}
+
+Assert-RepairContract ($CaptureCompatibilityReport -or $CaptureExecutionId -ceq 'default') 'execution selection requires capture mode.'
+
 if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbes -or $CaptureCompatibilityReport) {
   $tokens=$null; $errors=$null
   $ast=[System.Management.Automation.Language.Parser]::ParseFile(
     $checkerPath,[ref]$tokens,[ref]$errors)
   Assert-RepairContract ($errors.Count -eq 0) 'checker has parse errors.'
   foreach ($name in @('Get-OctoberCompatibilityBinding',
-      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Test-OctoberCompatibilityBindingInventory',
       'Test-OctoberCompatibilityStageFacts','Test-OctoberCompatibilityIntegrationIdentity','Assert-Coordination',
       'Get-OctoberCoverageBoundHash','New-OctoberCoverageMutex','Test-OctoberCoveragePreparation','Test-OctoberHandoverPreparation',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage',
-      'Test-OctoberCompatibilityQualification','Read-OctoberCompatibilityReportEvents',
+      'Test-OctoberCompatibilityQualification','Get-OctoberCompatibilityComparatorIdentity','Test-OctoberCompatibilityCaptureComparator','Test-OctoberCompatibilityVisualQualification','Test-OctoberCompatibilityLegacyQualification','Read-OctoberCompatibilityExecutionCoverage','Read-OctoberCompatibilityVisualManifestBinding','Test-OctoberCompatibilityVisualEvidenceShape','Read-OctoberCompatibilityVisualArtifactBytes','Read-OctoberCompatibilityJsonObject','Get-OctoberCompatibilityQualificationExecutions','Read-OctoberCompatibilityExecutionEvents','Read-OctoberCompatibilityExecutionEvidence','Get-OctoberCompatibilityByteHash','Read-OctoberCompatibilityReportEvents',
       'Get-OctoberCompatibilityReportPlan','Get-OctoberCompatibilityExecutionPlan','Test-OctoberCompatibilityCapture',
       'Test-OctoberCompatibilitySourceMarker','Test-OctoberCompatibilityCoverageSpecification',
-      'Get-OctoberCompatibilityCoverageSpecification','Test-OctoberCoveragePreCommitInventory')) {
+      'Get-OctoberCompatibilityCoverageSpecification','Read-OctoberCompatibilityResolutionSpecification','Get-OctoberCompatibilityResolutionSpecification','Get-OctoberCompatibilityVisualProtocol','Test-OctoberCompatibilityKResolution','Read-OctoberCompatibilityTrustedVisualDecisions','Read-OctoberCompatibilityPngPixels','Test-OctoberCompatibilityPngEquality','Read-OctoberCompatibilityVisualObservations','Open-OctoberCompatibilityVisualArtifact','Test-OctoberCompatibilityLockedPngPair','Test-OctoberCompatibilityVisualSlot','Test-OctoberCoveragePreCommitInventory')) {
     $nodes=@($ast.FindAll({param($node)
       $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
         $node.Name -ceq $name
@@ -45,6 +91,716 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     . ([scriptblock]::Create($nodes[0].Extent.Text))
   }
   $binding=Get-OctoberCompatibilityBinding
+  if($RequireCompatibilityStageProbes) {
+    $resolutionText=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
+    $resolutionBlocks=[regex]::Matches($resolutionText,'(?s)<!-- COMPATIBILITY_RESOLUTION_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_RESOLUTION_JSON_END -->')
+    Assert-RepairContract ($resolutionBlocks.Count -eq 1) 'resolution fixture source missing or ambiguous.'
+    $resolutionJson=$resolutionBlocks[0].Groups[1].Value
+    $resolution=Read-OctoberCompatibilityResolutionSpecification $resolutionJson
+    Assert-RepairContract ($null -ne $resolution -and $resolution.cases.Count -eq 84) 'exact resolution specification rejected.'
+    Assert-RepairContract ($null -ne (Read-OctoberCompatibilityResolutionSpecification (" `n"+$resolutionJson+"`n "))) 'normalized exact resolution rejected.'
+    $visualProtocol=Get-OctoberCompatibilityVisualProtocol
+    Assert-RepairContract ($null -ne $visualProtocol -and $visualProtocol.decisionCount -eq 65) 'exact working visual protocol rejected.'
+    Assert-RepairContract ($null -eq (Get-OctoberCompatibilityVisualProtocol -Commit 'not-a-commit')) 'invalid protocol commit admitted.'
+    Assert-RepairContract ($null -eq (Get-OctoberCompatibilityVisualProtocol -FromIndex -Commit ('c'*40))) 'mixed protocol source admitted.'
+    & {
+      $kResolutionFixtureBlock=[regex]::Match($resolutionText,'(?s)<!-- COMPATIBILITY_QUALIFICATION_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_QUALIFICATION_JSON_END -->')
+      # Permanent fixtures must survive actual K staging and later verified Q.
+      # Today's unstaged/pending observations belong to read-only diagnostics.
+      $kResolutionFixtureBaseline=[pscustomobject]@{schemaVersion=2;state='pending';sourceCommit=$null;sourceTree=$null;resolutionCommit=$null;
+        resolutionSpecificationSha256='69FD2DADE14A3A3CF52F1DFC20248E1C15D0F58386BB8F5DE9E8C78EDC4454F8';
+        coverageCommit='7ccc0f01372276f6bc0b654544c95fc56c7b7086';
+        coverageSpecificationSha256='7BBB55F9CC4A3B12483241A78BC5B754F12CD6F22F3AAF48EB72423616B98569';
+        registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3';reports=@();
+        visualProtocolSha256='6D71DBB461594FE0DD58B1FEB48AD2F3F47AAFF8EE863AE9CB7917167A87DA19';
+        trustedVisualAnchorSha256=$null;comparatorImplementationSha256='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA'}
+      $kResolutionFixtureBaselineJson=$kResolutionFixtureBaseline|ConvertTo-Json -Compress -Depth 8
+      foreach($kResolutionFixtureMode in @('positive','verified','coerced-schema','foreign-pin','claimed-source','claimed-anchor','nonempty-reports','extra-field','missing-field')) {
+        & {
+          $kResolutionFixtureContext=@{Reads=0;Unexpected=$false}
+          $kResolutionFixturePending=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($kResolutionFixtureBaselineJson))
+          switch -CaseSensitive ($kResolutionFixtureMode) {
+            'verified' {$kResolutionFixturePending.state='verified'}
+            'coerced-schema' {$kResolutionFixturePending.schemaVersion=@(2)}
+            'foreign-pin' {$kResolutionFixturePending.visualProtocolSha256='0'*64}
+            'claimed-source' {$kResolutionFixturePending.sourceCommit='a'*40}
+            'claimed-anchor' {$kResolutionFixturePending.trustedVisualAnchorSha256='F'*64}
+            'nonempty-reports' {$kResolutionFixturePending.reports=@([pscustomobject]@{id='labelled fake'})}
+            'extra-field' {$kResolutionFixturePending|Add-Member -NotePropertyName unowned -NotePropertyValue $true}
+            'missing-field' {$kResolutionFixturePending.PSObject.Properties.Remove('comparatorImplementationSha256')}
+          }
+          $kResolutionFixtureDocument=$resolutionText.Replace($kResolutionFixtureBlock.Groups[1].Value,($kResolutionFixturePending|ConvertTo-Json -Depth 8 -Compress))
+          function Get-OctoberCompatibilityGitLines {
+            param([string[]]$Arguments)
+            $kResolutionFixtureContext.Reads++
+            if(($Arguments -join '|') -cne 'show|:docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'){
+              $kResolutionFixtureContext.Unexpected=$true;throw 'Unexpected labelled K index read'
+            }
+            return $kResolutionFixtureDocument
+          }
+          $kResolutionFixtureResult=Test-OctoberCompatibilityKResolution -FromIndex
+          Assert-RepairContract ($kResolutionFixtureResult -eq ($kResolutionFixtureMode -ceq 'positive')) ('K staged resolution result incorrect: '+$kResolutionFixtureMode)
+          Assert-RepairContract (-not $kResolutionFixtureContext.Unexpected -and $kResolutionFixtureContext.Reads -eq 3) ('K used wrong source/selection: '+$kResolutionFixtureMode)
+        }
+      }
+      Write-Output 'Compatibility K resolution: 9 labelled staged-read probes passed independently of real preparation/Q state; no staging or source qualification.'
+    }
+    & {
+      # Execute the actual three live dispatch statements, not copied predicates.
+      $liveKBlocks=@{}
+      foreach($liveKSelection in @(
+          @('facts','$compatibilityFacts.KPreparationVerified=Test-OctoberCoverageCartPreparation'),
+          @('owner','$octoberCoveragePreservedOwner=@(Get-OctoberCompatibilityHandoverOwners)'),
+          @('inventory','K precommit must stage exact metadata4/resolution'))) {
+        $liveKNeedle=$liveKSelection[1]
+        $liveKNodes=@($ast.FindAll({param($n)
+          $n -is [System.Management.Automation.Language.IfStatementAst] -and
+          $n.Extent.Text.Contains($liveKNeedle) -and $n.Extent.Text.Length -lt 1500
+        },$true))
+        Assert-RepairContract ($liveKNodes.Count -eq 1) ('missing/ambiguous K live block: '+$liveKSelection[0])
+        $liveKBlocks[$liveKSelection[0]]=[scriptblock]::Create($liveKNodes[0].Extent.Text)
+      }
+      $liveKContext=@{Preparation=$true;Resolution=$true;Calls=@();FromIndex=$false}
+      function Test-OctoberCoverageCartPreparation {param([string]$Phase)
+        $liveKContext.Calls+=@($Phase);return $liveKContext.Preparation}
+      function Test-OctoberCompatibilityKResolution {param([switch]$FromIndex)
+        $liveKContext.FromIndex=$FromIndex.IsPresent;return $liveKContext.Resolution}
+      function Assert-Coordination {param([bool]$Condition,[string]$Message)
+        if(-not $Condition){throw $Message}}
+      foreach($liveKPhase in @('implementation','pre_commit')) {
+        $compatibilityHistory=[pscustomobject]@{Stage=5};$ProductionPhase=$liveKPhase;$compatibilityFacts=@{}
+        $liveKContext.Calls=@();$liveKContext.FromIndex=$false
+        . $liveKBlocks.facts
+        Assert-RepairContract ($compatibilityFacts.KPreparationVerified -eq $true -and
+          $compatibilityFacts.KResolutionVerified -eq $true -and
+          ($liveKContext.Calls -join '|') -ceq $liveKPhase -and
+          $liveKContext.FromIndex -eq ($liveKPhase -ceq 'pre_commit')) 'K live reader selection differs.'
+      }
+      $octoberCompatibilityIdentity=$true;$compatibilityHistory=[pscustomobject]@{Stage=5}
+      $ProductionPhase='pre_commit';$compatibilityFacts=@{KPreparationVerified=$true;KResolutionVerified=$true}
+      $liveKStaged=@(Get-OctoberCompatibilityAmendmentOwners)
+      $liveKUnstaged=@(Get-OctoberCompatibilityHandoverOwners)
+      foreach($liveKMode in @('positive','missing-staged','extra-staged','staged-source','missing-session',
+          'buy-dirt','untracked','false-preservation','false-resolution','foreign-identity','stage6')) {
+        $preCommitStagedOwners=@($liveKStaged);$preCommitUnstagedOwners=@($liveKUnstaged);$preCommitUntrackedOwners=@()
+        $compatibilityHistory.Stage=5;$octoberCompatibilityIdentity=$true
+        $compatibilityFacts=@{KPreparationVerified=$true;KResolutionVerified=$true}
+        switch($liveKMode) {
+          'missing-staged' {$preCommitStagedOwners=@($liveKStaged[0..2])}
+          'extra-staged' {$preCommitStagedOwners+=@('extra.txt')}
+          'staged-source' {$preCommitStagedOwners+=@($liveKUnstaged[0])}
+          'missing-session' {$preCommitUnstagedOwners=@($liveKUnstaged|Where-Object {$_ -cne 'apps/mobile/lib/features/work/work_session.dart'})}
+          'buy-dirt' {$preCommitUnstagedOwners+=@('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart')}
+          'untracked' {$preCommitUntrackedOwners=@('extra.txt')}
+          'false-preservation' {$compatibilityFacts.KPreparationVerified=$false}
+          'false-resolution' {$compatibilityFacts.KResolutionVerified=$false}
+          'foreign-identity' {$octoberCompatibilityIdentity=$false}
+          'stage6' {$compatibilityHistory.Stage=6}
+        }
+        $octoberCoveragePreparationPending=$false;$liveKRejected=$false
+        try {. $liveKBlocks.inventory} catch {$liveKRejected=$true}
+        Assert-RepairContract ($octoberCoveragePreparationPending -eq ($liveKMode -ceq 'positive')) ('K inventory result: '+$liveKMode)
+        Assert-RepairContract ($liveKRejected -eq ($liveKMode -cnotin @('positive','foreign-identity','stage6'))) ('K inventory reach: '+$liveKMode)
+      }
+      foreach($liveKOwnerMode in @('positive','buy','unknown','false-preservation','stage6','foreign-identity','wrong-phase')) {
+        $compatibilityHistory.Stage=5;$octoberCompatibilityIdentity=$true;$ProductionPhase='implementation'
+        $compatibilityFacts=@{KPreparationVerified=$true};$changedOwner=$liveKUnstaged[0]
+        switch($liveKOwnerMode) {
+          'buy' {$changedOwner='apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'}
+          'unknown' {$changedOwner='extra.dart'}
+          'false-preservation' {$compatibilityFacts.KPreparationVerified=$false}
+          'stage6' {$compatibilityHistory.Stage=6}
+          'foreign-identity' {$octoberCompatibilityIdentity=$false}
+          'wrong-phase' {$ProductionPhase='publication'}
+        }
+        $octoberCoveragePreservedOwner=$false
+        . $liveKBlocks.owner
+        Assert-RepairContract ($octoberCoveragePreservedOwner -eq ($liveKOwnerMode -ceq 'positive')) ('K owner result: '+$liveKOwnerMode)
+      }
+      Write-Output 'Compatibility K live dispatch: 20 labelled statement probes passed; no actual staging/admission or app edit.'
+    }
+    & {
+      Assert-RepairContract ((Get-OctoberCompatibilityComparatorIdentity) -ceq 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA') 'actual configured comparator SDK not verified.'
+      foreach($sdkFixtureMode in @('positive','wrong-commit','dirty-library','wrong-hash','git-failed')) {
+        & {
+          $sdkFixtureContext=@{UnexpectedRead=$false}
+          function Get-OctoberCompatibilityGitLines {
+            param([string[]]$Arguments)
+            $sdkFixtureSelection=$Arguments -join '|'
+            if($sdkFixtureSelection -cnotin @('-C|C:/Users/jisal/develop/flutter|rev-parse|HEAD',
+              '-C|C:/Users/jisal/develop/flutter|status|--porcelain|--untracked-files=all|--|packages/flutter_test/lib')) {
+              $sdkFixtureContext.UnexpectedRead=$true;throw 'Unexpected labelled SDK Git selection'
+            }
+            if($sdkFixtureMode -ceq 'git-failed'){throw 'Labelled SDK Git failure'}
+            if($sdkFixtureSelection -ceq '-C|C:/Users/jisal/develop/flutter|rev-parse|HEAD') {
+              if($sdkFixtureMode -ceq 'wrong-commit'){return ('0'*40)};return 'ee80f08bbf97172ec030b8751ceab557177a34a6'
+            }
+            if($sdkFixtureMode -ceq 'dirty-library'){return ' M packages/flutter_test/lib/src/_goldens_io.dart'}
+          }
+          function Get-OctoberCoverageBoundHash {
+            param([string]$Path)
+            if(-not [string]::Equals([IO.Path]::GetFullPath($Path),[IO.Path]::GetFullPath('C:/Users/jisal/develop/flutter/packages/flutter_test/lib/src/_goldens_io.dart'),[StringComparison]::OrdinalIgnoreCase)) {
+              $sdkFixtureContext.UnexpectedRead=$true;throw 'Unexpected labelled SDK hash path'
+            }
+            if($sdkFixtureMode -ceq 'wrong-hash'){return ('0'*64)};return 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA'
+          }
+          $sdkFixtureResult=Get-OctoberCompatibilityComparatorIdentity
+          Assert-RepairContract (($null -ne $sdkFixtureResult) -eq ($sdkFixtureMode -ceq 'positive')) ('SDK identity result incorrect: '+$sdkFixtureMode)
+          Assert-RepairContract (-not $sdkFixtureContext.UnexpectedRead) ('SDK probe used an unintended query/path: '+$sdkFixtureMode)
+        }
+      }
+      Write-Output 'Compatibility comparator SDK: actual configured identity and5 labelled rejection/positive probes passed; no visual invocation inferred.'
+    }
+    & {
+      foreach($sdkBoundaryFixtureMode in @('positive','before-failed','after-failed','invocation-threw')) {
+        & {
+          $sdkBoundaryFixtureContext=@{Reads=0;Invocations=0};$sdkBoundaryFixtureReceipt=@{}
+          $sdkBoundaryFixtureStarted=[DateTimeOffset]::UtcNow.ToString('o');$sdkBoundaryFixtureThrown=$false
+          function Get-OctoberCompatibilityComparatorIdentity {
+            $sdkBoundaryFixtureContext.Reads++
+            if($sdkBoundaryFixtureMode -ceq 'before-failed'){return $null}
+            if($sdkBoundaryFixtureMode -ceq 'after-failed' -and $sdkBoundaryFixtureContext.Reads -eq 2){return ('0'*64)}
+            return 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA'
+          }
+          try {
+            Invoke-OctoberCompatibilityComparatorBoundCapture -Receipt $sdkBoundaryFixtureReceipt -Invocation {
+              $sdkBoundaryFixtureContext.Invocations++
+              if($sdkBoundaryFixtureMode -ceq 'invocation-threw'){throw 'Labelled capture invocation failure'}
+            }
+          } catch {$sdkBoundaryFixtureThrown=$true}
+          $sdkBoundaryFixtureFinished=[DateTimeOffset]::UtcNow.ToString('o')
+          Assert-RepairContract ($sdkBoundaryFixtureThrown -eq ($sdkBoundaryFixtureMode -cne 'positive')) ('capture exception boundary incorrect: '+$sdkBoundaryFixtureMode)
+          $sdkBoundaryFixtureExpectedReads=if($sdkBoundaryFixtureMode -ceq 'before-failed'){1}else{2}
+          $sdkBoundaryFixtureExpectedInvocations=if($sdkBoundaryFixtureMode -ceq 'before-failed'){0}else{1}
+          Assert-RepairContract ($sdkBoundaryFixtureContext.Reads -eq $sdkBoundaryFixtureExpectedReads -and
+            $sdkBoundaryFixtureContext.Invocations -eq $sdkBoundaryFixtureExpectedInvocations) ('SDK/capture boundary not reached: '+$sdkBoundaryFixtureMode)
+          $sdkBoundaryFixtureReceipt.startedAtUtc=$sdkBoundaryFixtureStarted;$sdkBoundaryFixtureReceipt.finishedAtUtc=$sdkBoundaryFixtureFinished
+          Assert-RepairContract ((Test-OctoberCompatibilityCaptureComparator ([pscustomobject]$sdkBoundaryFixtureReceipt)) -eq
+            ($sdkBoundaryFixtureMode -cin @('positive','invocation-threw'))) ('SDK receipt binding incorrect: '+$sdkBoundaryFixtureMode)
+        }
+      }
+      $sdkShapeFixtureBase=[pscustomobject]@{startedAtUtc='2026-10-10T00:00:00.0000000+00:00';finishedAtUtc='2026-10-10T00:00:03.0000000+00:00';
+        comparatorImplementationSha256Before='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA';
+        comparatorImplementationSha256After='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA';
+        comparatorSdkCommitBefore='ee80f08bbf97172ec030b8751ceab557177a34a6';comparatorSdkCommitAfter='ee80f08bbf97172ec030b8751ceab557177a34a6';
+        comparatorCheckedBeforeAtUtc='2026-10-10T00:00:01.0000000+00:00';comparatorCheckedAfterAtUtc='2026-10-10T00:00:02.0000000+00:00'}
+      Assert-RepairContract (Test-OctoberCompatibilityCaptureComparator $sdkShapeFixtureBase) 'labelled SDK capture metadata rejected.'
+      foreach($sdkShapeFixtureMutation in @(
+        @{name='comparatorImplementationSha256Before';value=('0'*64)},@{name='comparatorSdkCommitAfter';value=('0'*40)},
+        @{name='comparatorCheckedBeforeAtUtc';value='2026-10-09T00:00:01.0000000+00:00'},
+        @{name='comparatorCheckedAfterAtUtc';value='2026-10-11T00:00:02.0000000+00:00'},
+        @{name='comparatorCheckedAfterAtUtc';value='2026-10-10T00:00:00.5000000+00:00'},
+        @{name='comparatorCheckedBeforeAtUtc';value=[DateTimeOffset]::UtcNow},
+        @{name='comparatorCheckedBeforeAtUtc';value='2026-10-10T00:00:01.0000000+05:30'})) {
+        $sdkShapeFixtureChanged=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($sdkShapeFixtureBase|ConvertTo-Json -Compress)))
+        $sdkShapeFixtureChanged.($sdkShapeFixtureMutation.name)=$sdkShapeFixtureMutation.value
+        Assert-RepairContract (-not(Test-OctoberCompatibilityCaptureComparator $sdkShapeFixtureChanged)) ('invalid SDK capture metadata admitted: '+$sdkShapeFixtureMutation.name)
+      }
+      $sdkShapeFixtureMissing=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($sdkShapeFixtureBase|ConvertTo-Json -Compress)))
+      $sdkShapeFixtureMissing.PSObject.Properties.Remove('comparatorImplementationSha256After')
+      Assert-RepairContract (-not(Test-OctoberCompatibilityCaptureComparator $sdkShapeFixtureMissing)) 'missing capture SDK identity admitted.'
+      Write-Output 'Compatibility capture SDK boundaries: 4 actual host-wrapper probes and9 labelled metadata cases passed; no Flutter or visual acceptance.'
+    }
+    & {
+      function Invoke-LabelledVisualAggregate([string]$Mode) {
+        $visualAggregateFixtureRows=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+        foreach($visualAggregateFixtureRow in $resolution.cases){foreach($visualAggregateFixtureSlot in $visualAggregateFixtureRow.comparisonSlots){
+          $visualAggregateFixtureRows.Add($visualAggregateFixtureSlot.slotId,@{Row=$visualAggregateFixtureRow;Slot=$visualAggregateFixtureSlot})
+        }}
+        $visualAggregateFixtureContext=@{Mode=$Mode;TrustReads=0;ExecutionReads=0;SlotReads=0;ManifestReads=@{};
+          Leases=[Collections.Generic.List[object]]::new();CurrentExecution='';FinalLogHashReached=$false}
+        $visualAggregateFixtureInventory=[Collections.Generic.List[object]]::new()
+        foreach($visualAggregateFixtureCategory in @('publication_contracts','impacted_store_buy','store_layout_and_recovery','enabled_review_fixture')) {
+          $visualAggregateFixtureExecutions=if($visualAggregateFixtureCategory -ceq 'store_layout_and_recovery'){
+            @('default','localstock_review','workspace_capture','historical_store_review','historical_store_capture','store_live_capture','founder_capture')
+          }else{@('default')}
+          foreach($visualAggregateFixtureExecution in $visualAggregateFixtureExecutions){
+            $visualAggregateFixtureInventory.Add(@{ReportId=$visualAggregateFixtureCategory;ExecutionId=$visualAggregateFixtureExecution;
+              Evidence=[pscustomobject]@{path=('apps/mobile/build/labelled-'+$visualAggregateFixtureCategory+'-'+$visualAggregateFixtureExecution+'.jsonl');sha256=('F'*64);
+                capturePath=('apps/mobile/build/labelled-'+$visualAggregateFixtureCategory+'-'+$visualAggregateFixtureExecution+'.jsonl.capture.json');captureSha256=('F'*64)}})
+          }
+        }
+        function Get-OctoberCompatibilityQualificationExecutions {
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-execution'){return $visualAggregateFixtureInventory.ToArray()[0..8]}
+          return $visualAggregateFixtureInventory.ToArray()
+        }
+        function Read-OctoberCompatibilityTrustedVisualDecisions {
+          $visualAggregateFixtureContext.TrustReads++
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-trust' -or
+              ($visualAggregateFixtureContext.Mode -ceq 'changed-anchor' -and $visualAggregateFixtureContext.TrustReads -eq 2)){return $null}
+          $visualAggregateFixtureDecisions=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+          foreach($visualAggregateFixtureId in $visualAggregateFixtureRows.Keys){$visualAggregateFixtureDecisions.Add($visualAggregateFixtureId,[pscustomobject]@{slotId=$visualAggregateFixtureId})}
+          if($visualAggregateFixtureContext.Mode -ceq 'foreign-anchor-slot') {
+            $visualAggregateFixtureFirst=@($visualAggregateFixtureDecisions.Keys)[0];[void]$visualAggregateFixtureDecisions.Remove($visualAggregateFixtureFirst)
+            $visualAggregateFixtureDecisions.Add('H99-visual-1',[pscustomobject]@{slotId='H99-visual-1'})
+          }
+          return [pscustomobject]@{Decisions=$visualAggregateFixtureDecisions}
+        }
+        function Read-OctoberCompatibilityExecutionEvidence {
+          param([object]$Evidence,[string]$ReportId,[string]$ExecutionId)
+          $visualAggregateFixtureContext.ExecutionReads++;$visualAggregateFixtureContext.CurrentExecution=$ExecutionId
+          if($visualAggregateFixtureContext.Mode -ceq 'failed-default' -and $ReportId -ceq 'store_layout_and_recovery' -and $ExecutionId -ceq 'default'){return $null}
+          $visualAggregateFixtureSuccess=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+          foreach($visualAggregateFixtureRow in $resolution.cases){[void]$visualAggregateFixtureSuccess.Add($visualAggregateFixtureRow.originalKey)}
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-original-success'){$visualAggregateFixtureSuccess.Clear()}
+          return @{Successes=$visualAggregateFixtureSuccess}
+        }
+        function Read-OctoberCompatibilityVisualManifestBinding {
+          param([object]$Evidence,[string]$ExecutionId,[string]$RecorderBlob,[string[]]$ExpectedSlotIds)
+          if(-not $visualAggregateFixtureContext.ManifestReads.ContainsKey($ExecutionId)){$visualAggregateFixtureContext.ManifestReads[$ExecutionId]=0}
+          $visualAggregateFixtureContext.ManifestReads[$ExecutionId]++
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-manifest' -or $RecorderBlob -cne ('d'*40) -or
+              ($visualAggregateFixtureContext.Mode -ceq 'changed-manifest' -and $visualAggregateFixtureContext.ManifestReads[$ExecutionId] -eq 2)){return $null}
+          $visualAggregateFixtureEntries=@($ExpectedSlotIds|ForEach-Object {[pscustomobject]@{slotId=$_}})
+          if($visualAggregateFixtureContext.Mode -ceq 'duplicate-manifest' -and $visualAggregateFixtureEntries.Count -gt 1){$visualAggregateFixtureEntries[-1].slotId=$visualAggregateFixtureEntries[0].slotId}
+          return [pscustomobject]@{entries=$visualAggregateFixtureEntries}
+        }
+        function Open-OctoberCompatibilityVisualArtifact {
+          param([string]$RelativePath)
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-log' -and $RelativePath.EndsWith('.jsonl',[StringComparison]::Ordinal)){return $null}
+          $visualAggregateFixtureLease=[IO.MemoryStream]::new();$visualAggregateFixtureContext.Leases.Add($visualAggregateFixtureLease)
+          $visualAggregateFixtureBuffer=[byte[]]@(1)
+          if($RelativePath.EndsWith('.capture.json',[StringComparison]::Ordinal)) {
+            $visualAggregateFixtureCapture=[pscustomobject]@{startedAtUtc='2026-10-10T00:00:00.0000000+00:00';finishedAtUtc='2026-10-10T00:00:03.0000000+00:00';
+              comparatorImplementationSha256Before='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA';
+              comparatorImplementationSha256After='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA';
+              comparatorSdkCommitBefore='ee80f08bbf97172ec030b8751ceab557177a34a6';comparatorSdkCommitAfter='ee80f08bbf97172ec030b8751ceab557177a34a6';
+              comparatorCheckedBeforeAtUtc='2026-10-10T00:00:01.0000000+00:00';comparatorCheckedAfterAtUtc='2026-10-10T00:00:02.0000000+00:00'}
+            if($visualAggregateFixtureContext.Mode -ceq 'missing-capture-sdk'){$visualAggregateFixtureCapture.PSObject.Properties.Remove('comparatorSdkCommitBefore')}
+            $visualAggregateFixtureBuffer=[Text.Encoding]::UTF8.GetBytes(($visualAggregateFixtureCapture|ConvertTo-Json -Compress))
+          }
+          return [pscustomobject]@{Stream=$visualAggregateFixtureLease;Bytes=$visualAggregateFixtureBuffer;CanonicalPath='C:/labelled-host/log.jsonl'}
+        }
+        function Read-OctoberCompatibilityVisualObservations {
+          param([string]$ExecutionId)
+          $visualAggregateFixtureObservations=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+          foreach($visualAggregateFixtureId in $visualAggregateFixtureRows.Keys){
+            if($visualAggregateFixtureRows[$visualAggregateFixtureId].Row.executionId -ceq $ExecutionId){
+              $visualAggregateFixtureObservations.Add($visualAggregateFixtureId,[pscustomobject]@{slotId=$visualAggregateFixtureId})
+            }
+          }
+          if($visualAggregateFixtureContext.Mode -ceq 'missing-observation') {
+            [void]$visualAggregateFixtureObservations.Remove(@($visualAggregateFixtureObservations.Keys)[0])
+          }
+          if($visualAggregateFixtureContext.Mode -ceq 'foreign-observation') {
+            [void]$visualAggregateFixtureObservations.Remove(@($visualAggregateFixtureObservations.Keys)[0])
+            $visualAggregateFixtureObservations.Add('H99-visual-1',[pscustomobject]@{slotId='H99-visual-1'})
+          }
+          return [pscustomobject]@{Observations=$visualAggregateFixtureObservations}
+        }
+        function Test-OctoberCompatibilityVisualSlot {
+          param([object]$Evidence,[object]$Slot,[object]$Decision,[object]$Observation,[string]$TestKey,[string]$ExecutionId)
+          $visualAggregateFixtureContext.SlotReads++
+          return $visualAggregateFixtureContext.Mode -cne 'failed-slot' -and $Evidence.slotId -ceq $Slot.slotId -and
+            $Decision.slotId -ceq $Slot.slotId -and $Observation.slotId -ceq $Slot.slotId -and
+            $TestKey -ceq $Slot.requiredProof.originalTestKey -and $ExecutionId -ceq $Slot.requiredProof.executionId
+        }
+        function Get-OctoberCoverageBoundHash {
+          $visualAggregateFixtureContext.FinalLogHashReached=$true
+          if($visualAggregateFixtureContext.Mode -ceq 'changed-log'){return ('0'*64)};return ('F'*64)
+        }
+        $visualAggregateFixtureComparator=if($Mode -ceq 'wrong-comparator'){'0'*64}else{'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA'}
+        $visualAggregateFixtureRecorder=if($Mode -ceq 'wrong-recorder'){'e'*40}else{'d'*40}
+        $visualAggregateFixtureResult=Test-OctoberCompatibilityVisualQualification -Proof ([pscustomobject]@{}) -Resolution $resolution -Protocol $visualProtocol `
+          -Source ('a'*40) -Tree ('b'*40) -RegistrySha ('F'*64) -ProducerBlob ('c'*40) -RecorderBlob $visualAggregateFixtureRecorder `
+          -ComparatorImplementationSha256 $visualAggregateFixtureComparator -TrustedAnchorSha256 ('F'*64)
+        Assert-RepairContract ($visualAggregateFixtureResult -eq ($Mode -ceq 'positive')) ('visual aggregate result incorrect: '+$Mode)
+        foreach($visualAggregateFixtureLease in $visualAggregateFixtureContext.Leases){Assert-RepairContract (-not $visualAggregateFixtureLease.CanRead) ('aggregate log lease not disposed: '+$Mode)}
+        if($Mode -cin @('positive','changed-anchor')) {
+          Assert-RepairContract ($visualAggregateFixtureContext.ExecutionReads -eq 10 -and $visualAggregateFixtureContext.SlotReads -eq 65 -and
+            $visualAggregateFixtureContext.TrustReads -eq 2) ('complete65/10/final-anchor boundary not reached: '+$Mode)
+        }
+        if($Mode -cin @('positive','changed-log')){Assert-RepairContract $visualAggregateFixtureContext.FinalLogHashReached ('final log hash not reached: '+$Mode)}
+      }
+      foreach($visualAggregateFixtureMode in @('positive','missing-execution','missing-trust','foreign-anchor-slot','failed-default',
+        'missing-original-success','missing-manifest','duplicate-manifest','missing-log','missing-observation','foreign-observation',
+        'failed-slot','changed-manifest','changed-log','changed-anchor','wrong-comparator','wrong-recorder','missing-capture-sdk')) {
+        Invoke-LabelledVisualAggregate $visualAggregateFixtureMode
+      }
+      Write-Output 'Compatibility complete visual aggregation: 18 labelled in-memory cases passed; exact65/10 composition only, no actual visual/source approval.'
+    }
+    & {
+      $qualificationFixtureResolution=$resolution;$qualificationFixtureProtocol=$visualProtocol
+      $qualificationFixtureCoverage=[regex]::Match($resolutionText,'(?s)<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_END -->').Groups[1].Value
+      Assert-RepairContract (Test-OctoberCompatibilityCoverageSpecification $qualificationFixtureCoverage) 'qualification fixture lost immutable H specification.'
+      foreach($qualificationFixtureMode in @('positive','wrong-source','wrong-tree','wrong-resolution','wrong-coverage','wrong-registry',
+        'wrong-resolution-digest','wrong-protocol-digest','wrong-coverage-digest','missing-anchor','failed-sdk','wrong-sdk-proof',
+        'missing-recorder','failed-coverage','failed-visual')) {
+        & {
+          $qualificationFixtureContext=@{Mode=$qualificationFixtureMode;CoverageReached=$false;VisualReached=$false;UnexpectedRead=$false}
+          $qualificationFixtureProof=[pscustomobject]@{schemaVersion=2;state='verified';sourceCommit=('a'*40);sourceTree=('b'*40);
+            resolutionCommit=('c'*40);coverageCommit='7ccc0f01372276f6bc0b654544c95fc56c7b7086';
+            coverageSpecificationSha256='7BBB55F9CC4A3B12483241A78BC5B754F12CD6F22F3AAF48EB72423616B98569';
+            resolutionSpecificationSha256='69FD2DADE14A3A3CF52F1DFC20248E1C15D0F58386BB8F5DE9E8C78EDC4454F8';
+            visualProtocolSha256='6D71DBB461594FE0DD58B1FEB48AD2F3F47AAFF8EE863AE9CB7917167A87DA19';
+            registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3';
+            trustedVisualAnchorSha256=('F'*64);comparatorImplementationSha256='A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA';reports=@()}
+          switch -CaseSensitive ($qualificationFixtureMode) {
+            'wrong-source' {$qualificationFixtureProof.sourceCommit='0'*40}
+            'wrong-tree' {$qualificationFixtureProof.sourceTree='0'*40}
+            'wrong-resolution' {$qualificationFixtureProof.resolutionCommit='0'*40}
+            'wrong-coverage' {$qualificationFixtureProof.coverageCommit='0'*40}
+            'wrong-registry' {$qualificationFixtureProof.registrySha256='0'*64}
+            'wrong-resolution-digest' {$qualificationFixtureProof.resolutionSpecificationSha256='0'*64}
+            'wrong-protocol-digest' {$qualificationFixtureProof.visualProtocolSha256='0'*64}
+            'wrong-coverage-digest' {$qualificationFixtureProof.coverageSpecificationSha256='0'*64}
+            'missing-anchor' {$qualificationFixtureProof.PSObject.Properties.Remove('trustedVisualAnchorSha256')}
+            'wrong-sdk-proof' {$qualificationFixtureProof.comparatorImplementationSha256='0'*64}
+          }
+          $qualificationFixtureDoc='<!-- COMPATIBILITY_QUALIFICATION_JSON_BEGIN -->'+($qualificationFixtureProof|ConvertTo-Json -Compress -Depth 8)+'<!-- COMPATIBILITY_QUALIFICATION_JSON_END -->'
+          function Get-OctoberCompatibilityGitLines {
+            param([string[]]$Arguments)
+            $qualificationFixtureSelection=$Arguments -join '|'
+            switch -CaseSensitive ($qualificationFixtureSelection) {
+              ('rev-parse|'+('a'*40)+'^{tree}') {return ('b'*40)}
+              ('rev-parse|'+('a'*40)+':scripts/test-codex-integration-repair-coordination-policy.ps1') {return ('d'*40)}
+              ('rev-parse|'+('a'*40)+':apps/mobile/test/work_workspace_layout_safety_test.dart') {
+                if($qualificationFixtureContext.Mode -ceq 'missing-recorder'){return};return ('e'*40)
+              }
+              ('show|'+('f'*40)+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') {return $qualificationFixtureDoc}
+              'show|7ccc0f01372276f6bc0b654544c95fc56c7b7086:docs/quality/STORE-BUY-COMPATIBILITY-20261008.md' {
+                return '<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_BEGIN -->'+$qualificationFixtureCoverage+'<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_END -->'
+              }
+              default {$qualificationFixtureContext.UnexpectedRead=$true;throw 'Unexpected labelled qualification Git selection'}
+            }
+          }
+          function Get-OctoberCompatibilityResolutionSpecification {
+            param([string]$Commit)
+            if($Commit -cne ('c'*40)){return $null};return $qualificationFixtureResolution
+          }
+          function Get-OctoberCompatibilityVisualProtocol {
+            param([string]$Commit)
+            if($Commit -cne ('c'*40)){return $null};return $qualificationFixtureProtocol
+          }
+          function Read-OctoberCompatibilityExecutionCoverage {
+            param([object]$Proof,[string]$CoverageJson,[string]$Source,[string]$Tree,[string]$RegistrySha,[string]$ProducerBlob)
+            $qualificationFixtureContext.CoverageReached=$true
+            if($qualificationFixtureContext.Mode -ceq 'failed-coverage' -or -not(Test-OctoberCompatibilityCoverageSpecification $CoverageJson) -or
+              $Source -cne ('a'*40) -or $Tree -cne ('b'*40) -or $ProducerBlob -cne ('d'*40) -or
+              $RegistrySha -cne '8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'){return $null}
+            return @{VerifiedExecutions=10}
+          }
+          function Get-OctoberCompatibilityComparatorIdentity {
+            if($qualificationFixtureContext.Mode -ceq 'failed-sdk'){return $null};return 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA'
+          }
+          function Test-OctoberCompatibilityVisualQualification {
+            param([object]$Proof,[object]$Resolution,[object]$Protocol,[string]$Source,[string]$Tree,
+              [string]$RegistrySha,[string]$ProducerBlob,[string]$RecorderBlob,[string]$ComparatorImplementationSha256,[string]$TrustedAnchorSha256)
+            $qualificationFixtureContext.VisualReached=$true
+            return $qualificationFixtureContext.Mode -cne 'failed-visual' -and $Resolution.cases.Count -eq 84 -and $Protocol.decisionCount -eq 65 -and
+              $Source -ceq ('a'*40) -and $Tree -ceq ('b'*40) -and $ProducerBlob -ceq ('d'*40) -and $RecorderBlob -ceq ('e'*40) -and
+              $RegistrySha -ceq '8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3' -and
+              $ComparatorImplementationSha256 -ceq 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA' -and $TrustedAnchorSha256 -ceq ('F'*64)
+          }
+          $qualificationFixtureHistory=@{Stage=8;Head=('f'*40);Commits=@(('1'*40),('2'*40),('3'*40),
+            '7ccc0f01372276f6bc0b654544c95fc56c7b7086','84b889430abb84e67ea1cf3838c63841429f7712',('c'*40),('a'*40),('f'*40))}
+          $qualificationFixtureResult=Test-OctoberCompatibilityQualification $qualificationFixtureHistory
+          Assert-RepairContract ($qualificationFixtureResult -eq ($qualificationFixtureMode -ceq 'positive')) ('concrete Q conjunction result incorrect: '+$qualificationFixtureMode)
+          Assert-RepairContract (-not $qualificationFixtureContext.UnexpectedRead) ('Q rejection masked unintended Git read: '+$qualificationFixtureMode)
+          if($qualificationFixtureMode -cin @('positive','failed-coverage','failed-visual')) {
+            Assert-RepairContract $qualificationFixtureContext.CoverageReached ('Q coverage boundary not reached: '+$qualificationFixtureMode)
+          }
+          if($qualificationFixtureMode -cin @('positive','failed-visual')) {
+            Assert-RepairContract $qualificationFixtureContext.VisualReached ('Q visual conjunction not reached: '+$qualificationFixtureMode)
+          }
+        }
+      }
+      Write-Output 'Compatibility concrete Q conjunction: 15 labelled in-memory cases passed; no real graph, capture, approval or source qualified.'
+    }
+    & {
+      $observationFixtureSource='a'*40;$observationFixtureTree='b'*40
+      $observationFixtureComparator='C'*64
+      $observationFixtureKey='work_workspace_layout_safety_test.dart:labelled observation fixture'
+      $observationFixtureKeys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      [void]$observationFixtureKeys.Add($observationFixtureKey)
+      $observationFixtureRow=[ordered]@{schemaVersion=1;sourceCommit=$observationFixtureSource;sourceTree=$observationFixtureTree;
+        executionId='default';testKey=$observationFixtureKey;slotId='H01-visual-1';captureTarget='labelled root';
+        viewportWidth=412;viewportHeight=915;devicePixelRatio=1;textScale=1;bottomViewPadding=34;bottomViewInsets=0;
+        captureLogicalBounds=@{left=0;top=0;right=412;bottom=915};renderedPixelWidth=412;renderedPixelHeight=915;
+        actualRenderSha256=('D'*64);referenceSha256Before=('E'*64);referenceSha256After=('E'*64);
+        comparatorIdentity='flutter_test.LocalFileComparator';comparatorImplementationSha256=$observationFixtureComparator;
+        comparatorInvoked=$true;comparisonPassed=$true}
+      function Invoke-LabelledObservationRead([object]$Row,[int]$PrintTestId=7,[bool]$Duplicate=$false,[bool]$IncludeStart=$true,[bool]$CompletedBeforePrint=$false) {
+        $observationFixtureLines=[Collections.Generic.List[string]]::new()
+        $observationFixtureLines.Add((@{type='suite';suite=@{id=3;path=($binding.worktreePath+'/apps/mobile/test/work_workspace_layout_safety_test.dart')}}|ConvertTo-Json -Compress -Depth 8))
+        if($IncludeStart){$observationFixtureLines.Add((@{type='testStart';test=@{id=7;suiteID=3;name='labelled observation fixture'}}|ConvertTo-Json -Compress -Depth 8))}
+        if($CompletedBeforePrint){$observationFixtureLines.Add((@{type='testDone';testID=7;result='success';skipped=$false;hidden=$false}|ConvertTo-Json -Compress))}
+        $observationFixturePrint=@{type='print';testID=$PrintTestId;message=($visualProtocol.observationPrefix+($Row|ConvertTo-Json -Compress -Depth 8))}|ConvertTo-Json -Compress -Depth 10
+        $observationFixtureLines.Add($observationFixturePrint)
+        if($Duplicate){$observationFixtureLines.Add($observationFixturePrint)}
+        return Read-OctoberCompatibilityVisualObservations -LogBytes ([Text.Encoding]::UTF8.GetBytes($observationFixtureLines -join "`n")) -Protocol $visualProtocol -Source $observationFixtureSource -Tree $observationFixtureTree -ExecutionId default -ComparatorImplementationSha256 $observationFixtureComparator -SuccessfulKeys $observationFixtureKeys
+      }
+      $observationFixtureResult=Invoke-LabelledObservationRead $observationFixtureRow
+      Assert-RepairContract ($null -ne $observationFixtureResult -and $observationFixtureResult.Observations.Count -eq 1) 'source/test-bound labelled observation rejected.'
+      foreach($observationFixtureMutation in @(
+        @{name='sourceCommit';value=('f'*40)},@{name='sourceTree';value=('f'*40)},
+        @{name='testKey';value='other test'},@{name='executionId';value='other execution'},
+        @{name='comparatorImplementationSha256';value=('F'*64)},
+        @{name='comparatorInvoked';value=$false},@{name='comparisonPassed';value=$false},
+        @{name='referenceSha256After';value=('F'*64)},@{name='comparatorInvoked';value='true'})) {
+        $observationFixtureChanged=[ordered]@{}
+        foreach($observationFixtureName in $observationFixtureRow.Keys){$observationFixtureChanged[$observationFixtureName]=$observationFixtureRow[$observationFixtureName]}
+        $observationFixtureChanged[$observationFixtureMutation.name]=$observationFixtureMutation.value
+        Assert-RepairContract ($null -eq (Invoke-LabelledObservationRead $observationFixtureChanged)) ('observation mutation admitted: '+$observationFixtureMutation.name)
+      }
+      Assert-RepairContract ($null -eq (Invoke-LabelledObservationRead $observationFixtureRow -PrintTestId 8)) 'unknown running test admitted.'
+      Assert-RepairContract ($null -eq (Invoke-LabelledObservationRead $observationFixtureRow -IncludeStart $false)) 'observation without test start admitted.'
+      Assert-RepairContract ($null -eq (Invoke-LabelledObservationRead $observationFixtureRow -Duplicate $true)) 'duplicate observation slot admitted.'
+      Assert-RepairContract ($null -eq (Invoke-LabelledObservationRead $observationFixtureRow -CompletedBeforePrint $true)) 'observation after successful test completion admitted.'
+      Write-Output 'Compatibility visual observations: 14 labelled in-memory checks passed; no real render/comparator or visual acceptance claimed.'
+    }
+    & {
+      Add-Type -AssemblyName System.Drawing
+      $pngFixtureBitmap=[Drawing.Bitmap]::new(2,2,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
+      $pngFixtureRgb=[Drawing.Bitmap]::new(2,2,[Drawing.Imaging.PixelFormat]::Format24bppRgb)
+      function Get-LabelledImageBuffer([Drawing.Bitmap]$Bitmap,[Drawing.Imaging.ImageFormat]$Format) {
+        $imageBuffer=[IO.MemoryStream]::new()
+        try{$Bitmap.Save($imageBuffer,$Format);return [pscustomobject]@{Bytes=$imageBuffer.ToArray()}}
+        finally{$imageBuffer.Dispose()}
+      }
+      try {
+        $pngFixtureBitmap.SetPixel(0,0,[Drawing.Color]::FromArgb(255,255,0,0))
+        $pngFixtureBitmap.SetPixel(1,0,[Drawing.Color]::FromArgb(255,0,255,0))
+        $pngFixtureBitmap.SetPixel(0,1,[Drawing.Color]::FromArgb(255,0,0,255))
+        $pngFixtureBitmap.SetPixel(1,1,[Drawing.Color]::FromArgb(128,10,20,30))
+        $pngFixtureReference=(Get-LabelledImageBuffer $pngFixtureBitmap ([Drawing.Imaging.ImageFormat]::Png)).Bytes
+        $pngFixtureDecoded=Read-OctoberCompatibilityPngPixels -Bytes $pngFixtureReference -ExpectedWidth 2 -ExpectedHeight 2
+        $pngFixtureExpected=@(255,0,0,255,0,255,0,255,0,0,255,255,10,20,30,128)
+        Assert-RepairContract ($null -ne $pngFixtureDecoded -and $pngFixtureDecoded.Representation -ceq 'independent_rgba8888_straight' -and
+          $pngFixtureDecoded.Pixels.Length -eq 16 -and (@($pngFixtureDecoded.Pixels) -join '|') -ceq ($pngFixtureExpected -join '|')) 'known RGBA/row/channel pixels decoded incorrectly.'
+        Assert-RepairContract (Test-OctoberCompatibilityPngEquality $pngFixtureReference $pngFixtureReference 2 2) 'identical decoded PNG rejected.'
+        $pngFixtureBitmap.SetPixel(0,0,[Drawing.Color]::FromArgb(255,254,0,0))
+        $pngFixtureChanged=(Get-LabelledImageBuffer $pngFixtureBitmap ([Drawing.Imaging.ImageFormat]::Png)).Bytes
+        Assert-RepairContract (-not(Test-OctoberCompatibilityPngEquality $pngFixtureReference $pngFixtureChanged 2 2)) 'single colour byte difference ignored.'
+        $pngFixtureBitmap.SetPixel(0,0,[Drawing.Color]::FromArgb(255,255,0,0))
+        $pngFixtureBitmap.SetPixel(1,1,[Drawing.Color]::FromArgb(127,10,20,30))
+        $pngFixtureChanged=(Get-LabelledImageBuffer $pngFixtureBitmap ([Drawing.Imaging.ImageFormat]::Png)).Bytes
+        Assert-RepairContract (-not(Test-OctoberCompatibilityPngEquality $pngFixtureReference $pngFixtureChanged 2 2)) 'alpha difference ignored.'
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityPngPixels -Bytes $pngFixtureReference[0..31] -ExpectedWidth 2 -ExpectedHeight 2)) 'truncated header admitted.'
+        $pngFixtureBmp=(Get-LabelledImageBuffer $pngFixtureBitmap ([Drawing.Imaging.ImageFormat]::Bmp)).Bytes
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityPngPixels -Bytes $pngFixtureBmp -ExpectedWidth 2 -ExpectedHeight 2)) 'non-PNG image admitted.'
+        $pngFixtureUnsupported=[byte[]]$pngFixtureReference.Clone();$pngFixtureUnsupported[24]=16
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityPngPixels -Bytes $pngFixtureUnsupported -ExpectedWidth 2 -ExpectedHeight 2)) 'unsupported bit depth admitted.'
+        Assert-RepairContract (-not(Test-OctoberCompatibilityPngEquality $pngFixtureReference $pngFixtureReference 3 2)) 'wrong expected dimensions rescued by resize.'
+        & {
+          $pngLimitHeader=[byte[]]$pngFixtureReference.Clone()
+          $pngLimitHeader[16]=0;$pngLimitHeader[17]=0;$pngLimitHeader[18]=32;$pngLimitHeader[19]=0
+          $pngLimitHeader[20]=0;$pngLimitHeader[21]=0;$pngLimitHeader[22]=32;$pngLimitHeader[23]=0
+          $pngLimitProbe=@{DecoderSetupReached=$false}
+          function Add-Type {$pngLimitProbe.DecoderSetupReached=$true;throw 'Labelled decoder-entry sentinel'}
+          $pngLimitResult=Read-OctoberCompatibilityPngPixels -Bytes $pngLimitHeader -ExpectedWidth 8192 -ExpectedHeight 8192
+          Assert-RepairContract ($null -eq $pngLimitResult -and -not $pngLimitProbe.DecoderSetupReached) 'pixel resource limit did not reject before decoder setup.'
+        }
+        Assert-RepairContract (-not(Test-OctoberCompatibilityPngEquality $null $pngFixtureReference 2 2)) 'missing image admitted.'
+        $pngFixtureRgb.SetPixel(0,0,[Drawing.Color]::FromArgb(1,2,3))
+        $pngFixtureRgbBytes=(Get-LabelledImageBuffer $pngFixtureRgb ([Drawing.Imaging.ImageFormat]::Png)).Bytes
+        $pngFixtureRgbDecoded=Read-OctoberCompatibilityPngPixels -Bytes $pngFixtureRgbBytes -ExpectedWidth 2 -ExpectedHeight 2
+        Assert-RepairContract ($null -ne $pngFixtureRgbDecoded -and ($pngFixtureRgbDecoded.Pixels[0..3] -join '|') -ceq '1|2|3|255') 'RGB PNG did not decode to exact opaque RGBA.'
+        & {
+          $leaseFixtureTempBase=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+          $leaseFixtureDirectory=[IO.Path]::Combine($leaseFixtureTempBase,('mool-visual-lease-fixture-'+[guid]::NewGuid().ToString('N')))
+          [void][IO.Directory]::CreateDirectory($leaseFixtureDirectory)
+          $leaseFixtureHeld=$null
+          try {
+            $leaseFixtureReference=[IO.Path]::Combine($leaseFixtureDirectory,'reference.png')
+            $leaseFixtureActual=[IO.Path]::Combine($leaseFixtureDirectory,'actual.png')
+            $leaseFixtureChanged=[IO.Path]::Combine($leaseFixtureDirectory,'changed.png')
+            [IO.File]::WriteAllBytes($leaseFixtureReference,$pngFixtureReference)
+            [IO.File]::WriteAllBytes($leaseFixtureActual,$pngFixtureReference)
+            [IO.File]::WriteAllBytes($leaseFixtureChanged,$pngFixtureChanged)
+            $leaseFixtureHash=Get-OctoberCompatibilityByteHash $pngFixtureReference
+            $leaseFixtureChangedHash=Get-OctoberCompatibilityByteHash $pngFixtureChanged
+            Assert-RepairContract (Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png $leaseFixtureHash $leaseFixtureDirectory actual.png $leaseFixtureHash 2 2) 'distinct identical locked PNG files rejected.'
+            Assert-RepairContract (-not(Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png $leaseFixtureHash $leaseFixtureDirectory reference.png $leaseFixtureHash 2 2)) 'same artifact used as reference and render.'
+            [void](New-Item -ItemType HardLink -Path ([IO.Path]::Combine($leaseFixtureDirectory,'alias.png')) -Value $leaseFixtureReference)
+            $leaseFixtureOriginalIdentity=$null;$leaseFixtureAliasIdentity=$null
+            try {
+              $leaseFixtureOriginalIdentity=Open-OctoberCompatibilityVisualArtifact $leaseFixtureDirectory reference.png $leaseFixtureHash
+              $leaseFixtureAliasIdentity=Open-OctoberCompatibilityVisualArtifact $leaseFixtureDirectory alias.png $leaseFixtureHash
+              Assert-RepairContract ($null -ne $leaseFixtureOriginalIdentity -and $null -ne $leaseFixtureAliasIdentity -and
+                $leaseFixtureOriginalIdentity.CanonicalPath -cne $leaseFixtureAliasIdentity.CanonicalPath -and
+                $leaseFixtureOriginalIdentity.FileIdentity -ceq $leaseFixtureAliasIdentity.FileIdentity) 'hardlink fixture did not reach two distinct-path leases with equal Windows identity.'
+            } finally {
+              try {if($null -ne $leaseFixtureAliasIdentity){$leaseFixtureAliasIdentity.Stream.Dispose()}}
+              finally {if($null -ne $leaseFixtureOriginalIdentity){$leaseFixtureOriginalIdentity.Stream.Dispose()}}
+            }
+            Assert-RepairContract (-not(Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png $leaseFixtureHash $leaseFixtureDirectory alias.png $leaseFixtureHash 2 2)) 'reference/render hardlink alias admitted.'
+            Assert-RepairContract (-not(Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png $leaseFixtureHash $leaseFixtureDirectory missing.png $leaseFixtureHash 2 2)) 'missing actual artifact admitted.'
+            Assert-RepairContract (-not(Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png ('F'*64) $leaseFixtureDirectory actual.png $leaseFixtureHash 2 2)) 'incorrect bound reference hash admitted.'
+            Assert-RepairContract (-not(Test-OctoberCompatibilityLockedPngPair $leaseFixtureDirectory reference.png $leaseFixtureHash $leaseFixtureDirectory changed.png $leaseFixtureChangedHash 2 2)) 'different pixels admitted by locked pair.'
+            $leaseFixtureHeld=Open-OctoberCompatibilityVisualArtifact $leaseFixtureDirectory reference.png $leaseFixtureHash
+            Assert-RepairContract ($null -ne $leaseFixtureHeld -and $leaseFixtureHeld.Stream.CanRead) 'read lease unavailable.'
+            $leaseFixtureWriterBlocked=$false
+            try {$leaseFixtureWriter=[IO.File]::Open($leaseFixtureReference,[IO.FileMode]::Open,[IO.FileAccess]::Write,[IO.FileShare]::ReadWrite);$leaseFixtureWriter.Dispose()}
+            catch [IO.IOException] {$leaseFixtureWriterBlocked=$true}
+            Assert-RepairContract $leaseFixtureWriterBlocked 'reference writer not excluded during held lease.'
+            $leaseFixtureDeleteBlocked=$false
+            try {[IO.File]::Delete($leaseFixtureReference)}catch [IO.IOException] {$leaseFixtureDeleteBlocked=$true}
+            Assert-RepairContract $leaseFixtureDeleteBlocked 'reference deletion not excluded during held lease.'
+            $leaseFixtureHeld.Stream.Dispose();$leaseFixtureHeld=$null
+            $leaseFixtureExclusive=[IO.File]::Open($leaseFixtureReference,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+            try {Assert-RepairContract $leaseFixtureExclusive.CanWrite 'lease not released after comparison.'}finally{$leaseFixtureExclusive.Dispose()}
+            $leaseFixtureOversizedPath=[IO.Path]::Combine($leaseFixtureDirectory,'oversized.bin')
+            $leaseFixtureOversizedStream=[IO.File]::Open($leaseFixtureOversizedPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+            try {$leaseFixtureOversizedStream.SetLength(67108865)}finally{$leaseFixtureOversizedStream.Dispose()}
+            & {
+              $leaseFixtureLimitProbe=@{HashReached=$false}
+              function Get-OctoberCoverageBoundHash {$leaseFixtureLimitProbe.HashReached=$true;throw 'Labelled pre-buffer hash sentinel'}
+              $leaseFixtureLimitResult=Open-OctoberCompatibilityVisualArtifact $leaseFixtureDirectory oversized.bin ('F'*64)
+              Assert-RepairContract ($null -eq $leaseFixtureLimitResult -and -not $leaseFixtureLimitProbe.HashReached) 'oversized artifact did not reject before hash/buffer allocation.'
+            }
+          } finally {
+            try {if($null -ne $leaseFixtureHeld){$leaseFixtureHeld.Stream.Dispose()}}
+            finally {
+              $leaseFixtureResolved=[IO.Path]::GetFullPath($leaseFixtureDirectory)
+              $leaseFixturePrefix=$leaseFixtureTempBase.TrimEnd([char[]]@('\','/'))+[IO.Path]::DirectorySeparatorChar
+              if(-not $leaseFixtureResolved.StartsWith($leaseFixturePrefix,[StringComparison]::OrdinalIgnoreCase) -or
+                  [IO.Path]::GetFileName($leaseFixtureResolved) -cnotmatch '\Amool-visual-lease-fixture-[0-9a-f]{32}\z'){throw 'Unsafe fixture cleanup target.'}
+              Remove-Item -LiteralPath $leaseFixtureResolved -Recurse -Force
+            }
+          }
+          Write-Output 'Compatibility locked PNG pairs: 12 labelled temporary-file checks passed; fixtures removed, no reference approval or visual acceptance.'
+        }
+      }finally{$pngFixtureBitmap.Dispose();$pngFixtureRgb.Dispose()}
+      Write-Output 'Compatibility independent PNG pixels: 11 labelled in-memory checks passed; not Flutter comparator invocation or visual acceptance.'
+    }
+    & {
+      $approvalFixtureSource='a'*40;$approvalFixtureTree='b'*40
+      $approvalFixtureResolution=$resolution;$approvalFixtureProtocol=$visualProtocol
+      $approvalFixtureFounderText='labelled-host-founder-message-no-human-approval'
+      $approvalFixtureFounderBytes=[Text.Encoding]::UTF8.GetBytes($approvalFixtureFounderText)
+      $approvalFixtureFounderHash=Get-OctoberCompatibilityByteHash $approvalFixtureFounderBytes
+      $approvalFixtureRows=[Collections.Generic.List[object]]::new()
+      foreach($fixtureRow in $approvalFixtureResolution.cases){foreach($fixtureSlot in $fixtureRow.comparisonSlots){
+        $approvalFixtureRows.Add([pscustomobject]@{slotId=$fixtureSlot.slotId;testKey=$fixtureRow.originalKey;
+          executionId=$fixtureRow.executionId;captureTarget=$fixtureSlot.captureTarget;
+          sourceCommit=$approvalFixtureSource;sourceTree=$approvalFixtureTree;
+          referencePath=$fixtureSlot.approvedAlternativePath;referenceSha256=('d'*64).ToUpperInvariant();
+          actualRenderSha256=('e'*64).ToUpperInvariant();approvalRecordPath=$fixtureSlot.approvalRecordRelativePath;
+          approvalRecordSha256=('f'*64).ToUpperInvariant();founderMessageLocator=$approvalFixtureFounderText;
+          decision=$approvalFixtureProtocol.decision;geometry=$fixtureSlot.expectedGeometry})
+      }}
+      $approvalFixtureBase=[pscustomobject]@{schemaVersion=1;state=$approvalFixtureProtocol.anchorState;
+        writerRole='primary';writerTask='/root';sourceCommit=$approvalFixtureSource;sourceTree=$approvalFixtureTree;
+        authoritySha256='3D9F45EFE4EBC751B72FB62887463973B4DE74973B4A010C9203BFE68918FCC2';
+        founderEvidenceSha256=$approvalFixtureFounderHash;decisions=$approvalFixtureRows.ToArray()}
+      $approvalFixtureModes=@('positive','missing-anchor','pending','coerced-state','wrong-source','wrong-tree',
+        'missing-slot','duplicate-slot','wrong-key','wrong-reference','coerced-geometry','missing-locator',
+        'extra-field','rejected-decision','anchor-changes')
+      foreach($approvalFixtureMode in $approvalFixtureModes) {
+        $approvalFixtureAnchor=(ConvertTo-Json -InputObject $approvalFixtureBase -Depth 18)|ConvertFrom-Json
+        switch($approvalFixtureMode){
+          'pending' {$approvalFixtureAnchor.state='pending'}
+          'coerced-state' {$approvalFixtureAnchor.state=@($approvalFixtureProtocol.anchorState)}
+          'wrong-source' {$approvalFixtureAnchor.sourceCommit='0'*40}
+          'wrong-tree' {$approvalFixtureAnchor.sourceTree='0'*40}
+          'missing-slot' {$approvalFixtureAnchor.decisions=@($approvalFixtureAnchor.decisions[0..63])}
+          'duplicate-slot' {$approvalFixtureAnchor.decisions[64]=$approvalFixtureAnchor.decisions[0]}
+          'wrong-key' {$approvalFixtureAnchor.decisions[0].testKey='labelled wrong original key'}
+          'wrong-reference' {$approvalFixtureAnchor.decisions[0].referencePath='labelled-other.png'}
+          'coerced-geometry' {$approvalFixtureAnchor.decisions[0].geometry.viewportWidth='412'}
+          'missing-locator' {$approvalFixtureAnchor.decisions[0].founderMessageLocator='labelled-missing-founder-message'}
+          'extra-field' {$approvalFixtureAnchor.decisions[0]|Add-Member -NotePropertyName extra -NotePropertyValue 1}
+          'rejected-decision' {$approvalFixtureAnchor.decisions[0].decision='rejected'}
+        }
+        $approvalFixtureAnchorBytes=[Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $approvalFixtureAnchor -Depth 18 -Compress))
+        $approvalFixtureAnchorHash=Get-OctoberCompatibilityByteHash $approvalFixtureAnchorBytes
+        $script:approvalFixtureReadCount=0;$script:approvalFixtureUnexpected=$false;$script:approvalFixtureChangedReached=$false
+        & {
+          function Read-OctoberCompatibilityVisualArtifactBytes([string]$Base,[string]$RelativePath,[string]$ExpectedSha256) {
+            $script:approvalFixtureReadCount++
+            if($Base -cne 'C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store'){
+              $script:approvalFixtureUnexpected=$true;throw 'unexpected labelled approval root'
+            }
+            if($RelativePath -ceq 'work/compatibility-visual-founder-decisions-20261010.json' -and $ExpectedSha256 -ceq $approvalFixtureAnchorHash) {
+              if($approvalFixtureMode -ceq 'missing-anchor'){return $null}
+              return [pscustomobject]@{Bytes=$approvalFixtureAnchorBytes;CanonicalPath=$approvalFixtureProtocol.trustedAnchorPath}
+            }
+            if($RelativePath -ceq 'outputs/compatibility-visual-founder-review-20261010.md' -and $ExpectedSha256 -ceq $approvalFixtureFounderHash) {
+              return [pscustomobject]@{Bytes=$approvalFixtureFounderBytes;CanonicalPath=$approvalFixtureProtocol.founderEvidencePath}
+            }
+            $script:approvalFixtureUnexpected=$true;throw 'unexpected labelled approval artifact'
+          }
+          function Get-OctoberCoverageBoundHash([string]$Path) {
+            if($Path -ceq $approvalFixtureProtocol.trustedAnchorPath) {
+              if($approvalFixtureMode -ceq 'anchor-changes'){$script:approvalFixtureChangedReached=$true;return ('0'*64)}
+              return $approvalFixtureAnchorHash
+            }
+            if($Path -ceq $approvalFixtureProtocol.founderEvidencePath){return $approvalFixtureFounderHash}
+            $script:approvalFixtureUnexpected=$true;throw 'unexpected labelled approval hash'
+          }
+          $approvalFixtureResult=Read-OctoberCompatibilityTrustedVisualDecisions -Resolution $approvalFixtureResolution `
+            -Protocol $approvalFixtureProtocol -Source $approvalFixtureSource -Tree $approvalFixtureTree -ExpectedAnchorSha256 $approvalFixtureAnchorHash
+          if($approvalFixtureMode -ceq 'positive') {
+            Assert-RepairContract ($null -ne $approvalFixtureResult -and $approvalFixtureResult.Decisions.Count -eq 65) 'labelled complete approval bindings rejected.'
+          }else{Assert-RepairContract ($null -eq $approvalFixtureResult) 'invalid labelled approval bindings admitted.'}
+          Assert-RepairContract ($script:approvalFixtureReadCount -gt 0 -and -not $script:approvalFixtureUnexpected) 'approval fixture failed before intended source or read unbound input.'
+          if($approvalFixtureMode -ceq 'anchor-changes'){Assert-RepairContract $script:approvalFixtureChangedReached 'approval final hash boundary not reached.'}
+        }
+      }
+      Remove-Variable -Name approvalFixtureReadCount,approvalFixtureUnexpected,approvalFixtureChangedReached -Scope Script
+      Write-Output 'Compatibility trusted decision bindings: 15 labelled in-memory cases passed; no founder decisions/files or visual approvals created.'
+    }
+    $resolutionCases=2
+    foreach($changed in @($null,$true,'{}',($resolutionJson+' ' + '{}'),
+        $resolutionJson.Replace('same_original_key_only_no_aliases','allow_aliases'),
+        $resolutionJson.Replace('specification_only_not_execution','verified'),
+        $resolutionJson.Replace('H01-visual-1','H02-visual-1'),
+        $resolutionJson.Replace('workspace_capture','default'))) {
+      Assert-RepairContract ($null -eq (Read-OctoberCompatibilityResolutionSpecification $changed)) 'changed resolution specification admitted.'
+      $resolutionCases++
+    }
+    Assert-RepairContract ($resolutionCases -eq 10) 'resolution fixture count changed.'
+    Write-Output "Compatibility resolution specification: $resolutionCases exact-payload host checks passed; no staged annex, visual approval or source qualification."
+    & {
+      $fixtureCommit='c'*40;$expectedRevision='';$fixtureDocument=$resolutionText;$readFailure=''
+      $script:resolutionReads=0;$script:wrongResolutionRead=$false
+      function Get-OctoberCompatibilityGitLines {
+        param([string[]]$Arguments)
+        $script:resolutionReads++
+        if($Arguments.Count -ne 2 -or $Arguments[0] -cne 'show' -or $Arguments[1] -cne $expectedRevision){
+          $script:wrongResolutionRead=$true;throw 'unexpected resolution source'
+        }
+        if($readFailure -ceq 'throw'){throw 'labelled resolution read failure'}
+        if($readFailure -ceq 'missing'){return @()}
+        return @($fixtureDocument -split "`n")
+      }
+      Assert-RepairContract ($null -ne (Get-OctoberCompatibilityResolutionSpecification)) 'exact working resolution rejected.'
+      Assert-RepairContract ($script:resolutionReads -eq 0) 'working resolution unexpectedly read Git.'
+      $readerCases=1
+      foreach($mode in @('index','commit')) {
+        $expectedRevision=if($mode -ceq 'index'){':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'}else{$fixtureCommit+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'}
+        $parameters=if($mode -ceq 'index'){@{FromIndex=$true}}else{@{Commit=$fixtureCommit}}
+        $script:resolutionReads=0
+        Assert-RepairContract ($null -ne (Get-OctoberCompatibilityResolutionSpecification @parameters)) 'exact selected resolution rejected.'
+        Assert-RepairContract ($script:resolutionReads -eq 1 -and -not $script:wrongResolutionRead) 'resolution read wrong source.'
+        $readerCases++
+        $fixtureDocument=$resolutionText.Replace($resolutionJson,'{}');$script:resolutionReads=0
+        Assert-RepairContract ($null -eq (Get-OctoberCompatibilityResolutionSpecification @parameters)) 'working resolution rescued invalid selected payload.'
+        Assert-RepairContract ($script:resolutionReads -eq 1 -and -not $script:wrongResolutionRead) 'invalid resolution read wrong source.'
+        $readerCases++;$fixtureDocument=$resolutionText
+      }
+      $expectedRevision=':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+      $fixtureDocument=$resolutionText+"`n"+$resolutionText;$script:resolutionReads=0
+      Assert-RepairContract ($null -eq (Get-OctoberCompatibilityResolutionSpecification -FromIndex)) 'duplicate selected resolution admitted.'
+      Assert-RepairContract ($script:resolutionReads -eq 1 -and -not $script:wrongResolutionRead) 'duplicate resolution read wrong source.'
+      $readerCases++;$fixtureDocument=$resolutionText
+      $script:resolutionReads=0
+      Assert-RepairContract ($null -eq (Get-OctoberCompatibilityResolutionSpecification -FromIndex -Commit $fixtureCommit)) 'mixed resolution sources admitted.'
+      Assert-RepairContract ($null -eq (Get-OctoberCompatibilityResolutionSpecification -Commit 'not-a-commit')) 'invalid resolution commit admitted.'
+      Assert-RepairContract ($script:resolutionReads -eq 0) 'invalid source selection reached Git.'
+      $readerCases+=2
+      foreach($readFailure in @('missing','throw')) {
+        $script:resolutionReads=0
+        Assert-RepairContract ($null -eq (Get-OctoberCompatibilityResolutionSpecification -FromIndex)) 'failed resolution read admitted.'
+        Assert-RepairContract ($script:resolutionReads -eq 1 -and -not $script:wrongResolutionRead) 'failed resolution read wrong source.'
+        $readerCases++
+      }
+      Assert-RepairContract ($readerCases -eq 10) 'resolution source fixture count changed.'
+      Remove-Variable -Name resolutionReads,wrongResolutionRead -Scope Script
+      Write-Output 'Compatibility resolution readers: 10 isolated source-selection checks passed; actual index and commits unchanged.'
+    }
+  }
   if($CaptureCompatibilityReport) {
     Assert-RepairContract (-not $RequireCompatibilityStageProbes -and -not $RequireCompatibilityLiveAdmissionProbes) 'capture cannot be combined with probe modes.'
     $branch=@(& git -C $root branch --show-current)
@@ -53,7 +809,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $source=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
     Assert-RepairContract ($source.Count -eq 1) 'capture source unavailable.'
     $history=Get-OctoberCompatibilityHistoryStage $source[0]
-    Assert-RepairContract ($history.Stage -eq 6) 'capture requires committed amended L, not E/G/C/A/H/J or documentary Q.'
+    Assert-RepairContract ($history.Stage -eq 7) 'capture requires committed amended L5, not E/G/C/A/H/J/K or documentary Q.'
     $before=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
     Assert-RepairContract ($before.Count -eq 0) 'capture requires clean L source.'
     $admission=@{
@@ -70,14 +826,17 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       -CandidateVersionName 1.0.0-r66.42 -CandidateVersionCode 2026100801 -RepositoryRoot $root
     & (Join-Path $PSScriptRoot 'check-codex-development-regression-memory.ps1') -Phase general `
       -RepositoryRoot $root -EvidenceArchiveRoot 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904'
-    $plan=Get-OctoberCompatibilityReportPlan $CaptureCompatibilityReport
+    $plan=Get-OctoberCompatibilityExecutionPlan -ReportId $CaptureCompatibilityReport -ExecutionId $CaptureExecutionId
+    Assert-RepairContract ($null -ne $plan) 'execution is not a literal plan for this report category.'
     $flutterArguments=@($plan.Arguments)
     $tree=@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($source[0])^{tree}"))
     $producer=@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($source[0]):scripts/test-codex-integration-repair-coordination-policy.ps1"))
     Assert-RepairContract ($tree.Count -eq 1 -and $producer.Count -eq 1) 'capture tree/producer identity unavailable.'
-    $relative='apps/mobile/build/compat-'+$CaptureCompatibilityReport+'-'+[Guid]::NewGuid().ToString('N')+'.jsonl'
+    $relative='apps/mobile/build/compat-'+$CaptureCompatibilityReport+'-'+$CaptureExecutionId+'-'+[Guid]::NewGuid().ToString('N')+'.jsonl'
     $log=Join-Path $root $relative; $stderr=$log+'.stderr.txt'; $capturePath=$log+'.capture.json'
-    foreach($path in @($log,$stderr,$capturePath)) {
+    $visualManifestRelative=$relative+'.visual.json'
+    $visualManifestPath=Join-Path $root $visualManifestRelative
+    foreach($path in @($log,$stderr,$capturePath,$visualManifestPath)) {
       Assert-RepairContract (-not (Test-Path -LiteralPath $path)) 'capture refuses existing evidence paths.'
     }
     $flutter='C:/Users/jisal/develop/flutter/bin/flutter.bat'
@@ -88,19 +847,35 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $started=[DateTimeOffset]::UtcNow.ToString('o')
     [IO.File]::WriteAllText($stderr,'',[Text.UTF8Encoding]::new($false))
     $writer=[IO.StreamWriter]::new($log,$false,[Text.UTF8Encoding]::new($false))
-    $script:compatNativeExit=-1; $guardCompleted=$false; $failure=$null
+    $script:compatNativeExit=-1; $guardCompleted=$false; $failure=$null;$captureSdkEvidence=@{}
     $marker=@{type='moolsocialSource'; sourceCommit=$source[0]; sourceTree=$tree[0]
       registrySha256=[string]$policy.registryBinding.sha256; reportId=$CaptureCompatibilityReport
-      executionId='default'; runtimeDefines=@($plan.RuntimeDefines)}
+      executionId=$CaptureExecutionId; runtimeDefines=@($plan.RuntimeDefines)}
     $writer.WriteLine((ConvertTo-Json -InputObject $marker -Compress -Depth 10)); $writer.Flush()
     . (Join-Path $PSScriptRoot 'invoke-flutter-with-clean-support.ps1')
     try {
       $guardExit=Invoke-MoolSocialFlutterWithCleanSupport -RepositoryRoot $root -Invocation {
         Push-Location (Join-Path $root 'apps/mobile')
+        $visualEnvironment=@{}
         try {
-          & $flutter @flutterArguments 2> $stderr | ForEach-Object {$writer.WriteLine([string]$_); $writer.Flush()}
-          $script:compatNativeExit=[int]$LASTEXITCODE
-          if($script:compatNativeExit -ne 0){throw "Flutter report exited $script:compatNativeExit; original output retained."}
+          if($CaptureCompatibilityReport -ceq 'store_layout_and_recovery' -and $CaptureExecutionId -cne 'default') {
+            # The committed L test recorder writes this unique execution's
+            # manifest. The host never invents entries or comparator results.
+            $visualEnvironment=@{
+              MOOLSOCIAL_COMPAT_VISUAL_MANIFEST=$visualManifestPath
+              MOOLSOCIAL_COMPAT_EXECUTION_LOG=$relative
+              MOOLSOCIAL_COMPAT_SOURCE_COMMIT=$source[0]
+              MOOLSOCIAL_COMPAT_SOURCE_TREE=$tree[0]
+              MOOLSOCIAL_COMPAT_EXECUTION_ID=$CaptureExecutionId
+            }
+          }
+          Invoke-OctoberCompatibilityVisualEnvironment -Values $visualEnvironment -Invocation {
+            Invoke-OctoberCompatibilityComparatorBoundCapture -Receipt $captureSdkEvidence -Invocation {
+              & $flutter @flutterArguments 2> $stderr | ForEach-Object {$writer.WriteLine([string]$_); $writer.Flush()}
+              $script:compatNativeExit=[int]$LASTEXITCODE
+              if($script:compatNativeExit -ne 0){throw "Flutter report exited $script:compatNativeExit; original output retained."}
+            }
+          }
         } finally { Pop-Location }
       }
       $guardCompleted=$true
@@ -111,7 +886,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $afterDirt=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
     $capture=@{
       schemaVersion=1; producer='test-codex-integration-repair-coordination-policy.ps1'
-      producerGitBlob=$producer[0]; reportId=$CaptureCompatibilityReport; executionId='default'
+      producerGitBlob=$producer[0]; reportId=$CaptureCompatibilityReport; executionId=$CaptureExecutionId
       sourceCommit=$source[0]; sourceTree=$tree[0]; registrySha256=[string]$policy.registryBinding.sha256
       sourceCommitAfter=$afterHead[0]; sourceTreeAfter=$afterTree[0]
       executable=$flutter; workingDirectory=$binding.worktreePath+'/apps/mobile'
@@ -120,18 +895,84 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       startedAtUtc=$started; finishedAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
       stdoutSha256=(Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash
       stderrPath=$relative+'.stderr.txt'; stderrSha256=(Get-FileHash -LiteralPath $stderr -Algorithm SHA256).Hash
+      visualManifestPath=if(Test-Path -LiteralPath $visualManifestPath -PathType Leaf){$visualManifestRelative}else{$null}
+      visualManifestSha256=if(Test-Path -LiteralPath $visualManifestPath -PathType Leaf){Get-OctoberCoverageBoundHash $visualManifestPath}else{$null}
+      comparatorImplementationSha256Before=$captureSdkEvidence['comparatorImplementationSha256Before']
+      comparatorImplementationSha256After=$captureSdkEvidence['comparatorImplementationSha256After']
+      comparatorSdkCommitBefore=$captureSdkEvidence['comparatorSdkCommitBefore'];comparatorSdkCommitAfter=$captureSdkEvidence['comparatorSdkCommitAfter']
+      comparatorCheckedBeforeAtUtc=$captureSdkEvidence['comparatorCheckedBeforeAtUtc'];comparatorCheckedAfterAtUtc=$captureSdkEvidence['comparatorCheckedAfterAtUtc']
     }
     [IO.File]::WriteAllText($capturePath,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false))
-    $record=@{id=$CaptureCompatibilityReport; executionId='default'; path=$relative; sha256=$capture.stdoutSha256
+    $record=@{id=$CaptureCompatibilityReport; executionId=$CaptureExecutionId; path=$relative; sha256=$capture.stdoutSha256
       capturePath=$relative+'.capture.json'; captureSha256=(Get-FileHash -LiteralPath $capturePath -Algorithm SHA256).Hash
       runtimeDefines=@($plan.RuntimeDefines)}
     Write-Output (ConvertTo-Json -InputObject $record -Compress -Depth 10)
     if($null -ne $failure){throw $failure}
-    Assert-RepairContract (Test-OctoberCompatibilityCapture -Capture $capture -ReportId $CaptureCompatibilityReport `
+    Assert-RepairContract (Test-OctoberCompatibilityCaptureComparator $capture) 'capture comparator provenance failed; retained capture is not qualified.'
+    Assert-RepairContract (Test-OctoberCompatibilityCapture -Capture $capture -ReportId $CaptureCompatibilityReport -ExecutionId $CaptureExecutionId `
       -Source $source[0] -Tree $tree[0] -RegistrySha ([string]$policy.registryBinding.sha256) `
       -ProducerBlob $producer[0] -LogSha $capture.stdoutSha256) 'host capture failed; retained files are not passing evidence.'
     return
   }
+  # Actual process-environment wrapper probes, with host-only values. Preserve
+  # all preexisting user values and never print their contents.
+  $fixtureEnvKeys=@('MOOLSOCIAL_COMPAT_VISUAL_MANIFEST','MOOLSOCIAL_COMPAT_EXECUTION_LOG',
+    'MOOLSOCIAL_COMPAT_SOURCE_COMMIT','MOOLSOCIAL_COMPAT_SOURCE_TREE','MOOLSOCIAL_COMPAT_EXECUTION_ID')
+  $originalFixtureEnv=@{};$fixtureEnvValues=@{};$environmentCases=0
+  foreach($name in $fixtureEnvKeys){$originalFixtureEnv[$name]=[Environment]::GetEnvironmentVariable($name,'Process');$fixtureEnvValues[$name]='labelled-current-host-value'}
+  try {
+    foreach($name in $fixtureEnvKeys){[Environment]::SetEnvironmentVariable($name,'labelled-preexisting-host-value','Process')}
+    foreach($kind in @('visual-success','nonvisual-success','visual-throw','nonvisual-throw')) {
+      $hostShouldThrow=$kind.EndsWith('-throw',[StringComparison]::Ordinal)
+      $hostIsVisual=$kind.StartsWith('visual-',[StringComparison]::Ordinal)
+      $values=if($hostIsVisual){$fixtureEnvValues}else{@{}}
+      $expectedException=$false;$script:hostEnvironmentInvocations=0
+      try {
+        Invoke-OctoberCompatibilityVisualEnvironment -Values $values -Invocation {
+          $script:hostEnvironmentInvocations++
+          foreach($name in $fixtureEnvKeys) {
+            $value=[Environment]::GetEnvironmentVariable($name,'Process')
+            if($hostIsVisual){Assert-RepairContract ($value -ceq 'labelled-current-host-value') 'visual environment did not use current bindings.'}
+            else{Assert-RepairContract ($null -eq $value) 'nonvisual environment inherited recorder settings.'}
+          }
+          if($hostShouldThrow){throw 'Labelled recorder environment exception.'}
+        }
+      } catch {
+        if(-not $hostShouldThrow -or $_.Exception.Message -cne 'Labelled recorder environment exception.'){throw}
+        $expectedException=$true
+      }
+      Assert-RepairContract ($script:hostEnvironmentInvocations -eq 1 -and $expectedException -eq $hostShouldThrow) 'environment invocation/exception boundary mismatch.'
+      foreach($name in $fixtureEnvKeys){Assert-RepairContract ([Environment]::GetEnvironmentVariable($name,'Process') -ceq 'labelled-preexisting-host-value') 'recorder environment not restored.'}
+      $environmentCases++
+    }
+    foreach($kind in @('partial','unknown','coerced','blank')) {
+      $values=$fixtureEnvValues.Clone();$script:hostEnvironmentInvocations=0;$rejected=$false
+      switch($kind) {
+        'partial' {$values.Remove($fixtureEnvKeys[0])}
+        'unknown' {$values.Remove($fixtureEnvKeys[0]);$values.UNKNOWN_RECORDER_SETTING='labelled'}
+        'coerced' {$values[$fixtureEnvKeys[0]]=$true}
+        'blank' {$values[$fixtureEnvKeys[0]]=' '}
+      }
+      try {Invoke-OctoberCompatibilityVisualEnvironment -Values $values -Invocation {$script:hostEnvironmentInvocations++}}
+      catch {$rejected=$_.Exception.Message.StartsWith('Recorder environment',[StringComparison]::Ordinal)}
+      Assert-RepairContract ($rejected -and $script:hostEnvironmentInvocations -eq 0) 'invalid recorder bindings reached invocation.'
+      foreach($name in $fixtureEnvKeys){Assert-RepairContract ([Environment]::GetEnvironmentVariable($name,'Process') -ceq 'labelled-preexisting-host-value') 'invalid bindings changed environment.'}
+      $environmentCases++
+    }
+    foreach($name in $fixtureEnvKeys){[Environment]::SetEnvironmentVariable($name,[NullString]::Value,'Process')}
+    Invoke-OctoberCompatibilityVisualEnvironment -Values $fixtureEnvValues -Invocation {
+      foreach($name in $fixtureEnvKeys){Assert-RepairContract ([Environment]::GetEnvironmentVariable($name,'Process') -ceq 'labelled-current-host-value') 'absent-value control bindings rejected.'}
+    }
+    foreach($name in $fixtureEnvKeys){Assert-RepairContract ($null -eq [Environment]::GetEnvironmentVariable($name,'Process')) 'absent recorder environment restored as an empty variable.'}
+    $environmentCases++
+    Assert-RepairContract ($environmentCases -eq 9) 'recorder environment fixture inventory changed.'
+  } finally {
+    foreach($name in $fixtureEnvKeys){
+      if($null -eq $originalFixtureEnv[$name]){[Environment]::SetEnvironmentVariable($name,[NullString]::Value,'Process')}
+      else{[Environment]::SetEnvironmentVariable($name,$originalFixtureEnv[$name],'Process')}
+    }
+  }
+  Write-Output "Compatibility recorder environment: $environmentCases actual host wrapper probes passed; no Flutter or runtime records invoked."
   $facts=@{
     Role=$binding.role; Task=$binding.task; Lane=$binding.lane
     WorkId=$binding.workId; TicketId=$binding.ticketId
@@ -143,6 +984,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     HPreparationVerified=$true
     HCoverageVerified=$true
     JPreparationVerified=$true
+    KPreparationVerified=$true
+    KResolutionVerified=$true
   }
   $cases=0
   Assert-RepairContract (Test-OctoberCompatibilityStageFacts $facts) 'exact pre-G bootstrap rejected.'
@@ -175,20 +1018,21 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'bad bootstrap owner inventory accepted.'
     $cases++
   }
-  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),@('pre_commit',6),
-      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('implementation',6),@('handoff',7),@('integration_admission_authorize',7))) {
+  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),@('pre_commit',6),@('pre_commit',7),
+      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('implementation',6),@('implementation',7),@('handoff',8),@('integration_admission_authorize',8))) {
     $stageFacts=$facts.Clone(); $stageFacts.Phase=$pair[0]; $stageFacts.Stage=[int]$pair[1]
     $stageFacts.Owners=if($stageFacts.Stage -eq 0){@($binding.bootstrapOwners)}
       elseif($stageFacts.Stage -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
       elseif($stageFacts.Stage -eq 2){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($stageFacts.Stage -eq 3){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($stageFacts.Stage -eq 4){@(Get-OctoberCompatibilityAmendmentOwners)}
-      elseif($stageFacts.Stage -eq 5){@(Get-OctoberCompatibilityHandoverOwners)}
+      elseif($stageFacts.Stage -eq 5){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($stageFacts.Stage -eq 6){@(Get-OctoberCompatibilityCoverageCartOwners)}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-RepairContract (Test-OctoberCompatibilityStageFacts $stageFacts) "exact stage$($pair -join '/') rejected."
     $cases++
   }
-  foreach ($stage in @(0,1,2,3,4,5,6)) {
+  foreach ($stage in @(0,1,2,3,4,5,6,7)) {
     $changed=$facts.Clone(); $changed.Phase='handoff'; $changed.Stage=[int]$stage
     $changed.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'unqualified E/G/C/A/L accepted for handoff.'
@@ -198,13 +1042,14 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       @{Stage=1; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
       @{Stage=2; Owners=@(Get-OctoberCompatibilityApplicationOwners)},
       @{Stage=3; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
-      @{Stage=5; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
+      @{Stage=5; Owners=@(Get-OctoberCompatibilityHandoverOwners)},
+      @{Stage=6; Owners=@(Get-OctoberCompatibilityHandoverOwners)})) {
     $changed=$facts.Clone(); $changed.Phase='pre_commit'; $changed.Stage=[int]$probe.Stage
     $changed.Owners=@($probe.Owners)
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'owners from another successor stage accepted.'
     $cases++
   }
-  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=7
+  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=8
   $handoff.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
   foreach($key in @('Clean','HostQualificationPassed')) {
     foreach($value in @($false,'true')) {
@@ -216,9 +1061,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   foreach($probe in @(
       @{Stage=2; Owners=@(Get-OctoberCompatibilityAmendmentOwners)+@('apps/mobile/test/work_public_handoff_test.dart')},
       @{Stage=2; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
-      @{Stage=5; Owners=@(Get-OctoberCompatibilityHandoverOwners | Where-Object {$_ -cne 'apps/mobile/lib/features/work/work_session.dart'})},
-      @{Stage=5; Owners=@(Get-OctoberCompatibilityHandoverOwners)+@('apps/mobile/lib/features/work/work_publication.dart')},
-      @{Stage=6; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
+      @{Stage=6; Owners=@(Get-OctoberCompatibilityCoverageCartOwners | Where-Object {$_ -cne 'apps/mobile/lib/features/work/work_session.dart'})},
+      @{Stage=6; Owners=@(Get-OctoberCompatibilityCoverageCartOwners)+@('apps/mobile/lib/features/work/work_publication.dart')},
+      @{Stage=7; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
     $changed=$facts.Clone(); $changed.Phase='pre_commit'; $changed.Stage=[int]$probe.Stage
     $changed.Owners=@($probe.Owners)
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'widened or incomplete amendment/layout/Q claim accepted.'
@@ -247,7 +1092,23 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       $cases++
     }
   }
-  Assert-RepairContract ($cases -eq 98) 'stage probe inventory changed.'
+  foreach($phase in @('implementation','pre_commit')) {
+    foreach($value in @($false,'true',$null)) {
+      $changed=$facts.Clone();$changed.Phase=$phase;$changed.Stage=5
+      $changed.Owners=@(Get-OctoberCompatibilityAmendmentOwners)
+      if($null -eq $value){$changed.Remove('KPreparationVerified')}else{$changed.KPreparationVerified=$value}
+      Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'K admitted without independent current preservation.';$cases++
+    }
+  }
+  foreach($value in @($false,'true',$null)) {
+    $changed=$facts.Clone();$changed.Phase='pre_commit';$changed.Stage=5
+    $changed.Owners=@(Get-OctoberCompatibilityAmendmentOwners)
+    if($null -eq $value){$changed.Remove('KResolutionVerified')}else{$changed.KResolutionVerified=$value}
+    Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'K committed without complete executable resolution contract.';$cases++
+  }
+  $changed=$handoff.Clone();$changed.Phase='integration_admission_authorize';$changed.Stage=7
+  Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'legacy stage7 admitted as qualified integration source.';$cases++
+  Assert-RepairContract ($cases -eq 112) 'stage probe inventory changed.'
   Write-Output "Compatibility stage predicates: $cases cases passed; live graph/admission and APK qualification remain separate."
   # Literal execution planning only: no Flutter or optional golden run is admitted.
   $planCases=0
@@ -263,6 +1124,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   $executionPins=@{
     localstock_review=@{Count=6;Hash='E7B0DB6254C1F760D16262A2009F8B804D9665DCEBCB1E54EBB6A381FE9B602E';Defines=@('MOOLSOCIAL_DEVICE_REVIEW=true','MOOLSOCIAL_UI_REVIEW_ONLY=true')}
     workspace_capture=@{Count=11;Hash='5EF22DD5FCB0E25192E5111C65EB66DF245A980F162988872756A8AE31459B83';Defines=@('MOOL_CAPTURE_STORE_VIEW_V2=true')}
+    historical_store_review=@{Count=17;Hash='6D022B1BA60353C92D634EC5CB7CAF7B1B374E4869C9271CF224BF1DB58FC9A4';Defines=@()}
+    historical_store_capture=@{Count=6;Hash='1DA2E56A0B3A09ECAC26C2FA2E2A00E6906DC5D0317E093D2BD6F74B127D8D3A';Defines=@('MOOL_CAPTURE_WORK_STORE_1_40=true')}
     store_live_capture=@{Count=20;Hash='E214B73B677EBE788E4C6F59306AC81293CDE7C064B5B7C50D4C87257DB7011F';Defines=@('MOOL_CAPTURE_WORK_STORE_LIVE_V1=true')}
     founder_capture=@{Count=24;Hash='7D5C3E747D69FB979740F5C719DEFACC81F47B6E8973BEC4A2DFD37850DF6E53';Defines=@('MOOL_CAPTURE_WORK_STORE_1_40=true')}
   }
@@ -288,7 +1151,13 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         -not [regex]::IsMatch($name+"`r`n",$selection)) 'literal selector is not fully anchored.'
       $literalNames++
     }
-    Assert-RepairContract (-not [regex]::IsMatch('local Store 1-40 review evidence founder review capture - setup dashboard',$selection)) 'supplemental flag pretends to enable an always-skipped parent group.'
+    if($id -ceq 'historical_store_review' -or $id -ceq 'historical_store_capture') {
+      Assert-RepairContract (@($names | Where-Object {-not $_.StartsWith('local Store 1-40 review evidence ',[StringComparison]::Ordinal)}).Count -eq 0) 'historical plan renames retained original cases.'
+      Assert-RepairContract (@($plan.RuntimeDefines | Where-Object {$_ -cne 'MOOL_CAPTURE_WORK_STORE_1_40=true'}).Count -eq 0) 'historical plan introduces a parent-skip bypass define.'
+      Assert-RepairContract ([regex]::IsMatch('local Store 1-40 review evidence founder review capture - setup dashboard',$selection) -eq ($id -ceq 'historical_store_capture')) 'historical functional and visual profiles overlap.'
+    } else {
+      Assert-RepairContract (-not [regex]::IsMatch('local Store 1-40 review evidence founder review capture - setup dashboard',$selection)) 'supplemental flag pretends to enable an always-skipped parent group.'
+    }
     $planCases++
   }
   foreach($id in @('unknown','LOCALSTOCK_REVIEW','localstock_review --update-goldens','')) {
@@ -297,8 +1166,82 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   foreach($id in @('publication_contracts','impacted_store_buy','enabled_review_fixture','unknown')) {
     Assert-RepairContract ($null -eq (Get-OctoberCompatibilityExecutionPlan -ReportId $id -ExecutionId localstock_review)) 'supplemental execution escaped its layout category.';$planCases++
   }
-  Assert-RepairContract ($literalNames -eq 61 -and $planCases -eq 16) 'execution fixture inventory changed.'
+  Assert-RepairContract ($literalNames -eq 84 -and $planCases -eq 18) 'execution fixture inventory changed.'
   Write-Output "Compatibility execution plans: $planCases configurations and $literalNames literal names checked; no supplemental capture or coverage admission."
+  # Labelled host-only inventory fixtures: no evidence file or app data is created.
+  $executionReports=@()
+  foreach($reportId in @('publication_contracts','impacted_store_buy','store_layout_and_recovery','enabled_review_fixture')) {
+    $executionIds=if($reportId -ceq 'store_layout_and_recovery') {
+      @('default','localstock_review','workspace_capture','historical_store_review',
+        'historical_store_capture','store_live_capture','founder_capture')
+    } else {@('default')}
+    $executionRows=@()
+    foreach($executionId in $executionIds) {
+      $executionPlan=Get-OctoberCompatibilityExecutionPlan -ReportId $reportId -ExecutionId $executionId
+      $fixturePath='apps/mobile/build/inventory-fixture-'+$reportId+'-'+$executionId+'.jsonl'
+      $executionRows+=@{executionId=$executionId;path=$fixturePath;sha256=('A'*64);
+        capturePath=($fixturePath+'.capture.json');captureSha256=('B'*64);
+        runtimeDefines=@($executionPlan.RuntimeDefines)}
+    }
+    $executionReports+=@{id=$reportId;executions=@($executionRows)}
+  }
+  $executionInventoryJson=@{schemaVersion=2;reports=@($executionReports)}|ConvertTo-Json -Depth 20
+  $inventoryProof=$executionInventoryJson|ConvertFrom-Json
+  $inventoryResult=@(Get-OctoberCompatibilityQualificationExecutions $inventoryProof)
+  Assert-RepairContract ($inventoryResult.Count -eq 10 -and
+    @($inventoryResult | Where-Object {$_.ExecutionId -ceq 'default'}).Count -eq 4) 'complete nested inventory rejected.'
+  $executionInventoryCases=1
+  foreach($kind in @('schema-string','legacy-schema','missing-category','duplicate-category',
+      'wrong-category-case','unknown-category','scalar-reports','scalar-executions',
+      'missing-default','duplicate-execution','wrong-execution-family','unknown-execution',
+      'wrong-execution-case','coerced-execution','extra-execution-field','flat-category-path',
+      'wrong-defines','coerced-defines','scalar-defines','duplicate-path','traversal-path',
+      'wrong-capture-path','bad-log-hash','bad-capture-hash','empty-string-defines',
+      'joined-defines','define-count','reordered-defines','path-final-lf',
+      'log-hash-final-lf','capture-hash-final-lf','capture-path-final-lf')) {
+    $probe=$executionInventoryJson|ConvertFrom-Json
+    switch($kind) {
+      'schema-string' {$probe.schemaVersion='2'}
+      'legacy-schema' {$probe.schemaVersion=1}
+      'missing-category' {$probe.reports=@($probe.reports | Select-Object -First 3)}
+      'duplicate-category' {$probe.reports[1].id=$probe.reports[0].id}
+      'wrong-category-case' {$probe.reports[0].id='PUBLICATION_CONTRACTS'}
+      'unknown-category' {$probe.reports[0].id='unknown'}
+      'scalar-reports' {$probe.reports=$probe.reports[0]}
+      'scalar-executions' {$probe.reports[0].executions=$probe.reports[0].executions[0]}
+      'missing-default' {$probe.reports[2].executions=@($probe.reports[2].executions | Select-Object -Skip 1)}
+      'duplicate-execution' {$probe.reports[2].executions[1].executionId='default'}
+      'wrong-execution-family' {$probe.reports[0].executions[0].executionId='workspace_capture'}
+      'unknown-execution' {$probe.reports[2].executions[1].executionId='unknown'}
+      'wrong-execution-case' {$probe.reports[2].executions[1].executionId='LOCALSTOCK_REVIEW'}
+      'coerced-execution' {$probe.reports[2].executions[1].executionId=$true}
+      'extra-execution-field' {$probe.reports[0].executions[0]|Add-Member -NotePropertyName success -NotePropertyValue $true}
+      'flat-category-path' {$probe.reports[0]|Add-Member -NotePropertyName path -NotePropertyValue 'apps/mobile/build/flat.jsonl'}
+      'wrong-defines' {$probe.reports[0].executions[0].runtimeDefines=@('MOOL_CAPTURE_WORK_STORE_1_40=true')}
+      'coerced-defines' {$probe.reports[0].executions[0].runtimeDefines=@($true)}
+      'scalar-defines' {$probe.reports[2].executions[4].runtimeDefines='MOOL_CAPTURE_WORK_STORE_1_40=true'}
+      'duplicate-path' {$probe.reports[1].executions[0].path=$probe.reports[0].executions[0].path;
+        $probe.reports[1].executions[0].capturePath=$probe.reports[0].executions[0].capturePath}
+      'traversal-path' {$probe.reports[0].executions[0].path='apps/mobile/build/../outside.jsonl';
+        $probe.reports[0].executions[0].capturePath='apps/mobile/build/../outside.jsonl.capture.json'}
+      'wrong-capture-path' {$probe.reports[0].executions[0].capturePath='apps/mobile/build/other.jsonl.capture.json'}
+      'bad-log-hash' {$probe.reports[0].executions[0].sha256='a'*64}
+      'bad-capture-hash' {$probe.reports[0].executions[0].captureSha256=$true}
+      'empty-string-defines' {$probe.reports[0].executions[0].runtimeDefines=@('')}
+      'joined-defines' {$probe.reports[2].executions[1].runtimeDefines=@('MOOLSOCIAL_DEVICE_REVIEW=true|MOOLSOCIAL_UI_REVIEW_ONLY=true')}
+      'define-count' {$probe.reports[2].executions[1].runtimeDefines=@('MOOLSOCIAL_DEVICE_REVIEW=true')}
+      'reordered-defines' {$probe.reports[2].executions[1].runtimeDefines=@('MOOLSOCIAL_UI_REVIEW_ONLY=true','MOOLSOCIAL_DEVICE_REVIEW=true')}
+      'path-final-lf' {$probe.reports[0].executions[0].path+="`n";
+        $probe.reports[0].executions[0].capturePath=$probe.reports[0].executions[0].path+'.capture.json'}
+      'log-hash-final-lf' {$probe.reports[0].executions[0].sha256+="`n"}
+      'capture-hash-final-lf' {$probe.reports[0].executions[0].captureSha256+="`n"}
+      'capture-path-final-lf' {$probe.reports[0].executions[0].capturePath+="`n"}
+    }
+    Assert-RepairContract ($null -eq (Get-OctoberCompatibilityQualificationExecutions $probe)) "nested execution inventory admitted $kind."
+    $executionInventoryCases++
+  }
+  Assert-RepairContract ($executionInventoryCases -eq 33) 'nested execution fixture count changed.'
+  Write-Output "Compatibility nested execution inventory: $executionInventoryCases labelled host fixtures passed; no logs, visuals or source qualified."
   $coverageDoc=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
   $coverageBlocks=[regex]::Matches($coverageDoc,'(?s)<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_END -->')
   Assert-RepairContract ($coverageBlocks.Count -eq 1) 'coverage specification missing/duplicated.'
@@ -357,6 +1300,71 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   Assert-RepairContract ($coverageCases -eq 32) 'prospective coverage fixture inventory changed.'
   Write-Output "Compatibility coverage specification: $coverageCases labelled fixtures passed; accounting only, not source qualification."
+  # Aggregate orchestration fixtures use an explicitly isolated evidence reader.
+  # Real file parsing has separate tests; these fixtures prove all ten callers
+  # and family-bound original coverage, not real source/visual qualification.
+  & {
+    $aggregateCoverageMode='positive';$failedExecution=''
+    $fixtureCoverageInventory=$coverageJson|ConvertFrom-Json
+    $coverageReaderCalls=[Collections.Generic.List[string]]::new()
+    $coverageFacts=@{Source=('a'*40);Tree=('b'*40);RegistrySha=('C'*64);ProducerBlob=('d'*40)}
+    function Read-OctoberCompatibilityExecutionEvidence {
+      param([object]$Evidence,[string]$ReportId,[string]$ExecutionId,
+        [string]$Source,[string]$Tree,[string]$RegistrySha,[string]$ProducerBlob)
+      $identity=$ReportId+':'+$ExecutionId;$coverageReaderCalls.Add($identity)
+      if($Source -cne $coverageFacts.Source -or $Tree -cne $coverageFacts.Tree -or
+          $RegistrySha -cne $coverageFacts.RegistrySha -or $ProducerBlob -cne $coverageFacts.ProducerBlob){return $null}
+      if($identity -ceq $failedExecution){return $null}
+      $passed=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      $ignored=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      $null=$passed.Add('labelled aggregate host control:'+ $identity)
+      if($ReportId -ceq 'store_layout_and_recovery') {
+        $plan=Get-OctoberCompatibilityExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId
+        foreach($row in $fixtureCoverageInventory.cases) {
+          foreach($key in $row.requiredSuccessKeys) {
+            if($plan.RequiredNames -ccontains $key.Substring($key.IndexOf(':')+1)) {
+              if($row.ordinal -eq 1 -and $aggregateCoverageMode -cin @('missing-original','wrong-family')){continue}
+              $null=$passed.Add($key)
+            }
+          }
+        }
+        if($ExecutionId -ceq 'default' -and $aggregateCoverageMode -ceq 'wrong-family') {
+          foreach($key in $fixtureCoverageInventory.cases[0].requiredSuccessKeys){$null=$passed.Add($key)}
+        }
+        if($ExecutionId -ceq 'default' -and $aggregateCoverageMode -ceq 'discharged-skip') {
+          foreach($key in $fixtureCoverageInventory.cases[0].requiredSuccessKeys){$null=$ignored.Add($key)}
+        }
+      }
+      if($aggregateCoverageMode -ceq 'undischarged-skip'){$null=$ignored.Add('unfulfilled original skip')}
+      if($aggregateCoverageMode -ceq 'invalid-reader-shape'){return @{Successes=@('not validated');Skipped=$ignored}}
+      return @{Successes=$passed;Skipped=$ignored}
+    }
+    $result=Read-OctoberCompatibilityExecutionCoverage -Proof $inventoryProof -CoverageJson $coverageJson @coverageFacts
+    Assert-RepairContract ($null -ne $result -and $result.VerifiedExecutions -eq 10 -and
+      $coverageReaderCalls.Count -eq 10 -and @($coverageReaderCalls | Select-Object -Unique).Count -eq 10) 'complete ten-execution aggregate rejected or did not read every execution.'
+    $aggregateCoverageCases=1
+    $aggregateCoverageMode='discharged-skip';$coverageReaderCalls.Clear()
+    $result=Read-OctoberCompatibilityExecutionCoverage -Proof $inventoryProof -CoverageJson $coverageJson @coverageFacts
+    Assert-RepairContract ($null -ne $result -and $coverageReaderCalls.Count -eq 10) 'same-key supplemental skip discharge rejected.';$aggregateCoverageCases++
+    $aggregateCoverageMode='positive'
+    foreach($execution in $inventoryResult) {
+      $failedExecution=$execution.ReportId+':'+$execution.ExecutionId;$coverageReaderCalls.Clear()
+      Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionCoverage -Proof $inventoryProof -CoverageJson $coverageJson @coverageFacts)) "aggregate rescued failed execution $failedExecution."
+      Assert-RepairContract ($coverageReaderCalls.Contains($failedExecution)) 'failed execution boundary was not reached.';$aggregateCoverageCases++
+    }
+    $failedExecution=''
+    foreach($kind in @('missing-original','wrong-family','undischarged-skip','missing-execution','wrong-source','invalid-reader-shape')) {
+      $aggregateCoverageMode=$kind;$probe=$executionInventoryJson|ConvertFrom-Json;$facts=$coverageFacts.Clone();$coverageReaderCalls.Clear()
+      if($kind -ceq 'missing-execution'){$probe.reports[2].executions=@($probe.reports[2].executions | Select-Object -Skip 1)}
+      if($kind -ceq 'wrong-source'){$facts.Source='invalid'}
+      Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionCoverage -Proof $probe -CoverageJson $coverageJson @facts)) "execution aggregate admitted $kind.";$aggregateCoverageCases++
+    }
+    $aggregateCoverageMode='positive';$coverageReaderCalls.Clear()
+    $result=Read-OctoberCompatibilityExecutionCoverage -Proof $inventoryProof -CoverageJson $coverageJson @coverageFacts
+    Assert-RepairContract ($null -ne $result -and $coverageReaderCalls.Count -eq 10) 'final aggregate control rejected.';$aggregateCoverageCases++
+    Assert-RepairContract ($aggregateCoverageCases -eq 19) 'aggregate coverage fixture count changed.'
+    Write-Output "Compatibility execution coverage: $aggregateCoverageCases labelled orchestration fixtures passed; real file, visual and immutable source qualification remain separate."
+  }
   # Isolated index observations: a valid working document must never rescue an
   # invalid staged payload. No real index or working document is modified.
   & {
@@ -759,14 +1767,588 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   Assert-RepairContract ($markerCases -eq 83) 'source marker fixture inventory changed.'
   Write-Output "Compatibility source marker identity: $markerCases labelled fixtures passed; no supplemental execution admitted."
+  function New-LabelledExecutionEvents([string]$ExecutionId) {
+    $executionPlan=Get-OctoberCompatibilityExecutionPlan -ReportId store_layout_and_recovery -ExecutionId $ExecutionId
+    $capture=$captureFixture.Clone();$capture.reportId='store_layout_and_recovery';$capture.executionId=$ExecutionId
+    $capture.arguments=@($executionPlan.Arguments);$capture.runtimeDefines=@($executionPlan.RuntimeDefines)
+    $marker=$markerFixture.Clone();$marker.executionId=$ExecutionId;$marker.runtimeDefines=@($executionPlan.RuntimeDefines)
+    $suitePath=$binding.worktreePath+'/apps/mobile/test/work_workspace_layout_safety_test.dart'
+    $events=[Collections.Generic.List[object]]::new()
+    $events.Add($marker);$events.Add(@{type='start'});$events.Add(@{type='allSuites';count=1})
+    $events.Add(@{type='suite';suite=@{id=0;path=$suitePath}})
+    $events.Add(@{type='testStart';test=@{id=0;suiteID=0;name=('loading '+$suitePath)}})
+    $events.Add(@{type='testDone';testID=0;result='success';skipped=$false;hidden=$true})
+    $names=if($ExecutionId -ceq 'default'){@(0..39 | ForEach-Object {'Host labelled execution fixture '+$_})}
+      else{@($executionPlan.RequiredNames)}
+    $testId=1
+    foreach($name in $names) {
+      $events.Add(@{type='testStart';test=@{id=$testId;suiteID=0;name=$name}})
+      $events.Add(@{type='testDone';testID=$testId;result='success';skipped=$false;hidden=$false});$testId++
+    }
+    $events.Add(@{type='done';success=$true})
+    return @{Capture=$capture;Events=$events.ToArray()}
+  }
+  $executionEventFacts=@{ReportId='store_layout_and_recovery';Source=$captureFacts.Source;
+    Tree=$captureFacts.Tree;RegistrySha=$captureFacts.RegistrySha;ProducerBlob=$captureFacts.ProducerBlob;LogSha=$captureFacts.LogSha}
+  $executionEventCases=0
+  foreach($id in @('default','localstock_review','workspace_capture','historical_store_review',
+      'historical_store_capture','store_live_capture','founder_capture')) {
+    $fixture=New-LabelledExecutionEvents $id
+    $result=Read-OctoberCompatibilityExecutionEvents -Events $fixture.Events -Capture $fixture.Capture -ExecutionId $id @executionEventFacts
+    Assert-RepairContract ($null -ne $result -and $result.Skipped.Count -eq 0) "complete labelled $id execution rejected."
+    $executionEventCases++
+  }
+  foreach($kind in @('capture-execution','marker-execution','missing-marker-execution',
+      'capture-source','marker-source','source-after','nonzero-exit','unclean-after',
+      'false-done','error-before-success','renamed-case','skipped-case','duplicate-case',
+      'extra-case','duplicate-marker','late-marker','coerced-skipped','outside-suite',
+      'unfinished-test','timestamp-final-lf','suite-id-string','test-id-string',
+      'done-id-string','capture-schema-string','marker-defines','skipped-loader',
+      'unhidden-loader','duplicate-loader','hidden-behavior','coerced-hidden',
+      'missing-hidden','missing-loader')) {
+    $fixture=New-LabelledExecutionEvents historical_store_review
+    switch($kind) {
+      'capture-execution' {$fixture.Capture.executionId='default'}
+      'marker-execution' {$fixture.Events[0].executionId='default'}
+      'missing-marker-execution' {$null=$fixture.Events[0].Remove('executionId')}
+      'capture-source' {$fixture.Capture.sourceCommit='0'*40}
+      'marker-source' {$fixture.Events[0].sourceCommit='0'*40}
+      'source-after' {$fixture.Capture.sourceCommitAfter='0'*40}
+      'nonzero-exit' {$fixture.Capture.exitCode=1}
+      'unclean-after' {$fixture.Capture.cleanAfter=$false}
+      'false-done' {$fixture.Events[-1].success=$false}
+      'error-before-success' {$fixture.Events=@($fixture.Events[0..($fixture.Events.Count-2)])+@(@{type='error';message='Labelled failure'},$fixture.Events[-1])}
+      'renamed-case' {$fixture.Events[6].test.name='Unrelated current test'}
+      'skipped-case' {$fixture.Events[7].skipped=$true}
+      'duplicate-case' {$fixture.Events[8].test.name=$fixture.Events[6].test.name}
+      'extra-case' {$fixture.Events=@($fixture.Events[0..($fixture.Events.Count-2)])+@(
+        @{type='testStart';test=@{id=99;suiteID=0;name='Unrelated extra case'}},
+        @{type='testDone';testID=99;result='success';skipped=$false;hidden=$false},$fixture.Events[-1])}
+      'duplicate-marker' {$fixture.Events=@($fixture.Events[0..1])+@($fixture.Events[0])+@($fixture.Events[2..($fixture.Events.Count-1)])}
+      'late-marker' {$fixture.Events=@($fixture.Events[1],$fixture.Events[0])+@($fixture.Events[2..($fixture.Events.Count-1)])}
+      'coerced-skipped' {$fixture.Events[7].skipped='false'}
+      'outside-suite' {$fixture.Events[3].suite.path='C:/other/apps/mobile/test/work_workspace_layout_safety_test.dart'}
+      'unfinished-test' {$fixture.Events=@($fixture.Events[0..6])+@($fixture.Events[8..($fixture.Events.Count-1)])}
+      'timestamp-final-lf' {$fixture.Capture.startedAtUtc+="`n"}
+      'suite-id-string' {$fixture.Events[3].suite.id='0'}
+      'test-id-string' {$fixture.Events[6].test.id='1'}
+      'done-id-string' {$fixture.Events[7].testID='1'}
+      'capture-schema-string' {$fixture.Capture.schemaVersion='1'}
+      'marker-defines' {$fixture.Events[0].runtimeDefines=@('MOOL_CAPTURE_WORK_STORE_1_40=true')}
+      'skipped-loader' {$fixture.Events[5].skipped=$true}
+      'unhidden-loader' {$fixture.Events[5].hidden=$false}
+      'duplicate-loader' {$fixture.Events=@($fixture.Events[0..5])+@(
+        @{type='testStart';test=@{id=99;suiteID=0;name=$fixture.Events[4].test.name}},
+        @{type='testDone';testID=99;result='success';skipped=$false;hidden=$true})+@($fixture.Events[6..($fixture.Events.Count-1)])}
+      'hidden-behavior' {$fixture.Events[7].hidden=$true}
+      'coerced-hidden' {$fixture.Events[7].hidden='false'}
+      'missing-hidden' {$null=$fixture.Events[7].Remove('hidden')}
+      'missing-loader' {$fixture.Events=@($fixture.Events[0..3])+@($fixture.Events[6..($fixture.Events.Count-1)])}
+    }
+    Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionEvents -Events $fixture.Events -Capture $fixture.Capture -ExecutionId historical_store_review @executionEventFacts)) "execution event validator admitted $kind."
+    $executionEventCases++
+  }
+  # A later passing supplement cannot make this failed default execution valid.
+  $fixture=New-LabelledExecutionEvents default;$fixture.Events[7].result='failure'
+  Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionEvents -Events $fixture.Events -Capture $fixture.Capture -ExecutionId default @executionEventFacts)) 'failed default run accepted.'
+  $executionEventCases++
+  $fixture=New-LabelledExecutionEvents default
+  $fixture.Events=@($fixture.Events[0..81])+@($fixture.Events[-1])
+  Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionEvents -Events $fixture.Events -Capture $fixture.Capture -ExecutionId default @executionEventFacts)) 'under-covered default run accepted.'
+  $executionEventCases++
+  Assert-RepairContract ($executionEventCases -eq 41) 'execution event fixture count changed.'
+  Write-Output "Compatibility execution events: $executionEventCases labelled host fixtures passed; actual file hashes and visual qualification remain separate."
+  & {
+    $jsonCases=0
+    foreach($json in @('{}','{"a":1}','{"a":"\/\b\f\r"}','{"a":[true,false,null,0,-1,1.5,1e2]}',
+        '{"a":{"x":1},"b":{"x":2}}','{"a":[{"x":1},{"x":2}]}',
+        '{"a":"x","b":"x"}','{"a\\b":1,"a\"b":2}',
+        '{"nested":{"empty":[],"object":{}},"literal":"},:[{\\\""}')){
+      $bytes=[Text.UTF8Encoding]::new($false).GetBytes($json)
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityJsonObject $bytes)) 'valid labelled JSON rejected.';$jsonCases++
+    }
+    $utc='2026-10-09T12:34:56.1234567Z'
+    $payload=Read-OctoberCompatibilityJsonObject ([Text.UTF8Encoding]::new($false).GetBytes('{"at":"'+$utc+'"}'))
+    Assert-RepairContract ($null -ne $payload -and $payload.at -is [string] -and $payload.at -ceq $utc) 'UTC string changed during JSON parse.';$jsonCases++
+    $dateKey='2026-10-09T12:34:56Z'
+    $payload=Read-OctoberCompatibilityJsonObject ([Text.UTF8Encoding]::new($false).GetBytes('{"'+$dateKey+'":1}'))
+    Assert-RepairContract ($null -ne $payload -and @($payload.PSObject.Properties).Count -eq 1 -and
+      @($payload.PSObject.Properties.Name)[0] -ceq $dateKey) 'date-looking JSON property name changed.';$jsonCases++
+    $payload=Read-OctoberCompatibilityJsonObject ([Text.UTF8Encoding]::new($false).GetBytes('{"a":"\n\t\u0000"}'))
+    Assert-RepairContract ($null -ne $payload -and $payload.a -ceq ("`n`t"+[char]0)) 'escaped control value changed.';$jsonCases++
+    foreach($control in @(0,9,10,31)){
+      $rawControlCases=@(('{"a":"'+[char]$control+'"}'),('{"a'+[char]$control+'":1}'),
+        ('{"a":"'+'\'+[char]$control+'"}'))
+      Assert-RepairContract ($rawControlCases.Count -eq 3) 'raw-control fixture expressions collapsed.'
+      foreach($json in $rawControlCases){
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityJsonObject ([Text.UTF8Encoding]::new($false).GetBytes($json)))) 'raw control character JSON admitted.';$jsonCases++
+      }
+    }
+    foreach($json in @('{"a":1,"a":2}','{"name":1,"na\u006de":2}',
+        '{"a":1,"A":2}','{"2026-10-09T12:34:56Z":1,"\u0032026-10-09T12:34:56Z":2}',
+        '{"p":{"a":1,"a":2}}','{"p":[{"a":1,"a":2}]}',
+        '{"a\\b":1,"a\\b":2}','{"a\"b":1,"a\"b":2}',
+        '{}{}','{} true','[]','[{}]','null','{"a":1,}','{"a":[1,]}',
+        '{/*comment*/"a":1}','{"a":1//comment
+}', '{"a":01}','{"a":.5}','{"a":+1}','{"a":1e}',
+        '{"a":truefalse}','{"a":NaN}','{"a":Infinity}','{"a":undefined}',
+        '{a:1}',"{'a':1}",'{"a" 1}','{"a":}','{"a":[1}}','{"a":"unfinished}',
+        '{"a":"bad\q"}','{"a":"bad\u000x"}','{"a":1',
+        ('{"a":"\'+[char]39+'"}'),('{"a\'+[char]39+'":1}'))){
+      Assert-RepairContract ($null -eq (Read-OctoberCompatibilityJsonObject ([Text.UTF8Encoding]::new($false).GetBytes($json)))) "invalid labelled JSON admitted: $json";$jsonCases++
+    }
+    Assert-RepairContract ($null -eq (Read-OctoberCompatibilityJsonObject ([byte[]]@(255)))) 'invalid UTF8 accepted.';$jsonCases++
+    Assert-RepairContract ($jsonCases -eq 61) 'JSON fixture count changed.'
+    Write-Output "Compatibility strict JSON: $jsonCases labelled host fixtures passed; no approval or source qualification."
+    # Labelled shape fixtures only: no approved reference or rendered image.
+    $slot=[pscustomobject]@{slotId='H01-visual-1';captureTarget='Key(store-review-root)';
+      originalPath='workspace-choose.png';approvedAlternativePath='01/workspace-choose.png';
+      actualRenderRelativePath='01/workspace-choose.png';approvalRecordRelativePath='approvals/H01-visual-1.json';
+      expectedGeometry=[pscustomobject]@{viewportWidth=412;viewportHeight=915;devicePixelRatio=1;
+        textScale=1;bottomViewPadding=34;bottomViewInsets=0}}
+    $facts=@{Slot=$slot;TestKey='original-exact-key';ExecutionId='workspace_capture';
+      Source=('a'*40);Tree=('b'*40);ComparatorImplementationSha256=('C'*64);
+      CaptureBounds=[pscustomobject]@{left=0;top=0;right=412;bottom=915}}
+    function New-LabelledVisualShape {
+      return [pscustomobject]@{sourceCommit=('a'*40);sourceTree=('b'*40);executionId='workspace_capture';
+        testKey='original-exact-key';slotId='H01-visual-1';captureTarget='Key(store-review-root)';textScale=1;
+        referencePath='01/workspace-choose.png';referenceSha256Before=('D'*64);referenceSha256After=('D'*64);
+        actualRenderPath='01/workspace-choose.png';actualRenderSha256=('E'*64);
+        approvalRecordPath='approvals/H01-visual-1.json';approvalRecordSha256=('F'*64);
+        approvalDecision='accept_this_exact_source_bound_visual_reference_for_this_retained_case';
+        approvedReferenceSha256=('D'*64);comparatorIdentity='flutter_test.LocalFileComparator';
+        comparatorImplementationSha256=('C'*64);strictComparisonPassed=$true;differentPixelCount=0;
+        viewportWidth=412;viewportHeight=915;devicePixelRatio=1;bottomViewPadding=34;bottomViewInsets=0;
+        captureLogicalBounds=[pscustomobject]@{left=0;top=0;right=412;bottom=915};
+        renderedPixelWidth=412;renderedPixelHeight=915}
+    }
+    $visualCases=0
+    $evidence=New-LabelledVisualShape
+    Assert-RepairContract (Test-OctoberCompatibilityVisualEvidenceShape -Evidence $evidence @facts) 'labelled visual shape rejected.';$visualCases++
+    $evidence.referencePath=$slot.originalPath
+    Assert-RepairContract (Test-OctoberCompatibilityVisualEvidenceShape -Evidence $evidence @facts) 'original reference shape rejected.';$visualCases++
+    $evidence.captureLogicalBounds.right=412.5;$evidence.renderedPixelWidth=413
+    $halfPixelFacts=$facts.Clone();$halfPixelFacts.CaptureBounds=[pscustomobject]@{left=0;top=0;right=412.5;bottom=915}
+    Assert-RepairContract (Test-OctoberCompatibilityVisualEvidenceShape -Evidence $evidence @halfPixelFacts) 'positive half-pixel Dart rounding rejected.';$visualCases++
+    $fields=@((New-LabelledVisualShape).PSObject.Properties.Name)
+    Assert-RepairContract ($fields.Count -eq 28) 'visual field inventory changed.'
+    foreach($field in $fields){
+      foreach($kind in @('missing','null','case-variant')){
+        $evidence=New-LabelledVisualShape
+        switch($kind){
+          'missing' {$evidence.PSObject.Properties.Remove($field)}
+          'null' {$evidence.$field=$null}
+          'case-variant' {$value=$evidence.$field;$evidence.PSObject.Properties.Remove($field);$evidence|Add-Member -NotePropertyName $field.ToUpperInvariant() -NotePropertyValue $value}
+        }
+        Assert-RepairContract (-not(Test-OctoberCompatibilityVisualEvidenceShape -Evidence $evidence @facts)) "visual shape admitted $kind $field.";$visualCases++
+      }
+    }
+    $negatives=@(
+      @{name='extra';mutate={param($e)$e|Add-Member -NotePropertyName extra -NotePropertyValue 1}},
+      @{name='wrong-source';mutate={param($e)$e.sourceCommit='c'*40}},
+      @{name='wrong-tree';mutate={param($e)$e.sourceTree='d'*40}},
+      @{name='wrong-slot';mutate={param($e)$e.slotId='H02-visual-1'}},
+      @{name='wrong-key';mutate={param($e)$e.testKey='other-key'}},
+      @{name='wrong-execution';mutate={param($e)$e.executionId='default'}},
+      @{name='wrong-target';mutate={param($e)$e.captureTarget='Scaffold.first'}},
+      @{name='wrong-comparator';mutate={param($e)$e.comparatorIdentity='other'}},
+      @{name='wrong-comparator-hash';mutate={param($e)$e.comparatorImplementationSha256='0'*64}},
+      @{name='wrong-reference';mutate={param($e)$e.referencePath='other.png'}},
+      @{name='wrong-render';mutate={param($e)$e.actualRenderPath='other.png'}},
+      @{name='wrong-approval';mutate={param($e)$e.approvalRecordPath='approvals/other.json'}},
+      @{name='unapproved';mutate={param($e)$e.approvalDecision='pending'}},
+      @{name='changed-reference';mutate={param($e)$e.referenceSha256After='0'*64}},
+      @{name='wrong-approved-hash';mutate={param($e)$e.approvedReferenceSha256='0'*64}},
+      @{name='hash-newline';mutate={param($e)$e.actualRenderSha256+="`n"}},
+      @{name='false-comparison';mutate={param($e)$e.strictComparisonPassed=$false}},
+      @{name='truthy-comparison';mutate={param($e)$e.strictComparisonPassed='true'}},
+      @{name='nonzero-difference';mutate={param($e)$e.differentPixelCount=1}},
+      @{name='fractional-difference';mutate={param($e)$e.differentPixelCount=0.0}},
+      @{name='string-number';mutate={param($e)$e.textScale='1'}},
+      @{name='bool-number';mutate={param($e)$e.devicePixelRatio=$true}},
+      @{name='wrong-dpr';mutate={param($e)$e.devicePixelRatio=2}},
+      @{name='wrong-geometry';mutate={param($e)$e.bottomViewInsets=280}},
+      @{name='nonfinite';mutate={param($e)$e.captureLogicalBounds.right=[double]::NaN}},
+      @{name='infinite';mutate={param($e)$e.captureLogicalBounds.bottom=[double]::PositiveInfinity}},
+      @{name='bounds-string';mutate={param($e)$e.captureLogicalBounds.left='0'}},
+      @{name='bounds-extra';mutate={param($e)$e.captureLogicalBounds|Add-Member -NotePropertyName crop -NotePropertyValue 1}},
+      @{name='bounds-inverted';mutate={param($e)$e.captureLogicalBounds.right=-1}},
+      @{name='shifted-region';mutate={param($e)$e.captureLogicalBounds.left=1;$e.captureLogicalBounds.right=413}},
+      @{name='smaller-crop';mutate={param($e)$e.captureLogicalBounds.right=400;$e.renderedPixelWidth=400}},
+      @{name='pixel-overflow';mutate={param($e)$e.renderedPixelWidth=[long]::MaxValue}},
+      @{name='bounds-overflow';mutate={param($e)$e.captureLogicalBounds.right=[double]::MaxValue}},
+      @{name='pixel-fraction';mutate={param($e)$e.renderedPixelHeight=915.5}},
+      @{name='pixel-mismatch';mutate={param($e)$e.renderedPixelWidth=411}},
+      @{name='pixel-string';mutate={param($e)$e.renderedPixelHeight='915'}}
+    )
+    foreach($negative in $negatives){
+      $evidence=New-LabelledVisualShape;& $negative.mutate $evidence
+      Assert-RepairContract (-not(Test-OctoberCompatibilityVisualEvidenceShape -Evidence $evidence @facts)) "visual shape admitted $($negative.name).";$visualCases++
+    }
+    Assert-RepairContract ($visualCases -eq (3+3*$fields.Count+$negatives.Count)) 'visual shape case count changed.'
+    Write-Output "Compatibility visual shapes: $visualCases labelled fixtures passed; no reference, approval, render or comparison qualified."
+    & {
+      function Invoke-LabelledVisualSlot([string]$Mode) {
+        $slotFixtureEvidence=New-LabelledVisualShape
+        $slotFixtureSlot=$slot|ConvertTo-Json -Depth 8|ConvertFrom-Json
+        $slotFixtureSlot|Add-Member -NotePropertyMembers @{actualRenderPathBase='actualRenderArtifactRoot';
+          approvalRecordPathBase='approvalArtifactRoot';approvedAlternativePathBase='approvalArtifactRoot';
+          originalPathBase='compatibilitySourceRoot';originalSha256=$null}
+        $slotFixtureProtocol=Get-OctoberCompatibilityVisualProtocol
+        $slotFixtureResolution=[pscustomobject]@{approvalArtifactRoot='C:/labelled-host/approved';
+          actualRenderArtifactRoot='compatibilitySourceRoot/apps/mobile/build/compat-visual-candidates-20261009'}
+        $slotFixtureDecision=[pscustomobject]@{sourceCommit=('a'*40);sourceTree=('b'*40);executionId='workspace_capture';
+          testKey='original-exact-key';slotId='H01-visual-1';captureTarget='Key(store-review-root)';
+          referencePath=$slotFixtureEvidence.referencePath;referenceSha256=('D'*64);actualRenderSha256=('E'*64);
+          approvalRecordPath=$slotFixtureEvidence.approvalRecordPath;approvalRecordSha256=('F'*64);
+          founderMessageLocator='labelled fixture only, not human approval';decision=$slotFixtureProtocol.decision;
+          geometry=$slotFixtureSlot.expectedGeometry}
+        $slotFixtureRecord=$slotFixtureDecision|ConvertTo-Json -Depth 8|ConvertFrom-Json
+        $slotFixtureRecord.PSObject.Properties.Remove('approvalRecordSha256')
+        $slotFixtureObservation=[pscustomobject]@{}
+        foreach($slotFixtureName in $slotFixtureProtocol.observationRequiredFields) {
+          $slotFixtureValue=switch -CaseSensitive ($slotFixtureName) {
+            'schemaVersion' {1}
+            'comparatorInvoked' {$true}
+            'comparisonPassed' {$true}
+            default {$slotFixtureEvidence.$slotFixtureName}
+          }
+          $slotFixtureObservation|Add-Member -NotePropertyName $slotFixtureName -NotePropertyValue $slotFixtureValue
+        }
+        $slotFixtureContext=@{Mode=$Mode;Lease=$null;PairReached=$false;FinalHashReached=$false}
+        switch -CaseSensitive ($Mode) {
+          'missing-decision' {$slotFixtureDecision=$null}
+          'wrong-observation' {$slotFixtureObservation.actualRenderSha256='0'*64}
+          'wrong-decision' {$slotFixtureDecision.sourceCommit='0'*40}
+          'wrong-record' {$slotFixtureRecord.sourceCommit='0'*40}
+          'missing-record-field' {$slotFixtureRecord.PSObject.Properties.Remove('founderMessageLocator')}
+          'record-geometry-string' {$slotFixtureRecord.geometry.viewportWidth='412'}
+          'wrong-root' {$slotFixtureSlot.actualRenderPathBase='caller override'}
+          'self-hashed-record' {$slotFixtureRecord|Add-Member -NotePropertyName approvalRecordSha256 -NotePropertyValue ('F'*64)}
+        }
+        # Serialize the13-field body first, then bind its real hash externally.
+        # The record never needs a SHA256 fixed point to satisfy a positive.
+        $slotFixtureRecordBytes=[Text.Encoding]::UTF8.GetBytes(($slotFixtureRecord|ConvertTo-Json -Depth 8 -Compress))
+        $slotFixtureContext.RecordHash=Get-OctoberCompatibilityByteHash $slotFixtureRecordBytes
+        $slotFixtureEvidence.approvalRecordSha256=$slotFixtureContext.RecordHash
+        if($null -ne $slotFixtureDecision){$slotFixtureDecision.approvalRecordSha256=$slotFixtureContext.RecordHash}
+        function Open-OctoberCompatibilityVisualArtifact {
+          param([string]$Base,[string]$RelativePath,[string]$ExpectedSha256)
+          if($slotFixtureContext.Mode -ceq 'missing-approval'){return $null}
+          if($Base -cne 'C:/labelled-host/approved' -or $RelativePath -cne 'approvals/H01-visual-1.json' -or
+              $ExpectedSha256 -cne (Get-OctoberCompatibilityByteHash $slotFixtureRecordBytes)){return $null}
+          $slotFixtureContext.Lease=[IO.MemoryStream]::new()
+          return [pscustomobject]@{CanonicalPath='C:/labelled-host/approved/approvals/H01-visual-1.json';
+            Bytes=$slotFixtureRecordBytes;Stream=$slotFixtureContext.Lease}
+        }
+        function Test-OctoberCompatibilityLockedPngPair {
+          param([string]$ReferenceBase,[string]$ReferencePath,[string]$ReferenceSha256,
+            [string]$ActualBase,[string]$ActualPath,[string]$ActualSha256,[int]$Width,[int]$Height)
+          $slotFixtureContext.PairReached=$true
+          return $slotFixtureContext.Mode -cne 'pair-failed' -and $ReferenceBase -ceq 'C:/labelled-host/approved' -and
+            $ReferencePath -ceq '01/workspace-choose.png' -and $ReferenceSha256 -ceq ('D'*64) -and
+            ([IO.Path]::GetFullPath($ActualBase)) -ceq ([IO.Path]::GetFullPath((Join-Path (Get-OctoberCompatibilityBinding).worktreePath 'apps/mobile/build/compat-visual-candidates-20261009'))) -and
+            $ActualPath -ceq '01/workspace-choose.png' -and $ActualSha256 -ceq ('E'*64) -and $Width -eq 412 -and $Height -eq 915
+        }
+        function Get-OctoberCoverageBoundHash {
+          $slotFixtureContext.FinalHashReached=$true
+          if($slotFixtureContext.Mode -ceq 'changed-approval'){return ('0'*64)};return $slotFixtureContext.RecordHash
+        }
+        $slotFixtureResult=Test-OctoberCompatibilityVisualSlot -Evidence $slotFixtureEvidence -Slot $slotFixtureSlot -Decision $slotFixtureDecision `
+          -Observation $slotFixtureObservation -Resolution $slotFixtureResolution -Protocol $slotFixtureProtocol -TestKey original-exact-key `
+          -ExecutionId workspace_capture -Source ('a'*40) -Tree ('b'*40) -ComparatorImplementationSha256 ('C'*64)
+        Assert-RepairContract ($slotFixtureResult -eq ($Mode -ceq 'positive')) ('visual slot composition result incorrect: '+$Mode)
+        if($null -ne $slotFixtureContext.Lease){Assert-RepairContract (-not $slotFixtureContext.Lease.CanRead) ('approval lease not disposed: '+$Mode)}
+        if($Mode -cin @('positive','pair-failed','changed-approval')){Assert-RepairContract $slotFixtureContext.PairReached ('pair boundary not reached: '+$Mode)}
+        if($Mode -cin @('positive','changed-approval')){Assert-RepairContract $slotFixtureContext.FinalHashReached ('final approval hash not reached: '+$Mode)}
+      }
+      foreach($slotFixtureMode in @('positive','missing-decision','wrong-observation','wrong-decision','wrong-record',
+        'missing-record-field','record-geometry-string','pair-failed','changed-approval','wrong-root','missing-approval','self-hashed-record')) {
+        Invoke-LabelledVisualSlot $slotFixtureMode
+      }
+      Write-Output 'Compatibility visual slot composition: 12 labelled in-memory cases passed; record bytes actually hashed, no actual approval, image or source qualification.'
+    }
+  }
+  & {
+    # Temporary host files only; never runtime storage or source/device evidence.
+    $fileFixtureRoot=Join-Path ([IO.Path]::GetTempPath()) ('moolsocial-labelled-execution-'+[Guid]::NewGuid().ToString('N'))
+    Assert-RepairContract (-not(Test-Path -LiteralPath $fileFixtureRoot)) 'temporary fixture root already exists.'
+    $fileFixtureBuild=Join-Path $fileFixtureRoot 'apps/mobile/build'
+    $null=[IO.Directory]::CreateDirectory($fileFixtureBuild)
+    $binding=@{worktreePath=$fileFixtureRoot.Replace('\','/')}
+    function Get-OctoberCompatibilityBinding {return $binding}
+    $realBoundHash=${function:Get-OctoberCoverageBoundHash}
+    $realEventReader=${function:Read-OctoberCompatibilityExecutionEvents}
+    $script:fileEventParserCalls=0
+    function Read-OctoberCompatibilityExecutionEvents {
+      param([object[]]$Events,[object]$Capture,[string]$ReportId,[string]$ExecutionId,
+        [string]$Source,[string]$Tree,[string]$RegistrySha,[string]$ProducerBlob,[string]$LogSha)
+      $script:fileEventParserCalls++
+      return & $realEventReader @PSBoundParameters
+    }
+    $fileHashCounts=@{};$fileMode='positive';$fileBoundaryObserved=$false
+    function Get-OctoberCoverageBoundHash([string]$Path) {
+      $fileName=[IO.Path]::GetFileName($Path)
+      if(-not $fileHashCounts.ContainsKey($fileName)){$fileHashCounts[$fileName]=0}
+      $fileHashCounts[$fileName]++
+      if($fileMode -ceq 'reparse-rejection'){$script:fileBoundaryObserved=$true;throw 'Labelled ancestor reparse rejection.'}
+      if($fileMode -ceq 'changed-after-read' -and $fileHashCounts[$fileName] -gt 1){$script:fileBoundaryObserved=$true;return ('0'*64)}
+      $manifestFinalTargets=@{
+        'manifest-final-log'=@('labelled-execution.jsonl',3)
+        'manifest-final-stderr'=@('labelled-execution.jsonl.stderr.txt',3)
+        'manifest-final-capture'=@('labelled-execution.jsonl.capture.json',5)
+        'manifest-final-manifest'=@('labelled-execution.jsonl.visual.json',3)
+      }
+      if($manifestFinalTargets.ContainsKey($fileMode) -and
+          $fileName -ceq $manifestFinalTargets[$fileMode][0] -and
+          $fileHashCounts[$fileName] -eq $manifestFinalTargets[$fileMode][1]){
+        $script:fileBoundaryObserved=$true;return ('0'*64)
+      }
+      if($fileMode -ceq 'buffered-byte-change' -and $fileName -ceq 'labelled-execution.jsonl' -and $fileHashCounts[$fileName] -eq 1){
+        $hash=& $realBoundHash $Path
+        # Leading JSON whitespace changes bytes without invalidating any event.
+        # A zero parser-call assertion below distinguishes the buffer boundary
+        # from the later path-stability rejection of these changed valid bytes.
+        $validJsonLines=[IO.File]::ReadAllText($Path)
+        [IO.File]::WriteAllText($Path,(' '+$validJsonLines),[Text.UTF8Encoding]::new($false))
+        $script:fileBoundaryObserved=$true;return $hash
+      }
+      return & $realBoundHash $Path
+    }
+    $fileRelative='apps/mobile/build/labelled-execution.jsonl'
+    $fileLog=Join-Path $fileFixtureRoot $fileRelative
+    $fileCapture=$fileLog+'.capture.json';$fileStderr=$fileLog+'.stderr.txt'
+    $fileFixturePassed=$false
+    function Write-LabelledExecutionFiles {
+      $fixture=New-LabelledExecutionEvents historical_store_review
+      $fixture.Capture.workingDirectory=$binding.worktreePath+'/apps/mobile'
+      $fixture.Capture.stderrPath=$fileRelative+'.stderr.txt'
+      $lines=@($fixture.Events | ForEach-Object {ConvertTo-Json -InputObject $_ -Depth 20 -Compress})
+      [IO.File]::WriteAllLines($fileLog,[string[]]$lines,[Text.UTF8Encoding]::new($false))
+      [IO.File]::WriteAllText($fileStderr,'',[Text.UTF8Encoding]::new($false))
+      $fixture.Capture.stdoutSha256=(Get-FileHash -LiteralPath $fileLog -Algorithm SHA256).Hash
+      $fixture.Capture.stderrSha256=(Get-FileHash -LiteralPath $fileStderr -Algorithm SHA256).Hash
+      [IO.File]::WriteAllText($fileCapture,(ConvertTo-Json -InputObject $fixture.Capture -Depth 20),[Text.UTF8Encoding]::new($false))
+      return [pscustomobject]@{executionId='historical_store_review';path=$fileRelative;
+        capturePath=($fileRelative+'.capture.json');sha256=$fixture.Capture.stdoutSha256;
+        captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash;runtimeDefines=@()}
+    }
+    function Read-LabelledCapture {
+      $jsonParameters=@{}
+      if((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')){$jsonParameters.DateKind='String'}
+      return Get-Content -Raw -LiteralPath $fileCapture|ConvertFrom-Json @jsonParameters
+    }
+    function Refresh-LabelledExecutionHashes([object]$Evidence) {
+      $capture=Read-LabelledCapture
+      $Evidence.sha256=(Get-FileHash -LiteralPath $fileLog -Algorithm SHA256).Hash
+      $capture.stdoutSha256=$Evidence.sha256
+      [IO.File]::WriteAllText($fileCapture,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false))
+      $Evidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash
+    }
+    $fileFacts=$executionEventFacts.Clone();$fileFacts.Remove('LogSha');$fileFacts.ExecutionId='historical_store_review'
+    $fileCases=0
+    try {
+      $evidence=Write-LabelledExecutionFiles
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityExecutionEvidence -Evidence $evidence @fileFacts)) 'complete actual host fixture files rejected.'
+      Assert-RepairContract ($script:fileEventParserCalls -eq 1) 'positive file reader did not reach the real event parser once.'
+      $fileCases++
+      Refresh-LabelledExecutionHashes $evidence
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityExecutionEvidence -Evidence $evidence @fileFacts)) 'unchanged UTC-preserving rewrite control rejected.'
+      Assert-RepairContract ($script:fileEventParserCalls -eq 2) 'rewrite control did not reach the real event parser once.'
+      $fileCases++
+      foreach($kind in @('missing-log','missing-capture','missing-stderr','wrong-log-hash',
+          'wrong-capture-hash','wrong-stderr-bytes','invalid-capture-json','invalid-log-json',
+          'blank-log-line','array-log-line','wrong-stderr-path','wrong-defines',
+          'traversal-path','final-lf-path','reparse-rejection','changed-after-read',
+          'array-capture-root','buffered-byte-change','invalid-utf8-log',
+          'duplicate-capture-key','duplicate-event-key','case-colliding-event-key')) {
+        $evidence=Write-LabelledExecutionFiles;$fileHashCounts.Clear();$fileMode='positive';$script:fileBoundaryObserved=$false;$script:fileEventParserCalls=0
+        switch($kind) {
+          'missing-log' {Remove-Item -LiteralPath $fileLog}
+          'missing-capture' {Remove-Item -LiteralPath $fileCapture}
+          'missing-stderr' {Remove-Item -LiteralPath $fileStderr}
+          'wrong-log-hash' {$evidence.sha256='0'*64}
+          'wrong-capture-hash' {$evidence.captureSha256='0'*64}
+          'wrong-stderr-bytes' {[IO.File]::WriteAllText($fileStderr,'changed',[Text.UTF8Encoding]::new($false))}
+          'invalid-capture-json' {[IO.File]::WriteAllText($fileCapture,'{broken',[Text.UTF8Encoding]::new($false));$evidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash}
+          'invalid-log-json' {[IO.File]::WriteAllText($fileLog,'{broken',[Text.UTF8Encoding]::new($false));Refresh-LabelledExecutionHashes $evidence}
+          'blank-log-line' {$text=[IO.File]::ReadAllText($fileLog);[IO.File]::WriteAllText($fileLog,("`n"+$text),[Text.UTF8Encoding]::new($false));Refresh-LabelledExecutionHashes $evidence}
+          'array-log-line' {$lines=[IO.File]::ReadAllLines($fileLog);$lines[0]='['+$lines[0]+']';[IO.File]::WriteAllLines($fileLog,$lines,[Text.UTF8Encoding]::new($false));Refresh-LabelledExecutionHashes $evidence}
+          'wrong-stderr-path' {$capture=Read-LabelledCapture;$capture.stderrPath='apps/mobile/build/other.stderr.txt';[IO.File]::WriteAllText($fileCapture,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false));$evidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash}
+          'wrong-defines' {$evidence.runtimeDefines=@('')}
+          'traversal-path' {$evidence.path='apps/mobile/build/../outside.jsonl';$evidence.capturePath=$evidence.path+'.capture.json'}
+          'final-lf-path' {$evidence.path+="`n";$evidence.capturePath=$evidence.path+'.capture.json'}
+          'reparse-rejection' {$fileMode=$kind}
+          'changed-after-read' {$fileMode=$kind}
+          'array-capture-root' {$text=[IO.File]::ReadAllText($fileCapture);[IO.File]::WriteAllText($fileCapture,('['+$text+']'),[Text.UTF8Encoding]::new($false));$evidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash}
+          'buffered-byte-change' {$fileMode=$kind}
+          'invalid-utf8-log' {[IO.File]::WriteAllBytes($fileLog,[byte[]]@(255));Refresh-LabelledExecutionHashes $evidence}
+          'duplicate-capture-key' {
+            $text=[IO.File]::ReadAllText($fileCapture)
+            $text=$text.Insert($text.IndexOf('{')+1,'"schemaVersion":1,')
+            [IO.File]::WriteAllText($fileCapture,$text,[Text.UTF8Encoding]::new($false))
+            $evidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash
+          }
+          'duplicate-event-key' {
+            $lines=[IO.File]::ReadAllLines($fileLog)
+            $lines[0]=$lines[0].Insert(1,'"type":"moolsocialSource",')
+            [IO.File]::WriteAllLines($fileLog,$lines,[Text.UTF8Encoding]::new($false))
+            Refresh-LabelledExecutionHashes $evidence
+          }
+          'case-colliding-event-key' {
+            $lines=[IO.File]::ReadAllLines($fileLog)
+            $lines[0]=$lines[0].Insert(1,'"TYPE":"moolsocialSource",')
+            [IO.File]::WriteAllLines($fileLog,$lines,[Text.UTF8Encoding]::new($false))
+            Refresh-LabelledExecutionHashes $evidence
+          }
+        }
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityExecutionEvidence -Evidence $evidence @fileFacts)) "actual host fixture reader admitted $kind."
+        if($kind -cin @('reparse-rejection','changed-after-read','buffered-byte-change')){Assert-RepairContract $script:fileBoundaryObserved 'file boundary rejection was not reached.'}
+        if($kind -ceq 'buffered-byte-change') {
+          Assert-RepairContract ($script:fileEventParserCalls -eq 0) 'changed buffered bytes reached event parsing before rejection.'
+        }
+        $fileCases++
+      }
+      $fileMode='positive';$fileHashCounts.Clear();$script:fileEventParserCalls=0;$evidence=Write-LabelledExecutionFiles
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityExecutionEvidence -Evidence $evidence @fileFacts)) 'actual file control after negative fixtures rejected.';$fileCases++
+      Assert-RepairContract ($script:fileEventParserCalls -eq 1) 'final control did not reach the real event parser once.'
+      Assert-RepairContract ($fileCases -eq 25) 'actual file fixture count changed.'
+      $artifactCases=0
+      $fileHashCounts.Clear()
+      $payload=Read-OctoberCompatibilityVisualArtifactBytes -Base $fileFixtureRoot -RelativePath $fileRelative -ExpectedSha256 $evidence.sha256
+      Assert-RepairContract ($null -ne $payload -and $payload.Bytes -is [byte[]] -and
+        (Get-OctoberCompatibilityByteHash $payload.Bytes) -ceq $evidence.sha256 -and
+        $payload.CanonicalPath -ceq [IO.Path]::GetFullPath($fileLog)) 'labelled artifact verified-byte control rejected.';$artifactCases++
+      foreach($kind in @('wrong-hash','missing-path','traversal','sibling-prefix','path-newline',
+          'rooted-relative','drive-relative-path','drive-relative-base','relative-base','non-directory-base',
+          'reparse-rejection','changed-after-read','buffered-byte-change')){
+        $evidence=Write-LabelledExecutionFiles;$fileHashCounts.Clear();$fileMode='positive';$script:fileBoundaryObserved=$false
+        $artifactArguments=@{Base=$fileFixtureRoot;RelativePath=$fileRelative;ExpectedSha256=$evidence.sha256}
+        switch($kind){
+          'wrong-hash' {$artifactArguments.ExpectedSha256='0'*64}
+          'missing-path' {$artifactArguments.RelativePath='missing.png'}
+          'traversal' {$artifactArguments.RelativePath='apps/../outside.png'}
+          'sibling-prefix' {$artifactArguments.RelativePath='../sibling/file.png'}
+          'path-newline' {$artifactArguments.RelativePath+="`n"}
+          'rooted-relative' {$artifactArguments.RelativePath=$fileLog}
+          'drive-relative-path' {$artifactArguments.RelativePath='C:relative.png'}
+          'drive-relative-base' {$artifactArguments.Base='C:relative'}
+          'relative-base' {$artifactArguments.Base='.'}
+          'non-directory-base' {$artifactArguments.Base=$fileLog}
+          'reparse-rejection' {$fileMode=$kind}
+          'changed-after-read' {$fileMode=$kind}
+          'buffered-byte-change' {$fileMode=$kind}
+        }
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityVisualArtifactBytes @artifactArguments)) "artifact reader admitted $kind.";$artifactCases++
+        if($kind -cin @('reparse-rejection','changed-after-read','buffered-byte-change')){
+          Assert-RepairContract $script:fileBoundaryObserved 'artifact boundary negative was not reached.'
+        }
+        if($kind -ceq 'buffered-byte-change'){
+          Assert-RepairContract ($fileHashCounts['labelled-execution.jsonl'] -eq 1) 'artifact buffer mismatch reached final path observation.'
+        }
+        if($kind -ceq 'changed-after-read'){
+          Assert-RepairContract ($fileHashCounts['labelled-execution.jsonl'] -eq 2) 'artifact final change rejected before its intended observation.'
+        }
+      }
+      $fileMode='positive';$fileHashCounts.Clear();$evidence=Write-LabelledExecutionFiles
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityVisualArtifactBytes -Base $fileFixtureRoot -RelativePath $fileRelative -ExpectedSha256 $evidence.sha256)) 'artifact final positive control rejected.';$artifactCases++
+      Assert-RepairContract ($artifactCases -eq 15) 'artifact fixture count changed.'
+      Write-Output "Compatibility artifact bytes: $artifactCases labelled host fixtures passed; no image, approval or comparison qualified."
+      $fileManifest=$fileLog+'.visual.json'
+      $manifestFacts=$fileFacts.Clone();$manifestFacts.RecorderBlob='e'*40
+      $manifestFacts.ExpectedSlotIds=@('labelled-host-slot-1','labelled-host-slot-2')
+      function Write-LabelledVisualManifestBinding([string]$Kind='positive') {
+        $fixtureEvidence=Write-LabelledExecutionFiles
+        $manifest=[pscustomobject]@{schemaVersion=1;sourceCommit=$fileFacts.Source;sourceTree=$fileFacts.Tree;
+          executionLogPath=$fileRelative;reportId=$fileFacts.ReportId;executionId=$fileFacts.ExecutionId;
+          recorderPath='apps/mobile/test/work_workspace_layout_safety_test.dart';recorderGitBlob=('e'*40);
+          entries=@([pscustomobject]@{slotId='labelled-host-slot-1'},[pscustomobject]@{slotId='labelled-host-slot-2'})}
+        switch($Kind) {
+          'wrong-execution' {$manifest.executionId='workspace_capture'}
+          'wrong-source' {$manifest.sourceCommit='f'*40}
+          'wrong-tree' {$manifest.sourceTree='f'*40}
+          'wrong-log' {$manifest.executionLogPath='apps/mobile/build/another.jsonl'}
+          'wrong-recorder' {$manifest.recorderGitBlob='f'*40}
+          'schema-string' {$manifest.schemaVersion='1'}
+          'extra-field' {$manifest|Add-Member -NotePropertyName accepted -NotePropertyValue $true}
+          'missing-slot' {$manifest.entries=@($manifest.entries[0])}
+          'unknown-slot' {$manifest.entries[0].slotId='unapproved-slot'}
+          'duplicate-slot' {$manifest.entries[1].slotId=$manifest.entries[0].slotId}
+          'scalar-entries' {$manifest.entries=$manifest.entries[0]}
+        }
+        $text=ConvertTo-Json -InputObject $manifest -Depth 20
+        if($Kind -ceq 'duplicate-key'){$text=$text.Insert($text.IndexOf('{')+1,'"schemaVersion":1,')}
+        [IO.File]::WriteAllText($fileManifest,$text,[Text.UTF8Encoding]::new($false))
+        $capture=Read-LabelledCapture
+        $capture|Add-Member -NotePropertyName visualManifestPath -NotePropertyValue ($fileRelative+'.visual.json')
+        $capture|Add-Member -NotePropertyName visualManifestSha256 -NotePropertyValue ((Get-FileHash -LiteralPath $fileManifest -Algorithm SHA256).Hash)
+        if($Kind -ceq 'unbound-manifest'){$capture.visualManifestPath=$null;$capture.visualManifestSha256=$null}
+        if($Kind -ceq 'wrong-manifest-hash'){$capture.visualManifestSha256='0'*64}
+        if($Kind -ceq 'wrong-manifest-path'){$capture.visualManifestPath='apps/mobile/build/another.visual.json'}
+        [IO.File]::WriteAllText($fileCapture,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false))
+        $fixtureEvidence.captureSha256=(Get-FileHash -LiteralPath $fileCapture -Algorithm SHA256).Hash
+        if($Kind -ceq 'missing-manifest'){Remove-Item -LiteralPath $fileManifest}
+        if($Kind -ceq 'changed-manifest-after-binding'){[IO.File]::WriteAllText($fileManifest,($text+' '),[Text.UTF8Encoding]::new($false))}
+        if($Kind -ceq 'failed-execution'){
+          $lines=[IO.File]::ReadAllLines($fileLog);$lines[$lines.Count-1]='{"type":"done","success":false}'
+          [IO.File]::WriteAllLines($fileLog,$lines,[Text.UTF8Encoding]::new($false));Refresh-LabelledExecutionHashes $fixtureEvidence
+        }
+        return $fixtureEvidence
+      }
+      $fileMode='positive';$fileHashCounts.Clear();$evidence=Write-LabelledVisualManifestBinding
+      $manifestResult=Read-OctoberCompatibilityVisualManifestBinding -Evidence $evidence @manifestFacts
+      Assert-RepairContract ($null -ne $manifestResult -and $manifestResult.entries.Count -eq 2) 'hash-bound labelled visual manifest rejected.'
+      $manifestCases=1
+      foreach($kind in @('missing-manifest','unbound-manifest','wrong-manifest-hash','wrong-manifest-path',
+          'wrong-execution','wrong-source','wrong-tree','wrong-log','wrong-recorder','schema-string',
+          'extra-field','duplicate-key','missing-slot','unknown-slot','duplicate-slot','scalar-entries',
+          'failed-execution','changed-manifest-after-binding','manifest-final-log','manifest-final-stderr',
+          'manifest-final-capture','manifest-final-manifest')) {
+        $fileMode='positive';$fileHashCounts.Clear();$evidence=Write-LabelledVisualManifestBinding $kind
+        if($kind.StartsWith('manifest-final-',[StringComparison]::Ordinal)){$fileMode=$kind;$script:fileBoundaryObserved=$false}
+        Assert-RepairContract ($null -eq (Read-OctoberCompatibilityVisualManifestBinding -Evidence $evidence @manifestFacts)) "visual manifest binding admitted $kind.";$manifestCases++
+        if($kind.StartsWith('manifest-final-',[StringComparison]::Ordinal)){Assert-RepairContract $script:fileBoundaryObserved 'manifest final preservation boundary not reached.'}
+      }
+      $fileMode='positive';$fileHashCounts.Clear();$evidence=Write-LabelledVisualManifestBinding
+      Assert-RepairContract ($null -ne (Read-OctoberCompatibilityVisualManifestBinding -Evidence $evidence @manifestFacts)) 'final visual manifest binding control rejected.';$manifestCases++
+      Assert-RepairContract ($manifestCases -eq 24) 'visual manifest fixture inventory changed.'
+      Write-Output "Compatibility visual manifest binding: $manifestCases labelled temporary host fixtures passed; no real render, approval or comparison qualified."
+      $fileFixturePassed=$true
+      Write-Output "Compatibility execution files: $fileCases labelled temporary host fixtures passed; reparse/change boundaries simulated, no real source or visuals qualified."
+    } finally {
+      if($fileFixturePassed) {
+        # Exact files and empty directories created by this invocation only.
+        foreach($path in @($fileLog,$fileCapture,$fileStderr,$fileManifest)){if(Test-Path -LiteralPath $path){Remove-Item -LiteralPath $path}}
+        foreach($path in @($fileFixtureBuild,(Join-Path $fileFixtureRoot 'apps/mobile'),(Join-Path $fileFixtureRoot 'apps'),$fileFixtureRoot)){
+          Assert-RepairContract ([IO.Path]::GetFullPath($path).StartsWith([IO.Path]::GetFullPath($fileFixtureRoot),[StringComparison]::OrdinalIgnoreCase)) 'fixture cleanup escaped its created root.'
+          Remove-Item -LiteralPath $path
+        }
+      } else {Write-Output ('Failed labelled host fixtures retained at '+$fileFixtureRoot)}
+    }
+  }
   $capturePrematureRejected=$false
   try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureCompatibilityReport publication_contracts }
   catch {
-    Assert-RepairContract ($_.Exception.Message.IndexOf('capture requires committed amended L, not E/G/C/A/H/J or documentary Q.',[StringComparison]::Ordinal) -ge 0) 'premature capture failed for an unrelated reason.'
+    Assert-RepairContract ($_.Exception.Message.IndexOf('capture requires committed amended L5, not E/G/C/A/H/J/K or documentary Q.',[StringComparison]::Ordinal) -ge 0) 'premature capture failed for an unrelated reason.'
     $capturePrematureRejected=$true
   }
   Assert-RepairContract $capturePrematureRejected 'premature host capture admitted before L.'
   Write-Output 'Compatibility capture producer: unqualified source rejected before Flutter or evidence-file creation.'
+  $selectionWithoutCaptureRejected=$false
+  try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureExecutionId localstock_review }
+  catch {
+    Assert-RepairContract ($_.Exception.Message.IndexOf('execution selection requires capture mode.',[StringComparison]::Ordinal) -ge 0) 'execution-only call failed for an unrelated reason.'
+    $selectionWithoutCaptureRejected=$true
+  }
+  Assert-RepairContract $selectionWithoutCaptureRejected 'supplemental selection admitted outside capture mode.'
+  $unknownSelectionRejected=$false
+  try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureExecutionId caller_injected_execution }
+  catch {
+    Assert-RepairContract ($_.FullyQualifiedErrorId.IndexOf('ParameterArgumentValidationError',[StringComparison]::Ordinal) -ge 0) 'unknown execution failed for an unrelated reason.'
+    $unknownSelectionRejected=$true
+  }
+  Assert-RepairContract $unknownSelectionRejected 'unknown capture execution admitted.'
+  Write-Output 'Compatibility capture execution selection: 2 actual producer rejection checks passed; no capture or Flutter invocation.'
   # Complete aggregate fixture in an isolated ignored build directory. Fake Git
   # reads are scoped to this scriptblock; no real source/ledger/device is changed.
   & {
@@ -852,8 +2434,12 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Write-FixtureProof $proof
     $working=@{Stage=6; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),('8'*40),$fakeSource); Head=$fakeSource}
     $committed=@{Stage=7; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),('8'*40),$fakeSource,$fakeQ); Head=$fakeQ}
-    Assert-RepairContract (Test-OctoberCompatibilityQualification $working -FromWorkingTree) 'complete labelled working-Q aggregate rejected.'
-    Assert-RepairContract (Test-OctoberCompatibilityQualification $committed) 'complete labelled committed-Q aggregate rejected.'
+    Assert-RepairContract (Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree) 'complete labelled legacy working-Q aggregate rejected.'
+    Assert-RepairContract (Test-OctoberCompatibilityLegacyQualification $committed) 'complete labelled legacy committed-Q aggregate rejected.'
+    Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $working -FromWorkingTree)) 'operative qualifier admitted legacy working proof.'
+    Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $committed)) 'operative qualifier admitted legacy committed proof.'
+    $prospective=@{Stage=8;Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),('8'*40),('7'*40),$fakeSource,$fakeQ);Head=$fakeQ}
+    Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $prospective -FromWorkingTree)) 'operative qualifier fell back to schema1 on prospective history.'
     $aggregateCases=2
     # Retain the two legacy positives above, then test the actual new producer
     # shape with explicit default identity at every link and fresh file hashes.
@@ -876,8 +2462,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       $report.captureSha256=(Get-FileHash -LiteralPath $sidecar -Algorithm SHA256).Hash
     }
     Write-FixtureProof $proof
-    Assert-RepairContract (Test-OctoberCompatibilityQualification $working -FromWorkingTree) 'explicit-default working-Q aggregate rejected.';$aggregateCases++
-    Assert-RepairContract (Test-OctoberCompatibilityQualification $committed) 'explicit-default committed-Q aggregate rejected.';$aggregateCases++
+    Assert-RepairContract (Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree) 'explicit-default legacy working-Q aggregate rejected.';$aggregateCases++
+    Assert-RepairContract (Test-OctoberCompatibilityLegacyQualification $committed) 'explicit-default legacy committed-Q aggregate rejected.';$aggregateCases++
     foreach($kind in @('missing-report','duplicate-report','stale-source','stale-registry','swapped-sidecars','supplemental-report-identity','coerced-report-identity',
         'missing-coverage-commit','wrong-coverage-commit','wrong-coverage-hash')) {
       $changed=(ConvertTo-Json -InputObject $proof -Depth 30 -Compress)|ConvertFrom-Json
@@ -897,7 +2483,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         }
       }
       Write-FixtureProof $changed
-      Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $working -FromWorkingTree)) "aggregate $kind accepted."
+      Assert-RepairContract (-not (Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree)) "aggregate $kind accepted."
       $aggregateCases++
     }
     $firstLog=Join-Path $root ([string]$proof.reports[0].path)
@@ -942,7 +2528,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         [IO.File]::WriteAllText($firstCapture,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false))
         $changed.reports[0].captureSha256=(Get-FileHash -LiteralPath $firstCapture -Algorithm SHA256).Hash
         Write-FixtureProof $changed
-        Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $working -FromWorkingTree)) "aggregate $kind accepted."
+        Assert-RepairContract (-not (Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree)) "aggregate $kind accepted."
         $aggregateCases++
       } finally {
         [IO.File]::WriteAllBytes($firstLog,$originalLog)
@@ -951,12 +2537,12 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     }
     Write-FixtureProof $proof
     $wrongHistory=$working.Clone();$wrongHistory.Commits=@($working.Commits);$wrongHistory.Commits[3]=$fakeSource
-    Assert-RepairContract (-not(Test-OctoberCompatibilityQualification $wrongHistory -FromWorkingTree)) 'wrong H history position admitted.';$aggregateCases++
+    Assert-RepairContract (-not(Test-OctoberCompatibilityLegacyQualification $wrongHistory -FromWorkingTree)) 'wrong H history position admitted.';$aggregateCases++
     foreach($kind in @('altered-contract','duplicate-contract')) {
       try {
         $fixtureCoverageDocument=if($kind -ceq 'altered-contract'){$coverageDoc.Replace('Workspace overnight visual - choose','unapproved different capture')}
           else{$coverageDoc+"`n"+$coverageDoc}
-        Assert-RepairContract (-not(Test-OctoberCompatibilityQualification $working -FromWorkingTree)) "immutable H $kind admitted.";$aggregateCases++
+        Assert-RepairContract (-not(Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree)) "immutable H $kind admitted.";$aggregateCases++
       }finally{$fixtureCoverageDocument=$coverageDoc}
     }
     $layoutLog=Join-Path $root ([string]$proof.reports[2].path)
@@ -984,7 +2570,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         $changed.reports[2].sha256=$capture.stdoutSha256
         $changed.reports[2].captureSha256=(Get-FileHash -LiteralPath $layoutCapture -Algorithm SHA256).Hash
         Write-FixtureProof $changed
-        Assert-RepairContract (-not(Test-OctoberCompatibilityQualification $working -FromWorkingTree)) "contract fulfillment $kind admitted.";$aggregateCases++
+        Assert-RepairContract (-not(Test-OctoberCompatibilityLegacyQualification $working -FromWorkingTree)) "contract fulfillment $kind admitted.";$aggregateCases++
       }finally{
         [IO.File]::WriteAllBytes($layoutLog,$originalLayoutLog)
         [IO.File]::WriteAllBytes($layoutCapture,$originalLayoutCapture)
