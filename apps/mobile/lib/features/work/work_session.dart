@@ -2691,6 +2691,9 @@ class WorkSession extends ChangeNotifier {
   int _counterSaleGeneration = 0;
   int get counterSaleGeneration => _counterSaleGeneration;
   bool get counterDraftLoading => _counterRecovery?.loading == true;
+  // Journal-read readiness only; this does not grant editing or submission.
+  bool get counterDraftLoaded =>
+      _counterDraftScope == null || _counterRecovery?.loaded == true;
   bool get counterDraftSubmitting => _counterRecovery?.submitting == true;
   bool get counterDraftNeedsReconciliation =>
       _counterRecovery?.record?.stage == WorkspaceCounterDraftStage.submitting;
@@ -8947,8 +8950,12 @@ class WorkSession extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  List<WorkspacePackingLine> get workspacePackingLines =>
-      _packingLines(currentWorkspaceOrder, workspacePackedProductIds);
+  List<WorkspacePackingLine> get workspacePackingLines {
+    final current = currentWorkspaceOrder;
+    final anonymous = current == null && currentWorkspaceOrderId == null &&
+        workspaceOrders.isEmpty ? visibleWorkspaceOrders.singleOrNull : null;
+    return _packingLines(current ?? anonymous, workspacePackedProductIds);
+  }
 
   List<WorkspacePackingLine> workspacePackingLinesForOrder(
     WorkspaceOrderRecord order,
@@ -9905,6 +9912,10 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
+  /// Read-only command preview; reuse the model's existing item allocation.
+  List<WorkspaceOrderItemSnapshot> get workspaceCounterPurchasedItems =>
+      _counterPurchasedItems();
+
   List<WorkspaceOrderItemSnapshot> _counterPurchasedItems() {
     final lines = <WorkspaceOrderItemSnapshot>[
       for (final product in workspaceCatalogueItems)
@@ -10372,9 +10383,44 @@ class WorkSession extends ChangeNotifier {
     }
     final data = _storeData;
     final scope = _contactAccountScope;
-    bool current() =>
+    // Capture independent facts before awaiting the provider. A same-ID record
+    // replacement or mutable quantity change is not the submitted handover.
+    final submittedLedger = jsonEncode(order.toLedgerJson());
+    final customer = workspaceOrderCustomer;
+    final address = workspaceOrderAddress;
+    final stage = workspaceOrderStage;
+    final fulfilment = workspaceOrderFulfilment;
+    final needsDelivery = workspaceOrderNeedsDelivery;
+    final assignment = workspaceDeliveryAssignment;
+    // A repeated confirmation may acknowledge an already completed pickup, but
+    // only its original invoice makes that existing completion idempotent.
+    final completedInvoice = order.stage == 'Completed'
+        ? workspaceInvoices
+              .where((invoice) => invoice.orderId == order.id)
+              .firstOrNull
+        : null;
+    bool sameContext() =>
         _isStoreScopeCurrent(data, id, scope) &&
         currentWorkspaceOrderId == order.id;
+    bool current() =>
+        sameContext() &&
+        identical(currentWorkspaceOrder, order) &&
+        (!order.isClosed ||
+            (completedInvoice != null &&
+                identical(
+                  workspaceInvoices
+                      .where((invoice) => invoice.orderId == order.id)
+                      .firstOrNull,
+                  completedInvoice,
+                ))) &&
+        submittedLedger == jsonEncode(order.toLedgerJson()) &&
+        customer == workspaceOrderCustomer &&
+        address == workspaceOrderAddress &&
+        stage == workspaceOrderStage &&
+        fulfilment == workspaceOrderFulfilment &&
+        needsDelivery == workspaceOrderNeedsDelivery &&
+        identical(assignment, workspaceDeliveryAssignment);
+    if (!current()) return false;
     workspaceHandoverBusy = true;
     clearMessages();
     notifyListeners();
@@ -10397,7 +10443,9 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally {
       data.workspaceHandoverBusy = false;
-      if (current()) notifyListeners();
+      // A stale reply still releases this request's busy state in its original
+      // current context. It must not notify a different account/Store/order.
+      if (sameContext()) notifyListeners();
     }
   }
 

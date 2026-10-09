@@ -1219,6 +1219,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       return _procurementScopeRecovery(session, onReturn: _exitBuy);
     }
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final embeddedCompactCart =
+        widget.embeddedStore &&
+        !keyboardVisible &&
+        _usesFixedCart(session) &&
+        _showsMiniCart(session);
     final viewport = MediaQuery.sizeOf(context);
     final shortLandscapeCatalogue =
         viewport.width > viewport.height &&
@@ -1369,7 +1374,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                           body: BuyV2CartAvoidanceScope(
                             cartVisible:
                                 !keyboardVisible &&
-                                !_usesFixedCart(session) &&
+                                (!_usesFixedCart(session) || embeddedCompactCart) &&
                                 _showsMiniCart(session),
                             navigationIdentity: (
                               session.view,
@@ -1380,6 +1385,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   ? session.selectedProduct?.id
                                   : null,
                               !_quickTrackerMinimized && !_quickTrackerHidden,
+                              embeddedCompactCart
+                                  ? (session.query, session.selectedFilter,
+                                      session.selectedCategoryId)
+                                  : null,
                             ),
                             child: Stack(
                               key: const ValueKey(
@@ -1388,7 +1397,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                               children: [
                                 Positioned.fill(
                                   child: BuyV2CartAvoidanceViewport(
-                                    reserveBottomSpace: false,
+                                    reserveBottomSpace: embeddedCompactCart,
                                     child: _BuyNavigationSurfaceOwner(
                                       key: ObjectKey(session),
                                       stateKey:
@@ -1455,6 +1464,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                       top: 8,
                                       child: _BuyNotice(message: message),
                                     ),
+                                if (embeddedCompactCart)
+                                  Positioned.fill(
+                                    child: _BuyEmbeddedCompactCartOverlay(
+                                      child: _BuyMiniCartBar(
+                                        session: session,
+                                        compact: true,
+                                        compactExtent: 48,
+                                        initialPosition: _miniCartPosition,
+                                        onPositionChanged: (_) {},
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
@@ -1467,6 +1488,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             ),
             floatingActionButton:
                 widget.embeddedStore &&
+                    !embeddedCompactCart &&
                     !keyboardVisible &&
                     (_miniCartParked || _usesFixedCart(session)) &&
                     _showsMiniCart(session)
@@ -3837,6 +3859,59 @@ class _BuyCartPanGestureRecognizer extends PanGestureRecognizer {
   }
 }
 
+/// Store's compact Cart shares the content's measured obstacle layout. Public
+/// Buy continues to use its fixed navigation target, without this overlay.
+class _BuyEmbeddedCompactCartOverlay extends StatefulWidget {
+  const _BuyEmbeddedCompactCartOverlay({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_BuyEmbeddedCompactCartOverlay> createState() =>
+      _BuyEmbeddedCompactCartOverlayState();
+}
+
+class _BuyEmbeddedCompactCartOverlayState
+    extends State<_BuyEmbeddedCompactCartOverlay> {
+  Size? _bodySize;
+
+  @override
+  Widget build(BuildContext context) {
+    final avoidance = BuyV2CartAvoidanceScope.of(context);
+    return ListenableBuilder(
+      listenable: avoidance ?? const AlwaysStoppedAnimation<int>(0),
+      child: widget.child,
+      builder: (context, child) => LayoutBuilder(
+        builder: (context, constraints) {
+          final available = constraints.biggest;
+          final sameBody = _bodySize == available;
+          _bodySize = available;
+          if (!sameBody) avoidance?.resetDock();
+          const cartSize = Size(48, 48);
+          final preferred = Offset(
+            math.max(8.0, available.width - cartSize.width - 8),
+            math.max(8.0, available.height - cartSize.height - 8),
+          );
+          final owner = context.findAncestorRenderObjectOfType<RenderBox>();
+          // A settled fallback remains stable while scrolling. Otherwise its
+          // own padding can alternate the floating/docked decision and clamp
+          // the scroll offset. New content identity or body size recomputes it.
+          final position = avoidance != null && owner != null && owner.hasSize &&
+                  avoidance.dockHeight == 0
+              ? avoidance.place(preferred, cartSize, available, owner)
+              : preferred;
+          return Stack(
+            key: const ValueKey('buy-embedded-compact-cart-overlay'),
+            children: [
+              Positioned(left: position.dx, top: position.dy, child: child!),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _BuyMiniCartBar extends StatefulWidget {
   const _BuyMiniCartBar({
     required this.session,
@@ -3844,12 +3919,14 @@ class _BuyMiniCartBar extends StatefulWidget {
     required this.onPositionChanged,
     this.aggregate = false,
     this.compact = false,
+    this.compactExtent = 44,
     this.onParkingChanged,
   });
 
   final BuyV2Session session;
   final bool aggregate;
   final bool compact;
+  final double compactExtent;
   final ValueChanged<bool>? onParkingChanged;
   final Offset? initialPosition;
   final ValueChanged<Offset> onPositionChanged;
@@ -3997,8 +4074,8 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
           message: semanticsLabel,
           child: SizedBox(
             key: const ValueKey('buy-cart-navigation-button'),
-            width: 44,
-            height: 44,
+            width: widget.compactExtent,
+            height: widget.compactExtent,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: BuyV2Colors.navy,

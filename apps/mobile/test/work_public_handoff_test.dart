@@ -10,8 +10,19 @@ import 'fixtures/store_public_handoff_v1.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
-    'HANDOFF Store-origin projection covers every current public product field',
+    'HANDOFF v1 export stays sealed while audit covers current public product fields',
     () {
+      final retained =
+          jsonDecode(
+                File(
+                  '../../docs/quality/store-public-test-handoff-v1.json',
+                ).readAsStringSync(),
+              )
+              as Map;
+      final v1Fields =
+          ((retained['cases'] as List).first['projections'] as List).first.keys
+              .cast<String>()
+              .toSet();
       for (final channel in [
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,
@@ -22,10 +33,25 @@ void main() {
           storeName: 'Same display name',
           channel: channel,
         );
-        expect(
-          handoffPublicProduct(projected).keys.toSet(),
-          WorkspacePublicationContract.productBindings.keys.toSet(),
+        final exported = handoffPublicProduct(projected);
+        expect(exported.keys.toSet(), v1Fields);
+        final audited = WorkspacePublicationContract.publicProductAuditValues(
+          projected,
         );
+        // v1 packs compliance into one object; audit checks its individual facts.
+        expect({
+          ...exported.keys,
+          ...audited.keys.where((key) => !key.startsWith('compliance.')),
+        }, WorkspacePublicationContract.productBindings.keys.toSet());
+        for (final field in [
+          'variantAttributes',
+          'packTerms',
+          'offerClass',
+          'reviewDeliveryOptions',
+        ]) {
+          expect(exported.containsKey(field), isFalse);
+          expect(audited.containsKey(field), isTrue);
+        }
         expect(
           WorkspacePublicationContract.productIssues(
             p,
@@ -233,13 +259,19 @@ void main() {
         hasLength(2),
       );
       expect(
-        WorkspaceSellingInputs.parse({
-          'wholesaleTiers': '',
-        }, existingWholesale: offer, clearBlankTiers: true).wholesale!.tiers,
+        WorkspaceSellingInputs.parse(
+          {'wholesaleTiers': ''},
+          existingWholesale: offer,
+          clearBlankTiers: true,
+        ).wholesale!.tiers,
         isEmpty,
       );
-      expect(WorkspaceSellingInputs.parse({'wholesaleTiers': ''},
-        existingWholesale: offer).wholesale!.tiers, hasLength(2));
+      expect(
+        WorkspaceSellingInputs.parse({
+          'wholesaleTiers': '',
+        }, existingWholesale: offer).wholesale!.tiers,
+        hasLength(2),
+      );
       expect(
         WorkspaceSellingInputs.parse({
           'sellingChannels': 'retail',
@@ -312,17 +344,36 @@ void main() {
   test('SELLING invalid price is reported without a projection crash', () {
     for (final amount in [-1, 1000000000]) {
       final product = handoffStock().copyWith(sellingPrice: amount);
-      final issues = WorkspacePublicationContract.productIssues(product,
-        storeId: 'fixture-store-a', storeName: 'Same display name');
-      expect(issues.any((issue) => issue.field.endsWith(':sellingPrice')), isTrue);
+      final issues = WorkspacePublicationContract.productIssues(
+        product,
+        storeId: 'fixture-store-a',
+        storeName: 'Same display name',
+      );
+      expect(
+        issues.any((issue) => issue.field.endsWith(':sellingPrice')),
+        isTrue,
+      );
     }
-    final large = WorkspaceSellingInputs.parse({'sellingChannels': 'wholesale',
-      'wholesalePrice': '10000000', 'wholesaleMinimum': '1', 'wholesaleIncrement': '1'});
+    final large = WorkspaceSellingInputs.parse({
+      'sellingChannels': 'wholesale',
+      'wholesalePrice': '10000000',
+      'wholesaleMinimum': '1',
+      'wholesaleIncrement': '1',
+    });
     expect(large.wholesale!.priceAt(1), 10000000);
     for (final field in ['wholesaleMinimum', 'wholesaleIncrement']) {
-      expect(() => WorkspaceSellingInputs.parse({field: '0'},
-        existingWholesale: handoffStock().wholesaleOffer),
-        throwsA(isA<FormatException>().having((error) => error.message, 'field', startsWith('$field:'))));
+      expect(
+        () => WorkspaceSellingInputs.parse({
+          field: '0',
+        }, existingWholesale: handoffStock().wholesaleOffer),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'field',
+            startsWith('$field:'),
+          ),
+        ),
+      );
     }
   });
 }

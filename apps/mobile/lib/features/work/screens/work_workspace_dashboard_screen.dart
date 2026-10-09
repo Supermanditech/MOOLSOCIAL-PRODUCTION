@@ -660,6 +660,7 @@ class _WorkWorkspaceDashboardScreenState
   final _purchasesKey = GlobalKey<_StorePurchasesSurfaceState>();
   final _receivingKey = GlobalKey<_StoreReceiveGoodsState>();
   bool _purchaseNavigationPending = false;
+  bool _openingCustomerOrder = false;
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   String? _salesTask;
@@ -690,6 +691,10 @@ class _WorkWorkspaceDashboardScreenState
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceFinanceFocus? _focusedFinance;
   _WorkspaceOperation? _operationReturnOperation;
+  int _deliveryOrderVisit = 0;
+  ({int visit, String orderId, String? selectedOrderId, String? storeId, String? accountScope,
+    _WorkspaceControlView returnView, _WorkspaceOperation? returnOperation})?
+      _deliveryOrderOrigin;
   Timer? _procurementRevealTimer;
   bool _procurementReady = false;
   bool _procurementSearchOpen = false;
@@ -1227,6 +1232,8 @@ class _WorkWorkspaceDashboardScreenState
     final saleOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.counterOrder;
+    final operationalComposer = saleOpen &&
+        _operationReturnOperation == _WorkspaceOperation.orders;
     final salesOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.sales;
@@ -1302,17 +1309,38 @@ class _WorkWorkspaceDashboardScreenState
         );
     final analyticsHeaderHeight = (namePainter.height + 12).clamp(48.0, double.infinity);
     namePainter.dispose();
+    final composerStore = session.activeWorkspace?.id ?? session.workspaceId;
+    final composerAccount = session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
     Widget counterSurface(bool expanded) => _CounterOrderSurface(
       key: _counterKey,
       query: _saleSearchController.text,
       session: session,
       fullScreen: expanded,
+      operationalOrder: operationalComposer,
       onExit: () => unawaited(_leaveOperation()),
-      onArrangeDelivery: () => unawaited(
-        _navigateFromCounterDraft(
+      onArrangeDelivery: (orderId) {
+        if (operationalComposer) {
+          final saved = session.currentWorkspaceOrder;
+          if (!mounted || _view != _WorkspaceControlView.operation ||
+              _operation != _WorkspaceOperation.counterOrder ||
+              _operationReturnOperation != _WorkspaceOperation.orders ||
+              (session.activeWorkspace?.id ?? session.workspaceId) != composerStore ||
+              (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) != composerAccount ||
+              session.currentWorkspaceOrderId != orderId || saved?.id != orderId ||
+              !saved!.needsDelivery || saved.isCustomerCollection ||
+              !const ['Own delivery', 'Mool delivery'].contains(saved.fulfilment) ||
+              saved.stage != 'Confirmed') {
+            return;
+          }
+          // Exact successful submission is not an unfinished draft. Do not
+          // reset its selected saved identity or attempt another journal save.
+          _showOperation(_WorkspaceOperation.orders);
+          return;
+        }
+        unawaited(_navigateFromCounterDraft(
           () => _showOperation(_WorkspaceOperation.storeLink),
-        ),
-      ),
+        ));
+      },
       onOpenCatalogue: () => unawaited(
         _navigateFromCounterDraft(
           () => _showOperation(_WorkspaceOperation.catalogue),
@@ -1362,8 +1390,8 @@ class _WorkWorkspaceDashboardScreenState
                       kToolbarHeight,
                       double.infinity,
                     ),
-                title: const Text(
-                  'Counter sale',
+                title: Text(
+                  operationalComposer ? 'Create customer order' : 'Counter sale',
                   softWrap: true,
                   maxLines: 2,
                   style: TextStyle(fontSize: 18),
@@ -1391,7 +1419,9 @@ class _WorkWorkspaceDashboardScreenState
       title: title,
       subtitle: subtitle,
       beforeExternalNavigation: _confirmPurchaseNavigation,
-      contentMaxWidth: (salesOpen || ordersContext) &&
+      contentMaxWidth: (salesOpen || ordersContext ||
+          (_view == _WorkspaceControlView.operation &&
+            _operation == _WorkspaceOperation.sourcing)) &&
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.sizeOf(context).height <= 450
           ? double.infinity : MoolMetrics.maximumContentWidth,
@@ -1870,6 +1900,7 @@ class _WorkWorkspaceDashboardScreenState
             onBuyStock: _showProcurement,
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
+            onCreateCustomerOrder: () => unawaited(_openCustomerOrderComposer()),
             onTrackPurchase: _showPurchaseTracking,
             onPurchaseBack: _operationReturnView == _WorkspaceControlView.search
                 ? _leaveOperation
@@ -1878,6 +1909,39 @@ class _WorkWorkspaceDashboardScreenState
         },
       ),
     );
+  }
+
+  Future<void> _openCustomerOrderComposer() async {
+    if (_openingCustomerOrder || _view != _WorkspaceControlView.operation ||
+        _operation != _WorkspaceOperation.orders || _focusedOrderId != null) {
+      return;
+    }
+    final store = session.activeWorkspace?.id ?? session.workspaceId;
+    final account = session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
+    final selected = session.currentWorkspaceOrderId;
+    bool current() => mounted && _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.orders && _focusedOrderId == null &&
+        (session.activeWorkspace?.id ?? session.workspaceId) == store &&
+        (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) == account &&
+        session.currentWorkspaceOrderId == selected;
+    bool pending() => session.busy || session.workspaceOperationsSyncing ||
+        session.workspaceHandoverBusy || session.hasPendingOrderTime ||
+        session.counterDraftLoading || session.counterDraftSubmitting ||
+        session.counterDraftNeedsReconciliation ||
+        session.currentCollection?.busy == true ||
+        session.currentCollection?.needsReconciliation == true;
+    if (store == null || pending()) return;
+    _openingCustomerOrder = true;
+    try {
+      await session.loadWorkspaceCounterDraft(retry: true, shouldRestore: () => false);
+      if (!current() || pending() || !session.counterDraftLoaded) return;
+      // Explicit create/resume decision only. The existing journal is retained
+      // and the composer restores it; changing source never resets the editor.
+      if (selected != null && !session.startNewWorkspaceOrder()) return;
+      _showOperation(_WorkspaceOperation.counterOrder);
+    } finally {
+      _openingCustomerOrder = false;
+    }
   }
 
   void _openCustomerCollection() {
@@ -1921,6 +1985,7 @@ class _WorkWorkspaceDashboardScreenState
     setState(() {
       _reviewedOrder = null;
       _focusedOrderId = null;
+      _deliveryOrderOrigin = null;
       _focusedCustomerId = null;
       _focusedFinance = null;
       _view = _WorkspaceControlView.dashboard;
@@ -2249,7 +2314,16 @@ class _WorkWorkspaceDashboardScreenState
         operation == _WorkspaceOperation.orders &&
         _focusedOrderId == null &&
         focusedOrderId != null;
+    final deliveryOrderOrigin = _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.orders &&
+        operation == _WorkspaceOperation.delivery && _focusedOrderId != null
+        ? (visit: ++_deliveryOrderVisit, orderId: _focusedOrderId!, selectedOrderId: session.currentWorkspaceOrderId,
+            storeId: session.activeWorkspace?.id ?? session.workspaceId,
+            accountScope: session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope,
+            returnView: _operationReturnView, returnOperation: _operationReturnOperation)
+        : null;
     setState(() {
+      _deliveryOrderOrigin = deliveryOrderOrigin;
       _focusedOrderId = focusedOrderId;
 
       _focusedCustomerId = focusedCustomerId;
@@ -2265,6 +2339,9 @@ class _WorkWorkspaceDashboardScreenState
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
           (openingOrderFromQueue ||
+              (_operation == _WorkspaceOperation.orders &&
+                  (operation == _WorkspaceOperation.delivery ||
+                      operation == _WorkspaceOperation.counterOrder)) ||
               (_operation == _WorkspaceOperation.sales &&
                   (operation == _WorkspaceOperation.counterOrder ||
                       operation == _WorkspaceOperation.dues)) ||
@@ -2654,6 +2731,7 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveOperation({bool exitSale = false}) async {
+    final deliveryVisitAtBack = _operation == _WorkspaceOperation.delivery ? _deliveryOrderOrigin : null;
     final receiving = _receivingKey.currentState;
     if (receiving != null) {
       await receiving._close();
@@ -2696,6 +2774,12 @@ class _WorkWorkspaceDashboardScreenState
       }
     }
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
+    if (deliveryVisitAtBack != null &&
+        (_view != _WorkspaceControlView.operation ||
+            _operation != _WorkspaceOperation.delivery ||
+            _deliveryOrderOrigin != deliveryVisitAtBack)) {
+      return;
+    }
     if (_operationReturnView == _WorkspaceControlView.alerts) {
       setState(() => _view = _WorkspaceControlView.alerts);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2744,6 +2828,23 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     final parent = _operationReturnOperation;
+    final deliveryOrigin = _deliveryOrderOrigin;
+    if (_operation == _WorkspaceOperation.delivery &&
+        parent == _WorkspaceOperation.orders && deliveryOrigin != null) {
+      final restore = deliveryOrigin.storeId != null &&
+          deliveryOrigin.storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+          deliveryOrigin.accountScope == (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) &&
+          deliveryOrigin.selectedOrderId == session.currentWorkspaceOrderId &&
+          session.workspaceOrders.any((order) => order.id == deliveryOrigin.orderId && !order.isClosed);
+      setState(() {
+        _operation = _WorkspaceOperation.orders;
+        _focusedOrderId = restore ? deliveryOrigin.orderId : null;
+        _operationReturnView = restore ? deliveryOrigin.returnView : _WorkspaceControlView.dashboard;
+        _operationReturnOperation = restore ? deliveryOrigin.returnOperation : null;
+        _deliveryOrderOrigin = null;
+      });
+      return;
+    }
     if (_operationReturnView == _WorkspaceControlView.operation &&
         parent != null) {
       setState(() {
@@ -5072,11 +5173,14 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
     }
   }
 
+  bool get _reducedReportMotion => MoolMotion.isReduced(context) ||
+      MediaQuery.accessibleNavigationOf(context);
+
   void _scheduleReveal(int generation) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final target = _detailKey.currentContext;
       if (mounted && generation == _transition && _expanded != null && target != null) {
-        Scrollable.ensureVisible(target, duration: MoolMotion.isReduced(context)
+        Scrollable.ensureVisible(target, duration: _reducedReportMotion
           ? Duration.zero : const Duration(milliseconds: 180), alignment: 0);
       }
     });
@@ -5085,9 +5189,9 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
 
   Widget _inlineReveal(Widget child) {
     return KeyedSubtree(key: const Key('analytics-inline-reveal'),
-      child: _expanded == null || MoolMotion.isReduced(context) ? child : TweenAnimationBuilder<double>(key: ValueKey(_expanded),
-        tween: Tween(begin: MoolMotion.isReduced(context) ? 1 : .35, end: 1),
-        duration: MoolMotion.isReduced(context) ? Duration.zero : const Duration(milliseconds: 240),
+      child: _expanded == null || _reducedReportMotion ? child : TweenAnimationBuilder<double>(key: ValueKey(_expanded),
+        tween: Tween(begin: .35, end: 1),
+        duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic, child: child,
         builder: (_, opacity, child) => Opacity(opacity: opacity, child: child)));
   }
@@ -6315,10 +6419,37 @@ class _StoreAnalyticsProviderReportState extends State<_StoreAnalyticsProviderRe
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
-                Align(alignment: Alignment.centerLeft, child: TextButton(
-                  key: Key('analytics-measure-definitions-${widget.report}'),
-                  onPressed: () => setState(() => _definitions = !_definitions),
-                  child: Text(_definitions ? 'Hide explanations' : 'About these measures'))),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton(
+                      key: Key('analytics-measure-definitions-${widget.report}'),
+                      onPressed: () => setState(() => _definitions = !_definitions),
+                      child: Text(_definitions ? 'Hide explanations' : 'About these measures')),
+                    if (widget.report == 'public')
+                      Tooltip(
+                        message: 'Store link sharing is not available yet.',
+                        child: Semantics(
+                          key: const Key('work-store-share-link-state'),
+                          button: true,
+                          enabled: false,
+                          label: 'Share Store link. Store link sharing is not available yet.',
+                          excludeSemantics: true,
+                          child: TextButton.icon(
+                            key: const Key('work-store-share-link'),
+                            onPressed: null,
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              disabledForegroundColor: _AnalyticsChartPalette.secondary,
+                            ),
+                            icon: const Icon(Icons.share_outlined, size: 18),
+                            label: const Text('Share Store link'),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 if (widget.report == 'journey') const Text('Separate stage counts · not a conversion funnel',
                   style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
                 if (widget.report == 'supply') const Text('Independent supply statuses · do not add them together',
@@ -8203,8 +8334,12 @@ class _DeskItemLine extends StatelessWidget {
 }
 
 class _DeskCustomerActions extends StatelessWidget {
-  const _DeskCustomerActions({required this.customer, required this.orderId});
+  const _DeskCustomerActions({required this.customer, required this.orderId,
+    this.canAct, this.chatDraft, this.chatKey});
   final String customer, orderId;
+  final bool Function()? canAct;
+  final String? chatDraft;
+  final Key? chatKey;
   @override
   Widget build(BuildContext context) {
     final phone = workspaceCustomerMobile(customer);
@@ -8214,16 +8349,18 @@ class _DeskCustomerActions extends StatelessWidget {
         IconButton(
           key: const Key('work-activity-order-call'),
           tooltip: phone != null ? 'Call customer' : 'Phone number unavailable',
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          constraints: BoxConstraints(minWidth: canAct == null ? 44 : 48,
+              minHeight: canAct == null ? 44 : 48),
           padding: EdgeInsets.zero,
           icon: const Icon(
             Icons.call_outlined,
             size: 19,
             color: MoolColors.navy,
           ),
-          onPressed: phone == null
+          onPressed: phone == null || canAct?.call() == false
               ? null
               : () async {
+                  if (canAct?.call() == false) return;
                   final messenger = ScaffoldMessenger.of(context);
                   try {
                     if (await launchUrl(Uri(scheme: 'tel', path: phone))) {
@@ -8232,7 +8369,7 @@ class _DeskCustomerActions extends StatelessWidget {
                   } catch (_) {
                     // The installed phone handler owns the call.
                   }
-                  if (context.mounted) {
+                  if (context.mounted && canAct?.call() != false) {
                     messenger.showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -8244,26 +8381,30 @@ class _DeskCustomerActions extends StatelessWidget {
                 },
         ),
         IconButton(
-          key: const Key('work-activity-order-chat'),
-          tooltip: 'Chat about this order',
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          key: chatKey ?? const Key('work-activity-order-chat'),
+          tooltip: chatDraft == null ? 'Chat about this order' : 'Packing problem? Message customer',
+          constraints: BoxConstraints(minWidth: canAct == null ? 44 : 48,
+              minHeight: canAct == null ? 44 : 48),
           padding: EdgeInsets.zero,
           icon: const Icon(
             Icons.chat_bubble_outline_rounded,
             size: 19,
             color: MoolColors.navy,
           ),
-          onPressed: () => context.push(
+          onPressed: canAct?.call() == false ? null : () {
+            if (canAct?.call() == false) return;
+            context.push(
             Uri(
               path: '/app/chat/inbox',
               queryParameters: {
                 'return': GoRouterState.of(context).uri.toString(),
                 'type': 'business',
                 'recipient': customer,
-                'draft': 'Question about your order $orderId',
+                'draft': chatDraft ?? 'Question about your order $orderId',
               },
             ).toString(),
-          ),
+            );
+          },
         ),
       ],
     );
@@ -10538,11 +10679,11 @@ class _DeliveryActivityCard extends StatelessWidget {
           WorkspaceDeliveryStage.outForDelivery,
         ].contains(deliveryStage);
     final stackContacts = MediaQuery.textScalerOf(context).scale(11) > 16;
-    return Column(
+    return SingleChildScrollView(
       key: const Key('work-activity-delivery'),
+      child: Column(
       children: [
-        Expanded(
-          child: SingleChildScrollView(
+        Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -10719,7 +10860,6 @@ class _DeliveryActivityCard extends StatelessWidget {
                 ],
               ],
             ),
-          ),
         ),
         const Divider(height: 1),
         Padding(
@@ -10895,6 +11035,7 @@ class _DeliveryActivityCard extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -10995,19 +11136,73 @@ Future<void> _showWorkspaceHandoverSheet(
   BuildContext context,
   WorkSession session,
 ) async {
+  // Freeze the order at entry, not when the sheet rebuilds or submits. The
+  // model's in-flight response checks remain separate from this UI boundary.
+  final account = session.contactDraftStore?.accountScope ??
+      session.pendingProofStore?.accountScope;
+  final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+  final order = session.currentWorkspaceOrder;
+  final selectedId = session.currentWorkspaceOrderId;
+  final customer = session.workspaceOrderCustomer;
+  final address = session.workspaceOrderAddress;
+  final stage = session.workspaceOrderStage;
+  final fulfilment = session.workspaceOrderFulfilment;
+  final needsDelivery = session.workspaceOrderNeedsDelivery;
+  final assignment = session.workspaceDeliveryAssignment;
+  // Encode now: retaining the ledger map would retain mutable quantities too.
+  final originalLedger = order == null ? null : jsonEncode(order.toLedgerJson());
+  final completedLedger = order == null ? null :
+      jsonEncode({...order.toLedgerJson(), 'stage': 'Completed'});
+  bool sameContext() =>
+      account == (session.contactDraftStore?.accountScope ??
+          session.pendingProofStore?.accountScope) &&
+      storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+      selectedId == session.currentWorkspaceOrderId &&
+      order != null && session.currentWorkspaceOrder?.id == order.id &&
+      customer == session.workspaceOrderCustomer &&
+      address == session.workspaceOrderAddress;
+  bool canSubmit() => sameContext() &&
+      identical(order, session.currentWorkspaceOrder) &&
+      originalLedger == jsonEncode(session.currentWorkspaceOrder!.toLedgerJson()) &&
+      order!.customer == customer && order.address == address &&
+      order.stage == stage && order.needsDelivery == needsDelivery &&
+      stage == session.workspaceOrderStage &&
+      fulfilment == session.workspaceOrderFulfilment &&
+      needsDelivery == session.workspaceOrderNeedsDelivery && needsDelivery &&
+      fulfilment == 'Own delivery' && order.fulfilment == 'Own delivery' &&
+      !order.isClosed && !order.isCustomerCollection &&
+      !session.hasScopedWorkspaceOrder(order.id) &&
+      identical(assignment, session.workspaceDeliveryAssignment) &&
+      assignment?.orderId == order.id &&
+      const [WorkspaceDeliveryStage.pickedUp, WorkspaceDeliveryStage.outForDelivery]
+          .contains(assignment?.deliveryStage) &&
+      !session.busy && !session.workspaceOperationsSyncing &&
+      !session.workspaceHandoverBusy &&
+      session.currentCollection?.needsReconciliation != true;
+  bool completedAsExpected() => sameContext() &&
+      session.workspaceOrderStage == 'Completed' &&
+      fulfilment == session.workspaceOrderFulfilment &&
+      needsDelivery == session.workspaceOrderNeedsDelivery &&
+      identical(assignment, session.workspaceDeliveryAssignment) &&
+      completedLedger == jsonEncode(session.currentWorkspaceOrder!.toLedgerJson());
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (_) => _WorkspaceHandoverSheet(session: session),
+    builder: (_) => _WorkspaceHandoverSheet(session: session,
+        canSubmit: canSubmit, sameContext: sameContext,
+        completedAsExpected: completedAsExpected),
   );
 }
 
 class _WorkspaceHandoverSheet extends StatefulWidget {
-  const _WorkspaceHandoverSheet({required this.session});
+  const _WorkspaceHandoverSheet({required this.session,
+      required this.canSubmit, required this.sameContext,
+      required this.completedAsExpected});
 
   final WorkSession session;
+  final bool Function() canSubmit, sameContext, completedAsExpected;
 
   @override
   State<_WorkspaceHandoverSheet> createState() =>
@@ -11069,12 +11264,27 @@ class _WorkspaceHandoverSheetState extends State<_WorkspaceHandoverSheet> {
             onPressed: widget.session.workspaceHandoverBusy
                 ? null
                 : () async {
+                    if (!mounted || ModalRoute.of(this.context)?.isCurrent != true) return;
+                    if (!widget.canSubmit()) {
+                      _controller.clear();
+                      setState(() => _error = 'This delivery has changed. Close and reopen it before entering the OTP.');
+                      return;
+                    }
                     final success = await widget.session
                         .verifyWorkspaceHandover(_controller.text);
-                    if (success && mounted) {
+                    if (!mounted) return;
+                    if (ModalRoute.of(this.context)?.isCurrent != true ||
+                        !widget.sameContext()) {
+                      _controller.clear();
+                      return;
+                    }
+                    if (success && widget.completedAsExpected()) {
                       Navigator.of(this.context).pop();
-                    } else if (mounted) {
+                    } else if (!success && widget.canSubmit()) {
                       setState(() => _error = widget.session.errorMessage);
+                    } else {
+                      _controller.clear();
+                      setState(() => _error = 'This delivery has changed. Close and reopen it before entering the OTP.');
                     }
                   },
             icon: const Icon(Icons.verified_rounded),
@@ -11865,7 +12075,60 @@ Future<void> _showRejectOrderSheet(
   final orderId = session.currentWorkspaceOrderId;
   final stage = session.workspaceOrderStage;
   final reviewedOrder = session.currentWorkspaceOrder;
-  if (stage != 'Confirmed') return;
+  final accountScope = session.contactDraftStore?.accountScope ??
+      session.pendingProofStore?.accountScope;
+  final anonymous = orderId == null && session.workspaceOrders.isEmpty;
+  final displayed = anonymous ? session.visibleWorkspaceOrders.singleOrNull : reviewedOrder;
+  if (stage != 'Confirmed' || displayed == null) {
+    return;
+  }
+  String ledger(WorkspaceOrderRecord record) {
+    final facts = record.toLedgerJson();
+    if (anonymous) {
+      // Only the unsaved fallback timestamp is regenerated by the model.
+      facts.remove('createdAt');
+    }
+    return jsonEncode(facts);
+  }
+  final capturedLedger = ledger(displayed);
+  final capturedAmount = session.workspaceOrderAmount;
+  final capturedQuantities = Map<String, int>.of(displayed.quantities);
+  String promotionInputs() => jsonEncode({
+    'discount': session.workspaceCounterDiscount.toJson(),
+    'products': [for (final product in session.workspaceCatalogueItems)
+      if ((capturedQuantities[product.id] ?? 0) > 0) product.toInventoryJson()],
+  });
+  final capturedPromotion = anonymous ? promotionInputs() : null;
+  bool sameIdentity() => context.mounted &&
+      storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+      accountScope == (session.contactDraftStore?.accountScope ??
+          session.pendingProofStore?.accountScope);
+  bool sameScope() => sameIdentity() && orderId == session.currentWorkspaceOrderId;
+  bool eligible() {
+    if (!sameScope() || session.workspaceOrderStage != 'Confirmed' ||
+        session.busy || session.workspaceOperationsSyncing ||
+        session.workspaceHandoverBusy || session.counterDraftSubmitting ||
+        session.hasPendingOrderTime ||
+        session.currentCollection?.needsReconciliation == true) {
+      return false;
+    }
+    final current = anonymous
+        ? (session.workspaceOrders.isEmpty ? session.visibleWorkspaceOrders.singleOrNull : null)
+        : session.currentWorkspaceOrder;
+    if (current == null || current.stage != 'Confirmed' || current.isClosed ||
+        current.isCustomerCollection || ledger(current) != capturedLedger ||
+        current.actionDeadline?.isAfter(DateTime.now()) == false) {
+      return false;
+    }
+    return anonymous
+        ? current.id == 'current-store-order' &&
+            session.workspaceOrderAmount == capturedAmount &&
+            promotionInputs() == capturedPromotion
+        : identical(current, reviewedOrder);
+  }
+  if (!eligible()) {
+    return;
+  }
   String? selectedReason;
   final reason = await showDialog<String>(
     context: context,
@@ -11897,7 +12160,11 @@ Future<void> _showRejectOrderSheet(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  onPressed: () {
+                    if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) {
+                      Navigator.of(dialogContext).pop();
+                    }
+                  },
                   child: const Text('Keep order', textAlign: TextAlign.center),
                 ),
               ),
@@ -11910,7 +12177,11 @@ Future<void> _showRejectOrderSheet(
                   ),
                   onPressed: selectedReason == null
                       ? null
-                      : () => Navigator.of(dialogContext).pop(selectedReason),
+                      : () {
+                          if (dialogContext.mounted && ModalRoute.of(dialogContext)?.isCurrent == true) {
+                            Navigator.of(dialogContext).pop(selectedReason);
+                          }
+                        },
                   child: const Text(
                     'Reject order',
                     textAlign: TextAlign.center,
@@ -11973,20 +12244,10 @@ Future<void> _showRejectOrderSheet(
     ),
   );
   if (reason == null || !context.mounted) return;
-  final order = session.currentWorkspaceOrder;
-  if (storeId != (session.activeWorkspace?.id ?? session.workspaceId) ||
-      orderId != session.currentWorkspaceOrderId ||
-      session.workspaceOrderStage != stage ||
-      (order != null && (order.id != orderId || order.stage != stage)) ||
-      (reviewedOrder != null &&
-          (order == null ||
-              order.payableMinor != reviewedOrder.payableMinor ||
-              order.items != reviewedOrder.items ||
-              order.payment != reviewedOrder.payment ||
-              !mapEquals(order.quantities, reviewedOrder.quantities))) ||
-      session.busy ||
-      session.workspaceOperationsSyncing ||
-      (order?.actionDeadline?.isAfter(DateTime.now()) == false)) {
+  if (!sameIdentity()) {
+    return;
+  }
+  if (!eligible()) {
     session.showNotice('This order changed. Review its latest status.');
     return;
   }
@@ -15569,8 +15830,8 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
                   _field('Invoice date', _date, 'work-purchase-date', limit: 10, hint: 'DD/MM/YYYY',
                     keyboard: TextInputType.datetime)];
                 // Floating keyboards can cover the right-hand date without reporting
-                // an inset. Keep both enlarged inputs left-aligned on narrow forms.
-                if (constraints.maxWidth < 520 && MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                // an inset. Keep enlarged inputs left-aligned in landscape too.
+                if (MediaQuery.textScalerOf(context).scale(1) > 1.3) {
                   return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [fields[0], const SizedBox(height: 6), fields[1]]);
                 }
@@ -17972,7 +18233,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       if (action.$1 == 'continue-receive' && _receivingResumeIds.isEmpty) continue;
       final row = measure(action.$2, (theme.bodyLarge ?? const TextStyle())
           .copyWith(fontSize: 13, fontWeight: FontWeight.w500)) +
-        measure(action.$3, (theme.bodyMedium ?? const TextStyle()).copyWith(fontSize: 12)) + 24;
+        measure(action.$3, (theme.bodyMedium ?? const TextStyle()).copyWith(fontSize: 12, height: 1.25)) + 24;
       if (row > tallest) tallest = row;
     }
     return _purchaseCategoryExtent(context, width, title) + tallest + 2 <= height;
@@ -20251,6 +20512,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenOperation,
     required this.onOpenRoute,
     required this.onTrackPurchase,
+    required this.onCreateCustomerOrder,
     this.onPurchaseBack,
     this.focusedOrderId,
     this.focusedCustomerId,
@@ -20274,6 +20536,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
   final ValueChanged<String> onTrackPurchase;
+  final VoidCallback onCreateCustomerOrder;
   final VoidCallback? onPurchaseBack;
   final String? focusedOrderId, focusedCustomerId;
 
@@ -20578,6 +20841,12 @@ class _WorkspaceOperationSurface extends StatelessWidget {
               },
             ),
             (
+              'statement',
+              'Sales, purchases & expenses',
+              Icons.receipt_long_outlined,
+              () => onOpenOperation(_WorkspaceOperation.statement),
+            ),
+            (
               'settings',
               'Store settings',
               Icons.tune_rounded,
@@ -20634,6 +20903,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         ),
         onOpenCollection: onOpenStore,
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+        onCreateOrder: onCreateCustomerOrder,
       );
     }
     if (operation == _WorkspaceOperation.counterOrder) {
@@ -20642,7 +20912,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         query: saleQuery,
         session: session,
         onExit: onOpenStore,
-        onArrangeDelivery: () => onOpenOperation(_WorkspaceOperation.orders),
+        onArrangeDelivery: (_) => onOpenOperation(_WorkspaceOperation.orders),
         onOpenCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
       );
     }
@@ -26126,6 +26396,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
     this.prefixText,
     this.stackedLabel = false,
     this.compact = false,
+    this.enabled = true,
   });
 
   final String keyName;
@@ -26140,6 +26411,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
   final String? prefixText;
   final bool stackedLabel;
   final bool compact;
+  final bool enabled;
 
   @override
   State<_AccessibleWorkTextField> createState() =>
@@ -26181,6 +26453,7 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
   Widget build(BuildContext context) {
     final field = TextField(
       key: Key(widget.keyName),
+      enabled: widget.enabled,
       controller: widget.controller,
       focusNode: _focusNode,
       keyboardType: widget.keyboardType,
@@ -26202,13 +26475,14 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
       container: true,
       identifier: widget.keyName,
       label: widget.label,
+      enabled: widget.enabled,
       hint: 'Enter ${widget.label.toLowerCase()}',
       value: widget.controller.text.trim().isEmpty
           ? 'Not entered'
           : widget.controller.text,
       textField: true,
-      onTap: _focusNode.requestFocus,
-      onSetText: (value) {
+      onTap: widget.enabled ? _focusNode.requestFocus : null,
+      onSetText: !widget.enabled ? null : (value) {
         widget.controller
           ..text = value
           ..selection = TextSelection.collapsed(offset: value.length);
@@ -27666,12 +27940,14 @@ class _OrdersDestinationSurface extends StatefulWidget {
     required this.session,
     required this.onOpenCollection,
     required this.onOpenDelivery,
+    required this.onCreateOrder,
     this.orderId,
   });
 
   final WorkSession session;
   final VoidCallback onOpenCollection;
   final VoidCallback onOpenDelivery;
+  final VoidCallback onCreateOrder;
   final String? orderId;
 
   final ValueChanged<String> onOpenOrder;
@@ -27740,14 +28016,18 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   void _scrollFilters() {
     if (!_filterScroll.hasClients) return;
     final position = _filterScroll.position;
+    final target = (position.pixels +
+            position.viewportDimension * (_atFilterEnd ? -.8 : .8))
+        .clamp(0.0, position.maxScrollExtent);
+    if (MoolMotion.isReduced(context) ||
+        MediaQuery.accessibleNavigationOf(context)) {
+      _filterScroll.jumpTo(target);
+      return;
+    }
     unawaited(
       _filterScroll.animateTo(
-        (position.pixels +
-                position.viewportDimension * (_atFilterEnd ? -.8 : .8))
-            .clamp(0.0, position.maxScrollExtent),
-        duration: MediaQuery.of(context).disableAnimations
-            ? Duration.zero
-            : const Duration(milliseconds: 180),
+        target,
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
       ),
     );
@@ -27825,9 +28105,49 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       color: Colors.white,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
-            child: Row(
+          LayoutBuilder(builder: (context, constraints) {
+            final headingStyle = TextStyle(
+              color: MoolColors.ink,
+              fontSize: widget.orderId == null ? 16 : 14,
+              fontWeight: FontWeight.w700,
+            );
+            const scopeStyle = TextStyle(
+              color: MoolColors.navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            );
+            final scopeLabel = '${filterLabels[_filter]} · ${countFor(_filter)}'
+                '${_filter == 'Live' ? ' active' : ''}';
+            double labelWidth(String text, TextStyle style) {
+              final painter = TextPainter(
+                text: TextSpan(text: text, style: style),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+                maxLines: 1,
+              )..layout();
+              final width = painter.width;
+              painter.dispose();
+              return width;
+            }
+            final createOrder = TextButton.icon(
+              key: const Key('work-orders-create-customer-order'),
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: session.busy || session.workspaceOperationsSyncing ||
+                      session.counterDraftLoading || session.counterDraftSubmitting ||
+                      session.counterDraftNeedsReconciliation || session.hasPendingOrderTime ||
+                      session.workspaceHandoverBusy
+                  ? null : widget.onCreateOrder,
+              icon: const Icon(Icons.add),
+              label: const Text('Create customer order'),
+            );
+            final titleWidth = labelWidth('Customer orders', headingStyle);
+            final scopeWidth = labelWidth(scopeLabel, scopeStyle);
+            final inlineCreate = widget.orderId == null &&
+                constraints.maxWidth >=
+                    (titleWidth > scopeWidth ? titleWidth : scopeWidth) +
+                    labelWidth('Create customer order',
+                        Theme.of(context).textTheme.labelLarge!) + 112;
+            final heading = Row(
               children: [
                 Expanded(
                   flex: 3,
@@ -27835,11 +28155,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     widget.orderId == null
                         ? 'Customer orders'
                         : 'Order details',
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: widget.orderId == null ? 16 : 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: headingStyle,
                   ),
                 ),
                 if (widget.orderId != null)
@@ -27848,20 +28164,37 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                   Flexible(
                     flex: 2,
                     child: Text(
-                      '${filterLabels[_filter]} · ${countFor(_filter)}'
-                          '${_filter == 'Live' ? ' active' : ''}',
+                      scopeLabel,
                       key: const Key('work-orders-current-scope'),
                       textAlign: TextAlign.end,
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: scopeStyle,
                     ),
                   ),
               ],
-            ),
-          ),
+            );
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
+              child: inlineCreate
+                  ? Row(children: [
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Customer orders', style: headingStyle),
+                          Text(scopeLabel,
+                            key: const Key('work-orders-current-scope'),
+                            style: scopeStyle),
+                        ],
+                      )),
+                      const SizedBox(width: 12),
+                      createOrder,
+                    ])
+                  : Column(children: [
+                      heading,
+                      if (widget.orderId == null)
+                        Align(alignment: Alignment.centerLeft, child: createOrder),
+                    ]),
+            );
+          }),
           if (widget.orderId == null)
             Row(
               children: [
@@ -27980,6 +28313,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                               (session.currentWorkspaceOrderId == null ||
                                   order.id == session.currentWorkspaceOrderId),
                           onOpenDelivery: widget.onOpenDelivery,
+                          onReview: () => widget.onOpenOrder(order.id),
                         ),
                       );
                     },
@@ -28542,6 +28876,7 @@ class _LiveOrderTicket extends StatelessWidget {
     required this.order,
     required this.active,
     required this.onOpenDelivery,
+    required this.onReview,
     this.detailed = false,
   });
 
@@ -28550,6 +28885,7 @@ class _LiveOrderTicket extends StatelessWidget {
   final WorkspaceOrderRecord order;
   final bool active;
   final VoidCallback onOpenDelivery;
+  final VoidCallback onReview;
   final bool detailed;
 
   @override
@@ -28577,18 +28913,138 @@ class _LiveOrderTicket extends StatelessWidget {
         : paymentName.isNotEmpty ? paymentName : order.customer;
     final hasCustomerName = customerName.trim().isNotEmpty &&
         !RegExp(r'^\+?[\d\s()-]+$').hasMatch(customerName.trim());
+    final selectedOrderIdAtBuild = session.currentWorkspaceOrderId;
+    final reviewAccountAtBuild = session.contactDraftStore?.accountScope ??
+        session.pendingProofStore?.accountScope;
+    final reviewLedgerAtBuild = jsonEncode(order.toLedgerJson());
+    final legacyAmountAtBuild = session.workspaceOrderAmount;
+    final legacyTrackingAtBuild = selectedOrderIdAtBuild == null &&
+        session.workspaceOrders.isEmpty && order.id == 'current-store-order' &&
+        order.isDeliveryInProgress && stage != 'Ready';
+    final legacyReadyAtBuild = active && stage == 'Ready' && order.needsDelivery &&
+        selectedOrderIdAtBuild == null && session.workspaceOrders.isEmpty &&
+        order.id == 'current-store-order';
+    final legacyConfirmedAtBuild = active && stage == 'Confirmed' &&
+        selectedOrderIdAtBuild == null && session.workspaceOrders.isEmpty &&
+        order.id == 'current-store-order';
+    final legacyAssignmentAtBuild = session.workspaceDeliveryAssignment;
+    final legacyQuantitiesAtBuild = Map<String, int>.of(order.quantities);
+    final legacyContactAtBuild = selectedOrderIdAtBuild == null &&
+        session.workspaceOrders.isEmpty && order.id == 'current-store-order';
+    bool currentContactFactsAreValid() {
+      if (!context.mounted ||
+          storeId != (session.activeWorkspace?.id ?? session.workspaceId) ||
+          reviewAccountAtBuild != (session.contactDraftStore?.accountScope ??
+              session.pendingProofStore?.accountScope) ||
+          session.currentWorkspaceOrderId != selectedOrderIdAtBuild ||
+          session.busy || session.workspaceOperationsSyncing ||
+          session.workspaceHandoverBusy || session.counterDraftSubmitting ||
+          session.hasPendingOrderTime ||
+          session.currentCollection?.needsReconciliation == true ||
+          !identical(session.workspaceDeliveryAssignment, legacyAssignmentAtBuild)) {
+        return false;
+      }
+      final current = session.visibleWorkspaceOrders
+          .where((record) => record.id == order.id).firstOrNull;
+      if (current == null || current.isClosed || current.isCustomerCollection ||
+          current.stage != stage) {
+        return false;
+      }
+      if (!legacyContactAtBuild) {
+        return identical(current, order) &&
+            jsonEncode(current.toLedgerJson()) == reviewLedgerAtBuild &&
+            session.workspaceOrderAmount == legacyAmountAtBuild;
+      }
+      // An unsaved row is recreated on read; its timestamp is not identity.
+      return session.currentWorkspaceOrderId == null &&
+          session.workspaceOrders.isEmpty && session.visibleWorkspaceOrders.length == 1 &&
+          session.workspaceOrderStage == stage && current.customer == order.customer &&
+          current.items == order.items && mapEquals(current.quantities, legacyQuantitiesAtBuild) &&
+          current.amount == order.amount && session.workspaceOrderAmount == legacyAmountAtBuild &&
+          current.source == order.source && current.payment == order.payment &&
+          current.address == order.address && current.fulfilment == order.fulfilment &&
+          current.needsDelivery == order.needsDelivery &&
+          current.actionDeadline == order.actionDeadline;
+    }
+    String promotionInputs() => jsonEncode({
+      'discount': session.workspaceCounterDiscount.toJson(),
+      'products': [for (final product in session.workspaceCatalogueItems)
+        if ((legacyQuantitiesAtBuild[product.id] ?? 0) > 0)
+          product.toInventoryJson()],
+    });
+    final legacyPreparingAtBuild = active && stage == 'Preparing' &&
+        selectedOrderIdAtBuild == null && session.workspaceOrders.isEmpty &&
+        order.id == 'current-store-order';
+    final legacyPromotionAtBuild = legacyReadyAtBuild || legacyConfirmedAtBuild || legacyPreparingAtBuild
+        ? promotionInputs() : null;
     bool sameStore() =>
         context.mounted &&
         storeId == (session.activeWorkspace?.id ?? session.workspaceId);
-    bool currentActionIsValid() {
+    bool currentLegacyDeliveryFactsAreValid() {
       if (!sameStore() ||
+          reviewAccountAtBuild != (session.contactDraftStore?.accountScope ??
+              session.pendingProofStore?.accountScope) ||
+          session.currentWorkspaceOrderId != null ||
+          session.workspaceOrders.isNotEmpty || session.busy ||
+          session.workspaceOperationsSyncing || session.workspaceHandoverBusy ||
+          session.counterDraftSubmitting || session.hasPendingOrderTime ||
+          session.currentCollection?.needsReconciliation == true ||
+          !identical(session.workspaceDeliveryAssignment, legacyAssignmentAtBuild)) {
+        return false;
+      }
+      final visible = session.visibleWorkspaceOrders;
+      if (visible.length != 1) return false;
+      final current = visible.single;
+      // The model regenerates this unsaved row's createdAt on every read.
+      // Guard durable facts here; each caller grants only its captured action.
+      return current.id == 'current-store-order' && !current.isClosed &&
+          !current.isCustomerCollection && current.isDeliveryInProgress &&
+          current.stage == stage && session.workspaceOrderStage == stage &&
+          current.customer == order.customer && current.items == order.items &&
+          mapEquals(current.quantities, legacyQuantitiesAtBuild) &&
+          current.amount == order.amount &&
+          session.workspaceOrderAmount == legacyAmountAtBuild &&
+          current.source == order.source && current.payment == order.payment &&
+          current.address == order.address && current.fulfilment == order.fulfilment &&
+          current.needsDelivery == order.needsDelivery &&
+          current.actionDeadline == order.actionDeadline;
+    }
+    bool currentActionIsValid({bool allowLegacyPacking = false}) {
+      if (!sameStore() ||
+          session.currentWorkspaceOrderId != selectedOrderIdAtBuild ||
           session.busy ||
           session.workspaceOperationsSyncing ||
           session.workspaceHandoverBusy ||
           session.currentCollection?.needsReconciliation == true) {
         return false;
       }
-      if (detailed && session.currentWorkspaceOrderId != order.id) {
+      // The model supports an in-memory Preparing order before a stored ID
+      // exists. Only packing/Ready may use it; never select or create a record
+      // to get around the stored-order/draft guard. Its sentinel is not identity:
+      // reject an old callback if any rendered order facts have been replaced.
+      if (allowLegacyPacking && legacyPreparingAtBuild) {
+        final visible = session.visibleWorkspaceOrders;
+        if (session.currentWorkspaceOrderId != null ||
+            session.workspaceOrders.isNotEmpty ||
+            session.counterDraftSubmitting || session.hasPendingOrderTime ||
+            visible.length != 1) {
+          return false;
+        }
+        final current = visible.single;
+        return current.id == order.id && !current.isClosed &&
+            !current.isCustomerCollection && current.stage == 'Preparing' &&
+            session.workspaceOrderStage == 'Preparing' &&
+            current.customer == order.customer && current.items == order.items &&
+            mapEquals(current.quantities, order.quantities) &&
+            current.amount == order.amount &&
+            session.workspaceOrderAmount == legacyAmountAtBuild &&
+            current.source == order.source && current.payment == order.payment &&
+            current.address == order.address &&
+            current.fulfilment == order.fulfilment &&
+            current.needsDelivery == order.needsDelivery &&
+            current.actionDeadline == order.actionDeadline;
+      }
+      if (session.currentWorkspaceOrderId != order.id) {
         final current = session.visibleWorkspaceOrders
             .where((record) => record.id == order.id)
             .firstOrNull;
@@ -28619,19 +29075,138 @@ class _LiveOrderTicket extends StatelessWidget {
       0,
       (total, line) => total + line.quantity,
     );
+    final readyAssignmentAtBuild = stage == 'Ready' && order.needsDelivery &&
+        !order.isCustomerCollection && legacyAssignmentAtBuild != null &&
+        legacyAssignmentAtBuild.orderId == order.id;
     final nextAction = switch (stage) {
       'Confirmed' => 'Accept',
       'Preparing' => 'Mark ready',
       'Ready for pickup' => 'Confirm pickup',
+      'Ready' when readyAssignmentAtBuild => 'Track delivery',
       'Ready' when order.needsDelivery => 'Arrange delivery',
       'Ready' => 'Complete pickup',
       'Delivery requested' => 'Track delivery',
       _ when order.isDeliveryInProgress => 'Track delivery',
       _ => 'Review',
     };
+    Future<void> markReadyAndOpenDelivery() async {
+      if (stage != 'Preparing' || !currentContactFactsAreValid() ||
+          (legacyPreparingAtBuild && promotionInputs() != legacyPromotionAtBuild) ||
+          !currentActionIsValid(allowLegacyPacking: true) ||
+          !session.workspaceCanMarkReady) {
+        return;
+      }
+      final targetId = session.currentWorkspaceOrderId;
+      final target = session.currentWorkspaceOrder;
+      final scopedCommand = targetId != null && session.hasScopedWorkspaceOrder(targetId);
+      String readyFacts(Map<String, Object?> facts) {
+        facts
+          ..remove('stage')
+          ..remove('actionDeadline');
+        // A successful scoped reply owns its fulfilment timing. Commercial,
+        // customer and order facts below still have to match the captured order.
+        if (scopedCommand) facts.remove('fulfilmentDeadline');
+        if (legacyPreparingAtBuild) {
+          facts.remove('id');
+          facts.remove('createdAt');
+        }
+        return jsonEncode(facts);
+      }
+      final expected = target?.toLedgerJson() ?? order.copyWith(
+        amount: session.workspaceCounterDiscount.isEmpty
+            ? order.amount : session.workspaceCounterPayableMinor ~/ 100,
+        itemSnapshots: session.workspaceCounterPurchasedItems,
+      ).toLedgerJson();
+      if (legacyPreparingAtBuild) {
+        expected['remainderPaise'] = session.workspaceCounterDiscount.isEmpty
+            ? 0 : session.workspaceCounterPayableMinor % 100;
+        expected['discount'] = session.workspaceCounterDiscount.toJson();
+        expected['discountMinor'] = session.workspaceCounterDiscountMinor;
+      }
+      final capturedFacts = readyFacts(expected);
+      Object? assignmentFacts(WorkspaceDeliveryAssignment? assignment) =>
+          assignment == null ? null : (
+            assignment.orderId, assignment.partnerName, assignment.vehicleLabel,
+            assignment.eta.toUtc(), assignment.stage, assignment.updatedAt?.toUtc(),
+          );
+      final capturedAssignmentFacts = assignmentFacts(legacyAssignmentAtBuild);
+      if (scopedCommand) {
+        // Await the existing authority, never dispatch readiness a second time.
+        if (!await session.submitWorkspaceOrderAction(targetId, WorkOrderAction.ready)) {
+          return;
+        }
+      } else {
+        _advanceDeskOrder(session, expectedOrderId: order.id);
+      }
+      final ready = session.currentWorkspaceOrder;
+      if (!sameStore() ||
+          reviewAccountAtBuild != (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) ||
+          ready == null || session.currentWorkspaceOrderId != ready.id ||
+          (legacyPreparingAtBuild && (session.workspaceOrders.length != 1 ||
+              !identical(session.workspaceOrders.single, ready))) ||
+          (targetId != null && ready.id != targetId) ||
+          readyFacts(ready.toLedgerJson()) != capturedFacts ||
+          ready.stage != 'Ready' || session.workspaceOrderStage != 'Ready' ||
+          !ready.needsDelivery || ready.isCustomerCollection ||
+          session.busy || (scopedCommand && session.workspaceOperationsSyncing) ||
+          session.workspaceHandoverBusy || session.counterDraftSubmitting ||
+          session.hasPendingOrderTime || session.currentCollection?.needsReconciliation == true ||
+          (scopedCommand
+              ? assignmentFacts(session.workspaceDeliveryAssignment) != capturedAssignmentFacts
+              : !identical(session.workspaceDeliveryAssignment, legacyAssignmentAtBuild))) {
+        return;
+      }
+      // Ready opens its working desk only; booking remains an explicit action.
+      onOpenDelivery();
+    }
+    bool confirmedCommandIsValid() {
+      if (stage != 'Confirmed' || !currentContactFactsAreValid() ||
+          order.actionDeadline?.isAfter(DateTime.now()) == false) {
+        return false;
+      }
+      if (legacyConfirmedAtBuild) {
+        return promotionInputs() == legacyPromotionAtBuild;
+      }
+      // Validate captured facts before selecting the displayed stored row.
+      return currentActionIsValid();
+    }
+    void acceptConfirmedOrder() {
+      if (confirmedCommandIsValid()) {
+        _advanceDeskOrder(session, expectedOrderId: order.id);
+      }
+    }
+    void rejectConfirmedOrder() {
+      if (confirmedCommandIsValid()) {
+        _showRejectOrderSheet(context, session);
+      }
+    }
+    final showContactActions = (active || detailed) && !order.isClosed &&
+        !order.isCustomerCollection &&
+        (stage == 'Confirmed' || stage == 'Preparing');
+    final contactActions = _DeskCustomerActions(
+      customer: order.customer, orderId: order.id,
+      canAct: currentContactFactsAreValid,
+      chatKey: stage == 'Preparing'
+          ? const Key('work-packing-contact-customer') : null,
+      chatDraft: stage == 'Preparing'
+          ? 'I need to confirm a product or quantity in your ₹${legacyContactAtBuild ? legacyAmountAtBuild : _formatStoreMinorAmount(order.payableMinor)} order.' : null,
+    );
     return _OrderDeadlineBoundary(
       deadline: stage == 'Confirmed' ? order.actionDeadline : null,
-      builder: (expired) => Material(
+      builder: (expired) => GestureDetector(
+        key: const Key('work-order-command-swipe'),
+        onHorizontalDragEnd: stage == 'Confirmed' ? (details) {
+          if (expired) {
+            return;
+          }
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity > 380) {
+            acceptConfirmedOrder();
+          } else if (velocity < -380) {
+            rejectConfirmedOrder();
+          }
+        } : null,
+        child: Material(
         key: const Key('work-live-order-ticket'),
         color: Colors.white,
         elevation: 0,
@@ -28717,27 +29292,55 @@ class _LiveOrderTicket extends StatelessWidget {
                   ),
                 ),
               if (!detailed) const SizedBox(height: 8),
-              if (!detailed) Text(
-                order.customer,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
               if (!detailed)
-                Text(
-                  order.isCustomerCollection
+                LayoutBuilder(builder: (context, constraints) {
+                  const customerStyle = TextStyle(
+                    color: MoolColors.ink, fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  );
+                  const factsStyle = TextStyle(color: MoolColors.muted, fontSize: 10.5);
+                  final factsText = order.isCustomerCollection
                       ? '${session.workspaceOrderPaymentLabel(order)} · Collect at store'
-                      : '${order.source} · ${session.workspaceOrderPaymentLabel(order)} · ${order.fulfilment}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                  ),
-                ),
+                      : '${order.source} · ${session.workspaceOrderPaymentLabel(order)} · ${order.fulfilment}';
+                  final facts = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(order.customer, style: customerStyle),
+                      Text(factsText, style: factsStyle),
+                    ],
+                  );
+                  if (!showContactActions) return facts;
+                  double widthOf(String text, TextStyle style) {
+                    final painter = TextPainter(
+                      text: TextSpan(text: text,
+                        style: DefaultTextStyle.of(context).style.merge(style)),
+                      textDirection: Directionality.of(context),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      locale: Localizations.maybeLocaleOf(context),
+                      maxLines: 1,
+                    )..layout();
+                    final width = painter.width;
+                    painter.dispose();
+                    return width;
+                  }
+                  final customerWidth = widthOf(order.customer, customerStyle);
+                  final factsWidth = widthOf(factsText, factsStyle);
+                  final fits = (customerWidth > factsWidth ? customerWidth : factsWidth) +
+                      100 <= constraints.maxWidth;
+                  return fits
+                      ? Row(children: [
+                          Expanded(child: facts),
+                          const SizedBox(width: 4),
+                          contactActions,
+                        ])
+                      : Column(crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [facts,
+                            Align(alignment: Alignment.centerRight, child: contactActions)]);
+                }),
               if (!detailed) const SizedBox(height: 7),
+              if (detailed && showContactActions)
+                Align(alignment: Alignment.centerRight,
+                  child: contactActions),
               if (detailed)
                 _ExactOrderInformation(
                   order: order,
@@ -28810,13 +29413,15 @@ class _LiveOrderTicket extends StatelessWidget {
                             : 'work-order-pack-${order.id}-${line.id}',
                       ),
                       dense: true,
+                      minTileHeight: 48,
                       visualDensity: VisualDensity.compact,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                       controlAffinity: ListTileControlAffinity.trailing,
                       value: line.packed,
                       onChanged: (value) {
                         if (!sameStore() ||
-                            (active && !currentActionIsValid())) {
+                            (active && !currentActionIsValid(
+                                allowLegacyPacking: true))) {
                           return;
                         }
                         session.setWorkspaceOrderPackingLine(
@@ -28851,6 +29456,24 @@ class _LiveOrderTicket extends StatelessWidget {
                     ),
                   ),
               ],
+              if (stage == 'Confirmed' && order.actionDeadline != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: Key('work-order-more-time-${order.id}'),
+                    style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    onPressed: session.busy || session.workspaceOperationsSyncing ||
+                            session.workspaceHandoverBusy || session.orderTimeRequestBusy ||
+                            session.workspaceOrderOperationState(order.id) != null
+                        ? null
+                        : () {
+                            if (currentActionIsValid()) {
+                              _showOrderTimeRequest(context, session);
+                            }
+                          },
+                    child: const Text('More time'),
+                  ),
+                ),
               if (order.isCustomerCollection)
                 Align(
                   alignment: Alignment.centerRight,
@@ -28879,21 +29502,33 @@ class _LiveOrderTicket extends StatelessWidget {
                   children: [
                     if (stage == 'Confirmed')
                       TextButton(
+                        key: const Key('work-activity-order-review'),
+                        onPressed: currentContactFactsAreValid() ? () {
+                          // Inspect the exact rendered order; never select/promote it.
+                          if (currentContactFactsAreValid()) {
+                            onReview();
+                          }
+                        } : null,
+                        style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                        child: const Text('Review'),
+                      ),
+                    if (stage == 'Confirmed')
+                      TextButton(
+                        key: const Key('work-activity-order-reject'),
                         onPressed:
                             expired ||
+                                session.hasPendingOrderTime ||
                                 session.busy ||
                                 session.workspaceOperationsSyncing
                             ? null
-                            : () {
-                                if (currentActionIsValid()) {
-                                  _showRejectOrderSheet(context, session);
-                                }
-                              },
+                            : rejectConfirmedOrder,
                         child: const Text('Reject'),
                       ),
                     FilledButton.icon(
+                      key: stage == 'Confirmed' ? const Key('work-activity-order-accept') : null,
                       onPressed:
                           expired ||
+                              (stage == 'Confirmed' && session.hasPendingOrderTime) ||
                               session.busy ||
                               session.workspaceOperationsSyncing ||
                               session.workspaceHandoverBusy ||
@@ -28901,7 +29536,58 @@ class _LiveOrderTicket extends StatelessWidget {
                                   !session.workspaceCanMarkReady)
                           ? null
                           : () {
-                              if (!currentActionIsValid() ||
+                              if (stage == 'Confirmed') {
+                                acceptConfirmedOrder();
+                                return;
+                              }
+                              if (stage == 'Preparing') {
+                                markReadyAndOpenDelivery();
+                                return;
+                              }
+                              if (nextAction == 'Track delivery' && readyAssignmentAtBuild) {
+                                if (currentContactFactsAreValid() &&
+                                    (legacyContactAtBuild || currentActionIsValid())) {
+                                  onOpenDelivery();
+                                }
+                                return;
+                              }
+                              if (nextAction == 'Track delivery' && legacyTrackingAtBuild) {
+                                if (currentLegacyDeliveryFactsAreValid()) onOpenDelivery();
+                                return;
+                              }
+                              if (nextAction == 'Arrange delivery' && legacyReadyAtBuild) {
+                                if (!currentLegacyDeliveryFactsAreValid() ||
+                                    promotionInputs() != legacyPromotionAtBuild) {
+                                  return;
+                                }
+                                // Promotion and assignment remain the existing model's
+                                // command. Never open as if a refused command succeeded.
+                                session.advanceWorkspaceOrder();
+                                if (session.workspaceOrderStage == 'Delivery requested' &&
+                                    session.currentWorkspaceOrder?.stage == 'Delivery requested') {
+                                  onOpenDelivery();
+                                }
+                                return;
+                              }
+                              if (nextAction == 'Review') {
+                                final current = session.visibleWorkspaceOrders
+                                    .where((record) => record.id == order.id)
+                                    .firstOrNull;
+                                if ((session.contactDraftStore?.accountScope ??
+                                        session.pendingProofStore?.accountScope) !=
+                                        reviewAccountAtBuild ||
+                                    !identical(current, order) ||
+                                    jsonEncode(current!.toLedgerJson()) !=
+                                        reviewLedgerAtBuild ||
+                                    !currentActionIsValid()) {
+                                  return;
+                                }
+                                onReview();
+                                return;
+                              }
+                              if ((stage == 'Confirmed' && session.hasPendingOrderTime) ||
+                                  !currentActionIsValid(
+                                      allowLegacyPacking: stage == 'Preparing') ||
                                   (stage == 'Preparing' &&
                                       !session.workspaceCanMarkReady)) {
                                 return;
@@ -28956,15 +29642,10 @@ class _LiveOrderTicket extends StatelessWidget {
                                 current?.stage != 'Preparing' ||
                                 current?.isCustomerCollection == true ||
                                 currentLines.isEmpty ||
-                                currentLines.any((line) => !line.packed) ||
-                                !session.selectWorkspaceOrder(order.id) ||
-                                !currentActionIsValid()) {
+                                currentLines.any((line) => !line.packed)) {
                               return;
                             }
-                            _advanceDeskOrder(
-                              session,
-                              expectedOrderId: order.id,
-                            );
+                            markReadyAndOpenDelivery();
                           },
                     child: const Text('Order ready'),
                   ),
@@ -28991,6 +29672,7 @@ class _LiveOrderTicket extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -37618,15 +38300,17 @@ class _CounterOrderSurface extends StatefulWidget {
     required this.onOpenCatalogue,
     required this.onExit,
     this.fullScreen = false,
+    this.operationalOrder = false,
     super.key,
   });
 
   final WorkSession session;
   final String query;
-  final VoidCallback onArrangeDelivery;
+  final ValueChanged<String> onArrangeDelivery;
   final VoidCallback onOpenCatalogue;
   final VoidCallback onExit;
   final bool fullScreen;
+  final bool operationalOrder;
 
   @override
   State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
@@ -37766,7 +38450,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _rememberDetails() {
-    if (_restoring || _saving || _openingDraft || !mounted) return;
+    if (_restoring || !_detailsEditable || !mounted) return;
     widget.session.updateWorkspaceCounterDetails(
       customer: _customerInput == null ? _customer.text : null,
       source: _source,
@@ -37775,6 +38459,30 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       address: _address.text,
     );
   }
+
+  bool get _detailsEditable => !_saving && !_openingDraft &&
+      !widget.session.counterDraftEditingBlocked && !widget.session.busy &&
+      !widget.session.workspaceOperationsSyncing &&
+      !widget.session.workspaceHandoverBusy && !widget.session.hasPendingOrderTime &&
+      widget.session.currentCollection?.busy != true &&
+      widget.session.currentCollection?.needsReconciliation != true;
+
+  Widget get _operationalSourceSelector => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: DropdownButtonFormField<String>(
+      key: const Key('work-operational-order-source'),
+      initialValue: _source,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Order received through'),
+      items: [for (final source in const ['Counter', 'Phone', 'Chat'])
+        DropdownMenuItem(value: source, child: Text(source))],
+      onChanged: !_detailsEditable ? null : (value) {
+        if (value == null || !_detailsEditable) return;
+        setState(() => _source = value);
+        _rememberDetails();
+      },
+    ),
+  );
 
   @override
   void dispose() {
@@ -37871,7 +38579,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             ? 'Delivery order saved. Confirm the order with the customer before dispatch.'
             : 'Delivery order saved. Pack the items before requesting a rider.',
       );
-      widget.onArrangeDelivery();
+      widget.onArrangeDelivery(submitted.orderId);
     }
   }
 
@@ -38307,13 +39015,17 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             fulfilment: _fulfilment,
             payment: _payment,
             counterOnly: true,
+            allowFulfilmentSelection: widget.operationalOrder,
+            enabled: _detailsEditable,
             compact: true,
             addressController: _address,
             onFulfilmentChanged: (value) {
+              if (!_detailsEditable) return;
               setState(() => _fulfilment = value);
               _rememberDetails();
             },
             onPaymentChanged: (value) {
+              if (!_detailsEditable) return;
               setState(() {
                 _payment = value;
                 _error = null;
@@ -38765,7 +39477,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       );
     }
     if (_stage == 'customer') {
-      return Material(color: Colors.white, child: _customerPanel());
+      return Material(color: Colors.white, child: widget.operationalOrder
+          ? Column(children: [_operationalSourceSelector, Expanded(child: _customerPanel())])
+          : _customerPanel());
     }
     if (_stage == 'review') return _reviewPanel();
     final query = _productSearch.text.trim().toLowerCase();
@@ -38838,6 +39552,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     final controls = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (widget.operationalOrder) _operationalSourceSelector,
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Semantics(
@@ -40455,6 +41170,8 @@ class _OrderCompletionChoices extends StatelessWidget {
   const _OrderCompletionChoices({
     this.counterOnly = false,
     this.compact = false,
+    this.allowFulfilmentSelection = false,
+    this.enabled = true,
     required this.fulfilment,
     required this.payment,
     required this.addressController,
@@ -40465,6 +41182,8 @@ class _OrderCompletionChoices extends StatelessWidget {
   final String fulfilment;
   final bool counterOnly;
   final bool compact;
+  final bool allowFulfilmentSelection;
+  final bool enabled;
   final String payment;
   final TextEditingController addressController;
   final ValueChanged<String> onFulfilmentChanged;
@@ -40476,7 +41195,7 @@ class _OrderCompletionChoices extends StatelessWidget {
     children: [
       if (!compact && counterOnly && fulfilment == 'At the shop')
         const Text('Customer takes items at the counter'),
-      if (!counterOnly || fulfilment != 'At the shop')
+      if (allowFulfilmentSelection || !counterOnly || fulfilment != 'At the shop')
         DropdownButtonFormField<String>(
           key: ValueKey('work-review-fulfilment-$fulfilment'),
           initialValue: fulfilment,
@@ -40497,7 +41216,7 @@ class _OrderCompletionChoices extends StatelessWidget {
                 }),
               ),
           ],
-          onChanged: (value) {
+          onChanged: !enabled ? null : (value) {
             if (value != null) onFulfilmentChanged(value);
           },
         ),
@@ -40505,6 +41224,7 @@ class _OrderCompletionChoices extends StatelessWidget {
         const SizedBox(height: 12),
         _AccessibleWorkTextField(
           keyName: 'work-order-address',
+          enabled: enabled,
           controller: addressController,
           label: 'Delivery address',
           minLines: 1,
@@ -40552,7 +41272,7 @@ class _OrderCompletionChoices extends StatelessWidget {
                           ),
                           foregroundColor: _counterSalePrimary,
                         ),
-                        onPressed: () => onPaymentChanged(method),
+                        onPressed: enabled ? () => onPaymentChanged(method) : null,
                         icon: Icon(
                           payment == method
                               ? Icons.radio_button_checked
