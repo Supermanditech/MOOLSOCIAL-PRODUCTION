@@ -29,9 +29,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $checkerPath,[ref]$tokens,[ref]$errors)
   Assert-RepairContract ($errors.Count -eq 0) 'checker has parse errors.'
   foreach ($name in @('Get-OctoberCompatibilityBinding',
-      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Test-OctoberCompatibilityBindingInventory',
       'Test-OctoberCompatibilityStageFacts','Test-OctoberCompatibilityIntegrationIdentity','Assert-Coordination',
-      'Get-OctoberCoverageBoundHash','New-OctoberCoverageMutex','Test-OctoberCoveragePreparation',
+      'Get-OctoberCoverageBoundHash','New-OctoberCoverageMutex','Test-OctoberCoveragePreparation','Test-OctoberHandoverPreparation',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage',
       'Test-OctoberCompatibilityQualification','Read-OctoberCompatibilityReportEvents',
       'Get-OctoberCompatibilityReportPlan','Get-OctoberCompatibilityExecutionPlan','Test-OctoberCompatibilityCapture',
@@ -53,7 +53,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $source=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
     Assert-RepairContract ($source.Count -eq 1) 'capture source unavailable.'
     $history=Get-OctoberCompatibilityHistoryStage $source[0]
-    Assert-RepairContract ($history.Stage -eq 5) 'capture requires committed L, not E/G/C/A/H or documentary Q.'
+    Assert-RepairContract ($history.Stage -eq 6) 'capture requires committed amended L, not E/G/C/A/H/J or documentary Q.'
     $before=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
     Assert-RepairContract ($before.Count -eq 0) 'capture requires clean L source.'
     $admission=@{
@@ -142,6 +142,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Clean=$true; HostQualificationPassed=$true
     HPreparationVerified=$true
     HCoverageVerified=$true
+    JPreparationVerified=$true
   }
   $cases=0
   Assert-RepairContract (Test-OctoberCompatibilityStageFacts $facts) 'exact pre-G bootstrap rejected.'
@@ -174,19 +175,20 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'bad bootstrap owner inventory accepted.'
     $cases++
   }
-  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),
-      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('handoff',6),@('integration_admission_authorize',6))) {
+  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),@('pre_commit',6),
+      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('implementation',6),@('handoff',7),@('integration_admission_authorize',7))) {
     $stageFacts=$facts.Clone(); $stageFacts.Phase=$pair[0]; $stageFacts.Stage=[int]$pair[1]
     $stageFacts.Owners=if($stageFacts.Stage -eq 0){@($binding.bootstrapOwners)}
       elseif($stageFacts.Stage -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
       elseif($stageFacts.Stage -eq 2){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($stageFacts.Stage -eq 3){@(Get-OctoberCompatibilityAmendmentOwners)}
-      elseif($stageFacts.Stage -eq 4){@(Get-OctoberCompatibilityLayoutOwners)}
+      elseif($stageFacts.Stage -eq 4){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($stageFacts.Stage -eq 5){@(Get-OctoberCompatibilityHandoverOwners)}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-RepairContract (Test-OctoberCompatibilityStageFacts $stageFacts) "exact stage$($pair -join '/') rejected."
     $cases++
   }
-  foreach ($stage in @(0,1,2,3,4,5)) {
+  foreach ($stage in @(0,1,2,3,4,5,6)) {
     $changed=$facts.Clone(); $changed.Phase='handoff'; $changed.Stage=[int]$stage
     $changed.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'unqualified E/G/C/A/L accepted for handoff.'
@@ -196,13 +198,13 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       @{Stage=1; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
       @{Stage=2; Owners=@(Get-OctoberCompatibilityApplicationOwners)},
       @{Stage=3; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
-      @{Stage=4; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
+      @{Stage=5; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
     $changed=$facts.Clone(); $changed.Phase='pre_commit'; $changed.Stage=[int]$probe.Stage
     $changed.Owners=@($probe.Owners)
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'owners from another successor stage accepted.'
     $cases++
   }
-  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=6
+  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=7
   $handoff.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
   foreach($key in @('Clean','HostQualificationPassed')) {
     foreach($value in @($false,'true')) {
@@ -214,9 +216,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   foreach($probe in @(
       @{Stage=2; Owners=@(Get-OctoberCompatibilityAmendmentOwners)+@('apps/mobile/test/work_public_handoff_test.dart')},
       @{Stage=2; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
-      @{Stage=4; Owners=@(Get-OctoberCompatibilityLayoutOwners | Where-Object {$_ -cne 'apps/mobile/test/work_public_handoff_test.dart'})},
-      @{Stage=4; Owners=@(Get-OctoberCompatibilityLayoutOwners)+@('apps/mobile/lib/features/work/work_publication.dart')},
-      @{Stage=5; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
+      @{Stage=5; Owners=@(Get-OctoberCompatibilityHandoverOwners | Where-Object {$_ -cne 'apps/mobile/lib/features/work/work_session.dart'})},
+      @{Stage=5; Owners=@(Get-OctoberCompatibilityHandoverOwners)+@('apps/mobile/lib/features/work/work_publication.dart')},
+      @{Stage=6; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
     $changed=$facts.Clone(); $changed.Phase='pre_commit'; $changed.Stage=[int]$probe.Stage
     $changed.Owners=@($probe.Owners)
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'widened or incomplete amendment/layout/Q claim accepted.'
@@ -236,7 +238,16 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'H commit admitted without verified coverage specification.'
     $cases++
   }
-  Assert-RepairContract ($cases -eq 89) 'stage probe inventory changed.'
+  foreach($phase in @('implementation','pre_commit')) {
+    foreach($value in @($false,'true',$null)) {
+      $changed=$facts.Clone();$changed.Phase=$phase;$changed.Stage=4
+      $changed.Owners=@(Get-OctoberCompatibilityAmendmentOwners)
+      if($null -eq $value){$changed.Remove('JPreparationVerified')}else{$changed.JPreparationVerified=$value}
+      Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'J admitted without independently verified preservation.'
+      $cases++
+    }
+  }
+  Assert-RepairContract ($cases -eq 98) 'stage probe inventory changed.'
   Write-Output "Compatibility stage predicates: $cases cases passed; live graph/admission and APK qualification remain separate."
   # Literal execution planning only: no Flutter or optional golden run is admitted.
   $planCases=0
@@ -751,7 +762,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   $capturePrematureRejected=$false
   try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureCompatibilityReport publication_contracts }
   catch {
-    Assert-RepairContract ($_.Exception.Message.IndexOf('capture requires committed L, not E/G/C/A/H or documentary Q.',[StringComparison]::Ordinal) -ge 0) 'premature capture failed for an unrelated reason.'
+    Assert-RepairContract ($_.Exception.Message.IndexOf('capture requires committed amended L, not E/G/C/A/H/J or documentary Q.',[StringComparison]::Ordinal) -ge 0) 'premature capture failed for an unrelated reason.'
     $capturePrematureRejected=$true
   }
   Assert-RepairContract $capturePrematureRejected 'premature host capture admitted before L.'
@@ -839,8 +850,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       coverageCommit=$fakeH;coverageSpecificationSha256='7BBB55F9CC4A3B12483241A78BC5B754F12CD6F22F3AAF48EB72423616B98569'
       registrySha256=$fakeRegistry; reports=$reports.ToArray()}
     Write-FixtureProof $proof
-    $working=@{Stage=5; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),$fakeSource); Head=$fakeSource}
-    $committed=@{Stage=6; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),$fakeSource,$fakeQ); Head=$fakeQ}
+    $working=@{Stage=6; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),('8'*40),$fakeSource); Head=$fakeSource}
+    $committed=@{Stage=7; Commits=@(('f'*40),('d'*40),('a'*40),('9'*40),('8'*40),$fakeSource,$fakeQ); Head=$fakeQ}
     Assert-RepairContract (Test-OctoberCompatibilityQualification $working -FromWorkingTree) 'complete labelled working-Q aggregate rejected.'
     Assert-RepairContract (Test-OctoberCompatibilityQualification $committed) 'complete labelled committed-Q aggregate rejected.'
     $aggregateCases=2
@@ -1061,7 +1072,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   Write-Output "Compatibility live sealed history: $historyCases cases passed; E/G/C retained, not qualified."
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $history)) 'unqualified E evidence accepted.'
-  $missingProof=@{ Stage=5; Commits=@($binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead); Head=$binding.baselineHead }
+  $missingProof=@{ Stage=6; Commits=@($binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead); Head=$binding.baselineHead }
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $missingProof -FromWorkingTree)) 'missing Q evidence accepted.'
   Write-Output 'Compatibility qualification: E and missing proof rejected; no host pass manufactured.'
   if($RequireCompatibilityLiveAdmissionProbes) {

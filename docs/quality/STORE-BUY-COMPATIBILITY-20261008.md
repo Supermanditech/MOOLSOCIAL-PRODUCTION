@@ -306,6 +306,57 @@ These are metadata/gate checks only, not passing application qualification.
 
 ## Forward qualification-coverage amendment H — preparation only
 
+### Forward stale-handover amendment J — 9 October, preparation only
+
+Founder explicitly approved switching audit-only mode to the narrow repair and
+ownership amendment. Independent primary provision is TASK
+work/handover-amendment-metadata-preparation-decision-20261009.json,
+SHA256400D48FCF084C1A6F966BAE8A7D16FE9A41F58DDE9991D9CD5BF6E08EA6236AC.
+This separately provisions exact metadata4 preparation at H; it does not claim
+the existing L3 gate permits metadata or session edits. Old A provision is history.
+Reviewed collectorB55D09202B6479759730CEF786380C427428D869B9EC3BF75F919C06CB8D0206
+and fixture27EBC110122AB1BC2CCB5C5DC8311E0CBC1283400F76E1DB0C4391C05529F06C
+passed actual read-only preparation and three labelled checks on both hosts.
+Frozen live receipts: PS7 4DB596A31C794104CF1B6632B91AE3712E4817EE996B4F5277EE2BE162672F84;
+PS5 D552E81F4571D590496A592B13C542D1D2A0FB10DFE20727B869FD4FFBD29947.
+They establish pre-edit facts, not commit, source, integration or APK qualification.
+
+Forward chain proposed: E-G-C-A-H-J-L-Q. J sole parent exact H
+7ccc0f01372276f6bc0b654544c95fc56c7b7086; committed apps must equal H.
+Literal J subject: coordination(store-buy-compatibility-20261008): admit exact stale handover protection.
+J changes exactly the same metadata4 owners as H. During preparation/precommit,
+preserve frozen dirty original L3 bytes/index, unchanged session preimage,
+registry4623/policy83, sealed history and approved/native source. Stage metadata4
+only. Fresh operative J precommit is mandatory; no admission has yet passed.
+Prospective amended L has original3 owners plus
+apps/mobile/lib/features/work/work_session.dart, only stale in-flight handover
+guards and existing focused regressions. No session edit precedes J commitment,
+fresh amended-L ownership/incremental admission and founder-input Check.
+
+Retained failed host run1814F9E0AD19A2DD77439B270AED7FE3BC830A54B798E7616B51952C37D3520E
+has four controls passing and three failures (record/stage/assignment changes).
+Native terminal exit is unknown after process-handle loss, not invented. Delayed
+completion must not overwrite a newer or cancelled order, create its invoice or
+change sales totals. Keep unchanged success, legitimate failure, busy lifetime
+and captured cleanup. No provider verification or backend decision is implemented.
+
+History/source/capture/final-admission consumers must all account for J. Immutable
+H coverage specification and four report categories/unmatched-skip rejection
+remain mandatory. Q binds the exact amended L and preserves its apps tree.
+All full-host, source publication, combined integration and APK/device evidence
+remain pending. This paragraph records preparation, not successful repair.
+
+J preparation verification: fresh full metadata-stage suites51212(PS7) and
+20403(PS5) exited0. Actual operative J preservation predicate has52labelled
+fixtures in TASK work/test-j-handover-preservation-20261009.ps1, SHA256
+C06DFD36D314B2086BBECA7E1B5A96C15F0D2070D4B590B090A3BB581CDA678C,
+both-host2a3301/807e69 exit0. Every case checks intended injection/no unexpected
+mock read and simulated acquisition/release/disposal counts. These do not prove
+native contention/abandonment or application safety. Initial capture-copy oracle,
+fixture dynamic scope and wrapped ScriptMethod exception failures remain recorded
+in TASK readiness; no failure was waived. Operative implementation59691 exited0;
+fresh actual staged precommit and final review remain required before J commitment.
+
 This section supersedes the earlier future G/C/A/L/Q ordering only through the
 separately recorded preparation provision. Sealed G/C/A and their evidence remain
 unchanged. Current HEAD is exact A8e711da618ed9b04b9a9e267b5d4b5c7400b02fe;
