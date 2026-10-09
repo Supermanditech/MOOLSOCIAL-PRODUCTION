@@ -572,6 +572,60 @@ before that becomes admission. Existing schema1 qualification remains unchanged.
 
 ## Exact coverage and visual resolution specification
 
+### Exclusive embedded Buy ownership handoff
+
+Actual L5 admission after K rejected the Buy owner: the raw primary claim has
+96 owners; the historical Cursor Redmi claim has 69 and still includes Buy.
+The independently reviewed K-bound preparation provision admits metadata4 only.
+Introduce sole-parent, metadata-only M after exact K; M apps must equal K.
+Original policy bytes and every original claim remain history, not edited policy.
+After independently verifying committed M, derive a separate root-bound inventory
+with only Buy moved from Cursor to primary (97/2/68). Run ordinary uniqueness and
+requested-owner membership checks on that inventory, never a membership exception.
+K-only/working/index drafts cannot activate transfer. Other roots remain unchanged.
+Recheck the bounded handoff/writer facts before mutation; the cooperative locks
+and clean handed-off worktree do not prove universal external-process inactivity.
+No source edit, visual approval, publication, integration or APK qualification is
+established by this contract alone. Standing founder blocker authority is separate
+from the Cursor handoff's provenance. Keep K and all prior commits unchanged.
+
+<!-- COMPATIBILITY_CLAIM_HANDOFF_JSON_BEGIN -->
+{
+  "schemaVersion": 1,
+  "state": "specified_exclusive_handoff_not_active_until_committed_M",
+  "predecessorCommit": "2beaf3775ed20f14fa42101346b35ddb7f8e9283",
+  "predecessorTree": "0d87fbad59a4102e0254f68a0ff6fae92b8d958d",
+  "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008",
+  "branch": "work/integration-repair/store-buy-compatibility-20261008",
+  "role": "primary",
+  "task": "/root",
+  "lane": "integration_repair",
+  "workId": "store-buy-compatibility-20261008",
+  "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008",
+  "owner": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+  "fromTask": "/root/cursor_redmi_v6_audit_20260913",
+  "toTask": "/root",
+  "policySha256": "84C191D84F5973126969568CC979B245233972BD5FF185BC599F51B4FCAFC8B3",
+  "registrySha256": "8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3",
+  "cursorCommit": "f32c17e1a3a41807564fe18f83c0520a66e0bfe6",
+  "buyBlobBeforeHandoff": "185d80e225d31929f5a42e3df4a432abcbfa309a",
+  "rawClaimCounts": [96, 2, 69],
+  "effectiveClaimCounts": [97, 2, 68],
+  "originalClaimBodySha256": {
+    "/root": "803ED08D3D59C4ECA0B8635FBBD6D5226A1AEC506E37FCDD52A86D0E482E5475",
+    "/root/repair_store_buy_conflict_v3_20260904": "B05255C9DCB5083E96110442A65BBB7CDA39D8EB4C07CADC0E559E3272C7D0A0",
+    "/root/cursor_redmi_v6_audit_20260913": "ADA9BBD52E0B569EE248A4A9282079E71A2DBFED601C7DCEE79D090E4E2BCB1D"
+  },
+  "preparationDecisionSha256": "4BA4E41CF5A2FBA36236FEF6E7742174E837FC18B26CBC7E76F5D3A3B8CA80E9",
+  "preparationObservationSha256": "3AC13D84DA2C756951E3948A786F406353F9088912B7A367FE8D108B61013E8C",
+  "collectorSha256": "FF166913835F639065B59CE42E7575FCDA5C33BC5FF81F7CABD05C3D19B43C28",
+  "cursorHandoffGitBlob": "f8011a35039f744c97886ea08eaf1f509dd0aa1f",
+  "cursorFinalPackageSha256": "65ED22E83CB9E9D59230F78720E35DE8CA5EC39F2E193117A00A0B637E2E419C",
+  "mSubject": "coordination(store-buy-compatibility-20261008): admit exclusive embedded Buy handoff",
+  "activationRule": "Only independently verified committed M in the exact compatibility root; normal duplicate-owner and membership checks remain mandatory."
+}
+<!-- COMPATIBILITY_CLAIM_HANDOFF_JSON_END -->
+
 ### Visual proof protocol
 
 This fixes the future approval/capture mechanism, not future approval outcomes.
