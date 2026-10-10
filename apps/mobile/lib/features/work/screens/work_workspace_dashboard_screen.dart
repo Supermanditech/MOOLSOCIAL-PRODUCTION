@@ -632,6 +632,11 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
       _WorkWorkspaceDashboardScreenState();
 }
 
+typedef _SavedStoreSearchVisit = ({
+  int token, WorkSession source, String? accountScope, String? storeId,
+  bool authenticated, bool fromOrders,
+});
+
 class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
@@ -647,6 +652,31 @@ class _WorkWorkspaceDashboardScreenState
   final ScrollController _searchScroll = ScrollController();
   double _searchReturnOffset = 0;
   String? _ordersSearchStoreId, _ordersSearchReturnOrderId;
+  int _searchVisitToken = 0;
+  _SavedStoreSearchVisit? _savedSearchVisit;
+  ({_SavedStoreSearchVisit visit, String query})? _retainedSavedSearch;
+  String? get _searchAccountScope =>
+      session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
+
+  bool _searchScopeCurrent(_SavedStoreSearchVisit visit) =>
+      mounted && identical(session, visit.source) &&
+      session.activeWorkspace?.id == visit.storeId &&
+      _searchAccountScope == visit.accountScope &&
+      widget.accountAuthenticated == visit.authenticated;
+
+  void _searchScopeChanged() {
+    final visit = _savedSearchVisit;
+    if (visit == null || _searchScopeCurrent(visit)) return;
+    _savedSearchVisit = null;
+    _searchVisitToken++;
+    _ordersSearchStoreId = null;
+    _ordersSearchReturnOrderId = null;
+    _searchFocus.unfocus();
+    _searchController.clear();
+    // Reconcile only this obsolete local surface. Never clear the replacement
+    // account/Store's session query from an old visit's notification/callback.
+    if (_view == _WorkspaceControlView.search) _view = _WorkspaceControlView.dashboard;
+  }
   final ScrollController _alertsScroll = ScrollController();
   final ScrollController _settingsScroll = ScrollController();
   final ScrollController _homeContentScroll = ScrollController();
@@ -664,6 +694,7 @@ class _WorkWorkspaceDashboardScreenState
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   String? _salesTask;
+  int _salesVisitEpoch = 0;
   String get _salesTaskTitle => switch (_salesTask) {
     'counter' => 'Counter sale',
     'manage' => 'Manage sales',
@@ -674,6 +705,17 @@ class _WorkWorkspaceDashboardScreenState
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
   final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
+  final Map<Object, _PurchaseRegisterBookmark> _purchaseRegisterViews = {};
+  _PurchaseRegisterBookmark? _purchaseRegisterBookmark() {
+    final account = session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
+    final store = session.activeWorkspace?.id;
+    // Unknown identity must not create a shared null/Store-only cache entry.
+    if (account == null || account.isEmpty || store == null) {
+      return null;
+    }
+    return _purchaseRegisterViews.putIfAbsent(
+      (account, store, session.workspaceSupplierScope), _PurchaseRegisterBookmark.new);
+  }
   final Set<Object> _collapsedStockActions = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
@@ -728,6 +770,7 @@ class _WorkWorkspaceDashboardScreenState
     _searchController = TextEditingController(
       text: session.workspaceSearchQuery,
     );
+    session.addListener(_searchScopeChanged);
     _storeProcurement?.addListener(_observeProcurementQuery);
     _observeProcurementQuery();
     final section = switch (widget.initialSection) {
@@ -767,6 +810,7 @@ class _WorkWorkspaceDashboardScreenState
 
   @override
   void dispose() {
+    session.removeListener(_searchScopeChanged);
     session.removeListener(_procurementIdentityChanged);
     _storeProcurement?.removeListener(_observeProcurementQuery);
     _observedProcurement?.removeListener(_procurementQueryChanged);
@@ -988,6 +1032,7 @@ class _WorkWorkspaceDashboardScreenState
     required WorkWorkspace workspace,
     required WorkProfileOption profile,
   }) {
+    final savedSearchVisit = _savedSearchVisit;
     const dashboardReturn = '/app/work/workspace/dashboard';
     void openRetailer(
       String path, {
@@ -1241,6 +1286,7 @@ class _WorkWorkspaceDashboardScreenState
     if (_salesTaskScope != salesTaskScope) {
       _salesTaskScope = salesTaskScope;
       _salesTask = null;
+      _salesVisitEpoch++;
     }
     final salesTaskOpen = salesOpen && _salesTask != null ||
         _view == _WorkspaceControlView.operation && _operationReturnOperation == _WorkspaceOperation.sales;
@@ -1535,10 +1581,16 @@ class _WorkWorkspaceDashboardScreenState
                       setState(() {});
                     }
                   : (query) {
+                      if (_view != _WorkspaceControlView.search ||
+                          savedSearchVisit == null || _savedSearchVisit != savedSearchVisit ||
+                          !_searchScopeCurrent(savedSearchVisit)) return;
+                      _retainedSavedSearch = (visit: savedSearchVisit, query: query);
                       if (_searchScroll.hasClients) _searchScroll.jumpTo(0);
                       session.updateWorkspaceSearch(query);
                     },
-              onCloseSearch: _finishSearch,
+              onCloseSearch: _view == _WorkspaceControlView.search
+                  ? () => _exitSavedSearch(savedSearchVisit)
+                  : _finishSearch,
               onScan: () {
                 if (procurementOpen) {
                   final purchase = _activeProcurement;
@@ -1614,7 +1666,8 @@ class _WorkWorkspaceDashboardScreenState
         _WorkspaceControlView.procurement => _leaveProcurement,
         _WorkspaceControlView.status => () => unawaited(_leaveSettings()),
         _WorkspaceControlView.operation => () => unawaited(_leaveOperation()),
-        _WorkspaceControlView.search => _finishSearch,
+        _WorkspaceControlView.search =>
+          () => _exitSavedSearch(savedSearchVisit, preserveGlobalQuery: true),
         _ => _showDashboard,
       },
       manageSystemBack: _view != _WorkspaceControlView.procurement,
@@ -1639,7 +1692,10 @@ class _WorkWorkspaceDashboardScreenState
                 ? _StoreStatementSurface(
                     key: _salesKey,
                     session: session,
-                    onSalesTaskChanged: (task) => setState(() => _salesTask = task),
+                    onSalesTaskChanged: (task) => setState(() {
+                      _salesTask = task;
+                      _salesVisitEpoch++;
+                    }),
                     initialSalesTask: _salesTask ?? 'home',
                     salesOnly: true,
                     showNewSaleAction: true,
@@ -1891,6 +1947,7 @@ class _WorkWorkspaceDashboardScreenState
               session.workspaceStockHistoryScope()?.key ?? workspace.id,
               _StockStatementBookmark.new,
             ),
+            purchaseRegisterBookmark: _purchaseRegisterBookmark(),
             requirementDraft: _requirementDrafts.putIfAbsent(
               workspace.id,
               () => {},
@@ -2060,10 +2117,32 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _showSearch() {
+    final fromOrders =
+        (_view == _WorkspaceControlView.operation &&
+            _operation == _WorkspaceOperation.orders) ||
+        (_view == _WorkspaceControlView.search &&
+            _savedSearchVisit?.fromOrders == true);
+    // Orders lookup is a separate purpose, not a retained global SKU query.
+    final retained = _retainedSavedSearch;
+    final retainedFromOtherAccount = retained != null &&
+        identical(retained.visit.source, session) &&
+        retained.visit.storeId == session.activeWorkspace?.id &&
+        !_searchScopeCurrent(retained.visit) &&
+        retained.query == session.workspaceSearchQuery;
+    // A new explicit search entry may discard a known leftover from another
+    // account, but scope-change notifications never overwrite replacement data.
+    if (fromOrders || retainedFromOtherAccount) session.updateWorkspaceSearch('');
+    _searchController.text = session.workspaceSearchQuery;
+    final visit = (
+      token: ++_searchVisitToken, source: session,
+      accountScope: _searchAccountScope, storeId: session.activeWorkspace?.id,
+      authenticated: widget.accountAuthenticated, fromOrders: fromOrders,
+    );
+    _savedSearchVisit = visit;
+    _retainedSavedSearch = (visit: visit, query: session.workspaceSearchQuery);
     setState(() {
       _ordersSearchStoreId =
-          _view == _WorkspaceControlView.operation &&
-              _operation == _WorkspaceOperation.orders
+          fromOrders
           ? session.activeWorkspace?.id
           : null;
       _ordersSearchReturnOrderId = _ordersSearchStoreId != null
@@ -2072,7 +2151,8 @@ class _WorkWorkspaceDashboardScreenState
       _view = _WorkspaceControlView.search;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _searchFocus.requestFocus();
+      if (_savedSearchVisit == visit && _searchScopeCurrent(visit) &&
+          _view == _WorkspaceControlView.search) _searchFocus.requestFocus();
     });
   }
 
@@ -2345,6 +2425,8 @@ class _WorkWorkspaceDashboardScreenState
               (_operation == _WorkspaceOperation.sales &&
                   (operation == _WorkspaceOperation.counterOrder ||
                       operation == _WorkspaceOperation.dues)) ||
+              (_operation == _WorkspaceOperation.growth &&
+                  operation == _WorkspaceOperation.customers) ||
               (_operation == _WorkspaceOperation.catalogue &&
                   (operation == _WorkspaceOperation.sourcing ||
                       operation == _WorkspaceOperation.stockStatement ||
@@ -2470,6 +2552,9 @@ class _WorkWorkspaceDashboardScreenState
             _operation == _WorkspaceOperation.orders
         ? _WorkspaceOperation.orders
         : _WorkspaceOperation.sourcing;
+    final retainRegister = returnOperation == _WorkspaceOperation.sourcing
+        ? _purchasesKey.currentState?._captureTrackingReturn()
+        : null;
     final purchase = session.workspacePurchases
         .where((record) => record.shipmentId == shipmentId)
         .firstOrNull;
@@ -2518,6 +2603,7 @@ class _WorkWorkspaceDashboardScreenState
       session.showNotice('Tracking is not available for this Store purchase.');
       return;
     }
+    retainRegister?.call();
     setState(() {
       _procurementReturnOperation = returnOperation;
       _procurementProductId = null;
@@ -2593,7 +2679,10 @@ class _WorkWorkspaceDashboardScreenState
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_procurementIdentityChanged);
       session.addListener(_procurementIdentityChanged);
+      oldWidget.session.removeListener(_searchScopeChanged);
+      session.addListener(_searchScopeChanged);
     }
+    _searchScopeChanged();
     _procurementIdentityChanged();
     _observeProcurementQuery();
   }
@@ -2731,6 +2820,15 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveOperation({bool exitSale = false}) async {
+    Object salesExitIdentity() => (
+      _view, _operation, _salesTask, _salesVisitEpoch,
+      session.counterDraftIdentity, session.workspaceFinance?.accountScope,
+      session.activeWorkspace?.id, session.counterSaleGeneration,
+      session.currentWorkspaceOrderId, session.currentWorkspaceOrder,
+      _counterKey.currentState, _counterKey.currentState?._invoice,
+      _counterKey.currentState?._stage,
+    );
+    final salesExit = salesExitIdentity();
     final deliveryVisitAtBack = _operation == _WorkspaceOperation.delivery ? _deliveryOrderOrigin : null;
     final receiving = _receivingKey.currentState;
     if (receiving != null) {
@@ -2760,7 +2858,15 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     if (_operation == _WorkspaceOperation.sales && _salesTask != null) {
-      if (!await (_counterKey.currentState?.flushForNavigation() ?? Future.value(true)) || !mounted) return;
+      final counter = _counterKey.currentState;
+      final task = _salesTask;
+      if (!await (counter?.flushForNavigation() ?? Future.value(true)) || !mounted ||
+          salesExitIdentity() != salesExit) return;
+      // A completed invoice owns its records; clear only the retained composer.
+      // Ordinary unfinished bills still leave and resume without a reset.
+      if (task == 'counter' && (counter?.hasCompletedInvoice ?? false) &&
+          (session.counterDraftNeedsReconciliation ||
+              !(counter?._startNextSale() ?? false))) return;
       _salesKey.currentState?.showSalesHome();
       return;
     }
@@ -3053,14 +3159,27 @@ class _WorkWorkspaceDashboardScreenState
     _searchFocus.requestFocus();
   }
 
-  void _finishSearch() {
+  void _exitSavedSearch(_SavedStoreSearchVisit? visit, {
+    bool preserveGlobalQuery = false,
+  }) {
+    if (visit == null || _savedSearchVisit != visit ||
+        _view != _WorkspaceControlView.search || !_searchScopeCurrent(visit)) return;
+    _finishSearch(preserveQuery: preserveGlobalQuery && !visit.fromOrders);
+  }
+
+  void _finishSearch({bool preserveQuery = false}) {
     final returnToOrders =
         _ordersSearchStoreId != null &&
         _ordersSearchStoreId == session.activeWorkspace?.id;
     final orderId = _ordersSearchReturnOrderId;
     _searchFocus.unfocus();
-    _searchController.clear();
-    session.updateWorkspaceSearch('');
+    if (!preserveQuery) _retainedSavedSearch = null;
+    _savedSearchVisit = null;
+    _searchVisitToken++;
+    if (!preserveQuery) {
+      _searchController.clear();
+      session.updateWorkspaceSearch('');
+    }
     _ordersSearchStoreId = null;
     _ordersSearchReturnOrderId = null;
     if (returnToOrders) {
@@ -3078,37 +3197,49 @@ class _WorkWorkspaceDashboardScreenState
       session.showError('Enter an active-order limit or choose Unlimited.');
       return;
     }
+    final availabilityChanged = _availabilityDirty;
+    final tradingControlsChanged = _tradingControlsDirty;
     if (_draftVisibleToCustomers != session.workspaceVisibleToCustomers &&
         !session.setWorkspaceVisibility(_draftVisibleToCustomers)) {
       return;
     }
-    session.saveWorkspaceAvailability(
-      acceptingOrders: _draftAcceptingOrders,
-      fulfilmentMode: _draftFulfilmentMode,
-      busyMinutes: _draftBusyMinutes,
-      reopensAt: _draftReopensAt,
-    );
-    session.saveWorkspaceTradingControls(
-      openingTime: _draftOpeningTime,
-      closingTime: _draftClosingTime,
-      maximumActiveOrders: _draftMaximumActiveOrders,
-      alertSound: _draftOrderAlertSound,
-      alertVibration: _draftOrderAlertVibration,
-    );
+    if (availabilityChanged) {
+      session.saveWorkspaceAvailability(
+        acceptingOrders: _draftAcceptingOrders,
+        fulfilmentMode: _draftFulfilmentMode,
+        busyMinutes: _draftBusyMinutes,
+        reopensAt: _draftReopensAt,
+      );
+    }
+    if (tradingControlsChanged) {
+      session.saveWorkspaceTradingControls(
+        openingTime: _draftOpeningTime,
+        closingTime: _draftClosingTime,
+        maximumActiveOrders: _draftMaximumActiveOrders,
+        alertSound: _draftOrderAlertSound,
+        alertVibration: _draftOrderAlertVibration,
+      );
+    }
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
 
-  bool get _settingsDirty =>
+  bool get _availabilityDirty =>
       _draftAcceptingOrders != session.workspaceAcceptingOrders ||
-      _draftVisibleToCustomers != session.workspaceVisibleToCustomers ||
       _draftFulfilmentMode != session.workspaceFulfilmentMode ||
       _draftBusyMinutes != session.workspaceBusyMinutes ||
-      _draftReopensAt != session.workspaceReopensAt ||
+      _draftReopensAt != session.workspaceReopensAt;
+
+  bool get _tradingControlsDirty =>
       _draftOpeningTime != session.workspaceOpeningTime ||
       _draftClosingTime != session.workspaceClosingTime ||
       _draftMaximumActiveOrders != session.workspaceMaximumActiveOrders ||
       _draftOrderAlertSound != session.workspaceOrderAlertSound ||
       _draftOrderAlertVibration != session.workspaceOrderAlertVibration;
+
+  bool get _settingsDirty =>
+      _availabilityDirty ||
+      _draftVisibleToCustomers != session.workspaceVisibleToCustomers ||
+      _tradingControlsDirty;
 
   Future<void> _leaveSettings() async {
     if (!_settingsDirty) {
@@ -11920,9 +12051,11 @@ class _LiveDot extends StatelessWidget {
 /// Rebuilds actions once at the deadline, independently of the digit ticker.
 /// Expiry is not evidence of rejection, reassignment or any server outcome.
 class _OrderDeadlineBoundary extends StatefulWidget {
-  const _OrderDeadlineBoundary({required this.deadline, required this.builder});
+  const _OrderDeadlineBoundary({required this.deadline, required this.builder,
+    this.observeMetrics = false});
   final DateTime? deadline;
   final Widget Function(bool expired) builder;
+  final bool observeMetrics;
 
   @override
   State<_OrderDeadlineBoundary> createState() => _OrderDeadlineBoundaryState();
@@ -11955,6 +12088,13 @@ class _OrderDeadlineBoundaryState extends State<_OrderDeadlineBoundary>
   void didUpdateWidget(covariant _OrderDeadlineBoundary oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.deadline != widget.deadline) _schedule();
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Some Store working pages remove inherited keyboard insets. Opted-in
+    // order actions must still observe the native View before rebuilding.
+    if (mounted && widget.observeMetrics) setState(() {});
   }
 
   @override
@@ -17800,6 +17940,13 @@ class _PurchaseCategoryHeader extends SliverPersistentHeaderDelegate {
     title != oldDelegate.title || extent != oldDelegate.extent || expanded != oldDelegate.expanded;
 }
 
+class _PurchaseRegisterBookmark {
+  Object? scope, owner;
+  List<String>? history;
+  double offset = 0;
+  String query = '', filter = 'All';
+}
+
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({
     super.key,
@@ -17810,8 +17957,10 @@ class _StorePurchasesSurface extends StatefulWidget {
     this.purchaseEntryKey,
     this.receivingKey,
     this.onOpenStock,
+    this.registerBookmark,
   });
   final WorkSession session;
+  final _PurchaseRegisterBookmark? registerBookmark;
   final bool statement;
   final VoidCallback? onOpenStock;
   final ValueChanged<String>? onTrackPurchase;
@@ -17846,36 +17995,147 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   Object? _surfaceScope;
   double _registerBookmark = 0;
   int _registerBookmarkEpoch = 0;
+  final _localRegisterBookmark = _PurchaseRegisterBookmark();
+  final Object _registerOwner = Object();
+  late _PurchaseRegisterBookmark _registerView;
+  bool _registerBindingChanged = false, _pendingDetailReturn = false, _detailReturnScheduled = false;
+  Object get _registerScope => (
+    session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope,
+    session.activeWorkspace?.id, session.workspaceSupplierScope,
+  );
+  bool get _ownsRegisterView => identical(_registerView.owner, _registerOwner) &&
+      _registerView.scope == _registerScope &&
+      identical(_registerView.history, session.workspaceRecentSearches('purchases'));
+  final _pendingRegisterRestoration = <ScrollPosition>{};
+  final _scheduledRegisterRestoration = <ScrollPosition>{};
+  final _registerRestorationExtents = <ScrollPosition, double>{};
+  final _registerRestorationAttempts = <ScrollPosition, int>{};
   final _registerPositionEpochs = <ScrollPosition, int>{};
   late final ScrollController _registerScroll = ScrollController(
     keepScrollOffset: false,
     onDetach: (position) {
-      if (_registerPositionEpochs.remove(position) == _registerBookmarkEpoch && position.hasPixels) {
+      if (_registerPositionEpochs.remove(position) == _registerBookmarkEpoch && position.hasPixels &&
+          !_pendingRegisterRestoration.contains(position)) {
         _registerBookmark = position.pixels;
+        if (_ownsRegisterView) {
+          _registerView.offset = position.pixels;
+          _registerView.query = _purchaseSearch.text;
+          _registerView.filter = _purchaseFilter;
+        }
       }
+      _pendingRegisterRestoration.remove(position);
+      _registerRestorationExtents.remove(position);
+      _registerRestorationAttempts.remove(position);
     },
     onAttach: (position) {
       final scope = session.workspaceSupplierScope;
       final epoch = _registerBookmarkEpoch;
       _registerPositionEpochs[position] = epoch;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || epoch != _registerBookmarkEpoch || scope != session.workspaceSupplierScope ||
-            !_registerScroll.positions.contains(position) || !position.hasContentDimensions) {
-          return;
-        }
-        position.jumpTo(_registerBookmark.clamp(position.minScrollExtent, position.maxScrollExtent));
-      });
+      _pendingRegisterRestoration.add(position);
+      _scheduleRegisterRestoration(position, epoch, scope);
     },
   );
   bool _newPurchase = false;
   WorkspacePurchaseSavedCopy? _savedCopy;
 
+  void _scheduleRegisterRestoration(ScrollPosition position, int epoch, Object? scope) {
+    if (!_scheduledRegisterRestoration.add(position)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduledRegisterRestoration.remove(position);
+      if (!mounted || epoch != _registerBookmarkEpoch || scope != session.workspaceSupplierScope ||
+          !_ownsRegisterView || !_registerScroll.positions.contains(position) ||
+          session.focusedWorkspacePurchaseId != null || _centreVisible ||
+          _recordPurchase || _savedCopy != null || _receiveGoods) {
+        _pendingRegisterRestoration.remove(position);
+        _registerRestorationExtents.remove(position);
+        _registerRestorationAttempts.remove(position);
+        return;
+      }
+      if (!_pendingRegisterRestoration.contains(position) || !position.hasContentDimensions) return;
+      final maximum = position.maxScrollExtent;
+      final previousMaximum = _registerRestorationExtents[position];
+      final attempts = _registerRestorationAttempts[position] ?? 0;
+      // A lazy sliver initially estimates its extent from the first built rows.
+      // Jumping to that boundary lays out more rows; do not accept the initial
+      // clamp as the saved position while the extent is still converging.
+      if (_registerBookmark > maximum && previousMaximum != maximum && attempts < 32) {
+        _registerRestorationExtents[position] = maximum;
+        _registerRestorationAttempts[position] = attempts + 1;
+        position.jumpTo(maximum);
+        _scheduleRegisterRestoration(position, epoch, scope);
+        WidgetsBinding.instance.scheduleFrame();
+        return;
+      }
+      _pendingRegisterRestoration.remove(position);
+      _registerRestorationExtents.remove(position);
+      _registerRestorationAttempts.remove(position);
+      position.jumpTo(_registerBookmark.clamp(position.minScrollExtent, maximum));
+      _scheduleDetailReturn();
+    });
+  }
+
+  void _scheduleDetailReturn() {
+    if (!_pendingDetailReturn || _detailReturnScheduled) return;
+    _detailReturnScheduled = true;
+    final scope = _registerScope, epoch = _registerBookmarkEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _detailReturnScheduled = false;
+      if (!mounted || !_pendingDetailReturn || !_ownsRegisterView || scope != _registerScope ||
+          epoch != _registerBookmarkEpoch || session.focusedWorkspacePurchaseId != null) return;
+      if (_pendingRegisterRestoration.isNotEmpty) return;
+      final target = _returnRowKey.currentContext;
+      if (target != null && target.mounted) {
+        _pendingDetailReturn = false;
+        unawaited(Scrollable.ensureVisible(target, alignment: .5));
+      }
+    });
+    // addPostFrameCallback alone does not request a subsequent layout frame.
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  VoidCallback? _captureTrackingReturn() {
+    if (!_ownsRegisterView || _centreVisible || _registerScroll.positions.length != 1) return null;
+    final position = _registerScroll.positions.single;
+    if (!position.hasPixels || _pendingRegisterRestoration.contains(position)) return null;
+    final bookmark = _registerView;
+    final epoch = _registerBookmarkEpoch, scope = _registerScope;
+    final history = _purchaseHistory;
+    final offset = position.pixels, query = _purchaseSearch.text, filter = _purchaseFilter;
+    return () {
+      if (!mounted || !identical(bookmark, _registerView) || !_ownsRegisterView ||
+          _centreVisible || session.focusedWorkspacePurchaseId != null || scope != _registerScope ||
+          _registerScroll.positions.length != 1 || !identical(_registerScroll.positions.single, position) ||
+          _pendingRegisterRestoration.contains(position) || _registerPositionEpochs[position] != epoch ||
+          epoch != _registerBookmarkEpoch || !identical(history, _purchaseHistory) ||
+          query != _purchaseSearch.text || filter != _purchaseFilter) return;
+      _registerView.offset = offset;
+      _registerView.query = query;
+      _registerView.filter = filter;
+      // Departing detach/dispose callbacks cannot overwrite this snapshot.
+      _registerView.owner = null;
+    };
+  }
+
   @override
   void initState() {
     super.initState();
+    _registerView = widget.registerBookmark ?? _localRegisterBookmark;
+    _registerView.owner = _registerOwner;
     _purchaseSearchFocus.addListener(_refreshPurchaseSearch);
     if (!statement) {
       unawaited(_loadEntry());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _StorePurchasesSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.registerBookmark ?? _localRegisterBookmark;
+    if (!identical(next, _registerView)) {
+      if (identical(_registerView.owner, _registerOwner)) _registerView.owner = null;
+      _registerView = next;
+      _registerBindingChanged = true;
+      _pendingRegisterRestoration.clear();
     }
   }
 
@@ -17890,6 +18150,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
 
   @override
   void dispose() {
+    if (identical(_registerView.owner, _registerOwner)) _registerView.owner = null;
     _registerScroll.dispose();
     _purchaseSearch.dispose();
     _purchaseSearchFocus.removeListener(_refreshPurchaseSearch);
@@ -18335,16 +18596,30 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   Widget build(BuildContext context) {
     final storeId = session.activeWorkspace?.id;
     final history = session.workspaceRecentSearches('purchases');
-    if (_storeId != storeId || _surfaceScope != session.workspaceSupplierScope || !identical(_purchaseHistory, history)) {
+    if (_storeId != storeId || _surfaceScope != session.workspaceSupplierScope ||
+        !identical(_purchaseHistory, history) || _registerView.scope != _registerScope ||
+        !identical(_registerView.owner, _registerOwner) || _registerBindingChanged) {
+      _registerBindingChanged = false;
+      _pendingDetailReturn = false;
+      final retained = _registerView.scope == _registerScope && identical(_registerView.history, history);
       _storeId = storeId;
       _surfaceScope = session.workspaceSupplierScope;
-      _registerBookmark = 0;
+      _registerBookmark = retained ? _registerView.offset : 0;
+      _registerView.scope = _registerScope;
+      _registerView.history = history;
+      _registerView.owner = _registerOwner;
+      if (!retained) {
+        _registerView.offset = 0;
+        _registerView.query = '';
+        _registerView.filter = 'All';
+      }
       ++_registerBookmarkEpoch;
       _lastViewedId = null;
       _showedDetails = false;
       _purchaseHistory = history;
       _purchaseSearch.clear();
-      _purchaseFilter = 'All';
+      _purchaseSearch.text = _registerView.query;
+      _purchaseFilter = _registerView.filter;
       _recordPurchase = false;
       _receiveGoods = false;
       _receivingSupplierId = null; _returnReceivingCopy = null;
@@ -18380,16 +18655,8 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
     _showedDetails = session.focusedWorkspacePurchaseId != null;
     if (selected != null) _lastViewedId = selected.shipmentId;
     if (returning) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final target = _returnRowKey.currentContext;
-        if (mounted &&
-            target != null &&
-            target.mounted &&
-            session.activeWorkspace?.id == storeId &&
-            session.focusedWorkspacePurchaseId == null) {
-          unawaited(Scrollable.ensureVisible(target, alignment: .5));
-        }
-      });
+      _pendingDetailReturn = true;
+      _scheduleDetailReturn();
     }
     if (session.focusedWorkspacePurchaseId != null) {
       if (selected == null) {
@@ -18645,7 +18912,22 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
       SizedBox(key: _centreVisible ? const Key('work-purchase-action-centre') : const Key('work-purchase-action-centre-closed'), height: 0),
       if (_centreVisible) _managementHeader(),
       Expanded(child: LayoutBuilder(builder: (context, constraints) => KeyedSubtree(
-      key: const Key('purchase-action-category-scroll'), child: CustomScrollView(
+      key: const Key('purchase-action-category-scroll'), child: NotificationListener<Notification>(
+      onNotification: (notification) {
+        if (notification is ScrollStartNotification && notification.dragDetails != null) {
+          // A deliberate gesture takes priority over an unfinished restoration.
+          _pendingRegisterRestoration.clear();
+          _registerRestorationExtents.clear();
+          _registerRestorationAttempts.clear();
+          _pendingDetailReturn = false;
+        }
+        if (notification is! ScrollMetricsNotification) return false;
+        for (final position in _pendingRegisterRestoration.toList()) {
+          final epoch = _registerPositionEpochs[position];
+          if (epoch != null) _scheduleRegisterRestoration(position, epoch, session.workspaceSupplierScope);
+        }
+        return false;
+      }, child: CustomScrollView(
       key: PageStorageKey('work-purchases-$storeId-$statement-$_registerBookmarkEpoch-${_centreVisible ? 'management' : 'register'}'),
       controller: _centreVisible ? null : _registerScroll,
       primary: false,
@@ -18809,7 +19091,6 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             }
             final record = visible[index - savedCopies.length - 1];
             return KeyedSubtree(
-                key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
                 child: InkWell(
                   key: ValueKey('work-purchase-${record.shipmentId}'),
                   onTap: () {
@@ -18835,7 +19116,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                         Expanded(child: Text(record.paymentLabel.trim().isEmpty
                             ? 'Payment update unavailable' : record.paymentLabel,
                             style: const TextStyle(fontSize: 11, color: MoolColors.ink))),
-                        TextButton(
+                        KeyedSubtree(
+                          key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
+                          child: TextButton(
                           key: ValueKey('work-purchase-open-${record.shipmentId}'),
                           style: TextButton.styleFrom(foregroundColor: MoolColors.navy,
                               minimumSize: const Size(48, 48), padding: const EdgeInsets.symmetric(horizontal: 6)),
@@ -18854,7 +19137,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                             Text(record.stage != WorkspaceSupplyStage.unknown && record.stage.incoming
                                 ? 'Track' : 'Details', style: const TextStyle(fontSize: 11)),
                             const Icon(Icons.chevron_right_rounded, size: 16),
-                          ])),
+                          ]))),
                       ]),
                       const Divider(height: 1),
                     ])),
@@ -18863,7 +19146,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           }, childCount: visible.length + savedCopies.length + 1)),
         ),
       ],
-    )))),
+    ))))),
     ]);
   }
 }
@@ -20507,6 +20790,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.saleQuery,
     required this.requirementDraft,
     required this.stockStatementBookmark,
+    required this.purchaseRegisterBookmark,
     required this.onOpenStore,
     required this.onBuyStock,
     required this.onOpenOperation,
@@ -20531,6 +20815,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final String saleQuery;
   final Map<String, String> requirementDraft;
   final _StockStatementBookmark stockStatementBookmark;
+  final _PurchaseRegisterBookmark? purchaseRegisterBookmark;
   final VoidCallback onOpenStore;
   final VoidCallback onBuyStock;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
@@ -20587,6 +20872,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
           session: session,
           purchaseEntryKey: purchaseEntryKey,
           receivingKey: receivingKey,
+          registerBookmark: purchaseRegisterBookmark,
           onOpenStock: () => onOpenOperation(_WorkspaceOperation.catalogue),
           onTrackPurchase: onTrackPurchase,
           onPurchaseBack: onPurchaseBack,
@@ -27957,7 +28243,8 @@ class _OrdersDestinationSurface extends StatefulWidget {
       _OrdersDestinationSurfaceState();
 }
 
-class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
+class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
+    with WidgetsBindingObserver {
   late String _filter;
   final _selectedFilterKey = GlobalKey();
   final _filterScroll = ScrollController();
@@ -27968,6 +28255,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   void initState() {
     super.initState();
     _filter = widget.session.workspaceOrderFilter;
+    WidgetsBinding.instance.addObserver(this);
     _filterScroll.addListener(_scheduleFilterMetrics);
     _revealSelectedFilter();
     // Analytics no longer mounts the collection card. Read its existing
@@ -27987,8 +28275,14 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _filterScroll.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (mounted) setState(() {});
   }
 
   void _scheduleFilterMetrics() {
@@ -28100,12 +28394,17 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     int countFor(String filter) => counts[filter] ?? 0;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     _scheduleFilterMetrics();
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0 ||
+        View.of(context).viewInsets.bottom > 0;
     return Container(
       key: const Key('work-orders-destination'),
       color: Colors.white,
-      child: Column(
+      child: LayoutBuilder(builder: (context, pageConstraints) => Column(
         children: [
           LayoutBuilder(builder: (context, constraints) {
+            // Keep this slot, and the keyed list/editor below it, stable while
+            // reclaiming the fixed header space for the keyboard viewport.
+            if (keyboardVisible) return const SizedBox.shrink();
             final headingStyle = TextStyle(
               color: MoolColors.ink,
               fontSize: widget.orderId == null ? 16 : 14,
@@ -28172,7 +28471,9 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                   ),
               ],
             );
-            return Padding(
+            final compactHeader = pageConstraints.maxHeight <
+                MediaQuery.textScalerOf(context).scale(260);
+            final header = Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
               child: inlineCreate
                   ? Row(children: [
@@ -28189,14 +28490,33 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       createOrder,
                     ])
                   : Column(children: [
+                      if (compactHeader && widget.orderId == null)
+                        Align(alignment: Alignment.centerLeft, child: createOrder),
                       heading,
-                      if (widget.orderId == null)
+                      if (!compactHeader && widget.orderId == null)
                         Align(alignment: Alignment.centerLeft, child: createOrder),
                     ]),
             );
+            if (compactHeader) {
+              // Retain all header controls, but let them scroll rather than
+              // consuming the space required by an enlarged response field.
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxHeight:
+                  (pageConstraints.maxHeight *
+                      (widget.orderId == null ? .4 : .25)).clamp(
+                    widget.orderId == null
+                        ? MediaQuery.textScalerOf(context).scale(48) + 6
+                        : 48.0,
+                    double.infinity)),
+                child: SingleChildScrollView(
+                  key: const Key('work-orders-compact-header-scroll'),
+                  primary: false, child: header),
+              );
+            }
+            return header;
           }),
           if (widget.orderId == null)
-            Row(
+            keyboardVisible ? const SizedBox.shrink() : Row(
               children: [
                 Expanded(
                   child: NotificationListener<ScrollMetricsNotification>(
@@ -28376,7 +28696,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                   ),
           ),
         ],
-      ),
+      )),
     );
   }
 }
@@ -29159,8 +29479,10 @@ class _LiveOrderTicket extends StatelessWidget {
       // Ready opens its working desk only; booking remains an explicit action.
       onOpenDelivery();
     }
+    bool keyboardVisible() => MediaQuery.viewInsetsOf(context).bottom > 0 ||
+        View.of(context).viewInsets.bottom > 0;
     bool confirmedCommandIsValid() {
-      if (stage != 'Confirmed' || !currentContactFactsAreValid() ||
+      if (stage != 'Confirmed' || !currentContactFactsAreValid() || keyboardVisible() ||
           order.actionDeadline?.isAfter(DateTime.now()) == false) {
         return false;
       }
@@ -29193,9 +29515,10 @@ class _LiveOrderTicket extends StatelessWidget {
     );
     return _OrderDeadlineBoundary(
       deadline: stage == 'Confirmed' ? order.actionDeadline : null,
+      observeMetrics: true,
       builder: (expired) => GestureDetector(
         key: const Key('work-order-command-swipe'),
-        onHorizontalDragEnd: stage == 'Confirmed' ? (details) {
+        onHorizontalDragEnd: stage == 'Confirmed' && !keyboardVisible() ? (details) {
           if (expired) {
             return;
           }
@@ -29456,7 +29779,7 @@ class _LiveOrderTicket extends StatelessWidget {
                     ),
                   ),
               ],
-              if (stage == 'Confirmed' && order.actionDeadline != null)
+              if (stage == 'Confirmed' && order.actionDeadline != null && !keyboardVisible())
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -29492,6 +29815,8 @@ class _LiveOrderTicket extends StatelessWidget {
                 )
               else if (session.workspaceOrderOperationState(order.id) != null)
                 _OrderOperationStatus(session: session, orderId: order.id)
+              else if (stage == 'Confirmed' && keyboardVisible())
+                const SizedBox.shrink()
               else if ((active && !order.isClosed) ||
                   (detailed && !order.isClosed && stage != 'Preparing')) ...[
                 const SizedBox(height: 10),
@@ -38339,7 +38664,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       return true;
     }
     if (_stage == 'customer' && !_customerReturnToItems) return false;
+    final identity = (_currentDraftIdentity, widget.session.counterSaleGeneration,
+        widget.session.currentWorkspaceOrderId, widget.session.currentWorkspaceOrder,
+        _stage, _invoice);
     if (!await flushForNavigation() || !mounted) return true;
+    if (identity != (_currentDraftIdentity, widget.session.counterSaleGeneration,
+        widget.session.currentWorkspaceOrderId, widget.session.currentWorkspaceOrder,
+        _stage, _invoice)) return true;
     setState(() {
       _stage = _stage == 'payment' ? 'invoice' : 'items';
       _error = null;
@@ -38584,7 +38915,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   void _nextSale() {
-    if (!widget.session.startNewWorkspaceOrder()) return;
+    _startNextSale();
+  }
+
+  bool _startNextSale() {
+    if (!mounted || !widget.session.startNewWorkspaceOrder()) return false;
     _restoring = true;
     setState(() {
       _invoice = null;
@@ -38603,6 +38938,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       _payment = widget.session.workspaceOrderPayment;
     });
     _restoring = false;
+    return true;
   }
 
   Future<void> _review() async {
