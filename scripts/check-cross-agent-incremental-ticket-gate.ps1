@@ -134,7 +134,7 @@ if($compatibilityIncremental) {
   $ast=[System.Management.Automation.Language.Parser]::ParseFile($checkerPath,[ref]$tokens,[ref]$errors)
   Assert-IncrementalTicket ($errors.Count -eq 0) 'compatibility graph checker has parse errors.'
   foreach($name in @('Assert-Coordination','Get-OctoberCompatibilityBinding',
-      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Get-OctoberCompatibilityInheritedCartTestOwners','Read-OctoberCompatibilityTestAdmissionContract','Test-OctoberCompatibilityBindingInventory',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityByteHash',
       'Read-OctoberCompatibilityJsonObject','Read-OctoberCompatibilityClaimHandoff',
       'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage')) {
@@ -152,10 +152,10 @@ if($compatibilityIncremental) {
     -Bindings @($compatibilityPolicy.productionGitDiscipline.continuationBindings) `
     -BaseBindings @($basePolicy.productionGitDiscipline.continuationBindings)) 'compatibility binding inventory changed.'
   Assert-IncrementalTicket ($Phase -cne 'ticket_start' -or $compatibilityHistory.Stage -eq 1) 'compatibility start must be clean at exact G, not unqualified E.'
-  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6,7,8)) 'compatibility implementation requires exact G/C/A/H/J/K/M/L5.'
+  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6,7,8,9,10)) 'compatibility implementation requires exact G/C/A/H/J/K/M/L5/N/T.'
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
-  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 9) 'compatibility handoff requires exact Q after M and amended L5.'
+  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 11) 'compatibility handoff requires exact qualified Q after immutable N and repaired T.'
 }
 
 $baselineTag = [string]$state.baselineTag

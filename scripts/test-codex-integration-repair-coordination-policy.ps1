@@ -75,7 +75,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $checkerPath,[ref]$tokens,[ref]$errors)
   Assert-RepairContract ($errors.Count -eq 0) 'checker has parse errors.'
   foreach ($name in @('Get-OctoberCompatibilityBinding',
-      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Test-OctoberCompatibilityBindingInventory',
+      'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Get-OctoberCompatibilityInheritedCartTestOwners','Read-OctoberCompatibilityTestAdmissionContract','Test-OctoberCompatibilityBindingInventory',
       'Test-OctoberCompatibilityStageFacts','Test-OctoberCompatibilityIntegrationIdentity','Assert-Coordination',
       'Get-OctoberCoverageBoundHash','New-OctoberCoverageMutex','Test-OctoberCoveragePreparation','Test-OctoberHandoverPreparation',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage',
@@ -98,10 +98,21 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       $claimFixtureBinding=Get-OctoberCompatibilityClaimHandoff
       Assert-RepairContract ($null -ne $claimFixtureBinding -and $claimFixtureBinding.Sha256 -ceq 'B2EE65275AF1A0BD2F176751EDA97C3493A1858CFB0B5588AED52D092D1DA505') 'Exact working handoff contract rejected.'
       $claimFixtureJson=$claimFixtureBinding.SpecificationJson
+      $claimFixtureN=Read-OctoberCompatibilityTestAdmissionContract -FromWorkingTree
+      Assert-RepairContract ($null -ne $claimFixtureN) 'Exact N fixture contract rejected.'
+      $claimFixtureNJson=$claimFixtureN|ConvertTo-Json -Depth 30 -Compress
+      $claimFixtureTestOwners=@('apps/mobile/test/ui_v2/buy/buy_v2_cart_safe_clear_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_navigation_motion_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_line_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart')
+      Assert-RepairContract ((@(Get-OctoberCompatibilityInheritedCartTestOwners) -join '|') -ceq ($claimFixtureTestOwners -join '|')) 'Literal N test owner inventory differs.'
       Assert-RepairContract ($null -ne (Read-OctoberCompatibilityClaimHandoff ($claimFixtureJson.Replace("`n","`r`n")))) 'CRLF-normalized handoff rejected.'
       $claimFixtureCases=@('positive','pre-M','unverified-M','coerced-M','writer-active','wrong-root','wrong-branch','wrong-task','wrong-role',
         'wrong-policy','wrong-registry','wrong-cursor','wrong-phase','wrong-M-commit','K-as-M','changed-contract',
-        'missing-claim','duplicate-claim','missing-Buy','duplicate-Buy','changed-non-Buy','changed-role')
+        'missing-claim','duplicate-claim','missing-Buy','duplicate-Buy','changed-non-Buy','changed-role',
+        'N-positive','T-positive','Q-positive','N-unverified','N-coerced','N-missing-proof','N-empty-contract',
+        'N-altered-contract','N-as-L','N-draft-pre-N','N-premature-handoff','Q-implementation','T-unrelated-owner')
+      Assert-RepairContract ($claimFixtureCases.Count -eq 35) 'M22 plus N13 fixture inventory differs.'
       $claimFixtureOriginal=$policy.activeClaims|ConvertTo-Json -Depth 30 -Compress
       foreach($claimFixtureMode in $claimFixtureCases){
         $claimFixtureClaims=ConvertFrom-Json -InputObject $claimFixtureOriginal
@@ -111,6 +122,11 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
           MCommit=('b'*40);PolicySha256='84C191D84F5973126969568CC979B245233972BD5FF185BC599F51B4FCAFC8B3';
           RegistrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3';CursorCommit='f32c17e1a3a41807564fe18f83c0520a66e0bfe6'}
         $claimFixtureCandidate=$claimFixtureJson
+        $claimFixtureTestCandidate=''
+        if($claimFixtureMode -cmatch '^(N|T|Q)-') {
+          $claimFixtureContext.Stage=9;$claimFixtureContext.ImmutableNVerified=$true;$claimFixtureContext.NCommit=('a'*40)
+          $claimFixtureTestCandidate=$claimFixtureNJson
+        }
         switch($claimFixtureMode){
           'pre-M' {$claimFixtureContext.Stage=6}
           'unverified-M' {$claimFixtureContext.ImmutableMVerified=$false}
@@ -133,24 +149,39 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
           'duplicate-Buy' {$claimFixtureClaims[0].owners+=@('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart')}
           'changed-non-Buy' {$claimFixtureClaims[1].owners+=@('extra.dart')}
           'changed-role' {$claimFixtureClaims[1].role='subagent'}
+          'T-positive' {$claimFixtureContext.Stage=10}
+          'Q-positive' {$claimFixtureContext.Stage=11;$claimFixtureContext.Phase='handoff'}
+          'N-unverified' {$claimFixtureContext.ImmutableNVerified=$false}
+          'N-coerced' {$claimFixtureContext.ImmutableNVerified='true'}
+          'N-missing-proof' {$claimFixtureContext.Remove('ImmutableNVerified')}
+          'N-empty-contract' {$claimFixtureTestCandidate=''}
+          'N-altered-contract' {$claimFixtureTestCandidate=$claimFixtureNJson.Replace('specified_test_addition_not_active_until_committed_N','unapproved_test_addition')}
+          'N-as-L' {$claimFixtureContext.NCommit='0da3630d1c857390c173ec83ba5c0210cb1e5ec2'}
+          'N-draft-pre-N' {$claimFixtureContext.Stage=8}
+          'N-premature-handoff' {$claimFixtureContext.Phase='handoff'}
+          'Q-implementation' {$claimFixtureContext.Stage=11}
+          'T-unrelated-owner' {$claimFixtureContext.Stage=10;$claimFixtureClaims[1].owners+=@('extra.dart')}
         }
         $claimFixtureBefore=$claimFixtureClaims|ConvertTo-Json -Depth 30 -Compress
-        $claimFixtureResult=@(Read-OctoberCompatibilityDerivedClaims -Claims $claimFixtureClaims -ContractJson $claimFixtureCandidate -Context $claimFixtureContext)
-        Assert-RepairContract (($claimFixtureResult.Count -eq 3) -eq ($claimFixtureMode -ceq 'positive')) ('Derived handoff result incorrect: '+$claimFixtureMode)
-        if($claimFixtureMode -cne 'positive'){
+        $claimFixtureResult=@(Read-OctoberCompatibilityDerivedClaims -Claims $claimFixtureClaims -ContractJson $claimFixtureCandidate -Context $claimFixtureContext -TestAdmissionJson $claimFixtureTestCandidate)
+        $claimFixtureAccepted=$claimFixtureMode -cin @('positive','N-positive','T-positive','Q-positive')
+        Assert-RepairContract (($claimFixtureResult.Count -eq 3) -eq $claimFixtureAccepted) ('Derived handoff result incorrect: '+$claimFixtureMode)
+        if(-not $claimFixtureAccepted){
           Assert-RepairContract (@($claimFixtureResult|Where-Object {$null -ne $_}).Count -eq 0) ('Rejected handoff returned non-null payload: '+$claimFixtureMode)
         }
         Assert-RepairContract (($claimFixtureClaims|ConvertTo-Json -Depth 30 -Compress) -ceq $claimFixtureBefore) ('Input claims mutated: '+$claimFixtureMode)
-        if($claimFixtureMode -ceq 'positive'){
+        if($claimFixtureAccepted){
           $claimFixtureExpected=ConvertFrom-Json -InputObject $claimFixtureOriginal
           $claimFixtureExpected=@($claimFixtureExpected)
           $claimFixtureExpected[0].owners+=@('apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart')
           $claimFixtureExpected[2].owners=@($claimFixtureExpected[2].owners|Where-Object {$_ -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'})
+          $claimFixtureExpectedCount=97
+          if($claimFixtureMode -cne 'positive'){$claimFixtureExpected[0].owners+=@($claimFixtureTestOwners);$claimFixtureExpectedCount=101}
           Assert-RepairContract (($claimFixtureResult|ConvertTo-Json -Depth 30 -Compress) -ceq
             ($claimFixtureExpected|ConvertTo-Json -Depth 30 -Compress)) 'Complete derived claim result differs from exclusive one-owner handoff.'
           $claimFixtureTo=@($claimFixtureResult|Where-Object {$_.task -ceq '/root'})
           $claimFixtureFrom=@($claimFixtureResult|Where-Object {$_.task -ceq '/root/cursor_redmi_v6_audit_20260913'})
-          Assert-RepairContract (@($claimFixtureTo[0].owners).Count -eq 97 -and @($claimFixtureFrom[0].owners).Count -eq 68 -and
+          Assert-RepairContract (@($claimFixtureTo[0].owners).Count -eq $claimFixtureExpectedCount -and @($claimFixtureFrom[0].owners).Count -eq 68 -and
             @($claimFixtureTo[0].owners|Where-Object {$_ -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'}).Count -eq 1 -and
             @($claimFixtureFrom[0].owners|Where-Object {$_ -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'}).Count -eq 0) 'One-owner transfer differs.'
         }
@@ -186,7 +217,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
           Assert-RepairContract (($null -ne $claimFixtureReadResult) -eq ($claimFixtureReadMode -cin @('index','commit'))) ('Handoff source result: '+$claimFixtureReadMode)
         }
       }
-      Write-Output ('Compatibility handoff composition: '+$claimFixtureCases.Count+' labelled in-memory cases and12 source-selection probes passed; simulated M only, no claim activation or source edit.')
+      Write-Output ('Compatibility handoff composition: '+$claimFixtureCases.Count+' labelled in-memory cases and12 source-selection probes passed; simulated M then additive N, no claim activation or source edit.')
     }
     $resolutionBlocks=[regex]::Matches($resolutionText,'(?s)<!-- COMPATIBILITY_RESOLUTION_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_RESOLUTION_JSON_END -->')
     Assert-RepairContract ($resolutionBlocks.Count -eq 1) 'resolution fixture source missing or ambiguous.'
@@ -523,11 +554,13 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       Assert-RepairContract (Test-OctoberCompatibilityCoverageSpecification $qualificationFixtureCoverage) 'qualification fixture lost immutable H specification.'
       foreach($qualificationFixtureMode in @('positive','wrong-source','wrong-tree','wrong-resolution','wrong-coverage','wrong-registry',
         'wrong-resolution-digest','wrong-protocol-digest','wrong-coverage-digest','missing-anchor','failed-sdk','wrong-sdk-proof',
-        'missing-recorder','failed-coverage','failed-visual')) {
+        'missing-recorder','failed-coverage','failed-visual','old-schema1','old-schema2',
+        'wrong-test-admission','wrong-test-admission-digest','missing-committed-N','working-positive','working-missing-proof')) {
         & {
           $qualificationFixtureContext=@{Mode=$qualificationFixtureMode;CoverageReached=$false;VisualReached=$false;UnexpectedRead=$false}
-          $qualificationFixtureProof=[pscustomobject]@{schemaVersion=2;state='verified';sourceCommit=('a'*40);sourceTree=('b'*40);
+          $qualificationFixtureProof=[pscustomobject]@{schemaVersion=3;state='verified';sourceCommit=('a'*40);sourceTree=('b'*40);
             resolutionCommit=('c'*40);coverageCommit='7ccc0f01372276f6bc0b654544c95fc56c7b7086';
+            testAdmissionCommit=('9'*40);testAdmissionSpecificationSha256='A27A195444E4295FA218F549EC4D978AF77605AA344C35B7D3A44CE783EAA889';
             coverageSpecificationSha256='7BBB55F9CC4A3B12483241A78BC5B754F12CD6F22F3AAF48EB72423616B98569';
             resolutionSpecificationSha256='69FD2DADE14A3A3CF52F1DFC20248E1C15D0F58386BB8F5DE9E8C78EDC4454F8';
             visualProtocolSha256='6D71DBB461594FE0DD58B1FEB48AD2F3F47AAFF8EE863AE9CB7917167A87DA19';
@@ -544,8 +577,27 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
             'wrong-coverage-digest' {$qualificationFixtureProof.coverageSpecificationSha256='0'*64}
             'missing-anchor' {$qualificationFixtureProof.PSObject.Properties.Remove('trustedVisualAnchorSha256')}
             'wrong-sdk-proof' {$qualificationFixtureProof.comparatorImplementationSha256='0'*64}
+            'old-schema1' {$qualificationFixtureProof.schemaVersion=1}
+            'old-schema2' {$qualificationFixtureProof.schemaVersion=2}
+            'wrong-test-admission' {$qualificationFixtureProof.testAdmissionCommit='0'*40}
+            'wrong-test-admission-digest' {$qualificationFixtureProof.testAdmissionSpecificationSha256='0'*64}
           }
           $qualificationFixtureDoc='<!-- COMPATIBILITY_QUALIFICATION_JSON_BEGIN -->'+($qualificationFixtureProof|ConvertTo-Json -Compress -Depth 8)+'<!-- COMPATIBILITY_QUALIFICATION_JSON_END -->'
+          $qualificationFixtureWorking=$qualificationFixtureMode.StartsWith('working-')
+          if($qualificationFixtureWorking) {
+            $qualificationFixtureWorkingPath=Join-Path $root ('apps/mobile/build/qualification-working-'+[Guid]::NewGuid().ToString('N')+'.fixture.md')
+            $qualificationFixtureContents=if($qualificationFixtureMode -ceq 'working-missing-proof'){'Missing working qualification block'}else{$qualificationFixtureDoc}
+            [IO.File]::WriteAllText($qualificationFixtureWorkingPath,$qualificationFixtureContents,[Text.UTF8Encoding]::new($false))
+            $qualificationFixtureContext.WorkingRead=$false
+            function Join-Path {
+              param([string]$Path,[string]$ChildPath)
+              if(@(Get-PSCallStack)[1].FunctionName -ceq 'Test-OctoberCompatibilityQualification' -and
+                  $Path -ceq $root -and $ChildPath -ceq 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') {
+                $qualificationFixtureContext.WorkingRead=$true;return $qualificationFixtureWorkingPath
+              }
+              $qualificationFixtureContext.UnexpectedRead=$true;throw 'Unexpected working qualification path query'
+            }
+          }
           function Get-OctoberCompatibilityGitLines {
             param([string[]]$Arguments)
             $qualificationFixtureSelection=$Arguments -join '|'
@@ -556,6 +608,10 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
                 if($qualificationFixtureContext.Mode -ceq 'missing-recorder'){return};return ('e'*40)
               }
               ('show|'+('f'*40)+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') {return $qualificationFixtureDoc}
+              ('show|'+('9'*40)+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') {
+                if($qualificationFixtureContext.Mode -ceq 'missing-committed-N'){return 'Missing committed N contract'}
+                return $resolutionText
+              }
               'show|7ccc0f01372276f6bc0b654544c95fc56c7b7086:docs/quality/STORE-BUY-COMPATIBILITY-20261008.md' {
                 return '<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_BEGIN -->'+$qualificationFixtureCoverage+'<!-- COMPATIBILITY_COVERAGE_SPECIFICATION_JSON_END -->'
               }
@@ -590,20 +646,30 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
               $RegistrySha -ceq '8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3' -and
               $ComparatorImplementationSha256 -ceq 'A17532A2EC45F463BCDD5966FD0FB7EED13573F6550A866A77D16068B32478BA' -and $TrustedAnchorSha256 -ceq ('F'*64)
           }
-          $qualificationFixtureHistory=@{Stage=9;Head=('f'*40);Commits=@(('1'*40),('2'*40),('3'*40),
-            '7ccc0f01372276f6bc0b654544c95fc56c7b7086','84b889430abb84e67ea1cf3838c63841429f7712',('c'*40),('6'*40),('a'*40),('f'*40))}
-          $qualificationFixtureResult=Test-OctoberCompatibilityQualification $qualificationFixtureHistory
-          Assert-RepairContract ($qualificationFixtureResult -eq ($qualificationFixtureMode -ceq 'positive')) ('concrete Q conjunction result incorrect: '+$qualificationFixtureMode)
+          $qualificationFixtureHistory=@{Stage=11;Head=('f'*40);Commits=@(('1'*40),('2'*40),('3'*40),
+            '7ccc0f01372276f6bc0b654544c95fc56c7b7086','84b889430abb84e67ea1cf3838c63841429f7712',('c'*40),('6'*40),
+            '0da3630d1c857390c173ec83ba5c0210cb1e5ec2',('9'*40),('a'*40),('f'*40))}
+          if($qualificationFixtureWorking) {
+            $qualificationFixtureHistory.Stage=10;$qualificationFixtureHistory.Commits=@($qualificationFixtureHistory.Commits|Select-Object -First 10)
+            $qualificationFixtureHistory.Head='a'*40
+          }
+          $qualificationFixtureResult=Test-OctoberCompatibilityQualification $qualificationFixtureHistory -FromWorkingTree:$qualificationFixtureWorking
+          Assert-RepairContract ($qualificationFixtureResult -eq ($qualificationFixtureMode -cin @('positive','working-positive'))) ('concrete Q conjunction result incorrect: '+$qualificationFixtureMode)
           Assert-RepairContract (-not $qualificationFixtureContext.UnexpectedRead) ('Q rejection masked unintended Git read: '+$qualificationFixtureMode)
-          if($qualificationFixtureMode -cin @('positive','failed-coverage','failed-visual')) {
+          if($qualificationFixtureWorking){Assert-RepairContract $qualificationFixtureContext.WorkingRead 'Working Q branch did not read its isolated fixture file.'}
+          if($qualificationFixtureMode -ceq 'working-missing-proof') {
+            Assert-RepairContract (-not $qualificationFixtureContext.CoverageReached -and
+              -not $qualificationFixtureContext.VisualReached) 'Missing working proof reached downstream qualification.'
+          }
+          if($qualificationFixtureMode -cin @('positive','working-positive','failed-coverage','failed-visual')) {
             Assert-RepairContract $qualificationFixtureContext.CoverageReached ('Q coverage boundary not reached: '+$qualificationFixtureMode)
           }
-          if($qualificationFixtureMode -cin @('positive','failed-visual')) {
+          if($qualificationFixtureMode -cin @('positive','working-positive','failed-visual')) {
             Assert-RepairContract $qualificationFixtureContext.VisualReached ('Q visual conjunction not reached: '+$qualificationFixtureMode)
           }
         }
       }
-      Write-Output 'Compatibility concrete Q conjunction: 15 labelled in-memory cases passed; no real graph, capture, approval or source qualified.'
+      Write-Output 'Compatibility concrete Q conjunction: 22 labelled cases passed; committed N and isolated stage10 working-proof branch included, no real graph, capture, approval or source qualified.'
     }
     & {
       $observationFixtureSource='a'*40;$observationFixtureTree='b'*40
@@ -907,9 +973,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     $source=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
     Assert-RepairContract ($source.Count -eq 1) 'capture source unavailable.'
     $history=Get-OctoberCompatibilityHistoryStage $source[0]
-    Assert-RepairContract ($history.Stage -eq 8) 'capture requires committed amended L5 after M, not E/G/C/A/H/J/K/M or documentary Q.'
+    Assert-RepairContract ($history.Stage -eq 10) 'capture requires committed T test repair after immutable N, not earlier source or documentary Q.'
     $before=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
-    Assert-RepairContract ($before.Count -eq 0) 'capture requires clean L source.'
+    Assert-RepairContract ($before.Count -eq 0) 'capture requires clean T source.'
     $admission=@{
       AgentRole='primary'; AgentTask='/root'; ClaimedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
       ExpectedRegistryEntryCount=[int]$policy.registryBinding.entryCount
@@ -957,7 +1023,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         $visualEnvironment=@{}
         try {
           if($CaptureCompatibilityReport -ceq 'store_layout_and_recovery' -and $CaptureExecutionId -cne 'default') {
-            # The committed L test recorder writes this unique execution's
+            # The committed T source's preserved recorder writes this execution's
             # manifest. The host never invents entries or comparator results.
             $visualEnvironment=@{
               MOOLSOCIAL_COMPAT_VISUAL_MANIFEST=$visualManifestPath
@@ -1086,6 +1152,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     KResolutionVerified=$true
     MPreparationVerified=$true
     MContractVerified=$true
+    NPreparationVerified=$true
+    NContractVerified=$true
+    NTestAdmissionVerified=$true
   }
   $cases=0
   Assert-RepairContract (Test-OctoberCompatibilityStageFacts $facts) 'exact pre-G bootstrap rejected.'
@@ -1118,8 +1187,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'bad bootstrap owner inventory accepted.'
     $cases++
   }
-  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),@('pre_commit',6),@('pre_commit',7),@('pre_commit',8),
-      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('implementation',6),@('implementation',7),@('implementation',8),@('handoff',9),@('integration_admission_authorize',9))) {
+  foreach ($pair in @(@('pre_commit',0),@('pre_commit',1),@('pre_commit',2),@('pre_commit',3),@('pre_commit',4),@('pre_commit',5),@('pre_commit',6),@('pre_commit',7),@('pre_commit',8),@('pre_commit',9),@('pre_commit',10),
+      @('task_start',1),@('implementation',1),@('implementation',2),@('implementation',3),@('implementation',4),@('implementation',5),@('implementation',6),@('implementation',7),@('implementation',8),@('implementation',9),@('implementation',10),@('handoff',11),@('integration_admission_authorize',11))) {
     $stageFacts=$facts.Clone(); $stageFacts.Phase=$pair[0]; $stageFacts.Stage=[int]$pair[1]
     $stageFacts.Owners=if($stageFacts.Stage -eq 0){@($binding.bootstrapOwners)}
       elseif($stageFacts.Stage -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
@@ -1129,11 +1198,13 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       elseif($stageFacts.Stage -eq 5){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($stageFacts.Stage -eq 6){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($stageFacts.Stage -eq 7){@(Get-OctoberCompatibilityCoverageCartOwners)}
+      elseif($stageFacts.Stage -eq 8){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($stageFacts.Stage -eq 9){@(Get-OctoberCompatibilityInheritedCartTestOwners)}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-RepairContract (Test-OctoberCompatibilityStageFacts $stageFacts) "exact stage$($pair -join '/') rejected."
     $cases++
   }
-  foreach ($stage in @(0,1,2,3,4,5,6,7,8)) {
+  foreach ($stage in @(0,1,2,3,4,5,6,7,8,9,10)) {
     $changed=$facts.Clone(); $changed.Phase='handoff'; $changed.Stage=[int]$stage
     $changed.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'unqualified E/G/C/A/L accepted for handoff.'
@@ -1150,7 +1221,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'owners from another successor stage accepted.'
     $cases++
   }
-  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=9
+  $handoff=$facts.Clone(); $handoff.Phase='handoff'; $handoff.Stage=11
   $handoff.Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')
   foreach($key in @('Clean','HostQualificationPassed')) {
     foreach($value in @($false,'true')) {
@@ -1164,11 +1235,20 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       @{Stage=2; Owners=@(Get-OctoberCompatibilityLayoutOwners)},
       @{Stage=7; Owners=@(Get-OctoberCompatibilityCoverageCartOwners | Where-Object {$_ -cne 'apps/mobile/lib/features/work/work_session.dart'})},
       @{Stage=7; Owners=@(Get-OctoberCompatibilityCoverageCartOwners)+@('apps/mobile/lib/features/work/work_publication.dart')},
-      @{Stage=8; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
+      @{Stage=10; Owners=@(Get-OctoberCompatibilityAmendmentOwners)})) {
     $changed=$facts.Clone(); $changed.Phase='pre_commit'; $changed.Stage=[int]$probe.Stage
     $changed.Owners=@($probe.Owners)
     Assert-RepairContract (-not (Test-OctoberCompatibilityStageFacts $changed)) 'widened or incomplete amendment/layout/Q claim accepted.'
     $cases++
+  }
+  foreach($flagCase in @(@(8,'NPreparationVerified'),@(8,'NContractVerified'),@(9,'NTestAdmissionVerified'))) {
+    foreach($value in @($false,'true',$null)) {
+      $changed=$facts.Clone();$changed.Phase='pre_commit';$changed.Stage=[int]$flagCase[0]
+      $changed.Owners=if($changed.Stage -eq 8){@(Get-OctoberCompatibilityAmendmentOwners)}else{@(Get-OctoberCompatibilityInheritedCartTestOwners)}
+      if($null -eq $value){$changed.Remove($flagCase[1])}else{$changed[$flagCase[1]]=$value}
+      Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'N/T admitted without exact typed internal verification.'
+      $cases++
+    }
   }
   foreach($value in @($false,'true',$null)) {
     $changed=$facts.Clone();$changed.Phase='implementation';$changed.Stage=3
@@ -1223,7 +1303,9 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     if($null -eq $value){$changed.Remove('MContractVerified')}else{$changed.MContractVerified=$value}
     Assert-RepairContract (-not(Test-OctoberCompatibilityStageFacts $changed)) 'M committed without verified staged handoff contract.';$cases++
   }
-  Assert-RepairContract ($cases -eq 124) 'stage probe inventory changed.'
+  # Preserve124 earlier probes, plus4 stage positives,2 premature-closure
+  # refusals and9 typed N-fact refusals. No old case is silently removed.
+  Assert-RepairContract ($cases -eq 139) 'stage probe inventory changed.'
   Write-Output "Compatibility stage predicates: $cases cases passed; live graph/admission and APK qualification remain separate."
   # Literal execution planning only: no Flutter or optional golden run is admitted.
   $planCases=0
@@ -2444,10 +2526,10 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   $capturePrematureRejected=$false
   try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureCompatibilityReport publication_contracts }
   catch {
-    Assert-RepairContract ($_.Exception.Message.IndexOf('capture requires committed amended L5 after M, not E/G/C/A/H/J/K/M or documentary Q.',[StringComparison]::Ordinal) -ge 0) 'premature capture failed for an unrelated reason.'
+    Assert-RepairContract ($_.Exception.Message -ceq 'Integration repair fixture rejected: capture requires committed T test repair after immutable N, not earlier source or documentary Q.') 'premature capture failed for an unrelated reason.'
     $capturePrematureRejected=$true
   }
-  Assert-RepairContract $capturePrematureRejected 'premature host capture admitted before L.'
+  Assert-RepairContract $capturePrematureRejected 'premature host capture admitted before T.'
   Write-Output 'Compatibility capture producer: unqualified source rejected before Flutter or evidence-file creation.'
   $selectionWithoutCaptureRejected=$false
   try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureExecutionId localstock_review }
@@ -2800,10 +2882,11 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   $historyWorkingDocument=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
   $historyMCases=0
-  foreach($historyMode in @('positive','wrong-K','wrong-parent','wrong-subject','missing-owner','extra-owner',
+  foreach($historyMode in @('positive','wrong-M','wrong-K','wrong-parent','wrong-subject','missing-owner','extra-owner',
       'changed-apps','missing-contract','altered-contract','duplicate-contract')) {
     & {
-      $historyContext=@{Mode=$historyMode;M=('a'*40);BadK=('b'*40);ContractRead=$false;Unexpected=$false;AncestryCalls=0}
+      $fixtureM=if($historyMode -ceq 'wrong-M'){('a'*40)}else{'122d9f12bde7baea38eeb30dada3b1321e3d5289'}
+      $historyContext=@{Mode=$historyMode;M=$fixtureM;BadK=('b'*40);ContractRead=$false;Unexpected=$false;AncestryCalls=0}
       function git {
         $historyArgs=@($args)
         # The prospective ancestry is simulated by the exact actual K ancestry.
@@ -2866,9 +2949,10 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       $accepted=$false;$rejection=''
       try {$result=Get-OctoberCompatibilityHistoryStage $historyContext.M;$accepted=$result.Stage -eq 7}
       catch {$rejection=$_.Exception.Message}
-      Assert-RepairContract ($accepted -eq ($historyMode -ceq 'positive')) ('M history result incorrect: '+$historyMode)
+      Assert-RepairContract ($accepted -eq ($historyMode -ceq 'positive')) ('M history result incorrect: '+$historyMode+'; rejection: '+$rejection)
       Assert-RepairContract (-not $historyContext.Unexpected -and $historyContext.AncestryCalls -eq 1) 'M history fixture missed ancestry or made an unexpected read.'
       $expectedError=switch($historyMode) {
+        'wrong-M' {'Sealed compatibility M changed.'}
         'wrong-K' {'Sealed compatibility K changed.'}
         'wrong-parent' {'Compatibility successor parent/subject changed.'}
         'wrong-subject' {'Compatibility successor parent/subject changed.'}
@@ -2881,22 +2965,29 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       if($historyMode -cin @('positive','missing-contract','altered-contract','duplicate-contract')) {
         Assert-RepairContract $historyContext.ContractRead 'M history did not read its committed contract.'
       }
+      if($historyMode -ceq 'wrong-M') {
+        Assert-RepairContract (-not $historyContext.ContractRead) 'Changed M identity reached contract reading.'
+      }
     }
     $historyMCases++
   }
-  Write-Output "Compatibility immutable M history: $historyMCases labelled prospective Git fixtures passed; no actual M commit or claim transfer."
+  Assert-RepairContract ($historyMCases -eq 11) 'Immutable M history case inventory changed.'
+  Write-Output "Compatibility immutable M history: $historyMCases labelled sealed-history Git fixtures passed; no commit or claim transfer."
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $history)) 'unqualified E evidence accepted.'
   $missingProof=@{ Stage=6; Commits=@($binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead); Head=$binding.baselineHead }
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $missingProof -FromWorkingTree)) 'premature stage6 evidence accepted.'
   & {
     $proofReadContext=@{Read=$false;Unexpected=$false}
+    $missingProofNText=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
     function Get-OctoberCompatibilityGitLines([string[]]$Arguments) {
+      if(($Arguments -join '|') -ceq ('show|'+('9'*40)+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')){return $missingProofNText}
       if(($Arguments -join '|') -ceq "show|$($binding.baselineHead):docs/quality/STORE-BUY-COMPATIBILITY-20261008.md") {
         $proofReadContext.Read=$true;return 'Deliberately missing qualification block.'
       }
       $proofReadContext.Unexpected=$true;throw 'Unexpected missing-Q fixture query.'
     }
-    $modernMissingProof=@{Stage=9;Head=$binding.baselineHead;Commits=@(('1'*40),('2'*40),('3'*40),('4'*40),('5'*40),('6'*40),('7'*40),('8'*40),$binding.baselineHead)}
+    $modernMissingProof=@{Stage=11;Head=$binding.baselineHead;Commits=@(('1'*40),('2'*40),('3'*40),('4'*40),('5'*40),('6'*40),('7'*40),
+      '0da3630d1c857390c173ec83ba5c0210cb1e5ec2',('9'*40),('a'*40),$binding.baselineHead)}
     Assert-RepairContract (-not(Test-OctoberCompatibilityQualification $modernMissingProof)) 'valid-stage missing Q proof accepted.'
     Assert-RepairContract ($proofReadContext.Read -and -not $proofReadContext.Unexpected) 'missing Q rejection did not reach the intended proof read.'
   }
