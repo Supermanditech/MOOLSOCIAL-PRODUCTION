@@ -792,3 +792,56 @@ gap after the documented corrections. Actual staged inventory, independent
 collector, ordinary ownership/incremental/memory and precommit remain required.
 Mocked host evidence is not live admission, source qualification, founder visual
 acceptance, backend/provider readiness or APK evidence.
+
+## Forward strict-retention compatibility amendment U — preparation
+
+T is preserved at 4d1b314b4f41b329998a65886cf459d18a9a12e2, sole parent N
+779a1a8bf92ea7ca4d404eef9d7bb8ba0f926bef. Capture18794 terminated19a355 exit1
+before Flutter: ordinary ownership/incremental gates passed; the existing
+retention reader accessed an absent optional candidate-state artifact field
+under the producer's StrictMode. Missing optional fields are not missing required
+provenance. Standalone non-strict success does not qualify this capture.
+
+Founder standing goal authorizes necessary narrow blocker repair and forward
+ownership amendment, not gate bypass. Architect01a12354/01a12357 approved the
+bounded plan: T -> U metadata4 -> V retention2 -> Q documentary. Preserve
+sealed T/N and previous graph, raw policy/registry and parked Store/Cursor.
+U sole parent T, exact subject:
+coordination(store-buy-compatibility-20261008): admit strict retention compatibility.
+U changes exactly the existing amendment4 owners and no apps. Current stage10
+requires independently collected, typed UPreparationVerified; no CLI proof
+flag. U is not yet admitted, staged or committed.
+
+Independent TASK provision work/compatibility-T-retention-preparation-20261010.json
+SHA32662998863A76D6F917E3D17BBBC3E0BED979CD067F5770B3B64CCB6DE754B1 binds
+exact T/tree/parent, metadata4/repair2/support4 preimages and no admission flags.
+Collector work/check-T-retention-preparation-20261010.ps1 SHA
+19B5EB353FA61A3427EF071D41079BC597EDC3CCDAFF8F73FD4F3909872D42D7 verifies
+current phase/preservation, cooperative locks, source/index, raw generation,
+Cursor F32 remote equality and final post-network readback. It proves neither
+universal writer exclusion nor capture-terminal authenticity. Its wrapper leases
+the exact executable, validates exact output/schema/types/pins and rehashes it.
+
+Stage11 after committed U admits only scripts/artifact-evidence-retention.ps1
+and scripts/test-artifact-evidence-retention.ps1. V sole parent U, subject:
+repair(store-buy-compatibility-20261008): preserve optional retention fields under strict mode.
+Only lookup the five optional candidate-state fields through PSObject.Properties,
+push present non-null values, preserve required provenance/hash/traversal and
+retired-binary rejection. Do not disable StrictMode or catch/waive the validator.
+Both PowerShell hosts must test absent/null optionals, nested present values,
+retired binaries beneath each of the five fields and existing negatives.
+V preserves the entire apps tree; fresh operative admission precedes edits.
+
+Capture/Q moves to stage12 and authentic source V at history index11; Q closure
+is stage13. H3/K5/N8 and their immutable coverage/resolution/test contracts remain
+unchanged. Preserve four categories, ten executions, all84 obligations and65
+independently approved visual slots, source/tree/producer/comparator proof,
+clean/native/secret/remote gates and qualified-only final integration. Old T
+captures cannot qualify V. Q remains documentary, apps equal V, no early success.
+
+Preparation collector23 labelled inventory/casing/blob fixtures passed PS7
+c91545 and PS5 8a92f3. Current implementation preservation692725 passed before
+metadata edits; initial old-revision receipts remain distinct. These are not
+live staged U precommit, source qualification, integration or APK evidence.
+Final goal halt is verified installation of the qualified combined-baseline APK
+on OPPO; applicable Redmi and required qualification precede that installation.
