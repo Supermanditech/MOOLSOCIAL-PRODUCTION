@@ -1,5 +1,54 @@
 # Store / Buy publication compatibility — exact successor
 
+## Current forward preparation W (10 October 2026)
+
+Current checkpoint V is aecfa68c1beb3517d57306ff7a596c539f8fe10b, parent U
+660c4c17f03d28a2a14cad668e16f91445b610e2. Its runtime library remains unchanged.
+V default-layout capture is failed, not qualified: 1826 successful testDone events,
+74 failures and84 skips. The six selected LOCALSTOCK review journeys passed;
+these do not establish complete host, visual, APK or backend acceptance.
+
+The standing goal admits this necessary forward sequence, not a gate waiver:
+
+| Checkpoint | History index / operative stage | Exact scope |
+| --- | --- | --- |
+| W | index12; prepare at stage12 | Existing amendment4 only; no apps change |
+| X | index13; repair at stage13 | work_workspace_layout_safety_test.dart only |
+| Q | index14; prepare at stage14, closure stage15 | This document and authentic final-X proof |
+
+W subject: coordination(store-buy-compatibility-20261008): admit exact forward layout test repair.
+X subject: repair(store-buy-compatibility-20261008): align remaining approved layout tests.
+Q retains its existing qualification subject. Historical T/U/V, H coverage84,
+K resolution/visual65, M claim handoff and N test admission remain unchanged.
+Preparation or historical V capture never qualifies X. Integration/handoff
+requires clean published Q at stage15; capture requires clean committed X at
+stage14. No compatibility-branch APK authority.
+
+Independent TASK provision compatibility-V-layout-preparation-20261010.json SHA
+E8EBB7D0226DA37FE74162F3F8BB3CB012D456D36B5798B2B9896FE0ED413E57,
+collector check-V-layout-preparation-20261010.ps1 SHA
+A1E860EF11B1F2A857BC19A3C220837255E0AE7FD1B47A331BF58073D7772F54,
+bind current V/parent/tree/library, metadata4 HEAD/index preimages, layout1,
+support4, raw policy/registry and parked Cursor F32 branch/remote. Three
+observations and cooperative lock checks preserve work; flags deny repair,
+commit, qualification, APK and failure-terminal authentication. The pinned
+wrapper independently verifies exact schema, leased bytes and false authority
+flags at implementation/precommit; no caller-supplied proof flag.
+
+All74 failure identities/outcomes remain accounted for. X may correct actual
+approved routes, realistic padding/viewPadding and deliberate editable hit targets,
+not restore retired Home or weaken money/Stock/isolation/recovery bounds. Runtime
+owners require a separately justified amendment if corrected tests prove a defect.
+Requested listing differs from effective publication; invoice Back differs from
+New sale reset. Require evidence before changing those assertions. H22/H27/H34/H40
+exact clauses and authentic visual65 references/approvals remain unresolved where
+evidence is missing: no automatic parent unskip, implicit exclusion, fabricated
+provider refresh or candidate-self golden approval. Final verified OPPO APK from
+the qualified combined baseline remains the goal halt after required checks.
+
+Earlier sections below retain historical bootstrap/amendment records. Their
+source/stage ordinals do not govern current W/X/Q admission.
+
 State: metadata bootstrap preparation, not admitted or committed. No application
 correction, passing combined host regression, integration or APK acceptance yet.
 
