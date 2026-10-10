@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction, Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -277,19 +279,39 @@ void main() {
         find.byKey(const ValueKey('buy-local-destination-tabs-overflow-cue')),
         findsNothing,
       );
-      session.openOrders();
+      final rail = find.byKey(const ValueKey('buy-local-destination-tabs'));
+      final originalRailRect = tester.getRect(rail);
+      final viewport =
+          Offset.zero &
+          (tester.view.physicalSize / tester.view.devicePixelRatio);
+      expect(originalRailRect.left, greaterThanOrEqualTo(viewport.left));
+      expect(originalRailRect.top, greaterThanOrEqualTo(viewport.top));
+      expect(originalRailRect.right, lessThanOrEqualTo(viewport.right));
+      expect(originalRailRect.bottom, lessThanOrEqualTo(viewport.bottom));
+      final orders = find.byKey(const ValueKey('buy-local-tab-orders'));
+      expect(orders.hitTestable(), findsOneWidget);
+      await tester.tap(orders);
       await tester.pumpAndSettle();
 
       expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.catalogue);
       expect(find.byKey(const ValueKey('buy-shared-header')), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-local-destination-tabs')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('buy-orders-tab-active')),
-        findsOneWidget,
-      );
+      expect(tester.getRect(rail), originalRailRect);
+      final semantics = tester.ensureSemantics();
+      try {
+        final data = tester.getSemantics(orders).getSemanticsData();
+        expect(data.label, 'Orders, current');
+        expect(data.flagsCollection.isSelected, Tristate.isTrue);
+        expect(data.flagsCollection.isButton, isTrue);
+        expect(data.flagsCollection.isEnabled, Tristate.isTrue);
+        expect(data.hasAction(SemanticsAction.tap), isTrue);
+      } finally {
+        semantics.dispose();
+      }
       expect(tester.takeException(), isNull);
     },
   );

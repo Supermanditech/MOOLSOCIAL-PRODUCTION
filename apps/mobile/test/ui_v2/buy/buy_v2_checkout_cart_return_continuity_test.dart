@@ -661,8 +661,29 @@ void main() {
         );
         final details = find.byKey(ValueKey('buy-order-details-${record.id}'));
         await tester.ensureVisible(details);
+        await tester.pumpAndSettle();
+        expect(details.hitTestable(), findsOneWidget);
         await tester.tap(details);
         await tester.pumpAndSettle();
+        final card = find.byKey(ValueKey('buy-order-card-${record.id}'));
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byTooltip('Hide order details'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: card, matching: find.text(record.id)),
+          findsOneWidget,
+        );
+        final expandedPaymentTexts = tester
+            .widgetList<Text>(
+              find.descendant(of: summary, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? '')
+            .join('\n');
+        expect(expandedPaymentTexts, texts);
         if (record.id == 'advance' || record.id == 'pending') {
           expect(
             find.descendant(
@@ -1147,9 +1168,13 @@ void main() {
             isTrue,
           );
           expect(tester.widget<TextButton>(productControl).onPressed, isNull);
-          final heldPill = tester.widget<DecoratedBox>(
-            find.byKey(const ValueKey('buy-compact-quantity-pill')),
-          ).decoration as BoxDecoration;
+          final heldPill =
+              tester
+                      .widget<DecoratedBox>(
+                        find.byKey(const ValueKey('buy-compact-quantity-pill')),
+                      )
+                      .decoration
+                  as BoxDecoration;
           expect(heldPill.color, BuyV2Colors.canvas);
           expect(heldPill.border, Border.all(color: BuyV2Colors.line));
           await tester.tap(productControl);
@@ -1193,30 +1218,48 @@ void main() {
           await captureR66Visual(tester, 't10-held-add-disabled-$scale');
           await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
-          expect(find.byKey(const ValueKey('buy-offers-payment-hold')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-offers-payment-hold')),
+            findsOneWidget,
+          );
           session.openDestination(BuyV2Destination.shop);
           session.openProduct('s-rice');
           session.openProduct('s-tomato');
           session.openDestination(BuyV2Destination.shop);
           await tester.pumpAndSettle();
-          unawaited(showBuyV2RecentlyViewed(
-            tester.element(find.byType(BuyV2Screen)), session,
-          ));
+          unawaited(
+            showBuyV2RecentlyViewed(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
           await tester.pumpAndSettle();
-          expect(find.byKey(const ValueKey('buy-recently-viewed-payment-hold')), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-recently-viewed-payment-hold')),
+            findsOneWidget,
+          );
           for (final id in ['s-rice', 's-tomato']) {
             final action = find.byKey(ValueKey('buy-recently-viewed-add-$id'));
             final recentScroll = find.descendant(
               of: find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
-              matching: find.byWidgetPredicate((widget) => widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              ),
             );
             expect(recentScroll, findsOneWidget);
             // Fixture positioning: each lookup starts at the list's beginning.
-            final position = tester.state<ScrollableState>(recentScroll).position;
+            final position = tester
+                .state<ScrollableState>(recentScroll)
+                .position;
             position.jumpTo(position.minScrollExtent);
             await tester.pumpAndSettle();
-            await tester.scrollUntilVisible(action, 100, scrollable: recentScroll);
+            await tester.scrollUntilVisible(
+              action,
+              100,
+              scrollable: recentScroll,
+            );
             await tester.pumpAndSettle();
             expect(action.hitTestable(), findsOneWidget);
             final button = tester.widget<ButtonStyleButton>(action);
@@ -1225,7 +1268,10 @@ void main() {
             await tester.pumpAndSettle();
             await tester.tap(action);
             await tester.pumpAndSettle();
-            expect(find.byKey(ValueKey('buy-recently-viewed-rejection-$id')), findsNothing);
+            expect(
+              find.byKey(ValueKey('buy-recently-viewed-rejection-$id')),
+              findsNothing,
+            );
           }
           expect(session.quantityFor('s-rice'), 0);
           expect(session.quantityFor('s-tomato'), 1);
@@ -3091,7 +3137,8 @@ void main() {
     expect(
       oldGroup,
       findsNothing,
-      reason: 'A single order keeps purchase identity in its details without a duplicate banner',
+      reason:
+          'A single order keeps purchase identity in its details without a duplicate banner',
     );
     expect(find.text(buyV2Money(previousOrder.total)), findsWidgets);
     final delivery = session.confirmedOrders.first;

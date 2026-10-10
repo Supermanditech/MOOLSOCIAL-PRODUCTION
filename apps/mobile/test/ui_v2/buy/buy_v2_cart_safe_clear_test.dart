@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction, Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -35,19 +37,22 @@ void main() {
   }
 
   testWidgets(
-    'Shop clear requires confirmation and preserves Wholesale items',
+    'mixed Cart clear requires confirmation and cancellation preserves both shops',
     (tester) async {
       final fixture = await mount(tester);
       final session = fixture.session;
       expect(session.addProduct('s-tomato'), isTrue);
       expect(session.addProduct('w-tomato'), isTrue);
-      final expectedRemaining = session.quantityFor('w-tomato');
+      final originalShop = session.quantityFor('s-tomato');
+      final originalWholesale = session.quantityFor('w-tomato');
       session.openCart(scope: BuyV2CartScope.shop);
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-empty')));
       await tester.pumpAndSettle();
-      expect(find.text('Remove Shop item?'), findsOneWidget);
+      expect(find.text('Empty entire Cart?'), findsOneWidget);
+      expect(session.quantityFor('s-tomato'), originalShop);
+      expect(session.quantityFor('w-tomato'), originalWholesale);
       expect(
         find.byKey(const ValueKey('buy-cart-clear-sheet')),
         findsOneWidget,
@@ -55,8 +60,8 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-clear-cancel')));
       await tester.pumpAndSettle();
-      expect(session.quantityFor('s-tomato'), greaterThan(0));
-      expect(session.quantityFor('w-tomato'), greaterThan(0));
+      expect(session.quantityFor('s-tomato'), originalShop);
+      expect(session.quantityFor('w-tomato'), originalWholesale);
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-empty')));
       await tester.pumpAndSettle();
@@ -64,19 +69,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(session.quantityFor('s-tomato'), 0);
-      expect(session.quantityFor('w-tomato'), greaterThan(0));
-      expect(session.view, BuyV2View.cart);
-      expect(session.destination, BuyV2Destination.wholesale);
-      expect(session.cartScope, BuyV2CartScope.wholesale);
-      expect(
-        session.cartAcknowledgement,
-        'Shop item removed · $expectedRemaining '
-        '${expectedRemaining == 1 ? 'item remains' : 'items remain'}',
-      );
+      expect(session.quantityFor('w-tomato'), 0);
+      expect(session.itemCount, 0);
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.cartScope, BuyV2CartScope.all);
       expect(find.byKey(const ValueKey('buy-cart-clear-sheet')), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('removing one Shop line preserves the exact Wholesale quantity', (
+    tester,
+  ) async {
+    final fixture = await mount(tester);
+    final session = fixture.session;
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('w-tomato'), isTrue);
+    expect(session.quantityFor('s-tomato'), 1);
+    final originalWholesale = session.quantityFor('w-tomato');
+    session.openCart(scope: BuyV2CartScope.shop);
+    await tester.pumpAndSettle();
+    final removeShop = find.byTooltip('Remove one');
+    expect(removeShop, findsOneWidget);
+    expect(removeShop.hitTestable(), findsOneWidget);
+    await tester.tap(removeShop);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor('s-tomato'), 0);
+    expect(session.quantityFor('w-tomato'), originalWholesale);
+    expect(session.view, BuyV2View.cart);
+    expect(find.byKey(const ValueKey('buy-cart-clear-sheet')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('All-cart clear changes nothing until the customer confirms', (
     tester,
@@ -113,16 +136,40 @@ void main() {
           BuyV2CheckoutSubmissionState.paymentPending;
       session.notifyListeners();
       await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('buy-cart-empty')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-cart-clear-sheet')), findsNothing);
-      expect(session.itemCount, 1);
-      expect(
-        session.notice,
-        'Check the current payment before changing your Cart or payment method.',
-      );
-      expect(tester.takeException(), isNull);
+      final semantics = tester.ensureSemantics();
+      try {
+        final originalQuantity = session.quantityFor('s-tomato');
+        final originalNotice = session.notice;
+        final clear = find.byKey(const ValueKey('buy-cart-empty'));
+        expect(tester.widget<IconButton>(clear).onPressed, isNull);
+        final data = tester.getSemantics(clear).getSemanticsData();
+        expect(data.flagsCollection.isEnabled, Tristate.isFalse);
+        expect(data.hasAction(SemanticsAction.tap), isFalse);
+        final recovery = find.byKey(
+          const ValueKey('buy-cart-payment-recovery-notice'),
+        );
+        expect(recovery, findsOneWidget);
+        expect(
+          tester.widget<Text>(recovery).data,
+          'Your Cart is kept unchanged while a payment needs review. Review the existing payment before editing or paying again.',
+        );
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-cart-clear-sheet')),
+          findsNothing,
+        );
+        expect(session.itemCount, 1);
+        expect(session.quantityFor('s-tomato'), originalQuantity);
+        expect(
+          session.checkoutSubmissionState,
+          BuyV2CheckoutSubmissionState.paymentPending,
+        );
+        expect(session.notice, originalNotice);
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
     },
   );
 

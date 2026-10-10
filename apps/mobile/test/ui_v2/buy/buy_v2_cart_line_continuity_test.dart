@@ -140,17 +140,40 @@ void main() {
     final target = find.byKey(
       ValueKey('buy-cart-product-details-${products.last.id}'),
     );
+    Finder cartScroll() => find.descendant(
+      of: find.byKey(const ValueKey('buy-cart-scroll')),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable &&
+            axisDirectionToAxis(widget.axisDirection) == Axis.vertical,
+      ),
+    );
+    expect(cartScroll(), findsOneWidget);
+    expect(
+      find.byKey(PageStorageKey('buy-cart-${session.cartScope.name}')),
+      findsOneWidget,
+    );
+    expect(session.cartScope, BuyV2CartScope.shop);
+    final originalScope = session.cartScope;
+    final originalFilter = session.cartDisplayFilter;
+    final originalSelection = {
+      for (final product in products)
+        product.id: session.cartProductSelected(product.id),
+    };
+    final originalQuantities = {
+      for (final product in products)
+        product.id: session.quantityFor(product.id),
+    };
     await tester.scrollUntilVisible(
       target,
       260,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: cartScroll(),
       maxScrolls: 20,
     );
     await tester.pumpAndSettle();
-    final before = tester
-        .state<ScrollableState>(find.byType(Scrollable).first)
-        .position
-        .pixels;
+    final before = tester.state<ScrollableState>(cartScroll()).position.pixels;
+    expect(before, greaterThan(0));
+    expect(target.hitTestable(), findsOneWidget);
 
     await tester.tap(target);
     await tester.pumpAndSettle();
@@ -160,16 +183,24 @@ void main() {
     );
     expect(session.openProduct(next.id), isTrue);
     await tester.pumpAndSettle();
+    expect(session.selectedProductId, next.id);
+    // This second hop exercises controller continuity, not a second UI tap.
 
     session.goBack();
     await tester.pumpAndSettle();
     expect(session.view, BuyV2View.cart);
-    expect(session.cartScope, BuyV2CartScope.shop);
+    expect(session.cartScope, originalScope);
+    expect(session.cartDisplayFilter, originalFilter);
     expect(session.cartLines, hasLength(products.length));
-    final after = tester
-        .state<ScrollableState>(find.byType(Scrollable).first)
-        .position
-        .pixels;
+    for (final product in products) {
+      expect(session.quantityFor(product.id), originalQuantities[product.id]);
+      expect(
+        session.cartProductSelected(product.id),
+        originalSelection[product.id],
+      );
+    }
+    expect(cartScroll(), findsOneWidget);
+    final after = tester.state<ScrollableState>(cartScroll()).position.pixels;
     expect(after, closeTo(before, 1));
     expect(target, findsOneWidget);
     expect(tester.takeException(), isNull);
