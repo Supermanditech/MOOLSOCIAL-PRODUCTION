@@ -140,10 +140,34 @@ function Get-OctoberCompatibilityForwardLayoutTestOwners {
 }
 
 function Get-OctoberCompatibilityScrollRepairOwners {
-  # Prospective runtime scope is only purchase-register return bookmarks;
-  # the existing test owner also completes its retained layout reconciliation.
+  # Runtime admission is exact-owner and immutable-contract bound. The forward
+  # contract adds H22 Back/query scope isolation to the purchase return repair;
+  # this inventory alone admits neither application edits nor qualification.
   return @('apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
     'apps/mobile/test/work_workspace_layout_safety_test.dart')
+}
+
+function Read-OctoberCompatibilityScopeRepairAdmission {
+  param([string]$Commit,[switch]$FromIndex,[switch]$FromWorkingTree)
+  try {
+    if(([int]$FromIndex.IsPresent+[int]$FromWorkingTree.IsPresent) -gt 1){return $null}
+    if(($FromIndex -or $FromWorkingTree) -and -not [string]::IsNullOrEmpty($Commit)){return $null}
+    if(-not $FromIndex -and -not $FromWorkingTree -and $Commit -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    if([IO.Path]::GetFullPath($root).Replace('\','/').TrimEnd('/') -cne
+        'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($Commit+':'+$owner))) -join "`n"}
+    $blocks=[regex]::Matches($text,'(?s)<!-- COMPATIBILITY_SCOPE_REPAIR_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_SCOPE_REPAIR_JSON_END -->')
+    if($blocks.Count -ne 1){return $null}
+    $contract=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($blocks[0].Groups[1].Value))
+    if($null -eq $contract){return $null}
+    $canonical=ConvertTo-Json -InputObject $contract -Depth 100 -Compress
+    if((Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($canonical))) -cne
+        '8BD8DE35E9888FCAB53DD6D34670CBE89B05E6E094896B2C2675E60226E8D8E5'){return $null}
+    return $contract
+  }catch{return $null}
 }
 
 function Read-OctoberCompatibilityTestAdmissionContract {
@@ -269,8 +293,8 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     'repair(store-buy-compatibility-20261008): preserve optional retention fields under strict mode',
     'coordination(store-buy-compatibility-20261008): admit exact forward layout test repair',
     'coordination(store-buy-compatibility-20261008): admit scoped purchase return recovery',
-    'repair(store-buy-compatibility-20261008): preserve purchase return and approved layout journeys',
-    'repair(store-buy-compatibility-20261008): qualify publication compatibility')
+    'coordination(store-buy-compatibility-20261008): admit exact scoped search and purchase repair',
+    'repair(store-buy-compatibility-20261008): preserve purchase return and scoped search journeys')
   for($index=0;$index -lt $commits.Count;$index++) {
     $commit=[string]$commits[$index]
     $parents=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$commit))
@@ -280,15 +304,15 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     $owners=@(Get-OctoberCompatibilityGitLines @('diff-tree','--no-commit-id','--name-only','-r',$commit))
     $expected=if($index -eq 0){@($binding.bootstrapOwners)}
       elseif($index -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
-      elseif($index -in @(2,3,4,5,6,8,10,12,13)){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($index -in @(2,3,4,5,6,8,10,12,13,14)){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($index -eq 7){@(Get-OctoberCompatibilityCoverageCartOwners)}
       elseif($index -eq 9){@(Get-OctoberCompatibilityInheritedCartTestOwners)}
       elseif($index -eq 11){@(Get-OctoberCompatibilityRetentionOwners)}
-      elseif($index -eq 14){@(Get-OctoberCompatibilityScrollRepairOwners)}
+      elseif($index -eq 15){@(Get-OctoberCompatibilityScrollRepairOwners)}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-Coordination ((@($owners | Sort-Object) -join '|') -ceq
       (@($expected | Sort-Object) -join '|')) 'Compatibility successor changed unexpected owners.'
-    if($index -in @(0,2,3,4,5,6,8,10,11,12,13,15)) {
+    if($index -in @(0,2,3,4,5,6,8,10,11,12,13,14)) {
       $apps=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${commit}:apps","${previous}:apps"))
       Assert-Coordination ($apps.Count -eq 2 -and $apps[0] -ceq $apps[1]) 'Compatibility metadata commit changed apps.'
     }
@@ -340,6 +364,14 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   }
   if($commits.Count -ge 13) {
     Assert-Coordination ($commits[12] -ceq '5a70a1728d534f72c06997d6c7146a46fa7481cf') 'Sealed compatibility W changed.'
+  }
+  if($commits.Count -ge 14) {
+    Assert-Coordination ($commits[13] -ceq 'b25e5913d088cc49b8c0fe40623cef49778e462a') 'Sealed compatibility B25 changed.'
+  }
+  if($commits.Count -ge 15) {
+    $scopeAdmission=Read-OctoberCompatibilityScopeRepairAdmission -Commit ([string]$commits[14])
+    Assert-Coordination ($null -ne $scopeAdmission -and
+      $scopeAdmission.predecessorCommit -ceq $commits[13]) 'Immutable scoped repair admission missing or changed.'
   }
   Assert-Coordination ($previous -ceq $HeadCommit) 'Compatibility tip does not match complete successor history.'
   return @{ Stage=[int]$commits.Count; Commits=$commits; Base=$e; Head=$HeadCommit }
@@ -1080,6 +1112,44 @@ function Test-OctoberCompatibilityScrollPreparation([string]$Phase) {
         ($proof.Observations -isnot [int] -and $proof.Observations -isnot [long]) -or $proof.Observations -ne 3){return $false}
     $pins=@{Operation='read_only_W_scroll_preparation';Phase=$Phase;Head='5a70a1728d534f72c06997d6c7146a46fa7481cf';
       ProvisionSha256='630942B1093AD45809D4BAC2216F70201BBD9E80535CE19C92316F69239E924B';CollectorSha256=$expected;
+      WriterScope='Cooperative support/claim locks, not universal writer inactivity'}
+    foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $false}}
+    foreach($name in @('RepairAdmitted','CommitAdmitted','QualificationPassed','ApkAuthority','FailureTerminalIndependentlyAuthenticated')) {
+      if($proof.$name -isnot [bool] -or $proof.$name){return $false}
+    }
+    if($proof.FailureBytesPreserved -isnot [bool] -or -not $proof.FailureBytesPreserved){return $false}
+    return $true
+  }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+function Test-OctoberCompatibilityScopePreparation([string]$Phase) {
+  # B25-bound preservation preparation, never a caller-supplied authority flag.
+  $lease=$null;$hasher=$null
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath){return $false}
+    $collector='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work/check-B25-scope-preparation-20261010.ps1'
+    $expected='21D68DC55098C459C17F5DF211B1E1DA16CDB88E565D359D66DBB2F91A991FC5'
+    $ancestor=[IO.Path]::GetFullPath($collector)
+    while($ancestor) {
+      if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+      $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+    }
+    $lease=[IO.File]::Open($collector,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    $hasher=[Security.Cryptography.SHA256]::Create()
+    if([BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected){return $false}
+    $result=@(& $collector -Phase $Phase -ExpectedCollectorSha256 $expected);$completed=$?
+    $lease.Position=0
+    if(-not $completed -or [BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected -or
+        $result.Count -ne 1 -or $result[0] -isnot [string]){return $false}
+    $proof=Read-OctoberCompatibilityJsonObject -Bytes ([Text.Encoding]::UTF8.GetBytes($result[0]))
+    $names=@('Operation','Phase','Observations','Head','ProvisionSha256','CollectorSha256','RepairAdmitted',
+      'CommitAdmitted','QualificationPassed','ApkAuthority','WriterScope','FailureBytesPreserved','FailureTerminalIndependentlyAuthenticated')
+    if($null -eq $proof -or (@($proof.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($names|Sort-Object) -join '|') -or
+        ($proof.Observations -isnot [int] -and $proof.Observations -isnot [long]) -or $proof.Observations -ne 3){return $false}
+    $pins=@{Operation='read_only_B25_scope_preparation';Phase=$Phase;Head='b25e5913d088cc49b8c0fe40623cef49778e462a';
+      ProvisionSha256='F1A95B921A301CF28F768A4AA60FB814811274C580A0488B699C9F4C017F2C77';CollectorSha256=$expected;
       WriterScope='Cooperative support/claim locks, not universal writer inactivity'}
     foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $false}}
     foreach($name in @('RepairAdmitted','CommitAdmitted','QualificationPassed','ApkAuthority','FailureTerminalIndependentlyAuthenticated')) {
@@ -2281,6 +2351,12 @@ function Test-OctoberCompatibilityVisualQualification {
 }
 
 function Test-OctoberCompatibilityQualification([hashtable]$History, [switch]$FromWorkingTree) {
+  # Repair-only intermediate. Historical/core parser positives are not current
+  # admission. A separately prepared contract amendment must enable qualification.
+  return $false
+}
+
+function Test-OctoberCompatibilityHistoricalQualificationCore([hashtable]$History, [switch]$FromWorkingTree) {
   # New K/N/T/Q path only. The retained schema1 reader below is a historical
   # protocol fixture target, never an operative fallback for new stage numbers.
   try {
@@ -2821,7 +2897,19 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
       $Facts.Stage -lt 0 -or $Facts.Stage -gt 16 -or
       -not $Facts.ContainsKey('Phase') -or
       -not $Facts.ContainsKey('Owners')) { return $false }
+  # Intermediate repair amendment: stage16 is repaired source, not Q. Neither
+  # caller flags nor the old future-stage number can turn it into a handoff.
+  if($Facts.Stage -eq 16 -or [string]$Facts.Phase -cin @('handoff','integration_admission_authorize')){return $false}
   $expectedOwners=@()
+  if($Facts.Stage -eq 14 -and [string]$Facts.Phase -cin @('implementation','pre_commit')) {
+    foreach($flag in @('ScopePreparationVerified','ScopeContractVerified')) {
+      if(-not $Facts.ContainsKey($flag) -or $Facts[$flag] -isnot [bool] -or -not $Facts[$flag]){return $false}
+    }
+  }
+  if($Facts.Stage -eq 15 -and [string]$Facts.Phase -cin @('implementation','pre_commit')) {
+    if(-not $Facts.ContainsKey('ScopeRepairAdmissionVerified') -or
+        $Facts.ScopeRepairAdmissionVerified -isnot [bool] -or -not $Facts.ScopeRepairAdmissionVerified){return $false}
+  }
   if($Facts.Stage -eq 13 -and [string]$Facts.Phase -cin @('implementation','pre_commit')) {
     if(-not $Facts.ContainsKey('ScrollPreparationVerified') -or
         $Facts.ScrollPreparationVerified -isnot [bool] -or -not $Facts.ScrollPreparationVerified){return $false}
@@ -2900,8 +2988,8 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
         11 { $expectedOwners=@(Get-OctoberCompatibilityRetentionOwners) }
         12 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
         13 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
-        14 { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
-        15 { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
+        14 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+        15 { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
         default { return $false }
       }
     }
@@ -2924,8 +3012,8 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
       elseif ($Facts.Stage -eq 11) { $expectedOwners=@(Get-OctoberCompatibilityRetentionOwners) }
       elseif ($Facts.Stage -eq 12) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
       elseif ($Facts.Stage -eq 13) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
-      elseif ($Facts.Stage -eq 14) { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
-      elseif ($Facts.Stage -eq 15) { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
+      elseif ($Facts.Stage -eq 14) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+      elseif ($Facts.Stage -eq 15) { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
       else { return $false }
     }
     'handoff' {
@@ -6871,7 +6959,8 @@ if ($ProductionLane -ceq 'baseline') {
           elseif($compatibilityHistory.Stage -eq 11){@(Get-OctoberCompatibilityRetentionOwners)}
           elseif($compatibilityHistory.Stage -eq 12){@(Get-OctoberCompatibilityAmendmentOwners)}
           elseif($compatibilityHistory.Stage -eq 13){@(Get-OctoberCompatibilityAmendmentOwners)}
-          elseif($compatibilityHistory.Stage -eq 14){@(Get-OctoberCompatibilityScrollRepairOwners)}
+          elseif($compatibilityHistory.Stage -eq 14){@(Get-OctoberCompatibilityAmendmentOwners)}
+          elseif($compatibilityHistory.Stage -eq 15){@(Get-OctoberCompatibilityScrollRepairOwners)}
           else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
         $octoberCompatibilityOwner=$compatibilityStageOwners -ccontains $effectiveOwner
         if ($octoberCompatibilityOwner) { $allowedOwner=$true }
@@ -7039,6 +7128,16 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
     }
     if($compatibilityHistory.Stage -eq 13 -and $ProductionPhase -cin @('implementation','pre_commit')) {
       $compatibilityFacts.ScrollPreparationVerified=Test-OctoberCompatibilityScrollPreparation $ProductionPhase
+    }
+    if($compatibilityHistory.Stage -eq 14 -and $ProductionPhase -cin @('implementation','pre_commit')) {
+      $compatibilityFacts.ScopePreparationVerified=Test-OctoberCompatibilityScopePreparation $ProductionPhase
+      $compatibilityFacts.ScopeContractVerified=if($ProductionPhase -ceq 'pre_commit'){
+        $null -ne (Read-OctoberCompatibilityScopeRepairAdmission -FromIndex)
+      }else{$null -ne (Read-OctoberCompatibilityScopeRepairAdmission -FromWorkingTree)}
+    }
+    if($compatibilityHistory.Stage -eq 15 -and $ProductionPhase -cin @('implementation','pre_commit')) {
+      $compatibilityFacts.ScopeRepairAdmissionVerified=$null -ne
+        (Read-OctoberCompatibilityScopeRepairAdmission -Commit ([string]$compatibilityHistory.Commits[14]))
     }
     Assert-Coordination (Test-OctoberCompatibilityStageFacts $compatibilityFacts) 'Compatibility live stage/claim/qualification rejected.'
   }
@@ -9676,6 +9775,14 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
           # never application mutation during metadata preparation.
           $octoberCoveragePreservedOwner=$changedOwner -ceq 'apps/mobile/test/work_workspace_layout_safety_test.dart'
         }
+        if($octoberCompatibilityIdentity -and $compatibilityHistory.Stage -eq 14 -and
+            $ProductionPhase -cin @('implementation','pre_commit') -and
+            $compatibilityFacts.ScopePreparationVerified -is [bool] -and $compatibilityFacts.ScopePreparationVerified -and
+            $compatibilityFacts.ScopeContractVerified -is [bool] -and $compatibilityFacts.ScopeContractVerified){
+          # Preservation only: the B25 collector checks both app working and
+          # index bytes. Neither app owner belongs to metadata14's edit claim.
+          $octoberCoveragePreservedOwner=@(Get-OctoberCompatibilityScrollRepairOwners) -ccontains $changedOwner
+        }
         Assert-Coordination (
           $effectiveOwnerKeys.Contains($changedOwnerKey) -or
           $repairAutomaticOwner -or
@@ -9742,6 +9849,16 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         $preCommitUntrackedOwners.Count -eq 0
       Assert-Coordination $octoberCoveragePreparationPending 'Scroll amendment precommit must stage exact metadata4 and preserve only frozen unstaged layout.'
     }
+    if($octoberCompatibilityIdentity -and $compatibilityHistory.Stage -eq 14){
+      $compatibilityFacts.ScopePreparationVerified=Test-OctoberCompatibilityScopePreparation 'pre_commit'
+      $compatibilityFacts.ScopeContractVerified=$null -ne (Read-OctoberCompatibilityScopeRepairAdmission -FromIndex)
+      $octoberCoveragePreparationPending=$compatibilityFacts.ScopePreparationVerified -is [bool] -and $compatibilityFacts.ScopePreparationVerified -and
+        $compatibilityFacts.ScopeContractVerified -is [bool] -and $compatibilityFacts.ScopeContractVerified -and
+        (@($preCommitStagedOwners|Sort-Object) -join '|') -ceq (@((Get-OctoberCompatibilityAmendmentOwners)|Sort-Object) -join '|') -and
+        (@($preCommitUnstagedOwners|Sort-Object) -join '|') -ceq (@((Get-OctoberCompatibilityScrollRepairOwners)|Sort-Object) -join '|') -and
+        $preCommitUntrackedOwners.Count -eq 0
+      Assert-Coordination $octoberCoveragePreparationPending 'Scope amendment precommit must stage exact metadata4 and preserve frozen unstaged dashboard/layout.'
+    }
     if ($r66OwnerAmendmentPending) {
       Assert-Coordination (
         (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
@@ -9805,8 +9922,14 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         $compatibilityFacts.ScrollPreparationVerified=Test-OctoberCompatibilityScrollPreparation 'pre_commit'
         Assert-Coordination ($compatibilityFacts.ScrollPreparationVerified -is [bool] -and $compatibilityFacts.ScrollPreparationVerified) 'Scroll amendment requires fresh W-bound preservation before commit.'
       }
+      if($compatibilityHistory.Stage -eq 14) {
+        $compatibilityFacts.ScopePreparationVerified=Test-OctoberCompatibilityScopePreparation 'pre_commit'
+        $compatibilityFacts.ScopeContractVerified=$null -ne (Read-OctoberCompatibilityScopeRepairAdmission -FromIndex)
+        Assert-Coordination ($compatibilityFacts.ScopePreparationVerified -is [bool] -and $compatibilityFacts.ScopePreparationVerified -and
+          $compatibilityFacts.ScopeContractVerified -is [bool] -and $compatibilityFacts.ScopeContractVerified) 'Scoped repair amendment requires fresh independent B25 preservation and exact staged contract.'
+      }
       if($compatibilityHistory.Stage -eq 15) {
-        Assert-Coordination (Test-OctoberCompatibilityQualification $compatibilityHistory -FromWorkingTree) 'Compatibility Q requires complete verified host/source evidence before commit.'
+        Assert-Coordination ($compatibilityFacts.ScopeRepairAdmissionVerified -is [bool] -and $compatibilityFacts.ScopeRepairAdmissionVerified) 'Application repair requires immutable scope admission, not working-document authority.'
       }
     } elseif ($ProductionLane -ceq 'integration_repair') {
       $repairMergeHeadPath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()

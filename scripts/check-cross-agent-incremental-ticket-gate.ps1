@@ -136,7 +136,7 @@ if($compatibilityIncremental) {
   foreach($name in @('Assert-Coordination','Get-OctoberCompatibilityBinding',
       'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Get-OctoberCompatibilityInheritedCartTestOwners','Get-OctoberCompatibilityRetentionOwners','Get-OctoberCompatibilityForwardLayoutTestOwners','Get-OctoberCompatibilityScrollRepairOwners','Read-OctoberCompatibilityTestAdmissionContract','Test-OctoberCompatibilityBindingInventory',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityByteHash',
-      'Read-OctoberCompatibilityJsonObject','Read-OctoberCompatibilityClaimHandoff',
+      'Read-OctoberCompatibilityJsonObject','Read-OctoberCompatibilityScopeRepairAdmission','Read-OctoberCompatibilityClaimHandoff',
       'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage')) {
     $functions=@($ast.FindAll({param($node)
       $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name
@@ -155,7 +155,7 @@ if($compatibilityIncremental) {
   Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)) 'compatibility implementation requires exact G/C/A/H/J/K/M/L5/N/T/U/V/W and scoped scroll preparation/repair.'
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
-  Assert-IncrementalTicket ($Phase -cne 'handoff' -or $compatibilityHistory.Stage -eq 16) 'compatibility handoff requires exact qualified Q after immutable N/T/U/V/W and scoped scroll preparation/repair.'
+  Assert-IncrementalTicket ($Phase -cne 'handoff') 'Intermediate scoped repair admits no handoff; a separate completed qualification-contract amendment is required.'
 }
 
 $baselineTag = [string]$state.baselineTag

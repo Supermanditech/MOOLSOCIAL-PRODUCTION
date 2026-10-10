@@ -910,3 +910,35 @@ metadata edits; initial old-revision receipts remain distinct. These are not
 live staged U precommit, source qualification, integration or APK evidence.
 Final goal halt is verified installation of the qualified combined-baseline APK
 on OPPO; applicable Redmi and required qualification precede that installation.
+
+## B25-bound narrow repair admission — forward continuation, 10 October
+
+This amendment preserves the preceding chapters and sealed history. Index14
+changes only the existing metadata4; dashboard and layout working/index bytes
+remain frozen by the independent B25 collector. Index15 owns only dashboard and
+layout: purchase-return bookmarks, H22 global saved-record Back/query retention
+with account/Store/visit isolation, and focused current-layout regressions.
+Explicit Close and Orders search retain their separate semantics. No Buy source,
+provider implementation, runtime-record injection or approved design rebuild.
+
+This is repair admission, not the completed qualification contract. Stage16 and
+all handoff/integration phases remain closed until a separate source-bound
+contract amendment establishes the current coverage and truthful deferred-provider
+dispositions. It must preserve all84 historical identities and65 visual-slot
+obligations without treating unavailable historical images as current references
+or claiming provider acceptance. Fresh captures do not self-approve themselves.
+Later intended sequence is metadata16 completion, qualification document17, then
+handoff18; this intermediate amendment does not activate those future stages.
+
+Independent provision F1A95B921A301CF28F768A4AA60FB814811274C580A0488B699C9F4C017F2C77
+and collector21D68DC55098C459C17F5DF211B1E1DA16CDB88E565D359D66DBB2F91A991FC5
+bind exact B25, metadata preimages, two frozen app owners, support/index bytes,
+source39 authority, preserved H22 red and parked Cursor remote equality. Their
+21 inventory,45 actual observation and30 actual wrapper fixtures passed on both
+PowerShell hosts. These are admission-machinery tests, not application, device,
+visual or APK qualification. Required ordinary live staging/precommit and fresh
+implementation admission must still pass before application mutation.
+
+<!-- COMPATIBILITY_SCOPE_REPAIR_JSON_BEGIN -->
+{"schemaVersion":1,"kind":"scoped_repair_admission_not_qualification","predecessorCommit":"b25e5913d088cc49b8c0fe40623cef49778e462a","root":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008","branch":"work/integration-repair/store-buy-compatibility-20261008","applicationOwners":["apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart","apps/mobile/test/work_workspace_layout_safety_test.dart"],"repairScope":["purchase_return_bookmarks","H22_global_search_Back_retention_with_scope_isolation","current_layout_observable_regressions"],"authoritySha256":"F76F211F42CE11D4842532E7BBE5FAF54C94DAF14150CC1522E93393D97D06BD","preparationProvisionSha256":"F1A95B921A301CF28F768A4AA60FB814811274C580A0488B699C9F4C017F2C77","redEvidenceSha256":"45E3DAA07EF529B2B88E738EEB307B3AB2E9AE093309FF2F575E8C0EFE35F87A","originalCaseIdentities":84,"originalVisualSlots":65,"qualificationPassed":false,"providerVerified":false,"apkAuthority":false,"historyRewriteAuthority":false}
+<!-- COMPATIBILITY_SCOPE_REPAIR_JSON_END -->
