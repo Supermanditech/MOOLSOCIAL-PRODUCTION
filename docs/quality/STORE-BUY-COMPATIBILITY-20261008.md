@@ -1,9 +1,9 @@
 # Store / Buy publication compatibility — exact successor
 
-## Current forward preparation W (10 October 2026)
+## Current W-bound purchase recovery amendment (10 October 2026)
 
-Current checkpoint V is aecfa68c1beb3517d57306ff7a596c539f8fe10b, parent U
-660c4c17f03d28a2a14cad668e16f91445b610e2. Its runtime library remains unchanged.
+Current checkpoint W is 5a70a1728d534f72c06997d6c7146a46fa7481cf, parent V
+aecfa68c1beb3517d57306ff7a596c539f8fe10b. Its runtime library remains unchanged.
 V default-layout capture is failed, not qualified: 1826 successful testDone events,
 74 failures and84 skips. The six selected LOCALSTOCK review journeys passed;
 these do not establish complete host, visual, APK or backend acceptance.
@@ -12,33 +12,49 @@ The standing goal admits this necessary forward sequence, not a gate waiver:
 
 | Checkpoint | History index / operative stage | Exact scope |
 | --- | --- | --- |
-| W | index12; prepare at stage12 | Existing amendment4 only; no apps change |
-| X | index13; repair at stage13 | work_workspace_layout_safety_test.dart only |
-| Q | index14; prepare at stage14, closure stage15 | This document and authentic final-X proof |
+| W (sealed) | index12; current stage13 | Existing amendment4 only; no apps change |
+| Scroll preparation | index13; prepare at stage13 | Existing amendment4 only; frozen layout dirt preserved, no apps change |
+| Scroll/layout repair | index14; repair at stage14 | Dashboard and layout test only; purchase return bookmark plus remaining approved test reconciliation |
+| Q | index15; prepare/capture at stage15, closure stage16 | This document and authentic final-repair proof |
 
 W subject: coordination(store-buy-compatibility-20261008): admit exact forward layout test repair.
-X subject: repair(store-buy-compatibility-20261008): align remaining approved layout tests.
-Q retains its existing qualification subject. Historical T/U/V, H coverage84,
+Scroll preparation subject: coordination(store-buy-compatibility-20261008): admit scoped purchase return recovery.
+Repair subject: repair(store-buy-compatibility-20261008): preserve purchase return and approved layout journeys.
+Q retains its existing qualification subject. Historical T/U/V/W, H coverage84,
 K resolution/visual65, M claim handoff and N test admission remain unchanged.
-Preparation or historical V capture never qualifies X. Integration/handoff
-requires clean published Q at stage15; capture requires clean committed X at
-stage14. No compatibility-branch APK authority.
+Preparation or historical V capture never qualifies the repair. Integration/handoff
+requires clean published Q at stage16; capture requires clean committed repair at
+stage15. No compatibility-branch APK authority.
 
-Independent TASK provision compatibility-V-layout-preparation-20261010.json SHA
-E8EBB7D0226DA37FE74162F3F8BB3CB012D456D36B5798B2B9896FE0ED413E57,
-collector check-V-layout-preparation-20261010.ps1 SHA
-A1E860EF11B1F2A857BC19A3C220837255E0AE7FD1B47A331BF58073D7772F54,
-bind current V/parent/tree/library, metadata4 HEAD/index preimages, layout1,
+Independent TASK provision compatibility-W-scroll-preparation-20261010.json SHA
+630942B1093AD45809D4BAC2216F70201BBD9E80535CE19C92316F69239E924B,
+collector check-W-scroll-preparation-20261010.ps1 SHA
+423DFBB8F601300D50F55CE35135CDAA66638C1130166ED2C25D3942C2E5DC2D,
+bind current W/parent/tree/library, metadata4 HEAD/index preimages, frozen layout1,
 support4, raw policy/registry and parked Cursor F32 branch/remote. Three
 observations and cooperative lock checks preserve work; flags deny repair,
 commit, qualification, APK and failure-terminal authentication. The pinned
 wrapper independently verifies exact schema, leased bytes and false authority
 flags at implementation/precommit; no caller-supplied proof flag.
 
-All74 failure identities/outcomes remain accounted for. X may correct actual
+Actual failed purchase-return capture uses frozen layout SHA
+4C37FA51A9250712148730EBB9420A1106957972431561D4EBCDA82FD80CA19F;
+TASK outputs/W-scroll-red-current-20261010.log SHA
+AE3A8AC18BFA82AC819AC50F57C4BC3807612A51628BEC3CEB45BAAB1F298A77.
+Returning from Buy tracking loses a previously measured239-pixel purchase
+register offset. Scope/epoch keys remain equal, but reconstructed surface-local
+state resets its bookmark. Runtime correction is limited to a dashboard-owned,
+account/Store/history-scoped purchase bookmark, restoration after dimensions,
+clamping for changed bounds and stale return/detach protection. Test repeated
+returns at normal/enlarged text, account/Store invalidation and unavailable
+tracking; retain detail-row reveal, management/statement and saved-record guards.
+No Buy/session/backend/storage ownership or successful provider result is added.
+
+All74 failure identities/outcomes remain accounted for. The repair may correct actual
 approved routes, realistic padding/viewPadding and deliberate editable hit targets,
 not restore retired Home or weaken money/Stock/isolation/recovery bounds. Runtime
-owners require a separately justified amendment if corrected tests prove a defect.
+owners beyond the two listed above require a separately justified amendment if
+corrected tests prove another defect. Preparation is not runtime edit admission.
 Requested listing differs from effective publication; invoice Back differs from
 New sale reset. Require evidence before changing those assertions. H22/H27/H34/H40
 exact clauses and authentic visual65 references/approvals remain unresolved where
@@ -47,7 +63,7 @@ provider refresh or candidate-self golden approval. Final verified OPPO APK from
 the qualified combined baseline remains the goal halt after required checks.
 
 Earlier sections below retain historical bootstrap/amendment records. Their
-source/stage ordinals do not govern current W/X/Q admission.
+source/stage ordinals do not govern the current scroll-preparation/repair/Q admission.
 
 State: metadata bootstrap preparation, not admitted or committed. No application
 correction, passing combined host regression, integration or APK acceptance yet.
