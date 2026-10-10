@@ -43,6 +43,64 @@ if ($approved.Count -ne 5 -or $approved.ContainsKey('unlisted|artifacts/quality/
 $passed++; Write-Output 'PASS exact three historical artifacts / five consumers; unlisted evidence denied'
 $candidateFile = Join-Path $fixture 'config/apk-regression-gate-state.json'
 $candidateBytes = [IO.File]::ReadAllBytes($candidateFile)
+# Labelled temporary candidate documents, never runtime APK/business records.
+# Do not modify hash-bound original provenance to exercise candidate traversal.
+$optionalCandidate = Join-Path $fixture 'docs/quality/CURSOR-BUY-STRICT-OPTIONALS-APK.json'
+[IO.File]::WriteAllText($optionalCandidate, '{}')
+$expectedKeys = @(
+  foreach ($artifact in $contract.artifacts) {
+    foreach ($id in $artifact.registryEntryIds) { [string]$id + '|' + [string]$artifact.path }
+  }
+) | Sort-Object
+if ($expectedKeys.Count -ne 5) { throw 'Strict fixture original consumer inventory changed.' }
+function Validate-Strict {
+  Set-StrictMode -Version Latest
+  Validate
+}
+function Assert-StrictOriginalKeys {
+  $result = Validate-Strict
+  if (($result.Keys | Sort-Object) -join '|' -cne ($expectedKeys -join '|')) {
+    throw 'Strict retention changed original consumer/artifact keys.'
+  }
+}
+try {
+  Assert-StrictOriginalKeys
+  $passed++; Write-Output 'PASS actual copied candidate state under StrictMode Latest; exact original five keys'
+  foreach ($owner in @($candidateFile, $optionalCandidate)) {
+    foreach ($shape in @('absent', 'null', 'nested-benign')) {
+      $optionalState = [ordered]@{}
+      foreach ($field in @('candidate','artifact','buildResult','installResult','promotion')) {
+        if ($shape -ceq 'null') { $optionalState[$field] = $null }
+        elseif ($shape -ceq 'nested-benign') {
+          $optionalState[$field] = [pscustomobject]@{
+            nested = @($null, [pscustomobject]@{ path = 'apps/mobile/build/non-retired-fixture.apk'; empty = $null })
+          }
+        }
+      }
+      [IO.File]::WriteAllText($owner, ($optionalState | ConvertTo-Json -Depth 100))
+      Assert-StrictOriginalKeys
+      $passed++; Write-Output "PASS strict optional fields $shape in $([IO.Path]::GetFileName($owner))"
+    }
+    foreach ($field in @('candidate','artifact','buildResult','installResult','promotion')) {
+      $optionalState = [ordered]@{}
+      $optionalState[$field] = [pscustomobject]@{
+        nested = @($null, [pscustomobject]@{ path = $contract.artifacts[0].path })
+      }
+      [IO.File]::WriteAllText($owner, ($optionalState | ConvertTo-Json -Depth 100))
+      $output = [Collections.Generic.List[object]]::new(); $failure = ''
+      try { Validate-Strict | ForEach-Object { $output.Add($_) } }
+      catch { $failure = $_.Exception.Message }
+      if ($failure -cne 'A current candidate references a retired historical binary.' -or $output.Count -ne 0) {
+        throw "Strict retired-artifact boundary differs: $field in $([IO.Path]::GetFileName($owner)); $failure"
+      }
+      $passed++; Write-Output "PASS strict retired artifact beneath $field in $([IO.Path]::GetFileName($owner))"
+    }
+    [IO.File]::WriteAllText($owner, '{}')
+  }
+} finally {
+  [IO.File]::WriteAllBytes($candidateFile, $candidateBytes)
+  [IO.File]::WriteAllText($optionalCandidate, '{}')
+}
 $candidateData = [Text.Encoding]::UTF8.GetString($candidateBytes) | ConvertFrom-Json
 $candidateData.candidate | Add-Member -NotePropertyName artifactPath -NotePropertyValue $contract.artifacts[0].path -Force
 [IO.File]::WriteAllText($candidateFile, ($candidateData | ConvertTo-Json -Depth 100))

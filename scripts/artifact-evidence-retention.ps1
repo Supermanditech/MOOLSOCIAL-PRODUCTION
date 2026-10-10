@@ -42,7 +42,10 @@ function Get-RetiredRegressionArtifacts {
     $candidateState = Get-Content -Raw -LiteralPath $candidateOwner | ConvertFrom-Json
     $stack = [Collections.Generic.Stack[object]]::new()
     foreach ($field in @('candidate','artifact','buildResult','installResult','promotion')) {
-      if ($null -ne $candidateState.$field) { $stack.Push($candidateState.$field) }
+      $property = $candidateState.PSObject.Properties[$field]
+      if ($null -ne $property -and $null -ne $property.Value) {
+        $stack.Push($property.Value)
+      }
     }
     while ($stack.Count -gt 0) {
       $value = $stack.Pop()
