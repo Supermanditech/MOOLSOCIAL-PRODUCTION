@@ -164,6 +164,7 @@ if($compatibilityIncremental) {
       'Read-OctoberCompatibilitySource17ForwardAmendment','Test-OctoberCompatibilitySource17Preparation','Test-OctoberCompatibilitySource17CurrentPreparation',
       'Read-OctoberCompatibilitySource19ForwardAmendment','Test-OctoberCompatibilitySource19Preparation','Test-OctoberCompatibilitySource19CurrentPreparation',
       'Read-OctoberCompatibilitySource21ForwardAmendment','Test-OctoberCompatibilitySource21Preparation','Test-OctoberCompatibilitySource21CurrentPreparation',
+      'Read-OctoberCompatibilitySource23ForwardAmendment','Test-OctoberCompatibilitySource23Preparation','Test-OctoberCompatibilitySource23CurrentPreparation',
       'Get-ProductionRemoteBranchHead','Test-OctoberCompatibilityPublishedForwardCheckpoint',
       'Read-OctoberCompatibilityCurrentSourceState','Test-OctoberCompatibilityCurrentSourceState')) {
     $functions=@($ast.FindAll({param($node)
