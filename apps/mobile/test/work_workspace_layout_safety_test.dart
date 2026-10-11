@@ -74339,9 +74339,71 @@ void main() {
         fileName: '07-store-live-pickup-code-412x915.png',
         target: find.byType(MaterialApp),
         afterMount: () async {
-          await tester.tap(
-            find.byKey(const Key('work-confirm-customer-pickup')),
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final storeId = work.activeWorkspace?.id;
+          final selectedOrder = work.currentWorkspaceOrderId;
+          final row = find.byKey(
+            ValueKey<(String?, String)>((
+              storeId,
+              selectedOrder ?? 'current-store-order',
+            )),
           );
+          expect(row, findsOneWidget);
+          expect(work.workspaceOrderStage, 'Ready for pickup');
+          expect(work.workspaceOrderCustomer, 'Rakesh · 98290 12345');
+          expect(
+            work.workspaceOrderItems,
+            'Fortune Oil × 2 · Aashirvaad Atta × 1',
+          );
+          expect(work.workspaceOrderAmount, '1468');
+          expect(work.workspaceOrderPayment, 'Paid online');
+          final sessionFacts = orderSessionFacts(work);
+          final savedFacts = jsonEncode({
+            'orders': [
+              for (final order in work.workspaceOrders) order.toLedgerJson(),
+            ],
+            'invoices': [
+              for (final invoice in work.workspaceInvoices)
+                invoice.toLedgerJson(),
+            ],
+            'stock': [
+              for (final product in work.workspaceCatalogueItems)
+                product.toInventoryJson(),
+            ],
+          });
+          final pickup = find.descendant(
+            of: row,
+            matching: find.widgetWithText(FilledButton, 'Confirm pickup'),
+          );
+          await reveal(tester, pickup);
+          expect(pickup.hitTestable(), findsOneWidget);
+          await tester.tap(pickup);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-pickup-code')), findsOneWidget);
+          expect(find.byKey(const Key('work-pickup-confirm')), findsOneWidget);
+          expect(find.text('Rakesh · 98290 12345 · ₹1468'), findsOneWidget);
+          expect(work.activeWorkspace?.id, storeId);
+          expect(work.currentWorkspaceOrderId, selectedOrder);
+          expect(orderSessionFacts(work), sessionFacts);
+          expect(
+            jsonEncode({
+              'orders': [
+                for (final order in work.workspaceOrders) order.toLedgerJson(),
+              ],
+              'invoices': [
+                for (final invoice in work.workspaceInvoices)
+                  invoice.toLedgerJson(),
+              ],
+              'stock': [
+                for (final product in work.workspaceCatalogueItems)
+                  product.toInventoryJson(),
+              ],
+            }),
+            savedFacts,
+          );
+          // Inspect the existing modal only; never verify or submit a pickup code.
+          expect(tester.takeException(), isNull);
         },
       );
     },
@@ -74389,29 +74451,79 @@ void main() {
     'Store Live v1 capture - customer delivery review',
     skip: !captureStoreLiveEvidence,
     (tester) async {
+      final work = liveStore();
       await captureActivityDeck(
         tester,
-        work: liveStore(),
+        work: work,
         directory: 'work-store-live-sell-deliver-v1-local-review-20260904',
         fileName: '02-customer-delivery-review-412x915.png',
         target: find.byType(MaterialApp),
         afterMount: () async {
+          final savedFacts = jsonEncode({
+            'orders': [
+              for (final order in work.workspaceOrders) order.toLedgerJson(),
+            ],
+            'invoices': [
+              for (final invoice in work.workspaceInvoices)
+                invoice.toLedgerJson(),
+            ],
+            'stock': [
+              for (final product in work.workspaceCatalogueItems)
+                product.toInventoryJson(),
+            ],
+          });
           await openExistingDeliveryDraft(tester);
-          await tester.pumpAndSettle();
-          await tester.enterText(
-            find.byKey(const Key('work-order-customer')),
-            '98290 12345',
-          );
-          await tester.enterText(
-            find.byKey(const Key('work-order-address')),
-            '12 Market Road, Sardarpura',
-          );
           await addCounterProduct(
             tester,
             find.byKey(const Key('work-order-add-oil-fortune-1l')),
           );
+          final review = find.byKey(const Key('work-order-review'));
+          await reveal(tester, review);
+          await tester.tap(review);
           await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const Key('work-order-review')));
+          final fulfilment = find.byKey(
+            const ValueKey('work-review-fulfilment-At the shop'),
+          );
+          await reveal(tester, fulfilment);
+          await tester.tap(fulfilment);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Mool delivery').last);
+          await tester.pumpAndSettle();
+          final address = find.byKey(const Key('work-order-address'));
+          await reveal(tester, address);
+          await tester.enterText(address, '12 Market Road, Sardarpura');
+          await tester.testTextInput.receiveAction(TextInputAction.done);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-order-review-summary')),
+            findsOneWidget,
+          );
+          expect(work.workspaceOrderSource, 'Phone');
+          expect(work.workspaceOrderCustomer, '9829012345');
+          expect(work.workspaceOrderQuantities, {'oil-fortune-1l': 1});
+          expect(work.workspaceOrderFulfilment, 'Mool delivery');
+          expect(
+            tester.widget<TextField>(address).controller?.text,
+            '12 Market Road, Sardarpura',
+          );
+          expect(
+            jsonEncode({
+              'orders': [
+                for (final order in work.workspaceOrders) order.toLedgerJson(),
+              ],
+              'invoices': [
+                for (final invoice in work.workspaceInvoices)
+                  invoice.toLedgerJson(),
+              ],
+              'stock': [
+                for (final product in work.workspaceCatalogueItems)
+                  product.toInventoryJson(),
+              ],
+            }),
+            savedFacts,
+          );
+          // This is an unsaved review, not a new order or invoice transaction.
+          expect(tester.takeException(), isNull);
         },
       );
     },
@@ -74959,11 +75071,79 @@ void main() {
         fileName: 'correction-invoice-handoff-412x915.png',
         target: find.byType(Overlay).last,
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-activity-mark-ready')));
+          await tester.tap(find.byKey(const Key('work-store-orders')));
           await tester.pumpAndSettle();
-          await tester.tap(
-            find.byKey(const Key('work-confirm-customer-pickup')),
+          final storeId = work.activeWorkspace?.id;
+          final selectedOrder = work.currentWorkspaceOrderId;
+          final row = find.byKey(
+            ValueKey<(String?, String)>((
+              storeId,
+              selectedOrder ?? 'current-store-order',
+            )),
           );
+          expect(row, findsOneWidget);
+          final ready = find.descendant(
+            of: row,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'),
+          );
+          await reveal(tester, ready);
+          await tester.tap(ready);
+          await tester.pumpAndSettle();
+          expect(work.workspaceOrderStage, 'Ready for pickup');
+          expect(work.workspaceOrderCustomer, 'Rakesh · 98290 12345');
+          expect(
+            work.workspaceOrderItems,
+            'Fortune Oil × 2 · Aashirvaad Atta × 1',
+          );
+          expect(work.workspaceOrderAmount, '1468');
+          expect(work.workspaceOrderPayment, 'Paid online');
+          expect(work.workspaceInvoices, isEmpty);
+          final sessionFacts = orderSessionFacts(work);
+          final savedFacts = jsonEncode({
+            'orders': [
+              for (final order in work.workspaceOrders) order.toLedgerJson(),
+            ],
+            'invoices': [
+              for (final invoice in work.workspaceInvoices)
+                invoice.toLedgerJson(),
+            ],
+            'stock': [
+              for (final product in work.workspaceCatalogueItems)
+                product.toInventoryJson(),
+            ],
+          });
+          final pickup = find.descendant(
+            of: row,
+            matching: find.widgetWithText(FilledButton, 'Confirm pickup'),
+          );
+          await reveal(tester, pickup);
+          expect(pickup.hitTestable(), findsOneWidget);
+          await tester.tap(pickup);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-pickup-code')), findsOneWidget);
+          expect(find.byKey(const Key('work-pickup-confirm')), findsOneWidget);
+          expect(find.text('Rakesh · 98290 12345 · ₹1468'), findsOneWidget);
+          expect(work.activeWorkspace?.id, storeId);
+          expect(work.currentWorkspaceOrderId, selectedOrder);
+          expect(orderSessionFacts(work), sessionFacts);
+          expect(
+            jsonEncode({
+              'orders': [
+                for (final order in work.workspaceOrders) order.toLedgerJson(),
+              ],
+              'invoices': [
+                for (final invoice in work.workspaceInvoices)
+                  invoice.toLedgerJson(),
+              ],
+              'stock': [
+                for (final product in work.workspaceCatalogueItems)
+                  product.toInventoryJson(),
+              ],
+            }),
+            savedFacts,
+          );
+          // Pending invoice handoff: no code verification or invoice creation.
+          expect(tester.takeException(), isNull);
         },
       );
     },
