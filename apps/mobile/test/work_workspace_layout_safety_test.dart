@@ -29881,21 +29881,24 @@ void main() {
         // The keyboard obscures current safe padding, not the physical inset.
         tester.view.padding = FakeViewPadding.zero;
         await tester.pumpAndSettle();
+        final rootViewGeometry = MediaQueryData.fromView(tester.view);
+        expect(rootViewGeometry.padding.bottom, 0);
+        expect(rootViewGeometry.viewPadding.bottom, 34);
+        expect(rootViewGeometry.viewInsets.bottom, 280);
+        final keyboardTop =
+            rootViewGeometry.size.height - rootViewGeometry.viewInsets.bottom;
+        expect(keyboardTop, 635);
+        // Scaffold and SafeArea have already consumed the body insets.
         final keyboardGeometry = MediaQuery.of(tester.element(code));
         expect(keyboardGeometry.padding.bottom, 0);
-        expect(keyboardGeometry.viewPadding.bottom, 34);
-        expect(keyboardGeometry.viewInsets.bottom, 280);
-        await reveal(
-          tester,
-          find.byKey(const Key('work-contact-email-confirm-otp')),
-        );
+        expect(keyboardGeometry.viewPadding.bottom, 0);
+        expect(keyboardGeometry.viewInsets.bottom, 0);
+        final confirm = find.byKey(const Key('work-contact-email-confirm-otp'));
+        await reveal(tester, confirm);
+        expect(confirm.hitTestable(), findsOneWidget);
         expect(
-          tester
-              .getBottomRight(
-                find.byKey(const Key('work-contact-email-confirm-otp')),
-              )
-              .dy,
-          lessThanOrEqualTo(635),
+          tester.getBottomRight(confirm).dy,
+          lessThanOrEqualTo(keyboardTop),
         );
         await captureStoreView(tester, 'workspace-contact-otp-keyboard');
       }
