@@ -74331,7 +74331,10 @@ void main() {
     skip: !captureStoreLiveEvidence,
     (tester) async {
       final work = liveStore();
-      seedIncomingOrder(work, stage: 'Ready for pickup');
+      seedIncomingOrder(work, stage: 'Preparing');
+      for (final line in work.workspacePackingLines) {
+        work.setWorkspacePackingLine(line.id, true);
+      }
       await captureActivityDeck(
         tester,
         work: work,
@@ -74342,7 +74345,32 @@ void main() {
           await tester.tap(find.byKey(const Key('work-store-orders')));
           await tester.pumpAndSettle();
           final storeId = work.activeWorkspace?.id;
+          final preparingRow = find.byKey(
+            ValueKey<(String?, String)>((
+              storeId,
+              work.currentWorkspaceOrderId ?? 'current-store-order',
+            )),
+          );
+          expect(preparingRow, findsOneWidget);
+          final ready = find.descendant(
+            of: preparingRow,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'),
+          );
+          await reveal(tester, ready);
+          expect(ready.hitTestable(), findsOneWidget);
+          await tester.tap(ready);
+          await tester.pumpAndSettle();
           final selectedOrder = work.currentWorkspaceOrderId;
+          expect(selectedOrder, isNotNull);
+          final savedOrder = work.workspaceOrders.singleWhere(
+            (order) => order.id == selectedOrder,
+          );
+          expect(savedOrder.customer, 'Rakesh · 98290 12345');
+          expect(savedOrder.items, 'Fortune Oil × 2 · Aashirvaad Atta × 1');
+          expect(savedOrder.amount, 1468);
+          expect(savedOrder.payment, 'Paid online');
+          expect(savedOrder.stage, 'Ready for pickup');
+          expect(work.workspaceInvoices, isEmpty);
           final row = find.byKey(
             ValueKey<(String?, String)>((
               storeId,
@@ -75074,7 +75102,31 @@ void main() {
           await tester.tap(find.byKey(const Key('work-store-orders')));
           await tester.pumpAndSettle();
           final storeId = work.activeWorkspace?.id;
+          final preparingRow = find.byKey(
+            ValueKey<(String?, String)>((
+              storeId,
+              work.currentWorkspaceOrderId ?? 'current-store-order',
+            )),
+          );
+          expect(preparingRow, findsOneWidget);
+          final ready = find.descendant(
+            of: preparingRow,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'),
+          );
+          await reveal(tester, ready);
+          expect(ready.hitTestable(), findsOneWidget);
+          await tester.tap(ready);
+          await tester.pumpAndSettle();
           final selectedOrder = work.currentWorkspaceOrderId;
+          expect(selectedOrder, isNotNull);
+          final savedOrder = work.workspaceOrders.singleWhere(
+            (order) => order.id == selectedOrder,
+          );
+          expect(savedOrder.customer, 'Rakesh · 98290 12345');
+          expect(savedOrder.items, 'Fortune Oil × 2 · Aashirvaad Atta × 1');
+          expect(savedOrder.amount, 1468);
+          expect(savedOrder.payment, 'Paid online');
+          expect(savedOrder.stage, 'Ready for pickup');
           final row = find.byKey(
             ValueKey<(String?, String)>((
               storeId,
@@ -75082,13 +75134,6 @@ void main() {
             )),
           );
           expect(row, findsOneWidget);
-          final ready = find.descendant(
-            of: row,
-            matching: find.widgetWithText(FilledButton, 'Mark ready'),
-          );
-          await reveal(tester, ready);
-          await tester.tap(ready);
-          await tester.pumpAndSettle();
           expect(work.workspaceOrderStage, 'Ready for pickup');
           expect(work.workspaceOrderCustomer, 'Rakesh · 98290 12345');
           expect(
