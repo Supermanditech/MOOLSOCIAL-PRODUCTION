@@ -162,6 +162,7 @@ if($compatibilityIncremental) {
       'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage',
       'Read-OctoberCompatibilityCurrentQualificationContract','Read-OctoberCompatibilityCurrentSuccessorSpecification','Test-OctoberCompatibilitySource15Preparation','Test-OctoberCompatibilityCurrentPreparation',
       'Read-OctoberCompatibilitySource17ForwardAmendment','Test-OctoberCompatibilitySource17Preparation','Test-OctoberCompatibilitySource17CurrentPreparation',
+      'Read-OctoberCompatibilitySource19ForwardAmendment','Test-OctoberCompatibilitySource19Preparation','Test-OctoberCompatibilitySource19CurrentPreparation',
       'Get-ProductionRemoteBranchHead','Test-OctoberCompatibilityPublishedForwardCheckpoint',
       'Read-OctoberCompatibilityCurrentSourceState','Test-OctoberCompatibilityCurrentSourceState')) {
     $functions=@($ast.FindAll({param($node)
@@ -182,7 +183,7 @@ if($compatibilityIncremental) {
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
   if($Phase -ceq 'handoff') {
-    Assert-IncrementalTicket ($compatibilityHistory.Stage -eq 21 -and $compatibilityHistory.Forward -and
+    Assert-IncrementalTicket ($compatibilityHistory.Stage -eq ($compatibilityHistory.CaptureIndex+2) -and $compatibilityHistory.Forward -and
       $compatibilityHistory.PhaseStage -eq 19 -and
       (Test-OctoberCompatibilityPublishedForwardCheckpoint $compatibilityHistory.Head)) 'Compatibility handoff requires the exact published forward Q and complete native qualification; intermediate phases remain blocked.'
   }

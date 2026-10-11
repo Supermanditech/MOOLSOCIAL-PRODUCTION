@@ -276,7 +276,7 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   Assert-Coordination ($LASTEXITCODE -eq 0) 'Compatibility HEAD must descend from exact E.'
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$e..$HeadCommit"))
   $firstParent=@(Get-OctoberCompatibilityGitLines @('rev-list','--first-parent','--reverse',"$e..$HeadCommit"))
-  Assert-Coordination ($commits.Count -le 21 -and
+  Assert-Coordination ($commits.Count -le 23 -and
     ($commits -join '|') -ceq ($firstParent -join '|')) 'Compatibility history contains an extra commit or merge.'
   $previous=$e
   $subjects=@($binding.bootstrapCommitSubject,
@@ -312,6 +312,19 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
       Assert-Coordination ($commits.Count -le 19) 'Original qualification graph cannot admit forward successors.'
     }
   }
+  $source19Forward=$null
+  if($commits.Count -ge 21 -and $null -ne $forward) {
+    $nextSubject=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',([string]$commits[20])))
+    if($nextSubject.Count -eq 1 -and $nextSubject[0] -ceq 'coordination(store-buy-compatibility-20261008): admit exact current obligation qualification') {
+      $source19Forward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit ([string]$commits[20])
+      Assert-Coordination ($null -ne $source19Forward -and
+        $commits[18] -ceq 'd50dab60b440bd7caaff312a8f037ba63759461a' -and
+        $commits[19] -ceq $source19Forward.predecessorCommit) 'Current obligation amendment requires exact Source18/19 history.'
+      $forward=$forward|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json
+      $forward.chain=@($forward.chain[0..1])+@($source19Forward.chain)
+      $subjects=@($subjects[0..19])+@($source19Forward.chain|ForEach-Object {[string]$_.subject})
+    }else{Assert-Coordination ($commits.Count -le 21) 'Source17 qualification cannot admit later successors.'}
+  }
   for($index=0;$index -lt $commits.Count;$index++) {
     $commit=[string]$commits[$index]
     $parents=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$commit))
@@ -332,7 +345,7 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     Assert-Coordination ((@($owners | Sort-Object) -join '|') -ceq
       (@($expected | Sort-Object) -join '|')) 'Compatibility successor changed unexpected owners.'
     if($index -in @(0,2,3,4,5,6,8,10,11,12,13,14,16,18) -or
-       ($null -ne $forward -and $index -eq 20)) {
+       ($null -ne $forward -and $index -eq 20) -or ($null -ne $source19Forward -and $index -eq 22)) {
       $apps=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${commit}:apps","${previous}:apps"))
       Assert-Coordination ($apps.Count -eq 2 -and $apps[0] -ceq $apps[1]) 'Compatibility metadata commit changed apps.'
     }
@@ -414,6 +427,9 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
         Assert-Coordination ($entry.index -eq $currentIndex -and $entry.parentIndex -eq ($currentIndex-1) -and
           $entry.subject -ceq $subjects[$currentIndex] -and
           $null -ne (Read-OctoberCompatibilitySource17ForwardAmendment -Commit ([string]$commits[$currentIndex]))) 'Forward successor lost its original or appended immutable contract.'
+        if($currentIndex -ge 20 -and $null -ne $source19Forward) {
+          Assert-Coordination ($null -ne (Read-OctoberCompatibilitySource19ForwardAmendment -Commit ([string]$commits[$currentIndex]))) 'Current obligation successor lost its sealed forward contract.'
+        }
         $runtime=@(Get-OctoberCompatibilityGitLines @('rev-parse',($commits[$currentIndex]+':apps/mobile/lib'),
           '3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib'))
         Assert-Coordination ($runtime.Count -eq 2 -and $runtime[0] -ceq $runtime[1]) 'Forward test/qualification correction changed frozen runtime.'
@@ -429,10 +445,11 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   # forward Stage19 is the admitted test-edit phase, never old Stage19 closure.
   $source17Preparation=$commits.Count -eq 18 -and
     $HeadCommit -ceq '737eea29357d5f42375b865754f3762f10545e37'
-  $phaseStage=if($null -ne $forward){[int]$commits.Count-2}elseif($source17Preparation){16}else{[int]$commits.Count}
+  $source19Preparation=$commits.Count -eq 20 -and $HeadCommit -ceq '51b3dc076ab10ff4f233a420791e4d2b25d2512a'
+  $phaseStage=if($null -ne $source19Forward){[int]$commits.Count-4}elseif($source19Preparation){16}elseif($null -ne $forward){[int]$commits.Count-2}elseif($source17Preparation){16}else{[int]$commits.Count}
   return @{Stage=[int]$commits.Count;Commits=$commits;Base=$e;Head=$HeadCommit;
-    PhaseStage=$phaseStage;Source17Preparation=$source17Preparation;Forward=($null -ne $forward);
-    ContractIndex=$(if($null -ne $forward){18}else{16});CaptureIndex=$(if($null -ne $forward){19}else{17})}
+    PhaseStage=$phaseStage;Source17Preparation=$source17Preparation;Source19Preparation=$source19Preparation;Source19Forward=($null -ne $source19Forward);Forward=($null -ne $forward);
+    ContractIndex=$(if($null -ne $source19Forward){20}elseif($null -ne $forward){18}else{16});CaptureIndex=$(if($null -ne $source19Forward){21}elseif($null -ne $forward){19}else{17})}
 }
 
 function Get-OctoberCompatibilityReportPlan([string]$ReportId) {
@@ -900,6 +917,14 @@ function Get-OctoberCompatibilityCurrentExecutionPlan {
        $SelectedSlots -isnot [array] -or $SelectedTestKeys -isnot [array]){return $null}
     $names=@($literal.RequiredNames);$arguments=@($literal.Arguments)
     $defines=@($literal.RuntimeDefines)
+    $currentForward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $SourceIdentity.contractCommit
+    if($null -ne $currentForward -and $ReportId -ceq 'store_layout_and_recovery' -and
+       $ExecutionId -cin @('historical_store_review','historical_store_capture')) {
+      $names=@($currentForward.currentExecutionOverrides.$ExecutionId|ForEach-Object {[string]$_.currentName})
+      if(-not $names.Count){return $null}
+      $selector='^(?:'+((@($names|ForEach-Object {[regex]::Escape($_)})) -join '|')+')$(?![\s\S])'
+      $arguments=@($arguments|Where-Object {-not $_.StartsWith('--name=',[StringComparison]::Ordinal)})+@('--name='+$selector)
+    }
     $bindings=@(
       ('MOOL_TECHNICAL_CAPTURE_RUN_ID='+$RunId),
       ('MOOL_TECHNICAL_CAPTURE_EXECUTION_ID='+$ExecutionId),
@@ -927,6 +952,11 @@ function Get-OctoberCompatibilityCurrentExecutionPlan {
         $key=$case[0].originalSuccessKeys[0];$owner='work_workspace_layout_safety_test.dart:'
         if($key -isnot [string] -or -not $key.StartsWith($owner,[StringComparison]::Ordinal)){return $null}
         $testName=$key.Substring($owner.Length)
+        if($null -ne $currentForward) {
+          if($ordinal -eq 40){return $null}
+          $replacement=@($currentForward.currentExecutionOverrides.historical_store_capture|Where-Object {$_.ordinal -eq $ordinal})
+          if($replacement.Count -eq 1){$testName=[string]$replacement[0].currentName}
+        }
         if($names -cnotcontains $testName){return $null}
         $null=$expectedTests.Add($testName)
       }
@@ -1340,7 +1370,7 @@ function Read-OctoberCompatibilityPostMWriterFacts([string]$Phase) {
     $history=Get-OctoberCompatibilityHistoryStage $initialHead[0]
     $qualifiedPhase=$Phase -cin @('handoff','integration_admission_authorize')
     if($qualifiedPhase) {
-      if(-not $history.Forward -or $history.Stage -ne 21 -or $history.PhaseStage -ne 19 -or
+      if(-not $history.Forward -or $history.Stage -ne ($history.CaptureIndex+2) -or $history.PhaseStage -ne 19 -or
          -not (Test-OctoberCompatibilityQualification $history)){return $null}
     }elseif($history.PhaseStage -notin @(7,8,9,10,11,12,13,14,15,16,17,18)){return $null}
     $currentPreparationVerified=$false
@@ -1705,6 +1735,35 @@ function Read-OctoberCompatibilitySource17ForwardAmendment {
   }catch{return $null}
 }
 
+function Read-OctoberCompatibilitySource19ForwardAmendment {
+  param([string]$Commit,[switch]$FromIndex,[switch]$FromWorkingTree)
+  try {
+    $hasCommit=$PSBoundParameters.ContainsKey('Commit')
+    if(@(@($hasCommit,[bool]$FromIndex,[bool]$FromWorkingTree)|Where-Object {$_}).Count -ne 1){return $null}
+    if($hasCommit -and $Commit -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    $arguments=if($hasCommit){@{Commit=$Commit}}elseif($FromIndex){@{FromIndex=$true}}else{@{FromWorkingTree=$true}}
+    if($null -eq (Read-OctoberCompatibilitySource17ForwardAmendment @arguments)){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($Commit+':'+$owner))) -join "`n"}
+    $begin='<!-- COMPATIBILITY_SOURCE19_FORWARD_AMENDMENT_JSON_BEGIN -->';$end='<!-- COMPATIBILITY_SOURCE19_FORWARD_AMENDMENT_JSON_END -->'
+    if(([regex]::Matches($text,[regex]::Escape($begin))).Count -ne 1 -or
+      ([regex]::Matches($text,[regex]::Escape($end))).Count -ne 1){return $null}
+    $start=$text.IndexOf($begin)+$begin.Length;$stop=$text.IndexOf($end,$start)
+    if($stop -le $start){return $null}
+    $bytes=[Text.Encoding]::UTF8.GetBytes($text.Substring($start,$stop-$start).Trim())
+    if((Get-OctoberCompatibilityByteHash $bytes) -cne '5D9B06BABFAF19B7E0373CA1E9EBAAD0E4596FF2483F05D91BE0349DFB7B53C7'){return $null}
+    $amendment=Read-OctoberCompatibilityJsonObject -Bytes $bytes
+    if($null -eq $amendment -or $amendment.kind -cne 'source19_forward_qualification_amendment_not_qualification' -or
+      $amendment.predecessorCommit -cne '51b3dc076ab10ff4f233a420791e4d2b25d2512a'){return $null}
+    foreach($flag in @('qualificationPassed','providerVerified','apkAuthority','historyRewriteAuthority')) {
+      if($amendment.$flag -isnot [bool] -or $amendment.$flag){return $null}
+    }
+    return $amendment
+  }catch{return $null}
+}
+
 function Test-OctoberCompatibilitySource17Preparation([string]$Phase) {
   # Source17-bound preservation preparation, never a caller-supplied authority flag.
   $lease=$null;$hasher=$null
@@ -1740,6 +1799,58 @@ function Test-OctoberCompatibilitySource17Preparation([string]$Phase) {
     }
     return $true
   }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+function Test-OctoberCompatibilitySource19Preparation([string]$Phase) {
+  # Source19-bound preservation preparation, never a caller-supplied authority flag.
+  $lease=$null;$hasher=$null
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath){return $false}
+    $collector='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work/check-source19-metadata-preparation-20261011.ps1'
+    $expected='ED8ADF9FB2036CCA04BCB9A56766565C9B5E00FE297BFEBF03863BD96495C903'
+    $ancestor=[IO.Path]::GetFullPath($collector)
+    while($ancestor) {
+      if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+      $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+    }
+    $lease=[IO.File]::Open($collector,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    $hasher=[Security.Cryptography.SHA256]::Create()
+    if([BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected){return $false}
+    $result=@(& $collector -Phase $Phase -ExpectedCollectorSha256 $expected);$completed=$?
+    $lease.Position=0
+    if(-not $completed -or [BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected -or
+        $result.Count -ne 1 -or $result[0] -isnot [string]){return $false}
+    $proof=Read-OctoberCompatibilityJsonObject -Bytes ([Text.Encoding]::UTF8.GetBytes($result[0]))
+    $names=@('Operation','Phase','Observations','Head','ProvisionSha256','CollectorSha256','RepairAdmitted',
+      'CommitAdmitted','QualificationPassed','ApkAuthority','WriterScope')
+    if($null -eq $proof -or (@($proof.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($names|Sort-Object) -join '|') -or
+        ($proof.Observations -isnot [int] -and $proof.Observations -isnot [long]) -or $proof.Observations -ne 3){return $false}
+    $pins=@{Operation='read_only_source19_metadata_preparation';Phase=$Phase;Head='51b3dc076ab10ff4f233a420791e4d2b25d2512a';
+      ProvisionSha256='95B788B6487ED8BE7454F0A86AFCD90DFBF7C28CCD986BFF5851C33F391924CB';CollectorSha256=$expected;
+      WriterScope='Cooperative support/claim locks, not universal writer inactivity'}
+    foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $false}}
+    foreach($name in @('RepairAdmitted','CommitAdmitted','QualificationPassed','ApkAuthority')) {
+      if($proof.$name -isnot [bool] -or $proof.$name){return $false}
+    }
+    return $true
+  }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+function Test-OctoberCompatibilitySource19CurrentPreparation([string]$Phase) {
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $before=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}else{(Get-FileHash -LiteralPath (Join-Path $root $owner)).Hash}
+    $selection=if($Phase -ceq 'pre_commit'){@{FromIndex=$true}}else{@{FromWorkingTree=$true}}
+    if($null -eq (Read-OctoberCompatibilitySource19ForwardAmendment @selection) -or -not (Test-OctoberCompatibilitySource19Preparation $Phase)){return $false}
+    $base=(@(Get-OctoberCompatibilityGitLines @('show',('51b3dc076ab10ff4f233a420791e4d2b25d2512a:'+$owner))) -join "`n").TrimEnd("`n")
+    $text=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}else{[IO.File]::ReadAllText((Join-Path $root $owner)).Replace("`r`n","`n")}
+    if(-not $text.StartsWith($base+"`n`n",[StringComparison]::Ordinal)){return $false}
+    $after=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}else{(Get-FileHash -LiteralPath (Join-Path $root $owner)).Hash}
+    return $before -ceq $after -and $null -ne (Read-OctoberCompatibilitySource19ForwardAmendment @selection)
+  }catch{return $false}
 }
 
 function Test-OctoberCompatibilitySource17CurrentPreparation([string]$Phase) {
@@ -1806,6 +1917,9 @@ function Test-OctoberCompatibilityCurrentPreparation([string]$Phase) {
     if($Phase -cnotin @('implementation','pre_commit')){return $false}
     $preparationHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
     if($preparationHead.Count -ne 1){return $false}
+    if($preparationHead[0] -ceq '51b3dc076ab10ff4f233a420791e4d2b25d2512a') {
+      return Test-OctoberCompatibilitySource19CurrentPreparation $Phase
+    }
     if($preparationHead[0] -ceq '737eea29357d5f42375b865754f3762f10545e37') {
       return Test-OctoberCompatibilitySource17CurrentPreparation $Phase
     }
@@ -1917,7 +2031,7 @@ function Read-OctoberCompatibilityCurrentSourceState {
       if((@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$allowed))) -join '') -cne
          (@(Get-OctoberCompatibilityGitLines @('hash-object','--',$allowed)) -join '')){return $null}
     }
-    $layoutPredecessor=if($observed.Forward){'eb0958e8654aa99eb8533ceadc044496932c40c9'}else{'d03a41613b82dfb01d2c55cf57ae5cb7fc34bb2a'}
+    $layoutPredecessor=if($observed.Source19Forward){'fc6030b6a9658b1c2e652d5f60490e6acf6bdbe4'}elseif($observed.Forward){'eb0958e8654aa99eb8533ceadc044496932c40c9'}else{'d03a41613b82dfb01d2c55cf57ae5cb7fc34bb2a'}
     if($observed.PhaseStage -eq 17 -and $Phase -ceq 'implementation' -and
        (@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$layout))) -join '') -cne
        $layoutPredecessor){return $null}
@@ -1935,6 +2049,8 @@ function Read-OctoberCompatibilityCurrentSourceState {
        $null -eq (Read-OctoberCompatibilityCurrentSuccessorSpecification -FromIndex)){return $null}
     if($observed.Forward -and ($null -eq (Read-OctoberCompatibilitySource17ForwardAmendment -FromWorkingTree) -or
        $null -eq (Read-OctoberCompatibilitySource17ForwardAmendment -FromIndex))){return $null}
+    if($observed.Source19Forward -and ($null -eq (Read-OctoberCompatibilitySource19ForwardAmendment -FromWorkingTree) -or
+       $null -eq (Read-OctoberCompatibilitySource19ForwardAmendment -FromIndex))){return $null}
     if((@(Get-OctoberCompatibilityGitLines @('ls-files','--stage')) -join "`n") -cne $indexBefore -or
        (@(Get-OctoberCompatibilityGitLines @('ls-files','-v')) -join "`n") -cne $flagsBefore -or
        (@(Get-OctoberCompatibilityGitLines @('diff','--name-only','--diff-filter=ACMRTUXBD')) -join '|') -cne ($unstaged -join '|') -or
@@ -3330,6 +3446,26 @@ function Read-OctoberCompatibilityCurrentVisualSlotAccounting {
       return $currentPairs.Count -gt 0
     }
     foreach($slot in $contract.visualSlots){if($literal.ContainsKey($slot.slot)){return $null};$literal.Add($slot.slot,$slot)}
+    $currentForward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $SourceIdentity.contractCommit
+    if($null -ne $currentForward) {
+      $preview=@($PrimaryBinding.Report.sourceReviews|Where-Object {$_.ordinal -eq 40})
+      if($preview.Count -ne 1 -or $preview[0].clauses.Count -ne $contract.cases[39].retainedObligations.Count){return $null}
+      foreach($clause in $preview[0].clauses) {
+        if(-not $clause.parts.Count){return $null}
+        foreach($part in $clause.parts) {
+          if($part.disposition -cne 'provider_unmet' -or $part.successfulTests.Count -or $part.assertionEvidence.Count -or
+             $null -ne $part.presentationAuthority -or $null -eq $part.dependency -or
+             $part.dependency.owner -cne $currentForward.providerDependency.owner -or
+             $part.dependency.completion -cne $currentForward.providerDependency.completion){return $null}
+        }
+      }
+      if(@($PrimaryAssertionReview.ReviewedAssertionPairs|Where-Object {$_.Ordinal -eq 40}).Count){return $null}
+      foreach($slot in $contract.visualSlots|Where-Object {$_.slot -cmatch '\AH40-visual-[1-9][0-9]*\z'}) {
+        # Account for the original slot without claiming a render/equivalence or
+        # promoting the dependency to a successful frontend preview.
+        $assigned.Add($slot.slot,@{RiskId=$null;Disposition='provider_unmet';CaptureRole='dependency';PresentationKey=$null})
+      }
+    }
     foreach($risk in $Inventory) {
       if(-not $risks.Add($risk.id) -or -not $PrimaryVisualReview.Reviews.ContainsKey($risk.id) -or
         (ConvertTo-Json $risk -Depth 100 -Compress) -cne
@@ -3446,6 +3582,9 @@ function Read-OctoberCompatibilityCurrentPresentationReview {
       # Forward contract18 selects this exact approved addition. Original40
       # identities remain byte-preserved; access is not presentation approval.
       $manifestHash='F77FEBDD4117C856269A391B6AA151A3509B7DE020117F4165A59521BD8682D3'
+      $manifestSourceCount=41
+      $currentForward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $SourceIdentity.contractCommit
+      if($null -ne $currentForward){$manifestHash=$currentForward.founderManifestSha256;$manifestSourceCount=$currentForward.founderSourceCount}
       $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
       $buffers=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
       $fileIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
@@ -3474,13 +3613,13 @@ function Read-OctoberCompatibilityCurrentPresentationReview {
       $stateBytes=Read-PresentationFile $statePath $stateHash
       if($null -eq $stateBytes){return $null}
       $state=Read-OctoberCompatibilityJsonObject ([byte[]]$stateBytes)
-      if($null -eq $manifest -or $manifest.sources -isnot [array] -or $manifest.sources.Count -ne 41 -or
+      if($null -eq $manifest -or $manifest.sources -isnot [array] -or $manifest.sources.Count -ne $manifestSourceCount -or
         $null -eq $state -or $state.task -cne 'store-buy-compatibility-20261008' -or
-        $state.manifestHash -cne $manifestHash -or $state.reads -isnot [array] -or $state.reads.Count -ne 41){return $null}
+        $state.manifestHash -cne $manifestHash -or $state.reads -isnot [array] -or $state.reads.Count -ne $manifestSourceCount){return $null}
       # Independent founder-gate access receipts select original source hashes;
       # Q cannot supply new authority hashes or paths. Access is not comprehension.
       $allowed=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
-      for($index=0;$index -lt 41;$index++) {
+      for($index=0;$index -lt $manifestSourceCount;$index++) {
         $entry=@($state.reads|Where-Object {$_.index -eq $index})
         $source=$manifest.sources[$index]
         if($entry.Count -ne 1 -or ($entry[0].index -isnot [int] -and $entry[0].index -isnot [long]) -or
@@ -3503,7 +3642,7 @@ function Read-OctoberCompatibilityCurrentPresentationReview {
             $path=[IO.Path]::GetFullPath($authority.path)
             if(-not $allowed.ContainsKey($path) -or $authority.sha256 -cne $allowed[$path] -or
               [IO.Path]::GetFileName($path) -cin @('founder-current-baseline-qualification-direction-20261010.json',
-                'founder-source17-minimal-amendment-authority-20261011.md')){return $null}
+                'founder-source17-minimal-amendment-authority-20261011.md','founder-public-preview-dependency-decision-20261011.md')){return $null}
             $decision=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($authority.decision))
             if($null -eq $decision -or (@($decision.PSObject.Properties.Name|Sort-Object) -join '|') -cne
               'clause|currentChange|founderExcerpt|limitations|ordinal|reason|requirement|schemaVersion|slotIds' -or
@@ -3657,7 +3796,17 @@ function Read-OctoberCompatibilityCurrentObligationJoins {
             $part.assertionEvidence -isnot [array]){return $null}
           if($part.disposition -ceq 'provider_unmet') {
             $allowed=@($spec.obligations.providerUnmetAllowed|Where-Object {$_.ordinal -eq $entry.ordinal -and $_.clause -eq $clause.index -and $_.requirement -ceq $part.requirement})
+            $dependencyForward=$null
+            if($entry.ordinal -eq 40){$dependencyForward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $SourceIdentity.contractCommit}
+            if($null -ne $dependencyForward) {
+              # Exact current-source authority retains the entire preview case
+              # unmet. This does not waive any other ordinal or count a success.
+              $allowed=@([pscustomobject]@{ordinal=40;clause=$clause.index;requirement=$part.requirement})
+            }
             $deferral=@($contract.providerDeferrals|Where-Object {$_.case -ceq ('H'+$entry.ordinal)})
+            if($null -ne $dependencyForward) {
+              $deferral=@([pscustomobject]@{case='H40';owner=$dependencyForward.providerDependency.owner;completion=$dependencyForward.providerDependency.completion})
+            }
             if($allowed.Count -ne 1 -or $deferral.Count -ne 1 -or $part.successfulTests.Count -or $part.assertionEvidence.Count -or
               $null -ne $part.presentationAuthority -or $null -eq $part.dependency -or
               (@($part.dependency.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'completion|owner'){return $null}
@@ -4809,6 +4958,13 @@ function Read-OctoberCompatibilityCurrentQualificationProof {
     $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $metadata
     $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $metadata
     if($null -eq $spec -or $null -eq $contract){return $null}
+    $dependencyForward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $metadata
+    if($null -ne $dependencyForward) {
+      foreach($dependency in $contract.providerDeferrals|Where-Object {$_.case -ceq 'H40'}) {
+        $dependency.owner=$dependencyForward.providerDependency.owner
+        $dependency.completion=$dependencyForward.providerDependency.completion
+      }
+    }
     $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
     $text=if($FromWorkingTree){Get-Content -LiteralPath (Join-Path $root $owner) -Raw -Encoding UTF8}
       elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
@@ -4976,7 +5132,7 @@ function Test-OctoberCompatibilityPublishedForwardCheckpoint([string]$ExpectedHe
       if($head.Count -ne 1 -or $head[0] -cne $requestedHead -or
          $branch.Count -ne 1 -or $branch[0] -cne $binding.branch){return $false}
       $history=Get-OctoberCompatibilityHistoryStage $head[0]
-      if($history.Stage -ne 21 -or $history.PhaseStage -ne 19 -or -not $history.Forward){return $false}
+      if($history.Stage -ne ($history.CaptureIndex+2) -or $history.PhaseStage -ne 19 -or -not $history.Forward){return $false}
       if(@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count -or
          @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '\A(?:[a-z]|S) '}).Count){return $false}
       $checker='scripts/check-codex-subagent-coordination-policy.ps1'
@@ -5561,8 +5717,10 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
   $qualifiedPhase=[string]$Facts.Phase -cin @('handoff','integration_admission_authorize')
   if($qualifiedPhase -or $Facts.Stage -eq 19) {
     if(-not $qualifiedPhase -or $Facts.Stage -ne 19 -or
-       -not $Facts.ContainsKey('PhysicalStage') -or $Facts.PhysicalStage -isnot [int] -or $Facts.PhysicalStage -ne 21 -or
+       -not $Facts.ContainsKey('PhysicalStage') -or $Facts.PhysicalStage -isnot [int] -or $Facts.PhysicalStage -notin @(21,23) -or
        -not $Facts.ContainsKey('ForwardHistory') -or $Facts.ForwardHistory -isnot [bool] -or -not $Facts.ForwardHistory){return $false}
+    if($Facts.PhysicalStage -eq 23 -and (-not $Facts.ContainsKey('Source19ForwardHistory') -or
+       $Facts.Source19ForwardHistory -isnot [bool] -or -not $Facts.Source19ForwardHistory)){return $false}
     foreach($flag in @('CurrentSourceVerified','CurrentQualificationVerified')) {
       if(-not $Facts.ContainsKey($flag) -or $Facts[$flag] -isnot [bool] -or -not $Facts[$flag]){return $false}
     }
@@ -9785,6 +9943,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Root=$rootForward; Branch=$branch; Base=$compatibilityHistory.Base
       Stage=$compatibilityHistory.PhaseStage; Phase=$ProductionPhase; Owners=$effectiveOwners
       PhysicalStage=$compatibilityHistory.Stage;ForwardHistory=$compatibilityHistory.Forward
+      Source19ForwardHistory=$compatibilityHistory.Source19Forward
       BaseGraphValid=$true; SourceRemotesExact=$true; NativeUnchanged=$true
       GenerationExact=$true; BindingsExact=$true; HistoryValid=$true
       Clean=(Test-ProductionWorktreeClean)
@@ -13136,7 +13295,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
     if ($octoberCompatibilityIdentity) {
-      Assert-Coordination ($compatibilityHistory.Stage -eq 21 -and $compatibilityHistory.Forward -and
+      Assert-Coordination ($compatibilityHistory.Stage -eq ($compatibilityHistory.CaptureIndex+2) -and $compatibilityHistory.Forward -and
         $compatibilityHistory.PhaseStage -eq 19 -and
         (Test-OctoberCompatibilityQualification $compatibilityHistory) -and
         (Test-ProductionWorktreeClean) -and
@@ -13597,7 +13756,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Assert-Coordination ($approvedCommits.Count -eq 1 -and $approvedBranches.Count -eq 1 -and
         $approvedBranches[0] -ceq (Get-OctoberCompatibilityBinding).branch) 'Final compatibility integration requires exactly the qualified successor branch.'
       $qualifiedHistory=Get-OctoberCompatibilityHistoryStage ([string]$approvedCommits[0])
-      Assert-Coordination ($qualifiedHistory.Stage -eq 21 -and $qualifiedHistory.Forward -and
+      Assert-Coordination ($qualifiedHistory.Stage -eq ($qualifiedHistory.CaptureIndex+2) -and $qualifiedHistory.Forward -and
         $qualifiedHistory.PhaseStage -eq 19 -and
         (Test-OctoberCompatibilityPublishedForwardCheckpoint $qualifiedHistory.Head)) 'Final compatibility integration rejects E/G/C/L or incomplete source qualification.'
       Assert-Coordination ($integrationMerges.Count -eq 1) 'Final compatibility integration requires one automatic merge only.'
