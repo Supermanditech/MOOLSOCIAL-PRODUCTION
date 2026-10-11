@@ -12,6 +12,7 @@ param(
   [switch]$RequireCurrentPrimaryVisualReviewProbes,
   [switch]$RequireSource17ForwardAmendmentProbes,
   [switch]$RequireSource19ForwardAmendmentProbes,
+  [switch]$RequireSource21ForwardAmendmentProbes,
   [switch]$RequireSource19FullDependencyProbes,
   [ValidateSet('publication_contracts','impacted_store_buy','store_layout_and_recovery','enabled_review_fixture')]
   [string]$CaptureCompatibilityReport,
@@ -2066,6 +2067,196 @@ function Invoke-OctoberCompatibilitySource19HistoryProbes {
   return $count
 }
 
+function Invoke-OctoberCompatibilitySource21HistoryProbes {
+  # Actual history/qualification-source predicates with labelled future Git
+  # objects. Existing sealed objects are read from Git; no commit is created.
+  $prefixHistory=Get-OctoberCompatibilityHistoryStage '43ea27a81e7c1876abc0df15b39342da96b63c10'
+  Assert-RepairContract ($prefixHistory.Stage -eq 22 -and $prefixHistory.PhaseStage -eq 16 -and
+    $prefixHistory.Source21Preparation -and $prefixHistory.Forward) 'Source21 must select its exact metadata preparation, not capture/Q.'
+  $prefix=@($prefixHistory.Commits);$metadata=('a'*40);$source=('b'*40);$qualified=('c'*40)
+  $document=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
+  $delta=Read-OctoberCompatibilitySource21ForwardAmendment -FromWorkingTree
+  $originalGit=(Get-Command Get-OctoberCompatibilityGitLines -CommandType Function).ScriptBlock
+  $gitExecutable=(Get-Command git.exe -CommandType Application | Select-Object -First 1).Source
+  $immutableCache=@{};$count=0
+  foreach($case in @('metadata','source','qualified','metadata-parent','metadata-owner','metadata-apps',
+      'source-owner','source-runtime','qualified-apps','missing-delta','duplicate-delta','changed-original','forged-roles')) {
+    & {
+      $tip=if($case -cin @('source','source-owner','source-runtime')){$source}elseif($case -cin @('qualified','qualified-apps')){$qualified}else{$metadata}
+      $graph=@($prefix)+@($metadata);if($tip -cin @($source,$qualified)){$graph+=@($source)};if($tip -ceq $qualified){$graph+=@($qualified)}
+      $observations=@{Ancestry=0;QualificationSourceReads=0;Unexpected=$false;MutationHits=0}
+      function git {
+        if(($args -join '|') -ceq ('-C|'+$root+'|merge-base|--is-ancestor|'+$prefixHistory.Base+'|'+$tip)) {
+          $observations.Ancestry++;$global:LASTEXITCODE=0;return
+        }
+        & $gitExecutable @args
+      }
+      function Get-OctoberCompatibilityGitLines([string[]]$Arguments) {
+        $query=$Arguments -join '|'
+        if($query -ceq ('rev-list|--reverse|'+$prefixHistory.Base+'..'+$tip) -or
+           $query -ceq ('rev-list|--first-parent|--reverse|'+$prefixHistory.Base+'..'+$tip)){return $graph}
+        foreach($index in 22..($graph.Count-1)) {
+          $commit=[string]$graph[$index];$entry=$delta.chain[$index-22]
+          if($query -ceq ('show|-s|--format=%P|'+$commit)) {
+            if($index -eq 22 -and $case -ceq 'metadata-parent'){$observations.MutationHits++;return ('f'*40)}
+            return [string]$graph[$index-1]
+          }
+          if($query -ceq ('show|-s|--format=%s|'+$commit)){return [string]$entry.subject}
+          if($query -ceq ('diff-tree|--no-commit-id|--name-only|-r|'+$commit)) {
+            if(($index -eq 22 -and $case -ceq 'metadata-owner') -or ($index -eq 23 -and $case -ceq 'source-owner')){
+              $observations.MutationHits++;return @($entry.owners)+@('apps/mobile/lib/unowned.dart')
+            }
+            return @($entry.owners)
+          }
+          if($query -ceq ('show|'+$commit+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')) {
+            switch($case) {
+              'missing-delta' {$observations.MutationHits++;return $document.Substring(0,$document.IndexOf('<!-- COMPATIBILITY_SOURCE21_FORWARD_AMENDMENT_JSON_BEGIN -->'))}
+              'duplicate-delta' {$observations.MutationHits++;return $document+"`n"+$document}
+              'changed-original' {$observations.MutationHits++;return $document.Replace('current_successor_and_qualification_specification_not_admission','changed-original')}
+              'forged-roles' {$observations.MutationHits++;return $document.Replace('"captureSourceIndex":23','"captureSourceIndex":21')}
+              default {return $document}
+            }
+          }
+          if($query -ceq ('rev-parse|'+$commit+':apps|'+$graph[$index-1]+':apps')) {
+            if(($index -eq 22 -and $case -ceq 'metadata-apps') -or ($index -eq 24 -and $case -ceq 'qualified-apps')){
+              $observations.MutationHits++;return @(('e'*40),('d'*40))
+            }
+            $apps=if($index -eq 22){'dcbf4f8f0fa63858427cc7a7879738b69f8093ff'}else{('d'*40)}
+            return @($apps,$apps)
+          }
+          if($query -ceq ('rev-parse|'+$commit+':apps/mobile/lib|3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib')) {
+            if($index -eq 23 -and $case -ceq 'source-runtime'){$observations.MutationHits++;return @(('e'*40),'1636d17025a9e80b362709f24c600d976ed6030f')}
+            return @('1636d17025a9e80b362709f24c600d976ed6030f','1636d17025a9e80b362709f24c600d976ed6030f')
+          }
+        }
+        # Cache only immutable sealed-object reads, not status, refs or paths.
+        if($query.Contains($metadata) -or $query.Contains($source) -or $query.Contains($qualified)){$observations.Unexpected=$true;throw 'Unexpected future-object query in labelled fixture'}
+        if($immutableCache.ContainsKey($query)){return $immutableCache[$query]}
+        $lines=@(& $originalGit $Arguments)
+        if($Arguments[0] -cin @('show','diff-tree') -or ($Arguments[0] -ceq 'rev-parse' -and
+            @($Arguments|Select-Object -Skip 1|Where-Object {$_ -cnotmatch '\A[0-9a-f]{40}:.+\z'}).Count -eq 0)){$immutableCache[$query]=$lines}
+        return $lines
+      }
+      $accepted=$false;$result=$null;$rejection=''
+      $stagePayloads=[Collections.Generic.List[object]]::new()
+      try {Get-OctoberCompatibilityHistoryStage $tip|ForEach-Object {$stagePayloads.Add($_)};$accepted=$true;if($stagePayloads.Count -eq 1){$result=$stagePayloads[0]}}catch{$rejection=$_.Exception.Message}
+      $expected=$case -cin @('metadata','source','qualified')
+      Assert-RepairContract ($accepted -eq $expected -and $observations.Ancestry -eq 1) ('forward immutable graph mismatch: '+$case+'; '+$rejection)
+      if($observations.Unexpected){throw 'Unexpected future query invalidates graph fixture'}
+      if(-not $expected) {
+        $expectedReason=switch($case) {
+          'metadata-parent' {'Compatibility successor parent/subject changed.'}
+          {$_ -cin @('metadata-owner','source-owner')} {'Compatibility successor changed unexpected owners.'}
+          {$_ -cin @('metadata-apps','qualified-apps')} {'Compatibility metadata commit changed apps.'}
+          'source-runtime' {'Forward test/qualification correction changed frozen runtime.'}
+          default {'Capture callback amendment requires exact Source20/21 history.'}
+        }
+        Assert-RepairContract ($observations.MutationHits -gt 0 -and $stagePayloads.Count -eq 0 -and
+          $rejection -ceq ('Codex subagent coordination gate rejected: '+$expectedReason)) ('negative did not reach intended discriminator: '+$case+'; '+$rejection)
+      }elseif($stagePayloads.Count -ne 1 -or $result -isnot [hashtable]){throw 'Positive graph emitted wrong stage payload'}
+      if($expected) {
+        Assert-RepairContract ($result.Stage -eq $graph.Count -and $result.PhaseStage -eq ($graph.Count-6) -and
+          $result.Forward -and $result.Source21Forward -and -not $result.Source21Preparation -and $result.ContractIndex -eq 22 -and
+          $result.CaptureIndex -eq 23) ('forward roles were inferred from old stage count: '+$case)
+      }
+      if($case -ceq 'metadata') {
+        # A caller's old-Q role fields cannot change independently recollected
+        # forward count19 into qualified count21 or start source-proof reads.
+        $forged=$result.Clone();$forged.PhaseStage=19;$forged.ContractIndex=16;$forged.CaptureIndex=17
+        function Read-OctoberCompatibilityCurrentSourceState {
+          $observations.QualificationSourceReads++;throw 'Premature source proof read.'
+        }
+        foreach($selection in @('working','index','committed')) {
+          $q=Read-OctoberCompatibilityCurrentQualificationProof -History $forged -FromWorkingTree:($selection -ceq 'working') -FromIndex:($selection -ceq 'index')
+          Assert-RepairContract ($null -eq $q -and $observations.QualificationSourceReads -eq 0) 'old stage19 or forged source roles qualified forward metadata.'
+        }
+      }
+    }
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilitySource21ReaderProbes {
+  # Actual reader and exact sealed delta; document transport alone is mocked.
+  $document=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
+  $positive=Read-OctoberCompatibilitySource21ForwardAmendment -FromWorkingTree
+  Assert-RepairContract ($null -ne $positive) 'Exact Source21 working delta rejected.'
+  $block=[regex]::Match($document,'(?s)<!-- COMPATIBILITY_SOURCE21_FORWARD_AMENDMENT_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_SOURCE21_FORWARD_AMENDMENT_JSON_END -->')
+  $probeText=$document;$observations=@{Reads=0;Expected='';Unexpected=$false};$count=1
+  function Get-OctoberCompatibilityGitLines([string[]]$Arguments) {
+    $observations.Reads++
+    if(($Arguments -join '|') -cne $observations.Expected){$observations.Unexpected=$true;throw 'Wrong Source21 document source.'}
+    return $probeText
+  }
+  foreach($selection in @('index','commit')) {
+    $observations.Expected=if($selection -ceq 'index'){'show|:docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'}else{'show|'+('a'*40)+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'}
+    $observations.Reads=0;$observations.Unexpected=$false
+    $result=if($selection -ceq 'index'){Read-OctoberCompatibilitySource21ForwardAmendment -FromIndex}else{Read-OctoberCompatibilitySource21ForwardAmendment -Commit ('a'*40)}
+    Assert-RepairContract ($null -ne $result -and $observations.Reads -eq 5 -and -not $observations.Unexpected) 'Source21 reader lost inherited validation or selected wrong source.'
+    $count++
+  }
+  $observations.Expected='show|:docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+  foreach($property in $positive.PSObject.Properties.Name) {
+    $changed=$positive|ConvertTo-Json -Depth 40 -Compress|ConvertFrom-Json
+    $changed.PSObject.Properties[$property].Value='altered'
+    $probeText=$document.Replace($block.Groups[1].Value,($changed|ConvertTo-Json -Depth 40 -Compress))
+    $observations.Reads=0;$observations.Unexpected=$false
+    Assert-RepairContract ($null -eq (Read-OctoberCompatibilitySource21ForwardAmendment -FromIndex) -and
+      $observations.Reads -eq 5 -and -not $observations.Unexpected) ('Altered Source21 property admitted: '+$property)
+    $count++
+  }
+  foreach($candidate in @($document.Replace($block.Value,''),($document+"`n"+$block.Value),
+      $document.Replace($block.Groups[1].Value,'{malformed}'),
+      $document.Replace('source19_forward_qualification_amendment_not_qualification','altered-inherited-contract'))) {
+    $probeText=$candidate;$observations.Reads=0;$observations.Unexpected=$false
+    Assert-RepairContract ($null -eq (Read-OctoberCompatibilitySource21ForwardAmendment -FromIndex) -and
+      -not $observations.Unexpected) 'Missing/duplicate/malformed Source21 or changed inherited contract admitted.'
+    $count++
+  }
+  $probeText=$document;$observations.Reads=0;$observations.Unexpected=$false
+  foreach($arguments in @(@{},@{Commit=''},@{Commit='bad'},@{FromWorkingTree=$true;FromIndex=$true},
+      @{Commit=('a'*40);FromIndex=$true},@{Commit=('a'*40);FromIndex=$true;FromWorkingTree=$true})) {
+    Assert-RepairContract ($null -eq (Read-OctoberCompatibilitySource21ForwardAmendment @arguments) -and
+      $observations.Reads -eq 0 -and -not $observations.Unexpected) 'Invalid Source21 selector reached document transport.'
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilitySource21FinalStageProbes {
+  # Facts are labelled unit mocks; execute the actual final stage predicate.
+  $binding=Get-OctoberCompatibilityBinding
+  $seed=@{Role=$binding.role;Task=$binding.task;Lane=$binding.lane;WorkId=$binding.workId;TicketId=$binding.ticketId;
+    Root=$binding.worktreePath;Branch=$binding.branch;Base=$binding.baselineHead;Stage=19;Phase='handoff';
+    PhysicalStage=25;ForwardHistory=$true;Source19ForwardHistory=$true;Source21ForwardHistory=$true;
+    CurrentSourceVerified=$true;CurrentQualificationVerified=$true;BaseGraphValid=$true;SourceRemotesExact=$true;
+    NativeUnchanged=$true;GenerationExact=$true;BindingsExact=$true;HistoryValid=$true;NTestAdmissionVerified=$true;
+    Clean=$true;HostQualificationPassed=$true;Owners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
+  $count=0
+  foreach($mode in @('valid','missing-forward','false-forward','coerced-forward','metadata-forged-phase','wrong-phase',
+      'old-physical-count','missing-proof','dirty','unverified-native','unowned','stale-generation','missing-source19')) {
+    $facts=$seed.Clone()
+    switch($mode) {
+      'missing-forward' {$facts.Remove('Source21ForwardHistory')}
+      'false-forward' {$facts.Source21ForwardHistory=$false}
+      'coerced-forward' {$facts.Source21ForwardHistory='true'}
+      'metadata-forged-phase' {$facts.PhysicalStage=23}
+      'wrong-phase' {$facts.Stage=18}
+      'old-physical-count' {$facts.PhysicalStage=21}
+      'missing-proof' {$facts.CurrentQualificationVerified=$false}
+      'dirty' {$facts.Clean=$false}
+      'unverified-native' {$facts.NativeUnchanged=$false}
+      'unowned' {$facts.Owners+=@('apps/mobile/lib/unowned.dart')}
+      'stale-generation' {$facts.GenerationExact=$false}
+      'missing-source19' {$facts.Remove('Source19ForwardHistory')}
+    }
+    Assert-RepairContract ((Test-OctoberCompatibilityStageFacts $facts) -eq ($mode -ceq 'valid')) ('Source21 final stage discriminator changed: '+$mode)
+    $count++
+  }
+  return $count
+}
+
 function Invoke-OctoberCompatibilityForwardConsumerProbes {
   # Execute the actual final-admission assertion from each consumer. Future
   # qualifier results are labelled mocks, never genuine published admission.
@@ -2095,7 +2286,11 @@ function Invoke-OctoberCompatibilityForwardConsumerProbes {
         @{Name='current-metadata';History=@{Stage=21;PhaseStage=17;Forward=$true;CaptureIndex=21;Head=('d'*40)};Verified=$true;Expected=$false;Calls=0},
         @{Name='current-capture';History=@{Stage=22;PhaseStage=18;Forward=$true;CaptureIndex=21;Head=('e'*40)};Verified=$true;Expected=$false;Calls=0},
         @{Name='current-qualified-without-proof';History=@{Stage=23;PhaseStage=19;Forward=$true;CaptureIndex=21;Head=('f'*40)};Verified=$false;Expected=$false;Calls=1},
-        @{Name='current-qualified-mechanism';History=@{Stage=23;PhaseStage=19;Forward=$true;CaptureIndex=21;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1})) {
+        @{Name='current-qualified-mechanism';History=@{Stage=23;PhaseStage=19;Forward=$true;CaptureIndex=21;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1},
+        @{Name='corrected-metadata-forged-phase';History=@{Stage=23;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('d'*40)};Verified=$true;Expected=$false;Calls=0},
+        @{Name='corrected-capture';History=@{Stage=24;PhaseStage=18;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('e'*40)};Verified=$true;Expected=$false;Calls=0},
+        @{Name='corrected-qualified-without-proof';History=@{Stage=25;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('f'*40)};Verified=$false;Expected=$false;Calls=1},
+        @{Name='corrected-qualified-mechanism';History=@{Stage=25;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1})) {
       if(-not $probe.History.ContainsKey('CaptureIndex')){$probe.History.CaptureIndex=19}
       & {
         $observations=@{Calls=0;WrongHead=$false};$qualifiedHistory=$probe.History;$compatibilityHistory=$probe.History
@@ -2126,13 +2321,14 @@ if($RequireSource19FullDependencyProbes) {
     -not $RequireCompatibilityLiveAdmissionProbes -and -not $RequireCurrentSelectionAggregationProbes -and
     -not $RequireCurrentPrimaryReviewBindingProbes -and -not $RequireCurrentPrimaryAssertionReviewProbes -and
     -not $RequireCurrentPrimaryVisualReviewProbes -and -not $RequireSource17ForwardAmendmentProbes -and
-    -not $RequireSource19ForwardAmendmentProbes -and -not $CaptureCompatibilityReport -and
+    -not $RequireSource19ForwardAmendmentProbes -and -not $RequireSource21ForwardAmendmentProbes -and -not $CaptureCompatibilityReport -and
     $CaptureExecutionId -ceq 'default' -and $CaptureMode -ceq 'behavior_only') 'dependency probes require standalone noncapture mode.'
   Invoke-OctoberCompatibilitySource19FullDependencyProbes
   return
 }
 
-if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentProbes) {
+if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentProbes -or $RequireSource21ForwardAmendmentProbes) {
+  Assert-RepairContract (@($RequireSource17ForwardAmendmentProbes,$RequireSource19ForwardAmendmentProbes,$RequireSource21ForwardAmendmentProbes|Where-Object {$_}).Count -eq 1 -and -not $RequireSource19FullDependencyProbes) 'select exactly one forward reader probe mode.'
   Assert-RepairContract (-not $RequireQualifiedGraph -and -not $RequireOctoberSourceAdmission -and
     -not $RequireOctoberBootstrapProbes -and -not $RequireCompatibilityStageProbes -and
     -not $RequireCompatibilityLiveAdmissionProbes -and -not $RequireCurrentSelectionAggregationProbes -and
@@ -2152,6 +2348,8 @@ if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentPr
       'Read-OctoberCompatibilityCurrentQualificationProof','Read-OctoberCompatibilityCurrentQualificationContract',
       'Read-OctoberCompatibilityCurrentSuccessorSpecification','Read-OctoberCompatibilitySource17ForwardAmendment',
       'Read-OctoberCompatibilitySource19ForwardAmendment',
+      'Read-OctoberCompatibilitySource21ForwardAmendment',
+      'Test-OctoberCompatibilityStageFacts',
       'Read-OctoberCompatibilityJsonObject','Get-OctoberCompatibilityByteHash','Get-OctoberCompatibilityGitLines')) {
     $nodes=@($forwardAst.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$true))
     Assert-RepairContract ($nodes.Count -eq 1) ('missing/duplicate forward reader dependency '+$name)
@@ -2206,6 +2404,14 @@ if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentPr
       LiveAdmission=$false;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
   }
   $historyCases=Invoke-OctoberCompatibilityForwardHistoryProbes
+  if($RequireSource21ForwardAmendmentProbes) {
+    $current=Get-OctoberCompatibilityHistoryStage '43ea27a81e7c1876abc0df15b39342da96b63c10'
+    Assert-RepairContract ($current.Stage -eq 22 -and $current.PhaseStage -eq 16 -and $current.Source21Preparation -and -not $current.Source21Forward) 'Actual Source21 is preparation only, not qualified.'
+    $source21HistoryCases=Invoke-OctoberCompatibilitySource21HistoryProbes
+    $source21ReaderCases=Invoke-OctoberCompatibilitySource21ReaderProbes
+    $source21FinalCases=Invoke-OctoberCompatibilitySource21FinalStageProbes
+    [pscustomobject]@{Source21HistoryCases=$source21HistoryCases;Source21ReaderCases=$source21ReaderCases;Source21FinalStageCases=$source21FinalCases;ActualSealedPrefixRead=$true;FutureObjectsMocked=$true;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+  }
   if($RequireSource19ForwardAmendmentProbes) {
     $current=Get-OctoberCompatibilityHistoryStage '51b3dc076ab10ff4f233a420791e4d2b25d2512a'
     Assert-RepairContract ($current.Stage -eq 20 -and $current.PhaseStage -eq 16 -and $current.Source19Preparation -and -not $current.Source19Forward) 'Actual Source19 is preparation only, not qualified.'
@@ -2245,6 +2451,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       'Read-OctoberCompatibilityCurrentQualificationContract','Read-OctoberCompatibilityCurrentSuccessorSpecification',
       'Read-OctoberCompatibilitySource17ForwardAmendment',
       'Read-OctoberCompatibilitySource19ForwardAmendment',
+      'Read-OctoberCompatibilitySource21ForwardAmendment',
+      'Test-OctoberCompatibilitySource21Preparation','Test-OctoberCompatibilitySource21CurrentPreparation',
       'Read-OctoberCompatibilityCurrentSourceState','Read-OctoberCompatibilityCurrentCaptureSource',
       'Test-OctoberCompatibilityCurrentGeometry','Read-OctoberCompatibilityCurrentSelectedRiskBindings',
       'Read-OctoberCompatibilityCurrentRiskInventoryBuffer','Read-OctoberCompatibilityCurrentRiskInventoryFile',
