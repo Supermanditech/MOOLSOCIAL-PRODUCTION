@@ -6,10 +6,16 @@ param(
   [switch]$RequireOctoberBootstrapProbes,
   [switch]$RequireCompatibilityStageProbes,
   [switch]$RequireCompatibilityLiveAdmissionProbes,
+  [switch]$RequireCurrentSelectionAggregationProbes,
+  [switch]$RequireCurrentPrimaryReviewBindingProbes,
+  [switch]$RequireCurrentPrimaryAssertionReviewProbes,
+  [switch]$RequireCurrentPrimaryVisualReviewProbes,
   [ValidateSet('publication_contracts','impacted_store_buy','store_layout_and_recovery','enabled_review_fixture')]
   [string]$CaptureCompatibilityReport,
   [ValidateSet('default','localstock_review','workspace_capture','historical_store_review','historical_store_capture','store_live_capture','founder_capture')]
-  [string]$CaptureExecutionId = 'default'
+  [string]$CaptureExecutionId = 'default',
+  [ValidateSet('behavior_only','selected_visual_risks')]
+  [string]$CaptureMode = 'behavior_only'
 )
 
 Set-StrictMode -Version Latest
@@ -23,6 +29,924 @@ $checker = Get-Content -Raw -LiteralPath $checkerPath
 
 function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
+}
+
+function New-OctoberCompatibilityCurrentCaptureEnvelope {
+  param([hashtable]$Plan,[hashtable]$SourceIdentityAfter,[string]$StartedAtUtc,[string]$FinishedAtUtc,
+    [string]$LogSha256,[string]$StderrRelativePath,[string]$StderrSha256,[int]$NativeExitCode,
+    [bool]$CleanBefore,[bool]$CleanAfter,[bool]$GuardCompleted)
+  # Serialization only. The caller must derive the plan from sealed source,
+  # retain actual process output, restore support and independently validate
+  # retained bytes/postflight. Failed runs retain failed receipts, never passes.
+  if($null -eq $Plan -or $null -eq $Plan.SourceIdentity){throw 'Current envelope requires a source-bound execution plan.'}
+  $identity=$Plan.SourceIdentity.Clone()
+  $marker=[ordered]@{type='moolsocialSource';schemaVersion=2;reportId=$Plan.Id;
+    executionId=$Plan.ExecutionId;mode=$Plan.Mode;runId=$Plan.RunId;sourceIdentity=$identity.Clone();
+    registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3';
+    runtimeDefines=@($Plan.RuntimeDefines)}
+  $receipt=[ordered]@{schemaVersion=2;producer='test-codex-integration-repair-coordination-policy.ps1';
+    producerGitBlob=$identity.producerBlob;reportId=$Plan.Id;executionId=$Plan.ExecutionId;
+    mode=$Plan.Mode;runId=$Plan.RunId;sourceIdentity=$identity.Clone();
+    sourceIdentityAfter=$(if($null -eq $SourceIdentityAfter){$null}else{$SourceIdentityAfter.Clone()});
+    registrySha256=$marker.registrySha256;executable='C:/Users/jisal/develop/flutter/bin/flutter.bat';
+    workingDirectory=(Get-OctoberCompatibilityBinding).worktreePath+'/apps/mobile';
+    cleanBefore=$CleanBefore;cleanAfter=$CleanAfter;guardCompleted=$GuardCompleted;exitCode=$NativeExitCode;
+    arguments=@($Plan.Arguments);runtimeDefines=@($Plan.RuntimeDefines);
+    startedAtUtc=$StartedAtUtc;finishedAtUtc=$FinishedAtUtc;stdoutSha256=$LogSha256;
+    stderrPath=$StderrRelativePath;stderrSha256=$StderrSha256}
+  return [pscustomobject]@{Marker=$marker;Receipt=$receipt;QualificationPassed=$false;ApkAuthority=$false}
+}
+
+function Convert-OctoberCompatibilityFlutterBatchArguments {
+  param([object[]]$Arguments)
+  # Windows .bat transport strips unescaped JSON quotes. This changes transport
+  # spelling only; the Dart flag value and receipt's logical argv stay unchanged.
+  if($null -eq $Arguments -or $Arguments.Count -eq 0){throw 'Empty Flutter transport arguments.'}
+  $prefix='--dart-define=MOOL_CURRENT_QUALIFICATION_SELECTED_VISUAL_SLOTS='
+  $selected=$false;$encoded=[Collections.Generic.List[string]]::new()
+  foreach($argument in $Arguments) {
+    if($argument -isnot [string] -or [string]::IsNullOrEmpty($argument) -or $argument -match '[\x00\r\n]'){throw 'Malformed Flutter transport argument.'}
+    if($argument.StartsWith($prefix,[StringComparison]::Ordinal)) {
+      if($selected){throw 'Duplicate selected-slot transport argument.'}
+      $selected=$true
+      $payload=$argument.Substring($prefix.Length)
+      if($payload -cnotmatch '\A\["[A-Za-z0-9._-]+"(?:,"[A-Za-z0-9._-]+")*\]\z'){throw 'Malformed selected-slot transport JSON.'}
+      $encoded.Add($argument.Replace('"','\"'))
+    }else{$encoded.Add($argument)}
+  }
+  return $encoded.ToArray()
+}
+
+function Invoke-OctoberCompatibilityNativeBatchStreams {
+  param([string]$BatchPath,[string]$WorkingDirectory,[object[]]$Arguments,
+    [IO.Stream]$Stdout,[IO.Stream]$Stderr,[hashtable]$State)
+  # Transport only. The production caller supplies fixed Flutter/canonical argv;
+  # this helper never determines source, capture or qualification authority.
+  if($null -eq $Arguments -or -not $Arguments.Count){throw 'Unsupported native batch arguments.'}
+  $selectedPrefix='--dart-define=MOOL_CURRENT_QUALIFICATION_SELECTED_VISUAL_SLOTS='
+  $selectedSeen=$false
+  foreach($argument in $Arguments) {
+    if($argument -isnot [string] -or -not $argument.Length -or $argument -match '[\x00-\x1f%]' -or $argument.EndsWith('\',[StringComparison]::Ordinal)){
+      throw 'Unsupported native batch arguments.'
+    }
+    if($argument.Contains('!') -and -not ($argument.StartsWith('--name=^(?:',[StringComparison]::Ordinal) -and
+      $argument.EndsWith(')$(?![\s\S])',[StringComparison]::Ordinal) -and $argument.IndexOf('!') -eq $argument.LastIndexOf('!'))){
+      throw 'Unsupported native batch arguments.'
+    }
+    if($argument.StartsWith($selectedPrefix,[StringComparison]::Ordinal)) {
+      if($selectedSeen){throw 'Unsupported native batch arguments.'}
+      $selectedSeen=$true
+      $payload=$argument.Substring($selectedPrefix.Length)
+      # Only the converter's exact compact JSON spelling may contain quotes.
+      # Scope/risk authority belongs to the independently reconstructed plan.
+      $logicalPayload=$payload.Replace('\"','"')
+      if($logicalPayload -cnotmatch '\A\["[A-Za-z0-9._-]+"(?:,"[A-Za-z0-9._-]+")*\]\z' -or
+        $logicalPayload.Replace('"','\"') -cne $payload){throw 'Unsupported native batch arguments.'}
+      $slotValues=ConvertFrom-Json -InputObject $logicalPayload
+      [string[]]$orderedSlots=@($slotValues);[Array]::Sort($orderedSlots,[StringComparer]::Ordinal)
+      $uniqueSlots=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      foreach($slot in $slotValues){if(-not $uniqueSlots.Add($slot)){throw 'Unsupported native batch arguments.'}}
+      if((ConvertTo-Json -InputObject @($orderedSlots) -Compress) -cne $logicalPayload){throw 'Unsupported native batch arguments.'}
+    }elseif($argument.Contains('"')){throw 'Unsupported native batch arguments.'}
+  }
+  foreach($path in @($BatchPath,$WorkingDirectory)) {
+    if($path -cnotmatch '\A[A-Za-z]:[\\/]' -or $path -match '[\x00-\x1f"%!]'){throw 'Unsupported native batch path.'}
+    $ancestor=[IO.Path]::GetFullPath($path)
+    while($ancestor) {
+      if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Native batch path traverses a reparse point.'}
+      $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+    }
+  }
+  if(-not(Test-Path -LiteralPath $BatchPath -PathType Leaf) -or [IO.Path]::GetExtension($BatchPath) -ine '.bat' -or
+    -not(Test-Path -LiteralPath $WorkingDirectory -PathType Container)){throw 'Unsupported native batch path.'}
+  if($null -eq $Stdout -or $null -eq $Stderr -or -not $Stdout.CanWrite -or -not $Stderr.CanWrite -or
+    [object]::ReferenceEquals($Stdout,$Stderr) -or $null -eq $State -or $State.Count){throw 'Native batch requires distinct writable streams and fresh state.'}
+  $State.started=$false;$State.exitObserved=$false;$State.exitCode=-1;$State.copiesCompleted=$false
+  $process=[Diagnostics.Process]::new();$copies=[Collections.Generic.List[Threading.Tasks.Task]]::new()
+  $failures=[Collections.Generic.List[string]]::new()
+  $cancel=[Threading.CancellationTokenSource]::new();$settlement=$null
+  try {
+    $process.StartInfo.FileName=Join-Path ([Environment]::SystemDirectory) 'cmd.exe'
+    $quoted=@($Arguments|ForEach-Object {'"'+$_+'"'}) -join ' '
+    $process.StartInfo.Arguments='/d /v:off /s /c ""'+[IO.Path]::GetFullPath($BatchPath)+'" '+$quoted+'"'
+    $process.StartInfo.WorkingDirectory=[IO.Path]::GetFullPath($WorkingDirectory)
+    $process.StartInfo.UseShellExecute=$false;$process.StartInfo.CreateNoWindow=$true
+    $process.StartInfo.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
+    $process.StartInfo.RedirectStandardOutput=$true;$process.StartInfo.RedirectStandardError=$true
+    if(-not $process.Start()){throw 'Native batch process did not start.'}
+    $State.started=$true
+    $copies.Add($process.StandardOutput.BaseStream.CopyToAsync($Stdout,81920,$cancel.Token))
+    $copies.Add($process.StandardError.BaseStream.CopyToAsync($Stderr,81920,$cancel.Token))
+    while($true) {
+      $exited=$process.WaitForExit(200)
+      if($exited -and -not $State.exitObserved) {
+        $State.exitCode=[int]$process.ExitCode;$State.exitObserved=$true;$settlement=[Diagnostics.Stopwatch]::StartNew()
+      }
+      if($copies[0].IsFaulted -or $copies[1].IsFaulted){throw 'Native stream copy failed while child was active.'}
+      if($exited -and $copies[0].IsCompleted -and $copies[1].IsCompleted){break}
+      if($exited) {
+        if($settlement.ElapsedMilliseconds -ge 15000){throw 'Native streams did not settle after process exit.'}
+        [Threading.Thread]::Sleep(20)
+      }
+    }
+  } catch {
+    $failures.Add($_.Exception.Message)
+    $cancel.Cancel()
+    if($State.started) {
+      try {
+        if(-not $process.HasExited) {
+          # Settle only this invocation's owned process tree, never broad names.
+          $treeKill=$process.GetType().GetMethod('Kill',[Type[]]@([bool]))
+          if($null -ne $treeKill){$null=$treeKill.Invoke($process,@($true))}
+          else {
+            $killer=[Diagnostics.Process]::new()
+            try {
+              $killer.StartInfo.FileName=Join-Path ([Environment]::SystemDirectory) 'taskkill.exe'
+              $killer.StartInfo.Arguments='/PID '+[int]$process.Id+' /T /F'
+              $killer.StartInfo.UseShellExecute=$false;$killer.StartInfo.CreateNoWindow=$true
+              $killer.StartInfo.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
+              $killer.StartInfo.RedirectStandardOutput=$true;$killer.StartInfo.RedirectStandardError=$true
+              if(-not $killer.Start()){throw 'Owned process termination helper did not start.'}
+              $killerOut=$killer.StandardOutput.BaseStream.CopyToAsync([IO.Stream]::Null)
+              $killerErr=$killer.StandardError.BaseStream.CopyToAsync([IO.Stream]::Null)
+              if(-not $killer.WaitForExit(10000)) {
+                $killer.Kill()
+                if(-not $killer.WaitForExit(5000)){throw 'Owned process termination helper did not exit after stop.'}
+                throw 'Owned process termination helper timed out.'
+              }
+              foreach($copy in @($killerOut,$killerErr)) {
+                if(-not $copy.Wait(5000)){throw 'Owned process termination output did not settle.'}
+                $null=$copy.GetAwaiter().GetResult()
+              }
+              if($killer.ExitCode -ne 0 -and -not $process.HasExited){throw 'Owned native process tree could not be settled.'}
+            } finally {try{$killer.Dispose()}catch{$failures.Add($_.Exception.Message)}}
+          }
+        }
+        if(-not $process.WaitForExit(15000)){throw 'Owned native process did not settle after termination.'}
+        $State.exitCode=[int]$process.ExitCode;$State.exitObserved=$true
+      } catch {$failures.Add($_.Exception.Message)}
+    }
+  } finally {
+    $copyFailures=0
+    if($failures.Count -and $State.started) {
+      # Close only process-owned read pipes; output streams remain caller-owned.
+      foreach($pipe in @($process.StandardOutput.BaseStream,$process.StandardError.BaseStream)) {
+        try{$pipe.Dispose()}catch{$failures.Add($_.Exception.Message)}
+      }
+    }
+    foreach($copy in $copies){
+      try {
+        if(-not $copy.Wait(15000)){throw 'Native copy did not settle within failure cleanup boundary.'}
+        $null=$copy.GetAwaiter().GetResult()
+      }catch{$copyFailures++;$failures.Add($_.Exception.Message)}
+    }
+    $State.copiesCompleted=($copies.Count -eq 2 -and $copyFailures -eq 0)
+    try{$process.Dispose()}catch{$failures.Add($_.Exception.Message)}
+    try{$cancel.Dispose()}catch{$failures.Add($_.Exception.Message)}
+  }
+  if($failures.Count){throw ('Native batch transport failed: '+($failures -join '; '))}
+}
+
+function Invoke-OctoberCompatibilityCurrentBehaviorCapture {
+  param([hashtable]$Plan,[object]$InitialSource,[string]$InventoryPath,[string]$InventorySha256)
+  # Execution evidence only: no Q4, visual approval or APK qualification.
+  if($null -eq $Plan -or $Plan.Mode -cnotin @('behavior_only','selected_visual_risks') -or $null -eq $InitialSource){throw 'Current launcher requires sealed source.'}
+  $selection=$null;$selectionSha=$null;$selectionPath=$null
+  if($Plan.Mode -ceq 'selected_visual_risks') {
+    $selection=New-OctoberCompatibilityCurrentSelectionContext -InventoryPath $InventoryPath -InventorySha256 $InventorySha256 `
+      -ReportId $Plan.Id -ExecutionId $Plan.ExecutionId -RunId $Plan.RunId
+    if($null -eq $selection){throw 'Current selected inventory admission failed.'}
+  }elseif(-not [string]::IsNullOrEmpty($InventoryPath) -or -not [string]::IsNullOrEmpty($InventorySha256)){
+    throw 'Behavior-only capture cannot bind a selection inventory.'
+  }
+  $before=Read-OctoberCompatibilityCurrentCaptureSource
+  if($null -eq $before -or $before.SourceStateIdentity -cne $InitialSource.SourceStateIdentity){throw 'Current source changed before launch.'}
+  foreach($role in $before.SourceIdentity.Keys) {
+    if($Plan.SourceIdentity[$role] -cne $before.SourceIdentity[$role]){throw 'Current execution plan/source mismatch.'}
+  }
+  if($null -ne $selection) {
+    if($selection.Context.sourceStateIdentity -cne $before.SourceStateIdentity){throw 'Selected source snapshot changed before launch.'}
+    foreach($role in $before.SourceIdentity.Keys) {
+      if($selection.InventoryProof.SourceIdentity[$role] -cne $before.SourceIdentity[$role]){throw 'Selected source roles changed before launch.'}
+    }
+    $canonical=$selection.Plan
+  }else{
+    $canonical=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $Plan.Id -ExecutionId $Plan.ExecutionId `
+      -Mode $Plan.Mode -RunId $Plan.RunId -SourceIdentity $before.SourceIdentity
+  }
+  if($null -eq $canonical -or (@($Plan.Keys|Sort-Object) -join '|') -cne (@($canonical.Keys|Sort-Object) -join '|')){throw 'Current execution plan is not canonical.'}
+  foreach($field in $canonical.Keys) {
+    if($field -ceq 'SourceIdentity') {
+      if((@($Plan.SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($canonical.SourceIdentity.Keys|Sort-Object) -join '|')){throw 'Current execution source roles changed.'}
+    }elseif((ConvertTo-Json -InputObject $Plan[$field] -Depth 10 -Compress) -cne (ConvertTo-Json -InputObject $canonical[$field] -Depth 10 -Compress)){
+      throw 'Current execution plan was altered before launch.'
+    }
+  }
+  $Plan=$canonical
+  $transport=@(Convert-OctoberCompatibilityFlutterBatchArguments -Arguments $Plan.Arguments)
+  $flutter='C:/Users/jisal/develop/flutter/bin/flutter.bat'
+  if(-not(Test-Path -LiteralPath $flutter -PathType Leaf)){throw 'Current Flutter executable unavailable.'}
+  foreach($suite in $Plan.Suites) {
+    if(-not(Test-Path -LiteralPath (Join-Path $root ('apps/mobile/test/'+$suite)) -PathType Leaf)){throw 'Current execution suite unavailable.'}
+  }
+  $relative='apps/mobile/build/compat-current-'+$Plan.Id+'-'+$Plan.ExecutionId+'-'+$Plan.RunId+'.jsonl'
+  $log=Join-Path $root $relative;$paths=@($log,($log+'.stderr.txt'),($log+'.capture.json'))
+  if($null -ne $selection){$selectionPath=$relative+'.selection.json';$paths+=@($log+'.selection.json')}
+  $streams=[Collections.Generic.List[IO.FileStream]]::new();$writers=[Collections.Generic.List[IO.StreamWriter]]::new()
+  $fatal=$null;$failure=$null;$cleanAfter=$false;$guardCompleted=$false
+  $cleanupFailures=[Collections.Generic.List[string]]::new()
+  try {
+    foreach($path in $paths) {
+      $ancestor=Split-Path -Parent ([IO.Path]::GetFullPath($path))
+      while($ancestor) {
+        if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Current output traverses a reparse point.'}
+        $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+      }
+      # Reserve each output exclusively. Collisions retain prior bytes.
+      $stream=[IO.File]::Open($path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+      $streams.Add($stream);$writers.Add([IO.StreamWriter]::new($stream,[Text.UTF8Encoding]::new($false),1024,$true))
+    }
+    $logWriter=$writers[0];$errorWriter=$writers[1];$started=[DateTimeOffset]::UtcNow.ToString('o')
+    if($null -ne $selection) {
+      $writers[3].Write((ConvertTo-Json -InputObject $selection.Context -Depth 20 -Compress));$writers[3].Flush()
+      $writers[3].Dispose();$writers[3]=$null;$streams[3].Dispose();$streams[3]=$null
+      $selectionSha=Get-OctoberCoverageBoundHash $paths[3]
+    }
+    $envelope=New-OctoberCompatibilityCurrentCaptureEnvelope -Plan $Plan
+    $logWriter.WriteLine((ConvertTo-Json -InputObject $envelope.Marker -Depth 10 -Compress));$logWriter.Flush()
+    if($null -ne $selection) {
+      $frame=@{type='print';message='moolsocialSelectionContext';selectionContext=@{path=$selectionPath;sha256=$selectionSha}}
+      $logWriter.WriteLine((ConvertTo-Json -InputObject $frame -Depth 10 -Compress));$logWriter.Flush()
+    }
+    $script:compatNativeExit=-1;$guardCompleted=$false;$failure=$null
+    try {
+      $guardExit=Invoke-MoolSocialFlutterWithCleanSupport -RepositoryRoot $root -Invocation {
+        $launchSource=Read-OctoberCompatibilityCurrentCaptureSource
+        if($null -eq $launchSource -or $launchSource.SourceStateIdentity -cne $before.SourceStateIdentity){throw 'Current source changed immediately before native launch.'}
+        foreach($role in $before.SourceIdentity.Keys){if($launchSource.SourceIdentity[$role] -cne $before.SourceIdentity[$role]){throw 'Current source roles changed immediately before native launch.'}}
+        if($null -ne $selection -and ((Get-OctoberCoverageBoundHash $selection.InventoryProof.CanonicalPath) -cne $selection.InventoryProof.Sha256 -or
+          (Get-OctoberCoverageBoundHash $paths[3]) -cne $selectionSha)){throw 'Current selected evidence changed before native launch.'}
+        Push-Location (Join-Path $root 'apps/mobile')
+        try {
+          $nativeState=@{}
+          try {
+            Invoke-OctoberCompatibilityNativeBatchStreams -BatchPath $flutter -WorkingDirectory (Join-Path $root 'apps/mobile') `
+              -Arguments $transport -Stdout $streams[0] -Stderr $streams[1] -State $nativeState
+          } finally {
+            $script:compatNativeExit=if($nativeState.ContainsKey('exitObserved') -and $nativeState.exitObserved){[int]$nativeState.exitCode}else{-1}
+            $global:LASTEXITCODE=$script:compatNativeExit
+          }
+          if($script:compatNativeExit -ne 0){throw ('Current Flutter report exited '+$script:compatNativeExit)}
+        } finally {Pop-Location}
+      }
+      $guardCompleted=([int]$guardExit -eq $script:compatNativeExit)
+      if(-not $guardCompleted){throw 'Current guard/native exit mismatch.'}
+    } catch {$failure=$_}
+    # Independent postflight follows support restoration, including failures.
+    $after=Read-OctoberCompatibilityCurrentCaptureSource
+    $cleanAfter=($null -ne $after -and $after.SourceStateIdentity -ceq $before.SourceStateIdentity)
+    if($cleanAfter){foreach($role in $before.SourceIdentity.Keys){if($after.SourceIdentity[$role] -cne $before.SourceIdentity[$role]){$cleanAfter=$false}}}
+    if($null -ne $selection -and ((Get-OctoberCoverageBoundHash $selection.InventoryProof.CanonicalPath) -cne $selection.InventoryProof.Sha256 -or
+      (Get-OctoberCoverageBoundHash $paths[3]) -cne $selectionSha)){$cleanAfter=$false}
+    $afterIdentity=if($null -ne $after){$after.SourceIdentity}else{$null}
+    $logWriter.Flush();$errorWriter.Flush()
+    $logWriter.Dispose();$writers[0]=$null;$errorWriter.Dispose();$writers[1]=$null
+    $streams[0].Dispose();$streams[0]=$null;$streams[1].Dispose();$streams[1]=$null
+    $envelope=New-OctoberCompatibilityCurrentCaptureEnvelope -Plan $Plan -SourceIdentityAfter $afterIdentity `
+      -StartedAtUtc $started -FinishedAtUtc ([DateTimeOffset]::UtcNow.ToString('o')) `
+      -LogSha256 ((Get-FileHash -LiteralPath $paths[0]).Hash) `
+      -StderrRelativePath ($relative+'.stderr.txt') -StderrSha256 ((Get-FileHash -LiteralPath $paths[1]).Hash) `
+      -NativeExitCode $script:compatNativeExit -CleanBefore $true -CleanAfter $cleanAfter -GuardCompleted $guardCompleted
+    $writers[2].Write((ConvertTo-Json -InputObject $envelope.Receipt -Depth 20));$writers[2].Flush()
+  } catch {$fatal=$_} finally {
+    foreach($writer in $writers){if($null -ne $writer){try{$writer.Dispose()}catch{$cleanupFailures.Add($_.Exception.Message)}}}
+    foreach($stream in $streams){if($null -ne $stream){try{$stream.Dispose()}catch{$cleanupFailures.Add($_.Exception.Message)}}}
+  }
+  if($null -ne $fatal){
+    if($null -ne $failure -or $cleanupFailures.Count) {
+      $earlier=if($null -ne $failure){'earlier native/guard failure: '+$failure.Exception.Message+'; '}else{''}
+      throw ($earlier+'later failure: '+$fatal.Exception.Message+'; cleanup failures: '+($cleanupFailures -join '; '))
+    }
+    throw $fatal
+  }
+  if($cleanupFailures.Count){
+    $nativeFailure=if($null -ne $failure){$failure.Exception.Message+'; '}else{''}
+    throw ($nativeFailure+'Current cleanup failures: '+($cleanupFailures -join '; '))
+  }
+  if($null -ne $failure){throw $failure}
+  if(-not $cleanAfter -or -not $guardCompleted -or $script:compatNativeExit -ne 0){throw 'Current capture failed postflight; original files retained.'}
+  $record=@{executionId=$Plan.ExecutionId;path=$relative;capturePath=$relative+'.capture.json';
+    sha256=(Get-FileHash -LiteralPath $paths[0]).Hash;captureSha256=(Get-FileHash -LiteralPath $paths[2]).Hash;runtimeDefines=@($Plan.RuntimeDefines)}
+  $typed=ConvertTo-Json -InputObject $record -Depth 10 -Compress | ConvertFrom-Json
+  $readArgs=@{Evidence=$typed;ReportId=$Plan.Id;ExecutionId=$Plan.ExecutionId;Mode=$Plan.Mode;RunId=$Plan.RunId;SourceIdentity=$before.SourceIdentity}
+  if($null -ne $selection){$readArgs.SelectedSlots=$selection.Context.selectedSlots;$readArgs.SelectedTestKeys=$selection.Context.selectedTestKeys}
+  $verified=Read-OctoberCompatibilityCurrentExecutionEvidence @readArgs
+  if($null -eq $verified){throw 'Current retained execution rejected; original files retained.'}
+  if($null -ne $selection) {
+    $retained=$verified.CurrentSelectionBinding
+    if($null -eq $retained -or $retained.Sha256 -cne $selectionSha -or
+      (ConvertTo-Json -InputObject $retained.Context -Depth 30 -Compress) -cne (ConvertTo-Json -InputObject $selection.Context -Depth 30 -Compress) -or
+      (ConvertTo-Json -InputObject $retained.Inventory -Depth 50 -Compress) -cne (ConvertTo-Json -InputObject $selection.InventoryProof.Inventory -Depth 50 -Compress)){
+      throw 'Current retained selection does not match original launch snapshot.'
+    }
+  }
+  return $typed
+}
+
+function Invoke-OctoberCompatibilityCurrentSelectionAggregationProbes {
+  # Labelled host-only controls: actual selectors/aggregation; native/hash mocks.
+  function Read-OctoberCompatibilityCurrentSuccessorSpecification {
+    param($Commit)
+    return [pscustomobject]@{visuals=[pscustomobject]@{
+      selectedRiskInventoryFields=@('id','slotIds','representative','currentSurface','target','geometry','state','rationale','equivalenceEvidence')
+      representativeFields=@('slotId','reportId','executionId','testKey','profile')
+    }}
+  }
+  function Read-OctoberCompatibilityCurrentQualificationContract {
+    param($Commit)
+    return [pscustomobject]@{
+      visualSlots=@([pscustomobject]@{slot='H01-visual-1';profile='workspace_capture';reference='workspace-choose.png'},
+        [pscustomobject]@{slot='H02-visual-1';profile='workspace_capture';reference='workspace-requirements.png'},
+        [pscustomobject]@{slot='H02-visual-2';profile='workspace_capture';reference='workspace-requirements-guidance.png'},
+        [pscustomobject]@{slot='H35-visual-1';profile='historical_store_capture';reference='historical/setup.png'})
+      cases=@([pscustomobject]@{ordinal=1;originalSuccessKeys=@('work_workspace_layout_safety_test.dart:Workspace overnight visual - choose')},
+        [pscustomobject]@{ordinal=2;originalSuccessKeys=@('work_workspace_layout_safety_test.dart:Workspace overnight visual - requirements')},
+        [pscustomobject]@{ordinal=35;originalSuccessKeys=@('work_workspace_layout_safety_test.dart:local Store 1-40 review evidence founder review capture - setup dashboard')})
+    }
+  }
+  $identity=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';contractCommit=('a'*40);
+    captureSourceCommit=('b'*40);captureSourceTree=('c'*40);producerBlob=('d'*40);executionHead=('b'*40)}
+  $seed='[{"id":"risk-choose","slotIds":["H01-visual-1"],"representative":{"slotId":"H01-visual-1","reportId":"store_layout_and_recovery","executionId":"workspace_capture","testKey":"work_workspace_layout_safety_test.dart:Workspace overnight visual - choose","profile":"workspace_capture"},"currentSurface":"Workspace choose","target":"Scaffold","geometry":{"logicalViewport":{"width":320,"height":640},"devicePixelRatio":2,"rasterRatio":1,"textScale":2,"padding":{"left":0,"top":20,"right":0,"bottom":10},"viewPadding":{"left":0,"top":20,"right":0,"bottom":10},"viewInsets":{"left":0,"top":0,"right":0,"bottom":0},"boundaryRect":{"left":0,"top":0,"width":320,"height":640},"rasterWidth":320,"rasterHeight":640},"state":"initial","rationale":"Labelled fixture only","equivalenceEvidence":[]}]'
+
+  $fixtureRoot='C:/labelled-current-selection-aggregate'
+  function Get-OctoberCompatibilityBinding {return @{worktreePath=$fixtureRoot}}
+  function Get-OctoberCoverageBoundHash {
+   param($Path)
+   if(-not $virtualHashes.ContainsKey($Path)){throw 'Unexpected hash path'}
+   if(-not $reads.ContainsKey($Path)){$reads[$Path]=0}
+   $reads[$Path]++
+   if($caseName -ceq 'final-inventory-drift' -and $Path -ceq $inventoryPath -and $reads[$Path] -gt $profiles.Count){return ('F'*64)}
+   if($caseName -ceq 'final-render-drift' -and $Path -ceq $renderDriftPath -and $reads[$Path] -gt 1){return ('F'*64)}
+   if($caseName -ceq 'render-late-drift' -and $Path -ceq $metaPath -and $reads[$Path] -gt 1){return ('F'*64)}
+   return $virtualHashes[$Path]
+  }
+  function New-LabelledRetainedExecution {
+   param($Profile,$Inventory)
+   $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $Inventory -ExecutionId $Profile -SourceIdentity $identity
+   if($null -eq $selection){throw 'Labelled inventory invalid'}
+   $run='current-'+[Guid]::NewGuid().ToString('N')
+   $relative='apps/mobile/build/compat-current-store_layout_and_recovery-'+$Profile+'-'+$run+'.jsonl'
+   $paths=@{};$hashes=@{}
+   foreach($role in @('log','capture','stderr')) {
+    $suffix=if($role -ceq 'log'){''}elseif($role -ceq 'capture'){'.capture.json'}else{'.stderr.txt'}
+    $paths[$role]=[IO.Path]::GetFullPath((Join-Path $fixtureRoot ($relative+$suffix)))
+    $hashes[$role]=switch($role){'log' {('A'*64)} 'capture' {('B'*64)} 'stderr' {('C'*64)}}
+    $virtualHashes[$paths[$role]]=$hashes[$role]
+   }
+   $sidecar=[IO.Path]::GetFullPath((Join-Path $fixtureRoot ($relative+'.selection.json')))
+   $selectionPins=@{};$selectionPins[$sidecar]=('D'*64);$selectionPins[$inventoryPath]=('E'*64)
+   foreach($path in $selectionPins.Keys){$virtualHashes[$path]=$selectionPins[$path]}
+   [string[]]$ids=@($selection.SelectedRisks|ForEach-Object {$_.id});[Array]::Sort($ids,[StringComparer]::Ordinal)
+   $context=[pscustomobject]@{schemaVersion=1;inventoryPath='apps/mobile/build/compat-current-risk-inventory-00000000000000000000000000000000.json';inventorySha256=('E'*64);
+    reportId='store_layout_and_recovery';executionId=$Profile;mode='selected_visual_risks';runId=$run;sourceIdentity=[pscustomobject]$identity.Clone();
+    sourceStateIdentity=('A'*64);selectedSlots=@($selection.SelectedSlots);selectedTestKeys=@($selection.SelectedTestKeys);selectedRiskIds=@($ids)}
+   $successes=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+   foreach($risk in $selection.SelectedRisks){$null=$successes.Add($risk.representative.testKey)}
+   $renderPins=@{};$renderSlots=@{}
+   foreach($risk in $selection.SelectedRisks) {
+    $slot=$risk.representative.slotId
+    $slotPins=@{}
+    foreach($suffix in @('.png','.metadata.json')) {
+     $path=[IO.Path]::GetFullPath((Join-Path $fixtureRoot ('apps/mobile/build/'+$run+'-'+$slot+$suffix)))
+     $renderPins[$path]=('9'*64);$virtualHashes[$path]=('9'*64)
+     $slotPins[$path]=('9'*64)
+    }
+    $renderSlots[$slot]=@{RiskId=$risk.id;TestKey=$risk.representative.testKey;GeometryBinding=@{OriginalFileHashes=$slotPins}}
+   }
+   return @{Successes=$successes;RetainedFilePaths=$paths;RetainedFileHashes=$hashes;RetainedSelectionFileHashes=$selectionPins;
+    CurrentRenderBindings=@{RenderedSlots=$renderSlots;OriginalFileHashes=$renderPins;RecordedRenderBindingsVerified=$true};
+    CurrentSelectionBinding=[pscustomobject]@{RelativePath=$relative+'.selection.json';CanonicalPath=$sidecar;Sha256=('D'*64);
+     InventoryCanonicalPath=$inventoryPath;InventorySha256=('E'*64);Context=$context;Inventory=$Inventory;Selection=$selection}}
+  }
+  $cases=0
+  foreach($caseName in @('valid-single','valid-multiple','missing-profile','duplicate-profile','different-inventory','wrong-context-slots',
+   'wrong-context-risk','wrong-selection','missing-success','wrong-source','wrong-native-path','missing-native-role',
+   'extra-selection-pin','conflicting-original-pin','current-inventory-drift','final-inventory-drift','empty-executions',
+   'missing-render','render-string-flag','render-missing-pin','render-foreign-slot','render-pin-collision','final-render-drift',
+   'valid-same-profile','render-pin-substitution')) {
+   $inventory=ConvertFrom-Json -InputObject $seed;$inventory=@($inventory)
+   if($caseName -cne 'valid-single') {
+    $other=ConvertFrom-Json -InputObject ($inventory[0]|ConvertTo-Json -Depth 30 -Compress)
+    $other.id='risk-historical';$other.slotIds=@('H35-visual-1');$other.representative.slotId='H35-visual-1'
+    $other.representative.executionId='historical_store_capture';$other.representative.profile='historical_store_capture'
+    $other.representative.testKey='work_workspace_layout_safety_test.dart:local Store 1-40 review evidence founder review capture - setup dashboard'
+    if($caseName -ceq 'valid-same-profile') {
+     $other.id='risk-requirements';$other.slotIds=@('H02-visual-1');$other.representative.slotId='H02-visual-1'
+     $other.representative.executionId='workspace_capture';$other.representative.profile='workspace_capture'
+     $other.representative.testKey='work_workspace_layout_safety_test.dart:Workspace overnight visual - requirements'
+    }
+    $inventory+=@($other)
+   }
+   $profiles=@($inventory|ForEach-Object {$_.representative.executionId}|Sort-Object -Unique)
+   $inventoryPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot 'apps/mobile/build/compat-current-risk-inventory-00000000000000000000000000000000.json'))
+   $virtualHashes=@{};$reads=@{};$records=@()
+   foreach($profile in $profiles){$records+=@(New-LabelledRetainedExecution -Profile $profile -Inventory $inventory)}
+   $renderDriftPath=@($records[0].CurrentRenderBindings.OriginalFileHashes.Keys)[0]
+   switch($caseName) {
+    'missing-profile' {$records=@($records[0])}
+    'duplicate-profile' {$records[1]=$records[0]}
+    'different-inventory' {$records[0].CurrentSelectionBinding.Inventory=@($inventory[0])}
+    'wrong-context-slots' {$records[0].CurrentSelectionBinding.Context.selectedSlots=@('H99-visual-1')}
+    'wrong-context-risk' {$records[0].CurrentSelectionBinding.Context.selectedRiskIds=@('wrong')}
+    'wrong-selection' {$records[0].CurrentSelectionBinding.Selection=$records[0].CurrentSelectionBinding.Selection.Clone();$records[0].CurrentSelectionBinding.Selection.SelectedTestKeys=@('wrong')}
+    'missing-success' {$records[0].Successes.Clear()}
+    'wrong-source' {$records[0].CurrentSelectionBinding.Context.sourceIdentity.producerBlob=('f'*40)}
+    'wrong-native-path' {$records[0].RetainedFilePaths.capture=$records[0].RetainedFilePaths.log}
+    'missing-native-role' {$records[0].RetainedFilePaths.Remove('stderr')}
+    'extra-selection-pin' {$records[0].RetainedSelectionFileHashes[(Join-Path $fixtureRoot 'extra.json')]=('F'*64)}
+    'conflicting-original-pin' {
+     $records[1].CurrentSelectionBinding.InventorySha256=('F'*64);$records[1].CurrentSelectionBinding.Context.inventorySha256=('F'*64)
+     $records[1].RetainedSelectionFileHashes[$inventoryPath]=('F'*64)
+    }
+    'current-inventory-drift' {$virtualHashes[$inventoryPath]=('F'*64)}
+    'empty-executions' {$records=@()}
+    'missing-render' {$records[0].Remove('CurrentRenderBindings')}
+    'render-string-flag' {$records[0].CurrentRenderBindings.RecordedRenderBindingsVerified='true'}
+    'render-missing-pin' {$records[0].CurrentRenderBindings.OriginalFileHashes.Remove($renderDriftPath)}
+    'render-foreign-slot' {
+     $slot=@($records[0].CurrentRenderBindings.RenderedSlots.Keys)[0]
+     $row=$records[0].CurrentRenderBindings.RenderedSlots[$slot]
+     $records[0].CurrentRenderBindings.RenderedSlots.Remove($slot)
+     $records[0].CurrentRenderBindings.RenderedSlots['H99-visual-1']=$row
+    }
+    'render-pin-collision' {
+     $records[0].CurrentRenderBindings.OriginalFileHashes.Remove($renderDriftPath)
+     $records[0].CurrentRenderBindings.OriginalFileHashes[$records[0].RetainedFilePaths.log]=('9'*64)
+    }
+    'render-pin-substitution' {
+     $records[0].CurrentRenderBindings.OriginalFileHashes.Remove($renderDriftPath)
+     $substitute=[IO.Path]::GetFullPath((Join-Path $fixtureRoot 'apps/mobile/build/unrelated-capture.png'))
+     $records[0].CurrentRenderBindings.OriginalFileHashes[$substitute]=('9'*64);$virtualHashes[$substitute]=('9'*64)
+    }
+   }
+   $result=Read-OctoberCompatibilityCurrentRetainedSelectionBindings -Inventory $inventory -Executions $records -SourceIdentity $identity
+   $expected=$caseName -in @('valid-single','valid-multiple','valid-same-profile')
+   if(($null -ne $result) -ne $expected){throw ('Aggregate result mismatch: '+$caseName)}
+   if($expected) {
+    if($result.SelectedExecutions.Count -ne $profiles.Count -or $result.OriginalFileHashes.Count -ne (4*$profiles.Count+1+2*$inventory.Count) -or
+     -not $result.RetainedSelectionBindingsVerified -or $result.EquivalenceVerified -or $result.GeometryObservationVerified -or $result.QualificationPassed -or $result.ApkAuthority){throw 'Aggregate positive coverage/flags changed'}
+    foreach($path in $result.OriginalFileHashes.Keys){if($result.OriginalFileHashes[$path] -cne $virtualHashes[$path] -or $reads[$path] -lt 2){throw 'Original hash lost or final fence missing'}}
+   }
+   if($caseName -ceq 'conflicting-original-pin' -and $reads[$inventoryPath] -ne 1){throw 'Conflicting pin refreshed or control not reached'}
+   if($caseName -ceq 'final-inventory-drift' -and $reads[$inventoryPath] -ne ($profiles.Count+1)){throw 'Final original inventory fence not reached'}
+   if($caseName -ceq 'final-render-drift' -and $reads[$renderDriftPath] -ne 2){throw 'Final render original fence not reached'}
+   $cases++
+  }
+  if($cases -ne 25){throw 'Current selection aggregation probe inventory changed.'}
+  $pinCases=0;$caseName='combined-original-pins'
+  foreach($pinCase in @('disjoint','shared','conflict','missing-behavior','empty-selection','outside','malformed','drift','copy')) {
+    $one=[IO.Path]::GetFullPath((Join-Path $fixtureRoot 'one.json'))
+    $two=[IO.Path]::GetFullPath((Join-Path $fixtureRoot 'two.json'))
+    $behaviorPins=@{};$behaviorPins[$one]=('A'*64)
+    $selectionPins=@{};$selectionPins[$two]=('B'*64)
+    $virtualHashes=@{};$virtualHashes[$one]=('A'*64);$virtualHashes[$two]=('B'*64);$reads=@{}
+    switch($pinCase) {
+      'shared' {$selectionPins[$one]=('A'*64)}
+      'conflict' {$selectionPins[$one]=('F'*64)}
+      'missing-behavior' {$behaviorPins=$null}
+      'empty-selection' {$selectionPins=@{}}
+      'outside' {$behaviorPins=@{};$behaviorPins[[IO.Path]::GetFullPath('C:/outside-original-pins.json')]=('A'*64)}
+      'malformed' {$selectionPins[$two]='invalid'}
+      'drift' {$virtualHashes[$one]=('F'*64)}
+    }
+    $merged=Read-OctoberCompatibilityCurrentCombinedOriginalFilePins -BehaviorPins $behaviorPins -SelectionPins $selectionPins
+    $pinExpected=$pinCase -in @('disjoint','shared','copy')
+    if(($null -ne $merged) -ne $pinExpected){throw ('Combined original-pin result mismatch: '+$pinCase)}
+    if($pinExpected) {
+      if($merged.OriginalFileHashes.Count -ne 2 -or $merged.OriginalFileHashes[$one] -cne ('A'*64) -or
+        $merged.OriginalFileHashes[$two] -cne ('B'*64) -or -not $merged.FinalFileBindingsVerified -or
+        $merged.QualificationPassed -or $merged.ApkAuthority -or $reads.Count -ne 2){throw 'Combined original-pin positive changed'}
+      foreach($path in $merged.OriginalFileHashes.Keys){if($reads[$path] -ne 1){throw 'Combined original pin not checked exactly once'}}
+      if($pinCase -ceq 'copy') {
+        $merged.OriginalFileHashes[$one]=('F'*64)
+        if($behaviorPins[$one] -cne ('A'*64) -or $selectionPins[$two] -cne ('B'*64)){throw 'Combined pin return aliases original inputs'}
+      }
+    }elseif($pinCase -cne 'drift' -and $reads.Count){throw 'Invalid combined inputs reached rehash before validation'}
+    if($pinCase -ceq 'drift' -and ($reads.Count -lt 1 -or $behaviorPins[$one] -cne ('A'*64))){throw 'Late drift not reached or original pin refreshed'}
+    $pinCases++
+  }
+  if($pinCases -ne 9){throw 'Combined original-pin probe inventory changed.'}
+  $recorderCases=0
+  foreach($recorderCase in @('valid','same-test-two-slots','missing','duplicate','unit','lookalike','foreign-slot','wrong-test',
+    'post-done','failed','hidden','skipped','wrong-claims','wrong-path','uppercase-hash','source-drift','context-slots',
+    'schema-array','classification-array','missing-done','missing-success','ordinary-diagnostic')) {
+    # PS5 root JSON arrays are emitted nonenumerated; materialize then flatten.
+    $inventory=ConvertFrom-Json -InputObject $seed;$inventory=@($inventory)
+    if($recorderCase -ceq 'same-test-two-slots') {
+      $inventory[0].id='risk-requirements';$inventory[0].slotIds=@('H02-visual-1')
+      $inventory[0].representative.slotId='H02-visual-1'
+      $inventory[0].representative.testKey='work_workspace_layout_safety_test.dart:Workspace overnight visual - requirements'
+      $second=ConvertFrom-Json -InputObject ($inventory[0]|ConvertTo-Json -Depth 30 -Compress)
+      $second.id='risk-guidance';$second.slotIds=@('H02-visual-2');$second.representative.slotId='H02-visual-2';$inventory+=@($second)
+    }
+    $run='current-'+('0'*32);$profile='workspace_capture'
+    $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $inventory -ExecutionId $profile -SourceIdentity $identity
+    if($null -eq $selection){throw ('Recorder probe inventory invalid: '+$recorderCase)}
+    $context=[pscustomobject]@{schemaVersion=1;inventoryPath='apps/mobile/build/compat-current-risk-inventory-00000000000000000000000000000000.json';inventorySha256=('E'*64);
+      reportId='store_layout_and_recovery';executionId=$profile;mode='selected_visual_risks';runId=$run;sourceIdentity=[pscustomobject]$identity.Clone();
+      sourceStateIdentity=('A'*64);selectedSlots=@($selection.SelectedSlots);selectedTestKeys=@($selection.SelectedTestKeys);
+      selectedRiskIds=@($selection.SelectedRisks|ForEach-Object {$_.id}|Sort-Object -CaseSensitive)}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $context.reportId -ExecutionId $profile -Mode selected_visual_risks -RunId $run `
+      -SourceIdentity $identity -SelectedSlots $selection.SelectedSlots -SelectedTestKeys $selection.SelectedTestKeys
+    $claims=@{}
+    foreach($define in $plan.RuntimeDefines) {
+      if($define.StartsWith('MOOL_TECHNICAL_CAPTURE_',[StringComparison]::Ordinal)) {
+        $pair=$define.Split('=',2)
+        $field=switch($pair[0]) {
+          'MOOL_TECHNICAL_CAPTURE_RUN_ID' {'runId'} 'MOOL_TECHNICAL_CAPTURE_EXECUTION_ID' {'executionId'}
+          'MOOL_TECHNICAL_CAPTURE_PROFILE' {'profile'} 'MOOL_TECHNICAL_CAPTURE_SOURCE_COMMIT' {'sourceCommit'}
+          'MOOL_TECHNICAL_CAPTURE_SOURCE_TREE' {'sourceTree'} 'MOOL_TECHNICAL_CAPTURE_EXECUTION_HEAD' {'executionHead'}
+          'MOOL_TECHNICAL_CAPTURE_PRODUCER_BLOB' {'producerBlob'} 'MOOL_TECHNICAL_CAPTURE_REGISTRY_SHA256' {'registrySha256'}
+        }
+        $claims[$field]=$pair[1]
+      }
+    }
+    $events=[Collections.Generic.List[object]]::new()
+    $suite=[IO.Path]::GetFullPath((Join-Path $fixtureRoot 'apps/mobile/test/work_workspace_layout_safety_test.dart'))
+    $events.Add([pscustomobject]@{type='suite';suite=[pscustomobject]@{id=1;path=$suite}})
+    $keys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);$testId=0
+    foreach($name in $selection.SelectedTestKeys) {
+      $testId++;$key='work_workspace_layout_safety_test.dart:'+$name;$null=$keys.Add($key)
+      $events.Add([pscustomobject]@{type='testStart';test=[pscustomobject]@{id=$testId;suiteID=1;name=$name}})
+      foreach($risk in @($selection.SelectedRisks|Where-Object {$_.representative.testKey -ceq $key})) {
+        $slot=$risk.representative.slotId
+        $literal=@((Read-OctoberCompatibilityCurrentQualificationContract).visualSlots|Where-Object {$_.slot -ceq $slot})[0]
+        $png=[IO.Path]::GetFullPath((Join-Path $fixtureRoot ('apps/mobile/build/compat-current-technical/'+$run+'/'+$profile+'/'+$slot+'.png')))
+        $capture=[pscustomobject]@{schema='moolsocial.current-technical-capture-event.v1';classification='technical-observation';syntheticFixture=$true;
+          founderApproved=$false;provenanceClaimsVerified=$false;slotId=$slot;originalReference=$literal.reference;pngPath=$png;
+          metadataPath=($png.Substring(0,$png.Length-4)+'.json');pngSha256=('a'*64);metadataSha256=('b'*64);provenanceClaims=[pscustomobject]$claims.Clone()}
+        $events.Add([pscustomobject]@{type='print';testID=$testId;message=('MOOL_TECHNICAL_CAPTURE '+($capture|ConvertTo-Json -Depth 10 -Compress))})
+      }
+      $events.Add([pscustomobject]@{type='testDone';testID=$testId;result='success';hidden=$false;skipped=$false})
+    }
+    $wire=ConvertFrom-Json -InputObject ($events.ToArray()|ConvertTo-Json -Depth 20 -Compress)
+    $capture=ConvertFrom-Json -InputObject $wire[2].message.Substring('MOOL_TECHNICAL_CAPTURE '.Length)
+    switch($recorderCase) {
+      'missing' {$wire=@($wire[0],$wire[1],$wire[3])}
+      'duplicate' {$wire=@($wire[0],$wire[1],$wire[2],$wire[2],$wire[3])}
+      'unit' {$wire[2].message=$wire[2].message.Replace('MOOL_TECHNICAL_CAPTURE ','MOOL_TECHNICAL_CAPTURE_UNIT ')}
+      'lookalike' {$wire[2].message=$wire[2].message.Replace('MOOL_TECHNICAL_CAPTURE ','MOOL_TECHNICAL_CAPTURE: ')}
+      'foreign-slot' {$capture.slotId='H03-visual-1'}
+      'wrong-test' {$wire[1].test.name='Workspace overnight visual - contact'}
+      'post-done' {$wire=@($wire[0],$wire[1],$wire[3],$wire[2])}
+      'failed' {$wire[3].result='error'}
+      'hidden' {$wire[3].hidden=$true}
+      'skipped' {$wire[3].skipped=$true}
+      'wrong-claims' {$capture.provenanceClaims.sourceCommit=('e'*40)}
+      'wrong-path' {$capture.pngPath=$capture.pngPath.Replace('H01-visual-1','H02-visual-1')}
+      'uppercase-hash' {$capture.pngSha256=('A'*64)}
+      'source-drift' {$context.sourceIdentity.captureSourceCommit=('e'*40)}
+      'context-slots' {$context.selectedSlots=@('H02-visual-1')}
+      'schema-array' {$capture.schema=@('moolsocial.current-technical-capture-event.v1')}
+      'classification-array' {$capture.classification=@('technical-observation')}
+      'missing-done' {$wire=@($wire[0],$wire[1],$wire[2])}
+      'missing-success' {$keys.Clear()}
+      'ordinary-diagnostic' {$wire=@($wire[0],$wire[1],[pscustomobject]@{type='print';testID=1;message='Ordinary test diagnostic'},$wire[2],$wire[3])}
+    }
+    if($recorderCase -in @('foreign-slot','wrong-claims','wrong-path','uppercase-hash','schema-array','classification-array')) {
+      $wire[2].message='MOOL_TECHNICAL_CAPTURE '+($capture|ConvertTo-Json -Depth 10 -Compress)
+    }
+    $joined=Read-OctoberCompatibilityCurrentSelectedRecorderEvents -Events @($wire) -Context $context -Inventory $inventory `
+      -SourceIdentity $identity -SuccessfulKeys $keys
+    $expected=$recorderCase -in @('valid','same-test-two-slots','ordinary-diagnostic')
+    if(($null -ne $joined) -ne $expected){throw ('Selected recorder-event result mismatch: '+$recorderCase)}
+    if($expected -and ($joined.Captures.Count -ne $selection.SelectedSlots.Count -or -not $joined.RecorderEventsBound -or
+      $joined.ArtifactBytesVerified -or $joined.GeometryObservationVerified -or $joined.InspectionVerified -or $joined.QualificationPassed -or $joined.ApkAuthority)) {
+      throw 'Selected recorder-event positive flags/coverage changed'
+    }
+    if($expected) {
+      foreach($risk in $selection.SelectedRisks) {
+        $slot=$risk.representative.slotId;$actual=$joined.Captures[$slot]
+        $relative='apps/mobile/build/compat-current-technical/'+$run+'/'+$profile+'/'+$slot+'.png'
+        if($actual.RiskId -cne $risk.id -or $actual.TestKey -cne $risk.representative.testKey -or $actual.TestId -ne 1 -or
+          $actual.PngRelativePath -cne $relative -or $actual.MetadataRelativePath -cne ($relative.Substring(0,$relative.Length-4)+'.json') -or
+          $actual.PngSha256 -cne ('A'*64) -or $actual.MetadataSha256 -cne ('B'*64)){throw 'Recorder positive lost exact risk/test/path/hash binding'}
+      }
+    }
+    $recorderCases++
+  }
+  if($recorderCases -ne 22){throw 'Selected recorder-event probe inventory changed.'}
+  # Labelled in-memory byte fixtures: real parser/hash/PNG decoder, mocked leases.
+  Add-Type -AssemblyName System.Drawing
+  $fixtureBitmap=[Drawing.Bitmap]::new(4,3,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $fixturePngBuffer=[IO.MemoryStream]::new()
+  try {
+    $fixtureBitmap.SetPixel(0,0,[Drawing.Color]::Teal)
+    $fixtureBitmap.Save($fixturePngBuffer,[Drawing.Imaging.ImageFormat]::Png)
+    [byte[]]$fixturePng=$fixturePngBuffer.ToArray()
+  }finally{try{$fixturePngBuffer.Dispose()}finally{$fixtureBitmap.Dispose()}}
+  $baseCapture=ConvertFrom-Json -InputObject ($joined.Captures['H01-visual-1']|ConvertTo-Json -Depth 20 -Compress)
+  function Open-OctoberCompatibilityVisualArtifact {
+    param($Base,$RelativePath,$ExpectedSha256,$MaxBytes=67108864)
+    $role=if($RelativePath -ceq $captureFixture.MetadataRelativePath){'metadata'}elseif($RelativePath -ceq $captureFixture.PngRelativePath){'png'}else{throw 'Unexpected fixture lease path'}
+    if($artifactCase -ceq 'absent-lease' -and $role -ceq 'png'){return $null}
+    $payload=$leasePayloads[$role];$leaseLimits[$role]=$MaxBytes
+    if($payload.Length -gt $MaxBytes){return $null}
+    $stream=[pscustomobject]@{Disposed=$false;FailDispose=($artifactCase -ceq 'dispose-error' -and $role -ceq 'png')}
+    $stream|Add-Member -MemberType ScriptMethod -Name Dispose -Value {$this.Disposed=$true;if($this.FailDispose){throw 'Labelled lease disposal failure'}}
+    $leasedStreams[$role]=$stream
+    $canonical=[IO.Path]::GetFullPath((Join-Path $Base $RelativePath))
+    if($artifactCase -ceq 'path-substitution' -and $role -ceq 'metadata'){$canonical=[IO.Path]::GetFullPath((Join-Path $Base 'wrong-metadata.json'))}
+    $fileIdentity=if($role -ceq 'metadata' -or $artifactCase -ceq 'same-file-identity'){'00000001:0000000000000001'}else{'00000001:0000000000000002'}
+    return [pscustomobject]@{CanonicalPath=$canonical;Sha256=$ExpectedSha256;Bytes=$payload;FileIdentity=$fileIdentity;Stream=$stream}
+  }
+  $artifactCases=0;$caseName='recorder-artifact-fixtures'
+  foreach($artifactCase in @('valid','duplicate-metadata-key','incomplete','approved','not-synthetic','provider-verified','comparison-passed','provenance-verified',
+    'schema-array','claim-array','wrong-claim','wrong-slot','wrong-reference','byte-count','dimension','unsupported-dimension',
+    'metadata-hash-drift','png-hash-drift','bad-png','same-file-identity','absent-lease','observations-array','dispose-error','path-substitution','pin-drift')) {
+    $captureFixture=ConvertFrom-Json -InputObject ($baseCapture|ConvertTo-Json -Depth 20 -Compress)
+    [byte[]]$pngBytes=$fixturePng.Clone()
+    if($artifactCase -ceq 'bad-png'){$pngBytes=[byte[]]$fixturePng[0..32]}
+    $pngHash=Get-OctoberCompatibilityByteHash $pngBytes
+    $captureFixture.PngSha256=$pngHash;$captureFixture.Event.pngSha256=$pngHash.ToLowerInvariant()
+    $metadata=[pscustomobject]@{schema='moolsocial.current-technical-capture.v1';classification='technical-observation';syntheticFixture=$true;complete=$true;
+      founderApproved=$false;comparisonPassed=$false;providerVerified=$false;provenanceClaimsVerified=$false;
+      provenanceClaims=$captureFixture.Event.provenanceClaims;originalReference=$captureFixture.Event.originalReference;slotId=$captureFixture.Event.slotId;
+      pngWidth=4;pngHeight=3;pngBytes=$pngBytes.Length;pngSha256=$pngHash.ToLowerInvariant();observations=[pscustomobject]@{unverifiedFixture='geometry pending'}}
+    switch($artifactCase) {
+      'incomplete' {$metadata.complete=$false}
+      'approved' {$metadata.founderApproved=$true}
+      'not-synthetic' {$metadata.syntheticFixture=$false}
+      'provider-verified' {$metadata.providerVerified=$true}
+      'comparison-passed' {$metadata.comparisonPassed=$true}
+      'provenance-verified' {$metadata.provenanceClaimsVerified=$true}
+      'schema-array' {$metadata.schema=@('moolsocial.current-technical-capture.v1')}
+      'claim-array' {$metadata.provenanceClaims=ConvertFrom-Json -InputObject ($metadata.provenanceClaims|ConvertTo-Json -Compress);$metadata.provenanceClaims.runId=@($metadata.provenanceClaims.runId)}
+      'wrong-claim' {$metadata.provenanceClaims=ConvertFrom-Json -InputObject ($metadata.provenanceClaims|ConvertTo-Json -Compress);$metadata.provenanceClaims.sourceCommit=('e'*40)}
+      'wrong-slot' {$metadata.slotId='H02-visual-1'}
+      'wrong-reference' {$metadata.originalReference='workspace-requirements.png'}
+      'byte-count' {$metadata.pngBytes++}
+      'dimension' {$metadata.pngWidth=5}
+      'unsupported-dimension' {$metadata.pngWidth=8193}
+      'observations-array' {$metadata.observations=@([pscustomobject]@{unverifiedFixture='geometry pending'})}
+    }
+    $metadataJson=$metadata|ConvertTo-Json -Depth 20 -Compress
+    if($artifactCase -ceq 'duplicate-metadata-key'){$metadataJson=$metadataJson.Substring(0,$metadataJson.Length-1)+',"schema":"moolsocial.current-technical-capture.v1"}'}
+    [byte[]]$metadataBytes=[Text.UTF8Encoding]::new($false,$true).GetBytes($metadataJson)
+    $metadataHash=Get-OctoberCompatibilityByteHash $metadataBytes
+    $captureFixture.MetadataSha256=$metadataHash;$captureFixture.Event.metadataSha256=$metadataHash.ToLowerInvariant()
+    $leasePayloads=@{metadata=$metadataBytes;png=$pngBytes}
+    if($artifactCase -ceq 'metadata-hash-drift'){$leasePayloads.metadata=[byte[]]$metadataBytes.Clone();$leasePayloads.metadata[0]=32}
+    if($artifactCase -ceq 'png-hash-drift'){$leasePayloads.png=[byte[]]$pngBytes.Clone();$leasePayloads.png[0]=0}
+    $metaPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot $captureFixture.MetadataRelativePath))
+    $pngPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot $captureFixture.PngRelativePath))
+    $virtualHashes=@{};$virtualHashes[$metaPath]=$metadataHash;$virtualHashes[$pngPath]=$pngHash
+    if($artifactCase -ceq 'pin-drift'){$virtualHashes[$metaPath]=('F'*64)}
+    $reads=@{};$leasedStreams=@{};$leaseLimits=@{}
+    $artifact=Read-OctoberCompatibilityCurrentRecorderArtifactBytes -Capture $captureFixture
+    if(($null -ne $artifact) -ne ($artifactCase -ceq 'valid')){throw ('Recorder artifact-byte result mismatch: '+$artifactCase)}
+    foreach($stream in $leasedStreams.Values){if(-not $stream.Disposed){throw ('Recorder lease not disposed: '+$artifactCase)}}
+    if($artifactCase -ceq 'dispose-error' -and $leasedStreams.Count -ne 2){throw 'Disposal failure did not exercise both leases'}
+    if($artifactCase -ceq 'pin-drift' -and ($reads.Count -ne 1 -or $reads[$metaPath] -ne 1 -or $captureFixture.MetadataSha256 -cne $metadataHash)) {
+      throw 'Recorder late metadata fence not reached or original hash refreshed'
+    }
+    if($artifactCase -ceq 'valid') {
+      if(-not $artifact.ArtifactBytesVerified -or $artifact.GeometryObservationVerified -or $artifact.InspectionVerified -or $artifact.QualificationPassed -or $artifact.ApkAuthority -or
+        $artifact.OriginalFileHashes.Count -ne 2 -or $artifact.OriginalFileHashes[$metaPath] -cne $metadataHash -or $artifact.OriginalFileHashes[$pngPath] -cne $pngHash -or
+        $artifact.PngWidth -ne 4 -or $artifact.PngHeight -ne 3 -or $artifact.Metadata.slotId -cne 'H01-visual-1' -or
+        $leaseLimits.metadata -ne 4194304 -or $leaseLimits.png -ne 67108864 -or $reads.Count -ne 2){throw 'Recorder artifact-byte positive binding/limits changed'}
+    }
+    $artifactCases++
+  }
+  if($artifactCases -ne 25){throw 'Recorder artifact-byte probe inventory changed.'}
+  # Labelled geometry fixtures, not native captures or visual acceptance.
+  $geometrySeed='{"logicalViewport":{"width":12,"height":8},"devicePixelRatio":3,"rasterRatio":2,"textScale":1.5,"padding":{"left":1,"top":2,"right":0,"bottom":1},"viewPadding":{"left":0,"top":0,"right":0,"bottom":3},"viewInsets":{"left":0,"top":0,"right":0,"bottom":4},"boundaryRect":{"left":1,"top":2,"width":2,"height":1.5},"rasterWidth":4,"rasterHeight":3}'
+  $observationSeed='{"fixtureKind":"existing-authored-widget-test-state","requestedTargetType":"LabelledMeasurementTarget","requestedTargetKey":null,"requestedTargetGlobalRect":{"left":3,"top":3,"width":2,"height":1.5},"boundaryType":"LabelledBoundary","boundaryLocalPaintBounds":{"left":1,"top":2,"width":2,"height":1.5},"boundaryToGlobalTransform":[1,0,0,0,0,1,0,0,0,0,1,0,2,1,0,1],"boundaryGlobalPaintBounds":{"left":3,"top":3,"width":2,"height":1.5},"rasterPixelRatio":2,"rootView":{"devicePixelRatio":3,"physicalWidth":36,"physicalHeight":24,"logicalWidth":12,"logicalHeight":8,"padding":{"left":3,"top":6,"right":0,"bottom":3},"viewPadding":{"left":0,"top":0,"right":0,"bottom":9},"viewInsets":{"left":0,"top":0,"right":0,"bottom":12}},"descendantMediaQuery":{"width":12,"height":8,"padding":{"left":0,"top":0,"right":0,"bottom":0},"viewPadding":{"left":0,"top":0,"right":0,"bottom":0},"viewInsets":{"left":0,"top":0,"right":0,"bottom":0},"textScaleAtOne":1.5}}'
+  $geometryCases=0
+  $geometryPins=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+  $geometryPins.Add($metaPath,$metadataHash);$geometryPins.Add($pngPath,$pngHash)
+  foreach($geometryCase in @('valid','key-string','fractional-ceil','transform-roundoff','transform-outside-tolerance','reviewed-exact','nonfinite-transform','no-descendant','string-density','zero-density','root-size','negative-inset','text-scale','raster-density-confusion','short-transform','zero-w','mixed-w','global-bounds','target-outside','wrong-target','bad-key','zero-boundary','png-dimension','extra-observation','unit-fixture','unverified-bytes')) {
+    $observed=ConvertFrom-Json $observationSeed
+    $risk=[pscustomobject]@{target='LabelledMeasurementTarget';geometry=(ConvertFrom-Json $geometrySeed)}
+    $geometryArtifact=@{ArtifactBytesVerified=$true;Metadata=[pscustomobject]@{observations=$observed};PngWidth=4;PngHeight=3;OriginalFileHashes=$geometryPins}
+    switch($geometryCase) {
+      'key-string' {$observed.requestedTargetKey='[<labelled-key>]'}
+      'fractional-ceil' {$observed.boundaryLocalPaintBounds.width=1.51;$observed.boundaryGlobalPaintBounds.width=1.51;$observed.requestedTargetGlobalRect.width=1.51;$risk.geometry.boundaryRect.width=1.51}
+      'transform-roundoff' {$observed.boundaryGlobalPaintBounds.width=2.00000005}
+      'transform-outside-tolerance' {$observed.boundaryGlobalPaintBounds.width=2.0000002}
+      'reviewed-exact' {$risk.geometry.boundaryRect.width=2.00000001}
+      'nonfinite-transform' {$observed.boundaryToGlobalTransform[0]=[double]::PositiveInfinity}
+      'no-descendant' {$observed.descendantMediaQuery=$null}
+      'string-density' {$observed.rootView.devicePixelRatio='3'}
+      'zero-density' {$observed.rootView.devicePixelRatio=0}
+      'root-size' {$observed.rootView.logicalWidth=13}
+      'negative-inset' {$observed.rootView.padding.left=-3}
+      'text-scale' {$observed.descendantMediaQuery.textScaleAtOne=1}
+      'raster-density-confusion' {$observed.rasterPixelRatio=3}
+      'short-transform' {$observed.boundaryToGlobalTransform=@(1,0)}
+      'zero-w' {$observed.boundaryToGlobalTransform[15]=0}
+      'mixed-w' {$observed.boundaryToGlobalTransform[3]=1;$observed.boundaryToGlobalTransform[15]=-2}
+      'global-bounds' {$observed.boundaryGlobalPaintBounds.left=4}
+      'target-outside' {$observed.requestedTargetGlobalRect.width=3}
+      'wrong-target' {$observed.requestedTargetType='OtherTarget'}
+      'bad-key' {$observed.requestedTargetKey=@('key')}
+      'zero-boundary' {$observed.boundaryLocalPaintBounds.width=0}
+      'png-dimension' {$geometryArtifact.PngWidth=5}
+      'extra-observation' {$observed|Add-Member NoteProperty unexpected 1}
+      'unit-fixture' {$observed.fixtureKind='unit-only'}
+      'unverified-bytes' {$geometryArtifact.ArtifactBytesVerified=$false}
+    }
+    $geometryResult=Read-OctoberCompatibilityCurrentRecorderGeometry -Artifact $geometryArtifact -Risk $risk
+    if(($null -ne $geometryResult) -ne ($geometryCase -cin @('valid','key-string','fractional-ceil','transform-roundoff'))){throw ('Recorder geometry result mismatch: '+$geometryCase)}
+    if($null -ne $geometryResult -and (-not $geometryResult.GeometryObservationVerified -or $geometryResult.TargetSemanticsVerified -or $geometryResult.InspectionVerified -or $geometryResult.QualificationPassed -or $geometryResult.ApkAuthority -or $geometryResult.Geometry.rasterRatio -ne 2 -or $geometryResult.Geometry.devicePixelRatio -ne 3 -or $geometryResult.Observations.descendantMediaQuery.padding.left -ne 0)){throw 'Recorder geometry positive binding/authority changed'}
+    if($null -ne $geometryResult) {
+      $geometryResult.OriginalFileHashes[$metaPath]='D'*64
+      if($geometryPins[$metaPath] -cne $metadataHash){throw 'Recorder geometry mutated its original byte pins'}
+    }
+    $geometryCases++
+  }
+  $renderCases=0
+  foreach($renderCase in @('valid','event-test','metadata-bytes','geometry','late-pin','missing-success','source-claims','extra-event')) {
+    $inventory=ConvertFrom-Json $seed;$inventory=@($inventory)
+    $inventory[0].target='LabelledMeasurementTarget';$inventory[0].geometry=ConvertFrom-Json $geometrySeed
+    $captureFixture=ConvertFrom-Json ($baseCapture|ConvertTo-Json -Depth 20 -Compress)
+    [byte[]]$pngBytes=$fixturePng.Clone();$pngHash=Get-OctoberCompatibilityByteHash $pngBytes
+    $captureFixture.PngSha256=$pngHash;$captureFixture.Event.pngSha256=$pngHash.ToLowerInvariant()
+    $metadata=[pscustomobject]@{schema='moolsocial.current-technical-capture.v1';classification='technical-observation';syntheticFixture=$true;complete=$true;
+      founderApproved=$false;comparisonPassed=$false;providerVerified=$false;provenanceClaimsVerified=$false;
+      provenanceClaims=$captureFixture.Event.provenanceClaims;originalReference=$captureFixture.Event.originalReference;slotId=$captureFixture.Event.slotId;
+      pngWidth=4;pngHeight=3;pngBytes=$pngBytes.Length;pngSha256=$pngHash.ToLowerInvariant();observations=(ConvertFrom-Json $observationSeed)}
+    if($renderCase -ceq 'geometry'){$metadata.observations.descendantMediaQuery.textScaleAtOne=1}
+    [byte[]]$metadataBytes=[Text.UTF8Encoding]::new($false,$true).GetBytes(($metadata|ConvertTo-Json -Depth 20 -Compress))
+    $metadataHash=Get-OctoberCompatibilityByteHash $metadataBytes
+    $captureFixture.MetadataSha256=$metadataHash;$captureFixture.Event.metadataSha256=$metadataHash.ToLowerInvariant()
+    $metaPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot $captureFixture.MetadataRelativePath))
+    $pngPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot $captureFixture.PngRelativePath))
+    $virtualHashes=@{};$virtualHashes[$metaPath]=$metadataHash;$virtualHashes[$pngPath]=$pngHash
+    $leasePayloads=@{metadata=$metadataBytes;png=$pngBytes};$leaseLimits=@{};$leasedStreams=@{};$reads=@{}
+    $artifactCase='valid';$caseName=if($renderCase -ceq 'late-pin'){'render-late-drift'}else{'render-chain-fixture'}
+    $renderEvents=ConvertFrom-Json ($events.ToArray()|ConvertTo-Json -Depth 20 -Compress)
+    $renderEvents[2].message='MOOL_TECHNICAL_CAPTURE '+($captureFixture.Event|ConvertTo-Json -Depth 20 -Compress)
+    $renderKeys=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $null=$renderKeys.Add($inventory[0].representative.testKey)
+    switch($renderCase) {
+      'event-test' {$renderEvents[2].testID=99}
+      'metadata-bytes' {$leasePayloads.metadata=[byte[]]$metadataBytes.Clone();$leasePayloads.metadata[0]=32}
+      'missing-success' {$renderKeys.Clear()}
+      'source-claims' {$captureFixture.Event.provenanceClaims.sourceCommit='f'*40;$renderEvents[2].message='MOOL_TECHNICAL_CAPTURE '+($captureFixture.Event|ConvertTo-Json -Depth 20 -Compress)}
+      'extra-event' {$renderEvents=@($renderEvents[0],$renderEvents[1],$renderEvents[2],$renderEvents[2],$renderEvents[3])}
+    }
+    $render=Read-OctoberCompatibilityCurrentSelectedRenderBindings -Events @($renderEvents) -Context $context -Inventory $inventory -SourceIdentity $identity -SuccessfulKeys $renderKeys
+    if(($null -ne $render) -ne ($renderCase -ceq 'valid')){throw ('Selected render chain result mismatch: '+$renderCase)}
+    foreach($stream in $leasedStreams.Values){if(-not $stream.Disposed){throw 'Selected render chain leaked artifact lease'}}
+    if($null -ne $render -and (-not $render.RecordedRenderBindingsVerified -or $render.InspectionVerified -or $render.QualificationPassed -or $render.ApkAuthority -or
+      $render.RenderedSlots.Count -ne 1 -or $render.OriginalFileHashes.Count -ne 2 -or $render.OriginalFileHashes[$metaPath] -cne $metadataHash -or $reads[$metaPath] -ne 2)){throw 'Selected render chain lost original pins or authority boundary'}
+    if($renderCase -ceq 'late-pin' -and $reads[$metaPath] -ne 2){throw 'Selected render late fence not reached'}
+    $renderCases++
+  }
+  # Two-risk pairing: actual event/geometry/compositor, labelled byte-reader mock.
+  $pairCases=& {
+    function Get-OctoberCoverageBoundHash($Path) {
+      if(-not $pairHashes.ContainsKey($Path)){throw 'Pairing read an unexpected original'}
+      return $pairHashes[$Path]
+    }
+    function Read-OctoberCompatibilityCurrentRecorderArtifactBytes($Capture) {
+      $pairCalls.bytes++
+      $risk=@($pairInventory|Where-Object {$_.representative.slotId -ceq $Capture.Event.slotId})
+      if($risk.Count -ne 1 -or $Capture.RiskId -cne $risk[0].id -or $Capture.TestKey -cne $risk[0].representative.testKey){throw 'Pairing substituted risk/test identity'}
+      $observations=ConvertFrom-Json $observationSeed
+      $width=$risk[0].geometry.logicalViewport.width
+      if($pairCase -ceq 'swapped'){$width=if($width -eq 12){13}else{12}}
+      $observations.rootView.logicalWidth=$width;$observations.rootView.physicalWidth=3*$width
+      $observations.descendantMediaQuery.width=$width
+      $pins=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      foreach($role in @('metadata','png')) {
+        $path=[IO.Path]::GetFullPath($Capture.Event.($role+'Path'));$hash=$Capture.Event.($role+'Sha256').ToUpperInvariant()
+        $pins.Add($path,$hash);$pairHashes[$path]=$hash
+      }
+      return @{ArtifactBytesVerified=$true;Metadata=[pscustomobject]@{observations=$observations};PngWidth=4;PngHeight=3;OriginalFileHashes=$pins}
+    }
+    $count=0
+    foreach($pairCase in @('valid','swapped','missing')) {
+      $first=ConvertFrom-Json $seed;$first=@($first)[0];$first.target='LabelledMeasurementTarget';$first.geometry=ConvertFrom-Json $geometrySeed
+      $second=ConvertFrom-Json ($first|ConvertTo-Json -Depth 20 -Compress)
+      $second.id='risk-second';$second.slotIds=@('H02-visual-1');$second.representative.slotId='H02-visual-1'
+      $second.representative.testKey='work_workspace_layout_safety_test.dart:Workspace overnight visual - requirements'
+      $second.geometry.logicalViewport.width=13;$second.currentSurface='Labelled second surface';$second.state='distinct viewport'
+      $pairInventory=@($first,$second)
+      $selected=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $pairInventory -ExecutionId workspace_capture -SourceIdentity $identity
+      if($null -eq $selected){throw 'Pairing selection invalid'}
+      $pairContext=ConvertFrom-Json ($context|ConvertTo-Json -Depth 20 -Compress)
+      $pairContext.selectedSlots=@($selected.SelectedSlots);$pairContext.selectedTestKeys=@($selected.SelectedTestKeys)
+      $pairContext.selectedRiskIds=@($selected.SelectedRisks|ForEach-Object {$_.id}|Sort-Object -CaseSensitive)
+      $pairEvents=[Collections.Generic.List[object]]::new();$pairSuccesses=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      $pairEvents.Add([pscustomobject]@{type='suite';suite=[pscustomobject]@{id=1;path=$suite}})
+      $pairHashes=@{};$pairCalls=@{bytes=0};$pairTestId=0
+      foreach($risk in $pairInventory) {
+        $pairTestId++;$key=$risk.representative.testKey;$null=$pairSuccesses.Add($key)
+        $pairEvents.Add([pscustomobject]@{type='testStart';test=[pscustomobject]@{id=$pairTestId;suiteID=1;name=$key.Substring($key.IndexOf(':')+1)}})
+        $captureEvent=ConvertFrom-Json ($baseCapture.Event|ConvertTo-Json -Depth 20 -Compress)
+        $captureEvent.slotId=$risk.representative.slotId
+        $captureEvent.originalReference=@((Read-OctoberCompatibilityCurrentQualificationContract).visualSlots|Where-Object {$_.slot -ceq $captureEvent.slotId})[0].reference
+        $captureEvent.pngPath=[IO.Path]::GetFullPath((Join-Path $fixtureRoot ('apps/mobile/build/compat-current-technical/'+$run+'/workspace_capture/'+$captureEvent.slotId+'.png')))
+        $captureEvent.metadataPath=$captureEvent.pngPath.Substring(0,$captureEvent.pngPath.Length-4)+'.json'
+        if($pairCase -cne 'missing' -or $pairTestId -ne 2){$pairEvents.Add([pscustomobject]@{type='print';testID=$pairTestId;message=('MOOL_TECHNICAL_CAPTURE '+($captureEvent|ConvertTo-Json -Depth 20 -Compress))})}
+        $pairEvents.Add([pscustomobject]@{type='testDone';testID=$pairTestId;result='success';hidden=$false;skipped=$false})
+      }
+      $paired=Read-OctoberCompatibilityCurrentSelectedRenderBindings -Events $pairEvents.ToArray() -Context $pairContext -Inventory $pairInventory -SourceIdentity $identity -SuccessfulKeys $pairSuccesses
+      if(($null -ne $paired) -ne ($pairCase -ceq 'valid')){throw ('Render multiple-risk pairing mismatch: '+$pairCase)}
+      if($pairCase -ceq 'valid') {
+        if($paired.RenderedSlots.Count -ne 2 -or $paired.OriginalFileHashes.Count -ne 4 -or $pairCalls.bytes -ne 2 -or $paired.InspectionVerified -or $paired.QualificationPassed -or $paired.ApkAuthority){throw 'Valid pair lost originals/count/authority'}
+        foreach($risk in $pairInventory) {
+          $actual=$paired.RenderedSlots[$risk.representative.slotId]
+          if($actual.RiskId -cne $risk.id -or $actual.TestKey -cne $risk.representative.testKey -or $actual.GeometryBinding.Geometry.logicalViewport.width -ne $risk.geometry.logicalViewport.width){throw 'Valid pair matched by position rather than exact identity'}
+        }
+      }
+      if($pairCase -ceq 'swapped' -and $pairCalls.bytes -ne 1){throw 'Swapped pair did not fail at first geometry binding'}
+      if($pairCase -ceq 'missing' -and $pairCalls.bytes -ne 0){throw 'Missing pair reached bytes before event completeness check'}
+      $count++
+    }
+    return $count
+  }
+  # Actual retained-file reader, labelled receipt/sidecar/render mocks. No Flutter.
+  $boundaryCases=& {
+    $boundaryRoot=Join-Path ([IO.Path]::GetTempPath()) ('mool-labelled-reader-'+[Guid]::NewGuid().ToString('N'))
+    $boundaryBuild=Join-Path $boundaryRoot 'apps/mobile/build'
+    [void][IO.Directory]::CreateDirectory($boundaryBuild)
+    $createdFiles=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    function Get-OctoberCompatibilityBinding {return @{worktreePath=$boundaryRoot}}
+    function Get-OctoberCoverageBoundHash($Path) {
+      if(-not $boundaryReads.ContainsKey($Path)){$boundaryReads[$Path]=0};$boundaryReads[$Path]++
+      return Get-OctoberCompatibilityByteHash ([IO.File]::ReadAllBytes($Path))
+    }
+    function Read-OctoberCompatibilityCurrentSelectionContextFile {
+      param($RelativePath,$ExpectedSha256,$ReportId,$ExecutionId,$RunId,$SourceIdentity)
+      if($RelativePath -cne $relative+'.selection.json' -or $ExpectedSha256 -cne $sidecarHash){throw 'Boundary wrong retained selection query'}
+      return $boundaryProof
+    }
+    function Read-OctoberCompatibilityCurrentExecutionEvents {
+      param($Capture,$Events,$ReportId,$ExecutionId,$Mode,$RunId,$SourceIdentity,$LogSha,$SelectedSlots,$SelectedTestKeys,$SelectionContextPath,$SelectionContextSha256)
+      if((ConvertTo-Json -InputObject @($Events) -Depth 20 -Compress) -cne $boundaryEventJson -or $LogSha -cne $logHash){throw 'Boundary receipt did not consume actual log bytes'}
+      return @{Successes=$boundarySuccesses;QualificationPassed=$false;ApkAuthority=$false}
+    }
+    function Read-OctoberCompatibilityCurrentSelectedRenderBindings {
+      param($Events,$Context,$Inventory,$SourceIdentity,$SuccessfulKeys)
+      $boundaryCalls.render++
+      if((ConvertTo-Json -InputObject @($Events) -Depth 20 -Compress) -cne $boundaryEventJson -or
+        -not [object]::ReferenceEquals($Context,$boundaryProof.Context) -or -not [object]::ReferenceEquals($Inventory,$boundaryProof.Inventory) -or
+        -not [object]::ReferenceEquals($SuccessfulKeys,$boundarySuccesses) -or -not [object]::ReferenceEquals($SourceIdentity,$identity)){throw 'Boundary substituted log/success/selection/source objects'}
+      if($boundaryCase -ceq 'render-null'){return $null}
+      if($boundaryCase -ceq 'render-throw'){throw 'Labelled render failure'}
+      if($boundaryCase -ceq 'render-malformed'){return @{RecordedRenderBindingsVerified='true'}}
+      if($boundaryCase -ceq 'late-native'){[IO.File]::AppendAllText($logPath,"`n")}
+      return @{RecordedRenderBindingsVerified=$true;OriginalFileHashes=$boundaryArtifactPins;InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+    }
+    $count=0
+    try {
+      foreach($boundaryCase in @('valid','render-null','render-throw','render-malformed','late-native','behavior-only')) {
+        $mode=if($boundaryCase -ceq 'behavior-only'){'behavior_only'}else{'selected_visual_risks'}
+        $profile=if($mode -ceq 'behavior_only'){'default'}else{'workspace_capture'}
+        $slots=if($mode -ceq 'behavior_only'){@()}else{@('H01-visual-1')}
+        $names=if($mode -ceq 'behavior_only'){@()}else{@('Workspace overnight visual - choose')}
+        $relative='apps/mobile/build/compat-current-boundary-'+$boundaryCase+'.jsonl'
+        $logPath=[IO.Path]::GetFullPath((Join-Path $boundaryRoot $relative));$capturePath=$logPath+'.capture.json';$stderrPath=$logPath+'.stderr.txt'
+        $sidecarPath=$logPath+'.selection.json';$inventoryPath=Join-Path $boundaryBuild 'inventory.json'
+        foreach($path in @($logPath,$capturePath,$stderrPath,$sidecarPath,$inventoryPath)){[void]$createdFiles.Add($path)}
+        [IO.File]::WriteAllText($sidecarPath,'labelled sidecar reader mock');[IO.File]::WriteAllText($inventoryPath,'labelled inventory reader mock');[IO.File]::WriteAllBytes($stderrPath,[byte[]]@())
+        $sidecarHash=Get-OctoberCompatibilityByteHash ([IO.File]::ReadAllBytes($sidecarPath))
+        $boundaryEvents=@([pscustomobject]@{type='print';message='Labelled native receipt fixture'})
+        if($mode -ceq 'selected_visual_risks'){$boundaryEvents+=@([pscustomobject]@{type='print';message='moolsocialSelectionContext';selectionContext=[pscustomobject]@{path=$relative+'.selection.json';sha256=$sidecarHash}})}
+        $boundaryEventJson=ConvertTo-Json -InputObject @($boundaryEvents) -Depth 20 -Compress
+        [IO.File]::WriteAllText($logPath,(@($boundaryEvents|ForEach-Object{$_|ConvertTo-Json -Depth 20 -Compress}) -join "`n"))
+        $logHash=Get-OctoberCompatibilityByteHash ([IO.File]::ReadAllBytes($logPath))
+        [IO.File]::WriteAllText($capturePath,([pscustomobject]@{stderrPath=$relative+'.stderr.txt';stderrSha256=(Get-OctoberCompatibilityByteHash ([byte[]]@()))}|ConvertTo-Json -Compress))
+        $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId store_layout_and_recovery -ExecutionId $profile -Mode $mode -RunId $run -SourceIdentity $identity -SelectedSlots @($slots) -SelectedTestKeys @($names)
+        if($null -eq $plan){throw 'Boundary plan invalid'}
+        $evidence=[pscustomobject]@{executionId=$profile;path=$relative;capturePath=$relative+'.capture.json';sha256=$logHash;captureSha256=(Get-OctoberCompatibilityByteHash ([IO.File]::ReadAllBytes($capturePath)));runtimeDefines=@($plan.RuntimeDefines)}
+        $boundaryProof=[pscustomobject]@{CanonicalPath=$sidecarPath;Sha256=$sidecarHash;InventoryCanonicalPath=$inventoryPath;InventorySha256=(Get-OctoberCompatibilityByteHash ([IO.File]::ReadAllBytes($inventoryPath)));
+          Context=[pscustomobject]@{labelledBoundary='context'};Inventory=@([pscustomobject]@{labelledBoundary='inventory'});Selection=[pscustomobject]@{SelectedSlots=@($slots);SelectedTestKeys=@($names)}}
+        $boundarySuccesses=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);$null=$boundarySuccesses.Add('labelled-success-this-execution')
+        $boundaryArtifactPins=@{};$boundaryArtifactPins[$sidecarPath]=$sidecarHash;$boundaryArtifactPins[$inventoryPath]=$boundaryProof.InventorySha256
+        $boundaryReads=@{};$boundaryCalls=@{render=0}
+        $actual=Read-OctoberCompatibilityCurrentExecutionEvidence -Evidence $evidence -ReportId store_layout_and_recovery -ExecutionId $profile -Mode $mode -RunId $run -SourceIdentity $identity -SelectedSlots @($slots) -SelectedTestKeys @($names)
+        if(($null -ne $actual) -ne ($boundaryCase -cin @('valid','behavior-only'))){throw ('Retained reader boundary result mismatch: '+$boundaryCase)}
+        if($mode -ceq 'behavior_only') {if($boundaryCalls.render -ne 0 -or $actual.ContainsKey('CurrentRenderBindings')){throw 'Behavior-only reader invoked render chain'}}
+        elseif($boundaryCalls.render -ne 1){throw 'Selected retained reader did not invoke render chain once'}
+        if($boundaryCase -ceq 'valid' -and ($actual.CurrentRenderBindings.QualificationPassed -or $boundaryReads[$logPath] -ne 2 -or $boundaryReads[$sidecarPath] -ne 2)){throw 'Retained reader lost final originals/authority boundary'}
+        if($boundaryCase -ceq 'late-native' -and $boundaryReads[$logPath] -ne 2){throw 'Post-render native original fence not reached'}
+        $count++
+      }
+    }finally {
+      foreach($path in $createdFiles){if([IO.File]::Exists($path)){[IO.File]::Delete($path)}}
+      foreach($dir in @($boundaryBuild,(Join-Path $boundaryRoot 'apps/mobile'),(Join-Path $boundaryRoot 'apps'),$boundaryRoot)){[IO.Directory]::Delete($dir,$false)}
+    }
+    return $count
+  }
+  [pscustomobject]@{Cases=$cases;CombinedPinCases=$pinCases;RecorderEventCases=$recorderCases;ArtifactByteCases=$artifactCases;GeometryCases=$geometryCases;RenderChainCases=$renderCases;MultiRiskPairCases=$pairCases;RetainedReaderBoundaryCases=$boundaryCases;ActualRiskSelector=$true;
+   NativeAndFileHashes='labelled native/hash/lease mocks; actual byte hash and PNG decoder';SourceAdmission=$false;
+   EquivalenceVerified=$false;ActualRender=$false;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+
+
 }
 
 function Invoke-OctoberCompatibilityVisualEnvironment {
@@ -50,6 +974,698 @@ function Invoke-OctoberCompatibilityVisualEnvironment {
   }
 }
 
+function Invoke-OctoberCompatibilityCurrentPrimaryVisualReviewProbes {
+  # Labelled upstream render/native mocks. This tests binding, not actual images.
+  $identity=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';contractCommit=('a'*40);
+    captureSourceCommit=('b'*40);captureSourceTree=('c'*40);producerBlob=('d'*40);executionHead=('b'*40)}
+  $base=(Get-OctoberCompatibilityBinding).worktreePath
+  $png='apps/mobile/build/compat-current-technical/current-'+('0'*32)+'/workspace_capture/H01-visual-1.png'
+  $metadata=$png.Substring(0,$png.Length-4)+'.json'
+  $log='apps/mobile/build/compat-current-store_layout_and_recovery-workspace_capture-current-'+('0'*32)+'.jsonl'
+  $capture=$log+'.capture.json'
+  $fields=@('riskId','artifactPath','artifactSha256','executionCapturePath','executionCaptureSha256','recorderMetadataPath',
+    'recorderMetadataSha256','eventLogPath','eventLogSha256','executionId','testKey','sourceIdentity','geometry','inspectedBy','inspectedAtUtc','findings','resolved')
+  function Read-OctoberCompatibilityCurrentSuccessorSpecification {param($Commit) return [pscustomobject]@{visuals=[pscustomobject]@{observationFields=$fields}}}
+  $count=0
+  foreach($case in @('valid','missing-primary','untyped-primary','untyped-selection','primary-source','missing-review',
+    'review-difference','inventory-difference','unresolved','wrong-inspector','bad-time','observation-source','foreign-risk',
+    'wrong-test','wrong-execution','png-path','png-hash','metadata-hash','log-hash','capture-hash','geometry',
+    'missing-slot','wrong-render-risk','missing-original','duplicate-observation',
+    'valid-empty-findings','original-pin-hash','cross-risk-substitution')) {
+    $risk=[pscustomobject]@{id='risk-choose';slotIds=@('H01-visual-1');representative=[pscustomobject]@{
+      slotId='H01-visual-1';executionId='workspace_capture';testKey='work_workspace_layout_safety_test.dart:choose'};state='Labelled fixture';geometry=[pscustomobject]@{width=4}}
+    $observation=[pscustomobject][ordered]@{riskId=$risk.id;artifactPath=$png;artifactSha256=('A'*64);executionCapturePath=$capture;
+      executionCaptureSha256=('D'*64);recorderMetadataPath=$metadata;recorderMetadataSha256=('B'*64);eventLogPath=$log;eventLogSha256=('C'*64);
+      executionId='workspace_capture';testKey=$risk.representative.testKey;sourceIdentity=[pscustomobject]$identity.Clone();geometry=$risk.geometry;
+      inspectedBy='primary:/root';inspectedAtUtc='2026-10-11T00:00:00.0000000+00:00';findings=@('Labelled review fixture, not an actual inspected image');resolved=$true}
+    $originals=@{}
+    foreach($pair in @(@($png,('A'*64)),@($metadata,('B'*64)),@($log,('C'*64)),@($capture,('D'*64)))) {
+      $originals[[IO.Path]::GetFullPath((Join-Path $base $pair[0]))]=$pair[1]
+    }
+    $row=@{RiskId=$risk.id;TestKey=$risk.representative.testKey;
+      Capture=@{PngRelativePath=$png;PngSha256=('A'*64);MetadataRelativePath=$metadata;MetadataSha256=('B'*64)};
+      GeometryBinding=@{Geometry=$risk.geometry;GeometryObservationVerified=$true}}
+    $render=@{RecordedRenderBindingsVerified=$true;RenderedSlots=@{'H01-visual-1'=$row}}
+    $execution=@{RetainedFilePaths=@{log=[IO.Path]::GetFullPath((Join-Path $base $log));capture=[IO.Path]::GetFullPath((Join-Path $base $capture))};
+      RetainedFileHashes=@{log=('C'*64);capture=('D'*64)};CurrentRenderBindings=$render}
+    $selection=@{RetainedSelectionBindingsVerified=$true;OriginalFileHashes=$originals;SelectedExecutions=@{workspace_capture=$execution}}
+    $primaryEntry=[pscustomobject]@{riskId=$risk.id;inventoryEntry=$risk;observation=$observation}
+    $primaryEntry=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($primaryEntry|ConvertTo-Json -Depth 40 -Compress)))
+    $primary=@{PrimaryReviewRecordBound=$true;Report=[pscustomobject]@{sourceIdentity=[pscustomobject]$identity.Clone();visualReviews=@($primaryEntry)}}
+    switch($case) {
+      'missing-primary' {$primary=$null}
+      'untyped-primary' {$primary.PrimaryReviewRecordBound='true'}
+      'untyped-selection' {$selection.RetainedSelectionBindingsVerified='true'}
+      'primary-source' {$primary.Report.sourceIdentity.executionHead=('f'*40)}
+      'missing-review' {$primary.Report.visualReviews=@()}
+      'review-difference' {$primaryEntry.observation.findings=@('Different independently retained review')}
+      'inventory-difference' {$primaryEntry.inventoryEntry.state='Different reviewed fixture'}
+      'unresolved' {$observation.resolved=$false;$primaryEntry.observation.resolved=$false}
+      'wrong-inspector' {$observation.inspectedBy='subagent';$primaryEntry.observation.inspectedBy='subagent'}
+      'bad-time' {$observation.inspectedAtUtc='yesterday';$primaryEntry.observation.inspectedAtUtc='yesterday'}
+      'observation-source' {$observation.sourceIdentity.producerBlob=('f'*40);$primaryEntry.observation.sourceIdentity.producerBlob=('f'*40)}
+      'foreign-risk' {$observation.riskId='other-risk'}
+      'wrong-test' {$observation.testKey='other';$primaryEntry.observation.testKey='other'}
+      'wrong-execution' {$observation.executionId='other';$primaryEntry.observation.executionId='other'}
+      'png-path' {$observation.artifactPath='apps/mobile/build/unrelated.png';$primaryEntry.observation.artifactPath=$observation.artifactPath}
+      'png-hash' {$observation.artifactSha256=('F'*64);$primaryEntry.observation.artifactSha256=$observation.artifactSha256}
+      'metadata-hash' {$observation.recorderMetadataSha256=('F'*64);$primaryEntry.observation.recorderMetadataSha256=$observation.recorderMetadataSha256}
+      'log-hash' {$observation.eventLogSha256=('F'*64);$primaryEntry.observation.eventLogSha256=$observation.eventLogSha256}
+      'capture-hash' {$observation.executionCaptureSha256=('F'*64);$primaryEntry.observation.executionCaptureSha256=$observation.executionCaptureSha256}
+      'geometry' {$observation.geometry=[pscustomobject]@{width=5};$primaryEntry.observation.geometry=$observation.geometry}
+      'missing-slot' {$render.RenderedSlots=@{}}
+      'wrong-render-risk' {$row.RiskId='other'}
+      'missing-original' {$originals.Remove([IO.Path]::GetFullPath((Join-Path $base $png)))}
+      'valid-empty-findings' {$observation.findings=@();$primaryEntry.observation.findings=@()}
+      'original-pin-hash' {$originals[[IO.Path]::GetFullPath((Join-Path $base $png))]=('F'*64)}
+      'cross-risk-substitution' {
+        # An otherwise valid retained render from risk B cannot occupy risk A's
+        # representative slot, even with identical geometry and test identity.
+        $otherPng=$png.Replace('H01-visual-1','H02-visual-1')
+        $otherMetadata=$otherPng.Substring(0,$otherPng.Length-4)+'.json'
+        $originals[[IO.Path]::GetFullPath((Join-Path $base $otherPng))]=('E'*64)
+        $originals[[IO.Path]::GetFullPath((Join-Path $base $otherMetadata))]=('F'*64)
+        $render.RenderedSlots['H01-visual-1']=@{RiskId='risk-other';TestKey=$risk.representative.testKey;
+          Capture=@{PngRelativePath=$otherPng;PngSha256=('E'*64);MetadataRelativePath=$otherMetadata;MetadataSha256=('F'*64)};
+          GeometryBinding=@{Geometry=$risk.geometry;GeometryObservationVerified=$true}}
+        $observation.artifactPath=$otherPng;$observation.artifactSha256=('E'*64)
+        $observation.recorderMetadataPath=$otherMetadata;$observation.recorderMetadataSha256=('F'*64)
+        $primaryEntry.observation=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($observation|ConvertTo-Json -Depth 40 -Compress)))
+      }
+    }
+    $observations=@($observation);if($case -ceq 'duplicate-observation'){$observations+=@($observation)}
+    $result=Read-OctoberCompatibilityCurrentPrimaryVisualReview -Inventory @($risk) -Observations $observations -SourceIdentity $identity -SelectionEvidence $selection -PrimaryBinding $primary
+    $expectValid=$case -in @('valid','valid-empty-findings')
+    if(($null -ne $result) -ne $expectValid){throw ('Primary visual review mismatch: '+$case)}
+    if($expectValid -and (-not $result.PrimaryVisualReviewBound -or $result.Reviews.Count -ne 1 -or
+      $result.EquivalenceVerified -or $result.FounderApprovalVerified -or $result.QualificationPassed -or $result.ApkAuthority)){throw 'Primary visual review overclaimed authority.'}
+    $count++
+  }
+  $slotCases=Invoke-OctoberCompatibilityCurrentVisualSlotAccountingProbes
+  $presentationCases=Invoke-OctoberCompatibilityCurrentPresentationReviewProbes
+  $compositionCases=Invoke-OctoberCompatibilityCurrentQualifiedEvidenceProbes
+  $activationCases=Invoke-OctoberCompatibilityCurrentQualificationActivationProbes
+  $incrementalCases=Invoke-OctoberCompatibilityIncrementalMetadataPhaseProbes
+  [pscustomobject]@{PrimaryVisualReviewCases=$count;VisualSlotAccountingCases=$slotCases;PresentationReviewCases=$presentationCases;CompositionCases=$compositionCases;ActivationCases=$activationCases;IncrementalStageCases=$incrementalCases;LabelledUpstreamRenderMocks=$true;ActualInspection=$false;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+}
+
+function Invoke-OctoberCompatibilityIncrementalMetadataPhaseProbes {
+  # Actual incremental predicate; labelled index/preparation observations.
+  $phaseTokens=$null;$phaseErrors=$null
+  $phaseAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'check-cross-agent-incremental-ticket-gate.ps1'),[ref]$phaseTokens,[ref]$phaseErrors)
+  if($phaseErrors.Count){throw 'Incremental phase parser failed.'}
+  $phaseNodes=@($phaseAst.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Test-CompatibilityIncrementalImplementationStage'},$true))
+  if($phaseNodes.Count -ne 1){throw 'Incremental phase predicate missing/duplicated.'}
+  . ([scriptblock]::Create($phaseNodes[0].Extent.Text))
+  $count=0
+  foreach($phaseCase in @('working','staged','unprepared','untyped','index-failure','foreign-staged','untyped-stage','qualified-stage')) {
+    $phaseReads=@{count=0}
+    function Get-OctoberCompatibilityGitLines {
+      param([string[]]$Arguments)
+      if(($Arguments -join '|') -cne 'diff|--cached|--name-only'){throw 'Unexpected incremental phase read.'}
+      if($phaseCase -ceq 'index-failure'){throw 'Labelled index failure.'}
+      if($phaseCase -ceq 'staged'){return @('scripts/check-cross-agent-incremental-ticket-gate.ps1')}
+      if($phaseCase -ceq 'foreign-staged'){return @('apps/mobile/lib/unowned.dart')}
+      return @()
+    }
+    function Test-OctoberCompatibilityCurrentPreparation {
+      param([string]$Phase)
+      $phaseReads.count++
+      $expected=if($phaseCase -cin @('staged','foreign-staged')){'pre_commit'}else{'implementation'}
+      if($Phase -cne $expected -or $phaseCase -cin @('unprepared','foreign-staged')){return $false}
+      if($phaseCase -ceq 'untyped'){return 'true'};return $true
+    }
+    $stage=if($phaseCase -ceq 'untyped-stage'){'16'}elseif($phaseCase -ceq 'qualified-stage'){19}else{16}
+    $result=Test-CompatibilityIncrementalImplementationStage $stage
+    if($result -isnot [bool] -or $result -ne ($phaseCase -cin @('working','staged'))){throw ('Incremental phase mismatch: '+$phaseCase)}
+    if($result -and $phaseReads.count -ne 1){throw 'Incremental stage bypassed preparation.'}
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilityCurrentQualificationActivationProbes {
+  # Actual boolean adapter, labelled already-composed evidence only.
+  $count=0
+  foreach($activationCase in @('valid-working','valid-index','valid-committed','invalid-both','missing','untyped-bound','provider','untyped-provider','images','untyped-images','apk','untyped-apk')) {
+    $activationHistory=@{Stage=$(if($activationCase -ceq 'valid-committed'){19}else{18})}
+    $activationWorking=$activationCase -cnotin @('valid-committed','valid-index')
+    $activationIndex=$activationCase -cin @('valid-index','invalid-both')
+    $activationEvidence=@{CurrentFrontendEvidenceBound=$true;ProviderVerified=$false;FounderApprovedImages=$false;ApkAuthority=$false}
+    switch($activationCase){
+      'untyped-bound' {$activationEvidence.CurrentFrontendEvidenceBound='true'}
+      'provider' {$activationEvidence.ProviderVerified=$true}
+      'untyped-provider' {$activationEvidence.ProviderVerified='false'}
+      'images' {$activationEvidence.FounderApprovedImages=$true}
+      'untyped-images' {$activationEvidence.FounderApprovedImages='false'}
+      'apk' {$activationEvidence.ApkAuthority=$true}
+      'untyped-apk' {$activationEvidence.ApkAuthority='false'}
+    }
+    function Read-OctoberCompatibilityCurrentQualifiedEvidence {
+      param($History,[switch]$FromWorkingTree,[switch]$FromIndex)
+      if($History.Stage -ne $activationHistory.Stage -or [bool]$FromWorkingTree -ne $activationWorking -or
+        [bool]$FromIndex -ne $activationIndex){throw 'Activation changed history/read mode.'}
+      if($activationCase -ceq 'missing'){return $null};return $activationEvidence
+    }
+    $result=Test-OctoberCompatibilityQualification -History $activationHistory -FromWorkingTree:$activationWorking -FromIndex:$activationIndex
+    if($result -isnot [bool] -or $result -ne ($activationCase -in @('valid-working','valid-index','valid-committed'))){throw ('Activation mismatch: '+$activationCase)}
+    $count++
+  }
+  # Execute the three actual staged-Q call expressions with a labelled callee.
+  # This checks caller wiring, not a live staged qualification or acceptance.
+  $callerTokens=$null;$callerErrors=$null
+  $callerAst=[Management.Automation.Language.Parser]::ParseFile($checkerPath,[ref]$callerTokens,[ref]$callerErrors)
+  if($callerErrors.Count){throw 'Qualification caller parser failed.'}
+  $indexCalls=@($callerAst.FindAll({param($node)
+    $node -is [Management.Automation.Language.CommandAst] -and $node.GetCommandName() -ceq 'Test-OctoberCompatibilityQualification' -and
+    @($node.CommandElements|Where-Object {$_ -is [Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -ceq 'FromIndex'}).Count -eq 1
+  },$true))
+  if($indexCalls.Count -ne 3){throw 'Exact staged-Q caller set changed.'}
+  $compatibilityHistory=@{Stage=18};$callerChecks=@{count=0}
+  function Test-OctoberCompatibilityQualification {
+    param($History,[switch]$FromWorkingTree,[switch]$FromIndex)
+    if($History.Stage -ne 18 -or $FromWorkingTree -or -not $FromIndex){throw 'Precommit caller changed staged-Q mode.'}
+    $callerChecks.count++;return $true
+  }
+  foreach($call in $indexCalls){if((& ([scriptblock]::Create($call.Extent.Text))) -ne $true){throw 'Staged-Q caller expression failed.'};$count++}
+  if($callerChecks.count -ne 3){throw 'Staged-Q caller omitted invocation.'}
+  return $count
+}
+
+function Invoke-OctoberCompatibilityCurrentQualifiedEvidenceProbes {
+  param([object]$SlotFixture)
+  # Labelled leaf mocks exercise orchestration and final fences, not actual Q.
+  $operativeSlot=(Get-Command Read-OctoberCompatibilityCurrentVisualSlotAccounting -CommandType Function -ErrorAction SilentlyContinue).ScriptBlock
+  $count=0
+  $compositionCases=if($null -ne $SlotFixture){@('valid')}else{@('valid','proof','primary','cycles','assertions','skips','presentation','selection','plan','execution','retained','visual','slots','files','pin-conflict','pin-drift','document-drift','proof-drift','history-drift',
+    'untyped-proof','untyped-primary','untyped-cycles','untyped-assertions','untyped-skips','untyped-presentation','untyped-retained','untyped-visual','untyped-slots','untyped-files',
+    'final-render-drift','final-primary-drift','selected-log-mismatch','selected-profile-mismatch')}
+  foreach($case in $compositionCases) {
+    $calls=@{proof=0;renderDrift=$false;primaryDrift=$false}
+    $task=[IO.Path]::GetFullPath('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store')
+    $pins=@{};foreach($n in 1..4){$pins[(Join-Path $task ('probe-'+$n+'.json'))]='A'*64}
+    $other=@{};foreach($n in 3..4){$other[(Join-Path $task ('probe-'+$n+'.json'))]='A'*64}
+    if($case -ceq 'pin-conflict'){$other[(Join-Path $task 'probe-3.json')]='B'*64}
+    $compositionProof=[pscustomobject]@{runtimeSourceCommit=('a'*40);contractCommit=('b'*40);captureSourceCommit=('c'*40);
+      captureSourceTree=('d'*40);producerBlob=('e'*40);cycles=@();obligations=@();visualReconciliation=@();providerDeferrals=@('pending');
+      visualRiskInventory=@([pscustomobject]@{representative=[pscustomobject]@{executionId='workspace_capture'}});
+      visualObservations=@([pscustomobject]@{executionId='workspace_capture';eventLogPath=('apps/mobile/build/compat-current-store_layout_and_recovery-workspace_capture-current-'+('a'*32)+'.jsonl');
+        eventLogSha256=('A'*64);executionCapturePath='fixture.capture.json';executionCaptureSha256=('A'*64)})}
+    $leaves=@{primary=@{PrimaryReviewRecordBound=$true;OriginalTaskFileHashes=$pins};cycles=@{CyclesVerified=$true;OriginalFileHashes=@{native='A'}};
+      assertions=@{PrimaryAssertionReviewBound=$true};skips=@{SkippedCoverageVerified=$true};presentation=@{SpecificPresentationReviewBound=$true;OriginalTaskFileHashes=$other};
+      selection=@{SelectedSlots=@('H01@portrait');SelectedTestKeys=@('test')};plan=@{RuntimeDefines=@()};execution=@{actual=$true};
+      retained=@{RetainedSelectionBindingsVerified=$true;OriginalFileHashes=@{render='A'}};visual=@{PrimaryVisualReviewBound=$true};
+      slots=@{HistoricalSlotsAccounted=$true;CurrentVisualDispositionReviewBound=$true};files=@{FinalFileBindingsVerified=$true;OriginalFileHashes=@{native='A';render='A'}}}
+    if($null -ne $SlotFixture){
+      $compositionProof.obligations=$SlotFixture.Primary.Report.sourceReviews
+      $compositionProof.visualRiskInventory=$SlotFixture.Inventory
+      $compositionProof.visualReconciliation=$SlotFixture.Rows
+      $leaves.primary=$SlotFixture.Primary.Clone();$leaves.primary.OriginalTaskFileHashes=$pins
+      $leaves.assertions=$SlotFixture.Assertions;$leaves.visual=$SlotFixture.Visual
+      $leaves.presentation=$SlotFixture.Presentation.Clone();$leaves.presentation.OriginalTaskFileHashes=$other
+    }
+    $flags=@{primary='PrimaryReviewRecordBound';cycles='CyclesVerified';assertions='PrimaryAssertionReviewBound';skips='SkippedCoverageVerified';
+      presentation='SpecificPresentationReviewBound';retained='RetainedSelectionBindingsVerified';visual='PrimaryVisualReviewBound';
+      slots='HistoricalSlotsAccounted';files='FinalFileBindingsVerified'}
+    foreach($name in $flags.Keys){if($case -ceq ('untyped-'+$name)){$leaves[$name][$flags[$name]]='true'}}
+    if($case -ceq 'selected-log-mismatch'){$compositionProof.visualObservations[0].eventLogPath='apps/mobile/build/unrelated.jsonl'}
+    if($case -ceq 'selected-profile-mismatch'){$compositionProof.visualObservations[0].executionId='founder_capture'}
+    function Read-ProbeLeaf([string]$Name){
+      if($case -ceq $Name -or ($Name -ceq 'files' -and $calls.renderDrift)){return $null};return $leaves[$Name]
+    }
+    function Read-OctoberCompatibilityCurrentQualificationProof {
+      $calls.proof++
+      if($case -ceq 'proof'){return $null}
+      $snapshot='A'*64;$history=@{Stage=18}
+      if($calls.proof -eq 2){
+        if($case -ceq 'document-drift'){$snapshot='B'*64}
+        if($case -ceq 'proof-drift'){$compositionProof.providerDeferrals=@('changed')}
+        if($case -ceq 'history-drift'){$history.Stage=19}
+        if($case -ceq 'final-render-drift'){$calls.renderDrift=$true}
+        if($case -ceq 'final-primary-drift'){$calls.primaryDrift=$true}
+      }
+      # Copy: mutating the final reader must not mutate the initial snapshot.
+      $copy=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($compositionProof|ConvertTo-Json -Depth 20 -Compress)))
+      return @{Proof=$copy;History=$history;StructureVerified=$(if($case -ceq 'untyped-proof'){'true'}else{$true});QualificationDocumentSnapshotSha256=$snapshot}
+    }
+    function Read-OctoberCompatibilityCurrentPrimaryReviewBinding {Read-ProbeLeaf primary}
+    function Read-OctoberCompatibilityCurrentCycles {Read-ProbeLeaf cycles}
+    function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {Read-ProbeLeaf assertions}
+    function Read-OctoberCompatibilityCurrentSkippedCoverage {Read-ProbeLeaf skips}
+    function Read-OctoberCompatibilityCurrentPresentationReview {Read-ProbeLeaf presentation}
+    function Read-OctoberCompatibilityCurrentSelectedRiskBindings {Read-ProbeLeaf selection}
+    function Get-OctoberCompatibilityCurrentExecutionPlan {Read-ProbeLeaf plan}
+    function Read-OctoberCompatibilityCurrentExecutionEvidence {Read-ProbeLeaf execution}
+    function Read-OctoberCompatibilityCurrentRetainedSelectionBindings {Read-ProbeLeaf retained}
+    function Read-OctoberCompatibilityCurrentPrimaryVisualReview {Read-ProbeLeaf visual}
+    function Read-OctoberCompatibilityCurrentVisualSlotAccounting {
+      param($Reconciliation,$Inventory,$SourceIdentity,$PrimaryVisualReview,$PrimaryAssertionReview,$PrimaryBinding,$PresentationReview)
+      if($null -eq $SlotFixture){return (Read-ProbeLeaf slots)}
+      return (& $operativeSlot -Reconciliation $Reconciliation -Inventory $Inventory -SourceIdentity $SourceIdentity `
+        -PrimaryVisualReview $PrimaryVisualReview -PrimaryAssertionReview $PrimaryAssertionReview -PrimaryBinding $PrimaryBinding -PresentationReview $PresentationReview)
+    }
+    function Read-OctoberCompatibilityCurrentCombinedOriginalFilePins {Read-ProbeLeaf files}
+    function Get-OctoberCoverageBoundHash {if($case -ceq 'pin-drift' -or $calls.primaryDrift){return ('B'*64)};return ('A'*64)}
+    $result=Read-OctoberCompatibilityCurrentQualifiedEvidence -History @{Stage=18} -FromWorkingTree
+    $expected=if($null -ne $SlotFixture){$SlotFixture.ExpectedSuccess}else{$case -ceq 'valid'}
+    if(($null -ne $result) -ne $expected){throw ('Current composition mismatch: '+$case)}
+    if($expected -and (-not $result.CurrentFrontendEvidenceBound -or $result.ProviderVerified -or
+      $result.FounderApprovedImages -or $result.ApkAuthority -or $result.QualificationPassed)){throw 'Composition overclaimed authority.'}
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilityCurrentPresentationReviewProbes {
+  # Actual pinned manifest bytes; labelled access-receipt/authority/lease mocks.
+  # No TASK source, approval, application data or evidence file is written.
+  $taskBase='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store'
+  $manifestPath=[IO.Path]::GetFullPath((Join-Path $taskBase 'work/founder-input-gate.json'))
+  $statePath=[IO.Path]::GetFullPath((Join-Path $taskBase 'work/founder-input-read-state.local.json'))
+  $actualManifestBytes=[IO.File]::ReadAllBytes($manifestPath)
+  $actualManifest=Read-OctoberCompatibilityJsonObject $actualManifestBytes
+  $sourcePath=[IO.Path]::GetFullPath((Join-Path $taskBase $actualManifest.sources[20]))
+  $count=0
+  foreach($presentationProbeCase in @('valid','missing-primary','untyped-assertions','primary-source','manifest-pin','state-task',
+    'duplicate-receipt','unlisted-path','candidate-hash','authority-bytes','absent-excerpt','wrong-case','wrong-clause',
+    'wrong-requirement','unknown-slot','duplicate-slot','empty-change','authentic-unreviewed-change','source39',
+    'late-authority-drift','late-state-drift','file-alias','untyped-receipt-index','other-case-known-slot')) {
+    $authorityBytes=[Text.Encoding]::UTF8.GetBytes('Labelled fixture: approved compact current layout for this specific case.')
+    $authorityHash=Get-OctoberCompatibilityByteHash $authorityBytes
+    $readState=[pscustomobject]@{task='store-buy-compatibility-20261008';manifestHash='78A0C5E9C653EF10E708C5B5CD61370083942EDDE0665D74C19506BBE6A85A9D';
+      reads=@(0..39|ForEach-Object {[pscustomobject]@{index=$_;hash=$(if($_ -eq 20){$authorityHash}else{'A'*64});utc='2026-10-11T00:00:00.0000000Z'}});consumed=$false}
+    if($presentationProbeCase -ceq 'state-task'){$readState.task='other-task'}
+    if($presentationProbeCase -ceq 'duplicate-receipt'){$readState.reads[39]=$readState.reads[38]}
+    if($presentationProbeCase -ceq 'untyped-receipt-index'){$readState.reads[0].index='0'}
+    $stateBytes=[Text.Encoding]::UTF8.GetBytes(($readState|ConvertTo-Json -Depth 10 -Compress))
+    $snapshots=@{}
+    $snapshots[$manifestPath]=@{Bytes=$actualManifestBytes;Hash=(Get-OctoberCompatibilityByteHash $actualManifestBytes);Id='00000001:0000000000000001'}
+    $snapshots[$statePath]=@{Bytes=$stateBytes;Hash=(Get-OctoberCompatibilityByteHash $stateBytes);Id='00000001:0000000000000002'}
+    $snapshots[$sourcePath]=@{Bytes=$authorityBytes;Hash=$authorityHash;Id='00000001:0000000000000003'}
+    if($presentationProbeCase -ceq 'manifest-pin'){$snapshots[$manifestPath].Hash='F'*64}
+    if($presentationProbeCase -ceq 'authority-bytes'){$snapshots[$sourcePath].Bytes=[Text.Encoding]::UTF8.GetBytes('Changed authority bytes')}
+    if($presentationProbeCase -ceq 'file-alias'){$snapshots[$statePath].Id=$snapshots[$manifestPath].Id}
+    $hashReads=@{};$opened=[Collections.Generic.List[object]]::new()
+    function Get-OctoberCoverageBoundHash {
+      param([string]$Path)
+      if(-not $snapshots.ContainsKey($Path)){throw 'Unexpected presentation hash path.'}
+      if(-not $hashReads.ContainsKey($Path)){$hashReads[$Path]=0};$hashReads[$Path]++
+      if(($presentationProbeCase -ceq 'late-authority-drift' -and $Path -ceq $sourcePath -and $hashReads[$Path] -ge 2) -or
+        ($presentationProbeCase -ceq 'late-state-drift' -and $Path -ceq $statePath -and $hashReads[$Path] -ge 3)){return ('F'*64)}
+      return $snapshots[$Path].Hash
+    }
+    function Open-OctoberCompatibilityVisualArtifact {
+      param($Base,$RelativePath,$ExpectedSha256,$MaxBytes)
+      $path=[IO.Path]::GetFullPath((Join-Path $Base $RelativePath))
+      if(-not $snapshots.ContainsKey($path)){throw 'Unexpected presentation lease path.'}
+      $snapshot=$snapshots[$path]
+      $lease=[pscustomobject]@{CanonicalPath=$path;Sha256=$snapshot.Hash;Bytes=[byte[]]$snapshot.Bytes;
+        FileIdentity=$snapshot.Id;Stream=[IO.MemoryStream]::new()}
+      $opened.Add($lease);return $lease
+    }
+    function Read-OctoberCompatibilityCurrentQualificationContract {param($Commit) return [pscustomobject]@{
+      visualSlots=@([pscustomobject]@{slot='H01-visual-1'},[pscustomobject]@{slot='H02-visual-1'})}}
+    $identity=@{runtimeSourceCommit=('a'*40);contractCommit=('b'*40);captureSourceCommit=('c'*40);
+      captureSourceTree=('d'*40);producerBlob=('e'*40);executionHead=('c'*40)}
+    $decision=[pscustomobject]@{schemaVersion=1;ordinal=1;clause=1;requirement='Labelled retained requirement';
+      founderExcerpt='approved compact current layout for this specific case';currentChange='Labelled compact current layout';
+      reason='Labelled primary review of exact case-specific applicability';limitations='No real founder approval or APK evidence';slotIds=@('H01-visual-1')}
+    $authority=[pscustomobject]@{path=$sourcePath;sha256=$authorityHash;decision=''}
+    switch($presentationProbeCase) {
+      'unlisted-path' {$authority.path=[IO.Path]::GetFullPath((Join-Path $taskBase 'outputs/not-in-manifest.md'))}
+      'candidate-hash' {$authority.sha256='F'*64}
+      'absent-excerpt' {$decision.founderExcerpt='Not present in the retained source'}
+      'wrong-case' {$decision.ordinal=2}
+      'wrong-clause' {$decision.clause=2}
+      'wrong-requirement' {$decision.requirement='Other retained requirement'}
+      'unknown-slot' {$decision.slotIds=@('H01-visual-99')}
+      'duplicate-slot' {$decision.slotIds=@('H01-visual-1','H01-visual-1')}
+      'other-case-known-slot' {$decision.slotIds=@('H02-visual-1')}
+      'empty-change' {$decision.currentChange=' '}
+      'source39' {$authority.path=[IO.Path]::GetFullPath((Join-Path $taskBase $actualManifest.sources[39]));$authority.sha256='A'*64}
+    }
+    $authority.decision=$decision|ConvertTo-Json -Depth 10 -Compress
+    $obligations=@([pscustomobject]@{ordinal=1;clauses=@([pscustomobject]@{index=1;parts=@([pscustomobject]@{
+      requirement=$decision.requirement;disposition='superseded_presentation';presentationAuthority=$authority})})})
+    if($presentationProbeCase -ceq 'wrong-requirement'){$obligations[0].clauses[0].parts[0].requirement='Labelled retained requirement'}
+    $reviewEnvelope=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(
+      (ConvertTo-Json -InputObject ([pscustomobject]@{sourceReviews=$obligations}) -Depth 100 -Compress)))
+    $primary=@{PrimaryReviewRecordBound=$true;Report=[pscustomobject]@{sourceIdentity=[pscustomobject]$identity.Clone();
+      sourceReviews=$reviewEnvelope.sourceReviews}}
+    $assertions=@{PrimaryAssertionReviewBound=$true}
+    if($presentationProbeCase -ceq 'missing-primary'){$primary=$null}
+    if($presentationProbeCase -ceq 'untyped-assertions'){$assertions.PrimaryAssertionReviewBound='true'}
+    if($presentationProbeCase -ceq 'primary-source'){$primary.Report.sourceIdentity.producerBlob='f'*40}
+    if($presentationProbeCase -ceq 'authentic-unreviewed-change'){
+      $decision.currentChange='Different change not approved for this case';$authority.decision=$decision|ConvertTo-Json -Depth 10 -Compress
+    }
+    $result=Read-OctoberCompatibilityCurrentPresentationReview -Obligations $obligations -SourceIdentity $identity `
+      -PrimaryAssertionReview $assertions -PrimaryBinding $primary
+    foreach($lease in $opened){if($lease.Stream.CanRead){throw 'Presentation probe lease was not closed.'}}
+    if(($null -ne $result) -ne ($presentationProbeCase -ceq 'valid')){throw ('Presentation review mismatch: '+$presentationProbeCase)}
+    if($presentationProbeCase -ceq 'valid' -and ($result.Decisions.Count -ne 1 -or $result.OriginalTaskFileHashes.Count -ne 3 -or
+      -not $result.SpecificPresentationReviewBound -or $result.MachineAuthorityMeaningVerified -or $result.FounderApprovedImages -or
+      $result.QualificationPassed -or $result.ApkAuthority)){throw 'Presentation review overclaimed authority.'}
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilityCurrentVisualSlotAccountingProbes {
+  # Labelled historical/native/review fixtures, not actual 65-slot acceptance.
+  $identity=@{runtimeSourceCommit=('a'*40);contractCommit=('b'*40);captureSourceCommit=('c'*40);
+    captureSourceTree=('d'*40);producerBlob=('e'*40);executionHead=('c'*40)}
+  $count=0
+  foreach($case in @('valid','missing-row','duplicate-row','literal-drift','wrong-risk','representative-relabel',
+    'missing-visual','untyped-assertions','source-drift','empty-reason','state-drift','geometry-drift',
+    'anchor-assertion','anchor-ordinal','anchor-slot','anchor-test','provider-anchor','orphan-risk','historical-approval',
+    'same-case-review-association','valid-superseded-shared','valid-superseded-representative',
+    'missing-specific-presentation','wrong-supersession-slot','supersession-equivalence-label',
+    'missing-reviewed-anchor-pair','duplicated-reviewed-anchor-pair','representative-missing-presentation',
+    'anchor-supersession-wrong-slot','representative-supersession-without-pair')) {
+    $slots=@(1..65|ForEach-Object {[pscustomobject]@{profile='workspace_capture';slot=('H{0:D2}-visual-1' -f $_);
+      reference=('historical-'+$_+'.png');referenceRole='historical_not_current_oracle';
+      newEvidenceRule='case_specific_visual_risk_or_verified_shared_current_surface';equivalenceProven=$false}})
+    function Read-OctoberCompatibilityCurrentQualificationContract {param($Commit) return [pscustomobject]@{visualSlots=$slots}}
+    $sourceReviews=@(1..65|ForEach-Object {[pscustomobject]@{ordinal=$_;clauses=@([pscustomobject]@{index=1;parts=@([pscustomobject]@{
+      requirement='Labelled retained requirement';disposition='asserted';successfulTests=@([pscustomobject]@{reportId='store_layout_and_recovery';executionId='default';testKey=('test:'+$_)});
+      assertionEvidence=@([pscustomobject]@{owner='apps/mobile/test/labelled.dart';sourceBlob=('f'*40);firstLine=$_;lastLine=$_;
+        excerptSha256=('A'*64);reviewObservation=('Labelled primary assertion '+$_)})})})}})
+    $risk=[pscustomobject]@{id='labelled-risk';slotIds=@($slots|ForEach-Object {$_.slot});representative=[pscustomobject]@{
+      slotId=$slots[0].slot;profile='workspace_capture'};currentSurface='labelled-surface';target='labelled-target';
+      state='labelled-state';geometry=[pscustomobject]@{width=4};equivalenceEvidence=@()}
+    $risk.equivalenceEvidence=@(2..65|ForEach-Object {
+      $slotIndex=$_-1
+      [pscustomobject]@{slotId=$slots[$slotIndex].slot;disposition='equivalent';presentationKey=$null;currentSurface=$risk.currentSurface;target=$risk.target;state=$risk.state;
+        geometry=$risk.geometry;reason=('Labelled reviewed equivalence for '+$slots[$slotIndex].slot);sourceAssertions=@(
+          [pscustomobject]@{role='slot';slotId=$slots[$slotIndex].slot;slotMeaning=('Labelled slot meaning '+$_);ordinal=$_;
+            successfulTest=$sourceReviews[$slotIndex].clauses[0].parts[0].successfulTests[0];
+            assertionEvidence=$sourceReviews[$slotIndex].clauses[0].parts[0].assertionEvidence[0]},
+          [pscustomobject]@{role='representative';slotId=$slots[0].slot;slotMeaning='Labelled representative meaning';ordinal=1;
+            successfulTest=$sourceReviews[0].clauses[0].parts[0].successfulTests[0];
+            assertionEvidence=$sourceReviews[0].clauses[0].parts[0].assertionEvidence[0]})}
+    })
+    $inventory=@($risk)
+    $rows=@($slots|ForEach-Object {[pscustomobject]@{profile=$_.profile;slot=$_.slot;reference=$_.reference;
+      referenceRole=$_.referenceRole;newEvidenceRule=$_.newEvidenceRule;equivalenceProven=$_.equivalenceProven;
+      riskId=$risk.id;captureRole=$(if($_.slot -ceq $risk.representative.slotId){'representative'}else{'shared'});
+      presentationKey=$null;disposition=$(if($_.slot -ceq $risk.representative.slotId){'representative'}else{'equivalent'})}})
+    $primary=@{PrimaryReviewRecordBound=$true;Report=[pscustomobject]@{sourceIdentity=[pscustomobject]$identity.Clone();sourceReviews=$sourceReviews}}
+    $reviewedRisk=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($risk|ConvertTo-Json -Depth 100 -Compress)))
+    $visual=@{PrimaryVisualReviewBound=$true;Reviews=@{$risk.id=@{inventoryEntry=$reviewedRisk}}}
+    $pairs=@($sourceReviews|ForEach-Object {[pscustomobject]@{Ordinal=$_.ordinal;Clause=1;Requirement=$_.clauses[0].parts[0].requirement;
+      Disposition='asserted';SuccessfulTest=$_.clauses[0].parts[0].successfulTests[0];AssertionEvidence=$_.clauses[0].parts[0].assertionEvidence[0]}})
+    $assertions=@{PrimaryAssertionReviewBound=$true;ReviewedAssertionPairs=$pairs}
+    $presentation=@{SpecificPresentationReviewBound=$true;Decisions=@{}}
+    $evidence=$risk.equivalenceEvidence[0]
+    if($case -in @('valid-superseded-shared','missing-specific-presentation','wrong-supersession-slot',
+      'supersession-equivalence-label','anchor-supersession-wrong-slot')) {
+      $key='H2:1:Labelled retained requirement'
+      $sourceReviews[1].clauses[0].parts[0].disposition='superseded_presentation';$pairs[1].Disposition='superseded_presentation'
+      $evidence.disposition='superseded_presentation';$evidence.presentationKey=$key
+      $rows[1].disposition='superseded_presentation';$rows[1].presentationKey=$key
+      $path=[IO.Path]::GetFullPath('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/labelled-only.md')
+      $presentation.Decisions[$key]=@{Decision=[pscustomobject]@{ordinal=2;clause=1;requirement='Labelled retained requirement';slotIds=@($slots[1].slot)};
+        SourcePath=$path;Authority=[pscustomobject]@{path=$path}}
+    }
+    if($case -in @('valid-superseded-representative','representative-missing-presentation','representative-supersession-without-pair')) {
+      $key='H1:1:Labelled retained requirement'
+      $sourceReviews[0].clauses[0].parts[0].disposition='superseded_presentation';$pairs[0].Disposition='superseded_presentation'
+      $rows[0].disposition='superseded_presentation';$rows[0].presentationKey=$key
+      $path=[IO.Path]::GetFullPath('C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/labelled-only.md')
+      $presentation.Decisions[$key]=@{Decision=[pscustomobject]@{ordinal=1;clause=1;requirement='Labelled retained requirement';slotIds=@($slots[0].slot)};
+        SourcePath=$path;Authority=[pscustomobject]@{path=$path}}
+    }
+    switch($case) {
+      'missing-row' {$rows=$rows[0..63]}
+      'duplicate-row' {$rows[64]=$rows[63]}
+      'literal-drift' {$rows[1].reference='other.png'}
+      'wrong-risk' {$rows[1].riskId='other'}
+      'representative-relabel' {$rows[0].disposition='equivalent'}
+      'missing-visual' {$visual=$null}
+      'untyped-assertions' {$assertions.PrimaryAssertionReviewBound='true'}
+      'source-drift' {$primary.Report.sourceIdentity.producerBlob=('a'*40)}
+      'empty-reason' {$evidence.reason=' '}
+      'state-drift' {$evidence.state='other'}
+      'geometry-drift' {$evidence.geometry=[pscustomobject]@{width=5}}
+      'anchor-assertion' {$evidence.sourceAssertions[0].assertionEvidence=$sourceReviews[2].clauses[0].parts[0].assertionEvidence[0]}
+      'anchor-ordinal' {$evidence.sourceAssertions[0].ordinal=3}
+      'anchor-slot' {$evidence.sourceAssertions[0].slotId=$slots[2].slot}
+      'anchor-test' {$evidence.sourceAssertions[0].successfulTest=$sourceReviews[2].clauses[0].parts[0].successfulTests[0]}
+      'provider-anchor' {$sourceReviews[1].clauses[0].parts[0].disposition='provider_unmet'}
+      'orphan-risk' {$visual.Reviews['other']=@{inventoryEntry=$risk}}
+      'historical-approval' {$rows[0].equivalenceProven=$true}
+      'missing-specific-presentation' {$presentation=$null}
+      'wrong-supersession-slot' {$presentation.Decisions['H2:1:Labelled retained requirement'].Decision.slotIds=@($slots[2].slot)}
+      'supersession-equivalence-label' {$rows[1].disposition='equivalent'}
+      'missing-reviewed-anchor-pair' {$assertions.ReviewedAssertionPairs=@($pairs|Where-Object {$_.Ordinal -ne 2})}
+      'duplicated-reviewed-anchor-pair' {$assertions.ReviewedAssertionPairs+=@($pairs[1])}
+      'representative-missing-presentation' {$presentation.Decisions=@{}}
+      'anchor-supersession-wrong-slot' {$evidence.sourceAssertions[0].slotId=$slots[2].slot}
+      'representative-supersession-without-pair' {$pairs[0].Disposition='asserted';$sourceReviews[0].clauses[0].parts[0].disposition='asserted'}
+      'same-case-review-association' {
+        # Both assertions and their test are valid in the same case. Only the
+        # first was independently reviewed for this slot's equivalence anchor.
+        $otherAssertion=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(
+          ($sourceReviews[1].clauses[0].parts[0].assertionEvidence[0]|ConvertTo-Json -Depth 100 -Compress)))
+        $otherAssertion.reviewObservation='Another valid assertion in the same historical case'
+        $sourceReviews[1].clauses+=@([pscustomobject]@{parts=@([pscustomobject]@{disposition='asserted';
+          successfulTests=@($sourceReviews[1].clauses[0].parts[0].successfulTests[0]);assertionEvidence=@($otherAssertion)})})
+        $evidence.sourceAssertions[0].assertionEvidence=$otherAssertion
+      }
+    }
+    if($null -ne $visual -and $case -cne 'same-case-review-association') {
+      # Other controls intentionally keep the review aligned with the changed
+      # input so they exercise the semantic/accounting checks, not only equality.
+      $visual.Reviews[$risk.id].inventoryEntry=Read-OctoberCompatibilityJsonObject (
+        [Text.Encoding]::UTF8.GetBytes(($risk|ConvertTo-Json -Depth 100 -Compress)))
+    }
+    $result=Read-OctoberCompatibilityCurrentVisualSlotAccounting -Reconciliation $rows -Inventory $inventory -SourceIdentity $identity `
+      -PrimaryVisualReview $visual -PrimaryAssertionReview $assertions -PrimaryBinding $primary -PresentationReview $presentation
+    $positive=$case -in @('valid','valid-superseded-shared','valid-superseded-representative')
+    if(($null -ne $result) -ne $positive){throw ('Visual slot accounting mismatch: '+$case)}
+    if($positive -and ($result.Slots.Count -ne 65 -or -not $result.HistoricalSlotsAccounted -or -not $result.CurrentVisualDispositionReviewBound -or
+      -not $result.PrimaryEquivalenceReviewBound -or $result.MachineEquivalenceVerified -or
+      $result.PresentationAuthorityVerified -or $result.QualificationPassed -or $result.ApkAuthority)){throw 'Slot accounting overclaimed authority.'}
+    if($case -ceq 'valid-superseded-shared' -and $result.Slots[$slots[1].slot].Disposition -cne 'superseded_presentation'){throw 'Shared supersession mislabeled equivalence.'}
+    if($case -ceq 'valid-superseded-representative' -and $result.Slots[$slots[0].slot].Disposition -cne 'superseded_presentation'){throw 'Representative supersession lost.'}
+    if($case -in @('valid-superseded-shared','valid-superseded-representative','wrong-supersession-slot')) {
+      # Reuse this exact actual slot-reader fixture inside the complete consumer.
+      # Other leaves stay labelled; success is not actual source/render acceptance.
+      $risk.representative|Add-Member -NotePropertyName executionId -NotePropertyValue workspace_capture
+      $visual.Reviews[$risk.id].inventoryEntry=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes(($risk|ConvertTo-Json -Depth 100 -Compress)))
+      $composed=Invoke-OctoberCompatibilityCurrentQualifiedEvidenceProbes -SlotFixture @{
+        Rows=$rows;Inventory=$inventory;Primary=$primary;Assertions=$assertions;Visual=$visual;Presentation=$presentation;ExpectedSuccess=$positive}
+      if($composed -ne 1){throw 'Actual slot composition control missing.'}
+    }
+    $count++
+  }
+  return $count
+}
+
+function Invoke-OctoberCompatibilityCurrentPrimaryAssertionReviewProbes {
+  # Labelled upstream admission/native/Git mocks; actual source excerpt hashing
+  # and primary-record/structured-review joins. Not actual Source17 qualification.
+  $identity=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';contractCommit=('a'*40);
+    captureSourceCommit=('b'*40);captureSourceTree=('c'*40);producerBlob=('d'*40);executionHead=('b'*40)}
+  $sourceLines=@("test('case', () {",'  expect(1, 1);','  // Labelled static test body','});','expect(2, 2);')
+  $owner='apps/mobile/test/work_workspace_layout_safety_test.dart';$blob=('e'*40)
+  $helperOwner='apps/mobile/test/review_helper.dart';$helperBlob=('f'*40)
+  $helperLines=@('void helperCheck() {','  expect(1, 1);','}','void otherCheck() {','  expect(2, 2);','}')
+  $sourcePath=[IO.Path]::GetFullPath((Join-Path (Get-OctoberCompatibilityBinding).worktreePath $owner))
+  function Read-OctoberCompatibilityCurrentObligationJoins {
+    param($Obligations,$SourceIdentity,$CycleEvidence)
+    if($case -ceq 'upstream-rejected'){return $null}
+    return @{RetentionAndSuccessJoinsVerified=$true;AssertionSemanticsVerified=$false;QualificationPassed=$false}
+  }
+  function Get-OctoberCompatibilityGitLines {
+    param([string[]]$Arguments)
+    $gitReads.Add(($Arguments -join '|'))
+    if(($Arguments -join '|') -ceq ('rev-parse|'+$identity.captureSourceCommit+':'+$owner)) {
+      if($case -ceq 'blob-drift'){return ('f'*40)}
+      return $blob
+    }
+    if(($Arguments -join '|') -ceq ('show|'+$identity.captureSourceCommit+':'+$owner)){return $sourceLines}
+    if(($Arguments -join '|') -ceq ('rev-parse|'+$identity.captureSourceCommit+':'+$helperOwner)){return $helperBlob}
+    if(($Arguments -join '|') -ceq ('show|'+$identity.captureSourceCommit+':'+$helperOwner)){return $helperLines}
+    throw 'Unexpected assertion source read.'
+  }
+  $count=0
+  foreach($case in @('valid','upstream-rejected','missing-primary','untyped-primary','primary-source','review-difference',
+    'duplicate-row','blob-drift','excerpt-drift','range-outside','review-unstructured','wrong-test',
+    'body-outside','assertion-expression','native-line','native-column','native-path','missing-native','review-empty-meaning',
+    'valid-loop','reviewed-loop-mismatch','assertion-outside-body','helper-valid','helper-blob','helper-excerpt',
+    'helper-call','helper-call-outside','helper-expression','helper-function','helper-wrong-function-assertion')) {
+    $gitReads=[Collections.Generic.List[string]]::new()
+    $sourceLines=@("test('case', () {",'  expect(1, 1);','  // Labelled static test body','});','expect(2, 2);')
+    if($case.StartsWith('helper-',[StringComparison]::Ordinal)){$sourceLines[1]='  helperCheck();'}
+    $review=[ordered]@{schemaVersion=1;testKey='work_workspace_layout_safety_test.dart:case';declarationLine=1;declarationColumn=1;
+      bodyFirstLine=1;bodyLastLine=4;loopBindings=@();helperEvidence=@();assertions=@([pscustomobject]@{firstLine=2;lastLine=2;expression=$sourceLines[1]});
+      meaning='Labelled primary review: this static equality assertion is associated with this case only.';limitations='No live behavior or render qualification.'}
+    switch($case) {
+      'wrong-test' {$review.testKey='work_workspace_layout_safety_test.dart:other'}
+      'body-outside' {$review.bodyLastLine=99}
+      'assertion-expression' {$review.assertions[0].expression='expect(2, 2);'}
+      'review-empty-meaning' {$review.meaning=' '}
+      'assertion-outside-body' {$review.assertions=@([pscustomobject]@{firstLine=5;lastLine=5;expression=$sourceLines[4]})}
+    }
+    if($case -in @('valid-loop','reviewed-loop-mismatch')){$review.loopBindings=@([pscustomobject]@{expression='case';value='choose'})}
+    if($case.StartsWith('helper-',[StringComparison]::Ordinal)) {
+      $helper=[pscustomobject]@{owner=$helperOwner;sourceBlob=$helperBlob;firstLine=1;lastLine=3;
+        excerptSha256=(Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes(($helperLines[0..2] -join "`n"))));
+        functionName='helperCheck';callFirstLine=2;callLastLine=2;callExpression=$sourceLines[1];
+        assertions=@([pscustomobject]@{firstLine=2;lastLine=2;expression=$helperLines[1]})}
+      switch($case) {
+        'helper-blob' {$helper.sourceBlob=('a'*40)}
+        'helper-excerpt' {$helper.excerptSha256=('A'*64)}
+        'helper-call' {$helper.callExpression='  otherCheck();'}
+        'helper-call-outside' {$helper.callFirstLine=5;$helper.callLastLine=5}
+        'helper-expression' {$helper.assertions[0].expression='  expect(2, 2);'}
+        'helper-function' {$helper.functionName='otherCheck'}
+        'helper-wrong-function-assertion' {$helper.assertions=@([pscustomobject]@{firstLine=5;lastLine=5;expression=$helperLines[4]})}
+      }
+      $review.helperEvidence=@($helper)
+    }
+    $obligations=@(1..84|ForEach-Object {
+      [pscustomobject]@{ordinal=$_;historicalKey=('H'+$_);clauses=@([pscustomobject]@{index=1;text='Labelled retained clause';parts=@(
+        [pscustomobject]@{requirement='Labelled retained clause';disposition='asserted';dependency=$null;presentationAuthority=$null;
+          successfulTests=@([pscustomobject]@{reportId='store_layout_and_recovery';executionId='default';testKey='work_workspace_layout_safety_test.dart:case'});
+          assertionEvidence=@([pscustomobject]@{owner=$owner;sourceBlob=$blob;firstLine=1;lastLine=4;
+            excerptSha256=(Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes(($sourceLines[0..3] -join "`n"))));
+            reviewObservation=($review|ConvertTo-Json -Depth 20 -Compress)})})})}
+    })
+    switch($case) {
+      'excerpt-drift' {$obligations[0].clauses[0].parts[0].assertionEvidence[0].excerptSha256=('F'*64)}
+      'range-outside' {$obligations[0].clauses[0].parts[0].assertionEvidence[0].lastLine=6}
+      'review-unstructured' {$obligations[0].clauses[0].parts[0].assertionEvidence[0].reviewObservation='Unstructured prose alone is not source association.'}
+      'duplicate-row' {$obligations[1]=$obligations[0]}
+    }
+    $primaryRows=ConvertFrom-Json -InputObject (ConvertTo-Json -InputObject $obligations -Depth 50 -Compress);$primaryRows=@($primaryRows)
+    if($case -ceq 'review-difference'){$primaryRows[0].clauses[0].text='Different independently reviewed clause'}
+    if($case -ceq 'reviewed-loop-mismatch') {
+      $different=ConvertFrom-Json -InputObject $obligations[0].clauses[0].parts[0].assertionEvidence[0].reviewObservation
+      $different.loopBindings[0].value='requirements'
+      $obligations[0].clauses[0].parts[0].assertionEvidence[0].reviewObservation=$different|ConvertTo-Json -Depth 20 -Compress
+    }
+    $primary=@{PrimaryReviewRecordBound=$true;Report=[pscustomobject]@{sourceIdentity=[pscustomobject]$identity.Clone();sourceReviews=$primaryRows}}
+    if($case -ceq 'missing-primary'){$primary=$null}
+    if($case -ceq 'untyped-primary'){$primary.PrimaryReviewRecordBound='true'}
+    if($case -ceq 'primary-source'){$primary.Report.sourceIdentity.executionHead=('f'*40)}
+    $location=[pscustomobject]@{DeclarationLocationReferenceVerified=$true;SelectedPath=$sourcePath;SelectedTuple='';Direct=[pscustomobject]@{Complete=$true;Line=1;Column=1};Root=$null}
+    switch($case) {
+      'native-line' {$location.Direct.Line=2}
+      'native-column' {$location.Direct.Column=2}
+      'native-path' {$location.SelectedPath=[IO.Path]::GetFullPath('C:/not-the-reviewed-test.dart')}
+    }
+    $native=@{Name='case';DeclarationLocation=$location}
+    $cycles=@{CyclesVerified=$true;QualificationPassed=$false;Executions=@{}}
+    foreach($id in @('cycle1','cycle2')) {
+      $tests=@{'1'=$native};if($case -ceq 'missing-native' -and $id -ceq 'cycle2'){$tests=@{}}
+      $cycles.Executions[$id+':store_layout_and_recovery:default']=@{TestIdentities=$tests}
+    }
+    $result=Read-OctoberCompatibilityCurrentPrimaryAssertionReview -Obligations $obligations -SourceIdentity $identity -CycleEvidence $cycles -PrimaryBinding $primary
+    $positive=$case -in @('valid','valid-loop','helper-valid')
+    if(($null -ne $result) -ne $positive){throw ('Primary assertion review mismatch: '+$case)}
+    $ownerCount=if($case -ceq 'helper-valid'){2}else{1}
+    if($positive -and (-not $result.PrimaryAssertionReviewBound -or $result.SourceOwners.Count -ne $ownerCount -or
+      $result.ReviewedAssertionPairs.Count -ne 84 -or
+      $gitReads.Count -ne (2*$ownerCount) -or $result.MachineSemanticsVerified -or $result.QualificationPassed -or $result.ApkAuthority)){throw 'Primary assertion review positive overclaimed or reread source.'}
+    $count++
+  }
+  [pscustomobject]@{PrimaryAssertionReviewCases=$count;LabelledUpstreamAndGitMocks=$true;ActualPrimaryReview=$false;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+}
+
+function Invoke-OctoberCompatibilityCurrentPrimaryReviewBindingProbes {
+  # Actual JSON/byte hashes; labelled leased-file and final-hash mocks only.
+  $taskRoot='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store'
+  $authorityRelative='outputs/founder-current-baseline-qualification-direction-20261010.json'
+  $authorityBytes=[IO.File]::ReadAllBytes((Join-Path $taskRoot $authorityRelative))
+  $authorityHash='F76F211F42CE11D4842532E7BBE5FAF54C94DAF14150CC1522E93393D97D06BD'
+  if((Get-OctoberCompatibilityByteHash $authorityBytes) -cne $authorityHash){throw 'Primary review authority fixture drift.'}
+  $identity=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';contractCommit=('a'*40);
+    captureSourceCommit=('b'*40);captureSourceTree=('c'*40);producerBlob=('d'*40);executionHead=('b'*40)}
+  $ledgerRelative='outputs/codex-integration-readiness-20261008.md'
+  $reportRelative='outputs/compatibility-primary-review-'+$identity.captureSourceCommit+'-r1.json'
+  $sealRelative='outputs/compatibility-primary-review-'+$identity.captureSourceCommit+'-r1.seal.json'
+  function Get-OctoberCoverageBoundHash {
+    param($Path)
+    if(-not $files.ContainsKey($Path)){return $null}
+    if(-not $reads.ContainsKey($Path)){$reads[$Path]=0};$reads[$Path]++
+    if($case -ceq 'late-ledger' -and $Path -ceq $ledgerPath -and $reads[$Path] -gt 1){return ('F'*64)}
+    if($case -ceq 'late-report' -and $Path -ceq $reportPath -and $reads[$Path] -gt 1){return ('F'*64)}
+    return Get-OctoberCompatibilityByteHash $files[$Path]
+  }
+  function Open-OctoberCompatibilityVisualArtifact {
+    param($Base,$RelativePath,$ExpectedSha256,$MaxBytes)
+    if($Base -cne $taskRoot){throw 'Primary reader widened root.'}
+    $path=[IO.Path]::GetFullPath((Join-Path $Base $RelativePath))
+    if(-not $files.ContainsKey($path)){return $null}
+    $bytes=$files[$path];$hash=Get-OctoberCompatibilityByteHash $bytes
+    if($hash -cne $ExpectedSha256 -or $bytes.Length -gt $MaxBytes){return $null}
+    $stream=[IO.MemoryStream]::new($bytes,$false);$primaryProbeLeases.Add($stream)
+    return @{CanonicalPath=$path;Bytes=$bytes;Sha256=$hash;Stream=$stream;FileIdentity=('00000000:'+$primaryProbeLeases.Count.ToString('X16'))}
+  }
+  $count=0
+  foreach($case in @('valid','missing-binding','duplicate-binding','wrong-source','wrong-authority',
+    'report-path-injection','report-digest','seal-digest','report-writer','report-extra-field',
+    'report-source','report-approved','report-short-clauses','report-empty-visuals','seal-source',
+    'late-ledger','late-report','missing-report','missing-seal')) {
+    $files=@{};$reads=@{};$primaryProbeLeases=[Collections.Generic.List[object]]::new()
+    $report=[ordered]@{schemaVersion=1;sourceIdentity=[pscustomobject]$identity.Clone();revision=1;authoritySha256=$authorityHash;
+      writerRole='primary';writerTask='/root';trustModel='procedural-primary-attestation';
+      sourceReviews=@(1..84|ForEach-Object {[pscustomobject]@{ordinal=$_;review='Labelled shape fixture; no semantic qualification'}});
+      visualReviews=@([pscustomobject]@{riskId='labelled-risk';review='Labelled shape fixture; not an actual inspected image'});
+      founderApproved=$false;providerVerified=$false;apkAuthority=$false}
+    switch($case) {
+      'report-writer' {$report.writerRole='subagent'}
+      'report-extra-field' {$report.extra='candidate'}
+      'report-source' {$report.sourceIdentity.executionHead=('f'*40)}
+      'report-approved' {$report.founderApproved=$true}
+      'report-short-clauses' {$report.sourceReviews=@($report.sourceReviews[0])}
+      'report-empty-visuals' {$report.visualReviews=@()}
+    }
+    $reportBytes=[Text.Encoding]::UTF8.GetBytes(($report|ConvertTo-Json -Depth 20 -Compress))
+    $reportHash=Get-OctoberCompatibilityByteHash $reportBytes
+    $seal=[ordered]@{schemaVersion=1;sourceIdentity=[pscustomobject]$identity.Clone();revision=1;authoritySha256=$authorityHash;
+      reportSha256=$reportHash;writerRole='primary';writerTask='/root'}
+    if($case -ceq 'seal-source'){$seal.sourceIdentity.captureSourceTree=('f'*40)}
+    $sealBytes=[Text.Encoding]::UTF8.GetBytes(($seal|ConvertTo-Json -Depth 20 -Compress))
+    $binding=[ordered]@{schemaVersion=1;sourceIdentity=[pscustomobject]$identity.Clone();revision=1;
+      authoritySha256=$authorityHash;reportSha256=$reportHash;sealSha256=(Get-OctoberCompatibilityByteHash $sealBytes)}
+    switch($case) {
+      'wrong-source' {$binding.sourceIdentity.producerBlob=('f'*40)}
+      'wrong-authority' {$binding.authoritySha256=('F'*64)}
+      'report-path-injection' {$binding.reportPath='candidate-selected.json'}
+      'report-digest' {$binding.reportSha256=('F'*64)}
+      'seal-digest' {$binding.sealSha256=('F'*64)}
+    }
+    $block='<!-- COMPATIBILITY_PRIMARY_TECHNICAL_REVIEW_BINDING_JSON_BEGIN -->'+($binding|ConvertTo-Json -Depth 20 -Compress)+
+      '<!-- COMPATIBILITY_PRIMARY_TECHNICAL_REVIEW_BINDING_JSON_END -->'
+    $ledger=if($case -ceq 'missing-binding'){'Labelled ledger without binding'}elseif($case -ceq 'duplicate-binding'){$block+$block}else{$block}
+    $ledgerPath=[IO.Path]::GetFullPath((Join-Path $taskRoot $ledgerRelative))
+    $reportPath=[IO.Path]::GetFullPath((Join-Path $taskRoot $reportRelative))
+    $sealPath=[IO.Path]::GetFullPath((Join-Path $taskRoot $sealRelative))
+    $files[$ledgerPath]=[Text.Encoding]::UTF8.GetBytes($ledger);$files[$reportPath]=$reportBytes;$files[$sealPath]=$sealBytes
+    $files[[IO.Path]::GetFullPath((Join-Path $taskRoot $authorityRelative))]=$authorityBytes
+    if($case -ceq 'missing-report'){$files.Remove($reportPath)}
+    if($case -ceq 'missing-seal'){$files.Remove($sealPath)}
+    $result=@(Read-OctoberCompatibilityCurrentPrimaryReviewBinding -SourceIdentity $identity)
+    $expected=$case -ceq 'valid'
+    if(($result.Count -eq 1 -and $null -ne $result[0]) -ne $expected){throw ('Primary review binding result mismatch: '+$case)}
+    if($expected -and (-not $result[0].PrimaryReviewRecordBound -or $result[0].OriginalTaskFileHashes.Count -ne 4 -or
+      $result[0].SemanticsVerified -or $result[0].InspectionVerified -or $result[0].QualificationPassed -or $result[0].ApkAuthority)) {
+      throw 'Primary review binding overclaimed authority.'
+    }
+    foreach($stream in $primaryProbeLeases){if($stream.CanRead){throw 'Primary reader leaked lease.'}}
+    if($case -ceq 'late-ledger' -and $reads[$ledgerPath] -ne 2){throw 'Late ledger control not reached.'}
+    if($case -ceq 'late-report' -and $reads[$reportPath] -ne 2){throw 'Late report control not reached.'}
+    $count++
+  }
+  if($count -ne 19){throw 'Primary review probe count changed.'}
+  [pscustomobject]@{PrimaryReviewBindingCases=$count;LabelledFileMocks=$true;ActualPrimaryReview=$false;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+}
+
 function Invoke-OctoberCompatibilityComparatorBoundCapture {
   param([hashtable]$Receipt,[scriptblock]$Invocation)
   if($null -eq $Receipt -or $Receipt.Count -ne 0 -or $null -eq $Invocation){throw 'Comparator capture requires a fresh receipt and invocation.'}
@@ -68,8 +1684,15 @@ function Invoke-OctoberCompatibilityComparatorBoundCapture {
 }
 
 Assert-RepairContract ($CaptureCompatibilityReport -or $CaptureExecutionId -ceq 'default') 'execution selection requires capture mode.'
+if($RequireCurrentSelectionAggregationProbes -or $RequireCurrentPrimaryReviewBindingProbes -or $RequireCurrentPrimaryAssertionReviewProbes -or $RequireCurrentPrimaryVisualReviewProbes) {
+  Assert-RepairContract (-not $RequireQualifiedGraph -and -not $RequireOctoberSourceAdmission -and
+    -not $RequireOctoberBootstrapProbes -and -not $RequireCompatibilityStageProbes -and
+    -not $RequireCompatibilityLiveAdmissionProbes -and -not $CaptureCompatibilityReport -and
+    $CaptureMode -ceq 'behavior_only') 'current aggregation probes require standalone noncapture mode.'
+  Assert-RepairContract (@($RequireCurrentSelectionAggregationProbes,$RequireCurrentPrimaryReviewBindingProbes,$RequireCurrentPrimaryAssertionReviewProbes,$RequireCurrentPrimaryVisualReviewProbes|Where-Object {$_}).Count -eq 1) 'select exactly one focused probe mode.'
+}
 
-if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbes -or $CaptureCompatibilityReport) {
+if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbes -or $CaptureCompatibilityReport -or $RequireCurrentSelectionAggregationProbes -or $RequireCurrentPrimaryReviewBindingProbes -or $RequireCurrentPrimaryAssertionReviewProbes -or $RequireCurrentPrimaryVisualReviewProbes) {
   $tokens=$null; $errors=$null
   $ast=[System.Management.Automation.Language.Parser]::ParseFile(
     $checkerPath,[ref]$tokens,[ref]$errors)
@@ -81,7 +1704,28 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityHistoryStage','Read-OctoberCompatibilityScopeRepairAdmission',
       'Test-OctoberCompatibilityQualification','Test-OctoberCompatibilityHistoricalQualificationCore','Get-OctoberCompatibilityComparatorIdentity','Test-OctoberCompatibilityCaptureComparator','Test-OctoberCompatibilityVisualQualification','Test-OctoberCompatibilityLegacyQualification','Read-OctoberCompatibilityExecutionCoverage','Read-OctoberCompatibilityVisualManifestBinding','Test-OctoberCompatibilityVisualEvidenceShape','Read-OctoberCompatibilityVisualArtifactBytes','Read-OctoberCompatibilityJsonObject','Get-OctoberCompatibilityQualificationExecutions','Read-OctoberCompatibilityExecutionEvents','Read-OctoberCompatibilityExecutionEvidence','Get-OctoberCompatibilityByteHash','Read-OctoberCompatibilityReportEvents',
       'Read-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityClaimHandoff','Read-OctoberCompatibilityDerivedClaims',
-      'Get-OctoberCompatibilityReportPlan','Get-OctoberCompatibilityExecutionPlan','Test-OctoberCompatibilityCapture',
+      'Get-OctoberCompatibilityReportPlan','Get-OctoberCompatibilityExecutionPlan','Get-OctoberCompatibilityCurrentExecutionPlan','Test-OctoberCompatibilityCapture',
+      'Read-OctoberCompatibilityCurrentQualificationContract','Read-OctoberCompatibilityCurrentSuccessorSpecification',
+      'Read-OctoberCompatibilityCurrentSourceState','Read-OctoberCompatibilityCurrentCaptureSource',
+      'Test-OctoberCompatibilityCurrentGeometry','Read-OctoberCompatibilityCurrentSelectedRiskBindings',
+      'Read-OctoberCompatibilityCurrentRiskInventoryBuffer','Read-OctoberCompatibilityCurrentRiskInventoryFile',
+      'New-OctoberCompatibilityCurrentSelectionContext','Read-OctoberCompatibilityCurrentSelectionContextFile',
+      'Test-OctoberCompatibilityCurrentSelectionEventSequence',
+      'Test-OctoberCompatibilityCurrentExecutionReceipt','Read-OctoberCompatibilityCurrentTestSourceLocation',
+      'Read-OctoberCompatibilityCurrentExecutionEvents','Read-OctoberCompatibilityCurrentExecutionEvidence',
+      'Read-OctoberCompatibilityCurrentRetainedSelectionBindings',
+      'Read-OctoberCompatibilityCurrentSelectedRecorderEvents',
+      'Read-OctoberCompatibilityCurrentRecorderArtifactBytes',
+      'Read-OctoberCompatibilityCurrentRecorderGeometry',
+      'Read-OctoberCompatibilityCurrentSelectedRenderBindings',
+      'Read-OctoberCompatibilityCurrentCombinedOriginalFilePins',
+      'Read-OctoberCompatibilityCurrentPrimaryReviewBinding',
+      'Read-OctoberCompatibilityCurrentObligationJoins','Read-OctoberCompatibilityCurrentPrimaryAssertionReview',
+      'Read-OctoberCompatibilityCurrentPrimaryVisualReview',
+      'Read-OctoberCompatibilityCurrentVisualSlotAccounting',
+      'Read-OctoberCompatibilityCurrentPresentationReview',
+      'Read-OctoberCompatibilityCurrentQualifiedEvidence',
+      'Read-OctoberCompatibilityCurrentQualificationProof','Read-OctoberCompatibilityCurrentCycles','Read-OctoberCompatibilityCurrentSkippedCoverage',
       'Test-OctoberCompatibilitySourceMarker','Test-OctoberCompatibilityCoverageSpecification',
       'Get-OctoberCompatibilityCoverageSpecification','Read-OctoberCompatibilityResolutionSpecification','Get-OctoberCompatibilityResolutionSpecification','Get-OctoberCompatibilityVisualProtocol','Test-OctoberCompatibilityKResolution','Read-OctoberCompatibilityTrustedVisualDecisions','Read-OctoberCompatibilityPngPixels','Test-OctoberCompatibilityPngEquality','Read-OctoberCompatibilityVisualObservations','Open-OctoberCompatibilityVisualArtifact','Test-OctoberCompatibilityLockedPngPair','Test-OctoberCompatibilityVisualSlot','Test-OctoberCoveragePreCommitInventory')) {
     $nodes=@($ast.FindAll({param($node)
@@ -92,6 +1736,56 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     . ([scriptblock]::Create($nodes[0].Extent.Text))
   }
   $binding=Get-OctoberCompatibilityBinding
+  if($RequireCurrentPrimaryVisualReviewProbes) {
+    $beforeSpec=(Get-Command Read-OctoberCompatibilityCurrentSuccessorSpecification -CommandType Function).ScriptBlock.ToString()
+    $beforeContract=(Get-Command Read-OctoberCompatibilityCurrentQualificationContract -CommandType Function).ScriptBlock.ToString()
+    $beforePresentationHash=(Get-Command Get-OctoberCoverageBoundHash -CommandType Function).ScriptBlock.ToString()
+    $beforePresentationOpen=(Get-Command Open-OctoberCompatibilityVisualArtifact -CommandType Function).ScriptBlock.ToString()
+    $output=@(Invoke-OctoberCompatibilityCurrentPrimaryVisualReviewProbes)
+    Assert-RepairContract ($output.Count -eq 1 -and
+      (Get-Command Read-OctoberCompatibilityCurrentSuccessorSpecification -CommandType Function).ScriptBlock.ToString() -ceq $beforeSpec -and
+      (Get-Command Read-OctoberCompatibilityCurrentQualificationContract -CommandType Function).ScriptBlock.ToString() -ceq $beforeContract -and
+      (Get-Command Get-OctoberCoverageBoundHash -CommandType Function).ScriptBlock.ToString() -ceq $beforePresentationHash -and
+      (Get-Command Open-OctoberCompatibilityVisualArtifact -CommandType Function).ScriptBlock.ToString() -ceq $beforePresentationOpen) 'visual review probes leaked mocks/output.'
+    Write-Output $output[0]
+    return
+  }
+  if($RequireCurrentPrimaryAssertionReviewProbes) {
+    $beforeJoins=(Get-Command Read-OctoberCompatibilityCurrentObligationJoins -CommandType Function).ScriptBlock.ToString()
+    $beforeGit=(Get-Command Get-OctoberCompatibilityGitLines -CommandType Function).ScriptBlock.ToString()
+    $output=@(Invoke-OctoberCompatibilityCurrentPrimaryAssertionReviewProbes)
+    Assert-RepairContract ($output.Count -eq 1 -and
+      (Get-Command Read-OctoberCompatibilityCurrentObligationJoins -CommandType Function).ScriptBlock.ToString() -ceq $beforeJoins -and
+      (Get-Command Get-OctoberCompatibilityGitLines -CommandType Function).ScriptBlock.ToString() -ceq $beforeGit) 'assertion review probes leaked mocks/output.'
+    Write-Output $output[0]
+    return
+  }
+  if($RequireCurrentPrimaryReviewBindingProbes) {
+    $beforeOpen=(Get-Command Open-OctoberCompatibilityVisualArtifact -CommandType Function).ScriptBlock.ToString()
+    $beforeHash=(Get-Command Get-OctoberCoverageBoundHash -CommandType Function).ScriptBlock.ToString()
+    $output=@(Invoke-OctoberCompatibilityCurrentPrimaryReviewBindingProbes)
+    Assert-RepairContract ($output.Count -eq 1 -and
+      (Get-Command Open-OctoberCompatibilityVisualArtifact -CommandType Function).ScriptBlock.ToString() -ceq $beforeOpen -and
+      (Get-Command Get-OctoberCoverageBoundHash -CommandType Function).ScriptBlock.ToString() -ceq $beforeHash) 'primary review probes leaked mocks/output.'
+    Write-Output $output[0]
+    return
+  }
+  if($RequireCurrentSelectionAggregationProbes) {
+    $productionMocks=@{}
+    foreach($probeName in @('Get-OctoberCompatibilityBinding','Get-OctoberCoverageBoundHash',
+      'Read-OctoberCompatibilityCurrentSuccessorSpecification','Read-OctoberCompatibilityCurrentQualificationContract','Open-OctoberCompatibilityVisualArtifact',
+      'Read-OctoberCompatibilityCurrentExecutionEvents','Read-OctoberCompatibilityCurrentSelectionContextFile','Read-OctoberCompatibilityCurrentSelectedRenderBindings',
+      'Read-OctoberCompatibilityCurrentRecorderArtifactBytes')) {
+      $productionMocks[$probeName]=(Get-Command $probeName -CommandType Function).ScriptBlock.ToString()
+    }
+    $probeOutput=@(Invoke-OctoberCompatibilityCurrentSelectionAggregationProbes)
+    foreach($probeName in $productionMocks.Keys) {
+      Assert-RepairContract ((Get-Command $probeName -CommandType Function).ScriptBlock.ToString() -ceq $productionMocks[$probeName]) 'aggregation probe leaked a production mock.'
+    }
+    Assert-RepairContract ($probeOutput.Count -eq 1 -and (Get-OctoberCompatibilityBinding).worktreePath -ceq $binding.worktreePath) 'aggregation probe changed binding or output inventory.'
+    Write-Output $probeOutput[0]
+    return
+  }
   if($RequireCompatibilityStageProbes) {
     $resolutionText=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
     & {
@@ -162,7 +1856,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       $claimFixtureCases=@('positive','pre-M','unverified-M','coerced-M','writer-active','wrong-root','wrong-branch','wrong-task','wrong-role',
         'wrong-policy','wrong-registry','wrong-cursor','wrong-phase','wrong-M-commit','K-as-M','changed-contract',
         'missing-claim','duplicate-claim','missing-Buy','duplicate-Buy','changed-non-Buy','changed-role',
-        'N-positive','T-positive','Q-positive','N-unverified','N-coerced','N-missing-proof','N-empty-contract',
+        'N-positive','T-positive','Q-stage16-handoff-denied','N-unverified','N-coerced','N-missing-proof','N-empty-contract',
         'N-altered-contract','N-as-L','N-draft-pre-N','N-premature-handoff','Q-implementation','T-unrelated-owner')
       Assert-RepairContract ($claimFixtureCases.Count -eq 35) 'M22 plus N13 fixture inventory differs.'
       $claimFixtureOriginal=$policy.activeClaims|ConvertTo-Json -Depth 30 -Compress
@@ -202,7 +1896,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
           'changed-non-Buy' {$claimFixtureClaims[1].owners+=@('extra.dart')}
           'changed-role' {$claimFixtureClaims[1].role='subagent'}
           'T-positive' {$claimFixtureContext.Stage=10}
-          'Q-positive' {$claimFixtureContext.Stage=16;$claimFixtureContext.Phase='handoff'}
+          'Q-stage16-handoff-denied' {$claimFixtureContext.Stage=16;$claimFixtureContext.Phase='handoff'}
           'N-unverified' {$claimFixtureContext.ImmutableNVerified=$false}
           'N-coerced' {$claimFixtureContext.ImmutableNVerified='true'}
           'N-missing-proof' {$claimFixtureContext.Remove('ImmutableNVerified')}
@@ -216,7 +1910,10 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         }
         $claimFixtureBefore=$claimFixtureClaims|ConvertTo-Json -Depth 30 -Compress
         $claimFixtureResult=@(Read-OctoberCompatibilityDerivedClaims -Claims $claimFixtureClaims -ContractJson $claimFixtureCandidate -Context $claimFixtureContext -TestAdmissionJson $claimFixtureTestCandidate)
-        $claimFixtureAccepted=$claimFixtureMode -cin @('positive','N-positive','T-positive','Q-positive')
+        # Metadata-only Stage16 cannot hand off. Keep this original fixture as
+        # a denial case; current Stage19 qualification needs a separate positive
+        # composition after the operative Q4 path is complete, before publication.
+        $claimFixtureAccepted=$claimFixtureMode -cin @('positive','N-positive','T-positive')
         Assert-RepairContract (($claimFixtureResult.Count -eq 3) -eq $claimFixtureAccepted) ('Derived handoff result incorrect: '+$claimFixtureMode)
         if(-not $claimFixtureAccepted){
           Assert-RepairContract (@($claimFixtureResult|Where-Object {$null -ne $_}).Count -eq 0) ('Rejected handoff returned non-null payload: '+$claimFixtureMode)
@@ -1139,13 +2836,11 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   if($CaptureCompatibilityReport) {
     Assert-RepairContract (-not $RequireCompatibilityStageProbes -and -not $RequireCompatibilityLiveAdmissionProbes) 'capture cannot be combined with probe modes.'
-    $branch=@(& git -C $root branch --show-current)
-    Assert-RepairContract ($LASTEXITCODE -eq 0 -and $branch.Count -eq 1 -and
-      $branch[0] -ceq $binding.branch -and $root.Replace('\','/').TrimEnd('/') -ceq $binding.worktreePath) 'capture requires exact successor worktree/branch.'
-    $source=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
-    Assert-RepairContract ($source.Count -eq 1) 'capture source unavailable.'
-    $history=Get-OctoberCompatibilityHistoryStage $source[0]
-    Assert-RepairContract $false 'repair-only intermediate cannot produce qualification captures before the completed contract amendment.'
+    Assert-RepairContract ($CaptureMode -ceq 'behavior_only') 'selected-risk capture awaits independently reviewed source-bound risk selection.'
+    $currentSource=Read-OctoberCompatibilityCurrentCaptureSource
+    Assert-RepairContract ($null -ne $currentSource) 'current capture requires independently derived clean sealed Stage18/source17.'
+    $source=@($currentSource.SourceIdentity.captureSourceCommit)
+    $history=$currentSource.History
     $before=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
     Assert-RepairContract ($before.Count -eq 0) 'capture requires clean committed scroll/layout repair source.'
     $admission=@{
@@ -1162,92 +2857,12 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       -CandidateVersionName 1.0.0-r66.42 -CandidateVersionCode 2026100801 -RepositoryRoot $root
     & (Join-Path $PSScriptRoot 'check-codex-development-regression-memory.ps1') -Phase general `
       -RepositoryRoot $root -EvidenceArchiveRoot 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904'
-    $plan=Get-OctoberCompatibilityExecutionPlan -ReportId $CaptureCompatibilityReport -ExecutionId $CaptureExecutionId
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $CaptureCompatibilityReport -ExecutionId $CaptureExecutionId `
+      -Mode $CaptureMode -RunId ('current-'+[Guid]::NewGuid().ToString('N')) -SourceIdentity $currentSource.SourceIdentity
     Assert-RepairContract ($null -ne $plan) 'execution is not a literal plan for this report category.'
-    $flutterArguments=@($plan.Arguments)
-    $tree=@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($source[0])^{tree}"))
-    $producer=@(Get-OctoberCompatibilityGitLines @('rev-parse',"$($source[0]):scripts/test-codex-integration-repair-coordination-policy.ps1"))
-    Assert-RepairContract ($tree.Count -eq 1 -and $producer.Count -eq 1) 'capture tree/producer identity unavailable.'
-    $relative='apps/mobile/build/compat-'+$CaptureCompatibilityReport+'-'+$CaptureExecutionId+'-'+[Guid]::NewGuid().ToString('N')+'.jsonl'
-    $log=Join-Path $root $relative; $stderr=$log+'.stderr.txt'; $capturePath=$log+'.capture.json'
-    $visualManifestRelative=$relative+'.visual.json'
-    $visualManifestPath=Join-Path $root $visualManifestRelative
-    foreach($path in @($log,$stderr,$capturePath,$visualManifestPath)) {
-      Assert-RepairContract (-not (Test-Path -LiteralPath $path)) 'capture refuses existing evidence paths.'
-    }
-    $flutter='C:/Users/jisal/develop/flutter/bin/flutter.bat'
-    Assert-RepairContract (Test-Path -LiteralPath $flutter -PathType Leaf) 'configured Flutter executable unavailable.'
-    foreach($suite in $plan.Suites) {
-      Assert-RepairContract (Test-Path -LiteralPath (Join-Path $root ('apps/mobile/test/'+$suite)) -PathType Leaf) 'capture suite unavailable.'
-    }
-    $started=[DateTimeOffset]::UtcNow.ToString('o')
-    [IO.File]::WriteAllText($stderr,'',[Text.UTF8Encoding]::new($false))
-    $writer=[IO.StreamWriter]::new($log,$false,[Text.UTF8Encoding]::new($false))
-    $script:compatNativeExit=-1; $guardCompleted=$false; $failure=$null;$captureSdkEvidence=@{}
-    $marker=@{type='moolsocialSource'; sourceCommit=$source[0]; sourceTree=$tree[0]
-      registrySha256=[string]$policy.registryBinding.sha256; reportId=$CaptureCompatibilityReport
-      executionId=$CaptureExecutionId; runtimeDefines=@($plan.RuntimeDefines)}
-    $writer.WriteLine((ConvertTo-Json -InputObject $marker -Compress -Depth 10)); $writer.Flush()
     . (Join-Path $PSScriptRoot 'invoke-flutter-with-clean-support.ps1')
-    try {
-      $guardExit=Invoke-MoolSocialFlutterWithCleanSupport -RepositoryRoot $root -Invocation {
-        Push-Location (Join-Path $root 'apps/mobile')
-        $visualEnvironment=@{}
-        try {
-          if($CaptureCompatibilityReport -ceq 'store_layout_and_recovery' -and $CaptureExecutionId -cne 'default') {
-            # The committed T source's preserved recorder writes this execution's
-            # manifest. The host never invents entries or comparator results.
-            $visualEnvironment=@{
-              MOOLSOCIAL_COMPAT_VISUAL_MANIFEST=$visualManifestPath
-              MOOLSOCIAL_COMPAT_EXECUTION_LOG=$relative
-              MOOLSOCIAL_COMPAT_SOURCE_COMMIT=$source[0]
-              MOOLSOCIAL_COMPAT_SOURCE_TREE=$tree[0]
-              MOOLSOCIAL_COMPAT_EXECUTION_ID=$CaptureExecutionId
-            }
-          }
-          Invoke-OctoberCompatibilityVisualEnvironment -Values $visualEnvironment -Invocation {
-            Invoke-OctoberCompatibilityComparatorBoundCapture -Receipt $captureSdkEvidence -Invocation {
-              & $flutter @flutterArguments 2> $stderr | ForEach-Object {$writer.WriteLine([string]$_); $writer.Flush()}
-              $script:compatNativeExit=[int]$LASTEXITCODE
-              if($script:compatNativeExit -ne 0){throw "Flutter report exited $script:compatNativeExit; original output retained."}
-            }
-          }
-        } finally { Pop-Location }
-      }
-      $guardCompleted=$true
-      Assert-RepairContract ([int]$guardExit -eq $script:compatNativeExit) 'guard/native exit mismatch.'
-    } catch { $failure=$_ } finally { $writer.Dispose() }
-    $afterHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
-    $afterTree=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD^{tree}'))
-    $afterDirt=@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','-z'))
-    $capture=@{
-      schemaVersion=1; producer='test-codex-integration-repair-coordination-policy.ps1'
-      producerGitBlob=$producer[0]; reportId=$CaptureCompatibilityReport; executionId=$CaptureExecutionId
-      sourceCommit=$source[0]; sourceTree=$tree[0]; registrySha256=[string]$policy.registryBinding.sha256
-      sourceCommitAfter=$afterHead[0]; sourceTreeAfter=$afterTree[0]
-      executable=$flutter; workingDirectory=$binding.worktreePath+'/apps/mobile'
-      cleanBefore=$true; cleanAfter=($afterDirt.Count -eq 0); guardCompleted=$guardCompleted
-      exitCode=$script:compatNativeExit; arguments=@($plan.Arguments); runtimeDefines=@($plan.RuntimeDefines)
-      startedAtUtc=$started; finishedAtUtc=[DateTimeOffset]::UtcNow.ToString('o')
-      stdoutSha256=(Get-FileHash -LiteralPath $log -Algorithm SHA256).Hash
-      stderrPath=$relative+'.stderr.txt'; stderrSha256=(Get-FileHash -LiteralPath $stderr -Algorithm SHA256).Hash
-      visualManifestPath=if(Test-Path -LiteralPath $visualManifestPath -PathType Leaf){$visualManifestRelative}else{$null}
-      visualManifestSha256=if(Test-Path -LiteralPath $visualManifestPath -PathType Leaf){Get-OctoberCoverageBoundHash $visualManifestPath}else{$null}
-      comparatorImplementationSha256Before=$captureSdkEvidence['comparatorImplementationSha256Before']
-      comparatorImplementationSha256After=$captureSdkEvidence['comparatorImplementationSha256After']
-      comparatorSdkCommitBefore=$captureSdkEvidence['comparatorSdkCommitBefore'];comparatorSdkCommitAfter=$captureSdkEvidence['comparatorSdkCommitAfter']
-      comparatorCheckedBeforeAtUtc=$captureSdkEvidence['comparatorCheckedBeforeAtUtc'];comparatorCheckedAfterAtUtc=$captureSdkEvidence['comparatorCheckedAfterAtUtc']
-    }
-    [IO.File]::WriteAllText($capturePath,(ConvertTo-Json -InputObject $capture -Depth 20),[Text.UTF8Encoding]::new($false))
-    $record=@{id=$CaptureCompatibilityReport; executionId=$CaptureExecutionId; path=$relative; sha256=$capture.stdoutSha256
-      capturePath=$relative+'.capture.json'; captureSha256=(Get-FileHash -LiteralPath $capturePath -Algorithm SHA256).Hash
-      runtimeDefines=@($plan.RuntimeDefines)}
+    $record=Invoke-OctoberCompatibilityCurrentBehaviorCapture -Plan $plan -InitialSource $currentSource
     Write-Output (ConvertTo-Json -InputObject $record -Compress -Depth 10)
-    if($null -ne $failure){throw $failure}
-    Assert-RepairContract (Test-OctoberCompatibilityCaptureComparator $capture) 'capture comparator provenance failed; retained capture is not qualified.'
-    Assert-RepairContract (Test-OctoberCompatibilityCapture -Capture $capture -ReportId $CaptureCompatibilityReport -ExecutionId $CaptureExecutionId `
-      -Source $source[0] -Tree $tree[0] -RegistrySha ([string]$policy.registryBinding.sha256) `
-      -ProducerBlob $producer[0] -LogSha $capture.stdoutSha256) 'host capture failed; retained files are not passing evidence.'
     return
   }
   # Actual process-environment wrapper probes, with host-only values. Preserve
@@ -2748,7 +4363,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   $capturePrematureRejected=$false
   try { $null=& $PSCommandPath -RepositoryRoot $root -CaptureCompatibilityReport publication_contracts }
   catch {
-    Assert-RepairContract ($_.Exception.Message -ceq 'Integration repair fixture rejected: repair-only intermediate cannot produce qualification captures before the completed contract amendment.') 'premature capture failed for an unrelated reason.'
+    Assert-RepairContract ($_.Exception.Message -ceq 'Integration repair fixture rejected: current capture requires independently derived clean sealed Stage18/source17.') 'premature capture failed for an unrelated reason.'
     $capturePrematureRejected=$true
   }
   Assert-RepairContract $capturePrematureRejected 'premature host capture admitted before committed scroll/layout repair.'
@@ -3219,7 +4834,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
     'apps/mobile/test/work_workspace_layout_safety_test.dart')
   Assert-RepairContract ((@(Get-OctoberCompatibilityAmendmentOwners) -join '|') -ceq ($literalMetadata -join '|') -and
     (@(Get-OctoberCompatibilityScrollRepairOwners) -join '|') -ceq ($literalRepair -join '|')) 'scope production inventories differ from independent literal metadata4/app2.'
-  foreach($mode in @('metadata-positive','repair-positive','metadata-missing-owner','metadata-extra-owner',
+  foreach($mode in @('metadata-positive','repair-source15-replacement-denied','metadata-missing-owner','metadata-extra-owner',
       'metadata-changed-apps','metadata-wrong-parent','metadata-wrong-subject',
       'missing-immutable-contract','altered-immutable-contract','duplicate-immutable-contract',
       'repair-missing-owner','repair-extra-owner','repair-wrong-parent','repair-wrong-subject','wrong-sealed-B25')) {
@@ -3294,19 +4909,20 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
         $accepted=$scopeStageOutput.Count -eq 1 -and $scopeStageOutput[0].Stage -eq $(if($hasRepair){16}else{15})
       }catch{$rejection=$_.Exception.Message}
       Assert-RepairContract (-not $scopeCtx.Unexpected -and $scopeCtx.AncestryCalls -eq 1) 'scope fixture concealed unexpected reads.'
-      Assert-RepairContract ($accepted -eq ($mode -cin @('metadata-positive','repair-positive'))) "scoped history result wrong for$mode."
+      Assert-RepairContract ($accepted -eq ($mode -ceq 'metadata-positive')) "scoped history result wrong for$mode; rejection=$rejection."
       if(-not $accepted) {
         $expectedError=switch($mode) {
           {$_ -cin @('metadata-missing-owner','metadata-extra-owner','repair-missing-owner','repair-extra-owner')} {'Compatibility successor changed unexpected owners.';break}
           {$_ -cin @('metadata-wrong-parent','metadata-wrong-subject','repair-wrong-parent','repair-wrong-subject')} {'Compatibility successor parent/subject changed.';break}
           'metadata-changed-apps' {'Compatibility metadata commit changed apps.';break}
           'wrong-sealed-B25' {'Sealed compatibility B25 changed.';break}
+          'repair-source15-replacement-denied' {'Sealed Source15 runtime/test checkpoint changed.';break}
           default {'Immutable scoped repair admission missing or changed.'}
         }
         Assert-RepairContract ($scopeStageOutput.Count -eq 0 -and
           $rejection -ceq ('Codex subagent coordination gate rejected: '+$expectedError)) 'scoped history concealed stage output or unrelated rejection.'
       }
-      if($mode -cin @('metadata-positive','repair-positive','missing-immutable-contract','altered-immutable-contract','duplicate-immutable-contract')) {
+      if($mode -cin @('metadata-positive','repair-source15-replacement-denied','missing-immutable-contract','altered-immutable-contract','duplicate-immutable-contract')) {
         Assert-RepairContract ($scopeCtx.ContractReads -eq 1) 'scope admission was not read exactly once from committed metadata14.'
       }else {
         Assert-RepairContract ($scopeCtx.ContractReads -eq 0) 'structural history rejection unexpectedly reached admission contract.'
@@ -3316,6 +4932,11 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
   }
   Assert-RepairContract ($scopeHistoryCases -eq 15) 'scope history fixture inventory changed.'
   Write-Output "Compatibility scoped history: $scopeHistoryCases actual predicate fixtures passed; simulated successors, no live commit or qualification."
+  $actualSealedSource15=Get-OctoberCompatibilityHistoryStage '3c3f38136db8bb184866635203d04ea4643f1eac'
+  Assert-RepairContract ($actualSealedSource15.Stage -eq 16 -and $actualSealedSource15.Head -ceq '3c3f38136db8bb184866635203d04ea4643f1eac' -and
+    $actualSealedSource15.Commits[14] -ceq '4e1c58fff39b770c32b3970470b9df9a51026b36' -and
+    $actualSealedSource15.Commits[15] -ceq '3c3f38136db8bb184866635203d04ea4643f1eac') 'Actual sealed Source15 history rejected.'
+  Write-Output 'Compatibility sealed Source15: actual immutable history passed; no replacement, handoff or application qualification.'
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $history)) 'unqualified E evidence accepted.'
   $missingProof=@{ Stage=6; Commits=@($binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead,$binding.baselineHead); Head=$binding.baselineHead }
   Assert-RepairContract (-not (Test-OctoberCompatibilityQualification $missingProof -FromWorkingTree)) 'premature stage6 evidence accepted.'

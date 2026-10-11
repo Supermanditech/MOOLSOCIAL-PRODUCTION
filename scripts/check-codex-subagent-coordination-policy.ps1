@@ -276,7 +276,7 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   Assert-Coordination ($LASTEXITCODE -eq 0) 'Compatibility HEAD must descend from exact E.'
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$e..$HeadCommit"))
   $firstParent=@(Get-OctoberCompatibilityGitLines @('rev-list','--first-parent','--reverse',"$e..$HeadCommit"))
-  Assert-Coordination ($commits.Count -le 16 -and
+  Assert-Coordination ($commits.Count -le 19 -and
     ($commits -join '|') -ceq ($firstParent -join '|')) 'Compatibility history contains an extra commit or merge.'
   $previous=$e
   $subjects=@($binding.bootstrapCommitSubject,
@@ -294,7 +294,10 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     'coordination(store-buy-compatibility-20261008): admit exact forward layout test repair',
     'coordination(store-buy-compatibility-20261008): admit scoped purchase return recovery',
     'coordination(store-buy-compatibility-20261008): admit exact scoped search and purchase repair',
-    'repair(store-buy-compatibility-20261008): preserve purchase return and scoped search journeys')
+    'repair(store-buy-compatibility-20261008): preserve purchase return and scoped search journeys',
+    'coordination(store-buy-compatibility-20261008): admit current frontend qualification contract',
+    'repair(store-buy-compatibility-20261008): align current qualification capture callers',
+    'qualification(store-buy-compatibility-20261008): verify current frontend source with provider deferrals')
   for($index=0;$index -lt $commits.Count;$index++) {
     $commit=[string]$commits[$index]
     $parents=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$commit))
@@ -304,15 +307,16 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     $owners=@(Get-OctoberCompatibilityGitLines @('diff-tree','--no-commit-id','--name-only','-r',$commit))
     $expected=if($index -eq 0){@($binding.bootstrapOwners)}
       elseif($index -eq 1){@(Get-OctoberCompatibilityApplicationOwners)}
-      elseif($index -in @(2,3,4,5,6,8,10,12,13,14)){@(Get-OctoberCompatibilityAmendmentOwners)}
+      elseif($index -in @(2,3,4,5,6,8,10,12,13,14,16)){@(Get-OctoberCompatibilityAmendmentOwners)}
       elseif($index -eq 7){@(Get-OctoberCompatibilityCoverageCartOwners)}
       elseif($index -eq 9){@(Get-OctoberCompatibilityInheritedCartTestOwners)}
       elseif($index -eq 11){@(Get-OctoberCompatibilityRetentionOwners)}
       elseif($index -eq 15){@(Get-OctoberCompatibilityScrollRepairOwners)}
+      elseif($index -eq 17){@('apps/mobile/test/work_workspace_layout_safety_test.dart')}
       else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
     Assert-Coordination ((@($owners | Sort-Object) -join '|') -ceq
       (@($expected | Sort-Object) -join '|')) 'Compatibility successor changed unexpected owners.'
-    if($index -in @(0,2,3,4,5,6,8,10,11,12,13,14)) {
+    if($index -in @(0,2,3,4,5,6,8,10,11,12,13,14,16,18)) {
       $apps=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${commit}:apps","${previous}:apps"))
       Assert-Coordination ($apps.Count -eq 2 -and $apps[0] -ceq $apps[1]) 'Compatibility metadata commit changed apps.'
     }
@@ -372,6 +376,25 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
     $scopeAdmission=Read-OctoberCompatibilityScopeRepairAdmission -Commit ([string]$commits[14])
     Assert-Coordination ($null -ne $scopeAdmission -and
       $scopeAdmission.predecessorCommit -ceq $commits[13]) 'Immutable scoped repair admission missing or changed.'
+  }
+  if($commits.Count -ge 16) {
+    Assert-Coordination ($commits[15] -ceq '3c3f38136db8bb184866635203d04ea4643f1eac') 'Sealed Source15 runtime/test checkpoint changed.'
+  }
+  if($commits.Count -ge 17) {
+    $current=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit ([string]$commits[16])
+    Assert-Coordination ($null -ne $current) 'Immutable current successor specification missing or changed.'
+    $layout=@(Get-OctoberCompatibilityGitLines @('rev-parse',($commits[16]+':apps/mobile/test/work_workspace_layout_safety_test.dart')))
+    Assert-Coordination ($layout.Count -eq 1 -and $layout[0] -ceq 'd03a41613b82dfb01d2c55cf57ae5cb7fc34bb2a') 'Current metadata changed the scoped layout predecessor.'
+    for($currentIndex=16;$currentIndex -lt $commits.Count;$currentIndex++) {
+      $entry=$current.chain[$currentIndex-16]
+      Assert-Coordination ($entry.index -eq $currentIndex -and $entry.subject -ceq $subjects[$currentIndex]) 'Current successor graph differs from its immutable contract.'
+      $currentContract=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit ([string]$commits[$currentIndex])
+      Assert-Coordination ($null -ne $currentContract) 'Current successor lost or changed its immutable contract.'
+    }
+  }
+  if($commits.Count -ge 18) {
+    $runtime=@(Get-OctoberCompatibilityGitLines @('rev-parse',($commits[17]+':apps/mobile/lib'),'3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib'))
+    Assert-Coordination ($runtime.Count -eq 2 -and $runtime[0] -ceq $runtime[1]) 'Capture caller correction changed frozen runtime source.'
   }
   Assert-Coordination ($previous -ceq $HeadCommit) 'Compatibility tip does not match complete successor history.'
   return @{ Stage=[int]$commits.Count; Commits=$commits; Base=$e; Head=$HeadCommit }
@@ -535,6 +558,401 @@ function Get-OctoberCompatibilityExecutionPlan {
       @($base.Suites | ForEach-Object {'test/'+$_})+
       @($defines | ForEach-Object {'--dart-define='+$_})+@('--name='+$selection)
   }
+}
+
+function Test-OctoberCompatibilityCurrentGeometry([object]$Geometry) {
+  # Typed normalized geometry only, not proof of a real render or visual approval.
+  try {
+    function Test-CurrentGeometryKeys([object]$Value,[string[]]$Names) {
+      return $null -ne $Value -and $Value -isnot [array] -and
+        (@($Value.PSObject.Properties.Name|Sort-Object) -join '|') -ceq (@($Names|Sort-Object) -join '|')
+    }
+    function Test-CurrentGeometryNumber([object]$Value) {
+      return ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [single] -or $Value -is [decimal]) -and
+        -not [double]::IsNaN([double]$Value) -and -not [double]::IsInfinity([double]$Value)
+    }
+    $fields=@('logicalViewport','devicePixelRatio','rasterRatio','textScale','padding','viewPadding','viewInsets','boundaryRect','rasterWidth','rasterHeight')
+    if(-not (Test-CurrentGeometryKeys $Geometry $fields)){return $false}
+    foreach($field in @('devicePixelRatio','rasterRatio','textScale')) {
+      if(-not (Test-CurrentGeometryNumber $Geometry.$field) -or $Geometry.$field -le 0){return $false}
+    }
+    if(-not (Test-CurrentGeometryKeys $Geometry.logicalViewport @('width','height'))){return $false}
+    foreach($field in @('width','height')) {
+      if(-not (Test-CurrentGeometryNumber $Geometry.logicalViewport.$field) -or $Geometry.logicalViewport.$field -le 0){return $false}
+    }
+    foreach($inset in @('padding','viewPadding','viewInsets')) {
+      if(-not (Test-CurrentGeometryKeys $Geometry.$inset @('left','top','right','bottom'))){return $false}
+      foreach($field in @('left','top','right','bottom')) {
+        if(-not (Test-CurrentGeometryNumber $Geometry.$inset.$field) -or $Geometry.$inset.$field -lt 0){return $false}
+      }
+    }
+    if(-not (Test-CurrentGeometryKeys $Geometry.boundaryRect @('left','top','width','height'))){return $false}
+    foreach($field in @('left','top','width','height')) {
+      if(-not (Test-CurrentGeometryNumber $Geometry.boundaryRect.$field)){return $false}
+    }
+    foreach($field in @('width','height')) {
+      if($Geometry.boundaryRect.$field -le 0 -or $Geometry.boundaryRect.$field -gt 16384){return $false}
+    }
+    foreach($field in @('rasterWidth','rasterHeight')) {
+      if(($Geometry.$field -isnot [int] -and $Geometry.$field -isnot [long]) -or $Geometry.$field -le 0 -or $Geometry.$field -gt [int]::MaxValue){return $false}
+    }
+    $width=[double]$Geometry.boundaryRect.width*[double]$Geometry.rasterRatio
+    $height=[double]$Geometry.boundaryRect.height*[double]$Geometry.rasterRatio
+    if(-not (Test-CurrentGeometryNumber $width) -or -not (Test-CurrentGeometryNumber $height) -or
+      $width -gt [int]::MaxValue -or $height -gt [int]::MaxValue){return $false}
+    return $Geometry.rasterWidth -eq [Math]::Ceiling($width) -and $Geometry.rasterHeight -eq [Math]::Ceiling($height)
+  }catch{return $false}
+}
+
+function Read-OctoberCompatibilityCurrentSelectedRiskBindings {
+  param([object]$Inventory,[string]$ExecutionId,[hashtable]$SourceIdentity)
+  # Structural selection only. Source admission, meaningful equivalence review,
+  # actual geometry observations and inspected PNGs remain independent.
+  try {
+    if($Inventory -isnot [array] -or $Inventory.Count -lt 1 -or $Inventory.Count -gt 65 -or
+      $ExecutionId -cnotin @('workspace_capture','historical_store_capture','store_live_capture','founder_capture') -or $null -eq $SourceIdentity){return $null}
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    if($null -eq $spec -or $null -eq $contract){return $null}
+    $ids=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $covered=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $slots=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $tests=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $selected=[Collections.Generic.List[object]]::new()
+    foreach($risk in $Inventory) {
+      if($null -eq $risk -or $risk -is [array] -or
+        (@($risk.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.visuals.selectedRiskInventoryFields|Sort-Object) -join '|')){return $null}
+      foreach($field in @('id','currentSurface','target','state','rationale')) {
+        if($risk.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($risk.$field)){return $null}
+      }
+      if($risk.id -cnotmatch '\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\z' -or -not $ids.Add($risk.id) -or
+        $risk.slotIds -isnot [array] -or $risk.slotIds.Count -lt 1 -or $risk.slotIds.Count -gt 65 -or
+        $risk.equivalenceEvidence -isnot [array] -or $risk.equivalenceEvidence.Count -ne ($risk.slotIds.Count-1) -or
+        -not (Test-OctoberCompatibilityCurrentGeometry $risk.geometry)){return $null}
+      foreach($evidence in $risk.equivalenceEvidence) {
+        if($null -eq $evidence -or $evidence -is [array] -or $evidence -is [string] -or @($evidence.PSObject.Properties).Count -eq 0){return $null}
+      }
+      foreach($slot in $risk.slotIds) {
+        if($slot -isnot [string] -or -not $covered.Add($slot) -or
+          @($contract.visualSlots|Where-Object {$_.slot -ceq $slot}).Count -ne 1){return $null}
+      }
+      $rep=$risk.representative
+      if($null -eq $rep -or $rep -is [array] -or
+        (@($rep.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.visuals.representativeFields|Sort-Object) -join '|')){return $null}
+      foreach($field in $spec.visuals.representativeFields) {
+        if($rep.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($rep.$field)){return $null}
+      }
+      $literal=@($contract.visualSlots|Where-Object {$_.slot -ceq $rep.slotId})
+      $owner='work_workspace_layout_safety_test.dart:'
+      if($risk.slotIds -cnotcontains $rep.slotId -or $literal.Count -ne 1 -or $rep.profile -cne $literal[0].profile -or
+        $rep.executionId -cne $rep.profile -or $rep.reportId -cne 'store_layout_and_recovery' -or
+        -not $rep.testKey.StartsWith($owner,[StringComparison]::Ordinal)){return $null}
+      $name=$rep.testKey.Substring($owner.Length)
+      $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $rep.reportId -ExecutionId $rep.executionId `
+        -Mode selected_visual_risks -RunId ('current-'+('0'*32)) -SourceIdentity $SourceIdentity `
+        -SelectedSlots @($rep.slotId) -SelectedTestKeys @($name)
+      if($null -eq $plan){return $null}
+      if($rep.profile -ceq $ExecutionId) {
+        $null=$slots.Add($rep.slotId);$null=$tests.Add($name);$selected.Add($risk)
+      }
+    }
+    if(-not $selected.Count){return $null}
+    [string[]]$orderedSlots=@($slots);[Array]::Sort($orderedSlots,[StringComparer]::Ordinal)
+    [string[]]$orderedTests=@($tests);[Array]::Sort($orderedTests,[StringComparer]::Ordinal)
+    return @{SelectedSlots=@($orderedSlots);SelectedTestKeys=@($orderedTests);SelectedRisks=$selected.ToArray();
+      StructuralSelectionVerified=$true;EquivalenceVerified=$false;GeometryObservationVerified=$false;
+      QualificationPassed=$false;CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentRiskInventoryBuffer {
+  param([byte[]]$Bytes,[string]$ExpectedSha256,[hashtable]$SourceIdentity,[string]$ExecutionId)
+  # Retained structural data only. No live launch/source-state admission here.
+  try {
+    $roles=@('runtimeSourceCommit','contractCommit','captureSourceCommit','captureSourceTree','producerBlob','executionHead')
+    if($null -eq $Bytes -or $Bytes.Length -lt 2 -or $Bytes.Length -gt 4194304 -or
+      $ExpectedSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or (Get-OctoberCompatibilityByteHash $Bytes) -cne $ExpectedSha256 -or
+      $null -eq $SourceIdentity -or (@($SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($roles|Sort-Object) -join '|')){return $null}
+    foreach($role in $roles){if($SourceIdentity[$role] -isnot [string] -or $SourceIdentity[$role] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}}
+    $document=Read-OctoberCompatibilityJsonObject -Bytes $Bytes
+    if($null -eq $document -or
+      (@($document.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'schemaVersion|sourceIdentity|visualRiskInventory' -or
+      ($document.schemaVersion -isnot [int] -and $document.schemaVersion -isnot [long]) -or $document.schemaVersion -ne 1 -or
+      $null -eq $document.sourceIdentity -or $document.sourceIdentity -is [array] -or
+      (@($document.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($roles|Sort-Object) -join '|')){return $null}
+    foreach($role in $roles){if($document.sourceIdentity.$role -isnot [string] -or $document.sourceIdentity.$role -cne $SourceIdentity[$role]){return $null}}
+    $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $document.visualRiskInventory `
+      -ExecutionId $ExecutionId -SourceIdentity $SourceIdentity
+    if($null -eq $selection){return $null}
+    return [pscustomobject]@{Inventory=$document.visualRiskInventory;Selection=$selection;
+      SourceStateAdmissionVerified=$false;QualificationPassed=$false;CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentRiskInventoryFile {
+  param([string]$RelativePath,[string]$ExpectedSha256,[string]$ExecutionId)
+  # A file-bound structural selection, not risk/equivalence or visual approval.
+  # Never accept source roles from a caller as the admission authority.
+  $lease=$null
+  try {
+    if($RelativePath -cnotmatch '\Aapps/mobile/build/compat-current-risk-inventory-[0-9a-f]{32}\.json\z' -or
+      $ExpectedSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+      $ExecutionId -cnotin @('workspace_capture','historical_store_capture','store_live_capture','founder_capture')){return $null}
+    $initial=Read-OctoberCompatibilityCurrentCaptureSource
+    if($null -eq $initial -or $initial.SourceIdentity -isnot [hashtable] -or
+      $initial.SourceStateIdentity -isnot [string] -or $initial.SourceStateIdentity -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+    $roles=@('runtimeSourceCommit','contractCommit','captureSourceCommit','captureSourceTree','producerBlob','executionHead')
+    if((@($initial.SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($roles|Sort-Object) -join '|')){return $null}
+    foreach($role in $roles) {
+      if($initial.SourceIdentity[$role] -isnot [string] -or $initial.SourceIdentity[$role] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    }
+    $path=[IO.Path]::GetFullPath((Join-Path $root $RelativePath))
+    # Bound the opened handle's length before allocating, retaining writer/deletion
+    # exclusion through parsing, selection and independent source postflight.
+    $lease=Open-OctoberCompatibilityVisualArtifact -Base $root -RelativePath $RelativePath `
+      -ExpectedSha256 $ExpectedSha256 -MaxBytes 4194304
+    if($null -eq $lease -or $lease.Bytes -isnot [byte[]] -or $lease.Bytes.Length -lt 2 -or
+      $lease.Bytes.Length -gt 4194304 -or $lease.CanonicalPath -cne $path -or $lease.Sha256 -cne $ExpectedSha256){return $null}
+    $buffer=Read-OctoberCompatibilityCurrentRiskInventoryBuffer -Bytes $lease.Bytes -ExpectedSha256 $ExpectedSha256 `
+      -ExecutionId $ExecutionId -SourceIdentity $initial.SourceIdentity
+    if($null -eq $buffer){return $null}
+    $final=Read-OctoberCompatibilityCurrentCaptureSource
+    if($null -eq $final -or $final.SourceIdentity -isnot [hashtable] -or
+      $final.SourceStateIdentity -cne $initial.SourceStateIdentity -or
+      (@($final.SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($roles|Sort-Object) -join '|')){return $null}
+    foreach($role in $roles) {
+      if($final.SourceIdentity[$role] -cne $initial.SourceIdentity[$role]){return $null}
+    }
+    if((Get-OctoberCoverageBoundHash $path) -cne $ExpectedSha256){return $null}
+    return [pscustomobject]@{RelativePath=$RelativePath;CanonicalPath=$path;Sha256=$ExpectedSha256;
+      SourceIdentity=$initial.SourceIdentity.Clone();SourceStateIdentity=$initial.SourceStateIdentity;
+      Inventory=$buffer.Inventory;Selection=$buffer.Selection;StructuralSelectionVerified=$true;
+      EquivalenceVerified=$false;GeometryObservationVerified=$false;QualificationPassed=$false;
+      CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}finally{if($null -ne $lease){$lease.Stream.Dispose()}}
+}
+
+function New-OctoberCompatibilityCurrentSelectionContext {
+  param([string]$InventoryPath,[string]$InventorySha256,[string]$ReportId,[string]$ExecutionId,[string]$RunId)
+  # Derive the context and canonical plan from independent source/file admission;
+  # caller-supplied selections, roles or approval flags cannot construct it.
+  try {
+    if($ReportId -cne 'store_layout_and_recovery' -or $RunId -cnotmatch '\Acurrent-[0-9a-f]{32}\z'){return $null}
+    $proof=Read-OctoberCompatibilityCurrentRiskInventoryFile -RelativePath $InventoryPath `
+      -ExpectedSha256 $InventorySha256 -ExecutionId $ExecutionId
+    if($null -eq $proof){return $null}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId `
+      -Mode selected_visual_risks -RunId $RunId -SourceIdentity $proof.SourceIdentity `
+      -SelectedSlots $proof.Selection.SelectedSlots -SelectedTestKeys $proof.Selection.SelectedTestKeys
+    if($null -eq $plan){return $null}
+    [string[]]$riskIds=@($proof.Selection.SelectedRisks|ForEach-Object {$_.id})
+    [Array]::Sort($riskIds,[StringComparer]::Ordinal)
+    $context=[pscustomobject]@{schemaVersion=1;inventoryPath=$proof.RelativePath;inventorySha256=$proof.Sha256;
+      reportId=$ReportId;executionId=$ExecutionId;mode='selected_visual_risks';runId=$RunId;
+      sourceIdentity=[pscustomobject]$proof.SourceIdentity.Clone();sourceStateIdentity=$proof.SourceStateIdentity;
+      selectedSlots=@($proof.Selection.SelectedSlots);selectedTestKeys=@($proof.Selection.SelectedTestKeys);selectedRiskIds=@($riskIds)}
+    return [pscustomobject]@{Context=$context;InventoryProof=$proof;Plan=$plan;
+      QualificationPassed=$false;CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentSelectionContextFile {
+  param([string]$RelativePath,[string]$ExpectedSha256,[string]$ReportId,[string]$ExecutionId,[string]$RunId,[hashtable]$SourceIdentity)
+  # Immutable retained evidence may be read after Stage18. Caller must separately
+  # establish sealed history and current-state preservation; this is not launch authority.
+  $contextLease=$null;$inventoryLease=$null
+  try {
+    $expectedPath='apps/mobile/build/compat-current-'+$ReportId+'-'+$ExecutionId+'-'+$RunId+'.jsonl.selection.json'
+    if($ReportId -cne 'store_layout_and_recovery' -or
+      $ExecutionId -cnotin @('workspace_capture','historical_store_capture','store_live_capture','founder_capture') -or
+      $RunId -cnotmatch '\Acurrent-[0-9a-f]{32}\z' -or $RelativePath -cne $expectedPath -or
+      $ExpectedSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or $null -eq $SourceIdentity){return $null}
+    $contextLease=Open-OctoberCompatibilityVisualArtifact -Base $root -RelativePath $RelativePath `
+      -ExpectedSha256 $ExpectedSha256 -MaxBytes 4194304
+    if($null -eq $contextLease){return $null}
+    $context=Read-OctoberCompatibilityJsonObject -Bytes $contextLease.Bytes
+    $fields=@('schemaVersion','inventoryPath','inventorySha256','reportId','executionId','mode','runId',
+      'sourceIdentity','sourceStateIdentity','selectedSlots','selectedTestKeys','selectedRiskIds')
+    if($null -eq $context -or (@($context.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+      ($context.schemaVersion -isnot [int] -and $context.schemaVersion -isnot [long]) -or $context.schemaVersion -ne 1 -or
+      $context.inventoryPath -isnot [string] -or $context.inventoryPath -cnotmatch '\Aapps/mobile/build/compat-current-risk-inventory-[0-9a-f]{32}\.json\z' -or
+      $context.inventorySha256 -isnot [string] -or $context.inventorySha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+      $context.sourceStateIdentity -isnot [string] -or $context.sourceStateIdentity -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+    $inventoryLease=Open-OctoberCompatibilityVisualArtifact -Base $root -RelativePath $context.inventoryPath `
+      -ExpectedSha256 $context.inventorySha256 -MaxBytes 4194304
+    if($null -eq $inventoryLease -or $inventoryLease.FileIdentity -ceq $contextLease.FileIdentity){return $null}
+    $buffer=Read-OctoberCompatibilityCurrentRiskInventoryBuffer -Bytes $inventoryLease.Bytes `
+      -ExpectedSha256 $context.inventorySha256 -SourceIdentity $SourceIdentity -ExecutionId $ExecutionId
+    if($null -eq $buffer){return $null}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId `
+      -Mode selected_visual_risks -RunId $RunId -SourceIdentity $SourceIdentity `
+      -SelectedSlots $buffer.Selection.SelectedSlots -SelectedTestKeys $buffer.Selection.SelectedTestKeys
+    if($null -eq $plan){return $null}
+    foreach($pair in @(@{Field='reportId';Value=$ReportId},@{Field='executionId';Value=$ExecutionId},
+      @{Field='runId';Value=$RunId},@{Field='mode';Value='selected_visual_risks'})) {
+      if($context.($pair.Field) -isnot [string] -or $context.($pair.Field) -cne $pair.Value){return $null}
+    }
+    if($null -eq $context.sourceIdentity -or $context.sourceIdentity -is [array] -or
+      (@($context.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+    foreach($role in $SourceIdentity.Keys){if($context.sourceIdentity.$role -isnot [string] -or $context.sourceIdentity.$role -cne $SourceIdentity[$role]){return $null}}
+    [string[]]$riskIds=@($buffer.Selection.SelectedRisks|ForEach-Object {$_.id});[Array]::Sort($riskIds,[StringComparer]::Ordinal)
+    $expected=@{selectedSlots=@($buffer.Selection.SelectedSlots);selectedTestKeys=@($buffer.Selection.SelectedTestKeys);selectedRiskIds=@($riskIds)}
+    foreach($field in $expected.Keys) {
+      if($context.$field -isnot [array] -or
+        (ConvertTo-Json -InputObject @($context.$field) -Compress) -cne (ConvertTo-Json -InputObject @($expected[$field]) -Compress)){return $null}
+    }
+    if((Get-OctoberCoverageBoundHash $inventoryLease.CanonicalPath) -cne $context.inventorySha256 -or
+      (Get-OctoberCoverageBoundHash $contextLease.CanonicalPath) -cne $ExpectedSha256){return $null}
+    return [pscustomobject]@{RelativePath=$RelativePath;CanonicalPath=$contextLease.CanonicalPath;Sha256=$ExpectedSha256;
+      Context=$context;Inventory=$buffer.Inventory;Selection=$buffer.Selection;Plan=$plan;
+      InventoryCanonicalPath=$inventoryLease.CanonicalPath;InventorySha256=$context.inventorySha256;
+      SourceStateAdmissionVerified=$false;QualificationPassed=$false;CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}finally{
+    try{if($null -ne $inventoryLease){$inventoryLease.Stream.Dispose()}}
+    finally{if($null -ne $contextLease){$contextLease.Stream.Dispose()}}
+  }
+}
+
+function Test-OctoberCompatibilityCurrentSelectionEventSequence {
+  param([object[]]$Events,[string]$Mode,[string]$SelectionContextPath='',[string]$SelectionContextSha256='')
+  # Protocol/position only. A matching frame does not verify its sidecar bytes.
+  try {
+    if($null -eq $Events -or $Mode -cnotin @('behavior_only','selected_visual_risks')){return $false}
+    $positions=[Collections.Generic.List[int]]::new()
+    for($index=0;$index -lt $Events.Count;$index++) {
+      $event=$Events[$index]
+      if($null -eq $event){return $false}
+      $names=@($event.PSObject.Properties.Name)
+      $reserved=$names -icontains 'selectionContext'
+      if($names -icontains 'message' -and $event.message -is [string] -and
+        $event.message.StartsWith('moolsocialSelectionContext',[StringComparison]::OrdinalIgnoreCase)){$reserved=$true}
+      if($reserved){$positions.Add($index)}
+    }
+    if($Mode -ceq 'behavior_only') {
+      return $positions.Count -eq 0 -and [string]::IsNullOrEmpty($SelectionContextPath) -and [string]::IsNullOrEmpty($SelectionContextSha256)
+    }
+    if($positions.Count -ne 1 -or $positions[0] -ne 1 -or
+      $SelectionContextPath -cnotmatch '\Aapps/mobile/build/compat-current-[a-z0-9._-]+\.jsonl\.selection\.json\z' -or
+      $SelectionContextSha256 -cnotmatch '\A[0-9A-F]{64}\z'){return $false}
+    $frame=$Events[1]
+    if((@($frame.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'message|selectionContext|type' -or
+      $frame.type -isnot [string] -or $frame.type -cne 'print' -or $frame.message -isnot [string] -or
+      $frame.message -cne 'moolsocialSelectionContext' -or $null -eq $frame.selectionContext -or $frame.selectionContext -is [array] -or
+      (@($frame.selectionContext.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'path|sha256' -or
+      $frame.selectionContext.path -isnot [string] -or $frame.selectionContext.path -cne $SelectionContextPath -or
+      $frame.selectionContext.sha256 -isnot [string] -or $frame.selectionContext.sha256 -cne $SelectionContextSha256){return $false}
+    return $true
+  }catch{return $false}
+}
+
+function Get-OctoberCompatibilityCurrentExecutionPlan {
+  param([string]$ReportId,[string]$ExecutionId='default',[string]$Mode,
+    [string]$RunId,[hashtable]$SourceIdentity,[object]$SelectedSlots=@(),[object]$SelectedTestKeys=@())
+  # Native argument construction only. Immutable history, risk/test equivalence,
+  # successful observations and capture permission require independent callers.
+  try {
+    if($Mode -cnotin @('behavior_only','selected_visual_risks') -or
+       $RunId -cnotmatch '\Acurrent-[0-9a-f]{32}\z' -or $null -eq $SourceIdentity){return $null}
+    $fields=@('runtimeSourceCommit','contractCommit','captureSourceCommit','captureSourceTree','producerBlob','executionHead')
+    if((@($SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|')){return $null}
+    foreach($field in $fields){if($SourceIdentity[$field] -isnot [string] -or $SourceIdentity[$field] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}}
+    if($SourceIdentity.runtimeSourceCommit -cne '3c3f38136db8bb184866635203d04ea4643f1eac' -or
+       $SourceIdentity.executionHead -cne $SourceIdentity.captureSourceCommit){return $null}
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    $literal=Get-OctoberCompatibilityExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId
+    if($null -eq $spec -or $null -eq $contract -or $null -eq $literal -or
+       $SelectedSlots -isnot [array] -or $SelectedTestKeys -isnot [array]){return $null}
+    $names=@($literal.RequiredNames);$arguments=@($literal.Arguments)
+    $defines=@($literal.RuntimeDefines)
+    $bindings=@(
+      ('MOOL_TECHNICAL_CAPTURE_RUN_ID='+$RunId),
+      ('MOOL_TECHNICAL_CAPTURE_EXECUTION_ID='+$ExecutionId),
+      ('MOOL_TECHNICAL_CAPTURE_PROFILE='+$ExecutionId),
+      ('MOOL_TECHNICAL_CAPTURE_SOURCE_COMMIT='+$SourceIdentity.captureSourceCommit),
+      ('MOOL_TECHNICAL_CAPTURE_SOURCE_TREE='+$SourceIdentity.captureSourceTree),
+      ('MOOL_TECHNICAL_CAPTURE_EXECUTION_HEAD='+$SourceIdentity.executionHead),
+      ('MOOL_TECHNICAL_CAPTURE_PRODUCER_BLOB='+$SourceIdentity.producerBlob),
+      'MOOL_TECHNICAL_CAPTURE_REGISTRY_SHA256=8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3')
+    if($Mode -ceq 'behavior_only') {
+      if($SelectedSlots.Count -or $SelectedTestKeys.Count){return $null}
+      $bindings+=@('MOOL_CURRENT_QUALIFICATION_BEHAVIOR_ONLY=true')
+    }else{
+      if($ReportId -cne 'store_layout_and_recovery' -or $ExecutionId -cnotin @('workspace_capture','historical_store_capture','store_live_capture','founder_capture') -or
+         -not $SelectedSlots.Count -or -not $SelectedTestKeys.Count){return $null}
+      $allowed=@($contract.visualSlots|Where-Object {$_.profile -ceq $ExecutionId}|ForEach-Object {$_.slot})
+      $slots=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      $expectedTests=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      foreach($slot in $SelectedSlots){
+        if($slot -isnot [string] -or $allowed -cnotcontains $slot -or -not $slots.Add($slot) -or
+          $slot -cnotmatch '\AH([0-9]{2})-visual-[1-9][0-9]*\z'){return $null}
+        $ordinal=[int]$Matches[1]
+        $case=@($contract.cases|Where-Object {$_.ordinal -eq $ordinal})
+        if($case.Count -ne 1 -or $case[0].originalSuccessKeys -isnot [array] -or $case[0].originalSuccessKeys.Count -ne 1){return $null}
+        $key=$case[0].originalSuccessKeys[0];$owner='work_workspace_layout_safety_test.dart:'
+        if($key -isnot [string] -or -not $key.StartsWith($owner,[StringComparison]::Ordinal)){return $null}
+        $testName=$key.Substring($owner.Length)
+        if($names -cnotcontains $testName){return $null}
+        $null=$expectedTests.Add($testName)
+      }
+      $tests=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      foreach($test in $SelectedTestKeys){if($test -isnot [string] -or $names -cnotcontains $test -or -not $tests.Add($test)){return $null}}
+      if($tests.Count -ne $expectedTests.Count){return $null}
+      foreach($test in $tests){if(-not $expectedTests.Contains($test)){return $null}}
+      [string[]]$ordered=@($slots);[Array]::Sort($ordered,[StringComparer]::Ordinal)
+      $slotJson=ConvertTo-Json -InputObject @($ordered) -Compress
+      $bindings+=@('MOOL_CURRENT_QUALIFICATION_SELECTED_VISUAL_SLOTS='+$slotJson)
+      $names=@($SelectedTestKeys)
+      $selector='^(?:'+((@($names|ForEach-Object {[regex]::Escape($_)})) -join '|')+')$(?![\s\S])'
+      $arguments=@($arguments|Where-Object {-not $_.StartsWith('--name=',[StringComparison]::Ordinal)})+@('--name='+$selector)
+    }
+    $defines+=@($bindings)
+    $arguments+=@($bindings|ForEach-Object {'--dart-define='+$_})
+    return @{Id=$ReportId;ExecutionId=$ExecutionId;Mode=$Mode;RunId=$RunId;Suites=@($literal.Suites);
+      Arguments=@($arguments);RuntimeDefines=@($defines);RequiredNames=@($names);
+      SourceIdentity=$SourceIdentity.Clone();QualificationPassed=$false;CaptureAuthority=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Test-OctoberCompatibilityCurrentExecutionReceipt {
+  param([object]$Capture,[string]$ReportId,[string]$ExecutionId,[string]$Mode,[string]$RunId,
+    [hashtable]$SourceIdentity,[string]$LogSha,[object]$SelectedSlots=@(),[object]$SelectedTestKeys=@())
+  # A receipt is not proof of successful test events, artifact bytes, assertions,
+  # inspections or qualification. Those independent conjuncts remain mandatory.
+  try {
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId -Mode $Mode -RunId $RunId `
+      -SourceIdentity $SourceIdentity -SelectedSlots $SelectedSlots -SelectedTestKeys $SelectedTestKeys
+    if($null -eq $plan -or $null -eq $Capture -or $LogSha -cnotmatch '\A[0-9A-F]{64}\z'){return $false}
+    $fields=@('schemaVersion','producer','producerGitBlob','reportId','executionId','mode','runId','sourceIdentity','sourceIdentityAfter',
+      'registrySha256','executable','workingDirectory','cleanBefore','cleanAfter','guardCompleted','exitCode','arguments','runtimeDefines',
+      'startedAtUtc','finishedAtUtc','stdoutSha256','stderrPath','stderrSha256')
+    if((@($Capture.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+       ($Capture.schemaVersion -isnot [int] -and $Capture.schemaVersion -isnot [long]) -or $Capture.schemaVersion -ne 2){return $false}
+    $pins=@{producer='test-codex-integration-repair-coordination-policy.ps1';producerGitBlob=$SourceIdentity.producerBlob;
+      reportId=$ReportId;executionId=$ExecutionId;mode=$Mode;runId=$RunId;
+      registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3';
+      executable='C:/Users/jisal/develop/flutter/bin/flutter.bat';workingDirectory=(Get-OctoberCompatibilityBinding).worktreePath+'/apps/mobile';stdoutSha256=$LogSha}
+    foreach($name in $pins.Keys){if($Capture.$name -isnot [string] -or $Capture.$name -cne $pins[$name]){return $false}}
+    foreach($name in @('sourceIdentity','sourceIdentityAfter')) {
+      $roles=$Capture.$name
+      if($null -eq $roles -or (@($roles.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $false}
+      foreach($role in $SourceIdentity.Keys){if($roles.$role -isnot [string] -or $roles.$role -cne $SourceIdentity[$role]){return $false}}
+    }
+    foreach($flag in @('cleanBefore','cleanAfter','guardCompleted')){if($Capture.$flag -isnot [bool] -or -not $Capture.$flag){return $false}}
+    if(($Capture.exitCode -isnot [int] -and $Capture.exitCode -isnot [long]) -or $Capture.exitCode -ne 0){return $false}
+    foreach($pair in @(@{Actual=$Capture.arguments;Expected=$plan.Arguments},@{Actual=$Capture.runtimeDefines;Expected=$plan.RuntimeDefines})) {
+      if($pair.Actual -isnot [array] -or $pair.Actual.Count -ne $pair.Expected.Count){return $false}
+      for($i=0;$i -lt $pair.Expected.Count;$i++){if($pair.Actual[$i] -isnot [string] -or $pair.Actual[$i] -cne $pair.Expected[$i]){return $false}}
+    }
+    $utc='\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|\+00:00)\z'
+    if($Capture.startedAtUtc -isnot [string] -or $Capture.finishedAtUtc -isnot [string] -or
+       $Capture.startedAtUtc -cnotmatch $utc -or $Capture.finishedAtUtc -cnotmatch $utc -or
+       $Capture.stderrPath -isnot [string] -or $Capture.stderrPath -cnotmatch '\Aapps/mobile/build/[a-z0-9][a-z0-9._-]+\.jsonl\.stderr\.txt\z' -or
+       $Capture.stderrSha256 -isnot [string] -or $Capture.stderrSha256 -cnotmatch '\A[0-9A-F]{64}\z'){return $false}
+    $start=[DateTimeOffset]::Parse($Capture.startedAtUtc,[Globalization.CultureInfo]::InvariantCulture)
+    $end=[DateTimeOffset]::Parse($Capture.finishedAtUtc,[Globalization.CultureInfo]::InvariantCulture)
+    return $start.Offset -eq [TimeSpan]::Zero -and $end.Offset -eq [TimeSpan]::Zero -and $end -ge $start
+  }catch{return $false}
 }
 
 function Test-OctoberCompatibilityCapture {
@@ -773,12 +1191,18 @@ function Read-OctoberCompatibilityDerivedClaims {
     foreach($key in @('ImmutableMVerified','WriterFactsVerified')){
       if(-not $Context.ContainsKey($key) -or $Context[$key] -isnot [bool] -or -not $Context[$key]){return $null}
     }
-    if(-not $Context.ContainsKey('Stage') -or $Context.Stage -isnot [int] -or $Context.Stage -notin @(7,8,9,10,11,12,13,14,15,16) -or
+    if(-not $Context.ContainsKey('Stage') -or $Context.Stage -isnot [int] -or $Context.Stage -notin @(7,8,9,10,11,12,13,14,15,16,17,18) -or
         -not $Context.ContainsKey('Phase') -or $Context.Phase -cnotin @('implementation','pre_commit','handoff','integration_admission_authorize') -or
         -not $Context.ContainsKey('MCommit') -or $Context.MCommit -isnot [string] -or
         $Context.MCommit -cnotmatch '\A[0-9a-f]{40}\z' -or $Context.MCommit -ceq $contract.predecessorCommit){return $null}
-    if(($Context.Phase -cin @('implementation','pre_commit') -and $Context.Stage -eq 16) -or
-        ($Context.Phase -cin @('handoff','integration_admission_authorize') -and $Context.Stage -ne 16)){return $null}
+    if($Context.Phase -cin @('handoff','integration_admission_authorize')){return $null}
+    if($Context.Stage -eq 16 -and
+       (-not $Context.ContainsKey('CurrentPreparationVerified') -or
+        $Context.CurrentPreparationVerified -isnot [bool] -or -not $Context.CurrentPreparationVerified)){return $null}
+    if($Context.Stage -in @(17,18) -and
+       (-not $Context.ContainsKey('CurrentSourceVerified') -or $Context.CurrentSourceVerified -isnot [bool] -or
+        -not $Context.CurrentSourceVerified -or -not $Context.ContainsKey('CurrentSourceIdentity') -or
+        $Context.CurrentSourceIdentity -isnot [string] -or $Context.CurrentSourceIdentity -cnotmatch '\A[0-9A-F]{64}\z')){return $null}
     $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach($claim in $Claims){
       if($claim.task -isnot [string] -or -not $seen.Add($claim.task)){return $null}
@@ -874,9 +1298,19 @@ function Read-OctoberCompatibilityPostMWriterFacts([string]$Phase) {
     $initialHead=@(Read-PostMWriterGit $root @('rev-parse','HEAD'))
     if($initialHead.Count -ne 1){return $null}
     $history=Get-OctoberCompatibilityHistoryStage $initialHead[0]
-    if($history.Stage -notin @(7,8,9,10,11,12,13,14,15,16) -or
-        ($Phase -cin @('handoff','integration_admission_authorize') -and $history.Stage -ne 16) -or
-        ($Phase -cin @('implementation','pre_commit') -and $history.Stage -notin @(7,8,9,10,11,12,13,14,15))){return $null}
+    if($history.Stage -notin @(7,8,9,10,11,12,13,14,15,16,17,18) -or
+        $Phase -cin @('handoff','integration_admission_authorize') -or
+        ($Phase -cin @('implementation','pre_commit') -and $history.Stage -notin @(7,8,9,10,11,12,13,14,15,16,17,18))){return $null}
+    $currentPreparationVerified=$false
+    $currentSourceProof=$null
+    if($history.Stage -eq 16) {
+      $currentPreparationVerified=Test-OctoberCompatibilityCurrentPreparation $Phase
+      if($currentPreparationVerified -isnot [bool] -or -not $currentPreparationVerified){return $null}
+    }
+    if($history.Stage -in @(17,18)) {
+      $currentSourceProof=Read-OctoberCompatibilityCurrentSourceState -History $history -Phase $Phase
+      if($null -eq $currentSourceProof){return $null}
+    }
     $handoff=Get-OctoberCompatibilityClaimHandoff -Commit ([string]$history.Commits[6])
     if($null -eq $handoff){return $null}
     $contract=$handoff.Contract;$rawPolicy=$null;$testAdmission=$null;$nCommit=$null;$cursorTestHashes=@{}
@@ -962,8 +1396,14 @@ function Read-OctoberCompatibilityPostMWriterFacts([string]$Phase) {
             (@(Read-PostMWriterGit $cursorRoot @('rev-parse',(':'+$owner))) -join '') -cne $predecessor){return $null}
       }
     }
+    if($history.Stage -in @(17,18)) {
+      $finalSourceProof=Read-OctoberCompatibilityCurrentSourceState -History $history -Phase $Phase
+      if($null -eq $finalSourceProof -or $finalSourceProof.Identity -cne $currentSourceProof.Identity){return $null}
+    }
     return [pscustomobject]@{Head=$initialHead[0];History=$history;Handoff=$handoff;RawClaims=@($rawPolicy.activeClaims);
-      WriterFactsVerified=$true;NCommit=$nCommit;TestAdmission=$testAdmission;ImmutableNVerified=($history.Stage -ge 9)}
+      WriterFactsVerified=$true;NCommit=$nCommit;TestAdmission=$testAdmission;ImmutableNVerified=($history.Stage -ge 9);
+      CurrentPreparationVerified=$currentPreparationVerified;CurrentSourceVerified=($null -ne $currentSourceProof);
+      CurrentSourceIdentity=$(if($null -ne $currentSourceProof){$currentSourceProof.Identity}else{$null})}
   }catch{return $null}finally{
     if($policyLease){$policyLease.Dispose()};if($registryLease){$registryLease.Dispose()}
     foreach($mutex in $held){$mutex.ReleaseMutex()};foreach($mutex in $mutexes){$mutex.Dispose()}
@@ -1120,6 +1560,315 @@ function Test-OctoberCompatibilityScrollPreparation([string]$Phase) {
     if($proof.FailureBytesPreserved -isnot [bool] -or -not $proof.FailureBytesPreserved){return $false}
     return $true
   }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+function Read-OctoberCompatibilityCurrentQualificationContract {
+  param([string]$Commit,[switch]$FromIndex,[switch]$FromWorkingTree)
+  try {
+    $commitSelected=$PSBoundParameters.ContainsKey('Commit')
+    $modes=@($commitSelected,[bool]$FromIndex,[bool]$FromWorkingTree)
+    if(@($modes | Where-Object {$_}).Count -ne 1){return $null}
+    if($commitSelected -and $Commit -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($Commit+':'+$owner))) -join "`n"}
+    $begin='<!-- COMPATIBILITY_CURRENT_QUALIFICATION_JSON_BEGIN -->'
+    $end='<!-- COMPATIBILITY_CURRENT_QUALIFICATION_JSON_END -->'
+    if(([regex]::Matches($text,[regex]::Escape($begin))).Count -ne 1 -or
+       ([regex]::Matches($text,[regex]::Escape($end))).Count -ne 1){return $null}
+    $start=$text.IndexOf($begin)+$begin.Length;$stop=$text.IndexOf($end,$start)
+    if($stop -le $start){return $null}
+    $json=$text.Substring($start,$stop-$start).Trim()
+    $bytes=[Text.Encoding]::UTF8.GetBytes($json)
+    if((Get-OctoberCompatibilityByteHash $bytes) -cne '74A621E2A3D6537CE2507B04578C61E9E78D11DE7B84E6DA6092932AD389FE1F'){return $null}
+    $contract=Read-OctoberCompatibilityJsonObject -Bytes $bytes
+    if($null -eq $contract -or $contract.kind -cne 'current_frontend_qualification_contract_not_qualification' -or
+       $contract.source15 -cne '3c3f38136db8bb184866635203d04ea4643f1eac' -or
+       @($contract.cases).Count -ne 84 -or @($contract.visualSlots).Count -ne 65){return $null}
+    foreach($name in @('qualificationPassed','providerVerified','apkAuthority','historyRewriteAuthority')) {
+      if($contract.$name -isnot [bool] -or $contract.$name){return $null}
+    }
+    return $contract
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentSuccessorSpecification {
+  param([string]$Commit,[switch]$FromIndex,[switch]$FromWorkingTree)
+  try {
+    $hasCommit=$PSBoundParameters.ContainsKey('Commit')
+    if(@(@($hasCommit,[bool]$FromIndex,[bool]$FromWorkingTree)|Where-Object {$_}).Count -ne 1){return $null}
+    if($hasCommit -and $Commit -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    $arguments=if($hasCommit){@{Commit=$Commit}}elseif($FromIndex){@{FromIndex=$true}}else{@{FromWorkingTree=$true}}
+    if($null -eq (Read-OctoberCompatibilityCurrentQualificationContract @arguments)){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($Commit+':'+$owner))) -join "`n"}
+    $begin='<!-- COMPATIBILITY_CURRENT_SUCCESSOR_SPECIFICATION_JSON_BEGIN -->'
+    $end='<!-- COMPATIBILITY_CURRENT_SUCCESSOR_SPECIFICATION_JSON_END -->'
+    if(([regex]::Matches($text,[regex]::Escape($begin))).Count -ne 1 -or
+       ([regex]::Matches($text,[regex]::Escape($end))).Count -ne 1){return $null}
+    $start=$text.IndexOf($begin)+$begin.Length;$stop=$text.IndexOf($end,$start)
+    if($stop -le $start){return $null}
+    $bytes=[Text.Encoding]::UTF8.GetBytes($text.Substring($start,$stop-$start).Trim())
+    if((Get-OctoberCompatibilityByteHash $bytes) -cne '985C43950F13A51900F74E7BC915F3D7916446DB3AD9129430D29F598432B4CC'){return $null}
+    $spec=Read-OctoberCompatibilityJsonObject -Bytes $bytes
+    if($null -eq $spec -or $spec.kind -cne 'current_successor_and_qualification_specification_not_admission' -or
+       $spec.source15 -cne '3c3f38136db8bb184866635203d04ea4643f1eac' -or
+       $spec.baseContractSha256 -cne '74A621E2A3D6537CE2507B04578C61E9E78D11DE7B84E6DA6092932AD389FE1F'){return $null}
+    foreach($flag in @('qualificationPassed','providerVerified','apkAuthority','historyRewriteAuthority')) {
+      if($spec.$flag -isnot [bool] -or $spec.$flag){return $null}
+    }
+    return $spec
+  }catch{return $null}
+}
+
+function Test-OctoberCompatibilitySource15Preparation([string]$Phase) {
+  # Source15-bound preservation preparation, never a caller-supplied authority flag.
+  $lease=$null;$hasher=$null
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath){return $false}
+    $collector='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work/check-source15-metadata-preparation-20261010.ps1'
+    $expected='AB3ABA6DA14BE2098B2D9E678701E10545A3ACE61C350EB26A7B152EA9B94ED2'
+    $ancestor=[IO.Path]::GetFullPath($collector)
+    while($ancestor) {
+      if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+      $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+    }
+    $lease=[IO.File]::Open($collector,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    $hasher=[Security.Cryptography.SHA256]::Create()
+    if([BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected){return $false}
+    $result=@(& $collector -Phase $Phase -ExpectedCollectorSha256 $expected);$completed=$?
+    $lease.Position=0
+    if(-not $completed -or [BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected -or
+        $result.Count -ne 1 -or $result[0] -isnot [string]){return $false}
+    $proof=Read-OctoberCompatibilityJsonObject -Bytes ([Text.Encoding]::UTF8.GetBytes($result[0]))
+    $names=@('Operation','Phase','Observations','Head','ProvisionSha256','CollectorSha256','RepairAdmitted',
+      'CommitAdmitted','QualificationPassed','ApkAuthority','WriterScope')
+    if($null -eq $proof -or (@($proof.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($names|Sort-Object) -join '|') -or
+        ($proof.Observations -isnot [int] -and $proof.Observations -isnot [long]) -or $proof.Observations -ne 3){return $false}
+    $pins=@{Operation='read_only_source15_metadata_preparation';Phase=$Phase;Head='3c3f38136db8bb184866635203d04ea4643f1eac';
+      ProvisionSha256='FC68FA80D44ADE6738D67894451FC03D6E09B60B3B6F6AE5C7D4DAE9CE00D459';CollectorSha256=$expected;
+      WriterScope='Cooperative support/claim locks, not universal writer inactivity'}
+    foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $false}}
+    foreach($name in @('RepairAdmitted','CommitAdmitted','QualificationPassed','ApkAuthority')) {
+      if($proof.$name -isnot [bool] -or $proof.$name){return $false}
+    }
+    return $true
+  }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+
+function Test-OctoberCompatibilityCurrentPreparation([string]$Phase) {
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $before=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}
+      else{(Get-FileHash -LiteralPath (Join-Path $root $owner) -Algorithm SHA256).Hash}
+    $contract=if($Phase -ceq 'pre_commit'){Read-OctoberCompatibilityCurrentQualificationContract -FromIndex}
+      else{Read-OctoberCompatibilityCurrentQualificationContract -FromWorkingTree}
+    $successor=if($Phase -ceq 'pre_commit'){Read-OctoberCompatibilityCurrentSuccessorSpecification -FromIndex}
+      else{Read-OctoberCompatibilityCurrentSuccessorSpecification -FromWorkingTree}
+    if($null -eq $contract -or $null -eq $successor -or -not(Test-OctoberCompatibilitySource15Preparation $Phase)){return $false}
+    $after=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}
+      else{(Get-FileHash -LiteralPath (Join-Path $root $owner) -Algorithm SHA256).Hash}
+    $again=if($Phase -ceq 'pre_commit'){Read-OctoberCompatibilityCurrentQualificationContract -FromIndex}
+      else{Read-OctoberCompatibilityCurrentQualificationContract -FromWorkingTree}
+    $successorAgain=if($Phase -ceq 'pre_commit'){Read-OctoberCompatibilityCurrentSuccessorSpecification -FromIndex}
+      else{Read-OctoberCompatibilityCurrentSuccessorSpecification -FromWorkingTree}
+    return $before -ceq $after -and $null -ne $again -and $null -ne $successorAgain
+  }catch{return $false}
+}
+
+function Read-OctoberCompatibilityCurrentSourceState {
+  param([hashtable]$History,[string]$Phase,[switch]$ReadOnlyQualifiedSource)
+  try {
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath -or $null -eq $History -or $History.Stage -isnot [int]){return $null}
+    $readOnly=[bool]$ReadOnlyQualifiedSource
+    if($readOnly){if($History.Stage -ne 19 -or $Phase -cne 'qualification'){return $null}}
+    elseif($Phase -cnotin @('implementation','pre_commit') -or $History.Stage -notin @(17,18)){return $null}
+    # The independently callable guard must reject overrides before any Git read.
+    if(@(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
+    function Test-CurrentSourceGitBoundary {
+      $common='C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION/.git'
+      $gitDirectory=$common+'/worktrees/'+(Split-Path -Leaf $root)
+      foreach($query in @(
+        @{Arguments=@('rev-parse','--show-toplevel');Expected=$binding.worktreePath},
+        @{Arguments=@('rev-parse','--absolute-git-dir');Expected=$gitDirectory},
+        @{Arguments=@('rev-parse','--path-format=absolute','--git-common-dir');Expected=$common})) {
+        $value=@(Get-OctoberCompatibilityGitLines $query.Arguments)
+        if($value.Count -ne 1 -or $value[0].Replace('\','/').TrimEnd('/') -cne $query.Expected){return $false}
+      }
+      if((@(Get-OctoberCompatibilityGitLines @('rev-parse','--is-shallow-repository')) -join '') -cne 'false' -or
+         (@(Get-OctoberCompatibilityGitLines @('config','--bool','--default=false','--get','core.sparseCheckout')) -join '') -cne 'false'){return $false}
+      foreach($state in @('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','index.lock','rebase-merge','rebase-apply','sequencer','info/grafts')) {
+        $pending=@(Get-OctoberCompatibilityGitLines @('rev-parse','--path-format=absolute','--git-path',$state))
+        $expectedPath=if($state -ceq 'info/grafts'){$common+'/'+$state}else{$gitDirectory+'/'+$state}
+        if($pending.Count -ne 1 -or -not [IO.Path]::IsPathRooted($pending[0]) -or
+           $pending[0].Replace('\','/') -cne $expectedPath -or (Test-Path -LiteralPath $pending[0])){return $false}
+      }
+      foreach($boundaryPath in @($root,$common,$gitDirectory)) {
+        $ancestor=[IO.Path]::GetFullPath($boundaryPath)
+        while($ancestor) {
+          if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+          $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+        }
+      }
+      return $true
+    }
+    if(-not (Test-CurrentSourceGitBoundary)){return $null}
+    if(@(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count){return $null}
+    $head=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
+    $branch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
+    if($head.Count -ne 1 -or $head[0] -cne $History.Head -or $branch.Count -ne 1 -or $branch[0] -cne $binding.branch){return $null}
+    $observed=Get-OctoberCompatibilityHistoryStage $head[0]
+    if($observed.Stage -ne $History.Stage -or ($observed.Commits -join '|') -cne ($History.Commits -join '|')){return $null}
+    $contractCommit=[string]$observed.Commits[16]
+    if($null -eq (Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $contractCommit)){return $null}
+    $doc='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $layout='apps/mobile/test/work_workspace_layout_safety_test.dart'
+    $allowed=if($observed.Stage -eq 17){$layout}else{$doc}
+    $owners=@(Get-OctoberCompatibilityAmendmentOwners)+@($layout)
+    $readOnlyPins=@{}
+    if($readOnly) {
+      $readOnlyPins=@{'config/codex-subagent-coordination-policy.json'='84C191D84F5973126969568CC979B245233972BD5FF185BC599F51B4FCAFC8B3';
+        'config/codex-development-regression-registry.json'='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'}
+      $owners+=@($readOnlyPins.Keys)
+    }
+    $before=@{}
+    foreach($owner in $owners) {
+      $path=Join-Path $root $owner;$ancestor=[IO.Path]::GetFullPath($path)
+      while($ancestor) {
+        if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $null}
+        $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+      }
+      $before[$owner]=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+      if($readOnlyPins.ContainsKey($owner) -and $before[$owner] -cne $readOnlyPins[$owner]){return $null}
+    }
+    $indexBefore=@(Get-OctoberCompatibilityGitLines @('ls-files','--stage')) -join "`n"
+    $flagsBefore=@(Get-OctoberCompatibilityGitLines @('ls-files','-v')) -join "`n"
+    $unstaged=@(Get-OctoberCompatibilityGitLines @('diff','--name-only','--diff-filter=ACMRTUXBD'))
+    $staged=@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only','--diff-filter=ACMRTUXBD'))
+    if(@(Get-OctoberCompatibilityGitLines @('ls-files','--unmerged')).Count -or
+       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -or
+       @($flagsBefore -split "`n"|Where-Object {$_ -cmatch '\A(?:[a-z]|S) '}).Count){return $null}
+    if($readOnly) {
+      if($staged.Count -or $unstaged.Count -or
+         (@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$doc))) -join '') -cne
+         (@(Get-OctoberCompatibilityGitLines @('rev-parse',($head[0]+':'+$doc))) -join '')){return $null}
+    }elseif($Phase -ceq 'implementation') {
+      if($staged.Count -or @($unstaged|Where-Object {$_ -cne $allowed}).Count -or $unstaged.Count -gt 1){return $null}
+      if((@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$allowed))) -join '') -cne
+         (@(Get-OctoberCompatibilityGitLines @('rev-parse',($head[0]+':'+$allowed))) -join '')){return $null}
+    }else{
+      if($unstaged.Count -or $staged.Count -ne 1 -or $staged[0] -cne $allowed){return $null}
+      if((@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$allowed))) -join '') -cne
+         (@(Get-OctoberCompatibilityGitLines @('hash-object','--',$allowed)) -join '')){return $null}
+    }
+    if($observed.Stage -eq 17 -and $Phase -ceq 'implementation' -and
+       (@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$layout))) -join '') -cne
+       'd03a41613b82dfb01d2c55cf57ae5cb7fc34bb2a'){return $null}
+    # Q permission is append-only. Neither clauses nor immutable contract blocks
+    # can be deleted/reworded merely because the document is the allowed owner.
+    $baseText=(@(Get-OctoberCompatibilityGitLines @('show',($contractCommit+':'+$doc))) -join "`n").TrimEnd("`n")
+    $workingText=(Get-Content -LiteralPath (Join-Path $root $doc) -Raw -Encoding UTF8).Replace("`r`n","`n").TrimEnd("`n")
+    $indexText=(@(Get-OctoberCompatibilityGitLines @('show',(':'+$doc))) -join "`n").TrimEnd("`n")
+    $qPrefix=$baseText+"`n`n### Current frontend qualification proof`n`n"
+    foreach($text in @($workingText,$indexText)) {
+      if($readOnly -and -not $text.StartsWith($qPrefix,[StringComparison]::Ordinal)){return $null}
+      if($text -cne $baseText -and ($observed.Stage -notin @(18,19) -or -not $text.StartsWith($qPrefix,[StringComparison]::Ordinal))){return $null}
+    }
+    if($null -eq (Read-OctoberCompatibilityCurrentSuccessorSpecification -FromWorkingTree) -or
+       $null -eq (Read-OctoberCompatibilityCurrentSuccessorSpecification -FromIndex)){return $null}
+    if((@(Get-OctoberCompatibilityGitLines @('ls-files','--stage')) -join "`n") -cne $indexBefore -or
+       (@(Get-OctoberCompatibilityGitLines @('ls-files','-v')) -join "`n") -cne $flagsBefore -or
+       (@(Get-OctoberCompatibilityGitLines @('diff','--name-only','--diff-filter=ACMRTUXBD')) -join '|') -cne ($unstaged -join '|') -or
+       (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only','--diff-filter=ACMRTUXBD')) -join '|') -cne ($staged -join '|') -or
+       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -or
+       (@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD')) -join '') -cne $head[0] -or
+       (@(Get-OctoberCompatibilityGitLines @('branch','--show-current')) -join '') -cne $branch[0]){return $null}
+    foreach($owner in $owners){
+      $path=Join-Path $root $owner;$ancestor=[IO.Path]::GetFullPath($path)
+      while($ancestor) {
+        if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $null}
+        $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+      }
+      if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -cne $before[$owner]){return $null}
+    }
+    # Recollect enclosing Git state after the selected source and owner reads.
+    # This is a bounded observation fence, not a claim of universal writer exclusion.
+    if(-not (Test-CurrentSourceGitBoundary)){return $null}
+    $identity=@{Head=$head[0];Branch=$branch[0];Stage=$observed.Stage;Phase=$Phase;ReadOnly=$readOnly;ContractCommit=$contractCommit;
+      Index=$indexBefore;Flags=$flagsBefore;WorkingHashes=$before;Staged=$staged;Unstaged=$unstaged}|ConvertTo-Json -Depth 8 -Compress
+    return [pscustomobject]@{Verified=$true;ReadOnly=$readOnly;Identity=(Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($identity)))}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentCaptureSource {
+  # No source identity parameters: derive every role from sealed current history.
+  # Ordinary ownership/incremental/memory gates still precede producer side effects.
+  try {
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath -or
+       @(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
+    $head=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
+    if($head.Count -ne 1 -or $head[0] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    $history=Get-OctoberCompatibilityHistoryStage $head[0]
+    if($history.Stage -isnot [int] -or $history.Stage -ne 18 -or $history.Head -cne $head[0] -or
+       @($history.Commits).Count -ne 18 -or $history.Commits[17] -cne $head[0]){return $null}
+    $initial=Read-OctoberCompatibilityCurrentSourceState -History $history -Phase implementation
+    if($null -eq $initial -or $initial.Verified -isnot [bool] -or -not $initial.Verified -or
+       $initial.Identity -isnot [string] -or $initial.Identity -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+    if((@(Get-OctoberCompatibilityGitLines @('branch','--show-current')) -join '') -cne $binding.branch -or
+       @(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count){return $null}
+    $metadata=[string]$history.Commits[16]
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $metadata
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $metadata
+    if($null -eq $spec -or $null -eq $contract){return $null}
+    $producer='scripts/test-codex-integration-repair-coordination-policy.ps1'
+    $tree=@(Get-OctoberCompatibilityGitLines @('rev-parse',($head[0]+'^{tree}')))
+    $blob=@(Get-OctoberCompatibilityGitLines @('rev-parse',($head[0]+':'+$producer)))
+    if($tree.Count -ne 1 -or $tree[0] -cnotmatch '\A[0-9a-f]{40}\z' -or
+       $blob.Count -ne 1 -or $blob[0] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    foreach($query in @(
+      @('rev-parse',($metadata+':'+$producer)),@('rev-parse',(':'+$producer)),@('hash-object','--',$producer))) {
+      if((@(Get-OctoberCompatibilityGitLines $query) -join '') -cne $blob[0]){return $null}
+    }
+    $runtime=@(Get-OctoberCompatibilityGitLines @('rev-parse',($head[0]+':apps/mobile/lib'),'3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib'))
+    if($runtime.Count -ne 2 -or $runtime[0] -cne $contract.source15RuntimeLibTree -or $runtime[1] -cne $runtime[0]){return $null}
+    $pins=@{'config/codex-subagent-coordination-policy.json'='84C191D84F5973126969568CC979B245233972BD5FF185BC599F51B4FCAFC8B3';
+      'config/codex-development-regression-registry.json'='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'}
+    function Test-CurrentCaptureSourcePins {
+      foreach($owner in $pins.Keys) {
+        $path=Join-Path $root $owner;$ancestor=[IO.Path]::GetFullPath($path)
+        while($ancestor) {
+          if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+          $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+        }
+        if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -cne $pins[$owner]){return $false}
+      }
+      return $true
+    }
+    if(-not (Test-CurrentCaptureSourcePins)){return $null}
+    $final=Read-OctoberCompatibilityCurrentSourceState -History $history -Phase implementation
+    if($null -eq $final -or $final.Verified -isnot [bool] -or -not $final.Verified -or $final.Identity -cne $initial.Identity -or
+       (@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD')) -join '') -cne $head[0] -or
+       @(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count){return $null}
+    if(-not (Test-CurrentCaptureSourcePins)){return $null}
+    return [pscustomobject]@{SourceIdentity=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';
+      contractCommit=$metadata;captureSourceCommit=$head[0];captureSourceTree=$tree[0];producerBlob=$blob[0];executionHead=$head[0]};
+      SourceStateIdentity=$initial.Identity;History=$history;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Test-OctoberCompatibilityCurrentSourceState {
+  param([hashtable]$History,[string]$Phase)
+  $proof=Read-OctoberCompatibilityCurrentSourceState -History $History -Phase $Phase
+  return $null -ne $proof -and $proof.Verified -is [bool] -and $proof.Verified
 }
 
 function Test-OctoberCompatibilityScopePreparation([string]$Phase) {
@@ -1571,6 +2320,121 @@ function Read-OctoberCompatibilityReportEvents {
   } catch { return $null }
 }
 
+function Read-OctoberCompatibilityCurrentTestSourceLocation {
+  param([object]$Test,[string]$ExpectedSuite)
+  # Native declaration references are not body association or clause evidence.
+  try {
+    if($null -eq $Test -or [string]::IsNullOrWhiteSpace($ExpectedSuite) -or
+       -not [IO.Path]::IsPathRooted($ExpectedSuite)){return $null}
+    $expected=[IO.Path]::GetFullPath($ExpectedSuite)
+    $tuples=@{}
+    foreach($prefix in @('','root_')) {
+      $tuple=@{Line=$null;Column=$null;Url=$null;Supplied=$false;Complete=$false}
+      foreach($field in @('line','column','url')) {
+        $property=$Test.PSObject.Properties[$prefix+$field]
+        if($null -eq $property){continue}
+        $tuple.Supplied=$true;$value=$property.Value
+        if($null -eq $value){continue}
+        if($field -ceq 'url') {
+          $uri=$null
+          if($value -isnot [string] -or -not [uri]::TryCreate($value,[UriKind]::Absolute,[ref]$uri) -or
+             -not [string]::IsNullOrEmpty($uri.Query) -or -not [string]::IsNullOrEmpty($uri.Fragment)){return $null}
+          $tuple.Url=$value
+        }else{
+          if(($value -isnot [int] -and $value -isnot [long]) -or $value -le 0){return $null}
+          if($field -ceq 'line'){$tuple.Line=$value}else{$tuple.Column=$value}
+        }
+      }
+      $tuple.Complete=($null -ne $tuple.Line -and $null -ne $tuple.Column -and $null -ne $tuple.Url)
+      $tuples[$prefix]=$tuple
+    }
+    $selected=if($tuples['root_'].Supplied){'root_'}else{''}
+    $reference=$tuples[$selected];$verified=$false;$path=$null
+    if($reference.Complete) {
+      $uri=[uri]$reference.Url
+      if($uri.IsFile -and -not $uri.IsUnc) {
+        $path=[IO.Path]::GetFullPath($uri.LocalPath)
+        $verified=[StringComparer]::OrdinalIgnoreCase.Equals($path,$expected)
+      }
+    }
+    return [pscustomobject]@{Direct=$tuples[''];Root=$tuples['root_'];SelectedTuple=$selected;
+      SelectedPath=$path;SelectionReason=$(if($selected -ceq 'root_'){'native root tuple supplied; no direct fallback'}else{'native direct tuple'});
+      DeclarationLocationReferenceVerified=$verified;TestBodyAssociationVerified=$false;
+      ClauseMeaningVerified=$false;QualificationPassed=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentExecutionEvents {
+  param([object[]]$Events,[object]$Capture,[string]$ReportId,[string]$ExecutionId,[string]$Mode,[string]$RunId,
+    [hashtable]$SourceIdentity,[string]$LogSha,[object]$SelectedSlots=@(),[object]$SelectedTestKeys=@(),
+    [string]$SelectionContextPath='',[string]$SelectionContextSha256='')
+  # Validate one current execution. Designated two-cycle success, skip disposition,
+  # source assertions and inspected artifacts remain independent requirements.
+  try {
+    if(-not (Test-OctoberCompatibilityCurrentExecutionReceipt -Capture $Capture -ReportId $ReportId -ExecutionId $ExecutionId `
+      -Mode $Mode -RunId $RunId -SourceIdentity $SourceIdentity -LogSha $LogSha -SelectedSlots $SelectedSlots -SelectedTestKeys $SelectedTestKeys)){return $null}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId -Mode $Mode -RunId $RunId `
+      -SourceIdentity $SourceIdentity -SelectedSlots $SelectedSlots -SelectedTestKeys $SelectedTestKeys
+    if($null -eq $plan -or $null -eq $Events -or $Events.Count -lt 3){return $null}
+    if($Mode -ceq 'selected_visual_risks' -and $SelectionContextPath -cne
+      ('apps/mobile/build/compat-current-'+$ReportId+'-'+$ExecutionId+'-'+$RunId+'.jsonl.selection.json')){return $null}
+    if(-not(Test-OctoberCompatibilityCurrentSelectionEventSequence -Events $Events -Mode $Mode `
+      -SelectionContextPath $SelectionContextPath -SelectionContextSha256 $SelectionContextSha256)){return $null}
+    $marker=$Events[0];$fields=@('type','schemaVersion','reportId','executionId','mode','runId','sourceIdentity','registrySha256','runtimeDefines')
+    if($null -eq $marker -or (@($marker.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+       ($marker.schemaVersion -isnot [int] -and $marker.schemaVersion -isnot [long]) -or $marker.schemaVersion -ne 2){return $null}
+    $pins=@{type='moolsocialSource';reportId=$ReportId;executionId=$ExecutionId;mode=$Mode;runId=$RunId;
+      registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'}
+    foreach($field in $pins.Keys){if($marker.$field -isnot [string] -or $marker.$field -cne $pins[$field]){return $null}}
+    if($null -eq $marker.sourceIdentity -or (@($marker.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+    foreach($role in $SourceIdentity.Keys){if($marker.sourceIdentity.$role -isnot [string] -or $marker.sourceIdentity.$role -cne $SourceIdentity[$role]){return $null}}
+    if($marker.runtimeDefines -isnot [array] -or $marker.runtimeDefines.Count -ne $plan.RuntimeDefines.Count){return $null}
+    for($i=0;$i -lt $plan.RuntimeDefines.Count;$i++){if($marker.runtimeDefines[$i] -isnot [string] -or $marker.runtimeDefines[$i] -cne $plan.RuntimeDefines[$i]){return $null}}
+    $suites=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+    $tests=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $loaders=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    for($index=0;$index -lt $Events.Count;$index++) {
+      $event=$Events[$index]
+      if($null -eq $event -or $event.type -isnot [string] -or ($index -gt 0 -and $event.type -ceq 'moolsocialSource')){return $null}
+      switch -CaseSensitive ($event.type) {
+        'suite' {
+          if(($event.suite.id -isnot [int] -and $event.suite.id -isnot [long]) -or $event.suite.path -isnot [string]){return $null}
+          $suites.Add([string]$event.suite.id,$event.suite.path.Replace('\','/'))
+        }
+        'testStart' {
+          if(($event.test.id -isnot [int] -and $event.test.id -isnot [long]) -or
+             ($event.test.suiteID -isnot [int] -and $event.test.suiteID -isnot [long]) -or $event.test.name -isnot [string] -or
+             -not $suites.ContainsKey([string]$event.test.suiteID)){return $null}
+          $location=Read-OctoberCompatibilityCurrentTestSourceLocation -Test $event.test -ExpectedSuite $suites[[string]$event.test.suiteID]
+          if($null -eq $location){return $null}
+          $tests.Add([string]$event.test.id,@{Name=$event.test.name;Suite=[string]$event.test.suiteID;DeclarationLocation=$location})
+        }
+        'testDone' {
+          if(($event.testID -isnot [int] -and $event.testID -isnot [long]) -or $event.result -isnot [string] -or
+             $event.hidden -isnot [bool] -or $event.skipped -isnot [bool] -or -not $tests.ContainsKey([string]$event.testID)){return $null}
+          $test=$tests[[string]$event.testID]
+          if($test.Name -ceq ('loading '+$suites[$test.Suite])) {
+            if($event.result -cne 'success' -or $event.skipped -or -not $event.hidden -or -not $loaders.Add($test.Suite)){return $null}
+          }elseif($event.hidden){return $null}
+        }
+      }
+    }
+    if($suites.Count -ne $loaders.Count){return $null}
+    $validated=Read-OctoberCompatibilityReportEvents -Events $Events -RequiredSuites @($plan.Suites) -SourceRoot (Get-OctoberCompatibilityBinding).worktreePath
+    if($null -eq $validated){return $null}
+    if($ExecutionId -ceq 'default') {
+      $minimum=@{publication_contracts=92;impacted_store_buy=984;store_layout_and_recovery=40;enabled_review_fixture=14}
+      if($validated.Completed -lt $minimum[$ReportId]){return $null}
+    }else{
+      if($plan.Suites.Count -ne 1 -or $validated.Skipped.Count -or $validated.Completed -ne $plan.RequiredNames.Count){return $null}
+      foreach($name in $plan.RequiredNames){if(-not $validated.Successes.Contains($plan.Suites[0]+':'+$name)){return $null}}
+    }
+    $validated.QualificationPassed=$false
+    $validated.TestIdentities=$tests
+    return $validated
+  }catch{return $null}
+}
+
 function Read-OctoberCompatibilityExecutionEvents {
   param([object[]]$Events,[object]$Capture,[string]$ReportId,[string]$ExecutionId,
     [string]$Source,[string]$Tree,[string]$RegistrySha,[string]$ProducerBlob,[string]$LogSha)
@@ -1653,6 +2517,1311 @@ function Get-OctoberCompatibilityByteHash([byte[]]$Bytes) {
   $sha=[Security.Cryptography.SHA256]::Create()
   try {return [BitConverter]::ToString($sha.ComputeHash($Bytes)).Replace('-','')}
   finally {$sha.Dispose()}
+}
+
+function Read-OctoberCompatibilityCurrentExecutionEvidence {
+  param([object]$Evidence,[string]$ReportId,[string]$ExecutionId,[string]$Mode,[string]$RunId,
+    [hashtable]$SourceIdentity,[object]$SelectedSlots=@(),[object]$SelectedTestKeys=@())
+  # Expected identities and reviewed selection come from the sealed source and
+  # inventory, never from the sidecar being checked. This proves one retained
+  # execution only; qualification and inspected visual coverage are separate.
+  try {
+    $fields=@('executionId','path','capturePath','sha256','captureSha256','runtimeDefines')
+    if($null -eq $Evidence -or (@($Evidence.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+      $Evidence.executionId -isnot [string] -or $Evidence.executionId -cne $ExecutionId -or
+      $Evidence.path -isnot [string] -or $Evidence.path -cnotmatch '\Aapps/mobile/build/[a-z0-9][a-z0-9._-]+\.jsonl\z' -or
+      $Evidence.capturePath -isnot [string] -or $Evidence.capturePath -cne ($Evidence.path+'.capture.json') -or
+      $Evidence.sha256 -isnot [string] -or $Evidence.sha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+      $Evidence.captureSha256 -isnot [string] -or $Evidence.captureSha256 -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $ReportId -ExecutionId $ExecutionId -Mode $Mode -RunId $RunId `
+      -SourceIdentity $SourceIdentity -SelectedSlots $SelectedSlots -SelectedTestKeys $SelectedTestKeys
+    if($null -eq $plan -or $Evidence.runtimeDefines -isnot [array] -or $Evidence.runtimeDefines.Count -ne $plan.RuntimeDefines.Count){return $null}
+    for($i=0;$i -lt $plan.RuntimeDefines.Count;$i++) {
+      if($Evidence.runtimeDefines[$i] -isnot [string] -or $Evidence.runtimeDefines[$i] -cne $plan.RuntimeDefines[$i]){return $null}
+    }
+    $base=[IO.Path]::GetFullPath((Get-OctoberCompatibilityBinding).worktreePath).TrimEnd([char[]]@('\','/'))
+    $paths=@{}
+    foreach($pair in @(@{Name='log';Relative=$Evidence.path},@{Name='capture';Relative=$Evidence.capturePath},@{Name='stderr';Relative=($Evidence.path+'.stderr.txt')})) {
+      $path=[IO.Path]::GetFullPath((Join-Path $base $pair.Relative))
+      if(-not $path.StartsWith($base+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
+        -not(Test-Path -LiteralPath $path -PathType Leaf)){return $null}
+      $paths[$pair.Name]=$path
+    }
+    $before=@{};$buffers=@{}
+    foreach($name in @('log','capture','stderr')) {
+      $before[$name]=Get-OctoberCoverageBoundHash $paths[$name]
+      if($before[$name] -isnot [string] -or $before[$name] -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+      $buffers[$name]=[IO.File]::ReadAllBytes($paths[$name])
+      if((Get-OctoberCompatibilityByteHash $buffers[$name]) -cne $before[$name]){return $null}
+    }
+    if($before.log -cne $Evidence.sha256 -or $before.capture -cne $Evidence.captureSha256){return $null}
+    $capture=Read-OctoberCompatibilityJsonObject -Bytes $buffers.capture
+    if($null -eq $capture -or $capture.stderrPath -isnot [string] -or $capture.stderrPath -cne ($Evidence.path+'.stderr.txt') -or
+      $capture.stderrSha256 -isnot [string] -or $capture.stderrSha256 -cne $before.stderr){return $null}
+    $utf8=[Text.UTF8Encoding]::new($false,$true)
+    $events=[Collections.Generic.List[object]]::new()
+    $reader=[IO.StringReader]::new($utf8.GetString($buffers.log))
+    try {
+      while($null -ne ($line=$reader.ReadLine())) {
+        $event=Read-OctoberCompatibilityJsonObject -Bytes $utf8.GetBytes($line)
+        if($null -eq $event -or $event -is [array]){return $null}
+        $events.Add($event)
+      }
+    }finally{$reader.Dispose()}
+    $selectionProof=$null;$selectionContextPath='';$selectionContextSha256='';$selectionPins=@{}
+    if($Mode -ceq 'selected_visual_risks') {
+      # Bootstrap only from the already hash-verified log buffer. This extraction
+      # does not itself establish protocol success or sidecar/source admission.
+      $selectionContextPath=$Evidence.path+'.selection.json'
+      if($events.Count -lt 2 -or $null -eq $events[1].selectionContext){return $null}
+      $selectionContextSha256=$events[1].selectionContext.sha256
+      if(-not(Test-OctoberCompatibilityCurrentSelectionEventSequence -Events $events.ToArray() -Mode $Mode `
+        -SelectionContextPath $selectionContextPath -SelectionContextSha256 $selectionContextSha256)){return $null}
+      $selectionProof=Read-OctoberCompatibilityCurrentSelectionContextFile -RelativePath $selectionContextPath `
+        -ExpectedSha256 $selectionContextSha256 -ReportId $ReportId -ExecutionId $ExecutionId -RunId $RunId -SourceIdentity $SourceIdentity
+      if($null -eq $selectionProof -or
+        (ConvertTo-Json -InputObject @($SelectedSlots) -Compress) -cne (ConvertTo-Json -InputObject @($selectionProof.Selection.SelectedSlots) -Compress) -or
+        (ConvertTo-Json -InputObject @($SelectedTestKeys) -Compress) -cne (ConvertTo-Json -InputObject @($selectionProof.Selection.SelectedTestKeys) -Compress)){return $null}
+      $selectionPins[$selectionProof.CanonicalPath]=$selectionProof.Sha256
+      $selectionPins[$selectionProof.InventoryCanonicalPath]=$selectionProof.InventorySha256
+    }
+    $validated=Read-OctoberCompatibilityCurrentExecutionEvents -Capture $capture -Events $events.ToArray() `
+      -ReportId $ReportId -ExecutionId $ExecutionId -Mode $Mode -RunId $RunId -SourceIdentity $SourceIdentity -LogSha $before.log `
+      -SelectedSlots $SelectedSlots -SelectedTestKeys $SelectedTestKeys `
+      -SelectionContextPath $selectionContextPath -SelectionContextSha256 $selectionContextSha256
+    if($null -eq $validated){return $null}
+    $renderBindings=$null
+    if($Mode -ceq 'selected_visual_risks') {
+      # Direct composition from THIS original-hash-checked native log and its
+      # actual sidecar/inventory, not document-supplied events or global success.
+      $renderBindings=Read-OctoberCompatibilityCurrentSelectedRenderBindings -Events $events.ToArray() `
+        -Context $selectionProof.Context -Inventory $selectionProof.Inventory -SourceIdentity $SourceIdentity -SuccessfulKeys $validated.Successes
+      if($null -eq $renderBindings -or $renderBindings.RecordedRenderBindingsVerified -isnot [bool] -or
+        -not $renderBindings.RecordedRenderBindingsVerified){return $null}
+    }
+    foreach($name in @('log','capture','stderr')) {
+      if((Get-OctoberCoverageBoundHash $paths[$name]) -cne $before[$name]){return $null}
+    }
+    foreach($path in $selectionPins.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $selectionPins[$path]){return $null}}
+    $validated.CurrentSelectionBinding=$selectionProof
+    $validated.RetainedSelectionFileHashes=$selectionPins
+    $validated.RetainedFileHashes=$before
+    $validated.RetainedFilePaths=$paths.Clone()
+    if($Mode -ceq 'selected_visual_risks') {
+      foreach($path in $renderBindings.OriginalFileHashes.Keys) {
+        if((Get-OctoberCoverageBoundHash $path) -cne $renderBindings.OriginalFileHashes[$path]){return $null}
+      }
+      $validated.CurrentRenderBindings=$renderBindings
+    }
+    return $validated
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentRetainedSelectionBindings {
+  param([object]$Inventory,[object]$Executions,[hashtable]$SourceIdentity)
+  # Compose already-read execution bindings only. This does not establish clause
+  # meaning, representative equivalence, actual geometry or visual inspection.
+  try {
+    if($Inventory -isnot [array] -or $Inventory.Count -lt 1 -or $Inventory.Count -gt 65 -or
+      $Executions -isnot [array] -or $Executions.Count -lt 1 -or $Executions.Count -gt 4 -or $null -eq $SourceIdentity){return $null}
+    $base=[IO.Path]::GetFullPath((Get-OctoberCompatibilityBinding).worktreePath).TrimEnd([char[]]@('\','/'))
+    $profiles=@($Inventory|ForEach-Object {$_.representative.executionId}|Sort-Object -Unique)
+    if($profiles.Count -ne $Executions.Count){return $null}
+    $byProfile=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $pins=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($execution in $Executions) {
+      if($null -eq $execution -or $null -eq $execution.CurrentSelectionBinding){return $null}
+      $binding=$execution.CurrentSelectionBinding;$context=$binding.Context
+      if($null -eq $context -or $context.mode -cne 'selected_visual_risks' -or $context.reportId -cne 'store_layout_and_recovery' -or
+        $context.runId -isnot [string] -or $context.runId -cnotmatch '\Acurrent-[0-9a-f]{32}\z' -or
+        $context.executionId -isnot [string] -or $profiles -cnotcontains $context.executionId -or $byProfile.ContainsKey($context.executionId) -or
+        (ConvertTo-Json -InputObject $binding.Inventory -Depth 100 -Compress) -cne (ConvertTo-Json -InputObject $Inventory -Depth 100 -Compress)){return $null}
+      if((@($context.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+      foreach($role in $SourceIdentity.Keys){if($context.sourceIdentity.$role -isnot [string] -or $context.sourceIdentity.$role -cne $SourceIdentity[$role]){return $null}}
+      $canonical=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $Inventory -ExecutionId $context.executionId -SourceIdentity $SourceIdentity
+      if($null -eq $canonical -or $null -eq $binding.Selection){return $null}
+      [string[]]$riskIds=@($canonical.SelectedRisks|ForEach-Object {$_.id});[Array]::Sort($riskIds,[StringComparer]::Ordinal)
+      foreach($pair in @(@{Field='selectedSlots';Expected=@($canonical.SelectedSlots)},
+        @{Field='selectedTestKeys';Expected=@($canonical.SelectedTestKeys)},@{Field='selectedRiskIds';Expected=@($riskIds)})) {
+        if($context.($pair.Field) -isnot [array] -or
+          (ConvertTo-Json -InputObject $context.($pair.Field) -Compress) -cne (ConvertTo-Json -InputObject $pair.Expected -Compress)){return $null}
+      }
+      foreach($field in @('SelectedSlots','SelectedTestKeys','SelectedRisks')) {
+        if((ConvertTo-Json -InputObject $binding.Selection[$field] -Depth 100 -Compress) -cne
+          (ConvertTo-Json -InputObject $canonical[$field] -Depth 100 -Compress)){return $null}
+      }
+      foreach($risk in $canonical.SelectedRisks){if($null -eq $execution.Successes -or -not $execution.Successes.Contains($risk.representative.testKey)){return $null}}
+      $relative='apps/mobile/build/compat-current-store_layout_and_recovery-'+$context.executionId+'-'+$context.runId+'.jsonl'
+      if($binding.RelativePath -cne ($relative+'.selection.json') -or
+        $binding.CanonicalPath -cne [IO.Path]::GetFullPath((Join-Path $base ($relative+'.selection.json')))){return $null}
+      $candidates=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      if($null -eq $execution.RetainedFilePaths -or $null -eq $execution.RetainedFileHashes -or
+        (@($execution.RetainedFilePaths.Keys|Sort-Object) -join '|') -cne 'capture|log|stderr' -or
+        (@($execution.RetainedFileHashes.Keys|Sort-Object) -join '|') -cne 'capture|log|stderr'){return $null}
+      foreach($role in @('log','capture','stderr')) {
+        $suffix=if($role -ceq 'log'){''}elseif($role -ceq 'capture'){'.capture.json'}else{'.stderr.txt'}
+        $path=[IO.Path]::GetFullPath((Join-Path $base ($relative+$suffix)))
+        if($execution.RetainedFilePaths[$role] -cne $path){return $null}
+        $candidates.Add($path,$execution.RetainedFileHashes[$role])
+      }
+      $selectionPins=$execution.RetainedSelectionFileHashes
+      if($null -eq $selectionPins -or $selectionPins.Count -ne 2 -or
+        -not $selectionPins.ContainsKey($binding.CanonicalPath) -or -not $selectionPins.ContainsKey($binding.InventoryCanonicalPath) -or
+        $selectionPins[$binding.CanonicalPath] -cne $binding.Sha256 -or
+        $selectionPins[$binding.InventoryCanonicalPath] -cne $binding.InventorySha256){return $null}
+      foreach($path in $selectionPins.Keys){$candidates.Add($path,$selectionPins[$path])}
+      # Carry the actual retained reader's artifact originals into the aggregate
+      # final fence; never replace them with newly observed screenshot hashes.
+      $render=$execution.CurrentRenderBindings
+      if($null -eq $render -or $render.RecordedRenderBindingsVerified -isnot [bool] -or
+        -not $render.RecordedRenderBindingsVerified -or
+        $render.RenderedSlots -isnot [Collections.IDictionary] -or
+        $render.OriginalFileHashes -isnot [Collections.IDictionary] -or
+        $render.RenderedSlots.Count -ne $canonical.SelectedRisks.Count -or
+        $render.OriginalFileHashes.Count -ne (2*$canonical.SelectedRisks.Count)){return $null}
+      $slotOriginals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      foreach($risk in $canonical.SelectedRisks) {
+        $slot=$risk.representative.slotId
+        if(-not $render.RenderedSlots.ContainsKey($slot)){return $null}
+        $row=$render.RenderedSlots[$slot]
+        if($null -eq $row -or $row.RiskId -cne $risk.id -or
+          $row.TestKey -cne $risk.representative.testKey){return $null}
+        if($null -eq $row.GeometryBinding -or
+          $row.GeometryBinding.OriginalFileHashes -isnot [Collections.IDictionary] -or
+          $row.GeometryBinding.OriginalFileHashes.Count -ne 2){return $null}
+        foreach($path in $row.GeometryBinding.OriginalFileHashes.Keys) {
+          $hash=$row.GeometryBinding.OriginalFileHashes[$path]
+          if($slotOriginals.ContainsKey($path) -or -not $render.OriginalFileHashes.ContainsKey($path) -or
+            $hash -isnot [string] -or $hash -cne $render.OriginalFileHashes[$path]){return $null}
+          $slotOriginals.Add($path,$hash)
+        }
+      }
+      if($slotOriginals.Count -ne $render.OriginalFileHashes.Count){return $null}
+      foreach($path in $render.OriginalFileHashes.Keys) {
+        # Native/selection files cannot masquerade as captured artifacts.
+        if($candidates.ContainsKey($path) -or $pins.ContainsKey($path)){return $null}
+        $hash=$render.OriginalFileHashes[$path]
+        if($hash -isnot [string]){return $null}
+        $candidates.Add($path,$hash)
+      }
+      foreach($path in $candidates.Keys) {
+        $hash=$candidates[$path]
+        if($path -cne [IO.Path]::GetFullPath($path) -or -not $path.StartsWith($base+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or
+          $hash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+        if($pins.ContainsKey($path)) {
+          if($pins[$path] -cne $hash){return $null}
+        }else{$pins.Add($path,$hash)}
+        if((Get-OctoberCoverageBoundHash $path) -cne $hash){return $null}
+      }
+      $byProfile.Add($context.executionId,$execution)
+    }
+    foreach($path in $pins.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $pins[$path]){return $null}}
+    return @{SelectedExecutions=$byProfile;OriginalFileHashes=$pins;RetainedSelectionBindingsVerified=$true;
+      EquivalenceVerified=$false;GeometryObservationVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentSelectedRecorderEvents {
+  param([object]$Events,[object]$Context,[object]$Inventory,[hashtable]$SourceIdentity,[object]$SuccessfulKeys)
+  # Event conjunct only. Caller must supply events/successes from the SAME
+  # original-hash-verified native log. Artifact bytes/geometry/inspection remain
+  # separate; no document-supplied event objects may qualify an execution.
+  try {
+    $contextFields=@('schemaVersion','inventoryPath','inventorySha256','reportId','executionId','mode','runId','sourceIdentity',
+      'sourceStateIdentity','selectedSlots','selectedTestKeys','selectedRiskIds')
+    if($Events -isnot [array] -or -not $Events.Count -or $null -eq $Context -or
+      (@($Context.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($contextFields|Sort-Object) -join '|') -or
+      ($Context.schemaVersion -isnot [int] -and $Context.schemaVersion -isnot [long]) -or $Context.schemaVersion -ne 1 -or
+      $Context.mode -isnot [string] -or $Context.mode -cne 'selected_visual_risks' -or
+      $Context.reportId -isnot [string] -or $Context.reportId -cne 'store_layout_and_recovery' -or
+      $SuccessfulKeys -isnot [Collections.Generic.HashSet[string]] -or $null -eq $SourceIdentity){return $null}
+    if((@($Context.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+    foreach($field in $SourceIdentity.Keys) {
+      if($Context.sourceIdentity.$field -isnot [string] -or $Context.sourceIdentity.$field -cne $SourceIdentity[$field]){return $null}
+    }
+    $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $Inventory -ExecutionId $Context.executionId -SourceIdentity $SourceIdentity
+    if($null -eq $selection){return $null}
+    foreach($field in @('SelectedSlots','SelectedTestKeys')) {
+      if($Context.$field -isnot [array] -or
+        (ConvertTo-Json -InputObject @($Context.$field) -Compress) -cne (ConvertTo-Json -InputObject @($selection.$field) -Compress)){return $null}
+    }
+    [string[]]$riskIds=@($selection.SelectedRisks|ForEach-Object {$_.id});[Array]::Sort($riskIds,[StringComparer]::Ordinal)
+    if($Context.selectedRiskIds -isnot [array] -or
+      (ConvertTo-Json -InputObject @($Context.selectedRiskIds) -Compress) -cne (ConvertTo-Json -InputObject @($riskIds) -Compress)){return $null}
+    $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId $Context.reportId -ExecutionId $Context.executionId `
+      -Mode selected_visual_risks -RunId $Context.runId -SourceIdentity $SourceIdentity `
+      -SelectedSlots $selection.SelectedSlots -SelectedTestKeys $selection.SelectedTestKeys
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    if($null -eq $plan -or $null -eq $contract){return $null}
+    $claims=@{runId=$Context.runId;executionId=$Context.executionId;profile=$Context.executionId;
+      sourceCommit=$SourceIdentity.captureSourceCommit;sourceTree=$SourceIdentity.captureSourceTree;
+      executionHead=$SourceIdentity.executionHead;producerBlob=$SourceIdentity.producerBlob;
+      registrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'}
+    $base=[IO.Path]::GetFullPath((Get-OctoberCompatibilityBinding).worktreePath)
+    $suitePath=[IO.Path]::GetFullPath((Join-Path $base 'apps/mobile/test/work_workspace_layout_safety_test.dart'))
+    $risks=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    foreach($risk in $selection.SelectedRisks){$risks.Add($risk.representative.slotId,$risk)}
+    $suites=@{};$tests=@{};$done=[Collections.Generic.HashSet[int]]::new()
+    $captures=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $captureTests=[Collections.Generic.HashSet[int]]::new()
+    foreach($event in $Events) {
+      if($null -eq $event -or $event.type -isnot [string]){return $null}
+      if($event.type -ceq 'suite') {
+        $suite=$event.suite
+        if(($suite.id -isnot [int] -and $suite.id -isnot [long]) -or $suite.id -lt 0 -or $suite.id -gt [int]::MaxValue -or
+          $suites.ContainsKey([int]$suite.id) -or $suite.path -isnot [string] -or
+          -not [IO.Path]::IsPathRooted($suite.path) -or
+          -not [string]::Equals([IO.Path]::GetFullPath($suite.path),$suitePath,[StringComparison]::OrdinalIgnoreCase)){return $null}
+        $suites[[int]$suite.id]=$suite.path;continue
+      }
+      if($event.type -ceq 'testStart') {
+        $test=$event.test
+        if(($test.id -isnot [int] -and $test.id -isnot [long]) -or $test.id -lt 0 -or $test.id -gt [int]::MaxValue -or
+          ($test.suiteID -isnot [int] -and $test.suiteID -isnot [long]) -or $test.suiteID -lt 0 -or $test.suiteID -gt [int]::MaxValue -or
+          -not $suites.ContainsKey([int]$test.suiteID) -or $tests.ContainsKey([int]$test.id) -or $test.name -isnot [string]){return $null}
+        $tests[[int]$test.id]='work_workspace_layout_safety_test.dart:'+$test.name;continue
+      }
+      if($event.type -ceq 'testDone') {
+        if(($event.testID -isnot [int] -and $event.testID -isnot [long]) -or $event.testID -lt 0 -or $event.testID -gt [int]::MaxValue -or
+          -not $tests.ContainsKey([int]$event.testID) -or -not $done.Add([int]$event.testID)){return $null}
+        if($captureTests.Contains([int]$event.testID) -and
+          ($event.result -cne 'success' -or $event.hidden -isnot [bool] -or $event.hidden -or
+           $event.skipped -isnot [bool] -or $event.skipped -or -not $SuccessfulKeys.Contains($tests[[int]$event.testID]))){return $null}
+        continue
+      }
+      if($event.type -cne 'print'){continue}
+      if($event.message -isnot [string]){return $null}
+      if(-not $event.message.StartsWith('MOOL_TECHNICAL_CAPTURE',[StringComparison]::OrdinalIgnoreCase)){continue}
+      $prefix='MOOL_TECHNICAL_CAPTURE '
+      if(-not $event.message.StartsWith($prefix,[StringComparison]::Ordinal) -or
+        ($event.testID -isnot [int] -and $event.testID -isnot [long]) -or $event.testID -lt 0 -or $event.testID -gt [int]::MaxValue -or
+        -not $tests.ContainsKey([int]$event.testID) -or $done.Contains([int]$event.testID)){return $null}
+      $capture=Read-OctoberCompatibilityJsonObject -Bytes ([Text.UTF8Encoding]::new($false,$true).GetBytes($event.message.Substring($prefix.Length)))
+      $fields=@('schema','classification','syntheticFixture','founderApproved','provenanceClaimsVerified','slotId','originalReference',
+        'pngPath','metadataPath','pngSha256','metadataSha256','provenanceClaims')
+      if($null -eq $capture -or (@($capture.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+        $capture.schema -isnot [string] -or $capture.schema -cne 'moolsocial.current-technical-capture-event.v1' -or
+        $capture.classification -isnot [string] -or $capture.classification -cne 'technical-observation' -or
+        $capture.syntheticFixture -isnot [bool] -or -not $capture.syntheticFixture -or
+        $capture.founderApproved -isnot [bool] -or $capture.founderApproved -or
+        $capture.provenanceClaimsVerified -isnot [bool] -or $capture.provenanceClaimsVerified -or
+        $capture.slotId -isnot [string] -or -not $risks.ContainsKey($capture.slotId) -or $captures.ContainsKey($capture.slotId)){return $null}
+      $risk=$risks[$capture.slotId];$testKey=$tests[[int]$event.testID]
+      $literal=@($contract.visualSlots|Where-Object {$_.slot -ceq $capture.slotId -and $_.profile -ceq $Context.executionId})
+      if($testKey -cne $risk.representative.testKey -or -not $SuccessfulKeys.Contains($testKey) -or $literal.Count -ne 1 -or
+        $capture.originalReference -isnot [string] -or $capture.originalReference -cne $literal[0].reference -or
+        (@($capture.provenanceClaims.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($claims.Keys|Sort-Object) -join '|')){return $null}
+      foreach($field in $claims.Keys){if($capture.provenanceClaims.$field -isnot [string] -or $capture.provenanceClaims.$field -cne $claims[$field]){return $null}}
+      $pngRelative='apps/mobile/build/compat-current-technical/'+$Context.runId+'/'+$Context.executionId+'/'+$capture.slotId+'.png'
+      $metadataRelative=$pngRelative.Substring(0,$pngRelative.Length-4)+'.json'
+      foreach($role in @('png','metadata')) {
+        $relative=if($role -ceq 'png'){$pngRelative}else{$metadataRelative}
+        $value=$capture.($role+'Path');$expected=[IO.Path]::GetFullPath((Join-Path $base $relative))
+        if($value -isnot [string] -or -not [IO.Path]::IsPathRooted($value) -or
+          -not [string]::Equals($value.Replace('/','\'),[IO.Path]::GetFullPath($value),[StringComparison]::OrdinalIgnoreCase) -or
+          -not [string]::Equals([IO.Path]::GetFullPath($value),$expected,[StringComparison]::OrdinalIgnoreCase) -or
+          $capture.($role+'Sha256') -isnot [string] -or $capture.($role+'Sha256') -cnotmatch '\A[0-9a-f]{64}\z'){return $null}
+      }
+      $captures.Add($capture.slotId,[pscustomobject]@{Event=$capture;RiskId=$risk.id;TestKey=$testKey;TestId=[int]$event.testID;
+        PngRelativePath=$pngRelative;MetadataRelativePath=$metadataRelative;
+        PngSha256=$capture.pngSha256.ToUpperInvariant();MetadataSha256=$capture.metadataSha256.ToUpperInvariant()})
+      $null=$captureTests.Add([int]$event.testID)
+    }
+    if($captures.Count -ne $selection.SelectedSlots.Count){return $null}
+    foreach($testId in $captureTests){if(-not $done.Contains($testId)){return $null}}
+    return @{Captures=$captures;RecorderEventsBound=$true;ArtifactBytesVerified=$false;GeometryObservationVerified=$false;
+      EquivalenceVerified=$false;InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentRecorderArtifactBytes {
+  param([object]$Capture)
+  # Consume a capture returned by the actual event conjunct. Bytes alone are not
+  # same-log/source admission, observed geometry, visual inspection or acceptance.
+  $metadataLease=$null;$pngLease=$null;$result=$null
+  try {
+    try {
+      $recordFields=@('Event','RiskId','TestKey','TestId','PngRelativePath','MetadataRelativePath','PngSha256','MetadataSha256')
+      if($null -eq $Capture -or (@($Capture.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($recordFields|Sort-Object) -join '|')){return $null}
+      $event=$Capture.Event
+      $claimFields=@('runId','executionId','profile','sourceCommit','sourceTree','executionHead','producerBlob','registrySha256')
+      if($null -eq $event -or $event.schema -isnot [string] -or $event.schema -cne 'moolsocial.current-technical-capture-event.v1' -or
+        $event.classification -isnot [string] -or $event.classification -cne 'technical-observation' -or
+        $event.slotId -isnot [string] -or $event.slotId -cnotmatch '\AH[0-9]{2}-visual-[1-9][0-9]*\z' -or
+        $event.originalReference -isnot [string] -or [string]::IsNullOrWhiteSpace($event.originalReference) -or
+        (@($event.provenanceClaims.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($claimFields|Sort-Object) -join '|')){return $null}
+      foreach($field in $claimFields){if($event.provenanceClaims.$field -isnot [string]){return $null}}
+      if($event.provenanceClaims.runId -cnotmatch '\Acurrent-[0-9a-f]{32}\z' -or
+        $event.provenanceClaims.executionId -cnotin @('workspace_capture','historical_store_capture','store_live_capture','founder_capture') -or
+        $event.provenanceClaims.profile -cne $event.provenanceClaims.executionId){return $null}
+      $base=[IO.Path]::GetFullPath((Get-OctoberCompatibilityBinding).worktreePath)
+      $pngRelative='apps/mobile/build/compat-current-technical/'+$event.provenanceClaims.runId+'/'+$event.provenanceClaims.executionId+'/'+$event.slotId+'.png'
+      $metadataRelative=$pngRelative.Substring(0,$pngRelative.Length-4)+'.json'
+      $paths=@{};$hashes=@{}
+      foreach($role in @('png','metadata')) {
+        $relative=if($role -ceq 'png'){$pngRelative}else{$metadataRelative}
+        $recordPath=$Capture.($role+'RelativePath');$value=$event.($role+'Path');$hash=$Capture.($role+'Sha256')
+        $expected=[IO.Path]::GetFullPath((Join-Path $base $relative))
+        if($recordPath -isnot [string] -or $recordPath -cne $relative -or $value -isnot [string] -or
+          -not [IO.Path]::IsPathRooted($value) -or
+          -not [string]::Equals($value.Replace('/','\'),[IO.Path]::GetFullPath($value),[StringComparison]::OrdinalIgnoreCase) -or
+          -not [string]::Equals([IO.Path]::GetFullPath($value),$expected,[StringComparison]::OrdinalIgnoreCase) -or
+          $hash -isnot [string] -or $hash -cnotmatch '\A[0-9A-F]{64}\z' -or
+          $event.($role+'Sha256') -isnot [string] -or $event.($role+'Sha256') -cnotmatch '\A[0-9a-f]{64}\z' -or
+          $hash -cne $event.($role+'Sha256').ToUpperInvariant()){return $null}
+        $paths[$role]=$expected;$hashes[$role]=$hash
+      }
+      $metadataLease=Open-OctoberCompatibilityVisualArtifact -Base $base -RelativePath $metadataRelative -ExpectedSha256 $hashes.metadata -MaxBytes 4194304
+      $pngLease=Open-OctoberCompatibilityVisualArtifact -Base $base -RelativePath $pngRelative -ExpectedSha256 $hashes.png -MaxBytes 67108864
+      if($null -eq $metadataLease -or $null -eq $pngLease){return $null}
+      foreach($role in @('metadata','png')) {
+        $lease=if($role -ceq 'metadata'){$metadataLease}else{$pngLease}
+        $limit=if($role -ceq 'metadata'){4194304}else{67108864}
+        if($lease.CanonicalPath -isnot [string] -or $lease.CanonicalPath -cne $paths[$role] -or
+          $lease.Sha256 -isnot [string] -or $lease.Sha256 -cne $hashes[$role] -or $lease.Bytes -isnot [byte[]] -or
+          $lease.Bytes.Length -lt 1 -or $lease.Bytes.Length -gt $limit -or
+          $lease.FileIdentity -isnot [string] -or $lease.FileIdentity -cnotmatch '\A[0-9A-F]{8}:[0-9A-F]{16}\z' -or
+          $null -eq $lease.Stream -or (Get-OctoberCompatibilityByteHash $lease.Bytes) -cne $hashes[$role]){return $null}
+      }
+      if([string]::Equals($metadataLease.CanonicalPath,$pngLease.CanonicalPath,[StringComparison]::OrdinalIgnoreCase) -or
+        $metadataLease.FileIdentity -ceq $pngLease.FileIdentity){return $null}
+      $metadata=Read-OctoberCompatibilityJsonObject -Bytes $metadataLease.Bytes
+      $fields=@('schema','classification','syntheticFixture','complete','founderApproved','comparisonPassed','providerVerified','provenanceClaimsVerified',
+        'provenanceClaims','originalReference','slotId','pngWidth','pngHeight','pngBytes','pngSha256','observations')
+      if($null -eq $metadata -or (@($metadata.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+        $metadata.schema -isnot [string] -or $metadata.schema -cne 'moolsocial.current-technical-capture.v1' -or
+        $metadata.classification -isnot [string] -or $metadata.classification -cne 'technical-observation' -or
+        $metadata.slotId -isnot [string] -or $metadata.slotId -cne $event.slotId -or
+        $metadata.originalReference -isnot [string] -or $metadata.originalReference -cne $event.originalReference -or
+        $null -eq $metadata.observations -or $metadata.observations -isnot [pscustomobject]){return $null}
+      foreach($flag in @('syntheticFixture','complete','founderApproved','comparisonPassed','providerVerified','provenanceClaimsVerified')) {
+        $expected=$flag -cin @('syntheticFixture','complete')
+        if($metadata.$flag -isnot [bool] -or $metadata.$flag -ne $expected){return $null}
+      }
+      if((@($metadata.provenanceClaims.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($claimFields|Sort-Object) -join '|')){return $null}
+      foreach($field in $claimFields){if($metadata.provenanceClaims.$field -isnot [string] -or $metadata.provenanceClaims.$field -cne $event.provenanceClaims.$field){return $null}}
+      foreach($dimension in @('pngWidth','pngHeight')) {
+        if(($metadata.$dimension -isnot [int] -and $metadata.$dimension -isnot [long]) -or $metadata.$dimension -lt 1 -or $metadata.$dimension -gt 8192){return $null}
+      }
+      if(([long]$metadata.pngWidth*[long]$metadata.pngHeight) -gt 16777216 -or
+        ($metadata.pngBytes -isnot [int] -and $metadata.pngBytes -isnot [long]) -or $metadata.pngBytes -ne $pngLease.Bytes.Length -or
+        $metadata.pngSha256 -isnot [string] -or $metadata.pngSha256 -cnotmatch '\A[0-9a-f]{64}\z' -or
+        $metadata.pngSha256 -cne $event.pngSha256 -or $metadata.pngSha256.ToUpperInvariant() -cne $hashes.png){return $null}
+      $decoded=Read-OctoberCompatibilityPngPixels -Bytes $pngLease.Bytes -ExpectedWidth ([int]$metadata.pngWidth) -ExpectedHeight ([int]$metadata.pngHeight)
+      if($null -eq $decoded){return $null}
+      $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      foreach($role in @('metadata','png')) {
+        if((Get-OctoberCoverageBoundHash $paths[$role]) -cne $hashes[$role]){return $null}
+        $originals.Add($paths[$role],$hashes[$role])
+      }
+      $result=@{Metadata=$metadata;PngWidth=$decoded.Width;PngHeight=$decoded.Height;OriginalFileHashes=$originals;
+        ArtifactBytesVerified=$true;GeometryObservationVerified=$false;TargetSemanticsVerified=$false;EquivalenceVerified=$false;
+        InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+    }finally{
+      try{if($null -ne $pngLease){$pngLease.Stream.Dispose()}}
+      finally{if($null -ne $metadataLease){$metadataLease.Stream.Dispose()}}
+    }
+  }catch{return $null}
+  # Emit a successful binding only after BOTH lease disposals completed.
+  return $result
+}
+
+function Read-OctoberCompatibilityCurrentRecorderGeometry {
+  param([object]$Artifact,[object]$Risk)
+  # Internal consistency of actual recorder measurements and reviewed geometry.
+  # Runtime type alone is NOT target identity, visual inspection or acceptance.
+  try {
+    function Test-RecorderNumber([object]$Value) {
+      return ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [single] -or $Value -is [decimal]) -and
+        -not [double]::IsNaN([double]$Value) -and -not [double]::IsInfinity([double]$Value)
+    }
+    function Test-RecorderFields([object]$Value,[string[]]$Fields) {
+      return $Value -is [pscustomobject] -and
+        (@($Value.PSObject.Properties.Name|Sort-Object) -join '|') -ceq (@($Fields|Sort-Object) -join '|')
+    }
+    function Test-RecorderRect([object]$Value) {
+      if(-not (Test-RecorderFields $Value @('left','top','width','height'))){return $false}
+      foreach($field in @('left','top','width','height')){if(-not (Test-RecorderNumber $Value.$field)){return $false}}
+      return $Value.width -gt 0 -and $Value.height -gt 0 -and (Test-RecorderNumber ($Value.left+$Value.width)) -and (Test-RecorderNumber ($Value.top+$Value.height))
+    }
+    if($null -eq $Artifact -or $Artifact.ArtifactBytesVerified -isnot [bool] -or -not $Artifact.ArtifactBytesVerified -or
+      $null -eq $Risk -or $Risk.target -isnot [string] -or [string]::IsNullOrWhiteSpace($Risk.target) -or
+      -not (Test-OctoberCompatibilityCurrentGeometry $Risk.geometry)){return $null}
+    foreach($dimension in @('PngWidth','PngHeight')){if(($Artifact.$dimension -isnot [int] -and $Artifact.$dimension -isnot [long]) -or $Artifact.$dimension -le 0){return $null}}
+    $o=$Artifact.Metadata.observations
+    if(-not (Test-RecorderFields $o @('fixtureKind','requestedTargetType','requestedTargetKey','requestedTargetGlobalRect','boundaryType','boundaryLocalPaintBounds','boundaryToGlobalTransform','boundaryGlobalPaintBounds','rasterPixelRatio','rootView','descendantMediaQuery')) -or
+      $o.fixtureKind -isnot [string] -or $o.fixtureKind -cne 'existing-authored-widget-test-state' -or
+      $o.requestedTargetType -isnot [string] -or $o.requestedTargetType -cne $Risk.target -or
+      ($null -ne $o.requestedTargetKey -and $o.requestedTargetKey -isnot [string]) -or
+      $o.boundaryType -isnot [string] -or [string]::IsNullOrWhiteSpace($o.boundaryType) -or
+      -not (Test-RecorderNumber $o.rasterPixelRatio) -or $o.rasterPixelRatio -le 0){return $null}
+    $root=$o.rootView;$desc=$o.descendantMediaQuery
+    if(-not (Test-RecorderFields $root @('devicePixelRatio','physicalWidth','physicalHeight','logicalWidth','logicalHeight','padding','viewPadding','viewInsets')) -or
+      -not (Test-RecorderFields $desc @('width','height','padding','viewPadding','viewInsets','textScaleAtOne'))){return $null}
+    foreach($field in @('devicePixelRatio','physicalWidth','physicalHeight','logicalWidth','logicalHeight')) {
+      if(-not (Test-RecorderNumber $root.$field) -or $root.$field -le 0){return $null}
+    }
+    foreach($field in @('width','height','textScaleAtOne')){if(-not (Test-RecorderNumber $desc.$field) -or $desc.$field -le 0){return $null}}
+    if($root.logicalWidth -ne ([double]$root.physicalWidth/[double]$root.devicePixelRatio) -or
+      $root.logicalHeight -ne ([double]$root.physicalHeight/[double]$root.devicePixelRatio)){return $null}
+    $insets=@{}
+    foreach($name in @('padding','viewPadding','viewInsets')) {
+      $normalized=[ordered]@{}
+      foreach($source in @($root,$desc)) {
+        if(-not (Test-RecorderFields $source.$name @('left','top','right','bottom'))){return $null}
+        foreach($edge in @('left','top','right','bottom')){if(-not (Test-RecorderNumber $source.$name.$edge) -or $source.$name.$edge -lt 0){return $null}}
+      }
+      foreach($edge in @('left','top','right','bottom')){$normalized[$edge]=[double]$root.$name.$edge/[double]$root.devicePixelRatio}
+      $insets[$name]=[pscustomobject]$normalized
+    }
+    foreach($name in @('boundaryLocalPaintBounds','boundaryGlobalPaintBounds','requestedTargetGlobalRect')){if(-not (Test-RecorderRect $o.$name)){return $null}}
+    $local=$o.boundaryLocalPaintBounds;$global=$o.boundaryGlobalPaintBounds;$target=$o.requestedTargetGlobalRect
+    $m=$o.boundaryToGlobalTransform
+    if($m -isnot [array] -or $m.Count -ne 16){return $null}
+    foreach($value in $m){if(-not (Test-RecorderNumber $value)){return $null}}
+    $xs=@();$ys=@();$sign=0
+    foreach($x in @([double]$local.left,([double]$local.left+[double]$local.width))) {
+      foreach($y in @([double]$local.top,([double]$local.top+[double]$local.height))) {
+        $w=([double]$m[3]*$x)+([double]$m[7]*$y)+[double]$m[15]
+        $px=([double]$m[0]*$x)+([double]$m[4]*$y)+[double]$m[12]
+        $py=([double]$m[1]*$x)+([double]$m[5]*$y)+[double]$m[13]
+        if(-not (Test-RecorderNumber $w) -or $w -eq 0 -or -not (Test-RecorderNumber $px) -or -not (Test-RecorderNumber $py)){return $null}
+        $cornerSign=[Math]::Sign($w)
+        if($sign -ne 0 -and $sign -ne $cornerSign){return $null};$sign=$cornerSign
+        $px=$px/$w;$py=$py/$w
+        if(-not (Test-RecorderNumber $px) -or -not (Test-RecorderNumber $py)){return $null}
+        $xs+=,$px;$ys+=,$py
+      }
+    }
+    $xMin=($xs|Measure-Object -Minimum).Minimum;$xMax=($xs|Measure-Object -Maximum).Maximum
+    $yMin=($ys|Measure-Object -Minimum).Minimum;$yMax=($ys|Measure-Object -Maximum).Maximum
+    $projected=@{left=$xMin;top=$yMin;width=($xMax-$xMin);height=($yMax-$yMin)}
+    foreach($field in @('left','top','width','height')) {
+      if(-not (Test-RecorderNumber $projected[$field]) -or [Math]::Abs([double]$projected[$field]-[double]$global.$field) -gt 0.0000001){return $null}
+    }
+    # No tolerance for target containment or reviewed layout measurements.
+    if($target.left -lt $global.left -or $target.top -lt $global.top -or
+      ($target.left+$target.width) -gt ($global.left+$global.width) -or ($target.top+$target.height) -gt ($global.top+$global.height)){return $null}
+    $geometry=[pscustomobject]@{logicalViewport=[pscustomobject]@{width=$root.logicalWidth;height=$root.logicalHeight};devicePixelRatio=$root.devicePixelRatio;
+      rasterRatio=$o.rasterPixelRatio;textScale=$desc.textScaleAtOne;padding=$insets.padding;viewPadding=$insets.viewPadding;viewInsets=$insets.viewInsets;
+      boundaryRect=$local;rasterWidth=$Artifact.PngWidth;rasterHeight=$Artifact.PngHeight}
+    if(-not (Test-OctoberCompatibilityCurrentGeometry $geometry)){return $null}
+    foreach($field in @('devicePixelRatio','rasterRatio','textScale','rasterWidth','rasterHeight')){if($geometry.$field -ne $Risk.geometry.$field){return $null}}
+    foreach($field in @('logicalViewport','padding','viewPadding','viewInsets','boundaryRect')) {
+      foreach($property in $Risk.geometry.$field.PSObject.Properties){if($geometry.$field.($property.Name) -ne $property.Value){return $null}}
+    }
+    if($Artifact.OriginalFileHashes -isnot [Collections.IDictionary] -or $Artifact.OriginalFileHashes.Count -ne 2){return $null}
+    $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($path in $Artifact.OriginalFileHashes.Keys) {
+      $hash=$Artifact.OriginalFileHashes[$path]
+      if($path -isnot [string] -or $hash -isnot [string] -or $hash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+      $originals.Add($path,$hash)
+    }
+    return @{Geometry=$geometry;Observations=$o;OriginalFileHashes=$originals;GeometryObservationVerified=$true;
+      TargetSemanticsVerified=$false;EquivalenceVerified=$false;InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentSelectedRenderBindings {
+  param([object]$Events,[object]$Context,[object]$Inventory,[hashtable]$SourceIdentity,[object]$SuccessfulKeys)
+  # Caller must be the actual retained-log reader. This proves recorded render
+  # consistency only, not source admission, semantic identity or inspection.
+  try {
+    $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $Inventory -ExecutionId $Context.executionId -SourceIdentity $SourceIdentity
+    $joined=Read-OctoberCompatibilityCurrentSelectedRecorderEvents -Events $Events -Context $Context -Inventory $Inventory `
+      -SourceIdentity $SourceIdentity -SuccessfulKeys $SuccessfulKeys
+    if($null -eq $selection -or $null -eq $joined -or $joined.Captures.Count -ne $selection.SelectedRisks.Count){return $null}
+    $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $slots=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    foreach($risk in $selection.SelectedRisks) {
+      $slot=$risk.representative.slotId
+      if(-not $joined.Captures.ContainsKey($slot) -or $slots.ContainsKey($slot)){return $null}
+      $capture=$joined.Captures[$slot]
+      if($capture.RiskId -cne $risk.id -or $capture.TestKey -cne $risk.representative.testKey){return $null}
+      $artifact=Read-OctoberCompatibilityCurrentRecorderArtifactBytes -Capture $capture
+      if($null -eq $artifact){return $null}
+      $geometry=Read-OctoberCompatibilityCurrentRecorderGeometry -Artifact $artifact -Risk $risk
+      if($null -eq $geometry -or -not $geometry.GeometryObservationVerified){return $null}
+      foreach($path in $geometry.OriginalFileHashes.Keys) {
+        $hash=$geometry.OriginalFileHashes[$path]
+        if($originals.ContainsKey($path)) {
+          if($originals[$path] -cne $hash){return $null}
+        }else{$originals.Add($path,$hash)}
+      }
+      $slots.Add($slot,@{RiskId=$risk.id;TestKey=$capture.TestKey;TestId=$capture.TestId;Capture=$capture;GeometryBinding=$geometry})
+    }
+    if($slots.Count -ne $selection.SelectedRisks.Count -or $originals.Count -ne (2*$slots.Count)){return $null}
+    foreach($path in $originals.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $originals[$path]){return $null}}
+    return @{RenderedSlots=$slots;OriginalFileHashes=$originals;RecordedRenderBindingsVerified=$true;
+      TargetSemanticsVerified=$false;EquivalenceVerified=$false;InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentPrimaryVisualReview {
+  param([object]$Inventory,[object]$Observations,[hashtable]$SourceIdentity,[object]$SelectionEvidence,[object]$PrimaryBinding)
+  # Actual retained selection/render output plus independently bound primary
+  # inspection records only. This reader does not inspect or approve an image.
+  try {
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    if($null -eq $spec -or $Inventory -isnot [array] -or $Inventory.Count -lt 1 -or $Inventory.Count -gt 65 -or
+      $Observations -isnot [array] -or $Observations.Count -ne $Inventory.Count -or
+      $null -eq $PrimaryBinding -or $PrimaryBinding.PrimaryReviewRecordBound -isnot [bool] -or -not $PrimaryBinding.PrimaryReviewRecordBound -or
+      $null -eq $PrimaryBinding.Report -or $PrimaryBinding.Report.visualReviews -isnot [array] -or
+      $PrimaryBinding.Report.visualReviews.Count -ne $Inventory.Count -or $null -eq $SelectionEvidence -or
+      $SelectionEvidence.RetainedSelectionBindingsVerified -isnot [bool] -or -not $SelectionEvidence.RetainedSelectionBindingsVerified -or
+      $SelectionEvidence.SelectedExecutions -isnot [Collections.IDictionary] -or
+      $SelectionEvidence.OriginalFileHashes -isnot [Collections.IDictionary]){return $null}
+    function Test-VisualReviewSource($Object) {
+      if($null -eq $Object -or (@($Object.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $false}
+      foreach($field in $SourceIdentity.Keys){if($Object.$field -isnot [string] -or $Object.$field -cne $SourceIdentity[$field]){return $false}}
+      return $true
+    }
+    if(-not (Test-VisualReviewSource $PrimaryBinding.Report.sourceIdentity)){return $null}
+    $risks=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $reviews=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach($risk in $Inventory) {
+      if($null -eq $risk -or $risk.id -isnot [string] -or [string]::IsNullOrWhiteSpace($risk.id) -or $risks.ContainsKey($risk.id)){return $null}
+      $risks.Add($risk.id,$risk)
+    }
+    foreach($review in $PrimaryBinding.Report.visualReviews) {
+      if($null -eq $review -or (@($review.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'inventoryEntry|observation|riskId' -or
+        $review.riskId -isnot [string] -or -not $risks.ContainsKey($review.riskId) -or $reviews.ContainsKey($review.riskId) -or
+        (ConvertTo-Json -InputObject $review.inventoryEntry -Depth 100 -Compress) -cne
+        (ConvertTo-Json -InputObject $risks[$review.riskId] -Depth 100 -Compress)){return $null}
+      $reviews.Add($review.riskId,$review)
+    }
+    $base=(Get-OctoberCompatibilityBinding).worktreePath
+    foreach($observation in $Observations) {
+      if($null -eq $observation -or (@($observation.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.visuals.observationFields|Sort-Object) -join '|') -or
+        $observation.riskId -isnot [string] -or -not $risks.ContainsKey($observation.riskId) -or -not $seen.Add($observation.riskId) -or
+        (ConvertTo-Json -InputObject $observation -Depth 100 -Compress) -cne
+        (ConvertTo-Json -InputObject $reviews[$observation.riskId].observation -Depth 100 -Compress) -or
+        -not (Test-VisualReviewSource $observation.sourceIdentity) -or $observation.resolved -isnot [bool] -or -not $observation.resolved -or
+        $observation.findings -isnot [array] -or $observation.inspectedBy -isnot [string] -or $observation.inspectedBy -cne 'primary:/root' -or
+        $observation.inspectedAtUtc -isnot [string]){return $null}
+      foreach($finding in $observation.findings){if($finding -isnot [string] -or [string]::IsNullOrWhiteSpace($finding)){return $null}}
+      $inspectionTime=[DateTimeOffset]::MinValue
+      if(-not [DateTimeOffset]::TryParseExact($observation.inspectedAtUtc,'o',[Globalization.CultureInfo]::InvariantCulture,
+        [Globalization.DateTimeStyles]::None,[ref]$inspectionTime) -or $inspectionTime.Offset -ne [TimeSpan]::Zero){return $null}
+      $risk=$risks[$observation.riskId];$representative=$risk.representative
+      if($null -eq $representative -or $observation.executionId -cne $representative.executionId -or
+        $observation.testKey -cne $representative.testKey -or -not $SelectionEvidence.SelectedExecutions.ContainsKey($representative.executionId)){return $null}
+      $execution=$SelectionEvidence.SelectedExecutions[$representative.executionId];$render=$execution.CurrentRenderBindings
+      if($null -eq $render -or $render.RecordedRenderBindingsVerified -isnot [bool] -or -not $render.RecordedRenderBindingsVerified -or
+        $render.RenderedSlots -isnot [Collections.IDictionary] -or -not $render.RenderedSlots.ContainsKey($representative.slotId)){return $null}
+      $slot=$render.RenderedSlots[$representative.slotId]
+      if($null -eq $slot -or $slot.RiskId -cne $risk.id -or $slot.TestKey -cne $representative.testKey -or
+        $null -eq $slot.GeometryBinding -or $slot.GeometryBinding.GeometryObservationVerified -isnot [bool] -or
+        -not $slot.GeometryBinding.GeometryObservationVerified -or
+        (ConvertTo-Json -InputObject $slot.GeometryBinding.Geometry -Depth 100 -Compress) -cne
+        (ConvertTo-Json -InputObject $observation.geometry -Depth 100 -Compress)){return $null}
+      $capture=$slot.Capture
+      if($null -eq $capture -or $observation.artifactPath -cne $capture.PngRelativePath -or
+        $observation.artifactSha256 -cne $capture.PngSha256 -or $observation.recorderMetadataPath -cne $capture.MetadataRelativePath -or
+        $observation.recorderMetadataSha256 -cne $capture.MetadataSha256){return $null}
+      $bindings=@(@{Path=$observation.artifactPath;Hash=$observation.artifactSha256;Native=$null},
+        @{Path=$observation.recorderMetadataPath;Hash=$observation.recorderMetadataSha256;Native=$null},
+        @{Path=$observation.eventLogPath;Hash=$observation.eventLogSha256;Native='log'},
+        @{Path=$observation.executionCapturePath;Hash=$observation.executionCaptureSha256;Native='capture'})
+      foreach($binding in $bindings) {
+        if($binding.Path -isnot [string] -or -not $binding.Path.StartsWith('apps/mobile/build/',[StringComparison]::Ordinal) -or
+          $binding.Path.Contains('\') -or $binding.Path.Split('/') -contains '..' -or $binding.Path.Split('/') -contains '.' -or
+          $binding.Path.Contains('//') -or $binding.Hash -isnot [string] -or $binding.Hash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+        $path=[IO.Path]::GetFullPath((Join-Path $base $binding.Path))
+        if(-not $SelectionEvidence.OriginalFileHashes.ContainsKey($path) -or
+          $SelectionEvidence.OriginalFileHashes[$path] -cne $binding.Hash){return $null}
+        if($null -ne $binding.Native -and ($execution.RetainedFilePaths[$binding.Native] -cne $path -or
+          $execution.RetainedFileHashes[$binding.Native] -cne $binding.Hash)){return $null}
+      }
+    }
+    return @{Reviews=$reviews;PrimaryVisualReviewBound=$true;EquivalenceVerified=$false;
+      FounderApprovalVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentVisualSlotAccounting {
+  param([object]$Reconciliation,[object]$Inventory,[hashtable]$SourceIdentity,
+    [object]$PrimaryVisualReview,[object]$PrimaryAssertionReview,[object]$PrimaryBinding,[object]$PresentationReview)
+  # Literal historical accounting plus independently bound primary equivalence
+  # decisions. No geometry-only inference or presentation supersession authority.
+  try {
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    if($null -eq $contract -or $contract.visualSlots.Count -ne 65 -or $Reconciliation -isnot [array] -or
+      $Reconciliation.Count -ne 65 -or $Inventory -isnot [array] -or $Inventory.Count -lt 1 -or
+      $null -eq $PrimaryVisualReview -or $PrimaryVisualReview.PrimaryVisualReviewBound -isnot [bool] -or
+      -not $PrimaryVisualReview.PrimaryVisualReviewBound -or $PrimaryVisualReview.Reviews -isnot [Collections.IDictionary] -or
+      $null -eq $PrimaryAssertionReview -or $PrimaryAssertionReview.PrimaryAssertionReviewBound -isnot [bool] -or
+      -not $PrimaryAssertionReview.PrimaryAssertionReviewBound -or $PrimaryAssertionReview.ReviewedAssertionPairs -isnot [array] -or
+      $null -eq $PrimaryBinding -or
+      $PrimaryBinding.PrimaryReviewRecordBound -isnot [bool] -or -not $PrimaryBinding.PrimaryReviewRecordBound -or
+      $PrimaryBinding.Report.sourceReviews -isnot [array]){return $null}
+    $actualSource=$PrimaryBinding.Report.sourceIdentity
+    if((@($actualSource.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+    foreach($field in $SourceIdentity.Keys){if($actualSource.$field -isnot [string] -or $actualSource.$field -cne $SourceIdentity[$field]){return $null}}
+    $literal=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $assigned=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $risks=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    function Test-CurrentSlotPresentation([string]$Key,[string]$SlotId) {
+      if([string]::IsNullOrWhiteSpace($Key) -or $null -eq $PresentationReview -or
+        $PresentationReview.SpecificPresentationReviewBound -isnot [bool] -or -not $PresentationReview.SpecificPresentationReviewBound -or
+        $PresentationReview.Decisions -isnot [Collections.IDictionary] -or -not $PresentationReview.Decisions.ContainsKey($Key)){return $false}
+      $bound=$PresentationReview.Decisions[$Key];$decision=$bound.Decision
+      if($null -eq $decision -or $Key -cne ('H'+$decision.ordinal+':'+$decision.clause+':'+$decision.requirement) -or
+        $decision.slotIds -isnot [array] -or $decision.slotIds -cnotcontains $SlotId -or
+        $SlotId -cnotmatch '\AH([0-9]+)-visual-[0-9]+\z' -or [int]$Matches[1] -ne $decision.ordinal -or
+        $bound.SourcePath -isnot [string] -or $null -eq $bound.Authority -or
+        [IO.Path]::GetFullPath($bound.Authority.path) -cne $bound.SourcePath){return $false}
+      $currentPairs=@($PrimaryAssertionReview.ReviewedAssertionPairs|Where-Object {
+        $_.Ordinal -eq $decision.ordinal -and $_.Clause -eq $decision.clause -and
+        $_.Requirement -ceq $decision.requirement -and $_.Disposition -ceq 'superseded_presentation'})
+      return $currentPairs.Count -gt 0
+    }
+    foreach($slot in $contract.visualSlots){if($literal.ContainsKey($slot.slot)){return $null};$literal.Add($slot.slot,$slot)}
+    foreach($risk in $Inventory) {
+      if(-not $risks.Add($risk.id) -or -not $PrimaryVisualReview.Reviews.ContainsKey($risk.id) -or
+        (ConvertTo-Json $risk -Depth 100 -Compress) -cne
+        (ConvertTo-Json $PrimaryVisualReview.Reviews[$risk.id].inventoryEntry -Depth 100 -Compress) -or
+        $risk.slotIds -isnot [array] -or $risk.slotIds.Count -lt 1 -or
+        $risk.equivalenceEvidence -isnot [array] -or $risk.equivalenceEvidence.Count -ne ($risk.slotIds.Count-1) -or
+        $risk.slotIds -cnotcontains $risk.representative.slotId){return $null}
+      $equivalences=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+      foreach($evidence in $risk.equivalenceEvidence) {
+        if($null -eq $evidence -or (@($evidence.PSObject.Properties.Name|Sort-Object) -join '|') -cne
+          'currentSurface|disposition|geometry|presentationKey|reason|slotId|sourceAssertions|state|target' -or
+          $risk.slotIds -cnotcontains $evidence.slotId -or $evidence.slotId -ceq $risk.representative.slotId -or
+          $equivalences.ContainsKey($evidence.slotId) -or $evidence.reason -isnot [string] -or
+          [string]::IsNullOrWhiteSpace($evidence.reason) -or $evidence.sourceAssertions -isnot [array] -or
+          $evidence.sourceAssertions.Count -ne 2){return $null}
+        if($evidence.disposition -cnotin @('equivalent','superseded_presentation')){return $null}
+        if($evidence.disposition -ceq 'equivalent') {
+          if($null -ne $evidence.presentationKey){return $null}
+        }elseif(-not (Test-CurrentSlotPresentation $evidence.presentationKey $evidence.slotId)){return $null}
+        foreach($field in @('currentSurface','target','state','geometry')) {
+          if((ConvertTo-Json $evidence.$field -Depth 100 -Compress) -cne (ConvertTo-Json $risk.$field -Depth 100 -Compress)){return $null}
+        }
+        for($index=0;$index -lt 2;$index++) {
+          $anchor=$evidence.sourceAssertions[$index]
+          $expectedRole=@('slot','representative')[$index]
+          $expectedSlot=@($evidence.slotId,$risk.representative.slotId)[$index]
+          if($null -eq $anchor -or (@($anchor.PSObject.Properties.Name|Sort-Object) -join '|') -cne
+            'assertionEvidence|ordinal|role|slotId|slotMeaning|successfulTest' -or $anchor.role -cne $expectedRole -or
+            $anchor.slotId -cne $expectedSlot -or $anchor.slotMeaning -isnot [string] -or
+            [string]::IsNullOrWhiteSpace($anchor.slotMeaning) -or $expectedSlot -cnotmatch '\AH([0-9]+)-visual-[0-9]+\z' -or
+            ($anchor.ordinal -isnot [int] -and $anchor.ordinal -isnot [long]) -or $anchor.ordinal -ne [int]$Matches[1]){return $null}
+          $cases=@($PrimaryBinding.Report.sourceReviews|Where-Object {$_.ordinal -eq $anchor.ordinal})
+          if($cases.Count -ne 1){return $null}
+          $matchesCount=0
+          foreach($clause in $cases[0].clauses) {
+            foreach($part in $clause.parts) {
+              if($part.disposition -ceq 'provider_unmet'){continue}
+              if($part.disposition -ceq 'superseded_presentation' -and
+                -not (Test-CurrentSlotPresentation ('H'+$anchor.ordinal+':'+$clause.index+':'+$part.requirement) $expectedSlot)){continue}
+              for($testIndex=0;$testIndex -lt $part.successfulTests.Count;$testIndex++) {
+                if((ConvertTo-Json $anchor.successfulTest -Depth 100 -Compress) -ceq
+                  (ConvertTo-Json $part.successfulTests[$testIndex] -Depth 100 -Compress) -and
+                  (ConvertTo-Json $anchor.assertionEvidence -Depth 100 -Compress) -ceq
+                  (ConvertTo-Json $part.assertionEvidence[$testIndex] -Depth 100 -Compress)) {
+                  $actualPairs=@($PrimaryAssertionReview.ReviewedAssertionPairs|Where-Object {
+                    $_.Ordinal -eq $anchor.ordinal -and $_.Clause -eq $clause.index -and
+                    $_.Requirement -ceq $part.requirement -and $_.Disposition -ceq $part.disposition -and
+                    (ConvertTo-Json $_.SuccessfulTest -Depth 100 -Compress) -ceq
+                    (ConvertTo-Json $anchor.successfulTest -Depth 100 -Compress) -and
+                    (ConvertTo-Json $_.AssertionEvidence -Depth 100 -Compress) -ceq
+                    (ConvertTo-Json $anchor.assertionEvidence -Depth 100 -Compress)})
+                  if($actualPairs.Count -eq 1){$matchesCount++}
+                }
+              }
+            }
+          }
+          if($matchesCount -lt 1){return $null}
+        }
+        $equivalences.Add($evidence.slotId,$evidence)
+      }
+      foreach($slotId in $risk.slotIds) {
+        if(-not $literal.ContainsKey($slotId) -or $assigned.ContainsKey($slotId)){return $null}
+        $disposition='equivalent'
+        if($slotId -ceq $risk.representative.slotId) {
+          $disposition='representative'
+          if($risk.representative.profile -cne $literal[$slotId].profile){return $null}
+        }elseif(-not $equivalences.ContainsKey($slotId)){return $null}
+        $captureRole='representative';$presentationKey=$null
+        if($disposition -ceq 'equivalent') {
+          $captureRole='shared';$disposition=$equivalences[$slotId].disposition
+          $presentationKey=$equivalences[$slotId].presentationKey
+        }
+        $assigned.Add($slotId,@{RiskId=$risk.id;Disposition=$disposition;CaptureRole=$captureRole;PresentationKey=$presentationKey})
+      }
+    }
+    if($assigned.Count -ne 65 -or $PrimaryVisualReview.Reviews.Count -ne $risks.Count){return $null}
+    $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach($row in $Reconciliation) {
+      if($null -eq $row -or (@($row.PSObject.Properties.Name|Sort-Object) -join '|') -cne
+        'captureRole|disposition|equivalenceProven|newEvidenceRule|presentationKey|profile|reference|referenceRole|riskId|slot' -or
+        -not $assigned.ContainsKey($row.slot) -or -not $seen.Add($row.slot) -or
+        $row.riskId -cne $assigned[$row.slot].RiskId -or $row.captureRole -cne $assigned[$row.slot].CaptureRole){return $null}
+      if($row.captureRole -ceq 'representative' -and $row.disposition -ceq 'superseded_presentation') {
+        if(-not (Test-CurrentSlotPresentation $row.presentationKey $row.slot)){return $null}
+        $assigned[$row.slot].Disposition=$row.disposition;$assigned[$row.slot].PresentationKey=$row.presentationKey
+      }elseif($row.disposition -cne $assigned[$row.slot].Disposition -or
+        $row.presentationKey -cne $assigned[$row.slot].PresentationKey){return $null}
+      foreach($field in @('profile','slot','reference','referenceRole','newEvidenceRule','equivalenceProven')) {
+        if((ConvertTo-Json $row.$field -Compress) -cne (ConvertTo-Json $literal[$row.slot].$field -Compress)){return $null}
+      }
+    }
+    return @{Slots=$assigned;HistoricalSlotsAccounted=$true;CurrentVisualDispositionReviewBound=$true;PrimaryEquivalenceReviewBound=$true;
+      MachineEquivalenceVerified=$false;PresentationAuthorityVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentPresentationReview {
+  param([object]$Obligations,[hashtable]$SourceIdentity,[object]$PrimaryAssertionReview,[object]$PrimaryBinding)
+  # Source access/byte integrity and case-specific procedural review only.
+  # This cannot turn delegated technical authority into founder-approved images.
+  $presentationLeases=[Collections.Generic.List[object]]::new();$result=$null
+  try {
+    try {
+      if($Obligations -isnot [array] -or $null -eq $PrimaryAssertionReview -or
+        $PrimaryAssertionReview.PrimaryAssertionReviewBound -isnot [bool] -or -not $PrimaryAssertionReview.PrimaryAssertionReviewBound -or
+        $null -eq $PrimaryBinding -or $PrimaryBinding.PrimaryReviewRecordBound -isnot [bool] -or
+        -not $PrimaryBinding.PrimaryReviewRecordBound -or
+        (ConvertTo-Json $Obligations -Depth 100 -Compress) -cne
+        (ConvertTo-Json $PrimaryBinding.Report.sourceReviews -Depth 100 -Compress)){return $null}
+      $actual=$PrimaryBinding.Report.sourceIdentity
+      if((@($actual.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+      foreach($field in $SourceIdentity.Keys){if($actual.$field -isnot [string] -or $actual.$field -cne $SourceIdentity[$field]){return $null}}
+      $taskRoot='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store'
+      $manifestHash='78A0C5E9C653EF10E708C5B5CD61370083942EDDE0665D74C19506BBE6A85A9D'
+      $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      $buffers=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::OrdinalIgnoreCase)
+      $fileIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      function Read-PresentationFile([string]$Path,[string]$ExpectedHash) {
+        if($ExpectedHash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+        if($buffers.ContainsKey($Path)) {
+          if($originals[$Path] -cne $ExpectedHash){return $null};return $buffers[$Path]
+        }
+        if((Get-OctoberCoverageBoundHash $Path) -cne $ExpectedHash){return $null}
+        $lease=Open-OctoberCompatibilityVisualArtifact -Base (Split-Path -Parent $Path) `
+          -RelativePath ([IO.Path]::GetFileName($Path)) -ExpectedSha256 $ExpectedHash -MaxBytes 4194304
+        if($null -eq $lease){return $null};$presentationLeases.Add($lease)
+        if($lease.CanonicalPath -cne $Path -or $lease.Sha256 -cne $ExpectedHash -or
+          $lease.Bytes -isnot [byte[]] -or $lease.Bytes.Length -lt 1 -or $lease.Bytes.Length -gt 4194304 -or
+          $null -eq $lease.Stream -or $lease.FileIdentity -isnot [string] -or
+          $lease.FileIdentity -cnotmatch '\A[0-9A-F]{8}:[0-9A-F]{16}\z' -or -not $fileIds.Add($lease.FileIdentity) -or
+          (Get-OctoberCompatibilityByteHash $lease.Bytes) -cne $ExpectedHash){return $null}
+        $originals.Add($Path,$ExpectedHash);$buffers.Add($Path,$lease.Bytes);return $lease.Bytes
+      }
+      $manifestPath=[IO.Path]::GetFullPath((Join-Path $taskRoot 'work/founder-input-gate.json'))
+      $manifestBytes=Read-PresentationFile $manifestPath $manifestHash
+      if($null -eq $manifestBytes){return $null}
+      $manifest=Read-OctoberCompatibilityJsonObject ([byte[]]$manifestBytes)
+      $statePath=[IO.Path]::GetFullPath((Join-Path $taskRoot 'work/founder-input-read-state.local.json'))
+      $stateHash=Get-OctoberCoverageBoundHash $statePath
+      $stateBytes=Read-PresentationFile $statePath $stateHash
+      if($null -eq $stateBytes){return $null}
+      $state=Read-OctoberCompatibilityJsonObject ([byte[]]$stateBytes)
+      if($null -eq $manifest -or $manifest.sources -isnot [array] -or $manifest.sources.Count -ne 40 -or
+        $null -eq $state -or $state.task -cne 'store-buy-compatibility-20261008' -or
+        $state.manifestHash -cne $manifestHash -or $state.reads -isnot [array] -or $state.reads.Count -ne 40){return $null}
+      # Independent founder-gate access receipts select original source hashes;
+      # Q cannot supply new authority hashes or paths. Access is not comprehension.
+      $allowed=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      for($index=0;$index -lt 40;$index++) {
+        $entry=@($state.reads|Where-Object {$_.index -eq $index})
+        $source=$manifest.sources[$index]
+        if($entry.Count -ne 1 -or ($entry[0].index -isnot [int] -and $entry[0].index -isnot [long]) -or
+          $entry[0].index -ne $index -or $entry[0].hash -isnot [string] -or $entry[0].hash -cnotmatch '\A[0-9A-F]{64}\z' -or
+          $source -isnot [string] -or [string]::IsNullOrWhiteSpace($source)){return $null}
+        $path=[IO.Path]::GetFullPath($(if([IO.Path]::IsPathRooted($source)){$source}else{Join-Path $taskRoot $source}))
+        if($allowed.ContainsKey($path)){return $null};$allowed.Add($path,$entry[0].hash)
+      }
+      $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+      if($null -eq $contract){return $null}
+      $decisions=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+      foreach($case in $Obligations) {
+        foreach($clause in $case.clauses) {
+          foreach($part in $clause.parts) {
+            if($part.disposition -cne 'superseded_presentation'){continue}
+            $authority=$part.presentationAuthority
+            if($null -eq $authority -or (@($authority.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'decision|path|sha256' -or
+              $authority.path -isnot [string] -or -not [IO.Path]::IsPathRooted($authority.path) -or
+              $authority.decision -isnot [string]){return $null}
+            $path=[IO.Path]::GetFullPath($authority.path)
+            if(-not $allowed.ContainsKey($path) -or $authority.sha256 -cne $allowed[$path] -or
+              [IO.Path]::GetFileName($path) -ceq 'founder-current-baseline-qualification-direction-20261010.json'){return $null}
+            $decision=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($authority.decision))
+            if($null -eq $decision -or (@($decision.PSObject.Properties.Name|Sort-Object) -join '|') -cne
+              'clause|currentChange|founderExcerpt|limitations|ordinal|reason|requirement|schemaVersion|slotIds' -or
+              ($decision.schemaVersion -isnot [int] -and $decision.schemaVersion -isnot [long]) -or $decision.schemaVersion -ne 1 -or
+              ($decision.ordinal -isnot [int] -and $decision.ordinal -isnot [long]) -or $decision.ordinal -ne $case.ordinal -or
+              ($decision.clause -isnot [int] -and $decision.clause -isnot [long]) -or $decision.clause -ne $clause.index -or
+              $decision.requirement -cne $part.requirement -or $decision.slotIds -isnot [array] -or $decision.slotIds.Count -lt 1){return $null}
+            foreach($field in @('founderExcerpt','currentChange','reason','limitations')) {
+              if($decision.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($decision.$field)){return $null}
+            }
+            $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach($slot in $decision.slotIds) {
+              if($slot -isnot [string] -or $slot -cnotmatch '\AH([0-9]+)-visual-[0-9]+\z' -or
+                [int]$Matches[1] -ne $case.ordinal -or -not $seen.Add($slot) -or
+                @($contract.visualSlots|Where-Object {$_.slot -ceq $slot}).Count -ne 1){return $null}
+            }
+            $bytes=Read-PresentationFile $path $allowed[$path]
+            if($null -eq $bytes){return $null}
+            $text=[Text.UTF8Encoding]::new($false,$true).GetString([byte[]]$bytes)
+            if(-not $text.Contains($decision.founderExcerpt)){return $null}
+            $key='H'+$case.ordinal+':'+$clause.index+':'+$part.requirement
+            if($decisions.ContainsKey($key)){return $null}
+            $decisions.Add($key,@{Decision=$decision;Authority=$authority;SourcePath=$path})
+          }
+        }
+      }
+      foreach($path in $originals.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $originals[$path]){return $null}}
+      $result=@{Decisions=$decisions;OriginalTaskFileHashes=$originals;SpecificPresentationReviewBound=$true;
+        MachineAuthorityMeaningVerified=$false;FounderApprovedImages=$false;QualificationPassed=$false;ApkAuthority=$false}
+    }finally {
+      $cleanupFailure=$false
+      foreach($lease in $presentationLeases){try{if($null -ne $lease.Stream){$lease.Stream.Dispose()}}catch{$cleanupFailure=$true}}
+      if($cleanupFailure){throw 'Presentation authority leases could not all be closed.'}
+    }
+  }catch{return $null}
+  return $result
+}
+
+function Read-OctoberCompatibilityCurrentCombinedOriginalFilePins {
+  param([object]$BehaviorPins,[object]$SelectionPins)
+  # Required originals from actual readers. Invoke after semantic/render/inspection
+  # composition; this final non-atomic file check is not source/Q qualification.
+  try {
+    if($BehaviorPins -isnot [Collections.IDictionary] -or $SelectionPins -isnot [Collections.IDictionary] -or
+      $BehaviorPins.Count -lt 1 -or $SelectionPins.Count -lt 1){return $null}
+    $base=[IO.Path]::GetFullPath((Get-OctoberCompatibilityBinding).worktreePath).TrimEnd([char[]]@('\','/'))
+    $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    # Finish all shape/conflict validation before any file is read again.
+    foreach($set in @($BehaviorPins,$SelectionPins)) {
+      foreach($path in $set.Keys) {
+        $hash=$set[$path]
+        if($path -isnot [string] -or $hash -isnot [string] -or $hash -cnotmatch '\A[0-9A-F]{64}\z' -or
+          -not [IO.Path]::IsPathRooted($path) -or $path -cne [IO.Path]::GetFullPath($path) -or
+          -not $path.StartsWith($base+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){return $null}
+        if($originals.ContainsKey($path)) {
+          if($originals[$path] -cne $hash){return $null}
+        }else{$originals.Add($path,$hash)}
+      }
+    }
+    foreach($path in $originals.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $originals[$path]){return $null}}
+    return @{OriginalFileHashes=$originals;FinalFileBindingsVerified=$true;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentCycles {
+  param([object]$Cycles,[hashtable]$SourceIdentity)
+  # Retained execution coverage only. Clause assertions, skip dispositions and
+  # inspected visual risks must still be composed before qualification can pass.
+  try {
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    if($null -eq $spec -or $Cycles -isnot [array] -or $Cycles.Count -ne 2){return $null}
+    $seenRuns=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $seenPaths=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $pins=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $executions=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $base=(Get-OctoberCompatibilityBinding).worktreePath
+    for($cycleIndex=0;$cycleIndex -lt 2;$cycleIndex++) {
+      $cycle=$Cycles[$cycleIndex]
+      if($null -eq $cycle -or (@($cycle.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'id|reports' -or
+        $cycle.id -isnot [string] -or $cycle.id -cne $spec.cycles.ids[$cycleIndex] -or
+        $cycle.reports -isnot [array] -or $cycle.reports.Count -ne $spec.cycles.reports.Count){return $null}
+      for($reportIndex=0;$reportIndex -lt $spec.cycles.reports.Count;$reportIndex++) {
+        $expected=$spec.cycles.reports[$reportIndex];$report=$cycle.reports[$reportIndex]
+        if($null -eq $report -or (@($report.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'executions|id' -or
+          $report.id -isnot [string] -or $report.id -cne $expected.id -or $report.executions -isnot [array] -or
+          $report.executions.Count -ne $expected.executions.Count){return $null}
+        for($executionIndex=0;$executionIndex -lt $expected.executions.Count;$executionIndex++) {
+          $entry=$report.executions[$executionIndex]
+          if($null -eq $entry -or (@($entry.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.cycles.executionFields|Sort-Object) -join '|') -or
+            $entry.executionId -isnot [string] -or $entry.executionId -cne $expected.executions[$executionIndex] -or
+            $entry.mode -isnot [string] -or $entry.mode -cne 'behavior_only' -or $entry.runId -isnot [string] -or
+            $entry.runId -cnotmatch '\Acurrent-[0-9a-f]{32}\z' -or -not $seenRuns.Add($entry.runId)){return $null}
+          $evidence=[pscustomobject]@{executionId=$entry.executionId;path=$entry.path;capturePath=$entry.capturePath;
+            sha256=$entry.sha256;captureSha256=$entry.captureSha256;runtimeDefines=$entry.runtimeDefines}
+          # Native file reader rejects malformed paths before these are joined.
+          $validated=Read-OctoberCompatibilityCurrentExecutionEvidence -Evidence $evidence -ReportId $report.id `
+            -ExecutionId $entry.executionId -Mode $entry.mode -RunId $entry.runId -SourceIdentity $SourceIdentity
+          if($null -eq $validated){return $null}
+          foreach($relative in @($entry.path,$entry.capturePath,($entry.path+'.stderr.txt'))) {
+            if(-not $seenPaths.Add($relative)){return $null}
+            $path=Join-Path $base $relative
+            $hash=Get-OctoberCoverageBoundHash $path
+            if($hash -isnot [string] -or $hash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+            $role=if($relative -ceq $entry.path){'log'}elseif($relative -ceq $entry.capturePath){'capture'}else{'stderr'}
+            if($null -eq $validated.RetainedFileHashes -or $hash -cne $validated.RetainedFileHashes[$role]){return $null}
+            if(($relative -ceq $entry.path -and $hash -cne $entry.sha256) -or
+              ($relative -ceq $entry.capturePath -and $hash -cne $entry.captureSha256)){return $null}
+            $pins.Add($path,$hash)
+          }
+          $executions.Add(($cycle.id+':'+$report.id+':'+$entry.executionId),$validated)
+        }
+      }
+    }
+    if($executions.Count -ne 20){return $null}
+    foreach($path in $pins.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $pins[$path]){return $null}}
+    return @{Executions=$executions;OriginalFileHashes=$pins;CyclesVerified=$true;QualificationPassed=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentObligationJoins {
+  param([object]$Obligations,[hashtable]$SourceIdentity,[hashtable]$CycleEvidence)
+  # Retention, typed wire shape and designated event-success joins only. Actual
+  # excerpt meaning and independently pinned founder authority remain unverified.
+  try {
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    if($null -eq $spec -or $null -eq $contract -or $Obligations -isnot [array] -or $Obligations.Count -ne 84 -or
+      $null -eq $CycleEvidence -or $CycleEvidence.CyclesVerified -isnot [bool] -or -not $CycleEvidence.CyclesVerified -or
+      $CycleEvidence.QualificationPassed -isnot [bool] -or $CycleEvidence.QualificationPassed){return $null}
+    for($caseIndex=0;$caseIndex -lt 84;$caseIndex++) {
+      $expected=$contract.cases[$caseIndex];$entry=$Obligations[$caseIndex]
+      if($null -eq $entry -or (@($entry.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'clauses|historicalKey|ordinal' -or
+        ($entry.ordinal -isnot [int] -and $entry.ordinal -isnot [long]) -or $entry.ordinal -ne $expected.ordinal -or
+        $entry.historicalKey -isnot [string] -or $entry.historicalKey -cne $expected.historicalKey -or
+        $entry.clauses -isnot [array] -or $entry.clauses.Count -ne $expected.retainedObligations.Count){return $null}
+      for($clauseIndex=0;$clauseIndex -lt $expected.retainedObligations.Count;$clauseIndex++) {
+        $clause=$entry.clauses[$clauseIndex];$text=$expected.retainedObligations[$clauseIndex]
+        if($null -eq $clause -or (@($clause.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.obligations.clauseFields|Sort-Object) -join '|') -or
+          ($clause.index -isnot [int] -and $clause.index -isnot [long]) -or $clause.index -ne ($clauseIndex+1) -or
+          $clause.text -isnot [string] -or $clause.text -cne $text -or $clause.parts -isnot [array]){return $null}
+        $requirements=@($text)
+        foreach($split in $spec.obligations.requiredSplit) {
+          if($split.ordinal -eq $entry.ordinal -and $split.clause -eq $clause.index){$requirements=@($split.parts)}
+        }
+        if($clause.parts.Count -ne $requirements.Count){return $null}
+        for($partIndex=0;$partIndex -lt $requirements.Count;$partIndex++) {
+          $part=$clause.parts[$partIndex]
+          if($null -eq $part -or (@($part.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.obligations.partFields|Sort-Object) -join '|') -or
+            $part.requirement -isnot [string] -or $part.requirement -cne $requirements[$partIndex] -or $part.disposition -isnot [string] -or
+            $spec.obligations.dispositions -cnotcontains $part.disposition -or $part.successfulTests -isnot [array] -or
+            $part.assertionEvidence -isnot [array]){return $null}
+          if($part.disposition -ceq 'provider_unmet') {
+            $allowed=@($spec.obligations.providerUnmetAllowed|Where-Object {$_.ordinal -eq $entry.ordinal -and $_.clause -eq $clause.index -and $_.requirement -ceq $part.requirement})
+            $deferral=@($contract.providerDeferrals|Where-Object {$_.case -ceq ('H'+$entry.ordinal)})
+            if($allowed.Count -ne 1 -or $deferral.Count -ne 1 -or $part.successfulTests.Count -or $part.assertionEvidence.Count -or
+              $null -ne $part.presentationAuthority -or $null -eq $part.dependency -or
+              (@($part.dependency.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'completion|owner'){return $null}
+            foreach($field in @('owner','completion')) {
+              if($part.dependency.$field -isnot [string] -or $part.dependency.$field -cne $deferral[0].$field){return $null}
+            }
+            continue
+          }
+          if($null -ne $part.dependency -or $part.successfulTests.Count -lt 1 -or
+            $part.assertionEvidence.Count -ne $part.successfulTests.Count){return $null}
+          if($part.disposition -ceq 'asserted') {if($null -ne $part.presentationAuthority){return $null}}
+          else {
+            $authority=$part.presentationAuthority
+            if($null -eq $authority -or (@($authority.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'decision|path|sha256' -or
+              $authority.path -isnot [string] -or [string]::IsNullOrWhiteSpace($authority.path) -or
+              $authority.decision -isnot [string] -or [string]::IsNullOrWhiteSpace($authority.decision) -or
+              $authority.sha256 -isnot [string] -or $authority.sha256 -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+          }
+          $seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+          for($testIndex=0;$testIndex -lt $part.successfulTests.Count;$testIndex++) {
+            $test=$part.successfulTests[$testIndex];$assertion=$part.assertionEvidence[$testIndex]
+            if($null -eq $test -or (@($test.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.obligations.successfulTestsFields|Sort-Object) -join '|')){return $null}
+            foreach($field in @('reportId','executionId','testKey')){if($test.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($test.$field)){return $null}}
+            if(-not $seen.Add(($test.reportId+':'+$test.executionId+':'+$test.testKey))){return $null}
+            foreach($cycleId in @('cycle1','cycle2')) {
+              $key=$cycleId+':'+$test.reportId+':'+$test.executionId
+              if(-not $CycleEvidence.Executions.ContainsKey($key) -or -not $CycleEvidence.Executions[$key].Successes.Contains($test.testKey)){return $null}
+            }
+            if($null -eq $assertion -or (@($assertion.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.obligations.assertionEvidenceFields|Sort-Object) -join '|') -or
+              $assertion.owner -isnot [string] -or $test.testKey.IndexOf(':') -lt 1 -or
+              $assertion.owner -cne ('apps/mobile/test/'+$test.testKey.Substring(0,$test.testKey.IndexOf(':'))) -or
+              $assertion.sourceBlob -isnot [string] -or $assertion.sourceBlob -cnotmatch '\A[0-9a-f]{40}\z' -or
+              $assertion.excerptSha256 -isnot [string] -or $assertion.excerptSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+              ($assertion.firstLine -isnot [int] -and $assertion.firstLine -isnot [long]) -or
+              ($assertion.lastLine -isnot [int] -and $assertion.lastLine -isnot [long]) -or
+              $assertion.firstLine -lt 1 -or $assertion.lastLine -lt $assertion.firstLine -or
+              $assertion.reviewObservation -isnot [string] -or [string]::IsNullOrWhiteSpace($assertion.reviewObservation)){return $null}
+          }
+        }
+      }
+    }
+    return @{RetentionAndSuccessJoinsVerified=$true;AssertionSemanticsVerified=$false;PresentationAuthorityVerified=$false;QualificationPassed=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {
+  param([object]$Obligations,[hashtable]$SourceIdentity,[hashtable]$CycleEvidence,[object]$PrimaryBinding)
+  # Consume only the independently bound primary record and actual cycle reader.
+  # Check committed excerpts/native declarations; meaning and loop association
+  # remain primary judgments, not an automatic semantic oracle.
+  try {
+    $joins=Read-OctoberCompatibilityCurrentObligationJoins -Obligations $Obligations -SourceIdentity $SourceIdentity -CycleEvidence $CycleEvidence
+    if($null -eq $joins -or $joins.RetentionAndSuccessJoinsVerified -isnot [bool] -or -not $joins.RetentionAndSuccessJoinsVerified -or
+      $null -eq $PrimaryBinding -or $PrimaryBinding.PrimaryReviewRecordBound -isnot [bool] -or -not $PrimaryBinding.PrimaryReviewRecordBound -or
+      $null -eq $PrimaryBinding.Report -or $PrimaryBinding.Report.sourceReviews -isnot [array] -or
+      $PrimaryBinding.Report.sourceReviews.Count -ne 84 -or $Obligations -isnot [array] -or $Obligations.Count -ne 84){return $null}
+    $primary=$PrimaryBinding.Report
+    if((@($primary.sourceIdentity.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($SourceIdentity.Keys|Sort-Object) -join '|')){return $null}
+    foreach($field in $SourceIdentity.Keys){if($primary.sourceIdentity.$field -isnot [string] -or $primary.sourceIdentity.$field -cne $SourceIdentity[$field]){return $null}}
+    $sources=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $reviewedPairs=[Collections.Generic.List[object]]::new()
+    $base=(Get-OctoberCompatibilityBinding).worktreePath
+    for($index=0;$index -lt 84;$index++) {
+      $entry=$Obligations[$index];$reviewed=$primary.sourceReviews[$index]
+      if(($entry.ordinal -isnot [int] -and $entry.ordinal -isnot [long]) -or $entry.ordinal -ne ($index+1) -or
+        (ConvertTo-Json -InputObject $entry -Depth 100 -Compress) -cne
+        (ConvertTo-Json -InputObject $reviewed -Depth 100 -Compress)){return $null}
+      foreach($clause in $entry.clauses) {
+        foreach($part in $clause.parts) {
+          if($part.disposition -ceq 'provider_unmet'){continue}
+          for($testIndex=0;$testIndex -lt $part.assertionEvidence.Count;$testIndex++) {
+            $assertion=$part.assertionEvidence[$testIndex];$test=$part.successfulTests[$testIndex]
+            $owner=$assertion.owner
+            if($owner -isnot [string] -or $owner -cnotmatch '\Aapps/mobile/test/[A-Za-z0-9_./-]+\.dart\z' -or
+              $owner.Split('/') -contains '..' -or $owner.Split('/') -contains '.' -or $owner.Contains('//')){return $null}
+            if(-not $sources.ContainsKey($owner)) {
+              $blob=@(Get-OctoberCompatibilityGitLines @('rev-parse',($SourceIdentity.captureSourceCommit+':'+$owner)))
+              $lines=@(Get-OctoberCompatibilityGitLines @('show',($SourceIdentity.captureSourceCommit+':'+$owner)))
+              if($blob.Count -ne 1 -or $blob[0] -cnotmatch '\A[0-9a-f]{40}\z' -or -not $lines.Count){return $null}
+              $sources.Add($owner,@{Blob=$blob[0];Lines=$lines})
+            }
+            $source=$sources[$owner]
+            if($assertion.sourceBlob -cne $source.Blob -or $assertion.lastLine -gt $source.Lines.Count){return $null}
+            $excerpt=$source.Lines[($assertion.firstLine-1)..($assertion.lastLine-1)] -join "`n"
+            if((Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($excerpt))) -cne $assertion.excerptSha256){return $null}
+            $review=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($assertion.reviewObservation))
+            $fields=@('schemaVersion','testKey','declarationLine','declarationColumn','bodyFirstLine','bodyLastLine','loopBindings','helperEvidence','assertions','meaning','limitations')
+            if($null -eq $review -or (@($review.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+              ($review.schemaVersion -isnot [int] -and $review.schemaVersion -isnot [long]) -or $review.schemaVersion -ne 1 -or
+              $review.testKey -isnot [string] -or $review.testKey -cne $test.testKey -or
+              $review.loopBindings -isnot [array] -or $review.helperEvidence -isnot [array] -or
+              $review.assertions -isnot [array] -or -not $review.assertions.Count){return $null}
+            foreach($field in @('meaning','limitations')){if($review.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($review.$field)){return $null}}
+            foreach($field in @('declarationLine','declarationColumn','bodyFirstLine','bodyLastLine')) {
+              if(($review.$field -isnot [int] -and $review.$field -isnot [long]) -or $review.$field -lt 1){return $null}
+            }
+            if($review.bodyLastLine -gt $source.Lines.Count -or $review.bodyFirstLine -gt $review.bodyLastLine -or
+              $review.declarationLine -gt $review.bodyFirstLine -or $assertion.firstLine -lt $review.bodyFirstLine -or
+              $assertion.lastLine -gt $review.bodyLastLine){return $null}
+            $wholeSource=$source.Lines -join "`n"
+            foreach($loop in $review.loopBindings) {
+              if($null -eq $loop -or (@($loop.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'expression|value' -or
+                $loop.expression -isnot [string] -or [string]::IsNullOrWhiteSpace($loop.expression) -or
+                $loop.value -isnot [string] -or [string]::IsNullOrWhiteSpace($loop.value) -or
+                $wholeSource.IndexOf($loop.expression,[StringComparison]::Ordinal) -lt 0){return $null}
+            }
+            foreach($expression in $review.assertions) {
+              if($null -eq $expression -or (@($expression.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'expression|firstLine|lastLine' -or
+                ($expression.firstLine -isnot [int] -and $expression.firstLine -isnot [long]) -or
+                ($expression.lastLine -isnot [int] -and $expression.lastLine -isnot [long]) -or
+                $expression.firstLine -lt $assertion.firstLine -or $expression.lastLine -gt $assertion.lastLine -or
+                $expression.lastLine -lt $expression.firstLine -or $expression.expression -isnot [string] -or
+                [string]::IsNullOrWhiteSpace($expression.expression)){return $null}
+              $actual=$source.Lines[($expression.firstLine-1)..($expression.lastLine-1)] -join "`n"
+              if($actual -cne $expression.expression){return $null}
+            }
+            $helperCalls=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            foreach($helper in $review.helperEvidence) {
+              $helperFields=@('owner','sourceBlob','firstLine','lastLine','excerptSha256','functionName','callFirstLine','callLastLine','callExpression','assertions')
+              if($null -eq $helper -or (@($helper.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($helperFields|Sort-Object) -join '|') -or
+                $helper.owner -isnot [string] -or $helper.owner -cnotmatch '\Aapps/mobile/(?:test|lib)/[A-Za-z0-9_./-]+\.dart\z' -or
+                $helper.owner.Split('/') -contains '..' -or $helper.owner.Split('/') -contains '.' -or $helper.owner.Contains('//') -or
+                $helper.sourceBlob -isnot [string] -or $helper.sourceBlob -cnotmatch '\A[0-9a-f]{40}\z' -or
+                $helper.excerptSha256 -isnot [string] -or $helper.excerptSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+                $helper.functionName -isnot [string] -or $helper.functionName -cnotmatch '\A[A-Za-z_][A-Za-z0-9_]*\z' -or
+                $helper.callExpression -isnot [string] -or [string]::IsNullOrWhiteSpace($helper.callExpression) -or
+                $helper.assertions -isnot [array] -or -not $helper.assertions.Count){return $null}
+              foreach($field in @('firstLine','lastLine','callFirstLine','callLastLine')) {
+                if(($helper.$field -isnot [int] -and $helper.$field -isnot [long]) -or $helper.$field -lt 1){return $null}
+              }
+              if($helper.callFirstLine -lt $assertion.firstLine -or $helper.callLastLine -gt $assertion.lastLine -or
+                $helper.callLastLine -lt $helper.callFirstLine -or $helper.lastLine -lt $helper.firstLine -or
+                -not $helperCalls.Add(($helper.owner+':'+$helper.functionName+':'+$helper.callFirstLine+':'+$helper.callLastLine))){return $null}
+              $callText=$source.Lines[($helper.callFirstLine-1)..($helper.callLastLine-1)] -join "`n"
+              $callPattern='(?<![A-Za-z0-9_])'+[regex]::Escape($helper.functionName)+'\s*\('
+              if($callText -cne $helper.callExpression -or -not [regex]::IsMatch($callText,$callPattern)){return $null}
+              if(-not $sources.ContainsKey($helper.owner)) {
+                $helperBlob=@(Get-OctoberCompatibilityGitLines @('rev-parse',($SourceIdentity.captureSourceCommit+':'+$helper.owner)))
+                $helperLines=@(Get-OctoberCompatibilityGitLines @('show',($SourceIdentity.captureSourceCommit+':'+$helper.owner)))
+                if($helperBlob.Count -ne 1 -or $helperBlob[0] -cnotmatch '\A[0-9a-f]{40}\z' -or -not $helperLines.Count){return $null}
+                $sources.Add($helper.owner,@{Blob=$helperBlob[0];Lines=$helperLines})
+              }
+              $helperSource=$sources[$helper.owner]
+              if($helperSource.Blob -cne $helper.sourceBlob -or $helper.lastLine -gt $helperSource.Lines.Count){return $null}
+              $helperText=$helperSource.Lines[($helper.firstLine-1)..($helper.lastLine-1)] -join "`n"
+              if((Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($helperText))) -cne $helper.excerptSha256 -or
+                -not [regex]::IsMatch($helperText,$callPattern)){return $null}
+              foreach($check in $helper.assertions) {
+                if($null -eq $check -or (@($check.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'expression|firstLine|lastLine' -or
+                  ($check.firstLine -isnot [int] -and $check.firstLine -isnot [long]) -or
+                  ($check.lastLine -isnot [int] -and $check.lastLine -isnot [long]) -or
+                  $check.firstLine -lt $helper.firstLine -or $check.lastLine -gt $helper.lastLine -or $check.lastLine -lt $check.firstLine -or
+                  $check.expression -isnot [string] -or [string]::IsNullOrWhiteSpace($check.expression)){return $null}
+                $actualCheck=$helperSource.Lines[($check.firstLine-1)..($check.lastLine-1)] -join "`n"
+                if($actualCheck -cne $check.expression){return $null}
+              }
+              # Text/name checks bind retained evidence. Actual helper definition,
+              # call dispatch and assertion meaning require the primary's review.
+            }
+            $path=[IO.Path]::GetFullPath((Join-Path $base $owner));$name=$test.testKey.Substring($test.testKey.IndexOf(':')+1)
+            foreach($cycle in @('cycle1','cycle2')) {
+              $execution=$CycleEvidence.Executions[$cycle+':'+$test.reportId+':'+$test.executionId]
+              if($null -eq $execution -or $execution.TestIdentities -isnot [Collections.IDictionary]){return $null}
+              $matches=@($execution.TestIdentities.Values|Where-Object {$_.Name -ceq $name -and
+                $null -ne $_.DeclarationLocation -and $_.DeclarationLocation.SelectedPath -ceq $path})
+              if($matches.Count -ne 1){return $null}
+              $location=$matches[0].DeclarationLocation
+              if($location.DeclarationLocationReferenceVerified -isnot [bool] -or -not $location.DeclarationLocationReferenceVerified){return $null}
+              $tuple=if($location.SelectedTuple -ceq 'root_'){$location.Root}elseif($location.SelectedTuple -ceq ''){$location.Direct}else{$null}
+              if($null -eq $tuple -or $tuple.Complete -isnot [bool] -or -not $tuple.Complete -or
+                $tuple.Line -ne $review.declarationLine -or $tuple.Column -ne $review.declarationColumn){return $null}
+            }
+            $reviewedPairs.Add([pscustomobject]@{Ordinal=$entry.ordinal;Clause=$clause.index;Requirement=$part.requirement;
+              Disposition=$part.disposition;SuccessfulTest=$test;AssertionEvidence=$assertion})
+          }
+        }
+      }
+    }
+    return @{SourceOwners=$sources;ReviewedAssertionPairs=$reviewedPairs.ToArray();PrimaryAssertionReviewBound=$true;MachineSemanticsVerified=$false;
+      PresentationAuthorityVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentSkippedCoverage {
+  param([object]$Obligations,[hashtable]$SourceIdentity,[hashtable]$CycleEvidence)
+  # A skipped historical test requires its exact retained case's complete current
+  # success joins. Unknown skips or unrelated passing tests cannot rescue it.
+  # Source assertion meaning, authority and visual acceptance are still separate.
+  try {
+    $joins=Read-OctoberCompatibilityCurrentObligationJoins -Obligations $Obligations -SourceIdentity $SourceIdentity -CycleEvidence $CycleEvidence
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $SourceIdentity.contractCommit
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $SourceIdentity.contractCommit
+    if($null -eq $joins -or $null -eq $spec -or $null -eq $contract -or $CycleEvidence.Executions.Count -ne 20){return $null}
+    $cases=[Collections.Generic.Dictionary[string,int]]::new([StringComparer]::Ordinal)
+    foreach($case in $contract.cases) {
+      foreach($key in $case.originalSuccessKeys){$cases.Add($key,[int]$case.ordinal)}
+    }
+    # These12 exact source15 recovery tests intentionally run in complementary
+    # review modes, outside H84. No prefix/nearby-name exception is permitted.
+    $prefix='work_store_atomic_operations_test.dart:COUNTERRELAUNCH review Store recovery '
+    $complementary=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+    $complementary.Add(($prefix+'disabled review mode cannot read or seed a Store'),
+      @{SkippedReport='enabled_review_fixture';SuccessfulReport='impacted_store_buy'})
+    foreach($name in @('ENTRYEMPTY actual startup migrates legacy Store and stays empty after relaunch',
+      'ENTRYEMPTY archives legacy selection without deleting linked data',
+      'ENTRYEMPTY write preserves legacy selection and supports safe retry',
+      'ENTRYEMPTY lost-reply preserves legacy selection and supports safe retry',
+      'ENTRYEMPTY archive-conflict preserves legacy selection and supports safe retry',
+      'ledger recovery retains invoice then product-entry history across restarts',
+      'selected Store retains imported stock and photo identity through invoice restart',
+      'encrypted selection retains original seed and rejects corrupt/cross-account data',
+      'fresh session reopens selected Store, discounted draft and completed invoice',
+      'selection read failure is retryable without creating a Store',
+      'account change during read cannot activate the previous Store')) {
+      $complementary.Add(($prefix+'enabled fixture mode '+$name),
+        @{SkippedReport='impacted_store_buy';SuccessfulReport='enabled_review_fixture'})
+    }
+    $expected=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $skips=[Collections.Generic.List[object]]::new()
+    foreach($cycleId in @('cycle1','cycle2')) {
+      foreach($report in $spec.cycles.reports) {
+        foreach($executionId in $report.executions) {
+          $executionKey=$cycleId+':'+$report.id+':'+$executionId
+          if(-not $expected.Add($executionKey) -or -not $CycleEvidence.Executions.ContainsKey($executionKey)){return $null}
+          $execution=$CycleEvidence.Executions[$executionKey]
+          foreach($key in $execution.Skipped) {
+            if($key -isnot [string] -or $execution.Successes.Contains($key)){return $null}
+            $ordinal=0;$kind='complementary_review_mode'
+            if($cases.ContainsKey($key)) {
+              $ordinal=$cases[$key];$kind='retained_case'
+              if($Obligations[$ordinal-1].ordinal -ne $ordinal){return $null}
+            }elseif($complementary.ContainsKey($key)) {
+              $mapping=$complementary[$key]
+              if($report.id -cne $mapping.SkippedReport -or $executionId -cne 'default'){return $null}
+              foreach($requiredCycle in @('cycle1','cycle2')) {
+                $target=$requiredCycle+':'+$mapping.SuccessfulReport+':default'
+                if(-not $CycleEvidence.Executions.ContainsKey($target) -or -not $CycleEvidence.Executions[$target].Successes.Contains($key)){return $null}
+              }
+            }else{return $null}
+            $skips.Add([pscustomobject]@{cycleId=$cycleId;reportId=$report.id;executionId=$executionId;testKey=$key;ordinal=$ordinal;kind=$kind})
+          }
+        }
+      }
+    }
+    foreach($key in $CycleEvidence.Executions.Keys){if(-not $expected.Contains($key)){return $null}}
+    return @{SkippedCoverageVerified=$true;Skipped=$skips.ToArray();AssertionSemanticsVerified=$false;QualificationPassed=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCommittedBlobBytes {
+  param([string]$Blob)
+  # Read bytes, not host-decoded native text. Git object identity is recomputed.
+  $process=$null;$buffer=$null
+  try {
+    if($Blob -cnotmatch '\A[0-9a-f]{40}\z' -or
+      @(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
+    $base=(Get-OctoberCompatibilityBinding).worktreePath
+    if($base -isnot [string] -or $base.Contains('"')){return $null}
+    $info=[Diagnostics.ProcessStartInfo]::new()
+    $info.FileName='git';$info.UseShellExecute=$false;$info.CreateNoWindow=$true
+    $info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+    $info.Arguments='--no-pager --no-optional-locks --no-replace-objects -C "'+$base+'" cat-file blob '+$Blob
+    $process=[Diagnostics.Process]::new();$process.StartInfo=$info
+    if(-not $process.Start()){return $null}
+    $stderr=$process.StandardError.ReadToEndAsync();$buffer=[IO.MemoryStream]::new()
+    $process.StandardOutput.BaseStream.CopyTo($buffer);$process.WaitForExit()
+    if($process.ExitCode -ne 0 -or $stderr.Result.Length -ne 0){return $null}
+    $bytes=$buffer.ToArray();$sha=[Security.Cryptography.SHA1]::Create()
+    try {
+      $header=[Text.Encoding]::ASCII.GetBytes('blob '+$bytes.Length+([char]0))
+      $object=[byte[]]::new($header.Length+$bytes.Length)
+      [Array]::Copy($header,0,$object,0,$header.Length);[Array]::Copy($bytes,0,$object,$header.Length,$bytes.Length)
+      $identity=[BitConverter]::ToString($sha.ComputeHash($object)).Replace('-','').ToLowerInvariant()
+    }finally{$sha.Dispose()}
+    if($identity -cne $Blob){return $null}
+    return ,$bytes
+  }catch{return $null}
+  finally{if($null -ne $buffer){$buffer.Dispose()};if($null -ne $process){$process.Dispose()}}
+}
+
+function Read-OctoberCompatibilityCurrentAssertionSource {
+  param([object]$Assertion,[object]$SuccessfulTest,[hashtable]$SourceIdentity)
+  # Byte identity and paired source-file reference only. A real clause review and
+  # association with the successful named test's body remain required separately.
+  try {
+    $fields=@('owner','sourceBlob','firstLine','lastLine','excerptSha256','reviewObservation')
+    if($null -eq $Assertion -or (@($Assertion.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
+      $null -eq $SuccessfulTest -or (@($SuccessfulTest.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'executionId|reportId|testKey' -or
+      $null -eq $SourceIdentity -or $SourceIdentity.captureSourceCommit -isnot [string] -or
+      $SourceIdentity.captureSourceCommit -cnotmatch '\A[0-9a-f]{40}\z' -or
+      @(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
+    foreach($field in @('reportId','executionId','testKey')){if($SuccessfulTest.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($SuccessfulTest.$field)){return $null}}
+    if($SuccessfulTest.testKey.IndexOf(':') -lt 1 -or
+      [string]::IsNullOrWhiteSpace($SuccessfulTest.testKey.Substring($SuccessfulTest.testKey.IndexOf(':')+1)) -or $Assertion.owner -isnot [string] -or
+      $Assertion.owner -cnotmatch '\Aapps/mobile/test/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\.dart\z' -or
+      $Assertion.owner -cne ('apps/mobile/test/'+$SuccessfulTest.testKey.Substring(0,$SuccessfulTest.testKey.IndexOf(':'))) -or
+      $Assertion.sourceBlob -isnot [string] -or $Assertion.sourceBlob -cnotmatch '\A[0-9a-f]{40}\z' -or
+      $Assertion.excerptSha256 -isnot [string] -or $Assertion.excerptSha256 -cnotmatch '\A[0-9A-F]{64}\z' -or
+      ($Assertion.firstLine -isnot [int] -and $Assertion.firstLine -isnot [long]) -or
+      ($Assertion.lastLine -isnot [int] -and $Assertion.lastLine -isnot [long]) -or
+      $Assertion.firstLine -lt 1 -or $Assertion.lastLine -lt $Assertion.firstLine -or
+      $Assertion.reviewObservation -isnot [string] -or [string]::IsNullOrWhiteSpace($Assertion.reviewObservation)){return $null}
+    $type=@(Get-OctoberCompatibilityGitLines @('cat-file','-t',$SourceIdentity.captureSourceCommit))
+    if($type.Count -ne 1 -or $type[0] -cne 'commit'){return $null}
+    $blob=@(Get-OctoberCompatibilityGitLines @('rev-parse',($SourceIdentity.captureSourceCommit+':'+$Assertion.owner)))
+    if($blob.Count -ne 1 -or $blob[0] -cne $Assertion.sourceBlob){return $null}
+    $bytes=Read-OctoberCompatibilityCommittedBlobBytes -Blob $blob[0]
+    if($null -eq $bytes){return $null}
+    $text=[Text.UTF8Encoding]::new($false,$true).GetString($bytes).Replace("`r`n","`n")
+    $lines=$text.Split([char]10)
+    # A trailing source newline is not an additional selectable source line.
+    $count=if($text.EndsWith("`n")){$lines.Length-1}else{$lines.Length}
+    if($Assertion.lastLine -gt $count){return $null}
+    $excerpt=@($lines[($Assertion.firstLine-1)..($Assertion.lastLine-1)]) -join "`n"
+    if((Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($excerpt))) -cne $Assertion.excerptSha256){return $null}
+    return @{Owner=$Assertion.owner;SourceCommit=$SourceIdentity.captureSourceCommit;SourceBlob=$blob[0];
+      FirstLine=$Assertion.firstLine;LastLine=$Assertion.lastLine;Excerpt=$excerpt;SourceExcerptVerified=$true;
+      TestBodyAssociationVerified=$false;ClauseMeaningVerified=$false;QualificationPassed=$false}
+  }catch{return $null}
 }
 
 function Read-OctoberCompatibilityExecutionEvidence {
@@ -1883,12 +4052,13 @@ function Read-OctoberCompatibilityVisualArtifactBytes {
 }
 
 function Open-OctoberCompatibilityVisualArtifact {
-  param([string]$Base,[string]$RelativePath,[string]$ExpectedSha256)
+  param([string]$Base,[string]$RelativePath,[string]$ExpectedSha256,[long]$MaxBytes=67108864)
   # Read-only lease: caller must dispose Stream in finally after comparison.
   # FileShare.Read excludes writers/deletion; Windows identity detects hardlinks.
   $artifactStream=$null;$leaseReturned=$false
   try {
-    if($Base -cnotmatch '\A(?:[A-Za-z]:[\\/]|\\\\[^\\/]+\\[^\\/]+)' -or
+    if($MaxBytes -lt 1 -or $MaxBytes -gt 67108864 -or
+        $Base -cnotmatch '\A(?:[A-Za-z]:[\\/]|\\\\[^\\/]+\\[^\\/]+)' -or
         $RelativePath -cnotmatch '\A[a-zA-Z0-9][a-zA-Z0-9._/-]*\z' -or
         [IO.Path]::IsPathRooted($RelativePath) -or
         @($RelativePath.Split('/')|Where-Object {$_ -in @('','..','.')}).Count -ne 0 -or
@@ -1937,7 +4107,7 @@ public static class MoolCompatibilityVisualFileIdentityV1 {
 '@
     }
     $artifactStream=[IO.FileStream]::new($artifactPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
-    if($artifactStream.Length -lt 1 -or $artifactStream.Length -gt 67108864){return $null}
+    if($artifactStream.Length -lt 1 -or $artifactStream.Length -gt $MaxBytes){return $null}
     if((Get-OctoberCoverageBoundHash $artifactPath) -cne $ExpectedSha256){return $null}
     $identity=[MoolCompatibilityVisualFileIdentityV1]::Read($artifactStream.SafeFileHandle)
     if(-not [string]::Equals([IO.Path]::GetFullPath($identity[0]),$artifactPath,[StringComparison]::OrdinalIgnoreCase)){return $null}
@@ -2350,10 +4520,282 @@ function Test-OctoberCompatibilityVisualQualification {
   } catch {return $false}
 }
 
-function Test-OctoberCompatibilityQualification([hashtable]$History, [switch]$FromWorkingTree) {
-  # Repair-only intermediate. Historical/core parser positives are not current
-  # admission. A separately prepared contract amendment must enable qualification.
-  return $false
+function Read-OctoberCompatibilityCurrentPrimaryReviewBinding {
+  param([hashtable]$SourceIdentity)
+  # Fixed primary TASK ledger selects report/seal digests, independently of Q.
+  # This is procedural attestation plus stable-byte checks, not authentication
+  # of a human, semantic proof, inspected-image proof or founder acceptance.
+  $leases=[Collections.Generic.List[object]]::new();$result=$null
+  try {
+    try {
+      $taskRoot='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store'
+      $authorityHash='F76F211F42CE11D4842532E7BBE5FAF54C94DAF14150CC1522E93393D97D06BD'
+      $sourceFields=@('runtimeSourceCommit','contractCommit','captureSourceCommit','captureSourceTree','producerBlob','executionHead')
+      if($null -eq $SourceIdentity -or (@($SourceIdentity.Keys|Sort-Object) -join '|') -cne (@($sourceFields|Sort-Object) -join '|')){return $null}
+      foreach($name in $sourceFields){if($SourceIdentity[$name] -isnot [string] -or $SourceIdentity[$name] -cnotmatch '\A[0-9a-f]{40}\z'){return $null}}
+      if($SourceIdentity.runtimeSourceCommit -cne '3c3f38136db8bb184866635203d04ea4643f1eac' -or
+        $SourceIdentity.executionHead -cne $SourceIdentity.captureSourceCommit){return $null}
+      $originals=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+      $fileIds=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+      function Test-PrimaryFields($Object,[string[]]$Fields) {
+        return $null -ne $Object -and $Object -isnot [array] -and
+          (@($Object.PSObject.Properties.Name|Sort-Object) -join '|') -ceq (@($Fields|Sort-Object) -join '|')
+      }
+      function Test-PrimarySource($Object) {
+        if(-not (Test-PrimaryFields $Object $sourceFields)){return $false}
+        foreach($name in $sourceFields){if($Object.$name -isnot [string] -or $Object.$name -cne $SourceIdentity[$name]){return $false}}
+        return $true
+      }
+      function Read-PrimaryFile([string]$Relative,[string]$ExpectedHash) {
+        if($ExpectedHash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+        $path=[IO.Path]::GetFullPath((Join-Path $taskRoot $Relative))
+        if((Get-OctoberCoverageBoundHash $path) -cne $ExpectedHash){return $null}
+        $lease=Open-OctoberCompatibilityVisualArtifact -Base $taskRoot -RelativePath $Relative -ExpectedSha256 $ExpectedHash -MaxBytes 4194304
+        if($null -eq $lease){return $null};$leases.Add($lease)
+        if($lease.CanonicalPath -isnot [string] -or $lease.CanonicalPath -cne $path -or
+          $lease.Sha256 -isnot [string] -or $lease.Sha256 -cne $ExpectedHash -or
+          $lease.Bytes -isnot [byte[]] -or $lease.Bytes.Length -lt 1 -or $lease.Bytes.Length -gt 4194304 -or
+          $null -eq $lease.Stream -or $lease.FileIdentity -isnot [string] -or
+          $lease.FileIdentity -cnotmatch '\A[0-9A-F]{8}:[0-9A-F]{16}\z' -or
+          -not $fileIds.Add($lease.FileIdentity) -or $originals.ContainsKey($path) -or
+          (Get-OctoberCompatibilityByteHash $lease.Bytes) -cne $ExpectedHash){return $null}
+        $originals.Add($path,$ExpectedHash)
+        return $lease
+      }
+      $ledgerRelative='outputs/codex-integration-readiness-20261008.md'
+      $ledgerPath=[IO.Path]::GetFullPath((Join-Path $taskRoot $ledgerRelative))
+      $ledgerHash=Get-OctoberCoverageBoundHash $ledgerPath
+      # First ledger observation selects the immutable originals for this read.
+      # Read-PrimaryFile would add a second pre-read; acquire the ledger directly.
+      if($ledgerHash -isnot [string] -or $ledgerHash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+      $ledgerLease=Open-OctoberCompatibilityVisualArtifact -Base $taskRoot -RelativePath $ledgerRelative -ExpectedSha256 $ledgerHash -MaxBytes 4194304
+      if($null -eq $ledgerLease){return $null};$leases.Add($ledgerLease)
+      if($ledgerLease.CanonicalPath -cne $ledgerPath -or $ledgerLease.Sha256 -cne $ledgerHash -or
+        $ledgerLease.Bytes -isnot [byte[]] -or $ledgerLease.Bytes.Length -lt 1 -or $ledgerLease.Bytes.Length -gt 4194304 -or
+        $null -eq $ledgerLease.Stream -or $ledgerLease.FileIdentity -isnot [string] -or
+        $ledgerLease.FileIdentity -cnotmatch '\A[0-9A-F]{8}:[0-9A-F]{16}\z' -or
+        -not $fileIds.Add($ledgerLease.FileIdentity) -or (Get-OctoberCompatibilityByteHash $ledgerLease.Bytes) -cne $ledgerHash){return $null}
+      $originals.Add($ledgerPath,$ledgerHash)
+      $text=[Text.UTF8Encoding]::new($false,$true).GetString($ledgerLease.Bytes)
+      $blocks=[regex]::Matches($text,'(?s)<!-- COMPATIBILITY_PRIMARY_TECHNICAL_REVIEW_BINDING_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_PRIMARY_TECHNICAL_REVIEW_BINDING_JSON_END -->')
+      if($blocks.Count -ne 1){return $null}
+      $binding=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($blocks[0].Groups[1].Value))
+      if(-not (Test-PrimaryFields $binding @('schemaVersion','sourceIdentity','revision','authoritySha256','reportSha256','sealSha256')) -or
+        ($binding.schemaVersion -isnot [int] -and $binding.schemaVersion -isnot [long]) -or $binding.schemaVersion -ne 1 -or
+        ($binding.revision -isnot [int] -and $binding.revision -isnot [long]) -or $binding.revision -lt 1 -or $binding.revision -gt 64 -or
+        -not (Test-PrimarySource $binding.sourceIdentity) -or $binding.authoritySha256 -isnot [string] -or
+        $binding.authoritySha256 -cne $authorityHash){return $null}
+      $prefix='outputs/compatibility-primary-review-'+$SourceIdentity.captureSourceCommit+'-r'+$binding.revision
+      $authority=Read-PrimaryFile 'outputs/founder-current-baseline-qualification-direction-20261010.json' $authorityHash
+      $reportFile=Read-PrimaryFile ($prefix+'.json') $binding.reportSha256
+      $sealFile=Read-PrimaryFile ($prefix+'.seal.json') $binding.sealSha256
+      if($null -eq $authority -or $null -eq $reportFile -or $null -eq $sealFile){return $null}
+      $report=Read-OctoberCompatibilityJsonObject $reportFile.Bytes
+      $seal=Read-OctoberCompatibilityJsonObject $sealFile.Bytes
+      if(-not (Test-PrimaryFields $report @('schemaVersion','sourceIdentity','revision','authoritySha256','writerRole','writerTask','trustModel',
+        'sourceReviews','visualReviews','founderApproved','providerVerified','apkAuthority')) -or
+        -not (Test-PrimaryFields $seal @('schemaVersion','sourceIdentity','revision','authoritySha256','reportSha256','writerRole','writerTask'))){return $null}
+      foreach($record in @($report,$seal)) {
+        if(($record.schemaVersion -isnot [int] -and $record.schemaVersion -isnot [long]) -or $record.schemaVersion -ne 1 -or
+          ($record.revision -isnot [int] -and $record.revision -isnot [long]) -or $record.revision -ne $binding.revision -or
+          -not (Test-PrimarySource $record.sourceIdentity) -or $record.authoritySha256 -isnot [string] -or
+          $record.authoritySha256 -cne $authorityHash -or $record.writerRole -isnot [string] -or $record.writerRole -cne 'primary' -or
+          $record.writerTask -isnot [string] -or $record.writerTask -cne '/root'){return $null}
+      }
+      if($seal.reportSha256 -isnot [string] -or $seal.reportSha256 -cne $binding.reportSha256 -or
+        $report.trustModel -isnot [string] -or $report.trustModel -cne 'procedural-primary-attestation' -or
+        $report.sourceReviews -isnot [array] -or $report.sourceReviews.Count -ne 84 -or
+        $report.visualReviews -isnot [array] -or $report.visualReviews.Count -lt 1 -or $report.visualReviews.Count -gt 65){return $null}
+      foreach($flag in @('founderApproved','providerVerified','apkAuthority')){if($report.$flag -isnot [bool] -or $report.$flag){return $null}}
+      foreach($path in $originals.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $originals[$path]){return $null}}
+      $result=@{Report=$report;OriginalTaskFileHashes=$originals;PrimaryReviewRecordBound=$true;
+        SemanticsVerified=$false;InspectionVerified=$false;QualificationPassed=$false;ApkAuthority=$false}
+    }finally{
+      $cleanupFailure=$false
+      foreach($lease in $leases){try{if($null -ne $lease.Stream){$lease.Stream.Dispose()}}catch{$cleanupFailure=$true}}
+      if($cleanupFailure){throw 'Primary review leases could not all be closed.'}
+    }
+  }catch{return $null}
+  # Emit only after cleanup; a failed cleanup must not leak accepted evidence.
+  return $result
+}
+
+function Read-OctoberCompatibilityCurrentQualificationProof {
+  param([hashtable]$History,[switch]$FromWorkingTree,[switch]$FromIndex)
+  # Source/shape validation is one conjunct only: it cannot qualify executions,
+  # semantic assertions, representative equivalence, inspections or handoff.
+  try {
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath -or $null -eq $History -or
+       $History.Stage -isnot [int] -or $History.Stage -notin @(18,19) -or
+       ($FromWorkingTree -and $FromIndex) -or
+       ($History.Stage -eq 18 -and -not ($FromWorkingTree -or $FromIndex)) -or
+       ($History.Stage -eq 19 -and ($FromWorkingTree -or $FromIndex)) -or
+       @(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
+    if(@($History.Commits).Count -ne $History.Stage -or $History.Head -cne $History.Commits[-1]){return $null}
+    $observed=Get-OctoberCompatibilityHistoryStage $History.Head
+    if($observed.Stage -ne $History.Stage -or ($observed.Commits -join '|') -cne ($History.Commits -join '|')){return $null}
+    $initial=$null
+    if($History.Stage -eq 18) {
+      $phase=if($FromIndex){'pre_commit'}else{'implementation'}
+      $initial=Read-OctoberCompatibilityCurrentSourceState -History $observed -Phase $phase
+      if($null -eq $initial -or $initial.Verified -isnot [bool] -or -not $initial.Verified){return $null}
+    }else{
+      $phase='qualification'
+      $initial=Read-OctoberCompatibilityCurrentSourceState -History $observed -Phase $phase -ReadOnlyQualifiedSource
+      if($null -eq $initial -or $initial.Verified -isnot [bool] -or -not $initial.Verified -or
+         $initial.ReadOnly -isnot [bool] -or -not $initial.ReadOnly){return $null}
+      if((@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD')) -join '') -cne $observed.Head -or
+         (@(Get-OctoberCompatibilityGitLines @('branch','--show-current')) -join '') -cne $binding.branch -or
+         @(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count){return $null}
+    }
+    $metadata=[string]$observed.Commits[16];$source=[string]$observed.Commits[17]
+    $spec=Read-OctoberCompatibilityCurrentSuccessorSpecification -Commit $metadata
+    $contract=Read-OctoberCompatibilityCurrentQualificationContract -Commit $metadata
+    if($null -eq $spec -or $null -eq $contract){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){Get-Content -LiteralPath (Join-Path $root $owner) -Raw -Encoding UTF8}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($observed.Head+':'+$owner))) -join "`n"}
+    $baseDocument=(@(Get-OctoberCompatibilityGitLines @('show',($metadata+':'+$owner))) -join "`n").Replace("`r`n","`n").TrimEnd("`n")
+    $expectedPrefix=$baseDocument+"`n`n### Current frontend qualification proof`n`n"
+    if($text -isnot [string] -or -not $text.Replace("`r`n","`n").StartsWith($expectedPrefix,[StringComparison]::Ordinal)){return $null}
+    $blocks=[regex]::Matches($text,'(?s)<!-- COMPATIBILITY_CURRENT_QUALIFICATION_PROOF_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_CURRENT_QUALIFICATION_PROOF_JSON_END -->')
+    if($blocks.Count -ne 1){return $null}
+    $proof=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($blocks[0].Groups[1].Value))
+    if($null -eq $proof -or (@($proof.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($spec.qRequiredFields|Sort-Object) -join '|') -or
+       ($proof.schemaVersion -isnot [int] -and $proof.schemaVersion -isnot [long]) -or $proof.schemaVersion -ne 4 -or
+       $proof.state -isnot [string] -or $proof.state -cne 'frontend_verified_provider_unverified'){return $null}
+    $tree=@(Get-OctoberCompatibilityGitLines @('rev-parse',($source+'^{tree}')))
+    $producer=@(Get-OctoberCompatibilityGitLines @('rev-parse',($source+':scripts/test-codex-integration-repair-coordination-policy.ps1')))
+    $originalProducer=@(Get-OctoberCompatibilityGitLines @('rev-parse',($metadata+':scripts/test-codex-integration-repair-coordination-policy.ps1')))
+    if($tree.Count -ne 1 -or $tree[0] -cnotmatch '\A[0-9a-f]{40}\z' -or
+       $producer.Count -ne 1 -or $producer[0] -cnotmatch '\A[0-9a-f]{40}\z' -or
+       $originalProducer.Count -ne 1 -or $originalProducer[0] -cne $producer[0]){return $null}
+    $pins=@{runtimeSourceCommit='3c3f38136db8bb184866635203d04ea4643f1eac';contractCommit=$metadata;captureSourceCommit=$source;
+      captureSourceTree=$tree[0];producerBlob=$producer[0];registrySha256=$contract.registrySha256;policySha256=$contract.policySha256;
+      baseContractSha256='74A621E2A3D6537CE2507B04578C61E9E78D11DE7B84E6DA6092932AD389FE1F';
+      successorContractSha256='985C43950F13A51900F74E7BC915F3D7916446DB3AD9129430D29F598432B4CC'}
+    foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $null}}
+    foreach($flag in @('providerVerified','apkAuthority')){if($proof.$flag -isnot [bool] -or $proof.$flag){return $null}}
+    foreach($array in @('cycles','obligations','visualReconciliation','visualRiskInventory','visualObservations','providerDeferrals')) {
+      if($proof.$array -isnot [array]){return $null}
+    }
+    if($proof.cycles.Count -ne 2 -or $proof.obligations.Count -ne 84 -or $proof.visualReconciliation.Count -ne 65 -or
+       $proof.visualRiskInventory.Count -lt 1 -or $proof.visualRiskInventory.Count -gt 65 -or
+       $proof.visualObservations.Count -ne $proof.visualRiskInventory.Count -or
+       $proof.providerDeferrals.Count -ne $contract.providerDeferrals.Count){return $null}
+    for($i=0;$i -lt $contract.providerDeferrals.Count;$i++) {
+      $actual=$proof.providerDeferrals[$i];$expected=$contract.providerDeferrals[$i]
+      if((@($actual.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($expected.PSObject.Properties.Name|Sort-Object) -join '|')){return $null}
+      foreach($property in $expected.PSObject.Properties){if($actual.($property.Name) -isnot [string] -or $actual.($property.Name) -cne $property.Value){return $null}}
+    }
+    if($History.Stage -eq 18) {
+      $final=Read-OctoberCompatibilityCurrentSourceState -History $observed -Phase $phase
+      if($null -eq $final -or $final.Verified -isnot [bool] -or -not $final.Verified -or $final.Identity -cne $initial.Identity){return $null}
+    }else{
+      $final=Read-OctoberCompatibilityCurrentSourceState -History $observed -Phase $phase -ReadOnlyQualifiedSource
+      if($null -eq $final -or $final.Verified -isnot [bool] -or -not $final.Verified -or
+         $final.ReadOnly -isnot [bool] -or -not $final.ReadOnly -or $final.Identity -cne $initial.Identity){return $null}
+      if((@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD')) -join '') -cne $observed.Head -or
+         (@(Get-OctoberCompatibilityGitLines @('branch','--show-current')) -join '') -cne $binding.branch -or
+         @(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count){return $null}
+    }
+    return [pscustomobject]@{Proof=$proof;Specification=$spec;Contract=$contract;History=$observed;
+      QualificationDocumentSnapshotSha256=(Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($text)));
+      StructureVerified=$true;QualificationPassed=$false;ApkAuthority=$false}
+  }catch{return $null}
+}
+
+function Read-OctoberCompatibilityCurrentQualifiedEvidence {
+  param([hashtable]$History,[switch]$FromWorkingTree,[switch]$FromIndex)
+  # Compose actual readers, not Q-supplied event objects or aggregate test totals.
+  # The document fingerprint below is its read representation, not a raw Git blob.
+  try {
+    $initial=Read-OctoberCompatibilityCurrentQualificationProof -History $History -FromWorkingTree:$FromWorkingTree -FromIndex:$FromIndex
+    if($null -eq $initial -or $initial.StructureVerified -isnot [bool] -or -not $initial.StructureVerified -or
+      $initial.QualificationDocumentSnapshotSha256 -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+    $proof=$initial.Proof
+    $identity=@{}
+    foreach($field in @('runtimeSourceCommit','contractCommit','captureSourceCommit','captureSourceTree','producerBlob')){$identity[$field]=$proof.$field}
+    $identity.executionHead=$proof.captureSourceCommit
+    $primary=Read-OctoberCompatibilityCurrentPrimaryReviewBinding -SourceIdentity $identity
+    if($null -eq $primary -or $primary.PrimaryReviewRecordBound -isnot [bool] -or -not $primary.PrimaryReviewRecordBound){return $null}
+    $cycles=Read-OctoberCompatibilityCurrentCycles -Cycles $proof.cycles -SourceIdentity $identity
+    if($null -eq $cycles -or $cycles.CyclesVerified -isnot [bool] -or -not $cycles.CyclesVerified){return $null}
+    $assertions=Read-OctoberCompatibilityCurrentPrimaryAssertionReview -Obligations $proof.obligations -SourceIdentity $identity -CycleEvidence $cycles -PrimaryBinding $primary
+    if($null -eq $assertions -or $assertions.PrimaryAssertionReviewBound -isnot [bool] -or -not $assertions.PrimaryAssertionReviewBound){return $null}
+    $skips=Read-OctoberCompatibilityCurrentSkippedCoverage -Obligations $proof.obligations -SourceIdentity $identity -CycleEvidence $cycles
+    if($null -eq $skips -or $skips.SkippedCoverageVerified -isnot [bool] -or -not $skips.SkippedCoverageVerified){return $null}
+    $presentation=Read-OctoberCompatibilityCurrentPresentationReview -Obligations $proof.obligations -SourceIdentity $identity -PrimaryAssertionReview $assertions -PrimaryBinding $primary
+    if($null -eq $presentation -or $presentation.SpecificPresentationReviewBound -isnot [bool] -or -not $presentation.SpecificPresentationReviewBound){return $null}
+    $executions=[Collections.Generic.List[object]]::new()
+    foreach($profile in @($proof.visualRiskInventory|ForEach-Object {$_.representative.executionId}|Sort-Object -Unique)) {
+      $selection=Read-OctoberCompatibilityCurrentSelectedRiskBindings -Inventory $proof.visualRiskInventory -ExecutionId $profile -SourceIdentity $identity
+      if($null -eq $selection){return $null}
+      $rows=@($proof.visualObservations|Where-Object {$_.executionId -ceq $profile})
+      if(-not $rows.Count){return $null}
+      $row=$rows[0]
+      foreach($other in $rows){foreach($field in @('eventLogPath','eventLogSha256','executionCapturePath','executionCaptureSha256')) {
+        if($other.$field -isnot [string] -or $other.$field -cne $row.$field){return $null}
+      }}
+      $pattern='\Aapps/mobile/build/compat-current-store_layout_and_recovery-'+[regex]::Escape($profile)+'-(current-[0-9a-f]{32})\.jsonl\z'
+      if($row.eventLogPath -isnot [string] -or $row.eventLogPath -cnotmatch $pattern){return $null}
+      $run=$Matches[1]
+      $plan=Get-OctoberCompatibilityCurrentExecutionPlan -ReportId store_layout_and_recovery -ExecutionId $profile -Mode selected_visual_risks -RunId $run -SourceIdentity $identity -SelectedSlots $selection.SelectedSlots -SelectedTestKeys $selection.SelectedTestKeys
+      if($null -eq $plan){return $null}
+      $evidence=[pscustomobject]@{executionId=$profile;path=$row.eventLogPath;sha256=$row.eventLogSha256;
+        capturePath=$row.executionCapturePath;captureSha256=$row.executionCaptureSha256;runtimeDefines=$plan.RuntimeDefines}
+      $execution=Read-OctoberCompatibilityCurrentExecutionEvidence -Evidence $evidence -ReportId store_layout_and_recovery -ExecutionId $profile -Mode selected_visual_risks -RunId $run -SourceIdentity $identity -SelectedSlots $selection.SelectedSlots -SelectedTestKeys $selection.SelectedTestKeys
+      if($null -eq $execution){return $null};$executions.Add($execution)
+    }
+    $retained=Read-OctoberCompatibilityCurrentRetainedSelectionBindings -Inventory $proof.visualRiskInventory -Executions $executions.ToArray() -SourceIdentity $identity
+    if($null -eq $retained -or $retained.RetainedSelectionBindingsVerified -isnot [bool] -or -not $retained.RetainedSelectionBindingsVerified){return $null}
+    $visual=Read-OctoberCompatibilityCurrentPrimaryVisualReview -Inventory $proof.visualRiskInventory -Observations $proof.visualObservations -SourceIdentity $identity -SelectionEvidence $retained -PrimaryBinding $primary
+    if($null -eq $visual -or $visual.PrimaryVisualReviewBound -isnot [bool] -or -not $visual.PrimaryVisualReviewBound){return $null}
+    $slots=Read-OctoberCompatibilityCurrentVisualSlotAccounting -Reconciliation $proof.visualReconciliation -Inventory $proof.visualRiskInventory -SourceIdentity $identity -PrimaryVisualReview $visual -PrimaryAssertionReview $assertions -PrimaryBinding $primary -PresentationReview $presentation
+    if($null -eq $slots -or $slots.HistoricalSlotsAccounted -isnot [bool] -or -not $slots.HistoricalSlotsAccounted -or
+      $slots.CurrentVisualDispositionReviewBound -isnot [bool] -or -not $slots.CurrentVisualDispositionReviewBound){return $null}
+    # Only originals admitted by the two independent TASK readers enter this map.
+    # Finish conflict/shape validation before any final hash; never rebase a pin.
+    $taskPins=[Collections.Generic.Dictionary[string,string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($set in @($primary.OriginalTaskFileHashes,$presentation.OriginalTaskFileHashes)) {
+      if($set -isnot [Collections.IDictionary] -or $set.Count -lt 2){return $null}
+      foreach($path in $set.Keys) {
+        $hash=$set[$path]
+        if($path -isnot [string] -or -not [IO.Path]::IsPathRooted($path) -or $path -cne [IO.Path]::GetFullPath($path) -or
+          $hash -isnot [string] -or $hash -cnotmatch '\A[0-9A-F]{64}\z'){return $null}
+        if($taskPins.ContainsKey($path)){if($taskPins[$path] -cne $hash){return $null}}
+        else{$taskPins.Add($path,$hash)}
+      }
+    }
+    $final=Read-OctoberCompatibilityCurrentQualificationProof -History $History -FromWorkingTree:$FromWorkingTree -FromIndex:$FromIndex
+    if($null -eq $final -or $final.StructureVerified -isnot [bool] -or -not $final.StructureVerified -or
+      $final.QualificationDocumentSnapshotSha256 -cne $initial.QualificationDocumentSnapshotSha256 -or
+      (ConvertTo-Json -InputObject $final.Proof -Depth 100 -Compress) -cne (ConvertTo-Json -InputObject $proof -Depth 100 -Compress) -or
+      (ConvertTo-Json -InputObject $final.History -Depth 100 -Compress) -cne (ConvertTo-Json -InputObject $initial.History -Depth 100 -Compress)){return $null}
+    # No substantive source/document reads after these original-pin fences.
+    # This is a cooperative non-atomic check, not a filesystem transaction.
+    $files=Read-OctoberCompatibilityCurrentCombinedOriginalFilePins -BehaviorPins $cycles.OriginalFileHashes -SelectionPins $retained.OriginalFileHashes
+    if($null -eq $files -or $files.FinalFileBindingsVerified -isnot [bool] -or -not $files.FinalFileBindingsVerified){return $null}
+    foreach($path in $taskPins.Keys){if((Get-OctoberCoverageBoundHash $path) -cne $taskPins[$path]){return $null}}
+    return @{SourceIdentity=$identity;OriginalFileHashes=$files.OriginalFileHashes;OriginalTaskFileHashes=$taskPins;
+      CurrentFrontendEvidenceBound=$true;ProviderDeferrals=$proof.providerDeferrals;ProviderVerified=$false;
+      FounderApprovedImages=$false;ApkAuthority=$false;QualificationPassed=$false}
+  }catch{return $null}
+}
+
+function Test-OctoberCompatibilityQualification([hashtable]$History, [switch]$FromWorkingTree, [switch]$FromIndex) {
+  # Only the complete current conjunction may qualify frontend evidence. No
+  # historical fallback, provider acceptance, image approval or APK authority.
+  try {
+    if($FromWorkingTree -and $FromIndex){return $false}
+    $evidence=Read-OctoberCompatibilityCurrentQualifiedEvidence -History $History -FromWorkingTree:$FromWorkingTree -FromIndex:$FromIndex
+    return $null -ne $evidence -and $evidence.CurrentFrontendEvidenceBound -is [bool] -and
+      $evidence.CurrentFrontendEvidenceBound -and $evidence.ProviderVerified -is [bool] -and -not $evidence.ProviderVerified -and
+      $evidence.FounderApprovedImages -is [bool] -and -not $evidence.FounderApprovedImages -and
+      $evidence.ApkAuthority -is [bool] -and -not $evidence.ApkAuthority
+  }catch{return $false}
 }
 
 function Test-OctoberCompatibilityHistoricalQualificationCore([hashtable]$History, [switch]$FromWorkingTree) {
@@ -2894,12 +5336,26 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
         $Facts[$key] -ne $true) { return $false }
   }
   if (-not $Facts.ContainsKey('Stage') -or $Facts.Stage -isnot [int] -or
-      $Facts.Stage -lt 0 -or $Facts.Stage -gt 16 -or
+      $Facts.Stage -lt 0 -or $Facts.Stage -gt 18 -or
       -not $Facts.ContainsKey('Phase') -or
       -not $Facts.ContainsKey('Owners')) { return $false }
-  # Intermediate repair amendment: stage16 is repaired source, not Q. Neither
-  # caller flags nor the old future-stage number can turn it into a handoff.
-  if($Facts.Stage -eq 16 -or [string]$Facts.Phase -cin @('handoff','integration_admission_authorize')){return $false}
+  # Source15 Stage16 permits only exact metadata preparation with fresh internal
+  # preservation and current contract facts. It is not source/Q/APK acceptance.
+  if([string]$Facts.Phase -cin @('handoff','integration_admission_authorize')){return $false}
+  if($Facts.Stage -eq 16) {
+    if([string]$Facts.Phase -cnotin @('implementation','pre_commit')){return $false}
+    foreach($flag in @('CurrentPreparationVerified','CurrentContractVerified')) {
+      if(-not $Facts.ContainsKey($flag) -or $Facts[$flag] -isnot [bool] -or -not $Facts[$flag]){return $false}
+    }
+  }
+  if($Facts.Stage -in @(17,18)) {
+    if([string]$Facts.Phase -cnotin @('implementation','pre_commit') -or
+       -not $Facts.ContainsKey('CurrentSourceVerified') -or $Facts.CurrentSourceVerified -isnot [bool] -or
+       -not $Facts.CurrentSourceVerified){return $false}
+    if($Facts.Stage -eq 18 -and [string]$Facts.Phase -ceq 'pre_commit' -and
+       (-not $Facts.ContainsKey('CurrentQualificationVerified') -or $Facts.CurrentQualificationVerified -isnot [bool] -or
+        -not $Facts.CurrentQualificationVerified)){return $false}
+  }
   $expectedOwners=@()
   if($Facts.Stage -eq 14 -and [string]$Facts.Phase -cin @('implementation','pre_commit')) {
     foreach($flag in @('ScopePreparationVerified','ScopeContractVerified')) {
@@ -2990,6 +5446,9 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
         13 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
         14 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
         15 { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
+        16 { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+        17 { $expectedOwners=@('apps/mobile/test/work_workspace_layout_safety_test.dart') }
+        18 { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
         default { return $false }
       }
     }
@@ -3014,6 +5473,9 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
       elseif ($Facts.Stage -eq 13) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
       elseif ($Facts.Stage -eq 14) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
       elseif ($Facts.Stage -eq 15) { $expectedOwners=@(Get-OctoberCompatibilityScrollRepairOwners) }
+      elseif ($Facts.Stage -eq 16) { $expectedOwners=@(Get-OctoberCompatibilityAmendmentOwners) }
+      elseif ($Facts.Stage -eq 17) { $expectedOwners=@('apps/mobile/test/work_workspace_layout_safety_test.dart') }
+      elseif ($Facts.Stage -eq 18) { $expectedOwners=@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md') }
       else { return $false }
     }
     'handoff' {
@@ -5658,6 +8120,15 @@ if($root.Replace('\','/').TrimEnd('/') -ceq (Get-OctoberCompatibilityBinding).wo
       WriterFactsVerified=$writerProof.WriterFactsVerified;PolicySha256=$contract.policySha256;
       RegistrySha256=$contract.registrySha256;CursorCommit=$contract.cursorCommit}
     $testAdmissionJson=''
+    if($writerProof.History.Stage -eq 16) {
+      Assert-Coordination ($writerProof.CurrentPreparationVerified -is [bool] -and $writerProof.CurrentPreparationVerified) 'Current derived claims require independent metadata preservation.'
+      $claimContext.CurrentPreparationVerified=$true
+    }
+    if($writerProof.History.Stage -in @(17,18)) {
+      Assert-Coordination ($writerProof.CurrentSourceVerified -is [bool] -and $writerProof.CurrentSourceVerified -and
+        $writerProof.CurrentSourceIdentity -is [string] -and $writerProof.CurrentSourceIdentity -cmatch '\A[0-9A-F]{64}\z') 'Current claims require independently preserved committed source state.'
+      $claimContext.CurrentSourceVerified=$true;$claimContext.CurrentSourceIdentity=$writerProof.CurrentSourceIdentity
+    }
     if($writerProof.History.Stage -ge 9) {
       Assert-Coordination ($writerProof.ImmutableNVerified -is [bool] -and $writerProof.ImmutableNVerified -and
         $null -ne $writerProof.TestAdmission -and $writerProof.NCommit -ceq [string]$writerProof.History.Commits[8]) 'Compatibility immutable N writer binding failed.'
@@ -6961,6 +9432,8 @@ if ($ProductionLane -ceq 'baseline') {
           elseif($compatibilityHistory.Stage -eq 13){@(Get-OctoberCompatibilityAmendmentOwners)}
           elseif($compatibilityHistory.Stage -eq 14){@(Get-OctoberCompatibilityAmendmentOwners)}
           elseif($compatibilityHistory.Stage -eq 15){@(Get-OctoberCompatibilityScrollRepairOwners)}
+          elseif($compatibilityHistory.Stage -eq 16){@(Get-OctoberCompatibilityAmendmentOwners)}
+          elseif($compatibilityHistory.Stage -eq 17){@('apps/mobile/test/work_workspace_layout_safety_test.dart')}
           else{@('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
         $octoberCompatibilityOwner=$compatibilityStageOwners -ccontains $effectiveOwner
         if ($octoberCompatibilityOwner) { $allowedOwner=$true }
@@ -7138,6 +9611,20 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
     if($compatibilityHistory.Stage -eq 15 -and $ProductionPhase -cin @('implementation','pre_commit')) {
       $compatibilityFacts.ScopeRepairAdmissionVerified=$null -ne
         (Read-OctoberCompatibilityScopeRepairAdmission -Commit ([string]$compatibilityHistory.Commits[14]))
+    }
+    if($compatibilityHistory.Stage -eq 16 -and $ProductionPhase -cin @('implementation','pre_commit')) {
+      $compatibilityFacts.CurrentPreparationVerified=Test-OctoberCompatibilityCurrentPreparation $ProductionPhase
+      $compatibilityFacts.CurrentContractVerified=if($ProductionPhase -ceq 'pre_commit'){
+        $null -ne (Read-OctoberCompatibilityCurrentQualificationContract -FromIndex)
+      }else{$null -ne (Read-OctoberCompatibilityCurrentQualificationContract -FromWorkingTree)}
+    }
+    if($compatibilityHistory.Stage -in @(17,18)) {
+      $sourceStateFactsProof=Read-OctoberCompatibilityCurrentSourceState -History $compatibilityHistory -Phase $ProductionPhase
+      $compatibilityFacts.CurrentSourceVerified=$null -ne $sourceStateFactsProof -and
+        $sourceStateFactsProof.Identity -ceq $claimContext.CurrentSourceIdentity
+      if($compatibilityHistory.Stage -eq 18 -and $ProductionPhase -ceq 'pre_commit') {
+        $compatibilityFacts.CurrentQualificationVerified=Test-OctoberCompatibilityQualification -History $compatibilityHistory -FromIndex
+      }
     }
     Assert-Coordination (Test-OctoberCompatibilityStageFacts $compatibilityFacts) 'Compatibility live stage/claim/qualification rejected.'
   }
@@ -9859,6 +12346,15 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
         $preCommitUntrackedOwners.Count -eq 0
       Assert-Coordination $octoberCoveragePreparationPending 'Scope amendment precommit must stage exact metadata4 and preserve frozen unstaged dashboard/layout.'
     }
+    if($octoberCompatibilityIdentity -and $compatibilityHistory.Stage -eq 16){
+      $compatibilityFacts.CurrentPreparationVerified=Test-OctoberCompatibilityCurrentPreparation 'pre_commit'
+      $compatibilityFacts.CurrentContractVerified=$null -ne (Read-OctoberCompatibilityCurrentQualificationContract -FromIndex)
+      $octoberCoveragePreparationPending=$compatibilityFacts.CurrentPreparationVerified -is [bool] -and $compatibilityFacts.CurrentPreparationVerified -and
+        $compatibilityFacts.CurrentContractVerified -is [bool] -and $compatibilityFacts.CurrentContractVerified -and
+        (@($preCommitStagedOwners|Sort-Object) -join '|') -ceq (@((Get-OctoberCompatibilityAmendmentOwners)|Sort-Object) -join '|') -and
+        $preCommitUnstagedOwners.Count -eq 0 -and $preCommitUntrackedOwners.Count -eq 0
+      Assert-Coordination $octoberCoveragePreparationPending 'Current preparation requires exact metadata4 staged/working equality and frozen Source15.'
+    }
     if ($r66OwnerAmendmentPending) {
       Assert-Coordination (
         (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq
@@ -9900,6 +12396,17 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
           $null -ne $lateWriterProof.TestAdmission -and
           $lateWriterProof.NCommit -ceq [string]$lateWriterProof.History.Commits[8]) 'Compatibility N late writer binding failed; no claim fallback.'
         $lateContext=$claimContext.Clone();$lateContext.NCommit=$lateWriterProof.NCommit
+        if($compatibilityHistory.Stage -eq 16) {
+          Assert-Coordination ($lateWriterProof.CurrentPreparationVerified -is [bool] -and $lateWriterProof.CurrentPreparationVerified) 'Current late claim derivation requires fresh metadata preservation.'
+          $lateContext.CurrentPreparationVerified=$true
+        }
+        if($compatibilityHistory.Stage -in @(17,18)) {
+          Assert-Coordination ($lateWriterProof.CurrentSourceVerified -is [bool] -and $lateWriterProof.CurrentSourceVerified -and
+            $lateWriterProof.CurrentSourceIdentity -ceq $claimContext.CurrentSourceIdentity) 'Current late claims require unchanged source/index identities.'
+          $lateContext.CurrentSourceVerified=$true;$lateContext.CurrentSourceIdentity=$lateWriterProof.CurrentSourceIdentity
+          $compatibilityFacts.CurrentSourceVerified=$true
+          if($compatibilityHistory.Stage -eq 18){$compatibilityFacts.CurrentQualificationVerified=Test-OctoberCompatibilityQualification -History $compatibilityHistory -FromIndex}
+        }
         $lateClaims=@(Read-OctoberCompatibilityDerivedClaims -Claims $lateWriterProof.RawClaims `
           -ContractJson $lateWriterProof.Handoff.SpecificationJson -Context $lateContext `
           -TestAdmissionJson ($lateWriterProof.TestAdmission|ConvertTo-Json -Depth 30 -Compress))
@@ -9930,6 +12437,17 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       }
       if($compatibilityHistory.Stage -eq 15) {
         Assert-Coordination ($compatibilityFacts.ScopeRepairAdmissionVerified -is [bool] -and $compatibilityFacts.ScopeRepairAdmissionVerified) 'Application repair requires immutable scope admission, not working-document authority.'
+      }
+      if($compatibilityHistory.Stage -eq 16) {
+        $compatibilityFacts.CurrentPreparationVerified=Test-OctoberCompatibilityCurrentPreparation 'pre_commit'
+        $compatibilityFacts.CurrentContractVerified=$null -ne (Read-OctoberCompatibilityCurrentQualificationContract -FromIndex)
+        Assert-Coordination ($compatibilityFacts.CurrentPreparationVerified -is [bool] -and $compatibilityFacts.CurrentPreparationVerified -and
+          $compatibilityFacts.CurrentContractVerified -is [bool] -and $compatibilityFacts.CurrentContractVerified) 'Current metadata requires fresh Source15 preparation and exact staged contract.'
+      }
+      if($compatibilityHistory.Stage -in @(17,18)) {
+        $finalSourceState=Read-OctoberCompatibilityCurrentSourceState -History $compatibilityHistory -Phase 'pre_commit'
+        Assert-Coordination ($null -ne $finalSourceState -and $finalSourceState.Identity -ceq $claimContext.CurrentSourceIdentity) 'Current precommit requires stable committed-source, working and index identities.'
+        if($compatibilityHistory.Stage -eq 18){Assert-Coordination (Test-OctoberCompatibilityQualification -History $compatibilityHistory -FromIndex) 'Current Q requires complete staged source-bound qualification, not historical success.'}
       }
     } elseif ($ProductionLane -ceq 'integration_repair') {
       $repairMergeHeadPath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()

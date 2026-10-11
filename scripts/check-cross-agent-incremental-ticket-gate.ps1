@@ -73,6 +73,28 @@ function Test-CompatibilityIncrementalIdentity([hashtable]$Facts) {
     [string]$Facts.Phase -cin @('ticket_start','implementation','handoff')
 }
 
+function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
+  # Current Source15 preparation must be collected internally, not supplied by
+  # a caller fact or inferred from a clean status. This grants no build/handoff.
+  if($Stage -isnot [int]){return $false}
+  if($Stage -in @(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)){return $true}
+  if($Stage -notin @(16,17,18)){return $false}
+  try {
+    $prepared=if($Stage -eq 16){
+      $stagedOwners=@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only'))
+      $preparationPhase=if($stagedOwners.Count){'pre_commit'}else{'implementation'}
+      Test-OctoberCompatibilityCurrentPreparation $preparationPhase
+    }else{
+      $observedHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
+      if($observedHead.Count -ne 1){return $false}
+      $observedHistory=Get-OctoberCompatibilityHistoryStage $observedHead[0]
+      if($observedHistory.Stage -ne $Stage){return $false}
+      Test-OctoberCompatibilityCurrentSourceState -History $observedHistory -Phase 'implementation'
+    }
+    return $prepared -is [bool] -and $prepared
+  }catch{return $false}
+}
+
 Assert-IncrementalTicket (
   $resolvedState.StartsWith(
     $root + [IO.Path]::DirectorySeparatorChar,
@@ -137,7 +159,9 @@ if($compatibilityIncremental) {
       'Get-OctoberCompatibilityApplicationOwners','Get-OctoberCompatibilityAmendmentOwners','Get-OctoberCompatibilityLayoutOwners','Get-OctoberCompatibilityHandoverOwners','Get-OctoberCompatibilityCoverageCartOwners','Get-OctoberCompatibilityInheritedCartTestOwners','Get-OctoberCompatibilityRetentionOwners','Get-OctoberCompatibilityForwardLayoutTestOwners','Get-OctoberCompatibilityScrollRepairOwners','Read-OctoberCompatibilityTestAdmissionContract','Test-OctoberCompatibilityBindingInventory',
       'Get-OctoberCompatibilityGitLines','Get-OctoberCompatibilityByteHash',
       'Read-OctoberCompatibilityJsonObject','Read-OctoberCompatibilityScopeRepairAdmission','Read-OctoberCompatibilityClaimHandoff',
-      'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage')) {
+      'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage',
+      'Read-OctoberCompatibilityCurrentQualificationContract','Read-OctoberCompatibilityCurrentSuccessorSpecification','Test-OctoberCompatibilitySource15Preparation','Test-OctoberCompatibilityCurrentPreparation',
+      'Read-OctoberCompatibilityCurrentSourceState','Test-OctoberCompatibilityCurrentSourceState')) {
     $functions=@($ast.FindAll({param($node)
       $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name
     },$true))
@@ -152,7 +176,7 @@ if($compatibilityIncremental) {
     -Bindings @($compatibilityPolicy.productionGitDiscipline.continuationBindings) `
     -BaseBindings @($basePolicy.productionGitDiscipline.continuationBindings)) 'compatibility binding inventory changed.'
   Assert-IncrementalTicket ($Phase -cne 'ticket_start' -or $compatibilityHistory.Stage -eq 1) 'compatibility start must be clean at exact G, not unqualified E.'
-  Assert-IncrementalTicket ($Phase -cne 'implementation' -or $compatibilityHistory.Stage -in @(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)) 'compatibility implementation requires exact G/C/A/H/J/K/M/L5/N/T/U/V/W and scoped scroll preparation/repair.'
+  Assert-IncrementalTicket ($Phase -cne 'implementation' -or (Test-CompatibilityIncrementalImplementationStage $compatibilityHistory.Stage)) 'compatibility implementation requires exact sealed history and independent current Source15 metadata preparation.'
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
   Assert-IncrementalTicket ($Phase -cne 'handoff') 'Intermediate scoped repair admits no handoff; a separate completed qualification-contract amendment is required.'
