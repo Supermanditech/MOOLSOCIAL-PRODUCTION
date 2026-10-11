@@ -54,7 +54,16 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 // Technical capture provenance only; this does not authorize capture execution
 // or make an image an approved historical comparator.
 class _TechnicalCapturePlan {
-  _TechnicalCapturePlan._(this.values);
+  _TechnicalCapturePlan._(
+    this.values, {
+    this.currentMode = false,
+    this.behaviorOnly = false,
+    this.selectedSlots = const <String>{},
+  });
+
+  final bool currentMode;
+  final bool behaviorOnly;
+  final Set<String> selectedSlots;
 
   static const keys = <String>[
     'runId',
@@ -206,7 +215,10 @@ class _TechnicalCapturePlan {
       _matches(r'[A-Za-z0-9][A-Za-z0-9_-]{0,95}', value) &&
       !_matches(r'CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]', value.toUpperCase());
 
-  static _TechnicalCapturePlan? parse(Map<String, String> supplied) {
+  static _TechnicalCapturePlan? parse(
+    Map<String, String> supplied, {
+    bool allowBehaviorProfiles = false,
+  }) {
     if (supplied.isEmpty) return null;
     if (supplied.length != keys.length ||
         keys.any((key) => !supplied.containsKey(key))) {
@@ -218,7 +230,13 @@ class _TechnicalCapturePlan {
           values['runId']!,
         ) ||
         !_safeComponent(values['executionId']!) ||
-        !profiles.contains(values['profile'])) {
+        !(profiles.contains(values['profile']) ||
+            (allowBehaviorProfiles &&
+                const <String>{
+                  'default',
+                  'localstock_review',
+                  'historical_store_review',
+                }.contains(values['profile'])))) {
       throw const FormatException('Invalid technical capture execution');
     }
     for (final key in [
@@ -278,11 +296,105 @@ class _TechnicalCapturePlan {
       if (bool.hasEnvironment('MOOL_TECHNICAL_CAPTURE_REGISTRY_SHA256'))
         'registrySha256',
     };
-    return parseEnvironment(
+    return parseCurrentEnvironment(
       values,
       presence,
       goldenUpdate: autoUpdateGoldenFiles,
+      behaviorValue: const String.fromEnvironment(
+        'MOOL_CURRENT_QUALIFICATION_BEHAVIOR_ONLY',
+      ),
+      behaviorPresent: const bool.hasEnvironment(
+        'MOOL_CURRENT_QUALIFICATION_BEHAVIOR_ONLY',
+      ),
+      selectedValue: const String.fromEnvironment(
+        'MOOL_CURRENT_QUALIFICATION_SELECTED_VISUAL_SLOTS',
+      ),
+      selectedPresent: const bool.hasEnvironment(
+        'MOOL_CURRENT_QUALIFICATION_SELECTED_VISUAL_SLOTS',
+      ),
     );
+  }
+
+  static _TechnicalCapturePlan? parseCurrentEnvironment(
+    Map<String, String> values,
+    Set<String> presence, {
+    required bool goldenUpdate,
+    required String behaviorValue,
+    required bool behaviorPresent,
+    required String selectedValue,
+    required bool selectedPresent,
+  }) {
+    if (!behaviorPresent &&
+        !selectedPresent &&
+        presence.isEmpty &&
+        values.values.every((value) => value.isEmpty)) {
+      return null;
+    }
+    if (goldenUpdate ||
+        behaviorPresent == selectedPresent ||
+        (behaviorPresent && behaviorValue != 'true') ||
+        (!behaviorPresent && behaviorValue.isNotEmpty) ||
+        (!selectedPresent && selectedValue.isNotEmpty) ||
+        presence.length != keys.length ||
+        !keys.every(presence.contains)) {
+      throw const FormatException('Invalid current qualification mode');
+    }
+    final plan = parse(values, allowBehaviorProfiles: behaviorPresent);
+    if (plan == null) {
+      throw const FormatException('Missing current capture provenance');
+    }
+    if (behaviorPresent) {
+      return _TechnicalCapturePlan._(
+        plan.values,
+        currentMode: true,
+        behaviorOnly: true,
+      );
+    }
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(selectedValue);
+    } on FormatException {
+      throw const FormatException('Invalid selected capture slots');
+    }
+    if (decoded is! List ||
+        decoded.isEmpty ||
+        decoded.any((value) => value is! String)) {
+      throw const FormatException('Invalid selected capture slots');
+    }
+    final selected = decoded.cast<String>();
+    final sorted = List<String>.of(selected)..sort();
+    final allowed = slots[plan.values['profile']]!.values.toSet();
+    if (jsonEncode(sorted) != selectedValue ||
+        selected.toSet().length != selected.length ||
+        selected.any((slot) => !allowed.contains(slot))) {
+      throw const FormatException('Noncanonical or foreign capture slots');
+    }
+    return _TechnicalCapturePlan._(
+      plan.values,
+      currentMode: true,
+      selectedSlots: Set<String>.unmodifiable(selected),
+    );
+  }
+
+  bool capturesReference(String reference) {
+    final profileSlots = slots[values['profile']];
+    final slot = profileSlots?[reference];
+    if (behaviorOnly && profileSlots == null) {
+      final matches = slots.values
+          .map((mapping) => mapping[reference])
+          .whereType<String>()
+          .toSet();
+      if (matches.length != 1) {
+        throw const FormatException(
+          'Unknown or ambiguous current capture reference',
+        );
+      }
+      return false;
+    }
+    if (slot == null) {
+      throw const FormatException('Reference is not in this capture profile');
+    }
+    return !behaviorOnly && selectedSlots.contains(slot);
   }
 
   static _TechnicalCapturePlan? parseEnvironment(
@@ -426,11 +538,17 @@ class _TechnicalCaptureWriter {
 
 Future<void> _dispatchTechnicalCapture(
   _TechnicalCapturePlan? plan, {
+  String? originalReference,
   required Future<void> Function() historical,
   required Future<void> Function(_TechnicalCapturePlan) technical,
 }) async {
   if (plan == null) {
     await historical();
+  } else if (plan.currentMode) {
+    if (originalReference == null) {
+      throw const FormatException('Current capture reference is required');
+    }
+    if (plan.capturesReference(originalReference)) await technical(plan);
   } else {
     await technical(plan);
   }
@@ -599,6 +717,7 @@ Future<void> _expectGoldenOrTechnical(
   String goldenUri,
 ) => _dispatchTechnicalCapture(
   _TechnicalCapturePlan.fromEnvironment(),
+  originalReference: originalReference,
   historical: () => expectLater(target, matchesGoldenFile(goldenUri)),
   technical: (plan) async {
     await _recordTechnicalTarget(tester, target, plan, originalReference);
@@ -1889,6 +2008,190 @@ Future<void> _captureAnalyticsFixture(WidgetTester tester, String name) async {
 
 void main() {
   group('TECHNICALCAPTURE dispatch and render synthetic unit fixtures', () {
+    Map<String, String> currentValues([String profile = 'workspace_capture']) =>
+        {
+          'runId': 'current-unit-mode',
+          'executionId': profile,
+          'profile': profile,
+          'sourceCommit': List.filled(40, 'a').join(),
+          'sourceTree': List.filled(40, 'b').join(),
+          'executionHead': List.filled(40, 'a').join(),
+          'producerBlob': List.filled(40, 'd').join(),
+          'registrySha256': List.filled(64, 'e').join(),
+        };
+    _TechnicalCapturePlan currentPlan({
+      bool behavior = false,
+      String selector = '["H01-visual-1"]',
+      String profile = 'workspace_capture',
+    }) => _TechnicalCapturePlan.parseCurrentEnvironment(
+      currentValues(profile),
+      _TechnicalCapturePlan.keys.toSet(),
+      goldenUpdate: false,
+      behaviorValue: behavior ? 'true' : '',
+      behaviorPresent: behavior,
+      selectedValue: behavior ? '' : selector,
+      selectedPresent: !behavior,
+    )!;
+    test('current mode rejects malformed contradictory and partial inputs', () {
+      for (final selector in [
+        '',
+        '[]',
+        '[1]',
+        '["unknown"]',
+        '["H35-visual-1"]',
+        '["H01-visual-1","H01-visual-1"]',
+        '["H02-visual-1","H01-visual-1"]',
+        '[ "H01-visual-1" ]',
+      ]) {
+        expect(() => currentPlan(selector: selector), throwsFormatException);
+      }
+      for (final variant in ['no-mode', 'both', 'false', 'partial', 'update']) {
+        expect(
+          () => _TechnicalCapturePlan.parseCurrentEnvironment(
+            currentValues(),
+            variant == 'partial'
+                ? {'runId'}
+                : _TechnicalCapturePlan.keys.toSet(),
+            goldenUpdate: variant == 'update',
+            behaviorValue: variant == 'false'
+                ? 'false'
+                : (variant == 'both' ? 'true' : ''),
+            behaviorPresent: variant == 'false' || variant == 'both',
+            selectedValue: variant == 'no-mode' || variant == 'false'
+                ? ''
+                : '["H01-visual-1"]',
+            selectedPresent: variant != 'no-mode' && variant != 'false',
+          ),
+          throwsFormatException,
+        );
+      }
+    });
+    test('current behavior accepts all literal execution profiles', () {
+      for (final profile in [
+        'default',
+        'localstock_review',
+        'workspace_capture',
+        'historical_store_review',
+        'historical_store_capture',
+        'store_live_capture',
+        'founder_capture',
+      ]) {
+        expect(
+          currentPlan(behavior: true, profile: profile).behaviorOnly,
+          isTrue,
+        );
+      }
+      expect(() => currentPlan(profile: 'default'), throwsFormatException);
+    });
+    test(
+      'current selected dispatch retains both calls and rejects unknown references',
+      () async {
+        final plan = currentPlan();
+        final emitted = <String>[];
+        var assertions = 0;
+        for (final reference in [
+          'workspace-choose.png',
+          'workspace-requirements.png',
+        ]) {
+          await _dispatchTechnicalCapture(
+            plan,
+            originalReference: reference,
+            historical: () async {
+              fail('Current mode must not compare old goldens');
+            },
+            technical: (_) async {
+              emitted.add(reference);
+            },
+          );
+          assertions++;
+        }
+        expect(emitted, ['workspace-choose.png']);
+        expect(assertions, 2);
+        await expectLater(
+          _dispatchTechnicalCapture(
+            plan,
+            originalReference: 'unknown.png',
+            historical: () async {},
+            technical: (_) async {
+              fail('Unknown reference must reject');
+            },
+          ),
+          throwsFormatException,
+        );
+        final behavior = currentPlan(behavior: true);
+        await expectLater(
+          _dispatchTechnicalCapture(
+            behavior,
+            originalReference: 'unknown.png',
+            historical: () async {},
+            technical: (_) async {
+              fail('Behavior mode must not emit');
+            },
+          ),
+          throwsFormatException,
+        );
+        await expectLater(
+          () async {
+            await _dispatchTechnicalCapture(
+              behavior,
+              originalReference: 'workspace-choose.png',
+              historical: () async {},
+              technical: (_) async {
+                fail('Behavior mode must not emit');
+              },
+            );
+            throw StateError('independent assertion sentinel');
+          }(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'independent assertion sentinel',
+            ),
+          ),
+        );
+      },
+    );
+    test(
+      'current behavioral launcher suppresses comparator and output',
+      () async {
+        final observed = <String>[];
+        final plan = _TechnicalCapturePlan.parseCurrentEnvironment(
+          {
+            'runId': 'current-unit-behavior',
+            'executionId': 'fixture-behavior',
+            'profile': 'workspace_capture',
+            'sourceCommit': List.filled(40, 'a').join(),
+            'sourceTree': List.filled(40, 'b').join(),
+            'executionHead': List.filled(40, 'c').join(),
+            'producerBlob': List.filled(40, 'd').join(),
+            'registrySha256': List.filled(64, 'e').join(),
+          },
+          _TechnicalCapturePlan.keys.toSet(),
+          goldenUpdate: false,
+          behaviorValue: 'true',
+          behaviorPresent: true,
+          selectedValue: '',
+          selectedPresent: false,
+        )!;
+        await _dispatchTechnicalCapture(
+          plan,
+          originalReference: 'workspace-choose.png',
+          historical: () async {
+            observed.add('historical');
+          },
+          technical: (_) async {
+            observed.add('technical');
+          },
+        );
+        expect(
+          observed,
+          isEmpty,
+          reason:
+              'Current behavioral mode must retain assertions without images',
+        );
+      },
+    );
     test(
       'environment presence rejects empty partial and golden-update mode',
       () {
@@ -1965,7 +2268,13 @@ void main() {
     test(
       'default dispatch executes historical callback and propagates failure',
       () async {
-        expect(_TechnicalCapturePlan.fromEnvironment(), isNull);
+        final environmentPlan = _TechnicalCapturePlan.fromEnvironment();
+        if (const bool.hasEnvironment('MOOL_TECHNICAL_CAPTURE_RUN_ID')) {
+          expect(environmentPlan, isNotNull);
+          expect(environmentPlan!.currentMode, isTrue);
+        } else {
+          expect(environmentPlan, isNull);
+        }
         final calls = <String>[];
         await _dispatchTechnicalCapture(
           null,
@@ -23181,6 +23490,7 @@ void main() {
     try {
       await _dispatchTechnicalCapture(
         _TechnicalCapturePlan.fromEnvironment(),
+        originalReference: '$name.png',
         historical: () => expectLater(image, matcher),
         technical: (plan) async {
           await _recordTechnicalTarget(
