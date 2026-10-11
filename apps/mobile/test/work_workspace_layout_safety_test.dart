@@ -554,12 +554,63 @@ Future<void> _dispatchTechnicalCapture(
   }
 }
 
+const _technicalCaptureAppRootKey = Key('technical-capture-owned-app-root');
+
+bool _captureElementIsWithin(Element element, Element ancestor) {
+  if (identical(element, ancestor)) return true;
+  var found = false;
+  element.visitAncestorElements((parent) {
+    if (identical(parent, ancestor)) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+MediaQueryData? _captureMediaSettings(Element target, Finder? appRoot) {
+  final inherited = MediaQuery.maybeOf(target);
+  if (inherited != null || appRoot == null) return inherited;
+  final roots = appRoot.evaluate().toList();
+  if (roots.length != 1) throw StateError('Capture app root must be unique');
+  final root = roots.single;
+  if (!_captureElementIsWithin(target, root) &&
+      !_captureElementIsWithin(root, target)) {
+    throw StateError('Capture app root is outside target ancestry');
+  }
+  final navigators = <Element>[];
+  void visit(Element element) {
+    if (element.widget is Navigator) {
+      // Nested navigators cannot identify the app's own effective context.
+      navigators.add(element);
+      return;
+    }
+    element.visitChildren(visit); // Includes offstage branches deliberately.
+  }
+
+  visit(root);
+  if (navigators.length != 1) {
+    throw StateError('Capture app must have one owned nonnested Navigator');
+  }
+  final navigator = navigators.single;
+  if (!_captureElementIsWithin(navigator, target)) {
+    throw StateError('Capture Navigator is outside requested target subtree');
+  }
+  final media = MediaQuery.maybeOf(navigator);
+  if (media == null) {
+    throw StateError('Capture Navigator has no media settings');
+  }
+  return media;
+}
+
 Future<({String pngPath, String metadataPath})> _recordTechnicalTarget(
   WidgetTester tester,
   Finder target,
   _TechnicalCapturePlan plan,
   String originalReference, {
   ui.Image? suppliedImage,
+  Finder? mediaSettingsRoot,
   String fixtureKind = 'existing-authored-widget-test-state',
 }) async {
   // Authorization before raster work; never silently change target or crop.
@@ -603,7 +654,7 @@ Future<({String pngPath, String metadataPath})> _recordTechnicalTarget(
   }
   if (!targetRect.isFinite) throw StateError('Invalid requested target bounds');
   final view = tester.view;
-  final descendant = MediaQuery.maybeOf(element);
+  final descendant = _captureMediaSettings(element, mediaSettingsRoot);
   Map<String, double> rect(Rect value) => {
     'left': value.left,
     'top': value.top,
@@ -720,7 +771,15 @@ Future<void> _expectGoldenOrTechnical(
   originalReference: originalReference,
   historical: () => expectLater(target, matchesGoldenFile(goldenUri)),
   technical: (plan) async {
-    await _recordTechnicalTarget(tester, target, plan, originalReference);
+    await _recordTechnicalTarget(
+      tester,
+      target,
+      plan,
+      originalReference,
+      mediaSettingsRoot: plan.currentMode
+          ? find.byKey(_technicalCaptureAppRootKey, skipOffstage: false)
+          : null,
+    );
   },
 );
 
@@ -2394,6 +2453,308 @@ void main() {
         );
       },
     );
+    for (final captureAppWidget in [false, true]) {
+      for (final missingContext in [false, true]) {
+        testWidgets(
+          '${missingContext ? "explicit app" : "inherited"} media context preserves outer target $captureAppWidget',
+          (tester) async {
+            tester.view.devicePixelRatio = 2;
+            tester.view.physicalSize = const Size(240, 160);
+            tester.view.padding = const FakeViewPadding(bottom: 8);
+            tester.view.viewPadding = const FakeViewPadding(bottom: 8);
+            tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+            addTearDown(tester.view.resetDevicePixelRatio);
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetPadding);
+            addTearDown(tester.view.resetViewPadding);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            const boundaryKey = Key('technical-unit-outer-boundary');
+            const appRootKey = Key('technical-unit-app-identity');
+            const materialApp = MaterialApp(
+              home: Scaffold(
+                body: SafeArea(child: ColoredBox(color: Color(0xff123456))),
+              ),
+            );
+            final app = RepaintBoundary(
+              key: boundaryKey,
+              child: KeyedSubtree(
+                key: appRootKey,
+                child: missingContext
+                    ? MediaQuery.fromView(view: tester.view, child: materialApp)
+                    : materialApp,
+              ),
+            );
+            await tester.pumpWidget(
+              missingContext ? RawView(view: tester.view, child: app) : app,
+              wrapWithView: !missingContext,
+            );
+            await tester.pumpAndSettle();
+            final target = captureAppWidget
+                ? (missingContext
+                      ? find.byKey(appRootKey)
+                      : find.byType(MaterialApp))
+                : find.byKey(boundaryKey);
+            expect(tester.takeException(), isNull);
+            final expectedMedia = MediaQuery.of(
+              tester.element(find.byType(Navigator)),
+            );
+            if (missingContext) {
+              expect(MediaQuery.maybeOf(tester.element(target)), isNull);
+            }
+            final result = await _recordTechnicalTarget(
+              tester,
+              target,
+              fixture('outer-context-$captureAppWidget'),
+              'workspace-choose.png',
+              fixtureKind: 'synthetic-unit-render-no-commerce',
+              mediaSettingsRoot: missingContext
+                  ? find.byKey(appRootKey)
+                  : find.byKey(const Key('unused-absent-media-root')),
+            );
+            final metadata = await tester.runAsync(
+              () async =>
+                  jsonDecode(await File(result.metadataPath).readAsString())
+                      as Map<String, dynamic>,
+            );
+            final geometry = metadata!['observations'] as Map<String, dynamic>;
+            expect(geometry['descendantMediaQuery'], isNotNull);
+            final media =
+                geometry['descendantMediaQuery'] as Map<String, dynamic>;
+            expect(
+              media.keys,
+              unorderedEquals([
+                'width',
+                'height',
+                'padding',
+                'viewPadding',
+                'viewInsets',
+                'textScaleAtOne',
+              ]),
+            );
+            expect(media['width'], 120);
+            expect(media['height'], 80);
+            expect(media['padding']['bottom'], 4);
+            expect(media['viewPadding']['bottom'], 4);
+            expect(media['viewInsets']['bottom'], 0);
+            expect(media['textScaleAtOne'], 1.4);
+            expect(media['width'], expectedMedia.size.width);
+            expect(media['height'], expectedMedia.size.height);
+            expect(media['padding']['bottom'], expectedMedia.padding.bottom);
+            expect(
+              media['viewPadding']['bottom'],
+              expectedMedia.viewPadding.bottom,
+            );
+            expect(
+              media['viewInsets']['bottom'],
+              expectedMedia.viewInsets.bottom,
+            );
+            expect(media['textScaleAtOne'], expectedMedia.textScaler.scale(1));
+            Map<String, double> actualEdges(EdgeInsets value) => {
+              'left': value.left,
+              'top': value.top,
+              'right': value.right,
+              'bottom': value.bottom,
+            };
+            expect(media['padding'], actualEdges(expectedMedia.padding));
+            expect(
+              media['viewPadding'],
+              actualEdges(expectedMedia.viewPadding),
+            );
+            expect(media['viewInsets'], actualEdges(expectedMedia.viewInsets));
+            expect(
+              geometry['requestedTargetType'],
+              captureAppWidget
+                  ? (missingContext ? 'KeyedSubtree' : 'MaterialApp')
+                  : 'RepaintBoundary',
+            );
+            expect(geometry['requestedTargetGlobalRect']['width'], 120);
+            expect(geometry['boundaryLocalPaintBounds'], {
+              'left': 0,
+              'top': 0,
+              'width': 120,
+              'height': 80,
+            });
+            expect(metadata['pngWidth'], 120);
+            expect(metadata['pngHeight'], 80);
+            expect((geometry['boundaryToGlobalTransform'] as List).length, 16);
+            expect(
+              geometry['boundaryGlobalPaintBounds'],
+              geometry['requestedTargetGlobalRect'],
+            );
+          },
+        );
+      }
+    }
+    for (final scenario in [
+      'missing-root',
+      'ambiguous-root',
+      'foreign-root',
+      'missing-navigator',
+      'multiple-navigators',
+      'navigator-outside-target',
+      'missing-media',
+      'multiple-offstage-navigators',
+      'nested-navigator',
+    ]) {
+      testWidgets('explicit capture context ownership $scenario', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 2;
+        tester.view.physicalSize = const Size(240, 160);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        const boundaryKey = Key('context-ownership-boundary');
+        const rootKey = Key('context-ownership-app');
+        const targetKey = Key('context-ownership-target');
+        Navigator navigator(Widget content) => Navigator(
+          onGenerateRoute: (_) => PageRouteBuilder<void>(
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, _, _) => content,
+          ),
+        );
+        const content = ColoredBox(color: Color(0xff123456));
+        Widget surface = navigator(content);
+        if (scenario == 'nested-navigator') {
+          surface = navigator(
+            MediaQuery(
+              data: const MediaQueryData(
+                size: Size(77, 55),
+                textScaler: TextScaler.linear(2),
+              ),
+              child: navigator(content),
+            ),
+          );
+        }
+        if (scenario != 'missing-media') {
+          surface = MediaQuery.fromView(view: tester.view, child: surface);
+        }
+        if (scenario == 'missing-navigator') surface = content;
+        if (scenario == 'multiple-navigators' ||
+            scenario == 'multiple-offstage-navigators') {
+          surface = Row(
+            children: [
+              Expanded(child: surface),
+              Expanded(
+                child: Offstage(
+                  offstage: scenario == 'multiple-offstage-navigators',
+                  child: MediaQuery.fromView(
+                    view: tester.view,
+                    child: navigator(content),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        if (scenario == 'navigator-outside-target') {
+          surface = Row(
+            children: [
+              const Expanded(
+                child: KeyedSubtree(key: targetKey, child: content),
+              ),
+              Expanded(child: surface),
+            ],
+          );
+        }
+        Widget app = KeyedSubtree(key: rootKey, child: surface);
+        if (scenario == 'ambiguous-root') {
+          app = Row(
+            children: [
+              Expanded(child: app),
+              const Expanded(
+                child: KeyedSubtree(key: rootKey, child: content),
+              ),
+            ],
+          );
+        }
+        if (scenario == 'foreign-root') {
+          app = Row(
+            children: [
+              Expanded(
+                child: KeyedSubtree(key: targetKey, child: surface),
+              ),
+              const Expanded(
+                child: KeyedSubtree(key: rootKey, child: content),
+              ),
+            ],
+          );
+        }
+        await tester.pumpWidget(
+          RawView(
+            view: tester.view,
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: RepaintBoundary(key: boundaryKey, child: app),
+            ),
+          ),
+          wrapWithView: false,
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final target =
+            scenario == 'foreign-root' || scenario == 'navigator-outside-target'
+            ? find.byKey(targetKey)
+            : find.byKey(boundaryKey);
+        expect(MediaQuery.maybeOf(tester.element(target)), isNull);
+        final plan = fixture('ownership-$scenario');
+        final root = find.byKey(
+          scenario == 'missing-root'
+              ? const Key('absent-context-root')
+              : rootKey,
+          skipOffstage: false,
+        );
+        if (scenario == 'nested-navigator') {
+          final result = await _recordTechnicalTarget(
+            tester,
+            target,
+            plan,
+            'workspace-choose.png',
+            mediaSettingsRoot: root,
+            fixtureKind: 'synthetic-unit-render-no-commerce',
+          );
+          final metadata = await tester.runAsync(
+            () async =>
+                jsonDecode(await File(result.metadataPath).readAsString())
+                    as Map<String, dynamic>,
+          );
+          final media = metadata!['observations']['descendantMediaQuery'];
+          expect(media['width'], 120);
+          expect(media['height'], 80);
+          expect(media['textScaleAtOne'], 1);
+        } else {
+          final expectedError = switch (scenario) {
+            'missing-root' || 'ambiguous-root' => 'Capture app root must be unique',
+            'foreign-root' => 'Capture app root is outside target ancestry',
+            'navigator-outside-target' => 'Capture Navigator is outside requested target subtree',
+            'missing-media' => 'Capture Navigator has no media settings',
+            _ => 'Capture app must have one owned nonnested Navigator',
+          };
+          await expectLater(
+            _recordTechnicalTarget(
+              tester,
+              target,
+              plan,
+              'workspace-choose.png',
+              mediaSettingsRoot: root,
+              fixtureKind: 'synthetic-unit-render-no-commerce',
+            ),
+            throwsA(isA<StateError>().having((error) => error.message,
+              'message', expectedError)),
+          );
+          expect(
+            await tester.runAsync(
+              () => File(
+                plan.authorizedImagePath('workspace-choose.png'),
+              ).exists(),
+            ),
+            isFalse,
+          );
+        }
+      });
+    }
     testWidgets('rejects ambiguous capture targets before creating output', (
       tester,
     ) async {
@@ -4304,7 +4665,9 @@ void main() {
     await tester.pumpWidget(
       RepaintBoundary(
         key: const Key('store-review-root'),
-        child: (wrapper ?? (child) => child)(app),
+        child: (wrapper ?? (child) => child)(
+          KeyedSubtree(key: _technicalCaptureAppRootKey, child: app),
+        ),
       ),
     );
     if (settle) await tester.pumpAndSettle();
@@ -23485,11 +23848,18 @@ void main() {
     }
     // Inspect the same unmodified raster that is saved as evidence, not merely
     // the title's widget geometry. Do not force app repaint to hide a failure.
+    final technicalPlan = _TechnicalCapturePlan.fromEnvironment();
+    if (technicalPlan?.currentMode == true) {
+      _captureMediaSettings(
+        tester.element(root),
+        find.byKey(_technicalCaptureAppRootKey, skipOffstage: false),
+      );
+    }
     final boundary = tester.renderObject<RenderRepaintBoundary>(root);
     final image = (await tester.runAsync(() => boundary.toImage()))!;
     try {
       await _dispatchTechnicalCapture(
-        _TechnicalCapturePlan.fromEnvironment(),
+        technicalPlan,
         originalReference: '$name.png',
         historical: () => expectLater(image, matcher),
         technical: (plan) async {
@@ -23499,6 +23869,9 @@ void main() {
             plan,
             '$name.png',
             suppliedImage: image,
+            mediaSettingsRoot: plan.currentMode
+                ? find.byKey(_technicalCaptureAppRootKey, skipOffstage: false)
+                : null,
           );
         },
       );
@@ -74203,6 +74576,22 @@ void main() {
     }
   });
 
+  String captureCommercialFacts(WorkSession work) => jsonEncode({
+    'workspace': work.activeWorkspace?.id,
+    'verified': work.activeWorkspace?.verified,
+    'setupSaved': work.retailerSetupSaved,
+    'orderSession': orderSessionFacts(work),
+    'orders': [for (final order in work.workspaceOrders) order.toLedgerJson()],
+    'invoices': [
+      for (final invoice in work.workspaceInvoices) invoice.toLedgerJson(),
+    ],
+    'stock': [
+      for (final product in work.workspaceCatalogueItems)
+        product.toInventoryJson(),
+    ],
+    'paidRequirement': work.workspacePaidRequirementReference,
+  });
+
   Future<void> captureActivityDeck(
     WidgetTester tester, {
     required WorkSession work,
@@ -75011,11 +75400,29 @@ void main() {
         fileName: 'destination-reject-order-412x915.png',
         target: find.byType(Overlay).last,
         afterMount: () async {
-          await reveal(
-            tester,
-            find.byKey(const Key('work-activity-order-reject')),
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final before = captureCommercialFacts(work);
+          final row = find.byKey(
+            ValueKey<(String?, String)>((
+              work.activeWorkspace?.id,
+              work.currentWorkspaceOrderId ?? 'current-store-order',
+            )),
           );
-          await tester.tap(find.byKey(const Key('work-activity-order-reject')));
+          expect(row, findsOneWidget);
+          final reject = find.descendant(
+            of: row,
+            matching: find.byKey(const Key('work-activity-order-reject')),
+          );
+          await reveal(tester, reject);
+          expect(reject.hitTestable(), findsOneWidget);
+          await tester.tap(reject);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-reject-order-dialog')),
+            findsOneWidget,
+          );
+          expect(captureCommercialFacts(work), before);
         },
       );
     },
@@ -75032,9 +75439,18 @@ void main() {
         fileName: 'correction-workspace-switcher-412x915.png',
         target: find.byType(Overlay).last,
         afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final before = captureCommercialFacts(work);
           await tester.tap(
             find.byKey(const Key('work-dashboard-workspace-switcher')),
           );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-switch-add-workspace')),
+            findsOneWidget,
+          );
+          expect(captureCommercialFacts(work), before);
         },
       );
     },
@@ -75078,7 +75494,56 @@ void main() {
         work: work,
         fileName: 'correction-pickup-ready-412x915.png',
         afterMount: () async {
-          await tester.tap(find.byKey(const Key('work-activity-mark-ready')));
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final workspaceId = work.activeWorkspace?.id;
+          final invoicesBefore = jsonEncode([
+            for (final invoice in work.workspaceInvoices)
+              invoice.toLedgerJson(),
+          ]);
+          final stockBefore = jsonEncode([
+            for (final product in work.workspaceCatalogueItems)
+              product.toInventoryJson(),
+          ]);
+          final row = find.byKey(
+            ValueKey<(String?, String)>((
+              work.activeWorkspace?.id,
+              work.currentWorkspaceOrderId ?? 'current-store-order',
+            )),
+          );
+          expect(row, findsOneWidget);
+          final ready = find.descendant(
+            of: row,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'),
+          );
+          await reveal(tester, ready);
+          expect(ready.hitTestable(), findsOneWidget);
+          await tester.tap(ready);
+          await tester.pumpAndSettle();
+          expect(work.currentWorkspaceOrderId, isNotNull);
+          expect(work.activeWorkspace?.id, workspaceId);
+          final order = work.workspaceOrders.singleWhere(
+            (order) => order.id == work.currentWorkspaceOrderId,
+          );
+          expect(order.stage, 'Ready for pickup');
+          expect(order.customer, 'Rakesh · 98290 12345');
+          expect(order.items, 'Fortune Oil × 2 · Aashirvaad Atta × 1');
+          expect(order.amount, 1468);
+          expect(order.payment, 'Paid online');
+          expect(
+            jsonEncode([
+              for (final invoice in work.workspaceInvoices)
+                invoice.toLedgerJson(),
+            ]),
+            invoicesBefore,
+          );
+          expect(
+            jsonEncode([
+              for (final product in work.workspaceCatalogueItems)
+                product.toInventoryJson(),
+            ]),
+            stockBefore,
+          );
         },
       );
     },
@@ -75217,16 +75682,24 @@ void main() {
     'founder correction capture - funded Store work',
     skip: !captureFounderEvidence,
     (tester) async {
+      final work = liveStore();
       await captureActivityDeck(
         tester,
-        work: liveStore(),
+        work: work,
         fileName: 'correction-funded-store-work-412x915.png',
         afterMount: () async {
-          await openStoreTools(tester);
-          await tester.pumpAndSettle();
-          await tester.tap(find.byKey(const Key('work-business-grow')));
-          await tester.pumpAndSettle();
-          await tester.tap(find.text('Publish paid work'));
+          final before = captureCommercialFacts(work);
+          await openStoreGrowthAction(tester, 'work-growth-paid-work');
+          expect(
+            find.byKey(const Key('work-requirement-category-0')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('work-paid-requirement-screen')),
+            findsNothing,
+          );
+          expect(work.workspacePaidRequirementReference, isNull);
+          expect(captureCommercialFacts(work), before);
         },
       );
     },
