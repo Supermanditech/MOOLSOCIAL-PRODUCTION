@@ -88,7 +88,7 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
       $observedHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
       if($observedHead.Count -ne 1){return $false}
       $observedHistory=Get-OctoberCompatibilityHistoryStage $observedHead[0]
-      if($observedHistory.Stage -ne $Stage){return $false}
+      if($observedHistory.PhaseStage -ne $Stage){return $false}
       Test-OctoberCompatibilityCurrentSourceState -History $observedHistory -Phase 'implementation'
     }
     return $prepared -is [bool] -and $prepared
@@ -161,6 +161,8 @@ if($compatibilityIncremental) {
       'Read-OctoberCompatibilityJsonObject','Read-OctoberCompatibilityScopeRepairAdmission','Read-OctoberCompatibilityClaimHandoff',
       'Get-OctoberCompatibilityClaimHandoff','Get-OctoberCompatibilityHistoryStage',
       'Read-OctoberCompatibilityCurrentQualificationContract','Read-OctoberCompatibilityCurrentSuccessorSpecification','Test-OctoberCompatibilitySource15Preparation','Test-OctoberCompatibilityCurrentPreparation',
+      'Read-OctoberCompatibilitySource17ForwardAmendment','Test-OctoberCompatibilitySource17Preparation','Test-OctoberCompatibilitySource17CurrentPreparation',
+      'Get-ProductionRemoteBranchHead','Test-OctoberCompatibilityPublishedForwardCheckpoint',
       'Read-OctoberCompatibilityCurrentSourceState','Test-OctoberCompatibilityCurrentSourceState')) {
     $functions=@($ast.FindAll({param($node)
       $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name
@@ -176,10 +178,14 @@ if($compatibilityIncremental) {
     -Bindings @($compatibilityPolicy.productionGitDiscipline.continuationBindings) `
     -BaseBindings @($basePolicy.productionGitDiscipline.continuationBindings)) 'compatibility binding inventory changed.'
   Assert-IncrementalTicket ($Phase -cne 'ticket_start' -or $compatibilityHistory.Stage -eq 1) 'compatibility start must be clean at exact G, not unqualified E.'
-  Assert-IncrementalTicket ($Phase -cne 'implementation' -or (Test-CompatibilityIncrementalImplementationStage $compatibilityHistory.Stage)) 'compatibility implementation requires exact sealed history and independent current Source15 metadata preparation.'
+  Assert-IncrementalTicket ($Phase -cne 'implementation' -or (Test-CompatibilityIncrementalImplementationStage $compatibilityHistory.PhaseStage)) 'compatibility implementation requires exact sealed history and independent source-bound metadata preparation.'
   # Q is not documentary success: coordination handoff qualification remains
   # mandatory separately and this gate does not authorize integration.
-  Assert-IncrementalTicket ($Phase -cne 'handoff') 'Intermediate scoped repair admits no handoff; a separate completed qualification-contract amendment is required.'
+  if($Phase -ceq 'handoff') {
+    Assert-IncrementalTicket ($compatibilityHistory.Stage -eq 21 -and $compatibilityHistory.Forward -and
+      $compatibilityHistory.PhaseStage -eq 19 -and
+      (Test-OctoberCompatibilityPublishedForwardCheckpoint $compatibilityHistory.Head)) 'Compatibility handoff requires the exact published forward Q and complete native qualification; intermediate phases remain blocked.'
+  }
 }
 
 $baselineTag = [string]$state.baselineTag

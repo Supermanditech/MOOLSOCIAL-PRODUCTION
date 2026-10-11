@@ -1641,3 +1641,21 @@ focused suite passed PS7 65728/e1d47a and PS5.1 61582/ee566a: 28 visual,
 Source17/cycle/render/primary inspection, provider, APK or device acceptance.
 Current metadata must be re-staged and all applicable gates rerun before commit.
 HEAD remains Source15; integration and combined baseline remain pending.
+
+
+### Source17 forward test-coordinate correction — bounded admission
+
+Founder approved the minimum four-file amendment on11October2026. Preserve
+all original specification bytes and sealed commits0–17; this separate forward
+contract does not reinterpret the original index18 qualification proposal.
+Metadata18 preserves Source17 apps. Only after its committed admission may
+layout-test19 correct viewport-versus-consumed OTP keyboard assertions; no runtime
+change. Qualification20 needs fresh evidence bound to runtime15/contract18/test19.
+All84 original obligations,65 historical-slot reconciliations, two complete cycles,
+selected-risk visual inspection, provider deferrals and normal release gates remain.
+Prior Source17 runs are diagnostics only for the corrected source. No future SHA
+is invented; derive identities from checked parent/subject/owner/tree history.
+
+<!-- COMPATIBILITY_SOURCE17_FORWARD_AMENDMENT_JSON_BEGIN -->
+{"schemaVersion":1,"kind":"source17_forward_qualification_amendment_not_qualification","predecessorCommit":"737eea29357d5f42375b865754f3762f10545e37","predecessorTree":"a3930d846d0c17e7c82c9d6ad9a114fd4789f0c2","originalSpecificationSha256":"985C43950F13A51900F74E7BC915F3D7916446DB3AD9129430D29F598432B4CC","authoritySha256":"EE45AD3F5128BBEA81A5ED8DC0FBF6CA944AC1CB87F8D26C9F0D94F63B013CC7","frozenRuntimeTree":"1636d17025a9e80b362709f24c600d976ed6030f","layoutPredecessorBlob":"eb0958e8654aa99eb8533ceadc044496932c40c9","identityRules":{"runtimeSourceIndex":15,"originalContractIndex":16,"sealedPredecessorIndex":17,"contractIndex":18,"captureSourceIndex":19,"qualifiedDocumentIndex":20},"chain":[{"index":18,"parentIndex":17,"subject":"coordination(store-buy-compatibility-20261008): admit exact Source17 coordinate correction","owners":["scripts/check-codex-subagent-coordination-policy.ps1","scripts/test-codex-integration-repair-coordination-policy.ps1","scripts/check-cross-agent-incremental-ticket-gate.ps1","docs/quality/STORE-BUY-COMPATIBILITY-20261008.md"],"appsEqualParent":true},{"index":19,"parentIndex":18,"subject":"repair(store-buy-compatibility-20261008): distinguish viewport and consumed keyboard geometry","owners":["apps/mobile/test/work_workspace_layout_safety_test.dart"],"runtimeLibEqualSource15":true},{"index":20,"parentIndex":19,"subject":"qualification(store-buy-compatibility-20261008): verify corrected frontend source with provider deferrals","owners":["docs/quality/STORE-BUY-COMPATIBILITY-20261008.md"],"appsEqualParent":true}],"inheritOriginalQualificationRequirements":true,"literalExecutionPlansUnchanged":true,"oldArtifactsCannotQualifySuccessor":true,"ordinaryPrecommitRequired":true,"founderPresentationManifest":{"sha256":"F77FEBDD4117C856269A391B6AA151A3509B7DE020117F4165A59521BD8682D3","sourceCount":41,"historicalManifestSha256":"78A0C5E9C653EF10E708C5B5CD61370083942EDDE0665D74C19506BBE6A85A9D","historicalSourceCount":40,"excludedAuthoritySourceIndexes":[39,40],"accessIsNotApproval":true},"qualificationPassed":false,"providerVerified":false,"apkAuthority":false,"historyRewriteAuthority":false}
+<!-- COMPATIBILITY_SOURCE17_FORWARD_AMENDMENT_JSON_END -->
