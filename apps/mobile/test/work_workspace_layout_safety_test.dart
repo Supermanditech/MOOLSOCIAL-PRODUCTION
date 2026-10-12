@@ -74639,12 +74639,42 @@ void main() {
         ..workspaceSalesToday = 28450
         ..workspaceSettlementBalance = 17820;
       seedIncomingOrder(work);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '02-store-live-order-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Pickup',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1', 'Awaiting acceptance']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final accept = find.descendant(of: row,
+            matching: find.byKey(const Key('work-activity-order-accept')));
+          await reveal(tester, accept);
+          expect(accept.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(accept).onPressed, isNotNull);
+          expect(work.workspaceOrderStage, 'Confirmed');
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -74656,12 +74686,43 @@ void main() {
         ..workspaceSalesToday = 28450
         ..workspaceSettlementBalance = 17820;
       seedIncomingOrder(work, stage: 'Preparing', delivery: true);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '03-store-live-packing-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Mool delivery', 'Preparing', '0/3 packed',
+            'Fortune Oil × 2', 'Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final ready = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'));
+          await reveal(tester, ready);
+          expect(ready.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(ready).onPressed, isNull);
+          expect(work.workspaceOrderStage, 'Preparing');
+          expect(work.workspaceCanMarkReady, isFalse);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -74673,12 +74734,44 @@ void main() {
         ..workspaceSalesToday = 28450
         ..workspaceSettlementBalance = 17820;
       seedIncomingOrder(work, stage: 'Ready', delivery: true);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '04-store-live-delivery-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Mool delivery', 'Ready',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final arrange = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Arrange delivery'));
+          await reveal(tester, arrange);
+          expect(arrange.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(arrange).onPressed, isNotNull);
+          // Opening this command would advance the order; inspect it only.
+          expect(work.workspaceOrderStage, 'Ready');
+          expect(work.workspaceDeliveryAssignment, isNull);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -74706,12 +74799,43 @@ void main() {
     (tester) async {
       final work = liveStore();
       seedIncomingOrder(work, stage: 'Ready for pickup');
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '06-store-live-pickup-ready-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Pickup', 'Ready for pickup',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final pickup = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Confirm pickup'));
+          await reveal(tester, pickup);
+          expect(pickup.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(pickup).onPressed, isNotNull);
+          expect(work.workspaceOrderStage, 'Ready for pickup');
+          expect(work.workspaceOrderNeedsDelivery, isFalse);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -74839,12 +74963,69 @@ void main() {
         eta: DateTime.now().add(const Duration(minutes: 8)),
         stage: 'Assigned',
       );
+      final before = captureCommercialFacts(work);
+      final assignment = work.workspaceDeliveryAssignment!;
+      final etaBefore = assignment.eta.toUtc();
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         directory: 'work-store-live-v1-local-review-20260903',
         fileName: '08-store-live-delivery-assigned-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Mool delivery', 'Ready',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final track = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Track delivery'));
+          await reveal(tester, track);
+          expect(track.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(track).onPressed, isNotNull);
+          await tester.tap(track);
+          await tester.pumpAndSettle();
+          final delivery = find.byKey(const Key('work-delivery-destination'));
+          expect(delivery, findsOneWidget);
+          for (final text in ['Customer delivery', 'Rakesh · 98290 12345',
+            'Rider · Ravi Kumar', 'Bike RJ19 AB 1234 · Assigned']) {
+            expect(find.descendant(of: delivery, matching: find.text(text)), findsOneWidget);
+          }
+          expect(find.descendant(of: delivery,
+            matching: find.byKey(const Key('work-delivery-progress'))), findsOneWidget);
+          final etaText = find.descendant(of: delivery,
+            matching: find.textContaining('Estimated arrival · '));
+          expect(etaText, findsOneWidget);
+          final etaMatch = RegExp(r'^Estimated arrival · (\d{2}):([0-5]\d)$')
+            .firstMatch(tester.widget<Text>(etaText).data!);
+          expect(etaMatch, isNotNull);
+          final shownSeconds = int.parse(etaMatch!.group(1)!) * 60 +
+            int.parse(etaMatch.group(2)!);
+          final remainingSeconds =
+            (etaBefore.difference(DateTime.now().toUtc()).inMilliseconds / 1000).ceil();
+          expect(shownSeconds, inInclusiveRange(remainingSeconds, remainingSeconds + 2));
+          expect(work.workspaceOrderStage, 'Ready');
+          expect(assignment.orderId, 'current-store-order');
+          expect(assignment.stage, 'Assigned');
+          expect(identical(work.workspaceDeliveryAssignment, assignment), isTrue);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect(identical(work.workspaceDeliveryAssignment, assignment), isTrue);
+      expect(work.workspaceDeliveryAssignment!.eta.toUtc(), etaBefore);
+      expect((work.currentWorkspaceOrderId, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -75236,11 +75417,41 @@ void main() {
     (tester) async {
       final work = liveStore();
       seedIncomingOrder(work);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         fileName: 'store-activity-incoming-order-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Pickup',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1', 'Awaiting acceptance']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final accept = find.descendant(of: row,
+            matching: find.byKey(const Key('work-activity-order-accept')));
+          await reveal(tester, accept);
+          expect(accept.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(accept).onPressed, isNotNull);
+          expect(work.workspaceOrderStage, 'Confirmed');
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -75250,11 +75461,42 @@ void main() {
     (tester) async {
       final work = liveStore();
       seedIncomingOrder(work, stage: 'Preparing', delivery: true);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         fileName: 'store-activity-packing-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Mool delivery', 'Preparing', '0/3 packed',
+            'Fortune Oil × 2', 'Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final ready = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Mark ready'));
+          await reveal(tester, ready);
+          expect(ready.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(ready).onPressed, isNull);
+          expect(work.workspaceOrderStage, 'Preparing');
+          expect(work.workspaceCanMarkReady, isFalse);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -75264,11 +75506,43 @@ void main() {
     (tester) async {
       final work = liveStore();
       seedIncomingOrder(work, stage: 'Ready', delivery: true);
+      final before = captureCommercialFacts(work);
+      final identity = (work.currentWorkspaceOrderId,
+        work.workspaceDeliveryAssignment, work.workspaceSalesToday,
+        work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope));
       await captureActivityDeck(
         tester,
         work: work,
         fileName: 'store-activity-delivery-412x915.png',
+        afterMount: () async {
+          await tester.tap(find.byKey(const Key('work-store-orders')));
+          await tester.pumpAndSettle();
+          final row = find.byKey(ValueKey<(String?, String)>((
+            work.activeWorkspace?.id, 'current-store-order')));
+          expect(row, findsOneWidget);
+          for (final text in ['Rakesh · 98290 12345', '₹1,468',
+            'App · Paid online · Mool delivery', 'Ready',
+            'Fortune Oil × 2 · Aashirvaad Atta × 1']) {
+            expect(find.descendant(of: row, matching: find.text(text)), findsOneWidget);
+          }
+          final arrange = find.descendant(of: row,
+            matching: find.widgetWithText(FilledButton, 'Arrange delivery'));
+          await reveal(tester, arrange);
+          expect(arrange.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(arrange).onPressed, isNotNull);
+          // Preserve Ready; booking is not part of this capture.
+          expect(work.workspaceOrderStage, 'Ready');
+          expect(work.workspaceDeliveryAssignment, isNull);
+          expect(captureCommercialFacts(work), before);
+          expect(tester.takeException(), isNull);
+        },
       );
+      expect(captureCommercialFacts(work), before);
+      expect((work.currentWorkspaceOrderId, work.workspaceDeliveryAssignment,
+        work.workspaceSalesToday, work.workspaceSettlementBalance,
+        (work.contactDraftStore?.accountScope, work.pendingProofStore?.accountScope)), identity);
+      expect(tester.takeException(), isNull);
     },
   );
 
