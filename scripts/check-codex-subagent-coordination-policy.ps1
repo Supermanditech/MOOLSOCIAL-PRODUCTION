@@ -276,7 +276,7 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   Assert-Coordination ($LASTEXITCODE -eq 0) 'Compatibility HEAD must descend from exact E.'
   $commits=@(Get-OctoberCompatibilityGitLines @('rev-list','--reverse',"$e..$HeadCommit"))
   $firstParent=@(Get-OctoberCompatibilityGitLines @('rev-list','--first-parent','--reverse',"$e..$HeadCommit"))
-  Assert-Coordination ($commits.Count -le 29 -and
+  Assert-Coordination ($commits.Count -le 30 -and
     ($commits -join '|') -ceq ($firstParent -join '|')) 'Compatibility history contains an extra commit or merge.'
   $previous=$e
   $subjects=@($binding.bootstrapCommitSubject,
@@ -376,6 +376,22 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
         $nextSubject[0] -ceq $source23Forward.chain[2].subject) 'Source25 qualification cannot admit later successors.'
     }
   }
+  $source27Forward=$null
+  if($commits.Count -ge 29 -and $null -ne $source25Forward) {
+    $nextSubject=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',([string]$commits[28])))
+    if($nextSubject.Count -eq 1 -and $nextSubject[0] -ceq 'coordination(store-buy-compatibility-20261008): admit exact current evidence evaluator binding') {
+      $source27Forward=Read-OctoberCompatibilitySource27ForwardAmendment -Commit ([string]$commits[28])
+      Assert-Coordination ($null -ne $source27Forward -and
+        $commits[26] -ceq '971897c27d3f07ff8fe429c16c962ceeb823d580' -and
+        $commits[27] -ceq $source27Forward.predecessorCommit) 'Evaluator amendment requires exact Source26/27 history.'
+      $forward=$forward|ConvertTo-Json -Depth 30 -Compress|ConvertFrom-Json
+      $forward.chain=@($forward.chain[0..9])+@($source27Forward.chain)
+      $subjects=@($subjects[0..27])+@($source27Forward.chain|ForEach-Object {[string]$_.subject})
+    }else{
+      Assert-Coordination ($commits.Count -eq 29 -and $nextSubject.Count -eq 1 -and
+        $nextSubject[0] -ceq $source25Forward.chain[2].subject) 'Source27 qualification cannot admit arbitrary later successors.'
+    }
+  }
   for($index=0;$index -lt $commits.Count;$index++) {
     $commit=[string]$commits[$index]
     $parents=@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$commit))
@@ -399,7 +415,8 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
        ($null -ne $forward -and $index -eq 20) -or ($null -ne $source19Forward -and $index -eq 22) -or
        ($null -ne $source21Forward -and $index -eq 24) -or
        ($null -ne $source23Forward -and $index -eq 26) -or
-       ($null -ne $source25Forward -and $index -eq 28)) {
+       ($null -ne $source25Forward -and $index -eq 28) -or
+       ($null -ne $source27Forward -and $index -eq 29)) {
       $apps=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${commit}:apps","${previous}:apps"))
       Assert-Coordination ($apps.Count -eq 2 -and $apps[0] -ceq $apps[1]) 'Compatibility metadata commit changed apps.'
     }
@@ -493,6 +510,9 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
         if($currentIndex -ge 26 -and $null -ne $source25Forward) {
           Assert-Coordination ($null -ne (Read-OctoberCompatibilitySource25ForwardAmendment -Commit ([string]$commits[$currentIndex]))) 'Capture context successor lost its sealed forward contract.'
         }
+        if($currentIndex -ge 28 -and $null -ne $source27Forward) {
+          Assert-Coordination ($null -ne (Read-OctoberCompatibilitySource27ForwardAmendment -Commit ([string]$commits[$currentIndex]))) 'Evaluator successor lost its sealed forward contract.'
+        }
         $runtime=@(Get-OctoberCompatibilityGitLines @('rev-parse',($commits[$currentIndex]+':apps/mobile/lib'),
           '3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib'))
         Assert-Coordination ($runtime.Count -eq 2 -and $runtime[0] -ceq $runtime[1]) 'Forward test/qualification correction changed frozen runtime.'
@@ -512,13 +532,19 @@ function Get-OctoberCompatibilityHistoryStage([string]$HeadCommit) {
   $source21Preparation=$commits.Count -eq 22 -and $HeadCommit -ceq '43ea27a81e7c1876abc0df15b39342da96b63c10'
   $source23Preparation=$commits.Count -eq 24 -and $HeadCommit -ceq '880eea8fa679712ce800f2408e264de1ef75a198'
   $source25Preparation=$commits.Count -eq 26 -and $HeadCommit -ceq '17fb46dcbd22271e8ba495f1aada24ba5f746360'
-  $phaseStage=if($null -ne $source25Forward){[int]$commits.Count-10}elseif($source25Preparation){16}elseif($null -ne $source23Forward){[int]$commits.Count-8}elseif($source23Preparation){16}elseif($null -ne $source21Forward){[int]$commits.Count-6}elseif($source21Preparation){16}elseif($null -ne $source19Forward){[int]$commits.Count-4}elseif($source19Preparation){16}elseif($null -ne $forward){[int]$commits.Count-2}elseif($source17Preparation){16}else{[int]$commits.Count}
+  $source27Preparation=$commits.Count -eq 28 -and $HeadCommit -ceq 'a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3'
+  $phaseStage=if($null -ne $source27Forward){[int]$commits.Count-11}elseif($source27Preparation){16}elseif($null -ne $source25Forward){[int]$commits.Count-10}elseif($source25Preparation){16}elseif($null -ne $source23Forward){[int]$commits.Count-8}elseif($source23Preparation){16}elseif($null -ne $source21Forward){[int]$commits.Count-6}elseif($source21Preparation){16}elseif($null -ne $source19Forward){[int]$commits.Count-4}elseif($source19Preparation){16}elseif($null -ne $forward){[int]$commits.Count-2}elseif($source17Preparation){16}else{[int]$commits.Count}
+  $contractIndex=if($null -ne $source25Forward){26}elseif($null -ne $source23Forward){24}elseif($null -ne $source21Forward){22}elseif($null -ne $source19Forward){20}elseif($null -ne $forward){18}else{16}
+  $captureIndex=$contractIndex+1
   return @{Stage=[int]$commits.Count;Commits=$commits;Base=$e;Head=$HeadCommit;
     PhaseStage=$phaseStage;Source17Preparation=$source17Preparation;Source19Preparation=$source19Preparation;Source19Forward=($null -ne $source19Forward);Forward=($null -ne $forward);
     Source21Preparation=$source21Preparation;Source21Forward=($null -ne $source21Forward);
     Source23Preparation=$source23Preparation;Source23Forward=($null -ne $source23Forward);
     Source25Preparation=$source25Preparation;Source25Forward=($null -ne $source25Forward);
-    ContractIndex=$(if($null -ne $source25Forward){26}elseif($null -ne $source23Forward){24}elseif($null -ne $source21Forward){22}elseif($null -ne $source19Forward){20}elseif($null -ne $forward){18}else{16});CaptureIndex=$(if($null -ne $source25Forward){27}elseif($null -ne $source23Forward){25}elseif($null -ne $source21Forward){23}elseif($null -ne $source19Forward){21}elseif($null -ne $forward){19}else{17})}
+    Source27Preparation=$source27Preparation;Source27Forward=($null -ne $source27Forward);
+    ContractIndex=$contractIndex;CaptureIndex=$captureIndex;
+    QualificationIndex=$(if($null -ne $source27Forward){29}else{$captureIndex+1});
+    QualificationBaseIndex=$(if($null -ne $source27Forward){28}else{$contractIndex})}
 }
 
 function Get-OctoberCompatibilityReportPlan([string]$ReportId) {
@@ -1439,7 +1465,7 @@ function Read-OctoberCompatibilityPostMWriterFacts([string]$Phase) {
     $history=Get-OctoberCompatibilityHistoryStage $initialHead[0]
     $qualifiedPhase=$Phase -cin @('handoff','integration_admission_authorize')
     if($qualifiedPhase) {
-      if(-not $history.Forward -or $history.Stage -ne ($history.CaptureIndex+2) -or $history.PhaseStage -ne 19 -or
+       if(-not $history.Forward -or $history.Stage -ne ($history.QualificationIndex+1) -or $history.PhaseStage -ne 19 -or
          -not (Test-OctoberCompatibilityQualification $history)){return $null}
     }elseif($history.PhaseStage -notin @(7,8,9,10,11,12,13,14,15,16,17,18)){return $null}
     $currentPreparationVerified=$false
@@ -1862,6 +1888,87 @@ function Read-OctoberCompatibilitySource25ForwardAmendment {
   }catch{return $null}
 }
 
+function Read-OctoberCompatibilitySource27ForwardAmendment {
+  param([string]$Commit,[switch]$FromIndex,[switch]$FromWorkingTree)
+  try {
+    $hasCommit=$PSBoundParameters.ContainsKey('Commit')
+    if(@(@($hasCommit,[bool]$FromIndex,[bool]$FromWorkingTree)|Where-Object {$_}).Count -ne 1){return $null}
+    if($hasCommit -and $Commit -cnotmatch '\A[0-9a-f]{40}\z'){return $null}
+    $arguments=if($hasCommit){@{Commit=$Commit}}elseif($FromIndex){@{FromIndex=$true}}else{@{FromWorkingTree=$true}}
+    if($null -eq (Read-OctoberCompatibilitySource25ForwardAmendment @arguments)){return $null}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $text=if($FromWorkingTree){[IO.File]::ReadAllText((Join-Path $root $owner))}
+      elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
+      else{@(Get-OctoberCompatibilityGitLines @('show',($Commit+':'+$owner))) -join "`n"}
+    $begin='<!-- COMPATIBILITY_SOURCE27_FORWARD_AMENDMENT_JSON_BEGIN -->';$end='<!-- COMPATIBILITY_SOURCE27_FORWARD_AMENDMENT_JSON_END -->'
+    if(([regex]::Matches($text,[regex]::Escape($begin))).Count -ne 1 -or
+      ([regex]::Matches($text,[regex]::Escape($end))).Count -ne 1){return $null}
+    $start=$text.IndexOf($begin)+$begin.Length;$stop=$text.IndexOf($end,$start)
+    if($stop -le $start){return $null}
+    $bytes=[Text.Encoding]::UTF8.GetBytes($text.Substring($start,$stop-$start).Trim())
+    if((Get-OctoberCompatibilityByteHash $bytes) -cne '885EB5F9D7DF08F126FC191A5F77D17D0D5D332689ADB5B0ACF82429953214BC'){return $null}
+    $amendment=Read-OctoberCompatibilityJsonObject -Bytes $bytes
+    if($null -eq $amendment -or $amendment.kind -cne 'source27_forward_evaluator_binding_amendment_not_qualification' -or
+      $amendment.predecessorCommit -cne 'a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3'){return $null}
+    foreach($flag in @('qualificationPassed','providerVerified','apkAuthority','historyRewriteAuthority')) {
+      if($amendment.$flag -isnot [bool] -or $amendment.$flag){return $null}
+    }
+    return $amendment
+  }catch{return $null}
+}
+
+function Test-OctoberCompatibilitySource27Preparation([string]$Phase) {
+  # Exact Source27 preservation preparation; no qualification or APK authority.
+  $lease=$null;$hasher=$null
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $binding=Get-OctoberCompatibilityBinding
+    if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath){return $false}
+    $collector='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work/check-source27-metadata-preparation-20261012.ps1'
+    $expected='E177E85049D6E3A5BE2DC25E96B98083422E02006087AC682143566B8F6E8737'
+    $ancestor=[IO.Path]::GetFullPath($collector)
+    while($ancestor) {
+      if(((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){return $false}
+      $parent=Split-Path -Parent $ancestor;if($parent -ceq $ancestor){break};$ancestor=$parent
+    }
+    $lease=[IO.File]::Open($collector,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+    $hasher=[Security.Cryptography.SHA256]::Create()
+    if([BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected){return $false}
+    $result=@(& $collector -Phase $Phase -ExpectedCollectorSha256 $expected);$completed=$?
+    $lease.Position=0
+    if(-not $completed -or [BitConverter]::ToString($hasher.ComputeHash($lease)).Replace('-','') -cne $expected -or
+        $result.Count -ne 1 -or $result[0] -isnot [string]){return $false}
+    $proof=Read-OctoberCompatibilityJsonObject -Bytes ([Text.Encoding]::UTF8.GetBytes($result[0]))
+    $names=@('Operation','Phase','Observations','Head','ProvisionSha256','CollectorSha256','RepairAdmitted',
+      'CommitAdmitted','QualificationPassed','ApkAuthority','WriterScope')
+    if($null -eq $proof -or (@($proof.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($names|Sort-Object) -join '|') -or
+        ($proof.Observations -isnot [int] -and $proof.Observations -isnot [long]) -or $proof.Observations -ne 3){return $false}
+    $pins=@{Operation='read_only_source27_metadata_preparation';Phase=$Phase;Head='a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3';
+      ProvisionSha256='286CB5F9E6C195B833365318FC159042A6AAD2D827ACBA228778EFE5102657C3';CollectorSha256=$expected;
+      WriterScope='Cooperative support/claim locks, not universal writer inactivity'}
+    foreach($name in $pins.Keys){if($proof.$name -isnot [string] -or $proof.$name -cne $pins[$name]){return $false}}
+    foreach($name in @('RepairAdmitted','CommitAdmitted','QualificationPassed','ApkAuthority')) {
+      if($proof.$name -isnot [bool] -or $proof.$name){return $false}
+    }
+    return $true
+  }catch{return $false}finally{if($hasher){$hasher.Dispose()};if($lease){$lease.Dispose()}}
+}
+
+function Test-OctoberCompatibilitySource27CurrentPreparation([string]$Phase) {
+  try {
+    if($Phase -cnotin @('implementation','pre_commit')){return $false}
+    $owner='docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'
+    $before=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}else{(Get-FileHash -LiteralPath (Join-Path $root $owner)).Hash}
+    $selection=if($Phase -ceq 'pre_commit'){@{FromIndex=$true}}else{@{FromWorkingTree=$true}}
+    if($null -eq (Read-OctoberCompatibilitySource27ForwardAmendment @selection) -or -not (Test-OctoberCompatibilitySource27Preparation $Phase)){return $false}
+    $base=(@(Get-OctoberCompatibilityGitLines @('show',('a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3:'+$owner))) -join "`n").TrimEnd("`n")
+    $text=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}else{[IO.File]::ReadAllText((Join-Path $root $owner)).Replace("`r`n","`n")}
+    if(-not $text.StartsWith($base+"`n`n",[StringComparison]::Ordinal)){return $false}
+    $after=if($Phase -ceq 'pre_commit'){@(Get-OctoberCompatibilityGitLines @('rev-parse',(':'+$owner))) -join ''}else{(Get-FileHash -LiteralPath (Join-Path $root $owner)).Hash}
+    return $before -ceq $after -and $null -ne (Read-OctoberCompatibilitySource27ForwardAmendment @selection)
+  }catch{return $false}
+}
+
 function Test-OctoberCompatibilitySource25Preparation([string]$Phase) {
   # Exact Source25 preservation preparation; no qualification or APK authority.
   $lease=$null;$hasher=$null
@@ -2229,6 +2336,9 @@ function Test-OctoberCompatibilityCurrentPreparation([string]$Phase) {
     if($Phase -cnotin @('implementation','pre_commit')){return $false}
     $preparationHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))
     if($preparationHead.Count -ne 1){return $false}
+    if($preparationHead[0] -ceq 'a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3') {
+      return Test-OctoberCompatibilitySource27CurrentPreparation $Phase
+    }
     if($preparationHead[0] -ceq '17fb46dcbd22271e8ba495f1aada24ba5f746360') {
       return Test-OctoberCompatibilitySource25CurrentPreparation $Phase
     }
@@ -2358,7 +2468,8 @@ function Read-OctoberCompatibilityCurrentSourceState {
        $layoutPredecessor){return $null}
     # Q permission is append-only. Neither clauses nor immutable contract blocks
     # can be deleted/reworded merely because the document is the allowed owner.
-    $baseText=(@(Get-OctoberCompatibilityGitLines @('show',($contractCommit+':'+$doc))) -join "`n").TrimEnd("`n")
+    $qualificationBase=[string]$observed.Commits[$observed.QualificationBaseIndex]
+    $baseText=(@(Get-OctoberCompatibilityGitLines @('show',($qualificationBase+':'+$doc))) -join "`n").TrimEnd("`n")
     $workingText=(Get-Content -LiteralPath (Join-Path $root $doc) -Raw -Encoding UTF8).Replace("`r`n","`n").TrimEnd("`n")
     $indexText=(@(Get-OctoberCompatibilityGitLines @('show',(':'+$doc))) -join "`n").TrimEnd("`n")
     $qPrefix=$baseText+"`n`n### Current frontend qualification proof`n`n"
@@ -2379,6 +2490,8 @@ function Read-OctoberCompatibilityCurrentSourceState {
     if($observed.ContainsKey('Source25Forward') -and $observed.Source25Forward -is [bool] -and $observed.Source25Forward -and
        ($null -eq (Read-OctoberCompatibilitySource25ForwardAmendment -FromWorkingTree) -or
         $null -eq (Read-OctoberCompatibilitySource25ForwardAmendment -FromIndex))){return $null}
+    if($observed.Source27Forward -and ($null -eq (Read-OctoberCompatibilitySource27ForwardAmendment -FromWorkingTree) -or
+       $null -eq (Read-OctoberCompatibilitySource27ForwardAmendment -FromIndex))){return $null}
     if((@(Get-OctoberCompatibilityGitLines @('ls-files','--stage')) -join "`n") -cne $indexBefore -or
        (@(Get-OctoberCompatibilityGitLines @('ls-files','-v')) -join "`n") -cne $flagsBefore -or
        (@(Get-OctoberCompatibilityGitLines @('diff','--name-only','--diff-filter=ACMRTUXBD')) -join '|') -cne ($unstaged -join '|') -or
@@ -4180,6 +4293,202 @@ function Read-OctoberCompatibilityCurrentObligationJoins {
   }catch{return $null}
 }
 
+function Initialize-Source27NamedCallbackTokenizer {
+ try {
+  $moduleDefinition={
+   Set-StrictMode -Version Latest
+   $script:initialization=$null
+   function Initialize-Source27PrivateTokenizer {
+    try {
+     $revision='source27-named-callback-tokenizer-v1'
+     $source=@'
+using System;
+using System.Collections.Generic;
+public sealed class Source27DartToken {
+ public string Value; public int Start, End, Line, Column, Scope, Match=-1;
+}
+public static class Source27DartTokens {
+ static bool Id(char c) { return Char.IsLetterOrDigit(c)||c=='_'||c=='$'; }
+ static int Comment(string s,int i) {
+  if(s[i+1]=='/') { int j=s.IndexOf('\n',i+2); return j<0?s.Length:j; }
+  int depth=1; i+=2;
+  while(i<s.Length && depth>0) {
+   if(i+1<s.Length && s[i]=='/' && s[i+1]=='*'){depth++;i+=2;}
+   else if(i+1<s.Length && s[i]=='*' && s[i+1]=='/'){depth--;i+=2;}
+   else i++;
+  }
+  if(depth!=0)throw new FormatException("Unterminated comment"); return i;
+ }
+ static int StringEnd(string s,int i,bool raw) {
+  char quote=s[i]; bool triple=i+2<s.Length && s[i+1]==quote && s[i+2]==quote;
+  i+=triple?3:1;
+  while(i<s.Length) {
+   if(!raw && s[i]=='\\'){i+=2;continue;}
+   if(!raw && s[i]=='$' && i+1<s.Length && s[i+1]=='{') {i=InterpolationEnd(s,i+2);continue;}
+   if(s[i]==quote && (!triple || i+2<s.Length && s[i+1]==quote && s[i+2]==quote))return i+(triple?3:1);
+   if(!triple && (s[i]=='\r'||s[i]=='\n'))throw new FormatException("Newline in simple string");
+   i++;
+  }
+  throw new FormatException("Unterminated string");
+ }
+ static int InterpolationEnd(string s,int i) {
+  int braces=1;
+  while(i<s.Length) {
+   if(i+1<s.Length && s[i]=='/' && (s[i+1]=='/'||s[i+1]=='*')){i=Comment(s,i);continue;}
+   if(s[i]=='\''||s[i]=='"'){i=StringEnd(s,i,false);continue;}
+   if(s[i]=='r' && i+1<s.Length && (s[i+1]=='\''||s[i+1]=='"')){i=StringEnd(s,i+1,true);continue;}
+   if(s[i]=='{')braces++;
+   if(s[i]=='}' && --braces==0)return i+1;
+   i++;
+  }
+  throw new FormatException("Unterminated interpolation");
+ }
+ public static Source27DartToken[] Read(string s) {
+  var list=new List<Source27DartToken>(); var brackets=new Stack<int>(); var scopes=new Stack<int>();
+  int i=0,line=1,column=1;
+  while(i<s.Length) {
+   int start=i,firstLine=line,firstColumn=column; char c=s[i]; bool skip=false;
+   if(Char.IsWhiteSpace(c)){i++;skip=true;}
+   else if(i+1<s.Length && c=='/' && (s[i+1]=='/'||s[i+1]=='*')){i=Comment(s,i);skip=true;}
+   else if(c=='\''||c=='"')i=StringEnd(s,i,false);
+   else if(c=='r' && i+1<s.Length && (s[i+1]=='\''||s[i+1]=='"'))i=StringEnd(s,i+1,true);
+   else if(Id(c)){i++;while(i<s.Length && Id(s[i]))i++;}
+   else i++;
+   for(int j=start;j<i;j++){if(s[j]=='\n'){line++;column=1;}else column++;}
+   if(skip)continue;
+   string value=s.Substring(start,i-start); int scope=scopes.Count==0?-1:scopes.Peek();
+   var token=new Source27DartToken{Value=value,Start=start,End=i,Line=firstLine,Column=firstColumn,Scope=scope};
+   int index=list.Count; list.Add(token);
+   if(value=="("||value=="["||value=="{"){brackets.Push(index);if(value=="{")scopes.Push(index);}
+   else if(value==")"||value=="]"||value=="}") {
+    if(brackets.Count==0)throw new FormatException("Unbalanced delimiter");
+    int opening=brackets.Pop();string expected=value==")"?"(":value=="]"?"[":"{";
+    if(list[opening].Value!=expected)throw new FormatException("Mismatched delimiter");
+    token.Match=opening;list[opening].Match=index;if(value=="}")scopes.Pop();
+   }
+  }
+  if(brackets.Count!=0)throw new FormatException("Unclosed delimiter");return list.ToArray();
+ }
+}
+'@
+     $algorithm=[Security.Cryptography.SHA256]::Create()
+     try {$identity=[BitConverter]::ToString($algorithm.ComputeHash([Text.Encoding]::UTF8.GetBytes($source))).Replace('-','')}
+     finally {$algorithm.Dispose()}
+     $tokenType='Source27DartToken' -as [type];$parserType='Source27DartTokens' -as [type]
+     if($null -ne $script:initialization){
+      $receipt=$script:initialization
+      return $receipt.Revision -ceq $revision -and $receipt.SourceSha256 -ceq $identity -and
+       $null -ne $tokenType -and $null -ne $parserType -and
+       [object]::ReferenceEquals($receipt.TokenType,$tokenType) -and
+       [object]::ReferenceEquals($receipt.ParserType,$parserType)
+     }
+     if($null -ne $tokenType -or $null -ne $parserType){return $false}
+     $compiled=@(Add-Type -TypeDefinition $source -PassThru -ErrorAction Stop)
+     $actualTokens=@($compiled|Where-Object FullName -CEQ 'Source27DartToken')
+     $actualParsers=@($compiled|Where-Object FullName -CEQ 'Source27DartTokens')
+     if($compiled.Count -ne 2 -or $actualTokens.Count -ne 1 -or $actualParsers.Count -ne 1 -or
+        -not [object]::ReferenceEquals($actualTokens[0],('Source27DartToken' -as [type])) -or
+        -not [object]::ReferenceEquals($actualParsers[0],('Source27DartTokens' -as [type]))){return $false}
+     $script:initialization=[pscustomobject]@{
+      Revision=$revision;SourceSha256=$identity;TokenType=$actualTokens[0];ParserType=$actualParsers[0]
+     }
+     return $true
+    }catch{return $false}
+   }
+   Export-ModuleMember -Function Initialize-Source27PrivateTokenizer
+  }
+  $definition=$moduleDefinition.ToString()
+  $hasher=[Security.Cryptography.SHA256]::Create()
+  try {$moduleIdentity=[BitConverter]::ToString($hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($definition))).Replace('-','')}
+  finally {$hasher.Dispose()}
+  $moduleName='MoolSocialSource27Callback_'+$moduleIdentity
+  $modules=@(Get-Module -All -Name $moduleName)
+  if($modules.Count -eq 0){
+   if(('Source27DartToken' -as [type]) -or ('Source27DartTokens' -as [type])){return $false}
+   $created=New-Module -Name $moduleName -ScriptBlock $moduleDefinition
+   Import-Module -ModuleInfo $created -Global -ErrorAction Stop
+   $modules=@(Get-Module -All -Name $moduleName)
+  }
+  if($modules.Count -ne 1){return $false}
+  $module=$modules[0]
+  if($module.Name -cne $moduleName -or $module.ModuleType -ne [Management.Automation.ModuleType]::Script -or
+     $module.Definition -cne ('{'+$definition+'}') -or
+     $null -ne $module.RootModule -or $module.Guid -ne [Guid]::Empty -or
+     -not [IO.Path]::IsPathRooted($module.Path) -or
+     (Split-Path -Leaf $module.Path) -cnotmatch '\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z' -or
+     (Test-Path -LiteralPath $module.Path) -or
+     @($module.ExportedVariables.Keys).Count -ne 0 -or @($module.ExportedAliases.Keys).Count -ne 0 -or
+     @($module.ExportedCmdlets.Keys).Count -ne 0 -or
+     (@($module.ExportedFunctions.Keys)-join '|') -cne 'Initialize-Source27PrivateTokenizer'){return $false}
+  $result=@(& $module.ExportedFunctions['Initialize-Source27PrivateTokenizer'])
+  return $result.Count -eq 1 -and $result[0] -is [bool] -and $result[0]
+ }catch{return $false}
+}
+
+function Test-Source27NamedCallbackBinding {
+ param([string]$Source,[int]$DeclarationLine,[int]$DeclarationColumn,
+   [string]$TestName,[string]$FunctionName,[int]$HelperFirstLine,[int]$HelperLastLine,
+   [int]$ReferenceFirstLine,[int]$ReferenceLastLine)
+ try {
+  if(-not (Initialize-Source27NamedCallbackTokenizer)){return $false}
+  $tokens=[Source27DartTokens]::Read($Source)
+  # Bounded supported source form: every registrar token must be a standalone
+  # unqualified call statement. Reject any declaration/parameter/alias/member
+  # token anywhere in this owner rather than guessing lexical import resolution.
+  # This is deliberately conservative, not a general-purpose Dart resolver.
+  for($scan=0;$scan -lt $tokens.Length;$scan++) {
+   if($tokens[$scan].Value -cne 'testWidgets'){continue}
+   if($scan -lt 1 -or $scan+1 -ge $tokens.Length -or
+      $tokens[$scan-1].Value -cnotin @('{','}',';') -or $tokens[$scan+1].Value -cne '('){return $false}
+   $endCall=$tokens[$scan+1].Match
+   if($endCall -le $scan -or $endCall+1 -ge $tokens.Length -or $tokens[$endCall+1].Value -cne ';'){return $false}
+  }
+  $registrations=@(0..($tokens.Length-1)|Where-Object {
+    $tokens[$_].Line -eq $DeclarationLine -and $tokens[$_].Column -eq $DeclarationColumn
+  })
+  if($registrations.Count -ne 1){return $false};$at=[int]$registrations[0]
+  # All ten observed callback registrations are direct statements in the
+  # parameterless top-level void main() block. Do not accept class/member,
+  # nested registrar or another enclosing-function context as equivalent.
+  $block=$tokens[$at].Scope
+  if($block -lt 4 -or $tokens[$block].Scope -ne -1 -or
+     (($tokens[($block-4)..($block-1)] | ForEach-Object {$_.Value}) -join '|') -cne 'void|main|(|)'){return $false}
+  if($at -lt 1 -or $tokens[$at-1].Value -cnotin @('{','}',';') -or
+     $at+6 -ge $tokens.Length -or $tokens[$at].Value -cne 'testWidgets' -or
+     $tokens[$at+1].Value -cne '(' -or $tokens[$at+2].Value -cne ("'"+$TestName+"'") -or
+     $tokens[$at+3].Value -cne ',' -or $tokens[$at+4].Value -cne $FunctionName){return $false}
+  # Bind the recorded reference to the actual second-argument identifier,
+  # never another occurrence, the declaration start, or a broader line range.
+  if($ReferenceFirstLine -lt 1 -or $ReferenceFirstLine -ne $tokens[$at+4].Line -or
+     $ReferenceLastLine -ne $ReferenceFirstLine){return $false}
+  $closing=$tokens[$at+1].Match;$end=$at+5
+  if($tokens[$end].Value -ceq ','){$end++}
+  if($end -ne $closing -or $tokens[$closing+1].Value -cne ';'){return $false}
+  # Accept the actual unqualified second argument only, never invocation,
+  # closure, property reference, conditional or a variable alias.
+  $definitions=@()
+  for($index=4;$index+6 -lt $tokens.Length;$index++) {
+   if($tokens[$index].Value -cne $FunctionName -or $tokens[$index].Scope -ne $tokens[$at].Scope){continue}
+   $prefix=($tokens[($index-4)..($index-1)]|ForEach-Object {$_.Value}) -join '|'
+   $parameterClose=$index+4
+   if($tokens[$parameterClose].Value -ceq ','){$parameterClose++}
+   if($prefix -ceq 'Future|<|void|>' -and $tokens[$index+1].Value -ceq '(' -and
+      $tokens[$index+2].Value -ceq 'WidgetTester' -and $tokens[$index+3].Value -ceq 'tester' -and
+      $tokens[$parameterClose].Value -ceq ')' -and $tokens[$parameterClose+1].Value -ceq 'async' -and
+      $tokens[$parameterClose+2].Value -ceq '{'){
+     $definitions+=,[pscustomobject]@{NameIndex=$index;BodyIndex=($parameterClose+2)}
+   } elseif($prefix -ceq 'Future|<|void|>' -or
+     $tokens[$index-1].Value -cin @('var','final','const','dynamic','Function','void') -or
+     $tokens[$index+1].Value -ceq '='){return $false}
+  }
+  if($definitions.Count -ne 1){return $false};$fn=[int]$definitions[0].NameIndex
+  $body=[int]$definitions[0].BodyIndex;$bodyEnd=$tokens[$body].Match
+  if($bodyEnd -lt $body -or $tokens[$fn-4].Line -ne $HelperFirstLine -or
+     $tokens[$bodyEnd].Line -ne $HelperLastLine){return $false}
+  return $true
+ } catch {return $false}
+}
+
 function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {
   param([object]$Obligations,[hashtable]$SourceIdentity,[hashtable]$CycleEvidence,[object]$PrimaryBinding)
   # Consume only the independently bound primary record and actual cycle reader.
@@ -4222,17 +4531,32 @@ function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {
             if((Get-OctoberCompatibilityByteHash ([Text.Encoding]::UTF8.GetBytes($excerpt))) -cne $assertion.excerptSha256){return $null}
             $review=Read-OctoberCompatibilityJsonObject ([Text.Encoding]::UTF8.GetBytes($assertion.reviewObservation))
             $fields=@('schemaVersion','testKey','declarationLine','declarationColumn','bodyFirstLine','bodyLastLine','loopBindings','helperEvidence','assertions','meaning','limitations')
+            $callbackHelperIndex=-1
+            if($null -ne $review -and $review.schemaVersion -eq 2){$fields+=@('callbackBinding')}
             if($null -eq $review -or (@($review.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($fields|Sort-Object) -join '|') -or
-              ($review.schemaVersion -isnot [int] -and $review.schemaVersion -isnot [long]) -or $review.schemaVersion -ne 1 -or
+              ($review.schemaVersion -isnot [int] -and $review.schemaVersion -isnot [long]) -or $review.schemaVersion -notin @(1,2) -or
               $review.testKey -isnot [string] -or $review.testKey -cne $test.testKey -or
               $review.loopBindings -isnot [array] -or $review.helperEvidence -isnot [array] -or
               $review.assertions -isnot [array] -or -not $review.assertions.Count){return $null}
+            if($review.schemaVersion -eq 2) {
+              $callback=$review.callbackBinding
+              if($null -eq $callback -or (@($callback.PSObject.Properties.Name|Sort-Object) -join '|') -cne 'helperEvidenceIndex|kind' -or
+                $callback.kind -isnot [string] -or $callback.kind -cne 'testWidgets_named_callback' -or
+                ($callback.helperEvidenceIndex -isnot [int] -and $callback.helperEvidenceIndex -isnot [long]) -or
+                $callback.helperEvidenceIndex -lt 0 -or $callback.helperEvidenceIndex -ge $review.helperEvidence.Count){return $null}
+              $callbackHelperIndex=[int]$callback.helperEvidenceIndex
+              $callbackHelper=$review.helperEvidence[$callbackHelperIndex]
+              if($null -eq $callbackHelper -or $callbackHelper.owner -cne $owner -or
+                $callbackHelper.sourceBlob -cne $source.Blob -or
+                $review.bodyFirstLine -ne $callbackHelper.firstLine -or
+                $review.bodyLastLine -ne $callbackHelper.lastLine){return $null}
+            }
             foreach($field in @('meaning','limitations')){if($review.$field -isnot [string] -or [string]::IsNullOrWhiteSpace($review.$field)){return $null}}
             foreach($field in @('declarationLine','declarationColumn','bodyFirstLine','bodyLastLine')) {
               if(($review.$field -isnot [int] -and $review.$field -isnot [long]) -or $review.$field -lt 1){return $null}
             }
             if($review.bodyLastLine -gt $source.Lines.Count -or $review.bodyFirstLine -gt $review.bodyLastLine -or
-              $review.declarationLine -gt $review.bodyFirstLine -or $assertion.firstLine -lt $review.bodyFirstLine -or
+              ($callbackHelperIndex -lt 0 -and $review.declarationLine -gt $review.bodyFirstLine) -or $assertion.firstLine -lt $review.bodyFirstLine -or
               $assertion.lastLine -gt $review.bodyLastLine){return $null}
             $wholeSource=$source.Lines -join "`n"
             foreach($loop in $review.loopBindings) {
@@ -4252,7 +4576,10 @@ function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {
               if($actual -cne $expression.expression){return $null}
             }
             $helperCalls=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+            $helperIndex=-1
             foreach($helper in $review.helperEvidence) {
+              $helperIndex++
+              $isCallbackHelper=$helperIndex -eq $callbackHelperIndex
               $helperFields=@('owner','sourceBlob','firstLine','lastLine','excerptSha256','functionName','callFirstLine','callLastLine','callExpression','assertions')
               if($null -eq $helper -or (@($helper.PSObject.Properties.Name|Sort-Object) -join '|') -cne (@($helperFields|Sort-Object) -join '|') -or
                 $helper.owner -isnot [string] -or $helper.owner -cnotmatch '\Aapps/mobile/(?:test|lib)/[A-Za-z0-9_./-]+\.dart\z' -or
@@ -4265,12 +4592,17 @@ function Read-OctoberCompatibilityCurrentPrimaryAssertionReview {
               foreach($field in @('firstLine','lastLine','callFirstLine','callLastLine')) {
                 if(($helper.$field -isnot [int] -and $helper.$field -isnot [long]) -or $helper.$field -lt 1){return $null}
               }
-              if($helper.callFirstLine -lt $assertion.firstLine -or $helper.callLastLine -gt $assertion.lastLine -or
+              if(((-not $isCallbackHelper) -and ($helper.callFirstLine -lt $assertion.firstLine -or $helper.callLastLine -gt $assertion.lastLine)) -or
+                $helper.callLastLine -gt $source.Lines.Count -or
                 $helper.callLastLine -lt $helper.callFirstLine -or $helper.lastLine -lt $helper.firstLine -or
                 -not $helperCalls.Add(($helper.owner+':'+$helper.functionName+':'+$helper.callFirstLine+':'+$helper.callLastLine))){return $null}
               $callText=$source.Lines[($helper.callFirstLine-1)..($helper.callLastLine-1)] -join "`n"
               $callPattern='(?<![A-Za-z0-9_])'+[regex]::Escape($helper.functionName)+'\s*\('
-              if($callText -cne $helper.callExpression -or -not [regex]::IsMatch($callText,$callPattern)){return $null}
+              if($callText -cne $helper.callExpression){return $null}
+              if($isCallbackHelper) {
+                $callbackTestName=$test.testKey.Substring($test.testKey.IndexOf(':')+1)
+                if(-not (Test-Source27NamedCallbackBinding -Source $wholeSource -DeclarationLine $review.declarationLine -DeclarationColumn $review.declarationColumn -TestName $callbackTestName -FunctionName $helper.functionName -HelperFirstLine $helper.firstLine -HelperLastLine $helper.lastLine -ReferenceFirstLine $helper.callFirstLine -ReferenceLastLine $helper.callLastLine)){return $null}
+              }elseif(-not [regex]::IsMatch($callText,$callPattern)){return $null}
               if(-not $sources.ContainsKey($helper.owner)) {
                 $helperBlob=@(Get-OctoberCompatibilityGitLines @('rev-parse',($SourceIdentity.captureSourceCommit+':'+$helper.owner)))
                 $helperLines=@(Get-OctoberCompatibilityGitLines @('show',($SourceIdentity.captureSourceCommit+':'+$helper.owner)))
@@ -4332,6 +4664,30 @@ function Read-OctoberCompatibilityCurrentSkippedCoverage {
     foreach($case in $contract.cases) {
       foreach($key in $case.originalSuccessKeys){$cases.Add($key,[int]$case.ordinal)}
     }
+    # Supplemental current names come only from the validated, sealed Source19
+    # forward contract. They are not prefix exceptions or waived skips.
+    $preSource19=$SourceIdentity.contractCommit -cin @(
+      '0d487b454cc515ed980eec2f48962846f1314994',
+      'd50dab60b440bd7caaff312a8f037ba63759461a')
+    # The independently validated original contract/spec above establishes these
+    # two immutable older identities. No current/malformed amendment may fall back.
+    $forward=$null;$supplementalEntries=@()
+    if(-not $preSource19) {
+      $forward=Read-OctoberCompatibilitySource19ForwardAmendment -Commit $SourceIdentity.contractCommit
+      if($null -eq $forward -or @($forward.currentExecutionOverrides.historical_store_capture).Count -ne 5){return $null}
+      $supplementalEntries=@($forward.currentExecutionOverrides.historical_store_capture)
+    }
+    $supplemental=[Collections.Generic.Dictionary[string,int]]::new([StringComparer]::Ordinal)
+    $ordinals=[Collections.Generic.HashSet[int]]::new()
+    foreach($entry in $supplementalEntries) {
+      $ordinal=[int]$entry.ordinal
+      $original='work_workspace_layout_safety_test.dart:'+$entry.originalName
+      $current='work_workspace_layout_safety_test.dart:'+$entry.currentName
+      if($ordinal -notin @(35,36,37,38,39) -or -not $ordinals.Add($ordinal) -or
+        -not $cases.ContainsKey($original) -or $cases[$original] -ne $ordinal -or
+        $cases.ContainsKey($current) -or $supplemental.ContainsKey($current)){return $null}
+      $supplemental.Add($current,$ordinal)
+    }
     # These12 exact source15 recovery tests intentionally run in complementary
     # review modes, outside H84. No prefix/nearby-name exception is permitted.
     $prefix='work_store_atomic_operations_test.dart:COUNTERRELAUNCH review Store recovery '
@@ -4366,6 +4722,15 @@ function Read-OctoberCompatibilityCurrentSkippedCoverage {
             if($cases.ContainsKey($key)) {
               $ordinal=$cases[$key];$kind='retained_case'
               if($Obligations[$ordinal-1].ordinal -ne $ordinal){return $null}
+            }elseif($supplemental.ContainsKey($key)) {
+              if($report.id -cne 'store_layout_and_recovery' -or $executionId -cne 'default'){return $null}
+              $ordinal=$supplemental[$key];$kind='current_capture_success'
+              if($Obligations[$ordinal-1].ordinal -ne $ordinal){return $null}
+              foreach($requiredCycle in @('cycle1','cycle2')) {
+                $target=$requiredCycle+':store_layout_and_recovery:historical_store_capture'
+                if(-not $CycleEvidence.Executions.ContainsKey($target) -or
+                  -not $CycleEvidence.Executions[$target].Successes.Contains($key)){return $null}
+              }
             }elseif($complementary.ContainsKey($key)) {
               $mapping=$complementary[$key]
               if($report.id -cne $mapping.SkippedReport -or $executionId -cne 'default'){return $null}
@@ -5259,7 +5624,7 @@ function Read-OctoberCompatibilityCurrentQualificationProof {
   try {
     $binding=Get-OctoberCompatibilityBinding
     if($root.Replace('\','/').TrimEnd('/') -cne $binding.worktreePath -or $null -eq $History -or
-       $History.Stage -isnot [int] -or $History.Stage -notin @(18,19,20,21,22,23,24,25,26,27,28,29) -or
+       $History.Stage -isnot [int] -or $History.Stage -notin @(18,19,20,21,22,23,24,25,26,27,28,29,30) -or
        ($FromWorkingTree -and $FromIndex) -or
        @(Get-ChildItem Env:|Where-Object {$_.Name -like 'GIT_*' -and $_.Name -cne 'GIT_PAGER'}).Count){return $null}
     if(@($History.Commits).Count -ne $History.Stage -or $History.Head -cne $History.Commits[-1]){return $null}
@@ -5297,7 +5662,8 @@ function Read-OctoberCompatibilityCurrentQualificationProof {
     $text=if($FromWorkingTree){Get-Content -LiteralPath (Join-Path $root $owner) -Raw -Encoding UTF8}
       elseif($FromIndex){@(Get-OctoberCompatibilityGitLines @('show',(':'+$owner))) -join "`n"}
       else{@(Get-OctoberCompatibilityGitLines @('show',($observed.Head+':'+$owner))) -join "`n"}
-    $baseDocument=(@(Get-OctoberCompatibilityGitLines @('show',($metadata+':'+$owner))) -join "`n").Replace("`r`n","`n").TrimEnd("`n")
+    $qualificationBase=[string]$observed.Commits[$observed.QualificationBaseIndex]
+    $baseDocument=(@(Get-OctoberCompatibilityGitLines @('show',($qualificationBase+':'+$owner))) -join "`n").Replace("`r`n","`n").TrimEnd("`n")
     $expectedPrefix=$baseDocument+"`n`n### Current frontend qualification proof`n`n"
     if($text -isnot [string] -or -not $text.Replace("`r`n","`n").StartsWith($expectedPrefix,[StringComparison]::Ordinal)){return $null}
     $blocks=[regex]::Matches($text,'(?s)<!-- COMPATIBILITY_CURRENT_QUALIFICATION_PROOF_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_CURRENT_QUALIFICATION_PROOF_JSON_END -->')
@@ -5460,7 +5826,7 @@ function Test-OctoberCompatibilityPublishedForwardCheckpoint([string]$ExpectedHe
       if($head.Count -ne 1 -or $head[0] -cne $requestedHead -or
          $branch.Count -ne 1 -or $branch[0] -cne $binding.branch){return $false}
       $history=Get-OctoberCompatibilityHistoryStage $head[0]
-      if($history.Stage -ne ($history.CaptureIndex+2) -or $history.PhaseStage -ne 19 -or -not $history.Forward){return $false}
+      if($history.Stage -ne ($history.QualificationIndex+1) -or $history.PhaseStage -ne 19 -or -not $history.Forward){return $false}
       if(@(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=all')).Count -or
          @(Get-OctoberCompatibilityGitLines @('ls-files','-v')|Where-Object {$_ -cmatch '\A(?:[a-z]|S) '}).Count){return $false}
       $checker='scripts/check-codex-subagent-coordination-policy.ps1'
@@ -6045,17 +6411,21 @@ function Test-OctoberCompatibilityStageFacts([hashtable]$Facts) {
   $qualifiedPhase=[string]$Facts.Phase -cin @('handoff','integration_admission_authorize')
   if($qualifiedPhase -or $Facts.Stage -eq 19) {
     if(-not $qualifiedPhase -or $Facts.Stage -ne 19 -or
-       -not $Facts.ContainsKey('PhysicalStage') -or $Facts.PhysicalStage -isnot [int] -or $Facts.PhysicalStage -notin @(21,23,25,27,29) -or
+       -not $Facts.ContainsKey('PhysicalStage') -or $Facts.PhysicalStage -isnot [int] -or $Facts.PhysicalStage -notin @(21,23,25,27,29,30) -or
        -not $Facts.ContainsKey('ForwardHistory') -or $Facts.ForwardHistory -isnot [bool] -or -not $Facts.ForwardHistory){return $false}
     if($Facts.PhysicalStage -eq 23 -and (-not $Facts.ContainsKey('Source19ForwardHistory') -or
        $Facts.Source19ForwardHistory -isnot [bool] -or -not $Facts.Source19ForwardHistory)){return $false}
     if($Facts.ContainsKey('Source21ForwardHistory') -and $Facts.Source21ForwardHistory -is [bool] -and
-       $Facts.Source21ForwardHistory -and $Facts.PhysicalStage -notin @(25,27,29)){return $false}
+       $Facts.Source21ForwardHistory -and $Facts.PhysicalStage -notin @(25,27,29,30)){return $false}
     if($Facts.ContainsKey('Source23ForwardHistory') -and $Facts.Source23ForwardHistory -is [bool] -and
-       $Facts.Source23ForwardHistory -and $Facts.PhysicalStage -notin @(27,29)){return $false}
+       $Facts.Source23ForwardHistory -and $Facts.PhysicalStage -notin @(27,29,30)){return $false}
     if($Facts.ContainsKey('Source25ForwardHistory') -and
-       ($Facts.Source25ForwardHistory -isnot [bool] -or ($Facts.Source25ForwardHistory -and $Facts.PhysicalStage -ne 29))){return $false}
-    if($Facts.PhysicalStage -eq 29 -and (-not $Facts.ContainsKey('Source25ForwardHistory') -or
+       ($Facts.Source25ForwardHistory -isnot [bool] -or ($Facts.Source25ForwardHistory -and $Facts.PhysicalStage -notin @(29,30)))){return $false}
+    if($Facts.ContainsKey('Source27ForwardHistory') -and
+       ($Facts.Source27ForwardHistory -isnot [bool] -or ($Facts.Source27ForwardHistory -and $Facts.PhysicalStage -ne 30))){return $false}
+    if($Facts.PhysicalStage -eq 30 -and (-not $Facts.ContainsKey('Source27ForwardHistory') -or
+       $Facts.Source27ForwardHistory -isnot [bool] -or -not $Facts.Source27ForwardHistory)){return $false}
+    if($Facts.PhysicalStage -in @(29,30) -and (-not $Facts.ContainsKey('Source25ForwardHistory') -or
        $Facts.Source25ForwardHistory -isnot [bool] -or -not $Facts.Source25ForwardHistory -or
        -not $Facts.ContainsKey('Source23ForwardHistory') -or $Facts.Source23ForwardHistory -isnot [bool] -or -not $Facts.Source23ForwardHistory -or
        -not $Facts.ContainsKey('Source21ForwardHistory') -or $Facts.Source21ForwardHistory -isnot [bool] -or -not $Facts.Source21ForwardHistory -or
@@ -10295,6 +10665,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Source21ForwardHistory=$compatibilityHistory.Source21Forward
       Source23ForwardHistory=$compatibilityHistory.Source23Forward
       Source25ForwardHistory=$compatibilityHistory.Source25Forward
+      Source27ForwardHistory=$compatibilityHistory.Source27Forward
       BaseGraphValid=$true; SourceRemotesExact=$true; NativeUnchanged=$true
       GenerationExact=$true; BindingsExact=$true; HistoryValid=$true
       Clean=(Test-ProductionWorktreeClean)
@@ -13646,7 +14017,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
     if ($octoberCompatibilityIdentity) {
-      Assert-Coordination ($compatibilityHistory.Stage -eq ($compatibilityHistory.CaptureIndex+2) -and $compatibilityHistory.Forward -and
+      Assert-Coordination ($compatibilityHistory.Stage -eq ($compatibilityHistory.QualificationIndex+1) -and $compatibilityHistory.Forward -and
         $compatibilityHistory.PhaseStage -eq 19 -and
         (Test-OctoberCompatibilityQualification $compatibilityHistory) -and
         (Test-ProductionWorktreeClean) -and
@@ -14107,7 +14478,7 @@ scripts/test-artifact-evidence-retention.ps1 text eol=lf
       Assert-Coordination ($approvedCommits.Count -eq 1 -and $approvedBranches.Count -eq 1 -and
         $approvedBranches[0] -ceq (Get-OctoberCompatibilityBinding).branch) 'Final compatibility integration requires exactly the qualified successor branch.'
       $qualifiedHistory=Get-OctoberCompatibilityHistoryStage ([string]$approvedCommits[0])
-      Assert-Coordination ($qualifiedHistory.Stage -eq ($qualifiedHistory.CaptureIndex+2) -and $qualifiedHistory.Forward -and
+      Assert-Coordination ($qualifiedHistory.Stage -eq ($qualifiedHistory.QualificationIndex+1) -and $qualifiedHistory.Forward -and
         $qualifiedHistory.PhaseStage -eq 19 -and
         (Test-OctoberCompatibilityPublishedForwardCheckpoint $qualifiedHistory.Head)) 'Final compatibility integration rejects E/G/C/L or incomplete source qualification.'
       Assert-Coordination ($integrationMerges.Count -eq 1) 'Final compatibility integration requires one automatic merge only.'

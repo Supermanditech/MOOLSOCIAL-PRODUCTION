@@ -2070,14 +2070,25 @@ function Invoke-OctoberCompatibilitySource19HistoryProbes {
 function Invoke-OctoberCompatibilityQualificationCountDispatchProbes {
   # Labelled history/source-state mocks test dispatch only, never qualification.
   $count=0
-  foreach($stage in @(18,19,20,21,22,23,24,25,26,27,28,29)) {
+  $dispatchCases=@(foreach($physicalStage in @(18,19,20,21,22,23,24,25,26,27,28,29)) {
+    $phaseStage=if($physicalStage % 2 -eq 0){18}else{19}
+    @{Stage=$physicalStage;Phase=$phaseStage;
+      ContractIndex=($physicalStage-$(if($phaseStage -eq 18){2}else{3}));
+      CaptureIndex=($physicalStage-$(if($phaseStage -eq 18){1}else{2}));
+      QualificationIndex=($physicalStage-$(if($phaseStage -eq 18){0}else{1}));
+      QualificationBaseIndex=($physicalStage-$(if($phaseStage -eq 18){2}else{3}))}
+  })+@(
+    @{Stage=29;Phase=18;ContractIndex=26;CaptureIndex=27;QualificationIndex=29;QualificationBaseIndex=28},
+    @{Stage=30;Phase=19;ContractIndex=26;CaptureIndex=27;QualificationIndex=29;QualificationBaseIndex=28})
+  foreach($dispatchCase in $dispatchCases) {
+    $stage=$dispatchCase.Stage
     foreach($mode in @('working','index','committed')) {
       & {
         $commits=@(for($index=1;$index -le $stage;$index++){'{0:x40}' -f $index})
-        $phase=if($stage % 2 -eq 0){18}else{19}
+        $phase=$dispatchCase.Phase
         $history=@{Stage=$stage;Commits=$commits;Head=$commits[-1];PhaseStage=$phase;
-          ContractIndex=($stage-$(if($phase -eq 18){2}else{3}));
-          CaptureIndex=($stage-$(if($phase -eq 18){1}else{2}))}
+          ContractIndex=$dispatchCase.ContractIndex;CaptureIndex=$dispatchCase.CaptureIndex;
+          QualificationIndex=$dispatchCase.QualificationIndex;QualificationBaseIndex=$dispatchCase.QualificationBaseIndex}
         $observations=@{History=0;Source=0;ExpectedPhase='';ExpectedReadOnly=$false;
           ExpectedContractIndex=$history.ContractIndex;ExpectedCaptureIndex=$history.CaptureIndex;
           UnexpectedDispatch=$false;UnexpectedHistory=$false;DispatchValidationComplete=$false;
@@ -2161,8 +2172,12 @@ function Invoke-OctoberCompatibilityQualificationCountDispatchProbes {
       $count++
     }
     $observed=$baseline.Clone()
-    foreach($invalidStage in @(17,30,'26',26.0)) {
+    foreach($invalidStage in @(17,31,'26',26.0)) {
       $invalid=$forged.Clone();$invalid.Stage=$invalidStage
+      if($invalidStage -is [int] -and $invalidStage -eq 31) {
+        $invalid.Commits=@(for($index=1;$index -le 31;$index++){'{0:x40}' -f $index})
+        $invalid.Head=$invalid.Commits[-1]
+      }
       $observations.History=0;$observations.Source=0
       $result=Read-OctoberCompatibilityCurrentQualificationProof -History $invalid
       Assert-RepairContract ($null -eq $result -and $observations.History -eq 0 -and
@@ -2489,6 +2504,119 @@ function Invoke-OctoberCompatibilitySource25HistoryProbes {
   return $count
 }
 
+function Invoke-OctoberCompatibilitySource27HistoryProbes {
+  # Exact immutable prefix plus labelled future objects, never real admission.
+  $prefixHistory=Get-OctoberCompatibilityHistoryStage 'a03eff1c0e37cc71d0c9bd26d2724de12e63a2d3'
+  Assert-RepairContract ($prefixHistory.Stage -eq 28 -and $prefixHistory.PhaseStage -eq 16 -and
+    $prefixHistory.Source27Preparation -and -not $prefixHistory.Source27Forward -and
+    $prefixHistory.ContractIndex -eq 26 -and $prefixHistory.CaptureIndex -eq 27) 'Source27 must remain exact preparation.'
+  $prefix=@($prefixHistory.Commits);$evaluator=('a'*40);$qualified=('c'*40);$oldQ=('b'*40);$extra=('d'*40)
+  $document=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
+  $delta=Read-OctoberCompatibilitySource27ForwardAmendment -FromWorkingTree
+  Assert-RepairContract ($null -ne $delta) 'Source27 probe requires the real sealed amendment.'
+  $block=[regex]::Match($document,'(?s)<!-- COMPATIBILITY_SOURCE27_FORWARD_AMENDMENT_JSON_BEGIN -->\s*(.*?)\s*<!-- COMPATIBILITY_SOURCE27_FORWARD_AMENDMENT_JSON_END -->')
+  $oldDelta=Read-OctoberCompatibilitySource25ForwardAmendment -FromWorkingTree
+  $originalGit=(Get-Command Get-OctoberCompatibilityGitLines -CommandType Function).ScriptBlock
+  $gitExecutable=(Get-Command git.exe -CommandType Application | Select-Object -First 1).Source
+  $immutableCache=@{};$count=0
+  foreach($case in @('evaluator','qualified','old-q','old-q-extra','evaluator-parent','q-parent',
+      'evaluator-owner','q-owner','evaluator-apps','q-apps','evaluator-subject','q-subject','q-old-subject',
+      'missing-delta','duplicate-delta','changed-original','forged-roles','q-lost-delta','q-changed-delta','evaluator-runtime','q-runtime')) {
+    & {
+      $qCase=$case -cin @('qualified','q-parent','q-owner','q-apps','q-subject','q-old-subject','q-lost-delta','q-changed-delta','q-runtime')
+      $oldCase=$case -cin @('old-q','old-q-extra')
+      $graph=if($oldCase){@($prefix)+@($oldQ)}else{@($prefix)+@($evaluator)}
+      if($qCase){$graph+=@($qualified)};if($case -ceq 'old-q-extra'){$graph+=@($extra)}
+      $tip=$graph[-1];$observations=@{Ancestry=0;Unexpected=$false;MutationHits=0}
+      function git {
+        if(($args -join '|') -ceq ('-C|'+$root+'|merge-base|--is-ancestor|'+$prefixHistory.Base+'|'+$tip)) {
+          $observations.Ancestry++;$global:LASTEXITCODE=0;return
+        }
+        & $gitExecutable @args
+      }
+      function Get-OctoberCompatibilityGitLines([string[]]$Arguments) {
+        $query=$Arguments -join '|'
+        if($query -ceq ('rev-list|--reverse|'+$prefixHistory.Base+'..'+$tip) -or
+           $query -ceq ('rev-list|--first-parent|--reverse|'+$prefixHistory.Base+'..'+$tip)){return $graph}
+        foreach($index in 28..($graph.Count-1)) {
+          $commit=[string]$graph[$index];$entry=$delta.chain[$index-28]
+          if($query -ceq ('show|-s|--format=%P|'+$commit)) {
+            if(($index -eq 28 -and $case -ceq 'evaluator-parent') -or ($index -eq 29 -and $case -ceq 'q-parent')){$observations.MutationHits++;return ('f'*40)}
+            return [string]$graph[$index-1]
+          }
+          if($query -ceq ('show|-s|--format=%s|'+$commit)) {
+            if($oldCase -and $index -eq 28){return [string]$oldDelta.chain[2].subject}
+            if(($index -eq 28 -and $case -ceq 'evaluator-subject') -or ($index -eq 29 -and $case -ceq 'q-subject')){$observations.MutationHits++;return 'invalid: future subject'}
+            if($index -eq 29 -and $case -ceq 'q-old-subject'){$observations.MutationHits++;return [string]$oldDelta.chain[2].subject}
+            return [string]$entry.subject
+          }
+          if($query -ceq ('diff-tree|--no-commit-id|--name-only|-r|'+$commit)) {
+            if(($index -eq 28 -and $case -ceq 'evaluator-owner') -or ($index -eq 29 -and $case -ceq 'q-owner')){$observations.MutationHits++;return @($entry.owners)+@('apps/mobile/lib/unowned.dart')}
+            if($oldCase){return @('docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')}
+            return @($entry.owners)
+          }
+          if($query -ceq ('show|'+$commit+':docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')) {
+            if($oldCase){return $document.Replace($block.Value,'')}
+            if(($index -eq 28 -and $case -ceq 'missing-delta') -or ($index -eq 29 -and $case -ceq 'q-lost-delta')){$observations.MutationHits++;return $document.Replace($block.Value,'')}
+            if($index -eq 28 -and $case -ceq 'duplicate-delta'){$observations.MutationHits++;return $document+"`n"+$block.Value}
+            if($index -eq 28 -and $case -ceq 'changed-original'){$observations.MutationHits++;return $document.Replace('current_successor_and_qualification_specification_not_admission','changed-original')}
+            if(($index -eq 28 -and $case -ceq 'forged-roles') -or ($index -eq 29 -and $case -ceq 'q-changed-delta')) {
+              $changedRoles=$block.Groups[1].Value|ConvertFrom-Json
+              Assert-RepairContract ($changedRoles.sourceRoles.captureIndex -eq 27) 'Role mutation must target original capture27.'
+              $changedRoles.sourceRoles.captureIndex=28
+              $changedDocument=$document.Replace($block.Groups[1].Value,($changedRoles|ConvertTo-Json -Depth 40 -Compress))
+              Assert-RepairContract ($changedDocument -cne $document) 'Role mutation must change bytes.'
+              $observations.MutationHits++;return $changedDocument
+            }
+            return $document
+          }
+          if($query -ceq ('rev-parse|'+$commit+':apps|'+$graph[$index-1]+':apps')) {
+            if(($index -eq 28 -and $case -ceq 'evaluator-apps') -or ($index -eq 29 -and $case -ceq 'q-apps')){$observations.MutationHits++;return @(('e'*40),'85d4d2b79d0bf308688365f216240eef79455509')}
+            return @('85d4d2b79d0bf308688365f216240eef79455509','85d4d2b79d0bf308688365f216240eef79455509')
+          }
+          if($query -ceq ('rev-parse|'+$commit+':apps/mobile/lib|3c3f38136db8bb184866635203d04ea4643f1eac:apps/mobile/lib')) {
+            if(($index -eq 28 -and $case -ceq 'evaluator-runtime') -or ($index -eq 29 -and $case -ceq 'q-runtime')){$observations.MutationHits++;return @(('e'*40),'1636d17025a9e80b362709f24c600d976ed6030f')}
+            return @('1636d17025a9e80b362709f24c600d976ed6030f','1636d17025a9e80b362709f24c600d976ed6030f')
+          }
+        }
+        if(@($evaluator,$qualified,$oldQ,$extra|Where-Object {$query.Contains($_)}).Count){$observations.Unexpected=$true;throw 'Unexpected future-object query'}
+        if($immutableCache.ContainsKey($query)){return $immutableCache[$query]}
+        $lines=@(& $originalGit $Arguments)
+        if($Arguments[0] -cin @('show','diff-tree') -or ($Arguments[0] -ceq 'rev-parse' -and
+            @($Arguments|Select-Object -Skip 1|Where-Object {$_ -cnotmatch '\A[0-9a-f]{40}:.+\z'}).Count -eq 0)){$immutableCache[$query]=$lines}
+        return $lines
+      }
+      $accepted=$false;$result=$null;$reason=''
+      try{$result=Get-OctoberCompatibilityHistoryStage $tip;$accepted=$true}catch{$reason=$_.Exception.Message}
+      $expected=$case -cin @('evaluator','qualified','old-q')
+      Assert-RepairContract ($accepted -eq $expected -and $observations.Ancestry -eq 1 -and -not $observations.Unexpected) ('Source27 history mismatch: '+$case+'; '+$reason)
+      if($expected) {
+        $expectedPhase=if($case -ceq 'evaluator'){18}else{19}
+        $expectedQ=if($oldCase){28}else{29};$expectedBase=if($oldCase){26}else{28}
+        Assert-RepairContract ($result.Stage -eq $graph.Count -and $result.PhaseStage -eq $expectedPhase -and
+          $result.ContractIndex -eq 26 -and $result.CaptureIndex -eq 27 -and $result.QualificationIndex -eq $expectedQ -and
+          $result.QualificationBaseIndex -eq $expectedBase -and $result.Commits[26] -ceq $prefix[26] -and
+          $result.Commits[27] -ceq $prefix[27] -and $result.Source27Forward -eq (-not $oldCase)) 'Source27 history roles changed.'
+      }else{
+        $expectedReason=switch($case) {
+          'old-q-extra' {'Source27 qualification cannot admit arbitrary later successors.'}
+          'evaluator-subject' {'Source27 qualification cannot admit arbitrary later successors.'}
+          {$_ -cin @('evaluator-parent','q-parent','q-subject','q-old-subject')} {'Compatibility successor parent/subject changed.'}
+          {$_ -cin @('evaluator-owner','q-owner')} {'Compatibility successor changed unexpected owners.'}
+          {$_ -cin @('evaluator-apps','q-apps')} {'Compatibility metadata commit changed apps.'}
+          {$_ -cin @('evaluator-runtime','q-runtime')} {'Forward test/qualification correction changed frozen runtime.'}
+          {$_ -cin @('q-lost-delta','q-changed-delta')} {'Evaluator successor lost its sealed forward contract.'}
+          default {'Evaluator amendment requires exact Source26/27 history.'}
+        }
+        Assert-RepairContract (($case -ceq 'old-q-extra' -or $observations.MutationHits -gt 0) -and
+          $reason -ceq ('Codex subagent coordination gate rejected: '+$expectedReason)) ('Source27 negative discriminator masked: '+$case+'; '+$reason)
+      }
+    }
+    $count++
+  }
+  return $count
+}
+
 function Invoke-OctoberCompatibilitySource25ReaderProbes {
   # Actual reader and exact sealed delta; document transport alone is mocked.
   $document=[IO.File]::ReadAllText((Join-Path $root 'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md'))
@@ -2794,8 +2922,14 @@ function Invoke-OctoberCompatibilityForwardConsumerProbes {
         @{Name='corrected-metadata-forged-phase';History=@{Stage=23;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('d'*40)};Verified=$true;Expected=$false;Calls=0},
         @{Name='corrected-capture';History=@{Stage=24;PhaseStage=18;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('e'*40)};Verified=$true;Expected=$false;Calls=0},
         @{Name='corrected-qualified-without-proof';History=@{Stage=25;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('f'*40)};Verified=$false;Expected=$false;Calls=1},
-        @{Name='corrected-qualified-mechanism';History=@{Stage=25;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1})) {
+        @{Name='corrected-qualified-mechanism';History=@{Stage=25;PhaseStage=19;Forward=$true;ContractIndex=22;CaptureIndex=23;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1},
+        @{Name='source25-qualified-mechanism';History=@{Stage=29;PhaseStage=19;Forward=$true;ContractIndex=26;CaptureIndex=27;QualificationIndex=28;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1},
+        @{Name='source27-evaluator-not-qualified';History=@{Stage=29;PhaseStage=18;Forward=$true;ContractIndex=26;CaptureIndex=27;QualificationIndex=29;Head=('e'*40)};Verified=$true;Expected=$false;Calls=0},
+        @{Name='source27-qualified-without-proof';History=@{Stage=30;PhaseStage=19;Forward=$true;ContractIndex=26;CaptureIndex=27;QualificationIndex=29;Head=('f'*40)};Verified=$false;Expected=$false;Calls=1},
+        @{Name='source27-qualified-mechanism';History=@{Stage=30;PhaseStage=19;Forward=$true;ContractIndex=26;CaptureIndex=27;QualificationIndex=29;Head=('f'*40)};Verified=$true;Expected=$true;Calls=1},
+        @{Name='source27-wrong-qualification-index';History=@{Stage=30;PhaseStage=19;Forward=$true;ContractIndex=26;CaptureIndex=27;QualificationIndex=28;Head=('f'*40)};Verified=$true;Expected=$false;Calls=0})) {
       if(-not $probe.History.ContainsKey('CaptureIndex')){$probe.History.CaptureIndex=19}
+      if(-not $probe.History.ContainsKey('QualificationIndex')){$probe.History.QualificationIndex=$probe.History.CaptureIndex+1}
       & {
         $observations=@{Calls=0;WrongHead=$false};$qualifiedHistory=$probe.History;$compatibilityHistory=$probe.History
         function Assert-Coordination([bool]$Condition,[string]$Message) {
@@ -2855,6 +2989,7 @@ if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentPr
       'Read-OctoberCompatibilitySource21ForwardAmendment',
       'Read-OctoberCompatibilitySource23ForwardAmendment',
       'Read-OctoberCompatibilitySource25ForwardAmendment',
+      'Read-OctoberCompatibilitySource27ForwardAmendment',
       'Test-OctoberCompatibilityStageFacts',
       'Read-OctoberCompatibilityJsonObject','Get-OctoberCompatibilityByteHash','Get-OctoberCompatibilityGitLines')) {
     $nodes=@($forwardAst.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq $name},$true))
@@ -2925,6 +3060,8 @@ if($RequireSource17ForwardAmendmentProbes -or $RequireSource19ForwardAmendmentPr
     $source25ReaderCases=Invoke-OctoberCompatibilitySource25ReaderProbes
     $source25FinalCases=Invoke-OctoberCompatibilitySource25FinalStageProbes
     [pscustomobject]@{Source25HistoryCases=$source25HistoryCases;Source25ReaderCases=$source25ReaderCases;Source25FinalStageCases=$source25FinalCases;ActualSealedPrefixRead=$true;FutureObjectsMocked=$true;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
+    $source27HistoryCases=Invoke-OctoberCompatibilitySource27HistoryProbes
+    [pscustomobject]@{Source27HistoryCases=$source27HistoryCases;ActualSealedPrefixRead=$true;FutureObjectsMocked=$true;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
     $qualificationCountCases=Invoke-OctoberCompatibilityQualificationCountDispatchProbes
     [pscustomobject]@{QualificationCountDispatchCases=$qualificationCountCases;HistoryAndSourceStateMocked=$true;SentinelRejectsQualification=$true;QualificationPassed=$false;ApkAuthority=$false}|ConvertTo-Json -Compress
   }
@@ -2973,6 +3110,8 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       'Test-OctoberCompatibilitySource23Preparation','Test-OctoberCompatibilitySource23CurrentPreparation',
       'Read-OctoberCompatibilitySource25ForwardAmendment',
       'Test-OctoberCompatibilitySource25Preparation','Test-OctoberCompatibilitySource25CurrentPreparation',
+      'Read-OctoberCompatibilitySource27ForwardAmendment',
+      'Test-OctoberCompatibilitySource27Preparation','Test-OctoberCompatibilitySource27CurrentPreparation',
       'Read-OctoberCompatibilityCurrentSourceState','Read-OctoberCompatibilityCurrentCaptureSource',
       'Test-OctoberCompatibilityCurrentGeometry','Read-OctoberCompatibilityCurrentSelectedRiskBindings',
       'Read-OctoberCompatibilityCurrentRiskInventoryBuffer','Read-OctoberCompatibilityCurrentRiskInventoryFile',
@@ -2987,7 +3126,7 @@ if ($RequireCompatibilityStageProbes -or $RequireCompatibilityLiveAdmissionProbe
       'Read-OctoberCompatibilityCurrentSelectedRenderBindings',
       'Read-OctoberCompatibilityCurrentCombinedOriginalFilePins',
       'Read-OctoberCompatibilityCurrentPrimaryReviewBinding',
-      'Read-OctoberCompatibilityCurrentObligationJoins','Read-OctoberCompatibilityCurrentPrimaryAssertionReview',
+      'Read-OctoberCompatibilityCurrentObligationJoins','Initialize-Source27NamedCallbackTokenizer','Test-Source27NamedCallbackBinding','Read-OctoberCompatibilityCurrentPrimaryAssertionReview',
       'Read-OctoberCompatibilityCurrentPrimaryVisualReview',
       'Read-OctoberCompatibilityCurrentVisualSlotAccounting',
       'Read-OctoberCompatibilityCurrentPresentationReview',
