@@ -2,6 +2,44 @@
 
 ## Direct baseline continuation — founder-approved 13 October 2026
 
+### Subsequent combined-APK test correction — 13 October
+
+Founder explicitly approved only the demonstrated Store test corrections and
+strictly necessary existing admission/compatibility updates. Published baseline
+`b16b5782ce9687d1eab6821e0ae4dbd102927f5c` remains preserved. There are no
+runtime, layout, dependency, repository policy or registry changes in this repair.
+The already-primary-owned Store test is admitted; no owner claim is added.
+
+The original candidate-flag run failed three of five tests and remains retained.
+Sales expected a retired Manage-only button on Recorded home. The canonical
+test now prepares a fresh Counter bill through the normal controller and tests
+its actual primary entry, without granting permission to replace a selected
+customer order. Counter's Sales flow returns Review -> Items -> Sales home;
+the standalone wizard differs. Store-home navigation, not a nonexistent home
+Back button, exercises the real draft-save boundary. At both text scales the
+save refuses a late selected incoming order, Keep editing cancels navigation,
+and reopening the retained Counter composer preserves customer/quantity while
+the incoming order is unchanged and no invoice is created.
+
+All five exact-runtime cases passed in actual native run v3; preliminary failed
+repair runs v1/v2 remain retained, not relabelled. The separate existing DASH15
+journal/recovery checks passed 16 scenarios, including scoped restart and
+read/completion retry behavior. Host mocks do not qualify encrypted device
+storage, provider operations or real-user records.
+
+Retained task-work logs (SHA-256):
+- apk-runtime-fixture-repair-20261013-v3.jsonl:
+  `E798FC63BD272D7A2885B9B754670BC34E8FEAFE13AE63B48BB0771EB5729B6F`
+- apk-runtime-journal-recovery-20261013-v1.jsonl:
+  `834179CA0BA6EB24D9827C9159FC7710CBA5291D1391F0B3066D6A5E10A6F238`
+
+Both runs used the four RuntimeUiReview defines and candidate ID
+UAW-STORE-BUY-COMBINED-R67.1-20261013. Its failed prebuild state is preserved;
+a fresh APK candidate must bind the published successor and its actual defines.
+The current APK goal stops only after applicable Redmi/OPPO checks and verified
+OPPO installation. Historical record origins/photo continuity and backend/
+provider qualification remain explicitly pending; do not clear their registry.
+
 ### Final publication admission (metadata only)
 
 Qualified source is `e0695334692dddb6e34e262c88b14612f2f33510`, published
