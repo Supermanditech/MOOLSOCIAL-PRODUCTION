@@ -2,6 +2,42 @@
 
 ## Direct baseline continuation — founder-approved 13 October 2026
 
+### Exact APK navigation replay correction — 13 October
+
+R67.2's wrapper stopped before compilation; no APK was created or installed.
+Its failed navigation replay and candidate state remain preserved. The existing
+approved test-only scope covers this correction, not a runtime redesign.
+
+STOREBACK01 now uses the existing visible Orders/Profile entry because approved
+Analytics has no utility band. The old Security tap missed the clipped panel at
+enlarged text and dismissed its barrier; centering the real row and requiring
+hitTestable fixes that test interaction. Hard Security destination, replaced
+stack, native Back, search/Bulk/focus and retained-cart assertions remain.
+The speculative async-wait diagnostic was removed after the actual missed-tap
+warning identified the cause. No route was fabricated to obtain a passing test.
+
+STOREBACK04 exercises the current production Analytics count projection and
+expansion at 250/249/248/249/247 saved host-fixture orders. It does not claim
+animation coverage of the four legacy workload rows removed from this approved
+composition or mount detached copies of their switchers. The live board must
+show each exact count, keep its control tappable and exit without errors during
+rapid updates. Host fixture mutation never writes device/runtime evaluation data.
+
+Actual replay v5 exited 0: all seven STOREBACK scenarios plus five Store cases
+passed (12), no errors, no missed taps, done.success true. Candidate defines:
+MOOLSOCIAL_UI_REVIEW_ONLY=true, MOOLSOCIAL_DEVICE_REVIEW=true,
+MOOLSOCIAL_USE_EMULATORS=true,
+MOOLSOCIAL_CANDIDATE_ID=UAW-STORE-BUY-COMBINED-R67.3-20261013.
+Task work/apk-navigation-repair-20261013-v5.jsonl SHA256:
+`C52F5AFCE1DEBC6512B52F3CDF349955AFFD685B831208CB3926FDE8D0376ACD`.
+Earlier failed diagnostic runs remain preserved, not relabelled.
+Focused analysis exited 0 with only the existing line-52271 brace info:
+work/apk-navigation-repair-analysis-20261013.log SHA256
+`5C0E3CFF895481442BA093F50883E969E92281A69438192B2E8E16636F361B19`.
+Runtime/native/assets/packages/lock inputs remain identical to original b16.
+Published af95d64f is preserved and is the starting parent of the next successor.
+Actual APK build/identity/device recovery/parity remain pending.
+
 ### Subsequent combined-APK test correction — 13 October
 
 Test correction checkpoint: `c8adaa03ccc987873def50f5afa0be7a82d2f1d1`.
