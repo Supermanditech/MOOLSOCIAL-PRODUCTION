@@ -63553,12 +63553,23 @@ void main() {
           if (replaceSignInStack) {
             // Authentication returns through go(), replacing the pushed Store
             // stack. Exercise the same return after all original stack cases.
-            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-            await tester.pumpAndSettle();
+            // Analytics has no utility band. Use the actual Orders/Profile
+            // entry without resetting the live Restock navigation stack.
+            await openStoreProfile(tester);
             final security = find.byKey(const Key('global-profile-security'));
-            await tester.ensureVisible(security);
+            // At enlarged text the nearest edge can lie below the panel's
+            // clipped viewport. Center the real row, never tap the barrier.
+            await Scrollable.ensureVisible(
+              tester.element(security), alignment: .5,
+            );
+            await tester.pumpAndSettle();
+            expect(security.hitTestable(), findsOneWidget);
             await tester.tap(security);
             await tester.pumpAndSettle();
+            expect(find.byType(GlobalSecurityV2), findsOneWidget,
+                reason: 'Security destination: '
+                    '${router.routeInformationProvider.value.uri}; '
+                    'router error: ${router.routerDelegate.currentConfiguration.error}');
             final securityLocation = GoRouterState.of(
               tester.element(find.byType(GlobalSecurityV2)),
             ).uri;
@@ -63694,54 +63705,44 @@ void main() {
         work: work,
         procurementFactory: () => controller,
       );
-      final actions = find.byWidgetPredicate(
-        (widget) =>
-            widget.key is ValueKey<String> &&
-            (widget.key! as ValueKey<String>).value.startsWith(
-              'work-store-workload-',
-            ),
-      );
-      final transitions = tester
-          .widgetList<AnimatedSwitcher>(
-            find.descendant(
-              of: actions,
-              matching: find.byType(AnimatedSwitcher),
-            ),
-          )
+      // The approved Analytics board replaces the four legacy workload rows.
+      // Exercise its real count projection and expansion during rapid updates,
+      // not detached copies of an unreachable legacy AnimatedSwitcher.
+      final openOrders = work.visibleWorkspaceOrders
+          .where((order) => !order.isClosed)
+          .take(250)
           .toList();
-      expect(transitions, hasLength(4));
-      for (final transition in transitions) {
-        for (final (count, elapsed) in [
-          (250, 220),
-          (249, 100),
-          (248, 16),
-          (249, 16),
-          (247, 16),
-        ]) {
-          await tester.pumpWidget(
-            MaterialApp(
-              home: AnimatedSwitcher(
-                duration: transition.duration,
-                reverseDuration: transition.reverseDuration,
-                switchInCurve: transition.switchInCurve,
-                switchOutCurve: transition.switchOutCurve,
-                transitionBuilder: transition.transitionBuilder,
-                layoutBuilder: transition.layoutBuilder,
-                child: Text('$count', key: ValueKey(count)),
-              ),
-            ),
-          );
-          await tester.pump(Duration(milliseconds: elapsed));
-          expect(
-            tester.takeException(),
-            isNull,
-            reason: 'Workload count $count',
-          );
-        }
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
+      expect(openOrders, hasLength(250));
+      final report = find.byKey(const Key('store-analytics-orders'));
+      await reveal(tester, report);
+      for (final (count, elapsed) in [
+        (250, 220),
+        (249, 100),
+        (248, 16),
+        (249, 16),
+        (247, 16),
+      ]) {
+        // Explicit host fixture only; no device/runtime storage injection.
+        work.workspaceOrders
+          ..clear()
+          ..addAll(openOrders.take(count));
+        work.notifyListeners();
+        await tester.pump(Duration(milliseconds: elapsed));
+        final value = find.byKey(
+          const Key('analytics-preview-value-orders-0'),
+        );
+        expect(value, findsOneWidget);
+        expect(tester.widget<Text>(value).data, '$count');
+        await reveal(tester, report);
+        expect(report.hitTestable(), findsOneWidget);
+        await tester.tap(report);
+        await tester.pump(Duration(milliseconds: elapsed));
+        expect(tester.takeException(), isNull,
+            reason: 'Live Analytics count/expansion $count');
       }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
   }
   for (final delayed in [false, true]) {

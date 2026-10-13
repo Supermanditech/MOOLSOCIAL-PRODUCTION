@@ -9430,13 +9430,13 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
   }
   if ($directFinal -or $ProductionPhase -ceq 'integration_admission_authorize') {
     # The approved APK successor reuses unchanged runtime evidence plus the
-    # native Store/journal tests of c8adaa03, not the retired
+    # native navigation/Store tests of 23a1d3a1, not the retired
     # recursive capture/phase workflow. Only metadata may follow that source.
-    $qualified='c8adaa03ccc987873def50f5afa0be7a82d2f1d1'
-    $publishedBaseline='b16b5782ce9687d1eab6821e0ae4dbd102927f5c'
+    $qualified='23a1d3a16363131603546cbf2d6af89c8da29297'
+    $publishedBaseline='af95d64f01dc23c75b325de5c26ee970cb82acfc'
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$qualified,$directSourceHead) | Out-Null
     Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"${directSourceHead}:apps"))[0]) -ceq
-      '09e5b7361c3eb369225ea76a9bca8721c2c86a2c') 'Qualified application tree changed; fresh regression evidence required.'
+      'bd45428ed324e9cea67f38868d4b253f061e51f8') 'Qualified application tree changed; fresh regression evidence required.'
     Get-OctoberCompatibilityGitLines @('diff','--exit-code',$publishedBaseline,$directSourceHead,'--',
       'apps/mobile/lib','apps/mobile/assets','apps/mobile/android','apps/mobile/packages',
       'apps/mobile/pubspec.yaml','apps/mobile/pubspec.lock') | Out-Null
@@ -9451,7 +9451,9 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
       @('direct-baseline-final-focused-20261013.log','ABD6D8DD1FD065797D5DEF521C0813AC1BD1D018DFC04EB09BBA83EA2ADF5B00'),
       @('direct-baseline-analysis-clean-20261013.log','CE615622C3C82DAEAEEEA969EB621F66B048712EA9CE8E71652484AF771B4EAB'),
       @('apk-runtime-fixture-repair-20261013-v3.jsonl','E798FC63BD272D7A2885B9B754670BC34E8FEAFE13AE63B48BB0771EB5729B6F'),
-      @('apk-runtime-journal-recovery-20261013-v1.jsonl','834179CA0BA6EB24D9827C9159FC7710CBA5291D1391F0B3066D6A5E10A6F238'))) {
+      @('apk-runtime-journal-recovery-20261013-v1.jsonl','834179CA0BA6EB24D9827C9159FC7710CBA5291D1391F0B3066D6A5E10A6F238'),
+      @('apk-navigation-repair-20261013-v5.jsonl','C52F5AFCE1DEBC6512B52F3CDF349955AFFD685B831208CB3926FDE8D0376ACD'),
+      @('apk-navigation-repair-analysis-20261013.log','5C0E3CFF895481442BA093F50883E969E92281A69438192B2E8E16636F361B19'))) {
       Assert-Coordination ((Get-FileHash -LiteralPath (Join-Path $logRoot $log[0]) -Algorithm SHA256).Hash -ceq $log[1]) 'Actual qualified test log is missing or changed.'
     }
     foreach ($source in @(
