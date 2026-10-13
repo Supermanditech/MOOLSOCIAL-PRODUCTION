@@ -25,8 +25,15 @@ function Assert-Fixture([bool]$Condition, [string]$Message) {
 }
 
 function Invoke-FixtureGit([string]$Root, [string[]]$Arguments) {
-  $result = @(& git -C $Root @Arguments 2>&1)
-  if ($LASTEXITCODE -ne 0) {
+  # Windows PowerShell reports successful native stderr as ErrorRecord objects.
+  # Capture it without treating a normal Git progress message as command failure.
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $result = @(& git -C $Root @Arguments 2>&1)
+    $nativeExit = $LASTEXITCODE
+  } finally { $ErrorActionPreference = $previousPreference }
+  if ($nativeExit -ne 0) {
     throw "Fixture Git failed: git $($Arguments -join ' ') :: $result"
   }
 }
@@ -36,10 +43,10 @@ function Assert-GateFails([scriptblock]$Invocation, [string]$Expected) {
   try {
     $null = & $Invocation
   } catch {
-    $failed = $_.Exception.Message.Contains(
+    $failed = $_.Exception.Message.IndexOf(
       $Expected,
       [StringComparison]::Ordinal
-    )
+    ) -ge 0
   }
   Assert-Fixture $failed "negative fixture did not fail with: $Expected"
 }
@@ -164,7 +171,28 @@ try {
       -CandidateVersionCode 2026082797 `
       -PackageId 'com.moolsocial.app.runtime' `
       -RepositoryRoot $fixtureRoot
-  } 'backend work is blocked until founder UI acceptance.'
+  } 'backend UI scope is not accepted or is duplicated.'
+
+  # Isolated fixture states: never change the repository's accepted UI state.
+  $fixtureStatePath = Join-Path $fixtureConfig 'cross-agent-incremental-ticket-gate.json'
+  foreach ($reviewState in @('pending','accepted')) {
+    $isolatedState = Get-Content -LiteralPath $state -Raw | ConvertFrom-Json
+    $isolatedState.uiFounderReview.state = $reviewState
+    $isolatedState.uiFounderReview.acceptedScopes = if ($reviewState -eq 'accepted') {
+      @([pscustomobject]@{id='buy.checkout'}, [pscustomobject]@{id='buy.checkout'})
+    } else { @() }
+    $isolatedState | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $fixtureStatePath -Encoding UTF8
+    $expected = if ($reviewState -eq 'pending') {
+      'backend work is blocked until founder UI acceptance.'
+    } else { 'backend UI scope is not accepted or is duplicated.' }
+    Assert-GateFails {
+      & $gate -Phase implementation -Lane codex_backend `
+        -TicketId 'UAW-FIXTURE-CODEX-BACKEND-001' -UiScope 'buy.checkout' `
+        -CandidateVersionName '1.0.0-r60.96' -CandidateVersionCode 2026082797 `
+        -PackageId 'com.moolsocial.app.runtime' -RepositoryRoot $fixtureRoot
+    } $expected
+  }
+  Copy-Item -LiteralPath $state -Destination $fixtureStatePath -Force
 
   Invoke-FixtureGit $fixtureRoot @(
     'switch', '-c', 'work/cursor-ui/fixture', $baselineTag
@@ -175,7 +203,7 @@ try {
     -TicketId 'UAW-FIXTURE-CURSOR-UI-001' `
     -UiScope 'buy.consumer_cart' `
     -CandidateVersionName '1.0.0-r60.96' `
-    -CandidateVersionCode 2026082799 `
+    -CandidateVersionCode ([int](@($stateValue.lanes | Where-Object id -ceq 'cursor_ui')[0].minimumVersionCodeExclusive) + 1) `
     -PackageId 'com.moolsocial.app.cursorreview' `
     -RepositoryRoot $fixtureRoot)
   Assert-Fixture ($cursorPositive.Count -eq 1) `

@@ -1,5 +1,40 @@
 # Store / Buy publication compatibility — exact successor
 
+## Direct baseline continuation — founder-approved 13 October 2026
+
+The operative goal supersedes this task's capture/phase prerequisite only.
+Use immutable checkpoint `50b0af4e0d02df0b5c615db773432a77b10214d0`, which
+already contains exact Store `8002e8cd740aaf613b75dc749212fb12ae4fddb7` and
+Cursor `f32c17e1a3a41807564fe18f83c0520a66e0bfe6`; do not re-merge them.
+The narrow continuation admits the stale incremental fixture and unsafe legacy
+route fixes, their focused tests, impacted regressions and normal publication.
+Only JourneySession, containment presentation and its existing focused test
+are added to the primary claim. No registry edits or new phase framework.
+Current ownership, anchor/delta, linear history, registry generation, Git and
+committed/staged-secret checks remain mandatory. Historical records below are
+retained as history, not current executable capture prerequisites.
+
+The uncommitted 445-line admission experiment was preserved outside Git at
+`C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work/parked-admission-experiment-20261013.patch`
+and removed from working source; `git apply --check` confirms recoverability.
+The live ownership gate and 25 focused repair-identity probes passed on the
+current metadata changes. They do not establish application regression success,
+publication readiness, backend/provider integration or APK/device acceptance.
+Finish the concrete fixes and targeted verification before publication; stop at
+the published combined baseline SHA. APK qualification is a subsequent scope.
+
+The incremental fixture failure was reproduced before correction. It confused
+accepted UI with missing accepted scope and used a Cursor version below the
+unchanged lane floor. The existing fixture now covers pending UI, missing and
+duplicate scope separately and uses floor + 1 for the positive Cursor case.
+Only temporary, isolated fixture configuration is modified. The real incremental
+checker/state and business data remain unchanged. Windows PowerShell's successful
+Git stderr messages are captured and classified by native exit code, not mistaken
+for failure; error matching uses the cross-host ordinal IndexOf overload.
+The complete fixture and 25 direct-identity probes passed on PowerShell 7 and 5.1.
+Actual legacy-route correction and its regressions remain pending; no combined
+baseline or APK acceptance is claimed by these host results.
+
 ## Current W-bound purchase recovery amendment (10 October 2026)
 
 Current checkpoint W is 5a70a1728d534f72c06997d6c7146a46fa7481cf, parent V

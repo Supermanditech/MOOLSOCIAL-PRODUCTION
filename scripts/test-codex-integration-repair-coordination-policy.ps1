@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
+  [switch]$RequireDirectBaselineScopeProbes,
   [switch]$RequireQualifiedGraph,
   [switch]$RequireOctoberSourceAdmission,
   [switch]$RequireOctoberBootstrapProbes,
@@ -33,6 +34,45 @@ $checker = Get-Content -Raw -LiteralPath $checkerPath
 
 function Assert-RepairContract([bool]$Condition, [string]$Message) {
   if (-not $Condition) { throw "Integration repair fixture rejected: $Message" }
+}
+
+if ($RequireDirectBaselineScopeProbes) {
+  $tokens=$null; $errors=$null
+  $ast=[System.Management.Automation.Language.Parser]::ParseFile($checkerPath,[ref]$tokens,[ref]$errors)
+  Assert-RepairContract ($errors.Count -eq 0) 'checker parse errors.'
+  $identity=@($ast.FindAll({param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Test-OctoberDirectBaselineIdentity'
+  },$true))
+  Assert-RepairContract ($identity.Count -eq 1) 'direct continuation identity missing or duplicated.'
+  . ([scriptblock]::Create($identity[0].Extent.Text))
+  $facts=@{Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
+    Branch='work/integration-repair/store-buy-compatibility-20261008'; Role='primary'; Task='/root'
+    Lane='integration_repair'; WorkId='store-buy-compatibility-20261008'
+    TicketId='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'; Phase='implementation'}
+  $cases=0
+  foreach ($phase in @('task_start','implementation','pre_commit','handoff')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-RepairContract (Test-OctoberDirectBaselineIdentity $probe) 'exact repair identity rejected.'
+    $cases++
+  }
+  foreach ($key in @($facts.Keys)) {
+    $probe=$facts.Clone(); $probe[$key]='altered'
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) "altered $key accepted."
+    $probe=$facts.Clone(); $probe.Remove($key)
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) "missing $key accepted."
+    $cases+=2
+  }
+  foreach ($phase in @('integration_admission_authorize','candidate_preflight','baseline','')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) 'publication/build phase accepted by repair-only identity.'
+    $cases++
+  }
+  Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $null)) 'null facts accepted.'
+  $cases++
+  Assert-RepairContract ($cases -eq 25) 'direct scope probe count changed.'
+  Write-Output "Direct baseline repair identity: $cases probes passed; no qualification/publication/APK authority."
+  return
 }
 
 function New-OctoberCompatibilityCurrentCaptureEnvelope {

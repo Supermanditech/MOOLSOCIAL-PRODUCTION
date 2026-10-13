@@ -55,6 +55,24 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+# Founder-approved direct-baseline continuation. No new phases or capture engine.
+function Test-OctoberDirectBaselineIdentity([hashtable]$Facts) {
+  if ($null -eq $Facts) { return $false }
+  $exact = @{
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
+    Branch='work/integration-repair/store-buy-compatibility-20261008'
+    Role='primary'; Task='/root'; Lane='integration_repair'
+    WorkId='store-buy-compatibility-20261008'
+    TicketId='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'
+  }
+  foreach ($key in $exact.Keys) {
+    if (-not $Facts.ContainsKey($key) -or $Facts[$key] -isnot [string] -or
+        $Facts[$key] -cne $exact[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Phase') -and $Facts.Phase -is [string] -and
+    $Facts.Phase -cin @('task_start','implementation','pre_commit','handoff')
+}
+
 # Exact forward successor; these predicates grant no admission until the live
 # caller derives every fact from Git, current owners and the sealed sources.
 function Get-OctoberCompatibilityBinding {
@@ -9318,6 +9336,81 @@ foreach ($readOwner in $mandatoryReads) {
 
 $rawClaims = @($policy.activeClaims)
 $claims = @($rawClaims)
+$directRoot='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
+if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot) {
+  $directBranch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
+  Assert-Coordination ($directBranch.Count -eq 1 -and (Test-OctoberDirectBaselineIdentity @{
+    Root=$directRoot; Branch=$directBranch[0]; Role=$AgentRole; Task=$AgentTask
+    Lane=$ProductionLane; WorkId=$ProductionWorkId; TicketId=$ProductionTicketId; Phase=$ProductionPhase
+  })) 'Direct baseline continuation identity/phase is outside the founder-approved boundary.'
+  $anchor='50b0af4e0d02df0b5c615db773432a77b10214d0'
+  $directHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0]
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"${anchor}^{tree}"))[0]) -ceq
+    '3522fc0894e2753da85ed6653253dcb43af32351') 'Direct baseline anchor tree changed.'
+  foreach ($tip in @($anchor,'8002e8cd740aaf613b75dc749212fb12ae4fddb7','f32c17e1a3a41807564fe18f83c0520a66e0bfe6')) {
+    Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$tip,'HEAD') | Out-Null
+  }
+  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$anchor..HEAD")).Count -eq 0) 'Direct repairs must remain linear.'
+  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and
+    (@(Get-OctoberCompatibilityGitLines @('rev-parse','--is-shallow-repository'))[0]) -ceq 'false') 'Direct baseline history overrides are forbidden.'
+  foreach ($operation in @('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply','info/grafts')) {
+    $operationPath=@(Get-OctoberCompatibilityGitLines @('rev-parse','--git-path',$operation))[0]
+    if (-not [IO.Path]::IsPathRooted($operationPath)) { $operationPath=Join-Path $root $operationPath }
+    Assert-Coordination (-not (Test-Path -LiteralPath $operationPath)) 'Direct baseline has an unresolved Git operation.'
+  }
+  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('ls-files','-v') | Where-Object {$_ -cmatch '^[a-zS] '}).Count -eq 0) 'Hidden index flags are forbidden.'
+  $addedOwners=@('apps/mobile/lib/features/journey01/journey_session.dart',
+    'apps/mobile/lib/ui_v2/universal/legacy_route_containment_screen_v2.dart',
+    'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart')
+  $originalPolicy=(Get-OctoberCompatibilityGitLines @('show',"${anchor}:config/codex-subagent-coordination-policy.json") -join "`n") | ConvertFrom-Json
+  $expectedPolicy=$originalPolicy | ConvertTo-Json -Depth 80 | ConvertFrom-Json
+  $expectedPrimary=@($expectedPolicy.activeClaims | Where-Object {$_.task -ceq '/root'})
+  Assert-Coordination ($expectedPrimary.Count -eq 1) 'Original primary claim is ambiguous.'
+  $expectedPrimary[0].owners=@($expectedPrimary[0].owners)+$addedOwners
+  # Ordering is not authority; compare exact owner sets while preserving all other fields.
+  foreach ($value in @($expectedPolicy,$policy)) {
+    foreach ($claim in $value.activeClaims) { $claim.owners=@($claim.owners | Sort-Object) }
+  }
+  Assert-Coordination (($expectedPolicy | ConvertTo-Json -Depth 80 -Compress) -ceq
+    ($policy | ConvertTo-Json -Depth 80 -Compress)) 'Only the three approved primary owner additions are permitted.'
+  $owned=@{}; $tasks=@{}
+  foreach ($claim in $claims) {
+    Assert-Coordination (-not $tasks.ContainsKey([string]$claim.task)) 'Duplicate active task.'
+    $tasks[[string]$claim.task]=$true
+    foreach ($value in $claim.owners) {
+      $owner=Get-CanonicalOwner ([string]$value)
+      Assert-Coordination (-not $owned.ContainsKey($owner)) 'Overlapping or duplicate active owner.'
+      $owned[$owner]=[string]$claim.task
+    }
+  }
+  $permitted=@('config/codex-subagent-coordination-policy.json','scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/test-codex-integration-repair-coordination-policy.ps1','scripts/test-cross-agent-incremental-ticket-gate.ps1',
+    'apps/mobile/lib/features/journey01/journey_router.dart','apps/mobile/lib/features/work/work_session.dart',
+    'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')+$addedOwners
+  $directChanged=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$anchor,'HEAD'))+
+    @(Get-OctoberCompatibilityGitLines @('diff','--name-only','HEAD'))+
+    @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')) | Sort-Object -Unique)
+  foreach ($owner in $directChanged) {
+    Assert-Coordination ($owner -cin $permitted -and $owned[$owner] -ceq '/root') 'Direct baseline changed an unapproved or unowned file.'
+  }
+  $currentClaim=@($claims | Where-Object {$_.task -ceq $AgentTask -and $_.role -ceq $AgentRole})
+  Assert-Coordination ($currentClaim.Count -eq 1) 'Direct baseline primary claim is absent.'
+  if (-not $UseRecordedClaim) {
+    Assert-Coordination ((@($ClaimedOwners | Sort-Object) -join '|') -ceq (@($currentClaim[0].owners | Sort-Object) -join '|')) 'Direct baseline requested claim is not exact.'
+  }
+  Assert-ProductionSecretSafe -BaseCommit $anchor -HeadCommit $directHead
+  Assert-ProductionSecretSafe -IndexOnly
+  if ($ProductionPhase -ceq 'pre_commit') {
+    Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -gt 0 -and
+      @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
+      @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'Precommit requires staged work only.'
+  }
+  if ($ProductionPhase -cin @('task_start','handoff')) {
+    Assert-Coordination (Test-ProductionWorktreeClean $root) 'Direct baseline boundary must be clean.'
+  }
+  Write-Output 'Direct baseline ownership/Git/registry/secret checks passed; qualification, publication and APK acceptance are not granted.'
+  return
+}
 $octoberCompatibilityTestAdmissionVerified=$false
 if($root.Replace('\','/').TrimEnd('/') -ceq (Get-OctoberCompatibilityBinding).worktreePath -and
     $ProductionLane -ceq 'integration_repair' -and
