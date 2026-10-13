@@ -1,0 +1,133 @@
+00:00 +0: loading C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart
+00:00 +0: C27B all six families use one fixed visual token system
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <22>
+  Actual: <20.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart:30:5)
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:29)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart line 30
+The test description was:
+  C27B all six families use one fixed visual token system
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:00 +0 -1: C27B all six families use one fixed visual token system [E]
+  Test failed. See exception logs above.
+  The test description was: C27B all six families use one fixed visual token system
+  
+00:00 +0 -1: C27B sparse actions stay compact and leading at 320.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <128.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 320.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:00 +0 -2: C27B sparse actions stay compact and leading at 320.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 320.0
+  
+00:00 +0 -2: C27B sparse actions stay compact and leading at 390.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <156.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 390.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -3: C27B sparse actions stay compact and leading at 390.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 390.0
+  
+00:01 +0 -3: C27B sparse actions stay compact and leading at 430.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <152>
+  Actual: <172.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart:138:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart line 138
+The test description was:
+  C27B sparse actions stay compact and leading at 430.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -4: C27B sparse actions stay compact and leading at 430.0 [E]
+  Test failed. See exception logs above.
+  The test description was: C27B sparse actions stay compact and leading at 430.0
+  
+00:01 +0 -4: C27B keeps semantic controls above persistent bottom inset
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: Size:<Size(54.0, 58.0)>
+  Actual: _DebugSize:<Size(60.0, 58.0)>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart:168:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart line 168
+The test description was:
+  C27B keeps semantic controls above persistent bottom inset
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:01 +0 -5: C27B keeps semantic controls above persistent bottom inset [E]
+  Test failed. See exception logs above.
+  The test description was: C27B keeps semantic controls above persistent bottom inset
+  
+00:01 +0 -5: Some tests failed.
+
+Failing tests:
+  C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart: C27B all six families use one fixed visual token system
+  C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart: C27B keeps semantic controls above persistent bottom inset
+  C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart: C27B sparse actions stay compact and leading at 320.0
+  C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart: C27B sparse actions stay compact and leading at 390.0
+  C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/baseline_navigation_test.dart: C27B sparse actions stay compact and leading at 430.0

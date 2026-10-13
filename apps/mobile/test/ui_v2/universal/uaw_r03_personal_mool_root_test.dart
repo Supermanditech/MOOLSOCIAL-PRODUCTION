@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -17,6 +18,7 @@ void main() {
     ValueChanged<PersonalMoolActionSpec>? onAction,
     ValueChanged<String>? onRoute,
     VoidCallback? onChat,
+    Future<void> Function()? onSignOut,
     VoidCallback? onBack,
     String? areaLabel,
   }) {
@@ -34,6 +36,7 @@ void main() {
           onOpenAction: onAction ?? (_) {},
           onOpenRoute: onRoute,
           onOpenChat: onChat ?? () {},
+          onSignOut: onSignOut,
           areaLabel: areaLabel,
         ),
       ),
@@ -73,6 +76,39 @@ void main() {
       historicalContract['authorityBoundary']['localCapabilityGrant'],
       isFalse,
     );
+  });
+
+  testWidgets('authenticated Home exposes confirmed sign out exactly once', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    var signOutCalls = 0;
+    await tester.pumpWidget(
+      rootHarness(onSignOut: () async => signOutCalls += 1),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mool-home-sign-out')), findsOneWidget);
+    expect(find.bySemanticsLabel('Sign out of MoolSocial'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('mool-home-sign-out')));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign out of MoolSocial?'), findsOneWidget);
+    expect(signOutCalls, 0);
+
+    await tester.tap(find.byKey(const Key('mool-confirm-sign-out')));
+    await tester.pumpAndSettle();
+    expect(signOutCalls, 1);
+    semantics.dispose();
+  });
+
+  testWidgets('Home omits sign out when no authenticated callback exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(rootHarness());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mool-home-sign-out')), findsNothing);
   });
 
   test('Buy permits only the exact Mool return route', () {
@@ -210,7 +246,7 @@ void main() {
     expect(find.byKey(const Key('mool-root-back')), findsNothing);
   });
 
-  testWidgets('existing app route opens native Mool root and restores it', (
+  testWidgets('Legacy Home route opens Buy and menu Back restores it', (
     tester,
   ) async {
     final session = JourneySession(
@@ -231,14 +267,54 @@ void main() {
       MoolSocialApp(session: session, initialLocation: '/app/mool'),
     );
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('mool-home-family-buy')));
+    await tester.tap(find.byKey(const ValueKey('mool-compact-launcher')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
   });
+
+  testWidgets(
+    'Legacy Home security sign out clears session and opens sign in',
+    (tester) async {
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'current',
+            currentAreaLabel: 'Jodhpur, Rajasthan',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      await tester.pumpWidget(
+        MoolSocialApp(session: session, initialLocation: '/app/mool'),
+      );
+      await tester.pumpAndSettle();
+      expect(session.isAuthenticated, isTrue);
+
+      GoRouter.of(
+        tester.element(find.byKey(const Key('buy-v2-screen'))),
+      ).push('/app/account/security');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('global-security-sign-out')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('global-security-sign-out-confirm')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+    },
+  );
 }

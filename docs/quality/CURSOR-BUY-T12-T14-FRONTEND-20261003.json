@@ -1,0 +1,176 @@
+{
+  "status": "boundedTechnicalCheckpoint",
+  "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+  "focusedPassed": 59,
+  "selectedDistinct": 1068,
+  "selectedReferences": 1128,
+  "selectedFiles": 54,
+  "receipts": [
+    {
+      "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-1.jsonl",
+      "sha256": "abcd2625a951fa57cd60ca133e550d90a54eb60575e13c7c6f9f6766cb8a9e85",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-2.jsonl",
+      "sha256": "9e939e57f5319c511bb142a36c10cb284bf53bc0ae529a30893977fb2cdd6771",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-SELECTED-3.jsonl",
+      "sha256": "dac6569443c1f464907ed72130f8f4b8ca158a592aa5195f6b17b7d943fc710d",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-T12-T13.jsonl",
+      "sha256": "fb3a1e97fb60c89577dcb309f68023be083d8c6c24645e01e0f3087c94fae9b3",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "coverage": "Combined T10/T12/T13/T14 and coupon minimum 59-case run; original stream preserved"
+    },
+    {
+      "path": "docs/quality/CURSOR-BUY-T12-T14-FRONTEND-20261003-FOCUSED-CART.jsonl",
+      "sha256": "fb3a1e97fb60c89577dcb309f68023be083d8c6c24645e01e0f3087c94fae9b3",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "coverage": "Combined T10/T12/T13/T14 and coupon minimum 59-case run; original stream preserved"
+    }
+  ],
+  "selectedResults": [
+    {
+      "batch": 1,
+      "exitCode": 0,
+      "passed": 431,
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "abcd2625a951fa57cd60ca133e550d90a54eb60575e13c7c6f9f6766cb8a9e85"
+    },
+    {
+      "batch": 2,
+      "exitCode": 0,
+      "passed": 362,
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "9e939e57f5319c511bb142a36c10cb284bf53bc0ae529a30893977fb2cdd6771"
+    },
+    {
+      "batch": 3,
+      "exitCode": 0,
+      "passed": 275,
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "unchangedSource": true,
+      "terminalSuccess": true,
+      "failures": 0,
+      "warnings": 0,
+      "sha256": "dac6569443c1f464907ed72130f8f4b8ca158a592aa5195f6b17b7d943fc710d"
+    }
+  ],
+  "admissionPins": {
+    "config/codex-development-regression-registry.json": "14f31e7e52b02593fea79cd2da0cbffee194074c8846afee41ead07decc23660",
+    "config/codex-subagent-coordination-policy.json": "d755e03f2f61d20a992cb4d72c69c029ca20889299c110de2d4747be5a6c0dfa",
+    "config/buy-founder-regression.json": "10cf33dc491596b907a2e4a1835d33079f995882bf11a0533fde961a8eae9c64"
+  },
+  "nativeBeforeCompactHeader": {
+    "sourceSha256": "e8d227c80f072c0dc084bca0f05a1261412d328362ea4500b2f95c97134a74b6",
+    "scope": "Current isolated Redmi review runtime; no build/install/live payment; APK unchanged r66.36.",
+    "verified": [
+      "Exact latest session/views/screen VM sources and settled retained unheld quantities",
+      "Shop fresh Add1/37 and last-line removal",
+      "Shop-filter bin whole-Cart confirmation/cancel/confirm deletion",
+      "Stale Shop filter empty\u2192WholesaleMOQ2/1160 reproduced, fixed, exact samecycle native replay All visible",
+      "Checkout Cart return preserves2/1160",
+      "Cart Back returns Wholesale, Orders, Offers with2/1160 retained",
+      "Offers Add creates mixed3/1197, Shop-filter bin confirms all3, cancel retains and confirm clears, Offers root retained"
+    ],
+    "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002/t14-native",
+    "reviewScreen": "current-founder-review-mixed-cart.png/xml",
+    "restoration": "Original37 and pending395 snapshots preserved; currentWholesale2 snapshot preserved. No real-payment hold bypass.",
+    "qualification": "10 focused host cases passed; final T12/T13+cumulative qualification pending; founder acceptance pending.",
+    "remaining": "Full seven Add-to-Delivered matrices and actual provider/workspace integration remain separate pending children; backend deferred, workspace Codex after integration, Google separate.",
+    "goldenImpact": "Visible Back changes2 existing draft responsive Cart captures. Create fresh T14 draft references only; preserve old T10/accepted images unchanged, do not claim founder visual acceptance."
+  },
+  "nativeSourceProof": {
+    "facts": {
+      "view.name": "catalogue",
+      "destination.name": "shop",
+      "cartScope.name": "all",
+      "cartDisplayFilter": "all",
+      "itemCount": "3",
+      "visibleCartLines.length": "2",
+      "cartChangesBlocked": "false",
+      "checkoutRequiresResolution": "false",
+      "checkoutBusy": "false",
+      "checkoutSubmissionState.name": "idle",
+      "canHandleBack": "false",
+      "customerStateStore?.ownerScope": "device-review:buy",
+      "commerceAdapter.runtimeType.toString()": "_BuyV2DeviceReviewCommerceAdapter",
+      "reviewDataEnabled": "true",
+      "_consumerStateWritesPending": "0",
+      "allRetainedUnheldQuantitiesVerified": true
+    },
+    "sources": [
+      {
+        "path": "features/buy/buy_v2_session.dart",
+        "vmSourceSha256": "74611d3ec788b373f64028a60e3e2ba1eaed1a632d8680a8f5cdd47bcb4ecc74",
+        "localCanonicalSha256": "74611d3ec788b373f64028a60e3e2ba1eaed1a632d8680a8f5cdd47bcb4ecc74",
+        "equal": true
+      },
+      {
+        "path": "ui_v2/buy/buy_v2_views.dart",
+        "vmSourceSha256": "9792b2c4f8bf020de1bcf8096c89184a47fe62c3cb42cfd3a0514da8ce4f0c8d",
+        "localCanonicalSha256": "9792b2c4f8bf020de1bcf8096c89184a47fe62c3cb42cfd3a0514da8ce4f0c8d",
+        "equal": true
+      },
+      {
+        "path": "ui_v2/buy/buy_v2_screen.dart",
+        "vmSourceSha256": "ab15ad580e68691ff080f6f76d9e01f05c6ea925bacd812858b08f298c95a2f5",
+        "localCanonicalSha256": "ab15ad580e68691ff080f6f76d9e01f05c6ea925bacd812858b08f298c95a2f5",
+        "equal": true
+      }
+    ],
+    "noStateMutation": true,
+    "noReloadRestartInstall": true
+  },
+  "nativeFinalLayout": {
+    "t14NativeCompactHeaderVerified20261004": {
+      "verifiedOn": "2026-10-04",
+      "sourceSha256": "83abbd2481b84b993f44b828d101c13181efa9792d3b70b6d1813e8222721637",
+      "runtime": "ExistingisolatedRedmi r66.36 review runtime, fullDartrestart; no APKbuild/install or realpayment/order.",
+      "sourceProof": "apps/mobile/build/t06-t07-cart-20261002/t14-native-compact-header-restart-after-20261003.json",
+      "verified": [
+        "Exact3 savedproductquantities stable in3 readbacks, buyerreviewscope/nohold and3namedVMlibraries matchlocal",
+        "CompactBack iconCart\u2192Shop\u2192same3item1197 mixedCart",
+        "Binexplicitall3 confirmation; KeepCart retains3/1197",
+        "Checkout\u2192Cart visible return retains3/1197; no paymentattempt",
+        "Shopdisplayfilter\u2192binexplicitall3\u2192confirmeddeletion removesallandreturnsShop withCartshortcutabsent andAddavailable",
+        "FreshShopAdd1/37; WholesaleCartshortcutremainsvisiblebadge1 as screenshot/Allcarts accessibility; WholesaleAddMOQ2/1160; openingCartAll shows3/1197 withcorrectCartactive"
+      ],
+      "evidenceDirectory": "apps/mobile/build/t06-t07-cart-20261002/t14-native",
+      "reviewScreen": "compact-header-final-fresh-mixed-cart-review.png/xml",
+      "remainingChildren": [
+        "Full7separate/mixed Add-to-Delivered native matrices",
+        "Scopedcatalogue shortcut usesWholesale2/1160 whileopeningmixedCart3/1197; reconcile count/total wording infullmatrix continuity audit, do not silentlyredesignpreviousscopedbehavior",
+        "AccessibilityAllcarts labelstandardization inpubliccopy audit",
+        "Prior37\u219297 unexplained, integration/Codexafterintegration/Google separatelypending",
+        "Formalhistorygate andfounderdraftacceptancepending"
+      ],
+      "qualification": "Final59 focusedpassed; frozenfullselectedpending. Nativeproof3librariesnotindependentwholeAPKasset/configurationacceptance."
+    }
+  },
+  "nativeFingerprintLimit": "Earlier scoped native journey evidence binds e8d227c. Revised compact header was restarted and retested at final 83abbd local fingerprint. VM proof covers three named libraries, not independent proof of every APK asset/configuration; cold installed APK remains r66.36.",
+  "pending": [
+    "Seven separate/mixed Add-to-Delivered native matrices",
+    "Catalogue destination-scoped shortcut count/total versus mixed Cart and All carts accessibility label: reconcile in full continuity/copy audit; Cart visibility itself verified",
+    "Live backend/provider recovery and workspace: Codex after integration",
+    "Google-related integrations separately listed",
+    "Founder approval of fresh draft visual references",
+    "Earlier Cart 1/37 to Checkout 2/97 discrepancy remains unexplained",
+    "Formal handoff blocked by inherited non-atomic 0e90a6ca74b81e212f118995f7c4fab0d3b78620; no history rewrite"
+  ],
+  "noBuildInstallRealPayment": true,
+  "founderAcceptancePending": true
+}

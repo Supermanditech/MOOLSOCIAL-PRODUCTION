@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+    "priorR12SelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "P05-R12: retailer saves a reviewed purchase copy and retrieves its frozen details/files from existing Purchases independently of later draft edits.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "C8C1ADA81459A5B7B4B5A388B8F57AA28CB2E563BE12518F9DCCADDEB69E4E01",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": [
+        "reuse",
+        "thin_policy_adapter",
+        "new_necessary_work"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_stock_export.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "R12 reviewed snapshots reuse existing purchase-paper preview/download and claimed work_stock_export.dart. C05/C06 correct word-safe exact text continuations, isolated retailer rows and explicit UTC saved-on representation. Retailer-only information shares the existing reference annexure; allow large trace tables to paginate, keep headings with following content. Preserve fields, source bytes, draft/saved distinctions and unposted disclosure. No new owner, screen, route, storage or accounting rules.",
+      "robustnessCoverage": [
+        "Legacy version1 reads and strict saved-copy validation",
+        "Frozen draft/supplier/Store identity after edits; preserve history on draft save",
+        "CAS, stable retry/collision, unavailable files and failed-save recovery",
+        "Compact/enlarged read-only preview, Back, exact download and Store-switch isolation"
+      ],
+      "adjustments": [
+        "Ticket-specific verified checkpoint instead of absent central v88; no acceptance implied"
+      ],
+      "explicitExclusions": [
+        "Only the founder-authorized 31 grouped r66.38 findings and directly related child defects discovered during local testing",
+        "No backend, production release, real payments or messages; only the explicitly approved successor debug OPPO build/install after qualification"
+      ],
+      "dependenciesAndApprovals": [
+        "Founder Screen 1 visual approval",
+        "Later full shared-journey local and OPPO testing"
+      ],
+      "timelineImpactDays": 1,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorP03SelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "P03 foundation: preserve actual Catalogue/manual/CSV stock-entry facts for later supplier bill reconciliation without inventing a supplier, payable or duplicate quantity.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "6CF0AE7EB23706FB9E7EEFC9B56A81B0E7256A7D13E2B4BD5A572142F13E0503",
+      "priorManifestSha256BeforeRetentionAppend": "B2683A70514CE8AF0FBC6D507446A562890A2DFE09BF16E61551A8C34852162B",
+      "p03C02Continuation": "Founder YES, 2 October: exact unique-ID-set guard in existing CSV failed-save callback and host/device qualification; fresh29-source decision. No screen/posting/backend/APK/push or widened ownership.",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "Movement journal cannot retain zero-stock entry or original SKU/pack/cost. Add immutable stock-entry snapshot to existing product, its versioned codec and existing inventory CAS, with explicit actual entry callback source. No parallel ledger, route, supplier-first screen, owner expansion or dependency. Existing unposted Already added to Stock bills must not alter quantity; future durable receipt allocation is P08.",
+      "robustnessCoverage": ["All three source callbacks; generic/JSON/purchase setup remains unknown", "Zero and availability-only stock without fake movement; original values survive edits", "Version1 legacy unknown, strict malformed/new records and old-writer protection", "Retained provenance immutability, retry/readback/restart and account/Store/QA separation", "Late unposted bill retains quantity; host tests separate from physical acceptance"],
+      "adjustments": ["Product-owned snapshot instead of movement-only metadata addresses architect zero-stock finding", "P03 foundation does not close later receipt/payable posting owners"],
+      "explicitExclusions": ["No P04/P08/P09 posting, financial authority or supplier invention", "No approved-layout redesign, backend/auth/Restock/native OCR/APK, other-tree change, service write or push"],
+      "dependenciesAndApprovals": ["Founder next-ticket continuation and bill-later direction, fresh26-source decision/Check", "Individual actual three-path/device/restart checks and C11 when OPPO free; not inferred from local tests"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Approved Store owner understands all eight analytics areas on one canvas, with compact summaries and exclusive in-place detail expansion.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "9313227F575DFF5FFC2D623C016D7A14F301BAE6299E7CCFBFC1D75F701EAE22",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "Reuse approved eight-area canvas and existing Store calculations/provider hooks. Complete retained analytics PDF request using existing work_downloads.dart, work_stock_export.dart and download tests already claimed; immutable primitive projection of same eligible values/request, exact formatted money, per-row source/coverage/basis/date, explicit unavailable domains and scoped picker. Correct confirmed analytics Back-state loss using existing scoped PageStorage for in-session selected report/period/cutoff only. No export re-query, new calculation, route, ledger, durable persistence, native bridge change or backend substitute; restored presentation never qualifies stale financial/provider data.",
+      "robustnessCoverage": ["All eight summaries, exclusive expansion, sibling collapse and repeat-tap close without route changes or additional reads", "Compact/enlarged layouts and analytics-only header with operational neighbour controls preserved", "Store/SKU and period isolation, stale response rejection and retry/loading/error/unavailable", "Verified zero versus missing/partial coverage, public readiness versus actual visibility", "Shared captured period for activity; current positions and provider freshness separately labelled", "Focused and impacted local tests, rendered inspection, guarded OPPO reload/audit/fix/retest and founder screenwise handoff"],
+      "adjustments": ["Latest explicit YES replaces earlier analytics shelf/folders/report routes with exclusive inline expansion; prior approval retained as history", "One shared scoped provider request across all areas; expansion never triggers reads", "Analytics-only Store header; neighbouring operational controls unchanged"],
+      "explicitExclusions": ["No backend/authentication/tracking/posting, production transactions or fabricated runtime records", "No Cursor integration/branch writes, APK/OCR/build/install/release/push or approved neighbouring-screen redesign"],
+      "dependenciesAndApprovals": ["Latest founder YES approves single canvas and restricted analytics header; complete36-source decision and fresh Check", "Architect current-source review; local/device evidence and founder acceptance remain separate", "Actual public tracking and combined provider wiring need later approved integration"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorPurchaseGoalSelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Retailer completes opening supplier position, bill/receipt linkage, payment/advance and supplier return reconciliation without duplicate stock or debt.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "DFE9C2939DF34BA0FAF228C6A4CB61D8B7AA54583872A187820E4415BC3B1823",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/lib/features/work/widgets/work_widgets.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "Existing purchase book saves unposted copies/openings; inventory uses a separate encrypted key. Existing supplier financial entries require genuine orderId. Add scoped durable posting/recovery to existing owners, allowing explicit manual bill identities and exact prior-stock allocations, not fake platform orders or duplicate ledger/screen owners.",
+      "robustnessCoverage": ["Unknown/zero and confirmed opening owed/advance", "Exact historical inclusion and bill identity/revisions", "Goods-before-bill/bill-before-goods and all three previous stock-entry paths", "Partial/short/damaged goods and payment/credit/refund limits", "Idempotent retry, changed-content collision, failed save/lost reply/restart and scope isolation", "Supplier reconciliation and impacted UI/keyboard/large-text/landscape device checks"],
+      "adjustments": ["Preserve old unposted records; enable posting only after explicit confirmation", "Durable recovery before cross-store stock/accounting effects", "Reuse existing Purchases/editor and approved layouts"],
+      "explicitExclusions": ["No APK/native OCR, backend/account integration, real transfer, broad merge or release", "No other-tree mutation, push or runtime injection for acceptance"],
+      "dependenciesAndApprovals": ["Founder bounded active goal 3 October; complete31-source decision and fresh Check", "Architect plan review and repeated-preflight review; independent local/device/founder evidence"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorP04C01SelectedTicketAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "P04-C01: retailer saves, reopens and explicitly corrects an unposted supplier opening record with exact supporting bill-copy assertions; no duplicate stock or payable.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "908212D34C46CD2EB364EF549F089B85A778E8F5B9456AB64EAD09F47282E883",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "thin_policy_adapter", "new_necessary_work"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/work/work_models.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart", "apps/mobile/test/work_store_atomic_operations_test.dart", "apps/mobile/test/work_workspace_layout_safety_test.dart"],
+      "newScreens": [], "newRoutes": [], "newBackendOwners": [],
+      "necessityProof": "No supplier manager exists; profiles already save in Purchase entry drafts without invoice facts. Contextual inline Opening dues editor in Purchases is necessary. Reuse encrypted purchase book/CAS/write lock and immutable saved copies. Existing supplier financial projection requires genuine order links; do not forge manual orders or build another ledger.",
+      "robustnessCoverage": ["Scoped legacy codec and unknown versus zero", "One current supplier basis and retained correction revisions", "Exact copy-revision assertions, no automatic bill-total or payment inference", "Append-only CAS, stable lost-reply retry, failed-save recovery and stale/scope rejection", "Compact/enlarged inline editor with cancel/navigation protection; physical checks pending"],
+      "adjustments": ["Frontend unposted record is complete dependency slice, not usable current supplier dues or full P04", "Keep P03-C02/C11 device checks pending during OPPO call"],
+      "explicitExclusions": ["No financial/stock/payment posting, new route/backend or invented platform identity", "No APK/OCR/account integration, other-tree mutation, push or device interaction before free report"],
+      "dependenciesAndApprovals": ["Founder CONTINUE NEXT; thirty-source fresh decision and Check", "Architect contract/topology review; OPPO real-flow and founder layout approval pending"],
+      "timelineImpactDays": 1, "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    },
+    "priorStoreAdmissionCorrectionAssessment": {
+      "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+      "customerOutcome": "Correct this Store continuation's exact admission record without replacing the unrelated release task or granting P03 application/posting authority.",
+      "manifestPath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+      "manifestSha256": "DBEA4E1EB54B44580E8B57C5A14E334F7DDF0A9536201176B1D2FD715FDE5906",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "configuration", "test_only_acceptance"],
+      "sharedImplementationOwners": [
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920-scope.json",
+        "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+        "config/codex-development-regression-registry.json",
+        "config/codex-subagent-coordination-policy.json"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "necessityProof": "Existing MVP gate StatePath and already-owned Store scope record are sufficient. Only admission metadata, current handoff and registry binding change; no gate/script/claim expansion, alternate state owner or global release replacement. Inventory and duplicate assertions apply to this admission correction, not unfinished P03 application assessment.",
+      "robustnessCoverage": [
+        "Exact Store path and existing UAW identity pass; unrelated default release is not used as Store authority",
+        "Wrong ticket, stale manifest and missing selected assessment reject",
+        "Global release bytes and all active owner claims remain identical",
+        "Application/backend/build/install/external flags remain false; deferred device checks remain open"
+      ],
+      "adjustments": ["Use existing separate Store StatePath instead of the default unrelated release path; preserve prior R12 assessment"],
+      "explicitExclusions": ["No P03 application edit or accounting/stock posting", "No global release state, gate code, claims, other tree, backend, APK, device call interaction or push change"],
+      "dependenciesAndApprovals": ["Founder exact admission-only go ahead, 2 October", "Fresh P03 reuse assessment and founder-input Check required before any later application edit"],
+      "timelineImpactDays": 0,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {
+    "branch": "work/codex-ui/add-product-screen1-20260920",
+    "head": "0bdeed235ec30a6f236709244eadc3420e1c5873",
+    "successorRegistered": true,
+    "priorApprovalState": "Founder approved exact Screen 1 checkpoint exception and narrow blocker registration; Counter Sale physical retest remains pending.",
+    "priorPurchaseApprovalState": "Founder CONTINUE NEXT selects P04-C01 unposted opening-record dependency after reuse/architect review and fresh founder Check. P03-C02/C11 and P04 actual device qualification remain pending; no OPPO interaction while busy.",
+    "approvalState": "Latest founder YES approves single-canvas analytics, exclusive inline detail expansion and Store/date/freshness-only header. Fresh36-source admission; local/device checks then founder review. No backend/integration/APK/release authority."
+  },
+  "ticket": {
+    "id": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+    "priorPurchaseCustomerOutcome": "Retailer completes confirmed opening supplier dues/advance, bills and goods in either order, supplier payments and returns with exact reconciliation and no duplicate stock/debt.",
+    "customerOutcome": "Approved Retailer/Grocery Store owner can understand Store operations and public customer activity with readable verified analytics and clear unavailable data.",
+    "classification": "mvp_supporting",
+    "priorPurchaseClassificationReason": "Necessary complete purchase bookkeeping journey behind existing frontend owners; current explicit founder goal permits bounded posting, not backend integration or release.",
+    "classificationReason": "Founder-approved launch-supporting frontend report redesign over existing Store records; no new operational or backend authority.",
+    "minimumCompleteScope": [
+      "Compact information-first Overview with period/freshness/coverage and verified numbers/units",
+      "All eight domain summaries on one canvas; one detail expands in place, sibling collapses and repeat tap closes; no analytics rail/folders/report routes",
+      "Analytics header limited to Store identity, reporting period and truthful local/provider freshness; shared operational headers outside analytics preserved",
+      "Read-only provider hooks with Store/SKU/period isolation, freshness/coverage and loading/error/unavailable/verified; unknown never zero",
+      "Local focused/impacted tests, rendered inspection, guarded OPPO reload/screenshots, bounded defect corrections/retest, then screenwise founder handoff",
+      "Retained analytics PDF export from one selected immutable snapshot with exact money, source/as-of/coverage/basis, unknown states, cancellation/failure/scope guards; fresh independent Sales/Stock qualification"
+    ],
+    "priorPurchaseGoalMinimumCompleteScope": [
+      "Durable scoped posting identity/recovery; explicitly confirmed opening position and exact bill inclusion",
+      "Reviewed manual bill identity, partial/short/damaged receiving and exact already-stocked allocation across Catalogue/manual/CSV",
+      "Supplier payment, advance/credit allocations, goods returns and monetary credits/refunds as separate effects",
+      "Bill/Goods/Payment next actions, supplier account/reconciliation and restart continuity on existing approved screens",
+      "Local tests, OPPO reload/screenshots, defect listing and bounded fixes, reload/retest and safe checkpoint then founder review"
+    ],
+    "priorP04C01MinimumCompleteScope": [
+      "Reuse Purchases inline supplier context, encrypted purchase book/CAS/write lock; no new route or service",
+      "Capture cutoff, known or unknown INR magnitude, owed/credit direction and source note separately from bill payments/stock",
+      "Save/reopen/correct with one current supplier basis and immutable revisions plus exact reviewed-copy relationships",
+      "Preserve working draft/profiles/copies and opening history; host retry/restart/scope tests then physical acceptance when free"
+    ],
+    "priorMinimumCompleteScope": [
+      "Screen 1 three entry choices wired to existing handlers",
+      "Shared Store photo reference with exact identity, preview isolation and existing Buy rendering; no media backend",
+      "Founder-authorized Store-contextual Add to Store copy and exact Store-to-Buy photo route/cache binding with local renderer tests",
+      "Catalogue category counts, list/grid toggle, local 50-item pages over up to 10000 supplied SKUs and product-specific test imagery",
+      "Founder-approved next screen: shared prefilled editable review with Save to Store, fuller thumbnails within existing tiles, local shared-inventory Counter Sale verification; stop before Store stock list/grid redesign",
+      "Founder-authorized exact variant and pack presentation, shared product metadata editor and public-field disposition; preserve one-time Store setup and system ownership, defer backend and pause for revised editor approval",
+      "Founder-approved v13 and explicit continue: saved Store stock list/grid with shared catalogue components and existing inventory; local tests then screen review",
+      "23 September founder-authorized continuation: implement the 31 grouped r66.38 Store/catalogue/Counter Sale findings, fix related child defects during local tests, and present all affected actual screens together for founder approval before a new APK",
+      "24 September founder bounded extension v1: shared contextual A4/58/80 mm printing, evidence-backed orphan-history recovery, and manual-photo stock-to-POS continuity; local tests and Git preservation before guarded APK; no automatic installation",
+      "26 September Store home authority v1: HOME-01–04 correction, reproduce HOME-05/06, explicit wallet Actions expand/manual collapse with central reflow, remove working-screen contextual rails while preserving actions, local and OPPO hot-reload tests",
+      "2 October founder continuation P05-R12 only: immutable reviewed purchase-copy snapshots in existing encrypted scoped book; existing Purchases/preview/download; draft-save and legacy compatibility; local tests then OPPO hot reload. No posting, backend or new APK authority."
+    ],
+    "explicitExclusions": ["No shared policy weakening, unclaimed owner or global release replacement", "No backend/authentication/tracking/posting, fabricated runtime data or production transaction", "No Cursor integration/branch changes, APK/OCR/build/install/release/push or approved neighbouring-screen redesign"],
+    "priorPurchaseGoalExplicitExclusions": [
+      "No global release replacement, unclaimed owners, fabricated platform identities or unconfirmed legacy posting; old unposted-only restriction retained in prior P04 assessment and superseded only by the 3 October explicit goal",
+      "No device interaction during OPPO call, APK, backend, other-tree change or push",
+      "CSV batch-review redesign pending its screenwise approval",
+      "Backend",
+      "Unapproved builds/installs or live service writes; Cursor edits/integration",
+      "Counter Sale work unrelated to the 31 grouped r66.38 findings, directly related child defects, or founder bounded extension v1 printing/history/photos"
+    ],
+    "dependenciesAndApprovals": ["Founder single-canvas YES7October, existing Store scope and complete36-source decision/Check", "Architect source review; verified data reuse and scoped provider hooks only", "Public live tracking/provider wiring deferred to approved integration; source/device/founder review independent"],
+    "priorPurchaseGoalDependenciesAndApprovals": [
+      "Founder bounded active end-to-end purchase goal 3 October; exact reuse and architect review complete, fresh31-source founder-input Check before source edits",
+      "C11/P03 actual device variants remain open until observed; latest connection is not acceptance"
+    ],
+    "testAndEvidencePlan": ["Exact Store founder/ownership/regression/incremental/scope gates and unchanged release restrictions", "Focused and impacted analysis/tests: no-route exclusive expansion/shared reads, compact/enlarged layout, captured cutoff, scope/stale responses, unknown-versus-zero and distinct financial bases", "Actual rendered inspection, guarded OPPO hot reload/screenshots, visual/technical defect list and bounded corrections/reload/retest, then founder screenwise review"],
+    "priorPurchaseGoalTestAndEvidencePlan": [
+      "Explicit Store scope, continuation/incremental/regression-memory gates; unchanged global release and owner claims",
+      "Unknown/zero and opening inclusion; partial receipts/exact prior stock, payment/advance/return/refund reconciliation; durable interrupted-save recovery, retry/collision/restart/stale/scope; focused analysis",
+      "Actual three-path and late-bill unchanged quantity checks on free OPPO; scoped local Git checkpoint, no false closure"
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md"
+  },
+  "authorization": {
+    "state": "existing_ticket_authority_confirmed",
+    "evidence": "docs/quality/ADD-PRODUCT-SCREEN1-20260920.md",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "nextCandidate": {
+    "id": "STORE-ANALYTICS-FRONTEND-20261007",
+    "state": "selected_frontend_goal_implementation_and_device_review_pending",
+    "customerOutcome": "Eight-area single analytics canvas with exclusive in-place details and provider-ready read-only hooks; local/device qualification then founder review.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "deferred": ["Backend/authentication/public tracking/provider integration", "Cursor integration", "APK/OCR and release qualification"]
+  },
+  "priorPurchaseGoalNextCandidate": {
+    "id": "P04-P11-BOUNDED-PURCHASE-JOURNEY",
+    "state": "selected_frontend_goal_implementation_and_device_review_pending",
+    "customerOutcome": "Complete supplier opening, bill/goods timing, payments and returns without duplicate stock/debt; reload/audit/fix/reload then founder review.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "deferred": ["Backend/account/Restock integration", "Native OCR next APK", "Actual money transfer and production promotion"]
+  },
+  "priorP04C01NextCandidate": {
+    "id": "P04-C01",
+    "state": "selected_unposted_frontend_dependency_device_acceptance_pending",
+    "customerOutcome": "Save/reopen/correct unposted supplier opening records and exact reviewed-bill assertions without stock/dues posting.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "deferred": ["Full P04 numerical reconciliation", "P08/P09 posting", "P03-C02/C11 and P04 device checks until OPPO free"]
+  },
+  "priorP03NextCandidate": {
+    "id": "P-03",
+    "state": "selected_bounded_frontend_foundation_device_acceptance_pending",
+    "customerOutcome": "Preserve opening-stock provenance and original quantity/unit/cost/as-of across Catalogue/manual/CSV, permitting unknown supplier and later bill linkage without duplicate stock.",
+    "reuseInventoryComplete": true,
+    "duplicateSearchComplete": true,
+    "observedOwners": ["work_models.dart WorkspaceStockMovement", "work_session.dart addOrUpdateWorkspaceProduct/importWorkspaceProducts", "Existing Add Product, product editor, CSV review and Already added to Stock purchase flow"],
+    "observedGaps": ["Opening quantity and Imported product quantity do not distinguish all three entry methods", "Movement freezes quantity/time but not original unit/cost/as-of provenance", "Purchase product review must remain distinct from invoice entry and later supplier/receipt/payable posting"],
+    "requiredBeforeApplicationEdit": ["Finish exact P03 reuse/duplicate assessment", "Fresh founder-input reads, concrete decision and Check", "Update only this Store scope record for the bounded P03 outcome before enabling application writes"],
+    "deferred": ["P04 existing supplier bills/balances", "P08 receipt posting", "P09 payable/payment posting", "C11 OPPO duplicate/Cancel retest when device is free"]
+  }
+}

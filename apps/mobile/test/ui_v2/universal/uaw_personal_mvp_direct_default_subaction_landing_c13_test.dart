@@ -121,7 +121,11 @@ void main() {
     expect(find.byKey(destination.owner), findsOneWidget);
     expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
     expect(find.byKey(destination.localNavigationOwner), findsOneWidget);
-    expect(find.byType(MoolLocalNavigationRail), findsOneWidget);
+    if (destination.id == 'social') {
+      expect(find.byKey(const Key('screen04-rail-feed')), findsOneWidget);
+    } else {
+      expect(find.byType(MoolLocalNavigationRail), findsOneWidget);
+    }
     for (final headline in chooserHeadlines) {
       expect(find.text(headline), findsNothing);
     }
@@ -146,8 +150,10 @@ void main() {
         JourneySession? journey;
         try {
           journey = await mount(tester, initialLocation: '/app/mool');
+          await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+          await tester.pumpAndSettle();
           final familyButton = find.byKey(
-            ValueKey('mool-home-family-${destination.id}'),
+            ValueKey('mool-navigator-family-${destination.id}'),
           );
           expect(familyButton, findsOneWidget);
           await tester.tap(familyButton);

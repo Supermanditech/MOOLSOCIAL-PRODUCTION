@@ -1,0 +1,521 @@
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 99.0.0 (108.0.0 available)
+  analyzer 12.1.0 (14.4.0 available)
+  android_file_picker 1.0.3 (2.0.0 available)
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.0.0 available)
+  cross_file 0.3.5+4 (0.3.5+5 available)
+  file_picker 12.1.2 (13.1.0 available)
+  file_picker_darwin 1.0.4 (2.1.0 available)
+  file_picker_linux 1.0.2 (2.0.0 available)
+  file_picker_platform_interface 3.2.0 (4.0.0 available)
+  file_picker_web 3.0.3 (4.0.0 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  firebase_app_check 0.4.7 (0.4.8 available)
+  firebase_auth 6.6.1 (6.7.0 available)
+  firebase_auth_platform_interface 9.0.7 (9.1.0 available)
+  firebase_auth_web 6.2.7 (6.3.0 available)
+  firebase_core 4.14.0 (4.15.0 available)
+  firebase_core_web 3.11.0 (3.12.0 available)
+  firebase_crashlytics 5.3.0 (5.4.0 available)
+  firebase_data_connect 0.3.0+7 (0.3.3 available)
+  firebase_messaging 16.6.0 (16.7.0 available)
+  flutter_riverpod 3.3.2 (3.4.3 available)
+  flutter_secure_storage 10.3.1 (11.1.1 available)
+  flutter_secure_storage_darwin 0.3.2 (0.4.2 available)
+  flutter_secure_storage_linux 3.0.2 (3.0.3 available)
+  flutter_secure_storage_platform_interface 2.0.3 (2.1.0 available)
+  glob 2.1.3 (2.2.0 available)
+  go_router 17.3.0 (18.0.1 available)
+  google_sign_in_android 7.2.16 (7.2.17 available)
+  google_sign_in_ios 6.3.0 (6.3.3 available)
+  hooks 2.0.2 (2.2.0 available)
+  html 0.15.6 (0.15.7 available)
+  image_picker_android 0.8.13+19 (0.8.13+23 available)
+  image_picker_ios 0.8.13+6 (0.8.13+7 available)
+  intl 0.20.2 (0.20.3 available)
+  io 1.0.5 (1.1.0 available)
+  jni 1.0.0 (1.0.3 available)
+  jni_flutter 1.0.1 (1.0.3 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  mobile_scanner 7.2.0 (7.4.2 available)
+  native_toolchain_c 0.19.2 (0.19.4 available)
+  objective_c 9.4.1 (9.6.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  permission_handler 12.0.3 (13.0.2 available)
+  permission_handler_android 13.0.1 (14.1.0 available)
+  permission_handler_apple 9.4.10 (9.6.1 available)
+  permission_handler_html 0.1.3+5 (0.1.4+1 available)
+  permission_handler_platform_interface 4.3.0 (4.4.1 available)
+  permission_handler_windows 0.2.1 (0.2.2 available)
+  platform 3.1.6 (3.2.0 available)
+  pool 1.5.2 (1.5.3 available)
+  process 5.0.5 (5.0.6 available)
+  protobuf 6.0.0 (6.1.0 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_android 2.1.2 (2.2.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  record_web 2.1.2 (2.1.3 available)
+  record_windows 2.2.3 (2.3.0 available)
+  riverpod 3.3.2 (3.4.3 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  source_maps 0.10.13 (0.10.14 available)
+  speech_to_text 7.4.0 (7.5.0 available)
+  sqlite3 3.4.0 (3.6.0 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  synchronized 3.4.1+2 (3.4.2 available)
+  test 1.31.0 (1.32.0 available)
+  test_api 0.7.11 (0.7.14 available)
+  test_core 0.6.17 (0.6.20 available)
+  url_launcher_android 6.3.32 (6.3.33 available)
+  url_launcher_ios 6.4.1 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  vector_graphics 1.2.2 (1.2.3 available)
+  vector_graphics_compiler 1.2.6 (1.3.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  video_player 2.13.0 (2.14.0 available)
+  video_player_android 2.12.0 (2.12.2 available)
+  video_player_avfoundation 2.11.0 (2.12.0 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  windows_file_picker 1.1.0 (2.0.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+89 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R669 supplier media contract SKU media grid shop 320.0 1.0 store false
+00:03 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:04 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:05 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:05 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:06 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:06 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:06 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:07 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:07 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:08 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:08 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:08 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:08 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:09 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:09 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:10 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:10 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:11 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:11 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:11 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:12 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:12 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:12 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:12 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:13 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:13 +26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:14 +27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:14 +28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:14 +29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:14 +30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:15 +31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:15 +32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:16 +33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:17 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:17 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:18 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:19 +37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:20 +38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:20 +39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:21 +40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:21 +41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:21 +42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:21 +43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:22 +44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:22 +45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:23 +46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:24 +47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:25 +48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:25 +49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:25 +50: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 1.0
+00:26 +51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:26 +52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:27 +53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:27 +54: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:28 +55: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:29 +56: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:29 +57: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=true
+00:30 +58: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:30 +59: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:30 +60: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:31 +61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:31 +62: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:31 +63: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:32 +64: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:32 +65: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +66: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +67: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +69: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:32 +71: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:33 +72: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:33 +73: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:33 +74: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:33 +75: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:34 +76: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:36 +77: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:37 +78: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:37 +79: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:38 +80: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:38 +81: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:38 +82: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:38 +83: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:39 +84: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:39 +85: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=false
+00:40 +86: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 844.0 2.0
+00:40 +87: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:40 +88: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +89: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +90: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +91: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +92: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +93: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +94: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +95: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +96: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +97: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +98: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +99: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +100: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +101: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +102: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +103: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +104: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +105: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +106: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +107: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +108: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +109: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +110: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +111: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +112: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +113: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +114: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +115: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +116: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +117: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +118: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +119: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +120: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +121: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +122: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +123: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +124: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +125: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +126: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +127: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +128: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:42 +129: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=true
+00:46 +130: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=true
+00:48 +131: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:50 +132: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(800.0, 360.0)
+00:51 +133: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 store shared grid follows finger and changes page
+00:52 +134: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:55 +135: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:55 +136: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:57 +137: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(360.0, 800.0)
+01:01 +138: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(360.0, 800.0)
+01:02 +139: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+01:02 +140: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 cancelling a drag restores the same grid and page
+01:02 +141: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item2 return at Size(360.0, 800.0)
+01:05 +142: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item2 return at Size(360.0, 800.0)
+01:07 +143: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item2 return at Size(360.0, 800.0)
+01:08 +144: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 2.0
+01:08 +145: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C07 actual Buy route retains search and stays closed across rotation
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+01:10 +146: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C07 actual Buy route retains search and stays closed across rotation
+01:12 +147: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+01:12 +148: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+01:12 +149: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+01:14 +150: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+01:15 +151: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item2 return at Size(800.0, 360.0)
+01:22 +152: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R665 O05 full medicine identity at text2 (featured: false, width: 320.0)
+01:22 +153: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R665 O05 full medicine identity at text2 (featured: true, width: 320.0)
+01:22 +154: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R665 O05 full medicine identity at text2 (featured: false, width: 360.0)
+01:22 +155: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R665 O05 full medicine identity at text2 (featured: true, width: 360.0)
+01:22 +156: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop false 1
+01:22 +157: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop false 2
+01:22 +158: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop false 3
+01:22 +159: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop false 18
+01:23 +160: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop true 1
+01:23 +161: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop true 2
+01:23 +162: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop true 3
+01:23 +163: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.shop true 18
+01:23 +164: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale false 1
+01:23 +165: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale false 2
+01:23 +166: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale false 3
+01:23 +167: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale false 18
+01:24 +168: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale true 1
+01:24 +169: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale true 2
+01:24 +170: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale true 3
+01:24 +171: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 customer catalogue announcements BuyV2Destination.wholesale true 18
+01:24 +172: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 1.0
+01:25 +173: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 2.0
+01:25 +174: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 360.0 / 1.0
+01:25 +175: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 360.0 / 2.0
+01:25 +176: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 430.0 / 1.0
+01:26 +177: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 430.0 / 2.0
+01:26 +178: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 1.0
+01:26 +179: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 2.0
+01:26 +180: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 360.0 / 1.0
+01:27 +181: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 360.0 / 2.0
+01:27 +182: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 430.0 / 1.0
+01:27 +183: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 430.0 / 2.0
+01:27 +184: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 1.0
+01:28 +185: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 2.0
+01:28 +186: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 1.0
+01:28 +187: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 2.0
+01:28 +188: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 430.0 / 1.0
+01:29 +189: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 430.0 / 2.0
+01:29 +190: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 320.0 / 1.0
+01:29 +191: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 320.0 / 2.0
+01:29 +192: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 360.0 / 1.0
+01:29 +193: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 360.0 / 2.0
+01:29 +194: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 430.0 / 1.0
+01:30 +195: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store bulk at 430.0 / 2.0
+01:30 +196: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 1.0
+01:30 +197: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 2.0
+01:30 +198: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 360.0 / 1.0
+01:30 +199: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 360.0 / 2.0
+01:31 +200: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 430.0 / 1.0
+01:31 +201: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 430.0 / 2.0
+01:31 +202: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 1.0
+01:31 +203: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 2.0
+01:32 +204: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 360.0 / 1.0
+01:32 +205: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 360.0 / 2.0
+01:32 +206: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 430.0 / 1.0
+01:32 +207: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 430.0 / 2.0
+01:33 +208: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 1.0
+01:33 +209: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 2.0
+01:33 +210: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 360.0 / 1.0
+01:33 +211: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 360.0 / 2.0
+01:33 +212: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 430.0 / 1.0
+01:34 +213: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 430.0 / 2.0
+01:34 +214: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 320.0 / 1.0
+01:34 +215: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 320.0 / 2.0
+01:34 +216: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 360.0 / 1.0
+01:34 +217: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 360.0 / 2.0
+01:34 +218: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 430.0 / 1.0
+01:35 +219: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main bulk at 430.0 / 2.0
+01:35 +220: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 1.0
+01:36 +221: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 2.0
+01:38 +222: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0
+01:40 +223: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 2.0
+01:42 +224: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 1.0
+01:44 +225: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 2.0
+01:46 +226: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 1.0
+01:48 +227: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 2.0
+01:51 +228: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 1.0
+01:53 +229: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 2.0
+01:55 +230: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 1.0
+01:58 +231: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 2.0
+02:00 +232: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 1.0
+02:05 +233: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 2.0
+02:11 +234: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 1.0
+02:17 +235: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 2.0
+02:23 +236: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 1.0
+02:28 +237: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 2.0
+02:33 +238: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 320.0 / 1.0
+02:33 +239: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 320.0 / 2.0
+02:34 +240: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 360.0 / 1.0
+02:34 +241: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 360.0 / 2.0
+02:34 +242: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 430.0 / 1.0
+02:35 +243: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 430.0 / 2.0
+02:35 +244: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <229.0>
+  Actual: <620.6666666666667>
+   Which:  differs by <391.66666666666674>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured shop cards fit Size(320.0, 700.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:40 +244 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured shop cards fit Size(320.0, 700.0) at 1.0 text
+
+02:40 +244 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.4 text
+02:42 +245 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 2.0 text
+02:43 +246 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <242.0>
+  Actual: <628.3333333333334>
+   Which:  differs by <386.33333333333337>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured shop cards fit Size(430.0, 932.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:46 +246 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured shop cards fit Size(430.0, 932.0) at 1.0 text
+
+02:46 +246 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 1.4 text
+02:48 +247 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 2.0 text
+02:49 +248 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <229.0>
+  Actual: <676.6666666666667>
+   Which:  differs by <447.66666666666674>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured wholesale cards fit Size(320.0, 700.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:56 +248 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured wholesale cards fit Size(320.0, 700.0) at 1.0 text
+
+02:56 +248 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 1.4 text
+02:58 +249 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 2.0 text
+02:59 +250 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <242.0>
+  Actual: <697.3333333333334>
+   Which:  differs by <455.33333333333337>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured wholesale cards fit Size(430.0, 932.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:05 +250 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured wholesale cards fit Size(430.0, 932.0) at 1.0 text
+
+03:05 +250 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 1.4 text
+03:07 +251 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 2.0 text
+03:08 +252 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <229.0>
+  Actual: <688.6666666666667>
+   Which:  differs by <459.66666666666674>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured medicine cards fit Size(320.0, 700.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:09 +252 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured medicine cards fit Size(320.0, 700.0) at 1.0 text
+
+03:09 +252 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 1.4 text
+03:10 +253 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 2.0 text
+03:10 +254 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 1.0 text
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <242.0>
+  Actual: <683.3333333333334>
+   Which:  differs by <441.33333333333337>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:838:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 838
+The test description was:
+  featured medicine cards fit Size(430.0, 932.0) at 1.0 text
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:11 +254 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 1.0 text [E]
+  Test failed. See exception logs above.
+  The test description was: featured medicine cards fit Size(430.0, 932.0) at 1.0 text
+
+03:11 +254 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 1.4 text
+03:11 +255 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 2.0 text
+03:12 +256 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: phone widths keep three readable product cards with all products reachable
+03:12 +257 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: large text retains vertical rows and complete minimum tap actions
+03:12 +258 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: wide catalogue admits three cards without compressing content
+03:12 +259 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: Fresh picks keeps store and delivery on separate complete lines
+03:13 +260 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: Fresh picks preserves complete seller facts at 140 percent text
+03:14 +261 -6: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 1.0 text
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 1.0 text
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.0 text
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 1.0 text
+  ... and 2 more

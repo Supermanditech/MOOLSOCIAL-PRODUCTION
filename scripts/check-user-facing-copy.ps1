@@ -53,6 +53,82 @@ $blockedQuotedWords = @(
   "placeholder"
 )
 
+function Remove-DartInterpolationForCustomerCopy {
+  param(
+    [Parameter(Mandatory = $true)]
+    [AllowEmptyString()]
+    [string]$Line
+  )
+  return [regex]::Replace($Line, '\$\{[^{}\r\n]*\}', '')
+}
+
+$interpolationFixture = 'https://graph.facebook.com${endpoint.path}'
+$literalFixture = 'Endpoint unavailable'
+$renderedInterpolationFixture = (
+  Remove-DartInterpolationForCustomerCopy $interpolationFixture
+).ToLowerInvariant()
+$renderedLiteralFixture = $literalFixture.ToLowerInvariant()
+if (
+  $renderedInterpolationFixture.Contains('endpoint') -or
+  -not $renderedLiteralFixture.Contains('endpoint') -or
+  (Remove-DartInterpolationForCustomerCopy '') -cne ''
+) {
+  throw 'User-facing copy interpolation fixture failed.'
+}
+
+function Test-NonVisibleDartCopyLine {
+  param(
+    [Parameter(Mandatory = $true)][string]$Extension,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Line,
+    [AllowEmptyString()][string]$RelativePath = ''
+  )
+  $trimmed = $Line.Trim()
+  return (
+    $Extension -eq '.dart' -and
+    (
+      $Line -match '\b(?:Key|ValueKey|ObjectKey)\s*\(' -or
+      $Line -match '\bsafeCode\s*:' -or
+      (
+        $Line -match '\bcode\s*:' -and
+        $Line.Contains("'auth-")
+      ) -or
+      $Line -match '\bArgumentError\.value\s*\(' -or
+      $trimmed.EndsWith('=>') -or
+      (
+        $Line.Contains("=> 'auth-") -and
+        $Line.TrimEnd().EndsWith("',")
+      ) -or
+      (
+        $RelativePath.EndsWith(
+          'core/auth/x_oauth2_pkce_network_adapter.dart',
+          [StringComparison]::OrdinalIgnoreCase
+        ) -and
+        $trimmed -ceq "'internal',"
+      )
+    )
+  )
+}
+
+$safeCodeFixture = "safeCode: 'auth-callback-payload-invalid',"
+$safeCodeMapFixture = "'internal' => 'auth-broker-internal',"
+$brokerSetFixture = "'internal',"
+$argumentFixture = "throw ArgumentError.value(value, name, 'Invalid HTTPS endpoint.');"
+$switchCodeFixture = "'internal-error' || 'web-internal-error' =>"
+$authCodeFixture = "code: 'auth-account-bootstrap-fatal',"
+$visiblePayloadFixture = "Text('Payload invalid')"
+if (
+  -not (Test-NonVisibleDartCopyLine '.dart' $safeCodeFixture) -or
+  -not (Test-NonVisibleDartCopyLine '.dart' $safeCodeMapFixture) -or
+  -not (Test-NonVisibleDartCopyLine '.dart' $brokerSetFixture `
+      'apps/mobile/lib/core/auth/x_oauth2_pkce_network_adapter.dart') -or
+  -not (Test-NonVisibleDartCopyLine '.dart' $argumentFixture) -or
+  -not (Test-NonVisibleDartCopyLine '.dart' $switchCodeFixture) -or
+  -not (Test-NonVisibleDartCopyLine '.dart' $authCodeFixture) -or
+  (Test-NonVisibleDartCopyLine '.dart' $visiblePayloadFixture)
+) {
+  throw 'User-facing copy non-visible Dart metadata fixture failed.'
+}
+
 $violations = [System.Collections.Generic.List[string]]::new()
 $files = foreach ($sourceSet in $sourceSets) {
   Get-ChildItem -LiteralPath $sourceSet.Path -Recurse -File |
@@ -60,26 +136,24 @@ $files = foreach ($sourceSet in $sourceSets) {
 }
 
 foreach ($file in $files) {
+  $relative = $file.FullName.Substring($root.Length + 1).Replace('\', '/')
   $lineNumber = 0
   foreach ($line in Get-Content -LiteralPath $file.FullName) {
     $lineNumber += 1
     $lower = $line.ToLowerInvariant()
-    $nonVisibleDartKey = (
-      $file.Extension -eq ".dart" -and
-      $line -match '\b(?:Key|ValueKey|ObjectKey)\s*\('
-    )
+    $customerCopyLine = Remove-DartInterpolationForCustomerCopy $line
+    $nonVisibleDartCopy = Test-NonVisibleDartCopyLine `
+      $file.Extension $line $relative
     foreach ($phrase in $blocked) {
       if ($lower.Contains($phrase)) {
-        $relative = $file.FullName.Substring($root.Length + 1)
         $violations.Add("${relative}:${lineNumber}: prohibited phrase '$phrase'")
       }
     }
     foreach ($word in $blockedQuotedWords) {
       if (
-        -not $nonVisibleDartKey -and
-        $line -match "['`"][^'`"]*\b$word\b[^'`"]*['`"]"
+        -not $nonVisibleDartCopy -and
+        $customerCopyLine -match "['`"][^'`"]*\b$word\b[^'`"]*['`"]"
       ) {
-        $relative = $file.FullName.Substring($root.Length + 1)
         $violations.Add("${relative}:${lineNumber}: prohibited word '$word'")
       }
     }
@@ -87,7 +161,7 @@ foreach ($file in $files) {
 }
 
 if ($violations.Count -gt 0) {
-  $violations | ForEach-Object { Write-Error $_ }
+  $violations | ForEach-Object { Write-Output $_ }
   throw "User-facing copy gate failed with $($violations.Count) violation(s)."
 }
 

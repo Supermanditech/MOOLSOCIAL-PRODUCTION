@@ -6,6 +6,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getDataConnect } from "firebase-admin/data-connect";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
@@ -113,12 +114,24 @@ import type { YouTubeUploadMetadata } from "./youtube/types.js";
 import type { YouTubeUploadFileIdentityInput } from "./youtube/upload_identity.js";
 import { ChatError, type ChatProfile } from "./chat/contracts.js";
 import { GoogleCloudStorageChatPhotoStore } from "./chat/attachment_store.js";
+import { GoogleCloudStorageChatAttachmentStore } from "./chat/media_store.js";
 import { FirestoreChatRepository } from "./chat/firestore_store.js";
 import { ChatService } from "./chat/service.js";
+import { FirebaseChatNotificationDispatcher } from "./chat/notification_dispatcher.js";
 import { SocialContentError } from "./social/contracts.js";
 import { FirestoreSocialContentRepository } from "./social/firestore_store.js";
 import { verifySocialInvocation } from "./social/request_security.js";
 import { SocialContentService } from "./social/service.js";
+import {
+  FirestoreWorkspaceProfileRepository,
+  WorkspaceProfileError,
+  WorkspaceProfileService,
+} from "./workspace/workspace_profile_service.js";
+import { GoogleCloudStorageWorkspaceProofStore } from "./workspace/workspace_proof_store.js";
+import {
+  FirestoreRetailerOrderRepository,
+  RetailerOrderService,
+} from "./workspace/retailer_order_service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -154,6 +167,8 @@ let providerService: YouTubeProviderService | undefined;
 let providerStores: FirestoreYouTubeStores | undefined;
 let socialContentService: SocialContentService | undefined;
 let chatRuntimeService: ChatService | undefined;
+let workspaceProfileRuntimeService: WorkspaceProfileService | undefined;
+let retailerOrderRuntimeService: RetailerOrderService | undefined;
 let xAuthRuntimeService: XPublicAuthBroker | undefined;
 let instagramAuthRuntimeService: InstagramPublicAuthBroker | undefined;
 let instagramMetaCallbackRuntimeService:
@@ -382,10 +397,33 @@ function chatService(): ChatService {
       getFirestore(),
       undefined,
       new GoogleCloudStorageChatPhotoStore(getStorage().bucket()),
+      new GoogleCloudStorageChatAttachmentStore(getStorage().bucket()),
+      new FirebaseChatNotificationDispatcher(getFirestore(), getMessaging()),
     ),
     resolveChatProfile,
   );
   return chatRuntimeService;
+}
+
+function workspaceProfileService(): WorkspaceProfileService {
+  if (workspaceProfileRuntimeService) return workspaceProfileRuntimeService;
+  workspaceProfileRuntimeService = new WorkspaceProfileService(
+    new FirestoreWorkspaceProfileRepository(getFirestore()),
+    undefined,
+    new GoogleCloudStorageWorkspaceProofStore(
+      getStorage().bucket(),
+      getFirestore(),
+    ),
+  );
+  return workspaceProfileRuntimeService;
+}
+
+function retailerOrderService(): RetailerOrderService {
+  if (retailerOrderRuntimeService) return retailerOrderRuntimeService;
+  retailerOrderRuntimeService = new RetailerOrderService(
+    new FirestoreRetailerOrderRepository(getFirestore()),
+  );
+  return retailerOrderRuntimeService;
 }
 
 function requiredEnvironment(name: string): string {
@@ -2466,6 +2504,10 @@ export const youtubeProvider = onRequest(
           requestId: id,
           error,
           code: providerError.code,
+          providerReason:
+            error instanceof YouTubeProviderError
+              ? error.providerReason
+              : undefined,
         }),
       );
       response.status(providerError.httpStatus).json({
@@ -2650,7 +2692,24 @@ export const moolSocialChat = onRequest(
         operation === "sendPhotoMessage" ||
         operation === "setReaction" ||
         operation === "forwardMessage" ||
-        operation === "markThreadRead";
+        operation === "markThreadRead" ||
+        operation === "updatePrivacySettings" ||
+        operation === "setBlockedAccount" ||
+        operation === "resolveMessageRequest";
+      const callMutation = operation === "updateCallPreferences" ||
+        operation === "setPresence" ||
+        operation === "startCall" ||
+        operation === "respondToCall" ||
+        operation === "endCall";
+      const attachmentMutation = operation === "prepareAttachmentUpload" ||
+        operation === "sendAttachmentMessage";
+      const groupMutation = operation === "inviteGroupMember" ||
+        operation === "updateGroupPermissions" ||
+        operation === "leaveGroup" ||
+        operation === "respondToGroupInvite";
+      const notificationMutation = operation === "updateNotificationPreferences" ||
+        operation === "registerNotificationDevice" ||
+        operation === "unregisterNotificationDevice";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2661,7 +2720,8 @@ export const moolSocialChat = onRequest(
             ),
           verifyIdToken: async (token) => getAuth().verifyIdToken(token),
         },
-        mutation,
+        mutation || callMutation || attachmentMutation || groupMutation ||
+          notificationMutation,
         true,
       );
       if (!ownerUserId) {
@@ -2677,14 +2737,66 @@ export const moolSocialChat = onRequest(
             ? await chatService().sendMessage(ownerUserId, body)
             : operation === "preparePhotoUpload"
               ? await chatService().preparePhotoUpload(ownerUserId, body)
+            : operation === "prepareAttachmentUpload"
+              ? await chatService().prepareAttachmentUpload(ownerUserId, body)
               : operation === "sendPhotoMessage"
                 ? await chatService().sendPhotoMessage(ownerUserId, body)
+              : operation === "sendAttachmentMessage"
+                ? await chatService().sendAttachmentMessage(ownerUserId, body)
+              : operation === "getGroupInfo"
+                ? await chatService().getGroupInfo(ownerUserId, body)
+              : operation === "inviteGroupMember"
+                ? await chatService().inviteGroupMember(ownerUserId, body)
+              : operation === "updateGroupPermissions"
+                ? await chatService().updateGroupPermissions(ownerUserId, body)
+              : operation === "leaveGroup"
+                ? await chatService().leaveGroup(ownerUserId, body)
+              : operation === "listGroupInvites"
+                ? await chatService().listGroupInvites(ownerUserId, body)
+              : operation === "respondToGroupInvite"
+                ? await chatService().respondToGroupInvite(ownerUserId, body)
+              : operation === "getNotificationPreferences"
+                ? await chatService().getNotificationPreferences(ownerUserId, body)
+              : operation === "updateNotificationPreferences"
+                ? await chatService().updateNotificationPreferences(ownerUserId, body)
+              : operation === "registerNotificationDevice"
+                ? await chatService().registerNotificationDevice(ownerUserId, body)
+              : operation === "unregisterNotificationDevice"
+                ? await chatService().unregisterNotificationDevice(ownerUserId, body)
               : operation === "setReaction"
                 ? await chatService().setReaction(ownerUserId, body)
                 : operation === "forwardMessage"
                   ? await chatService().forwardMessage(ownerUserId, body)
                 : operation === "markThreadRead"
                   ? await chatService().markThreadRead(ownerUserId, body)
+                : operation === "getPrivacySettings"
+                  ? await chatService().getPrivacySettings(ownerUserId, body)
+                : operation === "updatePrivacySettings"
+                  ? await chatService().updatePrivacySettings(ownerUserId, body)
+                : operation === "listBlockedAccounts"
+                  ? await chatService().listBlockedAccounts(ownerUserId, body)
+                : operation === "setBlockedAccount"
+                  ? await chatService().setBlockedAccount(ownerUserId, body)
+                : operation === "listMessageRequests"
+                  ? await chatService().listMessageRequests(ownerUserId, body)
+                : operation === "resolveMessageRequest"
+                  ? await chatService().resolveMessageRequest(ownerUserId, body)
+                : operation === "getCallPreferences"
+                  ? await chatService().getCallPreferences(ownerUserId, body)
+                : operation === "updateCallPreferences"
+                  ? await chatService().updateCallPreferences(ownerUserId, body)
+                : operation === "setPresence"
+                  ? await chatService().setPresence(ownerUserId, body)
+                : operation === "getCallAvailability"
+                  ? await chatService().getCallAvailability(ownerUserId, body)
+                : operation === "startCall"
+                  ? await chatService().startCall(ownerUserId, body)
+                : operation === "respondToCall"
+                  ? await chatService().respondToCall(ownerUserId, body)
+                : operation === "endCall"
+                  ? await chatService().endCall(ownerUserId, body)
+                : operation === "listIncomingCalls"
+                  ? await chatService().listIncomingCalls(ownerUserId, body)
               : (() => {
                   throw new ChatError(
                     "bad_request",
@@ -2717,6 +2829,161 @@ export const moolSocialChat = onRequest(
           code: chatError.code,
           message: chatError.message,
           retryable: chatError.retryable,
+        },
+      });
+    }
+  },
+);
+
+export const moolSocialWorkspace = onRequest(
+  {
+    region: "asia-south1",
+    timeoutSeconds: 60,
+    memory: "256MiB",
+    minInstances: 0,
+    maxInstances: 4,
+    concurrency: 40,
+    serviceAccount: socialContentRuntimeServiceAccount,
+  },
+  async (request, response) => {
+    const id = requestId(request.headers);
+    response.setHeader("cache-control", "no-store");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-request-id", id);
+    try {
+      if (request.method !== "POST") {
+        throw new WorkspaceProfileError(
+          "bad_request",
+          "Only POST requests are supported.",
+          405,
+        );
+      }
+      if (request.rawBody.byteLength > 64 * 1024) {
+        throw new WorkspaceProfileError(
+          "payload_too_large",
+          "The Workspace request is too large.",
+          413,
+        );
+      }
+      if (
+        request.body === null ||
+        typeof request.body !== "object" ||
+        Array.isArray(request.body)
+      ) {
+        throw new WorkspaceProfileError(
+          "bad_request",
+          "A valid request body is required.",
+          400,
+        );
+      }
+      const body = request.body as Record<string, unknown>;
+      const operation = typeof body.operation === "string"
+        ? body.operation.trim()
+        : "";
+      const mutation = operation === "prepareProofUpload" ||
+        operation === "confirmProofUpload" ||
+        operation === "submitProfile" ||
+        operation === "submitGst" ||
+        operation === "finishRetailerSetup" ||
+        operation === "setRetailerAvailability" ||
+        operation === "saveRetailerProduct";
+      const orderMutation = operation === "acceptRetailerOrder" ||
+        operation === "packRetailerOrder" ||
+        operation === "requestRetailerDelivery" ||
+        operation === "confirmRetailerHandover" ||
+        operation === "createRetailerIssue" ||
+        operation === "declineRetailerOrder";
+      const ownerUserId = await verifySocialInvocation(
+        request.headers,
+        {
+          verifyAppCheck: async (token, consume) =>
+            getAppCheck().verifyToken(
+              token,
+              consume ? { consume: true } : undefined,
+            ),
+          verifyIdToken: async (token) => getAuth().verifyIdToken(token),
+        },
+        mutation || orderMutation,
+        true,
+      );
+      if (!ownerUserId) {
+        throw new WorkspaceProfileError(
+          "authentication_required",
+          "Sign in to use Workspaces.",
+          401,
+        );
+      }
+      const service = workspaceProfileService();
+      const orders = retailerOrderService();
+      const result = operation === "listWorkspaces"
+        ? await service.listWorkspaces(ownerUserId)
+        : operation === "prepareProofUpload"
+          ? await service.prepareProofUpload(ownerUserId, body)
+          : operation === "confirmProofUpload"
+            ? await service.confirmProofUpload(ownerUserId, body)
+            : operation === "submitProfile"
+              ? await service.submitProfile(ownerUserId, body)
+            : operation === "retailerStoreState"
+              ? await service.retailerStoreState(ownerUserId)
+              : operation === "setRetailerAvailability"
+                ? await service.setRetailerAvailability(ownerUserId, body)
+                : operation === "saveRetailerProduct"
+                  ? await service.saveRetailerProduct(ownerUserId, body)
+            : operation === "listRetailerOrders"
+              ? await orders.list(ownerUserId)
+              : operation === "acceptRetailerOrder"
+                ? await orders.accept(ownerUserId, body)
+                : operation === "packRetailerOrder"
+                  ? await orders.pack(ownerUserId, body)
+                  : operation === "requestRetailerDelivery"
+                    ? await orders.requestDelivery(ownerUserId, body)
+                    : operation === "confirmRetailerHandover"
+                      ? await orders.confirmHandover(ownerUserId, body)
+                      : operation === "retailerDeliveryStatus"
+                        ? await orders.tracking(ownerUserId, body)
+                        : operation === "createRetailerIssue"
+                          ? await orders.issue(ownerUserId, body)
+                          : operation === "declineRetailerOrder"
+                            ? await orders.decline(ownerUserId, body)
+          : operation === "reviewStatus"
+            ? await service.reviewStatus(ownerUserId, body)
+            : operation === "submitGst"
+              ? await service.submitGst(ownerUserId, body)
+              : operation === "finishRetailerSetup"
+                ? await service.finishRetailerSetup(ownerUserId, body)
+                : (() => {
+                    throw new WorkspaceProfileError(
+                      "bad_request",
+                      "That Workspace action is not available yet.",
+                      400,
+                    );
+                  })();
+      logger.info("MoolSocial Workspace request completed.", {
+        operation,
+        requestId: id,
+      });
+      response.status(200).json({ ok: true, data: result });
+    } catch (error) {
+      const workspaceError = error instanceof WorkspaceProfileError ||
+          error instanceof SocialContentError
+        ? error
+        : new WorkspaceProfileError(
+            "internal",
+            "Workspace could not complete that request.",
+            500,
+            true,
+          );
+      logger.error("MoolSocial Workspace request failed.", {
+        requestId: id,
+        code: workspaceError.code,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      response.status(workspaceError.httpStatus).json({
+        ok: false,
+        error: {
+          code: workspaceError.code,
+          message: workspaceError.message,
+          retryable: workspaceError.retryable,
         },
       });
     }

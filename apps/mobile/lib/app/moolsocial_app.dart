@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/design/moolsocial_brand_motion.dart';
 import '../core/design/mool_theme.dart';
@@ -16,10 +19,12 @@ import '../features/pay/pay_session.dart';
 import '../features/retailer/retailer_session.dart';
 import '../features/ride/ride_session.dart';
 import '../features/shared/shared_session.dart';
+import '../features/shared/social_create_draft_repository.dart';
 import '../features/work/work_session.dart';
 import '../ui_v2/launch/launch_interruption_guard.dart';
 import '../ui_v2/launch/launch_presentation_gate.dart';
 import '../ui_v2/motion/mool_buy_tap_acknowledgement.dart';
+import '../ui_v2/social/social_v2_consumer.dart';
 
 class MoolSocialApp extends StatefulWidget {
   const MoolSocialApp({
@@ -39,7 +44,10 @@ class MoolSocialApp extends StatefulWidget {
     this.sharedSession,
     this.workSession,
     this.launchInterruptionGuard,
+    this.onAuthenticatedBoundary,
+    @visibleForTesting this.createDraftStateCache,
     this.initialLocation = '/boot',
+    this.uiReviewOnly = false,
     this.legacyPresentationForTestsOnly = false,
     this.disposeSession = false,
     this.disposeBookSession = false,
@@ -73,7 +81,10 @@ class MoolSocialApp extends StatefulWidget {
   final SharedSession? sharedSession;
   final WorkSession? workSession;
   final LaunchInterruptionGuard? launchInterruptionGuard;
+  final Future<void> Function()? onAuthenticatedBoundary;
+  final SocialCreateDraftStateCache? createDraftStateCache;
   final String initialLocation;
+  final bool uiReviewOnly;
 
   /// Keeps historical presentation regression tests attached to the untouched
   /// legacy widgets. Product builds must use the default native V2 routes.
@@ -125,7 +136,12 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late final LaunchInterruptionGuard _launchInterruptionGuard =
       widget.launchInterruptionGuard ?? LaunchInterruptionGuard();
   late final MoolSocialBrandCadence _brandCadence = MoolSocialBrandCadence();
-  late final _router = createJourneyRouter(
+  late bool _lastAuthenticated;
+  bool _signedOutBoundaryActive = false;
+  Future<void> _authenticationBoundaryTail = Future<void>.value();
+  late final GoRouter _router = _createRouter(widget.initialLocation);
+
+  GoRouter _createRouter(String initialLocation) => createJourneyRouter(
     _session,
     _bookSession,
     _buySession,
@@ -142,17 +158,67 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     _workSession,
     launchPresentationGate: _launchPresentationGate,
     launchInterruptionGuard: _launchInterruptionGuard,
-    initialLocation: widget.initialLocation,
+    initialLocation: initialLocation,
+    uiReviewOnly: widget.uiReviewOnly,
+    // Forward the test-only override; production leaves it null.
+    // ignore: invalid_use_of_visible_for_testing_member
+    createDraftStateCache: widget.createDraftStateCache,
     legacyPresentationForTestsOnly: widget.legacyPresentationForTestsOnly,
   );
 
   @override
   void initState() {
     super.initState();
+    _lastAuthenticated = _session.isAuthenticated;
     WidgetsBinding.instance.addObserver(this);
+    _session.addListener(_handleAuthenticationBoundary);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _launchInterruptionGuard.start();
     });
+  }
+
+  void _handleAuthenticationBoundary() {
+    final authenticated = _session.isAuthenticated;
+    if (authenticated == _lastAuthenticated) return;
+    final signedOut = _lastAuthenticated && !authenticated;
+    _lastAuthenticated = authenticated;
+    if (signedOut) {
+      _signedOutBoundaryActive = true;
+      _chatSession.resetForAuthenticationBoundary();
+      _sharedSession.resetForAuthenticationBoundary();
+      _queueAuthenticationBoundary(() async {
+        final passed =
+            await resetSocialV2RetainedStateForAuthenticationBoundary(
+              _sharedSession,
+            );
+        debugPrint(
+          'MOOLSOCIAL_AUTH_BOUNDARY social_create_draft_cleanup='
+          '${passed ? 'passed' : 'degraded'}',
+        );
+      });
+      return;
+    }
+    if (authenticated) {
+      if (_signedOutBoundaryActive) {
+        _signedOutBoundaryActive = false;
+        _sharedSession.setAuthorized(true);
+      }
+      final onAuthenticatedBoundary = widget.onAuthenticatedBoundary;
+      if (onAuthenticatedBoundary != null) {
+        _queueAuthenticationBoundary(onAuthenticatedBoundary);
+      }
+    }
+  }
+
+  void _queueAuthenticationBoundary(Future<void> Function() operation) {
+    final queued = _authenticationBoundaryTail.then<void>(
+      (_) => operation(),
+      onError: (Object _, StackTrace _) => operation(),
+    );
+    _authenticationBoundaryTail = queued.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
   }
 
   @override
@@ -164,6 +230,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
         _brandCadence.appPaused();
       case AppLifecycleState.resumed:
         _brandCadence.appResumed();
+        unawaited(_session.retryAuthenticatedAccountRevalidation());
       case AppLifecycleState.inactive:
         break;
     }
@@ -197,6 +264,7 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _session.removeListener(_handleAuthenticationBoundary);
     _router.dispose();
     _launchPresentationGate.dispose();
     _brandCadence.dispose();

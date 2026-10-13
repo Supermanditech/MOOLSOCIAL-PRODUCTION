@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-GLOBAL-HELP-TOPIC-RETURN-CONTINUITY-V1-20260828",
+  "workId": "global-help-topic-return-continuity-v1-20260828",
+  "lane": "codex_ui",
+  "acceptedCommit": "56c0c9962b9841c11ba506095162cd4252e0c2dd",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-08-28T19:58:03.8649974+05:30",
+  "privateValuesEmitted": false
+}

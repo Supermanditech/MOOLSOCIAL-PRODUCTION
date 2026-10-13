@@ -61,7 +61,7 @@ void main() {
     await mountSocial(tester);
     await openWorkAction(tester, 'workspace');
 
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

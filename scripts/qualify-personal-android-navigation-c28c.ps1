@@ -7,6 +7,8 @@ param(
   [string]$EvidenceDirectory,
   [switch]$GatePreflightOnly
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -35,12 +37,12 @@ function Get-C28CSourceFingerprint {
     Get-ChildItem -LiteralPath $resolved -Recurse -File
   }
   $records = foreach ($file in @($files | Sort-Object FullName -Unique)) {
-    $relativePath = [IO.Path]::GetRelativePath($Root, $file.FullName).Replace('\', '/')
+    $relativePath = (Get-MoolSocialPortableRelativePath -RelativeTo ($Root) -Path ($file.FullName)).Replace('\', '/')
     "$((Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash)  $relativePath"
   }
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
-    return [Convert]::ToHexString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($records -join "`n"))))
+    return (ConvertTo-MoolSocialPortableHex -Bytes ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($records -join "`n")))))
   } finally {
     $sha.Dispose()
   }

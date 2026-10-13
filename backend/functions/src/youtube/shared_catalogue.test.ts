@@ -101,6 +101,8 @@ class MemoryCatalogueStore implements SharedShortsCatalogueStore {
 
 class MemoryDocumentDatabase implements ProviderDocumentDatabase {
   readonly documents = new Map<string, Readonly<Record<string, unknown>>>();
+  failTransactionSetPrefix: string | null = null;
+  private transactionTail: Promise<void> = Promise.resolve();
 
   async get(
     path: string,
@@ -139,38 +141,51 @@ class MemoryDocumentDatabase implements ProviderDocumentDatabase {
   async runTransaction<T>(
     operation: (transaction: ProviderDocumentTransaction) => Promise<T>,
   ): Promise<T> {
-    const candidate = new Map(
-      [...this.documents.entries()].map(([path, data]) => [
-        path,
-        structuredClone(data),
-      ]),
-    );
-    let writeQueued = false;
-    const transaction: ProviderDocumentTransaction = {
-      get: async (path) => {
-        if (writeQueued) {
-          throw new Error("Firestore transaction read occurred after write");
-        }
-        return candidate.get(path);
-      },
-      create: (path, data) => {
-        writeQueued = true;
-        if (candidate.has(path)) throw new Error("already exists");
-        candidate.set(path, structuredClone(data));
-      },
-      set: (path, data) => {
-        writeQueued = true;
-        candidate.set(path, structuredClone(data));
-      },
-      delete: (path) => {
-        writeQueued = true;
-        candidate.delete(path);
-      },
-    };
-    const result = await operation(transaction);
-    this.documents.clear();
-    candidate.forEach((data, path) => this.documents.set(path, data));
-    return result;
+    let release!: () => void;
+    const previous = this.transactionTail;
+    this.transactionTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const candidate = new Map(
+        [...this.documents.entries()].map(([path, data]) => [
+          path,
+          structuredClone(data),
+        ]),
+      );
+      let writeQueued = false;
+      const transaction: ProviderDocumentTransaction = {
+        get: async (path) => {
+          if (writeQueued) {
+            throw new Error("Firestore transaction read occurred after write");
+          }
+          return candidate.get(path);
+        },
+        create: (path, data) => {
+          writeQueued = true;
+          if (candidate.has(path)) throw new Error("already exists");
+          candidate.set(path, structuredClone(data));
+        },
+        set: (path, data) => {
+          writeQueued = true;
+          if (path.startsWith(this.failTransactionSetPrefix ?? "\u0000")) {
+            throw new Error("simulated transaction write failure");
+          }
+          candidate.set(path, structuredClone(data));
+        },
+        delete: (path) => {
+          writeQueued = true;
+          candidate.delete(path);
+        },
+      };
+      const result = await operation(transaction);
+      this.documents.clear();
+      candidate.forEach((data, path) => this.documents.set(path, data));
+      return result;
+    } finally {
+      release();
+    }
   }
 }
 
@@ -292,6 +307,49 @@ test("expired fallback fails truthfully when refresh cannot start", async () => 
   );
 });
 
+test("expired refresh reports only its safe failing phase", async () => {
+  const store = new MemoryCatalogueStore(
+    snapshot([short("expired")], "2026-08-11T03:59:59.000Z"),
+    true,
+  );
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => {
+      throw new Error("private transport detail");
+    },
+  });
+
+  await assert.rejects(
+    coordinator.load("request-expired-refresh"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.code === "provider_unavailable" &&
+      error.providerReason === "sharedShortsCatalogue.load_page.error" &&
+      !error.message.includes("private transport detail"),
+  );
+});
+
+test("commit refresh reports a whitelisted persistence code", async () => {
+  const store = new MemoryCatalogueStore();
+  store.commitRefresh = async () => {
+    throw Object.assign(new Error("private persistence detail"), { code: 3 });
+  };
+  const coordinator = new SharedShortsCatalogueCoordinator({
+    store,
+    now: () => NOW,
+    loadPage: async () => ({ items: [short("commit-failure")] }),
+  });
+
+  await assert.rejects(
+    coordinator.load("request-commit-failure"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.providerReason === "sharedShortsCatalogue.commit_refresh.code_3" &&
+      !error.message.includes("private persistence detail"),
+  );
+});
+
 test("Firestore store enforces a cross-instance lease and durable outcomes", async () => {
   const database = new MemoryDocumentDatabase();
   const store = new FirestoreSharedShortsCatalogueStore(database);
@@ -321,6 +379,25 @@ test("Firestore store enforces a cross-instance lease and durable outcomes", asy
     cache_hit: -1,
   });
   await assert.rejects(store.recordOutcome("cache_hit", NOW.toISOString()));
+});
+
+test("shared snapshot retains a valid Short with no description", async () => {
+  const database = new MemoryDocumentDatabase();
+  const store = new FirestoreSharedShortsCatalogueStore(database);
+  const lease: SharedShortsCatalogueRefreshLease = {
+    leaseId: "empty-description-lease",
+    acquiredAt: NOW.toISOString(),
+    expiresAt: "2026-08-11T10:02:00.000Z",
+  };
+  assert.equal(await store.tryAcquireRefresh(lease), true);
+  const next = snapshot(
+    [short("empty-description", { description: "" })],
+    "2026-08-11T10:30:00.000Z",
+  );
+
+  await store.commitRefresh(lease.leaseId, next);
+
+  assert.deepEqual(await store.read(), next);
 });
 
 test("eligibility requires public processed embeddable India Shorts", () => {
@@ -424,4 +501,263 @@ test("quota decisions durably separate search, upload and general purpose", asyn
     }),
     /acceptedReservations is invalid/u,
   );
+});
+
+test("measured quota reservation rolls back usage when measurement write fails", async () => {
+  const database = new MemoryDocumentDatabase();
+  const governor = new YouTubeQuotaGovernor(
+    new FirestoreYouTubeQuotaStore(database),
+    {
+      clock: { now: () => NOW },
+      caps: { general: 2 },
+    },
+  );
+  const quota = new YouTubeQuotaGovernorAdapter(governor);
+  const reservation = {
+    principal: "public",
+    bucket: "general" as const,
+    amount: 1,
+    operation: "videos.list.chart",
+    requestId: "measurement-rollback",
+  };
+
+  database.failTransactionSetPrefix = "youtubeProviderQuotaMeasurements/";
+  await assert.rejects(
+    quota.reserve(reservation),
+    /simulated transaction write failure/,
+  );
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaMeasurements",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+
+  database.failTransactionSetPrefix = null;
+  await quota.reserve(reservation);
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    1,
+  );
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaMeasurements",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    1,
+  );
+});
+
+test("corrupt measurement prevents a new usage mutation", async () => {
+  const database = new MemoryDocumentDatabase();
+  const quota = new YouTubeQuotaGovernorAdapter(
+    new YouTubeQuotaGovernor(new FirestoreYouTubeQuotaStore(database), {
+      clock: { now: () => NOW },
+      caps: { general: 2 },
+    }),
+  );
+  const reservation = {
+    principal: "public",
+    bucket: "general" as const,
+    amount: 1,
+    operation: "videos.list.chart",
+    requestId: "measurement-corruption",
+  };
+  await quota.reserve(reservation);
+  const usage = await database.queryByField(
+    "youtubeProviderQuotaUsage",
+    "provider",
+    "YOUTUBE",
+  );
+  const measurements = await database.queryByField(
+    "youtubeProviderQuotaMeasurements",
+    "provider",
+    "YOUTUBE",
+  );
+  assert.equal(usage.length, 1);
+  assert.equal(measurements.length, 1);
+  await database.delete(usage[0]!.path);
+  await database.set(measurements[0]!.path, {
+    ...measurements[0]!.data,
+    acceptedReservations: -1,
+  });
+
+  await assert.rejects(
+    quota.reserve({ ...reservation, requestId: "measurement-corruption-2" }),
+    /acceptedReservations is invalid/u,
+  );
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+});
+
+test("measurement counter overflow rolls back accepted and rejected usage", async () => {
+  const acceptedDatabase = new MemoryDocumentDatabase();
+  const acceptedQuota = new YouTubeQuotaGovernorAdapter(
+    new YouTubeQuotaGovernor(
+      new FirestoreYouTubeQuotaStore(acceptedDatabase),
+      { clock: { now: () => NOW }, caps: { general: 2 } },
+    ),
+  );
+  const acceptedReservation = {
+    principal: "public",
+    bucket: "general" as const,
+    amount: 1,
+    operation: "videos.list.chart",
+    requestId: "accepted-overflow-seed",
+  };
+  await acceptedQuota.reserve(acceptedReservation);
+  const acceptedUsage = await acceptedDatabase.queryByField(
+    "youtubeProviderQuotaUsage",
+    "provider",
+    "YOUTUBE",
+  );
+  const acceptedMeasurements = await acceptedDatabase.queryByField(
+    "youtubeProviderQuotaMeasurements",
+    "provider",
+    "YOUTUBE",
+  );
+  await acceptedDatabase.delete(acceptedUsage[0]!.path);
+  await acceptedDatabase.set(acceptedMeasurements[0]!.path, {
+    ...acceptedMeasurements[0]!.data,
+    acceptedReservations: Number.MAX_SAFE_INTEGER,
+    acceptedLocalReservations: Number.MAX_SAFE_INTEGER,
+  });
+  await assert.rejects(
+    acceptedQuota.reserve({
+      ...acceptedReservation,
+      requestId: "accepted-overflow-retry",
+    }),
+    /acceptedReservations cannot be incremented safely/u,
+  );
+  assert.equal(
+    (await acceptedDatabase.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+  assert.equal(
+    (await acceptedDatabase.queryByField(
+      "youtubeProviderQuotaMeasurements",
+      "provider",
+      "YOUTUBE",
+    ))[0]?.data.acceptedReservations,
+    Number.MAX_SAFE_INTEGER,
+  );
+
+  const rejectedDatabase = new MemoryDocumentDatabase();
+  const rejectedQuota = new YouTubeQuotaGovernorAdapter(
+    new YouTubeQuotaGovernor(
+      new FirestoreYouTubeQuotaStore(rejectedDatabase),
+      { clock: { now: () => NOW }, caps: { general: 0 } },
+    ),
+  );
+  const rejectedReservation = {
+    ...acceptedReservation,
+    requestId: "rejected-overflow-seed",
+  };
+  await assert.rejects(
+    rejectedQuota.reserve(rejectedReservation),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError && error.code === "quota_exhausted",
+  );
+  const rejectedMeasurements = await rejectedDatabase.queryByField(
+    "youtubeProviderQuotaMeasurements",
+    "provider",
+    "YOUTUBE",
+  );
+  await rejectedDatabase.set(rejectedMeasurements[0]!.path, {
+    ...rejectedMeasurements[0]!.data,
+    rejectedReservations: Number.MAX_SAFE_INTEGER,
+  });
+  await assert.rejects(
+    rejectedQuota.reserve({
+      ...rejectedReservation,
+      requestId: "rejected-overflow-retry",
+    }),
+    /rejectedReservations cannot be incremented safely/u,
+  );
+  assert.equal(
+    (await rejectedDatabase.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+  assert.equal(
+    (await rejectedDatabase.queryByField(
+      "youtubeProviderQuotaMeasurements",
+      "provider",
+      "YOUTUBE",
+    ))[0]?.data.rejectedReservations,
+    Number.MAX_SAFE_INTEGER,
+  );
+});
+
+test("concurrent measured reservations keep usage and decision counters exact", async () => {
+  const database = new MemoryDocumentDatabase();
+  const quota = new YouTubeQuotaGovernorAdapter(
+    new YouTubeQuotaGovernor(new FirestoreYouTubeQuotaStore(database), {
+      clock: { now: () => NOW },
+      caps: { general: 5 },
+    }),
+  );
+  const results = await Promise.allSettled(
+    Array.from({ length: 20 }, (_, index) =>
+      quota.reserve({
+        principal: "public",
+        bucket: "general",
+        amount: 1,
+        operation: "videos.list.chart",
+        requestId: `concurrent-measurement-${index}`,
+      }),
+    ),
+  );
+  assert.equal(
+    results.filter((result) => result.status === "fulfilled").length,
+    5,
+  );
+  assert.equal(
+    results.filter((result) => result.status === "rejected").length,
+    15,
+  );
+  const usage = await database.queryByField(
+    "youtubeProviderQuotaUsage",
+    "provider",
+    "YOUTUBE",
+  );
+  const measurements = await database.queryByField(
+    "youtubeProviderQuotaMeasurements",
+    "provider",
+    "YOUTUBE",
+  );
+  assert.equal(usage.length, 1);
+  assert.equal(usage[0]?.data.used, 5);
+  assert.equal(measurements.length, 1);
+  assert.equal(measurements[0]?.data.acceptedReservations, 5);
+  assert.equal(measurements[0]?.data.rejectedReservations, 15);
+  assert.equal(measurements[0]?.data.acceptedLocalReservations, 5);
 });

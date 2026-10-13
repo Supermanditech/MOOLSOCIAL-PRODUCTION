@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-READY-20260921",
+    "classification": "mvp_supporting",
+    "customerOutcome": "Public buyers inspect category-applicable product facts, exact variants and media, then preserve exact SKU/pack choices into Cart across existing Buy, Wholesale, Bulk, Offers and Store entry paths.",
+    "classificationReason": "Complete founder-selected pending frontend acceptance within existing Buy launch journey; backend dependencies remain separately pending.",
+    "minimumCompleteScope": [
+      "C06-A01 impacted Create route child: normalize retired home entry to existing post editor so Back uses draft preservation",
+      "R6634-C06-A01 historical13 navigation/projection findings reconciled against accepted successors, preserving all behavioral checks",
+      "R6633-D10-C2 compact expandable provider-map presentation and truthful compact fallback; actual Google Maps/provider integration remains pending",
+      "R6634-C06-A01 navigation test migration and historical supplier-chat viewport/draft/return reconciliation",
+      "R6634-C07 Profile GST and consolidated checkout entry",
+      "R6633-D05 controlled comparison provider",
+      "R6633-D06-B both publisher tabs with truthful controlled offers",
+      "R6634-C08 through C16 founder visual corrections, local impact/child-defect checks and native review captures",
+      "Founder-authorized Redmi children D06-B-A01 publisher query and C10-A01 Store-details identity: implement and locally test, no new APK.",
+      "Founder bounded 19-reference goal; active sequential implementation BUY-PDP-REF-20260924-01 gallery and shared product composition, source connector and affected navigation tests.",
+      "Active sequential reference BUY-PDP-REF-20260924-02: existing variant/price/delivery/seller composition and typed metadata consumers; actual Store publication remains a required distinct acceptance dependency.",
+      "Active BUY-PDP-REF-20260924-03: return-policy and contextual-help presentation in existing owners; authoritative COD policy/placement/collection/ledger remains required and unresolved on the same ticket.",
+      "Active PDP04 replaces the existing commerce continuation rail, reusing published catalogue/content/facts and navigation; actual related-publication integration remains required on04.",
+      "Active PDP05 replaces existing commerce content/compliance card composition; optional source attribute and producer-address fields reuse existing contracts. Actual Store publication remains required on05.",
+      "Active PDP06: reuse recent-history/session/catalogue and shared product cards for lower product-page rail/grid. No invented history, personalization or sponsorship; preserve existing history/account persistence. Actual Store publication remains required.",
+      "Founder26Sep public-only catalogue01-08: implement and test shared public journey sequentially; first step typed category facts and impacted gallery replay; latest Store mapping/provider scope waits for successful Redmi hot reload and founder visual approval. Backend and new APK deferred."
+    ],
+    "explicitExclusions": [
+      "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized by latest founder instruction; production promotion excluded.",
+      "No production Store offers, account GST backend, payment/logistics integration or deployment.",
+      "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder authorizes C08-C16 implementation and local testing now, then fresh native screens for approval. Git checkout/reconciliation and Redmi APK/device phases follow later.",
+      "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
+    ],
+    "testAndEvidencePlan": [
+      "Run all 388 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
+      "Run focused affected-owner tests, audit shared callers, register every child defect before retry and verify its fix plus parent regression.",
+      "Capture standard/narrow enlarged-text native screens for founder approval; no approval implied by technical checks."
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "beyondMvpExplicitlyAuthorized": false,
+    "evidence": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md",
+    "latestFounderInstruction": "Fully implement all19 tickets/defects plus children, locally test and check impacts, then produce actual native screens for founder approval; no partial completion claim."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  },
+  "checkpoint": {
+    "successorRegistered": true
+  },
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "d257d6203db07dbe1dd9de4722bc3f283981d8172ccf7474c6ae53e48e26c544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4d614f74b98ddf83fde3a1091b4344ecfd70fe87d9a23c886e5cc696886e482a",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-READY-20260921",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-READY-20260921",
+      "customerOutcome": "Compact, readable Buy discovery, Store identity/cards and comparison controls with preserved navigation, basket, filters and truthful source data.",
+      "necessityProof": "Reuse existing comparison sheet, product/store cards, catalogue chrome, delivery selectors and vertical progress painter. No new screen, route, provider or backend.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration",
+        "test_only_acceptance"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/test/ui_v2/social/rt0802_dirty_create_back_contract_test.dart",
+        "apps/mobile/lib/app/moolsocial_app.dart",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_action_wording_wiring_navigation_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_contextual_subaction_thumb_shelf_c11_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_dock_projection_parity_fix1_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_personal_mvp_global_mool_navigation_c03_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_pending_defects_20260923_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Run all 250 selected scenarios across 20 ticket entries against one current source fingerprint; retain the original 19-entry visual approval separately.",
+        "Run focused affected-owner tests, audit shared callers, register every child defect before retry and verify its fix plus parent regression.",
+        "Capture standard/narrow enlarged-text native screens for founder approval; no approval implied by technical checks."
+      ],
+      "adjustments": [
+        "Keep frontend proof separate from real Store/account backend acceptance."
+      ],
+      "explicitExclusions": [
+        "Fresh isolated CursorUiReview debug APK and Redmi preserved-data testing authorized; no production promotion.",
+        "No production Store offers, account GST backend, payment/logistics integration or deployment.",
+        "No edits to Store/Counter Sale/CSV, another worktree, main or accepted reference assets."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder authorizes C08-C16 implementation and local testing now, then fresh native screens for approval. Git checkout/reconciliation and Redmi APK/device phases follow later.",
+        "Read Store contract from local Codex checkpoint e5abc55b; preserve existing Store ID/SKU mapping and coordinate shared-owner changes without merging or changing Store worktree."
+      ],
+      "manifestPath": "config/buy-founder-regression.json",
+      "manifestSha256": "062FD60ECAFAB9B397523B5E6A137A0306DDA3C5C4AEE16057F55572A0CEABC2",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/CURSOR-BUY-INTEGRATION-HANDOFF-20260922.md"
+    }
+  },
+  "boundedGoalManifest": "config/buy-founder-regression.json#boundedGoal19_20260924"
+}

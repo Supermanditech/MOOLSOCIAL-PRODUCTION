@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "referenceVersion": "cursor-storefront-pickup-20260921-r2",
+  "status": "founder_accepted",
+  "approval": "APPROVED CONTINUE, explicitly approving the new reference version and local ticket commit",
+  "acceptedOn": "2026-09-21",
+  "ticket": "UAW-CURSOR-BUY-READY-20260921",
+  "reviewPacket": "C:/GUARANTEED OUTCOME/outputs/cursor-buy-ready-20260921/REFERENCE-REVIEW.md",
+  "previousVersionPreserved": "r669-founder-review-20260912",
+  "runtimeAcceptance": false,
+  "apkAcceptance": false,
+  "images": [
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png",
+      "sha256": "192dbd99c1aa1406464eb36335ab31210a81f66aa5026cf5efc418e3a927bb64"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png",
+      "sha256": "ecfe9a750d97e9fa6d47c2dae05596e03e746f900d97caae07386b4f00b24f53"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png",
+      "sha256": "b09f63645bdc296425acc4960133f59f05f633a1c5ce3eb925d3351de02db034"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png",
+      "sha256": "097239cf706ccbbfc5dbd1e9cbd5b2a2c708b765ac0c8329bbdbe3e98201a60e"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png",
+      "sha256": "48acf24d8f00c2b54dba4f4eb683b74c45f495d87385cfda089e3dc1ac0937cf"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png",
+      "sha256": "192dbd99c1aa1406464eb36335ab31210a81f66aa5026cf5efc418e3a927bb64"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-320x568-android-checkout.png",
+      "sha256": "ecfe9a750d97e9fa6d47c2dae05596e03e746f900d97caae07386b4f00b24f53"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-360x800-android-cart.png",
+      "sha256": "315d34dfe2cb7e504f05cffbea0452f8cc4a7c597555c325351852411eac5ce1"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png",
+      "sha256": "097239cf706ccbbfc5dbd1e9cbd5b2a2c708b765ac0c8329bbdbe3e98201a60e"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/candidate_captures/cursor-storefront-pickup-20260921-r2/buy-v2-r58-8-7-c24f-430x932-ios-cart.png",
+      "sha256": "57b59ebae4c1d97974f10d86abeff5e4d61b65fc6f0d598cff8ebb94d8cfead6"
+    }
+  ],
+  "reviewSourceOwnerSha256": {
+    "apps/mobile/lib/features/buy/buy_v2_session.dart": "daad8aff03f3be09796098bbd6a72da2d43e6f575f9dfaa1df23c1a1b4ddc7ef",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart": "95e40d14ef8c9764b8b779e7ac44b436ce31031a52889bd1f32c472dcebc706e",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "a08da05249a4a1c0ceaf1f18334da2d9a4bf7873831e5382010bb53ff5af0a73",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "61f7dceb433dfadadc97e8536a8d09e142be6a4ff18af6cd2fc49051429e87d4",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "2115479ecff27cca146e56aedf47d6497d7856d25ae579d1a836ad1d71eb0d17",
+    "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart": "0fcbf1be73bbaac3dfa13f96b76ecf8f95b4fc30eb72d9434ca1ea0f52338c99",
+    "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart": "d3bd47a77866fae2578ca9981594dfdc41a8fb94453a0a30103e8b5e01753709"
+  }
+}

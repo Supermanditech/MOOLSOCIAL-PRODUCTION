@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-CODEX-UI-SOCIAL-CREATE-COMPOSER-CONTEXTUAL-LAYOUT-V1-20260831",
+  "workId": "social-create-composer-contextual-layout-v1-20260831",
+  "lane": "codex_ui",
+  "acceptedCommit": "d9e35264ce4412aafc43831b2c28572adad2d626",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-09-01T01:18:50.7383631+05:30",
+  "privateValuesEmitted": false
+}

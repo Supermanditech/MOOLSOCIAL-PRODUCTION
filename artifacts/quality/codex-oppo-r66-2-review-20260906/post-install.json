@@ -1,0 +1,23 @@
+{
+  "candidate": "UAW-CODEX-OPPO-R66.2-REVIEW-20260906",
+  "sourceHead": "595353d7fd74a29a60a86c8f15c0ff0a606643da",
+  "serial": "2b3e0f71",
+  "model": "CPH2375",
+  "package": "com.moolsocial.app.runtime",
+  "versionCode": "2026090601",
+  "versionName": "1.0.0-r66.2-runtime",
+  "previousVersionCode": "2026090501",
+  "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\\artifacts\\device\\codex-oppo-r66-2-review-20260906\\uaw-codex-oppo-r66.2-review-20260906-device-review-debug.apk",
+  "sha256": "243E37A420FFB77BF6EAF813F19D59E86A5392B16855ACA70810AE1B9898ADA1",
+  "installedSha256": "243E37A420FFB77BF6EAF813F19D59E86A5392B16855ACA70810AE1B9898ADA1",
+  "checksumEqual": true,
+  "install": "passed",
+  "launch": "passed",
+  "startedUtc": "2026-09-05T23:25:47.0035504Z",
+  "completedUtc": "2026-09-05T23:25:58.0670058Z",
+  "nativeJourneyReview": "in_progress",
+  "founderReview": "pending",
+  "productionQualification": "not_claimed",
+  "redmiAction": "none",
+  "productionPackageAction": "none"
+}

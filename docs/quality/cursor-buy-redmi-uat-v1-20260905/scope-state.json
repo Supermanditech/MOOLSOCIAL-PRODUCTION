@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-REDMI-UAT-V1-20260905",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-REDMI-UAT-V1-20260905",
+      "customerOutcome": "Verify the current Buy journey and provider-facing operational projections on a newly identified Redmi review APK.",
+      "necessityProof": "Founder requests fresh real-device evidence, not reused historical UAT screens, after the paused catalogue correction.",
+      "implementationDisposition": ["reuse", "test_only_acceptance"],
+      "sharedImplementationOwners": ["apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": ["nested taps and exact return", "operational and payment recovery", "visual density and keyboard", "narrow/enlarged text", "lifecycle and backend truth"],
+      "adjustments": ["Use existing isolated CursorUiReview debug package and review-only data; enumerate before implementing confirmed owned defects."],
+      "explicitExclusions": ["WhatsApp", "OPPO", "real transactions", "shared source writes", "backend", "integration", "production app"],
+      "dependenciesAndApprovals": ["Founder standing authority for review APK and Redmi UAT", "Source checkpoint e2dd3bc706065fbc08d9c526c48e24374cd32e6e", "Shared Workspace/backend dependencies remain Codex-owned"],
+      "manifestPath": "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
+      "manifestSha256": "91D9DCFAADF6F8699C0884A7156CF48AE77E538F4D5F40ACE2E6B983976AAA4E",
+      "evidencePath": "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {"successorRegistered": true},
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-REDMI-UAT-V1-20260905",
+    "classification": "mvp_required",
+    "customerOutcome": "Find and document current consumer Buy operational, navigation and visual defects on Redmi.",
+    "classificationReason": "Required review evidence for existing launch journeys, not new speculative development.",
+    "minimumCompleteScope": ["One source-bound review APK", "Fresh complete journey inventory and evidence", "Confirmed-defect list with exact owners"],
+    "explicitExclusions": ["New screens/routes", "WhatsApp", "shared source", "real transactions", "integration", "production app"],
+    "dependenciesAndApprovals": ["Founder-approved Redmi review only", "Completed catalogue checkpoint", "Backend absence is reported as blocked verification"],
+    "testAndEvidencePlan": ["Prebuild qualification", "installed/source APK checksum equality", "fresh taps/screens/keyboard/operational journeys", "separate local and backend-only evidence"]
+  },
+  "founderDisclosure": {"state": "presented_before_execution", "evidence": "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md"},
+  "authorization": {"state": "existing_ticket_authority_confirmed", "beyondMvpExplicitlyAuthorized": false, "evidence": "docs/quality/UAW-CURSOR-BUY-REDMI-UAT-V1-20260905.md"},
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "externalServiceWriteAuthorized": false
+  }
+}

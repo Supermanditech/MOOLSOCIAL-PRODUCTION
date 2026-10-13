@@ -71,6 +71,7 @@ function Get-MappedClassName([string]$OriginalClass) {
 $requiredClasses = @(
   'io.flutter.plugins.GeneratedPluginRegistrant',
   'io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin',
+  'dev.fluttercommunity.plus.share.SharePlusPlugin',
   'com.moolsocial.app.MainActivity'
 )
 $requiredDescriptors = @($requiredClasses | ForEach-Object {
@@ -140,5 +141,5 @@ try {
 Write-Output (
   'AAB production plugin integrity passed: ' +
   "candidate=$CandidateId; mappingAware=true; dexFiles=$($dexEntries.Count); " +
-  'registrant=true; firebaseCore=true; integrationTest=false.'
+  'registrant=true; firebaseCore=true; sharePlus=true; integrationTest=false.'
 )

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_service_home.dart';
+import 'package:moolsocial/features/book/book_models.dart';
 import 'package:moolsocial/features/book/book_services.dart';
 import 'package:moolsocial/features/book/book_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -174,10 +175,13 @@ void main() {
       await _scrollTo(tester, provider, const Key('doctor-discovery-home'));
       final data = tester.getSemantics(provider).getSemanticsData();
       expect(data.hasAction(SemanticsAction.tap), isTrue);
-      expect(data.label, contains('verified general physician'));
+      expect(data.label, contains('Registration checked at confirmation'));
       expect(data.label, contains('₹300'));
       expect(data.label, contains('12 minute wait'));
       await tester.tap(provider);
+      await tester.pumpAndSettle();
+      expect(sessions.book.selectedDoctorId, 'kavita-sharma');
+      await tester.tap(find.byKey(const Key('book-doctor')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('patient-self')), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -185,6 +189,51 @@ void main() {
       semantics.dispose();
       sessions.dispose();
     }
+  });
+
+  testWidgets('Doctor keeps Video selected through details and native Back', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/book/doctor',
+      size: const Size(360, 800),
+    );
+    addTearDown(sessions.dispose);
+
+    await tester.tap(find.byKey(const Key('doctor-care-video')));
+    await tester.pumpAndSettle();
+    expect(sessions.book.doctorCare, DoctorCare.video);
+    expect(find.text('Choose a doctor above'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.descendant(
+              of: find.byKey(const Key('book-doctor')),
+              matching: find.byType(FilledButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    sessions.book.selectDoctor('kavita-sharma');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('book-doctor')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Video · ₹300 · registration status confirmed before booking'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('6:20 PM'), findsNothing);
+    expect(find.textContaining('Prescription is already linked'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('doctor-care-video')), findsOneWidget);
+    expect(sessions.book.doctorCare, DoctorCare.video);
+    expect(find.text('Review Dr. Kavita · ₹300'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('C24E Salon search updates the direct price and booking choice', (

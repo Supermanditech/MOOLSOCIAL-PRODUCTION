@@ -1,0 +1,12 @@
+{
+  "schema": "moolsocial_ticket_oppo_acceptance_v1",
+  "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+  "workId": "add-product-screen1-20260920",
+  "lane": "codex_ui",
+  "acceptedCommit": "6c613ba4510d43634efd551b641a68790808870c",
+  "deviceClass": "OPPO",
+  "ticketRequirementTested": true,
+  "result": "passed",
+  "testedAtIst": "2026-10-08T15:21:00+05:30",
+  "privateValuesEmitted": false
+}

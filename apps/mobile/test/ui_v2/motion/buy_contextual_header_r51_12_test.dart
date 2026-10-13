@@ -24,7 +24,7 @@ void main() {
     expect(find.text('Plan basket'), findsNothing);
 
     for (final entry in const [
-      (BuyV2Destination.wholesale, 'Flexible packs'),
+      (BuyV2Destination.wholesale, 'Lower minimums'),
       (BuyV2Destination.medicine, 'Prescription centre'),
       (BuyV2Destination.orders, 'Track active order'),
     ]) {

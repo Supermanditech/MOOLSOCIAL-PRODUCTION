@@ -1,62 +1,9071 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
+import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
 
 import 'work_models.dart';
+import 'work_publication.dart';
 import 'work_services.dart';
+import 'scan_and_pick_contract.dart';
 
-class WorkSession extends ChangeNotifier {
-  WorkSession({ReviewWorkGateway? gateway})
-    : gateway = gateway ?? ReviewWorkGateway();
+/// Receipt authority and its recoverable Stock projection are distinct.
+enum WorkspaceGoodsReceiptSaveResult {
+  notPosted,
+  saved,
+  stockRecoveryPending,
+  statusUnknown,
+}
 
-  final ReviewWorkGateway gateway;
+/// Store packing capability, separate from the sealed consumer collection API.
+/// An authenticated adapter must persist the explicit staff action against this
+/// exact order/revision and register operationId in the collection reconciliation
+/// ledger. Returning here is NOT readiness authority: the controller reconciles
+/// the operation through ScanPickGateway before exposing a code. No default
+/// implementation, endpoint or local-ready fallback is supplied.
+abstract interface class StoreCollectionReadinessGateway {
+  Future<void> markGoodsReady({
+    required String storeId,
+    required String orderId,
+    required String expectedRevision,
+    required String operationId,
+  });
+}
 
+/// Per-order presentation controller. Only an authenticated injected adapter
+/// may supply authority; no review WorkGateway or local completion fallback.
+class StoreCollectionController extends ChangeNotifier {
+  StoreCollectionController({
+    required this.storeId,
+    required this.orderId,
+    required this.gateway,
+    this.readinessGateway,
+  });
+
+  final String storeId, orderId;
+  final ScanPickGateway gateway;
+  final StoreCollectionReadinessGateway? readinessGateway;
+  ScanPickResult? _result;
+  ScanPickRequest? _request;
+  ScanPickRequest? _uncertainMutation;
+  String? _readinessRevision;
+  final Stopwatch _elapsed = Stopwatch();
+  Timer? _matchExpiryTimer;
+  bool _matchExpired = false;
+  Duration _responseAllowance = Duration.zero;
   bool busy = false;
-  String? errorMessage;
-  String? noticeMessage;
-  WorkFeedFilter filter = WorkFeedFilter.forYou;
-  String searchQuery = '';
-  String? expandedOpportunityId;
-  WorkOpportunity? selectedOpportunity;
-  WorkOpportunity? savedOpportunity;
-  String? applicationId;
-  final Set<String> expandedTerms = <String>{};
+  bool _closed = false;
+  bool Function()? _packingIssueBlocked;
+  String? message;
+  ScanPickSnapshot? get snapshot => _result?.snapshot;
+  bool get needsReconciliation => _uncertainMutation != null;
+  bool get confirmingReadiness => _readinessRevision != null;
+  bool get confirmingHandover =>
+      _uncertainMutation?.operation == ScanPickOperation.handOver;
+  DateTime? get serverNow =>
+      snapshot?.serverTime.add(_responseAllowance + _elapsed.elapsed);
 
-  String? selectedFamilyId;
-  WorkProfileOption? selectedProfile;
-  String alternateMobile = '';
-  bool alternateOtpSent = false;
-  bool alternateVerified = false;
+  static String _id() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
 
-  String workName = '';
-  String workArea = '';
-  String primaryActivity = '';
-  final Map<String, String> addedProofs = <String, String>{
-    'personal-kyc': 'ACCOUNT-KYC',
-  };
-  bool declarationAccepted = false;
-  WorkReviewStage reviewStage = WorkReviewStage.none;
-  String? reviewCaseId;
-  String? workspaceId;
-  bool gstReminder = false;
-  String gstin = '';
-  bool gstAttachmentAdded = false;
-  bool unsupportedRequestSent = false;
-  String unsupportedWorkspace = '';
-  String unsupportedArea = '';
-  String unsupportedFamily = '';
+  bool get hasCurrentMatch =>
+      !_closed &&
+      !_matchExpired &&
+      message == null &&
+      !needsReconciliation &&
+      _request != null &&
+      serverNow != null &&
+      (_result?.canRequestHandOver(_request!, serverNow!) ?? false);
+  bool get canHandOver => !busy && hasCurrentMatch;
+  bool get canMarkGoodsReady =>
+      !_closed &&
+      _packingIssueBlocked?.call() != true &&
+      !busy &&
+      !needsReconciliation &&
+      message == null &&
+      readinessGateway != null &&
+      _result?.outcome == ScanPickOutcome.snapshot &&
+      snapshot?.state == ScanPickState.preparing &&
+      snapshot?.readiness == ScanPickReadiness.preparing &&
+      snapshot?.payment == ScanPickPayment.paid;
+  bool get actionPending => busy && needsReconciliation;
+  bool get hasAuthoritativeSnapshot =>
+      !needsReconciliation &&
+      (_result?.outcome == ScanPickOutcome.snapshot ||
+          _result?.error == ScanPickError.alreadyCollected);
 
-  WorkWorkspace? activeWorkspace;
-  final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
+  String? get visibleQr {
+    final value = snapshot;
+    final now = serverNow;
+    if (_closed ||
+        message != null ||
+        needsReconciliation ||
+        _result?.outcome != ScanPickOutcome.snapshot ||
+        value == null ||
+        now == null ||
+        value.state != ScanPickState.awaitingCustomer ||
+        !now.isBefore(value.challenge!.expiresAt)) {
+      return null;
+    }
+    return value.challenge?.qrPayload;
+  }
 
+  Future<void> refresh() async {
+    if (_closed || busy) return;
+    final pending = _uncertainMutation;
+    await _execute(
+      pending == null
+          ? ScanPickRequest.read(
+              requestId: _id(),
+              orderId: orderId,
+              storeId: storeId,
+            )
+          : ScanPickRequest.reconcile(
+              requestId: _id(),
+              operationId: pending.operationId!,
+              orderId: orderId,
+              storeId: storeId,
+            ),
+    );
+  }
+
+  Future<void> showCode() async {
+    final value = snapshot;
+    if (_closed ||
+        busy ||
+        needsReconciliation ||
+        message != null ||
+        value == null ||
+        _result?.outcome != ScanPickOutcome.snapshot ||
+        value.payment != ScanPickPayment.paid ||
+        value.readiness != ScanPickReadiness.ready ||
+        !{
+          ScanPickState.ready,
+          ScanPickState.awaitingCustomer,
+        }.contains(value.state)) {
+      return;
+    }
+    await _execute(
+      ScanPickRequest.issueChallenge(
+        requestId: _id(),
+        operationId: _id(),
+        orderId: orderId,
+        storeId: storeId,
+        expectedRevision: value.revision,
+      ),
+    );
+  }
+
+  /// One deliberate retailer action after packing and bringing goods to the
+  /// counter. Neither polling, item ticks, a timer nor a transport ACK calls this.
+  Future<void> goodsReady() async {
+    if (!canMarkGoodsReady) return;
+    final revision = snapshot!.revision;
+    final operationId = _id();
+    _readinessRevision = revision;
+    _uncertainMutation = ScanPickRequest.reconcile(
+      requestId: _id(),
+      operationId: operationId,
+      orderId: orderId,
+      storeId: storeId,
+    );
+    busy = true;
+    message = null;
+    notifyListeners();
+    try {
+      await readinessGateway!
+          .markGoodsReady(
+            storeId: storeId,
+            orderId: orderId,
+            expectedRevision: revision,
+            operationId: operationId,
+          )
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // A lost reply cannot establish failure or justify a new operation. Read
+      // the same operation's outcome; never turn the local order ready here.
+    }
+    if (_closed) return;
+    busy = false;
+    await refresh();
+  }
+
+  Future<void> handOver() async {
+    if (!canHandOver) return;
+    final value = snapshot!;
+    await _execute(
+      ScanPickRequest.handOver(
+        requestId: _id(),
+        operationId: _id(),
+        orderId: orderId,
+        storeId: storeId,
+        expectedRevision: value.revision,
+        approvalId: value.approval!.id,
+      ),
+    );
+  }
+
+  Future<void> _execute(ScanPickRequest request) async {
+    if (_closed || busy) return;
+    busy = true;
+    message = null;
+    if (request.operation == ScanPickOperation.handOver ||
+        request.operation == ScanPickOperation.issueChallenge) {
+      _uncertainMutation = request;
+    }
+    notifyListeners();
+    final roundTrip = Stopwatch()..start();
+    try {
+      final result = await gateway
+          .execute(request)
+          .timeout(const Duration(seconds: 20));
+      if (_closed) return;
+      result.validateFor(request, client: ScanPickClient.retailer);
+      _request = request;
+      _result = result;
+      _responseAllowance = roundTrip.elapsed;
+      _elapsed
+        ..reset()
+        ..start();
+      _matchExpiryTimer?.cancel();
+      _matchExpired = false;
+      final expiry = result.snapshot?.approval?.expiresAt;
+      if (expiry != null) {
+        final remaining = expiry.difference(serverNow!);
+        _matchExpired = remaining <= Duration.zero;
+        if (!_matchExpired) {
+          // Expiry can only remove the confirmed presentation/action. It never
+          // advances an order, creates authority or performs a server mutation.
+          _matchExpiryTimer = Timer(remaining, () {
+            if (_closed) return;
+            _matchExpired = true;
+            notifyListeners();
+          });
+        }
+      }
+      if (result.outcome == ScanPickOutcome.unknown ||
+          (confirmingReadiness &&
+              result.outcome == ScanPickOutcome.snapshot &&
+              (result.snapshot?.state == ScanPickState.preparing ||
+                  result.snapshot?.revision == _readinessRevision)) ||
+          result.error == ScanPickError.operationInProgress ||
+          (request.operation == ScanPickOperation.reconcile &&
+              {
+                ScanPickError.unauthenticated,
+                ScanPickError.forbidden,
+                ScanPickError.unavailable,
+                ScanPickError.rateLimited,
+                ScanPickError.operationConflict,
+              }.contains(result.error))) {
+        message = confirmingReadiness
+            ? 'Checking your update. Do not hand over yet.'
+            : confirmingHandover
+            ? 'Confirming collection…'
+            : 'Checking your update. Do not hand over yet.';
+      } else {
+        _uncertainMutation = null;
+        _readinessRevision = null;
+        if (result.outcome == ScanPickOutcome.rejected &&
+            result.error != ScanPickError.alreadyCollected) {
+          message = switch (result.error) {
+            ScanPickError.paymentRequired || ScanPickError.paymentChanged =>
+              'Payment needs confirmation before handover.',
+            ScanPickError.notReady =>
+              'Finish packing before marking the order ready.',
+            ScanPickError.challengeExpired || ScanPickError.approvalExpired =>
+              'Ask the customer to scan the current code.',
+            ScanPickError.cancelled =>
+              'This order is cancelled. Do not hand over.',
+            ScanPickError.forbidden || ScanPickError.unauthenticated =>
+              'Sign in with an authorised store account.',
+            _ => 'This order has changed. Check the latest details.',
+          };
+        }
+      }
+    } catch (_) {
+      if (!_closed) {
+        message = confirmingReadiness
+            ? 'Checking your update. Do not hand over yet.'
+            : confirmingHandover
+            ? 'Confirming collection…'
+            : needsReconciliation
+            ? 'Checking your update. Do not hand over yet.'
+            : 'Unable to load this order. Try again.';
+      }
+    } finally {
+      if (!_closed) {
+        busy = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _closed = true;
+    _matchExpiryTimer?.cancel();
+    _elapsed.stop();
+    super.dispose();
+  }
+}
+
+/// Existing Store fields partitioned by workspace, within this signed-in session.
+/// This cache is not authoritative persistence or backend membership validation.
+class _StoreOperationalData {
+  String? issueAccountScope;
+  int issueFeedRevision = 0;
+  bool issuesStale = false;
+  final Map<String, WorkspaceIssueRecord> issues = {};
+  final Map<String, WorkspaceIssueRecord> issueHistory = {};
+  WorkspaceFinanceSnapshot? finance;
+  bool financeStale = false;
+  final Map<String, WorkspacePaymentRecord> financePayments = {};
+  final Map<String, WorkspacePaymentRecord> financePaymentHistory = {};
+  final Map<String, WorkspacePayoutRecord> financePayoutHistory = {};
+  final Map<String, WorkspaceCustomerLedger> financeCustomerHistory = {};
+  WorkCustomerCollectionGateway? customerCollectionGateway;
+  WorkspaceCustomerCollection? pendingCustomerCollection;
+  WorkspacePendingCustomerReturn? pendingCustomerReturn;
+  WorkspaceCustomerRefund? pendingCustomerRefund;
+  bool refundMayHaveSubmitted = false;
+  bool refundIntentSaved = false;
+  bool returnMayHaveSubmitted = false;
+  bool returnIntentSaved = false;
+  bool customerCollectionBusy = false;
+  WorkLedgerCheckpointStore? ledgerCheckpointStore;
+  int? ledgerCheckpointRevision;
+  WorkspaceInventoryLedger? ledgerInventory;
+  Map<String, WorkspaceOrderRecord> ledgerBilledOrders = const {};
+  Map<String, WorkspaceCustomerInvoice> ledgerBilledInvoices = const {};
+  Map<String, WorkspaceConfirmedPurchaseReceipt> ledgerPurchaseReceipts =
+      const {};
+  bool ledgerRecovered = false;
+  Future<bool>? ledgerRecovery;
+  bool collectionMayHaveSubmitted = false;
+  String? ledgerRecoveryError;
+  String? purchaseAccountScope;
+  int purchaseFeedRevision = 0;
+  bool purchasesComplete = false;
+  String? purchasesNextCursor;
+  final Map<String, WorkspacePurchaseRecord> purchases = {};
+  final Map<(String, String), WorkspaceSupplierLedger> supplierLedgers = {};
+  final Map<(String, String), WorkspaceExpenseRecord> expenses = {};
+  final Map<(String, String), WorkspaceMoneyRegisterSnapshot> moneyRegisters =
+      {};
+  final Set<(String, String)> staleSupplierLedgers = {};
+  final Map<String, WorkspacePurchaseRecord> purchaseLastRecords = {};
+  String? focusedPurchaseId;
+  WorkOrderOperations? orderOperations;
+  final Map<String, int> projectedOrderRevisions = {};
   bool retailerProductAdded = false;
   int retailerQuantity = 0;
   int retailerBuyPrice = 0;
   int retailerSellPrice = 0;
   bool retailerHomeDelivery = false;
   bool retailerStoreCollection = false;
+  bool retailerPublishAfterSetup = false;
   bool retailerSetupSaved = false;
+  String workspaceSearchQuery = '';
+  WorkspaceStoreState workspaceStoreState = WorkspaceStoreState.off;
+  WorkspaceDashboardState workspaceDashboardState =
+      WorkspaceDashboardState.ready;
+  DateTime? workspaceLastUpdatedAt;
+  String workspaceDashboardError = '';
+  bool workspaceAcceptingOrders = false;
+  String workspaceFulfilmentMode = 'Delivery and pickup';
+  int workspaceBusyMinutes = 0;
+  String workspaceReopensAt = '';
+  String workspaceOpeningTime = '8:00 AM';
+  String workspaceClosingTime = '10:00 PM';
+  int workspaceMaximumActiveOrders = 8;
+  bool workspaceOrderAlertSound = true;
+  bool workspaceOrderAlertVibration = true;
+  bool workspaceVisibleToCustomers = false;
+  String workspaceOrderCustomer = '';
+  String workspaceOrderItems = '';
+  String workspaceOrderAmount = '';
+  bool workspaceOrderNeedsDelivery = false;
+  String workspaceOrderSource = 'Counter';
+  String workspaceOrderFulfilment = 'At the shop';
+  String workspaceOrderPayment = 'Cash';
+  String workspaceOrderAddress = '';
+  WorkspaceBillingDetails workspaceOrderBillingDetails =
+      const WorkspaceBillingDetails();
+  String workspaceOrderBillingCustomer = '';
+  WorkspaceBillDiscount counterDiscount = const WorkspaceBillDiscount.none();
+  String workspaceOrderStage = 'No order';
+  int workspaceOrderExtraMinutes = 0;
+  DateTime? workspaceOrderActionDeadline;
+  String workspaceOrderFilter = 'Live';
+  String workspaceCustomerPeriod = 'Month';
+  String workspaceCustomerSearch = '';
+  String workspaceCustomerFilter = 'Recent';
+  String workspaceMoneyPeriod = 'Today';
+  DateTime? workspaceCustomerCustomStart;
+  DateTime? workspaceCustomerCustomEnd;
+  int workspaceSalesToday = 0;
+  int salesTodayRemainderPaise = 0;
+  int workspaceCompletedSalesCount = 0;
+  int workspacePlatformAdjustments = 0;
+  int workspaceDeliveryAdjustments = 0;
+  int workspaceRefunds = 0;
+  int workspaceTaxWithheld = 0;
+  int workspaceSettlementBalance = 0;
+  int workspaceSettlementRequested = 0;
+  String? workspaceSettlementReference;
+  String workspacePayoutBankName = '';
+  String workspacePayoutAccountEnding = '';
+  final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  WorkspaceProductDefaults productDefaults = const WorkspaceProductDefaults();
+  WorkspaceStorePublicationDetails publicationDetails =
+      const WorkspaceStorePublicationDetails();
+  final Set<String> catalogueShortlist = {};
+  final List<String> catalogueSearchHistory = [];
+  final Map<String, List<String>> contextualSearchHistory = {};
+  final List<WorkspaceStockMovement> workspaceStockMovements = [];
+  int stockMovementSequence = 0;
+  _StockHistoryState? stockHistory;
+  final Map<String, int> workspaceOrderQuantities = {};
+  final List<WorkspaceOrderRecord> workspaceOrders = [];
+  final Set<String> workspacePackedProductIds = <String>{};
+  final Map<String, Set<String>> _packingByOrder = {};
+  final Map<String, ({String items, Map<String, int> quantities})>
+  _packingContentsByOrder = {};
+  final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
+  final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
+  final List<WorkspaceStoreOffer> workspaceOffers = [];
+  // Unsent offer input belongs to this Store's in-session operational state.
+  final Map<String, String> workspaceOfferDraft = {};
+  String? currentWorkspaceOrderId;
+  WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
+  bool workspaceOperationsSyncing = false;
+  String? workspaceOperationsSyncError;
+  bool workspaceHandoverBusy = false;
+  final List<WorkspaceActivityEntry> workspaceActivity = [];
+  WorkspaceGroupBuy? activeGroupBuy;
+  String? groupAccountScope, selectedGroupOfferId;
+  int groupFeedRevision = 0;
+  bool groupOffersStale = false, groupOffersComplete = false;
+  final Map<String, WorkspaceGroupOffer> groupOffers = {};
+  final Map<String, WorkspaceGroupOffer> groupOfferHistory = {};
+  int workspaceDeliveryRadiusKm = 5;
+  int workspaceDeliveryFee = 30;
+  int workspaceFreeDeliveryAbove = 499;
+  String workspaceDeliveryCity = 'Jodhpur';
+  String workspaceDeliveryArea = 'Sardarpura';
+  String workspaceDeliveryPincode = '342003';
+  bool workspacePickupEnabled = true;
+  bool workspaceStaffAccessEnabled = false;
+  int workspaceCounterCount = 1;
+  String? workspacePaidRequirementReference;
+  WorkspacePaidRequirementState workspacePaidRequirementState =
+      WorkspacePaidRequirementState.draft;
+  final Set<String> dismissedWorkspaceAlerts = <String>{};
+  final Set<String> workspaceCustomersFollowingStore = <String>{};
+  final Set<String> workspaceCustomersAllowingMessages = <String>{};
+  final Map<String, DateTime> workspaceCustomerLastContactAt =
+      <String, DateTime>{};
+
+  int pendingOperationalRequests = 0;
+  bool inventoryLoaded = false;
+  int? inventoryRevision;
+  int? inventoryReceiptCheckpointRevision;
+  int inventoryMutations = 0;
+  String? inventoryError;
+  Future<bool>? inventoryLoad;
+  Future<bool> inventoryWrites = Future<bool>.value(true);
+  bool inventoryReceiptBusy = false;
+  bool inventoryReceiptRecoveryPending = false;
+}
+
+/// Editable application data is separate from an approved Store's operations.
+/// Document bytes and contact confirmation are memory-only and account-bound.
+class _WorkspaceApplicationDraft {
+  const _WorkspaceApplicationDraft({
+    required this.id,
+    required this.scope,
+    required this.details,
+    this.submitted,
+    this.files = const {},
+    this.confirmed = const {},
+    this.status,
+    this.reason,
+    this.needsStatusRefresh = false,
+  });
+
+  final String id;
+  final String? scope;
+  final Map<String, Object?> details;
+  final WorkProfileSubmission? submitted;
+  final Map<String, WorkPickedProof> files;
+  final Set<WorkContactChannel> confirmed;
+  final WorkRemoteReviewStatus? status;
+  final String? reason;
+  final bool needsStatusRefresh;
+  String? get caseId => details['caseId'] as String?;
+}
+
+class _StockHistoryState {
+  _StockHistoryState(this.query);
+  final WorkspaceStockHistoryQuery query;
+  final records = <WorkspaceStockMovement>[];
+  final recordIds = <String>{};
+  final usedCursors = <String>{};
+  String? snapshotId, nextCursor, error;
+  int? totalCount;
+  bool busy = false, loaded = false, needsRefresh = false;
+}
+
+class _CounterDraftRecovery {
+  WorkspaceCounterDraft? record;
+  Future<void> writes = Future<void>.value();
+  bool loaded = false, loading = false, submitting = false;
+  String? error;
+  String? editingId;
+  String? customerInput;
+  // Volatile proof only: cleared before the first order/sale effect is invoked.
+  // Never restored from a journal or interpreted as backend authority.
+  String? unappliedOrderId;
+  bool catalogueChanged = false;
+  ({String orderId, WorkspaceCustomerInvoice? invoice})? completed;
+}
+
+class WorkSession extends ChangeNotifier {
+  // New identities must not collide when the device clock repeats or changes.
+  // Persisted identities and submission/recovery markers remain authoritative.
+  static String _newCounterIdentity(String prefix) {
+    final random = Random.secure();
+    final suffix = List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    return '$prefix-$suffix';
+  }
+
+  WorkSession({
+    WorkGateway? gateway,
+    WorkProofPicker? proofPicker,
+    WorkPendingProofStore? pendingProofStore,
+    WorkPendingProofStore? contactDraftStore,
+    this.issueDraftStore,
+    this.receiptDraftStore,
+    this.issueCommandGateway,
+    this.issueCommandStore,
+    this.stockHistoryGateway,
+    this.counterDraftStore,
+    this.ledgerFormDraftStore,
+    this.upiDestinationStore,
+    this.invoiceDeliveryPreferenceStore,
+    this.reviewStoreSelectionStore,
+    this.inventoryStore,
+    this.purchaseEntryStore,
+    this.purchaseInvoiceCapture,
+    this.catalogueReference,
+    this.productPhotoSupportDirectory,
+    this.analyticsReader,
+  }) : _productionSession = false,
+       gateway = gateway ?? ReviewWorkGateway(),
+       contactDraftStore =
+           contactDraftStore ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? SecureWorkPendingProofStore.contactDraft(reviewOnly: true)
+               : null),
+       pendingProofStore =
+           pendingProofStore ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? SecureWorkPendingProofStore(reviewOnly: true)
+               : null),
+       proofPicker =
+           proofPicker ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')
+               ? NativeWorkProofPicker()
+               : ReviewWorkProofPicker());
+
+  WorkSession.production({
+    WorkGateway? gateway,
+    WorkProofPicker? proofPicker,
+    WorkPendingProofStore? pendingProofStore,
+    WorkPendingProofStore? contactDraftStore,
+    this.issueDraftStore,
+    this.receiptDraftStore,
+    this.issueCommandGateway,
+    this.issueCommandStore,
+    this.stockHistoryGateway,
+    this.counterDraftStore,
+    this.ledgerFormDraftStore,
+    this.upiDestinationStore,
+    this.invoiceDeliveryPreferenceStore,
+    this.reviewStoreSelectionStore,
+    this.inventoryStore,
+    this.purchaseEntryStore,
+    this.purchaseInvoiceCapture,
+    this.catalogueReference,
+    this.productPhotoSupportDirectory,
+    this.analyticsReader,
+  }) : _productionSession = true,
+       gateway = gateway ?? buildWorkGateway(),
+       contactDraftStore =
+           contactDraftStore ??
+           (proofPicker == null || proofPicker is NativeWorkProofPicker
+               ? SecureWorkPendingProofStore.contactDraft()
+               : null),
+       pendingProofStore =
+           pendingProofStore ??
+           (proofPicker == null || proofPicker is NativeWorkProofPicker
+               ? SecureWorkPendingProofStore()
+               : null),
+       proofPicker = proofPicker ?? NativeWorkProofPicker();
+
+  final WorkGateway gateway;
+  /// Read-only integration seam. No tracking, posting or local analytics seed.
+  final WorkspaceAnalyticsReader? analyticsReader;
+
+  WorkspaceAnalyticsRequest? analyticsRequest({
+    required DateTime start,
+    required DateTime end,
+    Iterable<String> skuIds = const [],
+  }) {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (_disposed || account == null || store == null) return null;
+    final request = WorkspaceAnalyticsRequest(
+      accountScope: account,
+      storeId: store,
+      start: start,
+      end: end,
+      skuIds: skuIds,
+    );
+    return request.valid ? request : null;
+  }
+
+  Future<WorkspaceAnalyticsSnapshot> readWorkspaceAnalytics(
+    WorkspaceAnalyticsRequest request,
+  ) async {
+    WorkspaceAnalyticsSnapshot absent(WorkspaceAnalyticsState state) =>
+        WorkspaceAnalyticsSnapshot(
+          request: request,
+          state: state,
+          coverage: WorkspaceAnalyticsCoverage.unknown,
+          source: 'Analytics provider',
+          metrics: const [],
+        );
+    bool current() =>
+        analyticsRequest(
+          start: request.start,
+          end: request.end,
+          skuIds: request.skuIds,
+        )?.sameScope(request) ==
+        true;
+    if (!current() || analyticsReader == null) {
+      return absent(WorkspaceAnalyticsState.unavailable);
+    }
+    var scopeChanged = false;
+    void watchScope() { if (!current()) scopeChanged = true; }
+    addListener(watchScope);
+    try {
+      // Release the scope watcher even if an integration provider never settles.
+      // A late result after this deadline cannot publish through this operation.
+      final response = await analyticsReader!(request).timeout(const Duration(seconds: 30));
+      if (scopeChanged || !current()) return absent(WorkspaceAnalyticsState.unavailable);
+      return response.usableFor(request, DateTime.now())
+          ? response
+          : absent(WorkspaceAnalyticsState.error);
+    } catch (_) {
+      return absent(
+        current() && !scopeChanged
+            ? WorkspaceAnalyticsState.error
+            : WorkspaceAnalyticsState.unavailable,
+      );
+    } finally {
+      removeListener(watchScope);
+    }
+  }
+
+  final WorkProofPicker proofPicker;
+  final WorkPendingProofStore? pendingProofStore;
+  final WorkPendingProofStore? contactDraftStore;
+  final WorkIssueDraftStore? issueDraftStore;
+  final WorkReceiptDraftStore? receiptDraftStore;
+  final WorkIssueCommandGateway? issueCommandGateway;
+  final WorkIssueCommandStore? issueCommandStore;
+  final WorkStockHistoryGateway? stockHistoryGateway;
+  final WorkCounterDraftStore? counterDraftStore;
+  final WorkLedgerFormDraftStore? ledgerFormDraftStore;
+  final WorkUpiDestinationStore? upiDestinationStore;
+  final WorkInvoiceDeliveryPreferenceStore? invoiceDeliveryPreferenceStore;
+  final WorkReviewStoreSelectionStore? reviewStoreSelectionStore;
+  final WorkInventoryStore? inventoryStore;
+  final WorkPurchaseEntryStore? purchaseEntryStore;
+  final WorkPurchaseInvoiceCapture? purchaseInvoiceCapture;
+  late final WorkPurchaseInvoiceCapture workspacePurchaseInvoiceCapture =
+      purchaseInvoiceCapture ?? WorkPurchaseInvoiceCapture(currentScope: () => workspaceSupplierScope);
+  final List<WorkspaceCatalogueItem>? catalogueReference;
+
+  /// Optional filesystem location injection; the real scoped media store is
+  /// retained in tests. Production uses the OS application-support directory.
+  final Future<Directory> Function()? productPhotoSupportDirectory;
+  List<WorkspaceCatalogueItem> get referenceCatalogue => List.unmodifiable(
+    catalogueReference ??
+        (!_productionSession &&
+                SecureWorkReviewStoreSelectionStore.enabled &&
+                _selectedReviewSeed?.orderCount == 0
+            ? storeEntryEvaluationCatalogue
+            : workspaceMasterCatalogue),
+  );
+  late final WorkInventoryStore _inventoryStorage =
+      inventoryStore ??
+      SecureWorkInventoryStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+      );
+  // Production wiring needs the future authoritative inventory adapter. QA
+  // persists edited stock in the QA namespace, never as production inventory.
+  bool get localInventoryEnabled =>
+      inventoryStore != null ||
+      (!_productionSession &&
+          kDebugMode &&
+          const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY'));
+  String? get workspaceInventoryError => _storeData.inventoryError;
+  late final WorkPurchaseEntryStore _supplierStorage = purchaseEntryStore ??
+      SecureWorkPurchaseEntryStore(accountScope: () => _disposed ? null : _contactAccountScope);
+  final _supplierDirectories = <(String, String, bool), WorkspacePurchaseEntryBook?>{};
+  final _supplierLoads = <(String, String, bool), Future<bool>>{};
+  final _supplierErrors = <(String, String, bool), String>{};
+  // Definite pre-write rejection is not a failed read or an uncertain save.
+  final _supplierValidationErrors = <(String, String, bool), String>{};
+  final _supplierWrites = <(String, String, bool)>{};
+  final _supplierNeedsReload = <(String, String, bool)>{};
+  (String, String, bool)? get _supplierKey {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    return !_disposed && account != null && account.isNotEmpty && store != null &&
+        (purchaseEntryStore != null || _productionSession || localInventoryEnabled)
+        ? (account, store, !_productionSession) : null;
+  }
+  bool get workspaceSuppliersLoaded => _supplierDirectories.containsKey(_supplierKey);
+  (String, String, bool)? get workspaceSupplierScope => _supplierKey;
+  String newWorkspaceSupplierId() => _newCounterIdentity('local-supplier');
+  String newWorkspacePurchaseDraftId() => _newCounterIdentity('manual-purchase-draft');
+  WorkspacePurchaseEntryDraft? get workspacePurchaseEntryDraft =>
+      _supplierDirectories[_supplierKey]?.draft;
+  bool get workspacePurchaseDraftReviewed =>
+      _supplierDirectories[_supplierKey]?.draftHasReviewedCopy == true;
+  bool get workspaceSupplierSaving => _supplierWrites.contains(_supplierKey);
+  String? get workspaceSupplierRecoveryError => _supplierErrors[_supplierKey];
+  String? get workspaceSupplierError => workspaceSupplierRecoveryError ?? _supplierValidationErrors[_supplierKey];
+  void dismissWorkspacePurchaseValidation((String, String, bool) scope) {
+    if (_supplierKey != scope || _supplierWrites.contains(scope)) return;
+    if (_supplierValidationErrors.remove(scope) != null) notifyListeners();
+  }
+  List<WorkspaceSupplierProfile> get workspaceSuppliers =>
+      _supplierDirectories[_supplierKey]?.profiles ?? const [];
+  Future<bool> loadWorkspaceSuppliers({bool retry = false}) {
+    final key = _supplierKey;
+    if (key == null) return Future.value(false);
+    if (_supplierLoads[key] != null) return _supplierLoads[key]!;
+    if (workspaceSupplierSaving) return Future.value(false);
+    if (!retry && !_supplierNeedsReload.contains(key) && _supplierDirectories.containsKey(key)) {
+      return Future.value(true);
+    }
+    final operation = () async {
+      try {
+        final saved = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        if (_supplierKey != key) return false;
+        _supplierDirectories[key] = saved;
+        _supplierNeedsReload.remove(key);
+        _supplierErrors.remove(key);
+        _supplierValidationErrors.remove(key);
+        return true;
+      } on Object {
+        if (_supplierKey == key) {
+          _supplierErrors[key] = 'Purchase draft could not be opened. Retry; saved details have been kept.';
+        }
+        return false;
+      } finally {
+        _supplierLoads.remove(key);
+        if (_supplierKey == key) notifyListeners();
+      }
+    }();
+    _supplierLoads[key] = operation;
+    return operation;
+  }
+  Future<bool> saveWorkspacePurchaseEntry(WorkspaceSupplierProfile profile, {
+    required (String, String, bool) scope, required WorkspacePurchaseEntryDraft draft,
+    required int? expectedRevision,
+    WorkspacePurchaseSavedCopy? reviewedCopy,
+    String? replaceReviewedDraftId,
+  }) async {
+    final key = _supplierKey;
+    if (key == null || key != scope || !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key)) {
+      return false;
+    }
+    final old = _supplierDirectories[key];
+    if (reviewedCopy != null) {
+      final prior = old?.copies.where((c) => c.id == reviewedCopy.id).firstOrNull;
+      if (prior != null) {
+        if (jsonEncode(prior.toJson()) == jsonEncode(reviewedCopy.toJson())) {
+          dismissWorkspacePurchaseValidation(key);
+          return true;
+        }
+        _supplierValidationErrors[key] = 'This saved copy has different details. Reopen Purchases before saving again.';
+        notifyListeners();
+        return false;
+      }
+      if (!reviewedCopy.valid || reviewedCopy.revision != (expectedRevision ?? 0) + 1 ||
+          jsonEncode(reviewedCopy.draft.toJson()) != jsonEncode(draft.toJson()) ||
+          jsonEncode(reviewedCopy.supplier.toJson()) != jsonEncode(profile.toJson()) ||
+          (old?.copies.length ?? 0) >= 1000) {
+        _supplierValidationErrors[key] = 'Cannot save this purchase copy. Your draft and earlier copies are kept; reopen Purchases.';
+        notifyListeners();
+        return false;
+      }
+      if (draft.invoiceFinancialYear == null) {
+        _supplierValidationErrors[key] = 'Check Invoice date. Enter a valid date as DD/MM/YYYY before saving the purchase copy. Your entries are kept.';
+        notifyListeners();
+        return false;
+      }
+      final duplicateBill = old?.duplicateInvoice(draft);
+      if (duplicateBill != null) {
+        _supplierValidationErrors[key] = 'Bill ${duplicateBill.draft.invoiceReference} dated ${duplicateBill.draft.invoiceDate} is already saved for ${duplicateBill.supplier.name}. Check the bill number, or cancel to reopen its saved copy in Purchases. Your entries are kept.';
+        notifyListeners();
+        return false;
+      }
+    }
+    final replacesReviewedDraft = replaceReviewedDraftId != null &&
+      old?.draft?.id == replaceReviewedDraftId && old?.draftHasReviewedCopy == true &&
+      draft.id != replaceReviewedDraftId;
+    if (old?.revision != expectedRevision || !draft.valid || draft.supplierId != profile.id ||
+        (replaceReviewedDraftId != null && !replacesReviewedDraft) ||
+        (old?.draft != null && !replacesReviewedDraft && (old!.draft!.id != draft.id ||
+          old.draft!.createdAt != draft.createdAt))) {
+      _supplierValidationErrors[key] = 'This purchase draft changed. Reopen it before saving again.';
+      notifyListeners();
+      return false;
+    }
+    final error = profile.validationError;
+    if (error != null) {
+      _supplierValidationErrors[key] = error;
+      notifyListeners();
+      return false;
+    }
+    final profiles = old?.profiles ?? const <WorkspaceSupplierProfile>[];
+    final duplicate = profiles.where((p) => p.id != profile.id &&
+      ((profile.phone.isNotEmpty && p.phone == profile.phone) ||
+       (profile.gstin.isNotEmpty && p.gstin == profile.gstin))).firstOrNull;
+    if (duplicate != null) {
+      _supplierValidationErrors[key] = 'These contact details belong to ${duplicate.name}. Select that supplier in the Supplier name or phone field.';
+      notifyListeners();
+      return false;
+    }
+    final existing = profiles.where((p) => p.id == profile.id).firstOrNull;
+    if (existing != null && (existing.createdAt != profile.createdAt ||
+        profile.updatedAt.isBefore(existing.updatedAt))) {
+      _supplierValidationErrors[key] = 'Supplier details changed. Reopen that supplier before editing again.';
+      notifyListeners();
+      return false;
+    }
+    final saved = WorkspacePurchaseEntryBook(account: key.$1, store: key.$2,
+      qa: key.$3, revision: (old?.revision ?? 0) + 1,
+      profiles: [...profiles.where((p) => p.id != profile.id), profile], draft: draft,
+      copies: [...?old?.copies, ?reviewedCopy], openingRecords: old?.openingRecords ?? const [],
+      goodsReceiptDrafts: old?.goodsReceiptDrafts ?? const [],
+      goodsReceiptCancellations: old?.goodsReceiptCancellations ?? const [],
+      billGoodsReviews: old?.billGoodsReviews ?? const [],
+      billGoodsCancellations: old?.billGoodsCancellations ?? const []);
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      await _supplierStorage.save(saved, expectedRevision: old?.revision);
+      if (_supplierKey != key) {
+        _supplierNeedsReload.add(key);
+        return false;
+      }
+      _supplierDirectories[key] = saved;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) {
+        _supplierErrors[key] = 'Purchase draft could not be saved. Your changes are still here. Retry, or reopen the saved draft.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (_supplierKey == key) notifyListeners();
+    }
+  }
+  String newWorkspaceSupplierOpeningId() =>
+      _newCounterIdentity('supplier-opening');
+  List<WorkspaceSupplierOpeningRecord> get workspaceSupplierOpeningRecords =>
+      _supplierDirectories[_supplierKey]?.openingRecords ?? const [];
+  WorkspaceSupplierOpeningRecord? workspaceSupplierOpeningRecord(
+    String supplierId,
+  ) => _supplierDirectories[_supplierKey]?.openingRecordFor(supplierId);
+  bool get workspaceSupplierOpeningConfirmationAvailable =>
+      !_disposed && !_productionSession && _supplierKey?.$3 == true &&
+      !_storeData.inventoryReceiptBusy &&
+      _supplierStorage is WorkPurchaseEntryRevisionGuard &&
+      _storeData.ledgerCheckpointStore != null &&
+      _storeData.customerCollectionGateway is StoreReviewCustomerCollectionGateway;
+
+  /// Confirm saved opening evidence in the existing financial checkpoint.
+  /// Review-only until an authoritative production supplier adapter is connected.
+  /// Saving the evidence alone never posts it or changes Stock.
+  Future<bool> confirmWorkspaceSupplierOpeningRecord(
+    WorkspaceSupplierOpeningRecord record, {
+    required (String, String, bool) scope,
+    required int expectedRevision,
+    required DateTime confirmedAt,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) || _supplierNeedsReload.contains(key) ||
+        !record.valid || record.account != key.$1 || record.store != key.$2 ||
+        record.qa != key.$3 ||
+        _supplierStorage is! WorkPurchaseEntryRevisionGuard ||
+        data.customerCollectionGateway is! StoreReviewCustomerCollectionGateway) {
+      return false;
+    }
+    bool reject(String message) {
+      if (_supplierKey == key) {
+        _supplierValidationErrors[key] = message;
+        notifyListeners();
+      }
+      return false;
+    }
+
+    // Reserve the purchase book while awaiting checkpoint recovery/save. This
+    // prevents confirmation of evidence superseded by a simultaneous edit.
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData)) {
+        return false;
+      }
+      final previous = data.supplierLedgers[(key.$1, record.supplierId)];
+      if (previous != null) {
+        if (previous.openingRecord != null &&
+            jsonEncode(previous.openingRecord!.toJson()) == jsonEncode(record.toJson()) &&
+            !data.staleSupplierLedgers.contains((key.$1, record.supplierId))) {
+          return true; // Saved response was lost: acknowledge, never post twice.
+        }
+        return reject('This supplier already has posted records. Keep them unchanged; a starting balance cannot replace its account.');
+      }
+      final guarded = _supplierStorage as WorkPurchaseEntryRevisionGuard;
+      return await guarded.withReviewedBook(key.$1, key.$2, qa: key.$3,
+        expectedRevision: expectedRevision, action: (book) async {
+          if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
+          final saved = book.openingRecordFor(record.supplierId);
+          final supplier = book.profiles
+              .where((p) => p.id == record.supplierId).firstOrNull;
+          if (saved == null || supplier == null ||
+              jsonEncode(saved.toJson()) != jsonEncode(record.toJson())) {
+            return reject('Opening details changed. Reopen the supplier and review the latest saved balance.');
+          }
+          final localConfirmation = confirmedAt.toLocal();
+          final confirmationDay = DateTime(localConfirmation.year,
+              localConfirmation.month, localConfirmation.day);
+          final openingDay = DateTime.tryParse(record.asOfDate);
+          if (openingDay == null || openingDay.isAfter(confirmationDay)) {
+            return reject('Starting date cannot be after the date you confirm the balance.');
+          }
+          final copies = book.latestReviewedCopies
+              .where((c) => c.supplier.id == record.supplierId).toList();
+          if (copies.length != record.bills.length ||
+              copies.any((copy) => record.bills.where((link) =>
+                link.copyId == copy.id && link.copyRevision == copy.revision &&
+                link.draftId == copy.draft.id &&
+                link.inclusion != WorkspaceOpeningBillInclusion.unknown).length != 1)) {
+            return reject('For each saved supplier bill, confirm whether it is already included in this starting balance.');
+          }
+          final opening = WorkspaceSupplierLedger.confirmedOpening(record,
+            accountScope: key.$1, workspaceId: key.$2,
+            supplierId: supplier.id, supplierName: supplier.name,
+            qa: key.$3, confirmedAt: confirmedAt);
+          if (opening == null) {
+            return reject('Check the saved amount and bill inclusion before confirming. An unknown balance cannot be posted.');
+          }
+          return saveWorkspaceSupplierLedger(opening);
+        });
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      return reject('Balance confirmation needs recovery. Reopen Purchases; your saved records are kept.');
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
+
+  /// Accept the exact reviewed bill into the supplier account, without receipt
+  /// or payment effects. Production requires the future authoritative adapter.
+  Future<bool> confirmWorkspacePurchaseBill(
+    WorkspacePurchaseSavedCopy copy, {
+    required (String, String, bool) scope,
+    required int expectedPurchaseRevision,
+    required int expectedLedgerRevision,
+    required WorkspaceOpeningBillInclusion openingTreatment,
+    required DateTime confirmedAt,
+    WorkspaceSupplierBillOpeningReview? openingReview,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope ||
+        !workspaceSupplierOpeningConfirmationAvailable ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) || _supplierNeedsReload.contains(key) ||
+        !copy.valid) {
+      return false;
+    }
+    bool reject(String message) {
+      if (!_disposed && _supplierKey == key) {
+        _supplierValidationErrors[key] = message;
+        notifyListeners();
+      }
+      return false;
+    }
+    // Freeze nested document data before awaiting recovery or store queues.
+    final bill = WorkspaceSupplierBillAcceptance(copy: copy,
+      acceptedAt: confirmedAt, openingTreatment: openingTreatment,
+      openingReview: openingReview);
+    if (!bill.valid) {
+      final missingPackIndex = bill.copy.draft.goods.indexWhere(
+        (line) => (line['pack'] ?? '').trim().isEmpty,
+      );
+      if (missingPackIndex >= 0) {
+        return reject('Item ${missingPackIndex + 1} is missing Pack / unit. '
+            'Edit purchase, enter the pack or unit shown on the supplier bill, '
+            'then save a new reviewed copy.');
+      }
+      return reject('Check the supplier invoice number, date, items and invoice total before confirming the bill.');
+    }
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData)) {
+        return false;
+      }
+      final ledger = workspaceSupplierLedger(bill.copy.supplier.id);
+      if (ledger == null || ledger.openingRecord == null) {
+        return reject('Confirm this supplier’s opening balance first. Confirm zero if there are no earlier dues or advances.');
+      }
+      for (final other in _supplierLedgerCheckpointEntries(data).values) {
+        if (other.supplierId != ledger.supplierId && other.purchaseBills.containsKey(bill.billId)) {
+          return reject('This bill is already confirmed for another supplier. Reopen its saved supplier account; do not record it twice.');
+        }
+      }
+      final accepted = ledger.purchaseBills[bill.billId];
+      if (accepted != null) {
+        return jsonEncode(accepted.copy.toJson()) == jsonEncode(bill.copy.toJson()) &&
+            accepted.openingTreatment == bill.openingTreatment &&
+            jsonEncode(accepted.openingReview?.toJson()) ==
+              jsonEncode(bill.openingReview?.toJson())
+            ? true : reject('This bill is already confirmed with different details. Its accounting record has been kept unchanged.');
+      }
+      if (ledger.revision != expectedLedgerRevision) {
+        return reject('Supplier account changed. Reopen it before confirming the bill.');
+      }
+      final guarded = _supplierStorage as WorkPurchaseEntryRevisionGuard;
+      return await guarded.withReviewedBook(key.$1, key.$2, qa: key.$3,
+        expectedRevision: expectedPurchaseRevision, action: (book) async {
+          if (_disposed || _supplierKey != key || !identical(data, _storeData)) {
+            return false;
+          }
+          final latest = book.latestReviewedCopies.where((item) =>
+            item.draft.id == bill.billId).toList();
+          if (latest.length != 1 ||
+              jsonEncode(latest.single.toJson()) != jsonEncode(bill.copy.toJson()) ||
+              book.duplicateInvoice(bill.copy.draft) != null) {
+            return reject('Saved bill changed or its invoice number is already used. Reopen Purchases and review the latest copy.');
+          }
+          final next = ledger.acceptReviewedBill(bill,
+            expectedRevision: expectedLedgerRevision);
+          if (next == null) {
+            return reject('Check this bill’s starting-balance inclusion and supplier account. No Stock, payment or dues were changed.');
+          }
+          return saveWorkspaceSupplierLedger(next);
+        });
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      return reject('Bill confirmation needs recovery. Reopen Purchases to check its saved status before trying again.');
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Review-only receiving uses the financial journal as its single authority.
+  /// The standalone Stock copy is projected under the shared inventory queue.
+  /// An uncertain reply is never described as a definite unposted receipt.
+  Future<WorkspaceGoodsReceiptSaveResult> confirmWorkspaceSupplierGoodsReceipt(
+    WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId,
+    required (String, String, bool) scope,
+    required int expectedPurchaseRevision,
+    required int expectedSupplierRevision,
+    bool requireSavedReview = false,
+  }) async {
+    final data = _storeData;
+    final key = _supplierKey;
+    if (key == null || key != scope || !receipt.valid ||
+        !workspaceSupplierOpeningConfirmationAvailable ||
+        !localInventoryEnabled ||
+        _inventoryStorage is! WorkInventoryReceiptProjectionGuard ||
+        workspaceSupplierSaving || !workspaceSuppliersLoaded ||
+        data.customerCollectionBusy || _supplierNeedsReload.contains(key)) {
+      return WorkspaceGoodsReceiptSaveResult.notPosted;
+    }
+    final frozen = WorkspaceSupplierGoodsReceipt.fromJson(receipt.toJson());
+    // Acquire before the first await: every Stock editor must retain input.
+    data.inventoryReceiptBusy = true;
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    var attemptedCommit = false;
+    var financeLease = false;
+    var projectionComplete = false;
+    WorkspaceLedgerCheckpoint? authoritative;
+    WorkspaceSavedInventory? projected;
+    String? projectionIssue;
+    WorkspaceSavedInventory? refuseProjection(String message) {
+      projectionIssue = message;
+      return null;
+    }
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    WorkspaceGoodsReceiptSaveResult reject(String message) {
+      if (current()) _supplierValidationErrors[key] = message;
+      return authoritative != null
+          ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending
+          : attemptedCommit ? WorkspaceGoodsReceiptSaveResult.statusUnknown
+          : WorkspaceGoodsReceiptSaveResult.notPosted;
+    }
+    try {
+      if (!await data.inventoryWrites || !current() ||
+          !await loadWorkspaceInventory(retry: true) || !current() ||
+          !await recoverCustomerLedger() || !current() ||
+          data.finance == null || data.financeStale ||
+          data.customerCollectionBusy || data.pendingCustomerCollection != null ||
+          data.pendingCustomerReturn != null || data.pendingCustomerRefund != null) {
+        return reject('Recover saved Stock and the supplier account before receiving goods. Your entries are kept.');
+      }
+      data.customerCollectionBusy = true;
+      financeLease = true;
+      final generation = data.inventoryMutations;
+      final purchaseGuard = _supplierStorage as WorkPurchaseEntryRevisionGuard;
+      final inventoryGuard = _inventoryStorage as WorkInventoryReceiptProjectionGuard;
+      Future<bool> projectReceipt() => inventoryGuard.projectReceipt(key.$1, key.$2, qa: key.$3,
+            expectedRevision: data.inventoryRevision, commit: (previous) async {
+              if (!current() || generation != data.inventoryMutations || previous == null) return null;
+              final store = data.ledgerCheckpointStore!;
+              final journal = await store.read(key.$1, key.$2);
+              if (!current()) return null;
+              final ledger = journal?.supplierLedgers[supplierId];
+              if (journal == null || ledger == null || ledger.openingRecord == null ||
+                  journal.revision != data.ledgerCheckpointRevision) {
+                return refuseProjection('Supplier account changed. Recover its confirmed opening balance before receiving goods.');
+              }
+              for (final other in journal.supplierLedgers.values) {
+                if (other.supplierId != supplierId && other.goodsReceipts.containsKey(frozen.id)) {
+                  return null;
+                }
+              }
+              final existing = ledger.goodsReceipts[frozen.id];
+              if (existing != null) {
+                if (jsonEncode(existing.toJson()) != jsonEncode(frozen.toJson())) return null;
+                authoritative = journal; // Retry projects, never reposts.
+              } else {
+                if (ledger.revision != expectedSupplierRevision ||
+                    previous.revision != data.inventoryRevision ||
+                    jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) !=
+                      jsonEncode(data.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()) ||
+                    !listEquals(previous.movements.map((m) => m.contentIdentity).toList(),
+                      data.workspaceStockMovements.map((m) => m.contentIdentity).toList())) {
+                  return refuseProjection('Saved Stock or supplier account changed. Keep your receipt entries and reopen Stock.');
+                }
+                for (final line in frozen.lines) {
+                  final products = previous.products.where((p) => p.id == line.productId).toList();
+                  if (products.length != 1 || products.single.stockMode != WorkspaceStockMode.exactQuantity ||
+                      products.single.pack != line.stockUnit) {
+                    return refuseProjection('Match each receipt item to its saved Stock product and pack before receiving it.');
+                  }
+                }
+                final nextLedger = ledger.receiveGoods(frozen, expectedRevision: expectedSupplierRevision);
+                final baseline = _captureLedgerInventory(data);
+                final inventory = baseline?.post([
+                  for (final line in frozen.lines)
+                    if (frozen.movementFor(line) != null) frozen.movementFor(line)!,
+                ], at: DateTime.now().toUtc());
+                if (nextLedger == null || inventory == null) {
+                  return refuseProjection('Check received quantities, earlier deliveries and Stock units. No goods were posted.');
+                }
+                final next = WorkspaceLedgerCheckpoint(revision: journal.revision + 1,
+                  finance: journal.finance, inventory: inventory,
+                  billedOrders: journal.billedOrders, billedInvoices: journal.billedInvoices,
+                  purchaseReceipts: journal.purchaseReceipts,
+                  supplierLedgers: {...journal.supplierLedgers, supplierId: nextLedger},
+                  moneyRegisters: journal.moneyRegisters, expenses: journal.expenses);
+                if (!next.valid) {
+                  return refuseProjection('Previously entered Stock does not match this receipt. Check its original entry and linked quantities.');
+                }
+                attemptedCommit = true;
+                try {
+                  await store.save(next, expectedRevision: journal.revision);
+                  authoritative = next;
+                } on Object {
+                  // Reconcile a lost reply while still owning the inventory queue.
+                  final recovered = await store.read(key.$1, key.$2);
+                  final proof = recovered?.supplierLedgers[supplierId]?.goodsReceipts[frozen.id];
+                  if (proof == null || jsonEncode(proof.toJson()) != jsonEncode(frozen.toJson())) rethrow;
+                  authoritative = recovered;
+                }
+              }
+              if (!current()) return null;
+              final saved = authoritative!;
+              final inventory = saved.inventory;
+              final quantities = inventory?.quantities;
+              if (inventory == null || quantities == null) return null;
+              final known = {for (final m in inventory.movements) m.id: m};
+              final tails = <WorkspaceStockMovement>[];
+              for (final m in previous.movements) {
+                final original = known[m.id];
+                if (original != null && original.contentIdentity != m.contentIdentity) return null;
+                if (original == null) tails.add(m);
+              }
+              final products = <WorkspaceCatalogueItem>[];
+              for (final product in previous.products) {
+                final baseline = quantities[product.id];
+                if (product.stockMode == WorkspaceStockMode.exactQuantity && baseline != null) {
+                  final quantity = baseline + tails.where((m) => m.productId == product.id)
+                    .fold<int>(0, (total, m) => total + m.quantityDelta);
+                  if (quantity < 0 || quantity > 2147483647) return null;
+                  products.add(product.copyWith(stock: quantity, available: product.available && quantity > 0));
+                } else {
+                  products.add(product);
+                }
+              }
+              if (frozen.lines.any((line) => !products.any((p) => p.id == line.productId))) return null;
+              final movements = [...tails, ...inventory.movements.reversed];
+              if (previous.manualReceiptCheckpointRevision == saved.revision &&
+                  jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) ==
+                    jsonEncode(products.map((p) => p.toInventoryJson()).toList()) &&
+                  listEquals(previous.movements.map((m) => m.contentIdentity).toList(),
+                    movements.map((m) => m.contentIdentity).toList())) {
+                projected = previous;
+                return previous;
+              }
+              projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
+                revision: previous.revision + 1, savedAt: DateTime.now().toUtc(),
+                products: products, movements: movements,
+                manualReceiptCheckpointRevision: saved.revision);
+              return projected;
+            });
+      // Durable receipt evidence is independent of later bill-book revisions.
+      final existingProof = data.supplierLedgers[(key.$1, supplierId)]?.goodsReceipts[frozen.id];
+      if (existingProof != null) {
+        // A known committed receipt must never become "not posted" when its
+        // separate review record is unavailable or contradictory.
+        attemptedCommit = true;
+        final freshBook = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        if (!current() || freshBook == null ||
+            freshBook.goodsReceiptCancellations.any((c) => c.receiptId == frozen.id)) {
+          return reject('Receipt and cancellation records need review. Saved history is kept; no Stock reversal was made.');
+        }
+      }
+      final complete = existingProof != null
+          ? await projectReceipt()
+          : await purchaseGuard.withReviewedBook(key.$1, key.$2, qa: key.$3,
+              expectedRevision: expectedPurchaseRevision, action: (book) async {
+                if (!current() || !book.profiles.any((p) => p.id == supplierId)) return false;
+                final review = book.goodsReceiptDrafts.where((r) => r.receipt.id == frozen.id).firstOrNull;
+                if (book.goodsReceiptCancellations.any((c) => c.receiptId == frozen.id)) {
+                  projectionIssue = 'This receiving review was cancelled. Use the corrected saved review; no goods were posted by cancellation.';
+                  return false;
+                }
+                if ((requireSavedReview && review == null) || (review != null &&
+                    (review.supplierId != supplierId ||
+                      jsonEncode(review.receipt.toJson()) != jsonEncode(frozen.toJson())))) {
+                  projectionIssue = 'Resume the exact saved receiving review. Changed receipt details cannot be posted.';
+                  return false;
+                }
+                return projectReceipt();
+              });
+      if (authoritative == null || !complete || projected == null || !current()) {
+        return reject(projectionIssue ?? (authoritative == null
+          ? 'Receipt status needs review. Reopen Stock and the supplier account before retrying the same receipt.'
+          : 'Goods receipt is saved. Stock recovery is pending; reopen this receipt before further stock changes.'));
+      }
+      data.workspaceCatalogueItems..clear()..addAll(projected!.products);
+      data.workspaceStockMovements..clear()..addAll(projected!.movements);
+      data.inventoryRevision = projected!.revision;
+      data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
+      data.inventoryMutations++;
+      data.inventoryError = null;
+      data.inventoryReceiptRecoveryPending = false;
+      data.ledgerInventory = authoritative!.inventory;
+      data.ledgerCheckpointRevision = authoritative!.revision;
+      data.supplierLedgers[(key.$1, supplierId)] = authoritative!.supplierLedgers[supplierId]!;
+      data.ledgerRecovered = true;
+      projectionComplete = true;
+      _persistOperationalState('supplier-goods-received');
+      return WorkspaceGoodsReceiptSaveResult.saved;
+    } on Object {
+      return reject(authoritative == null
+        ? 'Receipt status is not verified. Your entries are kept; reopen its saved status before retrying.'
+        : 'Goods receipt is saved. Stock recovery is pending; do not record the goods again.');
+    } finally {
+      if (!projectionComplete && (attemptedCommit || authoritative != null)) {
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        data.inventoryReceiptRecoveryPending = true;
+        data.inventoryError = 'Goods receipt status needs recovery. Reopen the saved receipt before changing Stock.';
+      }
+      if (financeLease) data.customerCollectionBusy = false;
+      data.inventoryReceiptBusy = false;
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
+
+  /// Low-level review checkpoint owner. Retailer actions must additionally use
+  /// the durable reviewed-return intent guard before calling this method.
+  Future<WorkspaceGoodsReceiptSaveResult> confirmWorkspaceSupplierGoodsReturned(
+    WorkspaceSupplierGoodsReturn returned, {
+    required (String, String, bool) scope,
+    required int expectedPurchaseRevision,
+    required int expectedSupplierRevision,
+  }) async {
+    final data = _storeData, key = _supplierKey;
+    if (key == null || key != scope || !returned.valid ||
+        returned.accountScope != key.$1 || returned.workspaceId != key.$2 ||
+        returned.recordedAt.isAfter(DateTime.now().toUtc()) ||
+        !workspaceSupplierOpeningConfirmationAvailable || !localInventoryEnabled ||
+        _inventoryStorage is! WorkInventoryReceiptProjectionGuard ||
+        workspaceSupplierSaving || !workspaceSuppliersLoaded || data.customerCollectionBusy ||
+        _supplierNeedsReload.contains(key)) {
+      return WorkspaceGoodsReceiptSaveResult.notPosted;
+    }
+    final frozen = WorkspaceSupplierGoodsReturn.fromJson(returned.toJson());
+    data.inventoryReceiptBusy = true;
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    final priorRecoveryPending = data.inventoryReceiptRecoveryPending;
+    var financeLease = false, complete = false, provenUncommitted = false, attemptedWrite = false;
+    WorkspaceLedgerCheckpoint? authoritative;
+    WorkspaceSavedInventory? projected;
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    WorkspaceGoodsReceiptSaveResult reject(String message) {
+      if (current()) _supplierValidationErrors[key] = message;
+      return authoritative != null ? WorkspaceGoodsReceiptSaveResult.stockRecoveryPending
+        : provenUncommitted && !attemptedWrite ? WorkspaceGoodsReceiptSaveResult.notPosted
+        : WorkspaceGoodsReceiptSaveResult.statusUnknown;
+    }
+    try {
+      // Recovery must read the checkpoint, not route committed retries from a
+      // cache that may predate another instance's post or a lost acknowledgement.
+      final pendingRecovery = data.ledgerRecovery;
+      if (pendingRecovery != null) await pendingRecovery;
+      if (!current()) return reject('Return status needs recovery in the original Store.');
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (!await data.inventoryWrites || !current() || !await loadWorkspaceInventory(retry: true) || !current() ||
+          !await recoverCustomerLedger() || !current() || data.finance == null || data.financeStale ||
+          data.customerCollectionBusy || data.pendingCustomerCollection != null ||
+          data.pendingCustomerReturn != null || data.pendingCustomerRefund != null) {
+        return reject('Recover saved Stock and the supplier account. The return details are kept.');
+      }
+      data.customerCollectionBusy = true;
+      financeLease = true;
+      final generation = data.inventoryMutations;
+      final existing = data.supplierLedgers[(key.$1, frozen.supplierId)]?.goodsReturns[frozen.operationId];
+      final projectionRevision = existing == null ? data.inventoryRevision
+        : (await _inventoryStorage.read(key.$1, key.$2, qa: key.$3))?.revision;
+      Future<bool> projectReturn() => (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
+        .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: projectionRevision, commit: (previous) async {
+          if (!current() || generation != data.inventoryMutations || previous == null) return null;
+          final store = data.ledgerCheckpointStore!, journal = await store.read(key.$1, key.$2);
+          if (!current() || journal == null || journal.revision != data.ledgerCheckpointRevision) return null;
+          final ledger = journal.supplierLedgers[frozen.supplierId];
+          if (ledger == null || ledger.openingRecord == null || journal.supplierLedgers.values.any((other) =>
+              other.supplierId != frozen.supplierId && other.goodsReturns.containsKey(frozen.operationId))) {
+            return null;
+          }
+          final existing = ledger.goodsReturns[frozen.operationId];
+          if (existing != null) {
+            if (jsonEncode(existing.toJson()) != jsonEncode(frozen.toJson())) return null;
+            authoritative = journal;
+          } else {
+            provenUncommitted = true;
+            if (ledger.revision != expectedSupplierRevision || previous.revision != data.inventoryRevision ||
+                jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) !=
+                  jsonEncode(data.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()) ||
+                !listEquals(previous.movements.map((m) => m.contentIdentity).toList(),
+                  data.workspaceStockMovements.map((m) => m.contentIdentity).toList())) {
+              return null;
+            }
+            for (final line in frozen.lines) {
+              final product = previous.products.where((p) => p.id == line.productId).singleOrNull;
+              if (product == null || product.stockMode != WorkspaceStockMode.exactQuantity || product.pack != line.stockUnit) return null;
+            }
+            final nextLedger = ledger.recordGoodsReturned(frozen, expectedRevision: expectedSupplierRevision);
+            final inventory = _captureLedgerInventory(data)?.post([
+              for (final line in frozen.lines) ?frozen.movementFor(line),
+            ], at: DateTime.now().toUtc());
+            if (nextLedger == null || inventory == null) return null;
+            final next = WorkspaceLedgerCheckpoint(revision: journal.revision + 1, finance: journal.finance,
+              inventory: inventory, billedOrders: journal.billedOrders, billedInvoices: journal.billedInvoices,
+              purchaseReceipts: journal.purchaseReceipts, supplierLedgers: {...journal.supplierLedgers, frozen.supplierId: nextLedger},
+              moneyRegisters: journal.moneyRegisters, expenses: journal.expenses);
+            if (!next.valid) return null;
+            attemptedWrite = true;
+            try {
+              await store.save(next, expectedRevision: journal.revision);
+              authoritative = next;
+            } on Object {
+              final recovered = await store.read(key.$1, key.$2);
+              final proof = recovered?.supplierLedgers[frozen.supplierId]?.goodsReturns[frozen.operationId];
+              if (proof == null || jsonEncode(proof.toJson()) != jsonEncode(frozen.toJson())) rethrow;
+              // Do not mark unrelated newer finance/supplier facts recovered
+              // while adopting only this operation. A fresh retry recovers all.
+              if (recovered!.revision != next.revision ||
+                  jsonEncode(recovered.toJson()) != jsonEncode(next.toJson())) {
+                rethrow;
+              }
+              authoritative = recovered;
+            }
+          }
+          if (!current()) return null;
+          final saved = authoritative!, inventory = saved.inventory, quantities = saved.inventory?.quantities;
+          if (inventory == null || quantities == null) return null;
+          final known = {for (final movement in inventory.movements) movement.id: movement};
+          final tails = <WorkspaceStockMovement>[];
+          for (final movement in previous.movements) {
+            final original = known[movement.id];
+            if (original != null && original.contentIdentity != movement.contentIdentity) return null;
+            if (original == null) {
+              if ({WorkspaceStockReferenceKind.manualSupplierReceipt, WorkspaceStockReferenceKind.manualSupplierReturn}
+                  .contains(movement.referenceKind)) {
+                return null;
+              }
+              tails.add(movement);
+            }
+          }
+          final products = <WorkspaceCatalogueItem>[];
+          for (final product in previous.products) {
+            final base = quantities[product.id];
+            if (product.stockMode == WorkspaceStockMode.exactQuantity && base != null) {
+              final quantity = base + tails.where((m) => m.productId == product.id).fold<int>(0, (sum, m) => sum + m.quantityDelta);
+              if (quantity < 0 || quantity > 2147483647) return null;
+              products.add(product.copyWith(stock: quantity, available: product.available && quantity > 0));
+            } else { products.add(product); }
+          }
+          if (frozen.lines.any((line) => !products.any((p) => p.id == line.productId))) return null;
+          final movements = [...tails, ...inventory.movements.reversed];
+          if (previous.manualReceiptCheckpointRevision == saved.revision &&
+              jsonEncode(previous.products.map((p) => p.toInventoryJson()).toList()) ==
+                jsonEncode(products.map((p) => p.toInventoryJson()).toList()) &&
+              listEquals(previous.movements.map((m) => m.contentIdentity).toList(), movements.map((m) => m.contentIdentity).toList())) {
+            projected = previous;
+          } else {
+            projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
+              revision: previous.revision + 1, savedAt: DateTime.now().toUtc(), products: products,
+              movements: movements, manualReceiptCheckpointRevision: saved.revision);
+          }
+          return projected;
+        });
+      final saved = existing != null ? await projectReturn()
+        : await (_supplierStorage as WorkPurchaseEntryRevisionGuard).withReviewedBook(key.$1, key.$2, qa: key.$3,
+          expectedRevision: expectedPurchaseRevision, action: (book) async =>
+            current() && book.profiles.any((p) => p.id == frozen.supplierId) && await projectReturn());
+      if (!saved || projected == null || authoritative == null || !current()) {
+        return reject(authoritative == null ? 'Return status needs recovery. Keep and retry the same return.'
+          : 'Goods returned are recorded. Recover Stock before making another change.');
+      }
+      data.workspaceCatalogueItems..clear()..addAll(projected!.products);
+      data.workspaceStockMovements..clear()..addAll(projected!.movements);
+      data.inventoryRevision = projected!.revision;
+      data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
+      data.inventoryMutations++;
+      data.inventoryReceiptRecoveryPending = false;
+      data.inventoryError = null;
+      data.ledgerInventory = authoritative!.inventory;
+      data.ledgerCheckpointRevision = authoritative!.revision;
+      data.supplierLedgers[(key.$1, frozen.supplierId)] = authoritative!.supplierLedgers[frozen.supplierId]!;
+      data.ledgerRecovered = true;
+      complete = true;
+      _persistOperationalState('supplier-goods-returned');
+      return WorkspaceGoodsReceiptSaveResult.saved;
+    } on Object {
+      return reject('Return status is not verified. Keep the same details and recover before retrying.');
+    } finally {
+      if (!complete && (!provenUncommitted || attemptedWrite || authoritative != null)) {
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        data.inventoryReceiptRecoveryPending = true;
+        data.inventoryError = 'Goods return status needs recovery before changing Stock.';
+      } else if (!complete) {
+        data.inventoryReceiptRecoveryPending = priorRecoveryPending || data.inventoryReceiptRecoveryPending;
+      }
+      if (financeLease) data.customerCollectionBusy = false;
+      data.inventoryReceiptBusy = false;
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
+
+  Future<bool> confirmWorkspaceSupplierBillGoodsAllocation(
+    WorkspaceSupplierBillGoodsAllocation link, {
+    required String supplierId,
+    required (String, String, bool) scope,
+    required int expectedSupplierRevision,
+    bool requireSavedReview = false,
+    int? expectedPurchaseRevision,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !link.valid ||
+        !workspaceSupplierOpeningConfirmationAvailable || workspaceSupplierSaving ||
+        data.inventoryReceiptRecoveryPending || data.customerCollectionBusy) {
+      return false;
+    }
+    _supplierWrites.add(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData)) {
+        return false;
+      }
+      final freshBook = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+      if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
+      final frozenReview = freshBook?.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+      if (freshBook != null && freshBook.billGoodsCancellations.isNotEmpty) {
+        final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+        if (!_billGoodsCancellationStateVerified(freshBook, journal) ||
+            _disposed || _supplierKey != key || !identical(data, _storeData)) {
+          throw StateError('Cancelled match and supplier account need recovery.');
+        }
+        if (freshBook.billGoodsCancellations.any((c) => c.operationId == link.operationId)) {
+          _supplierValidationErrors[key] = 'This matching review was cancelled. Prepare a new match; received goods and the bill are unchanged.';
+          return false;
+        }
+      }
+      if ((requireSavedReview && frozenReview == null) || (frozenReview != null &&
+          (frozenReview.supplierId != supplierId ||
+            jsonEncode(frozenReview.allocation.toJson()) != jsonEncode(link.toJson())))) {
+        _supplierValidationErrors[key] = 'Resume the exact saved bill goods match. Changed details cannot be linked.';
+        return false;
+      }
+      final ledger = workspaceSupplierLedger(supplierId);
+      for (final other in _supplierLedgerCheckpointEntries(data).values) {
+        if (other.supplierId != supplierId && other.billGoodsAllocations.containsKey(link.operationId)) {
+          _supplierValidationErrors[key] = 'This goods link belongs to another supplier. Reopen its saved purchase.';
+          return false;
+        }
+      }
+      final next = ledger?.allocateBillGoods(link, expectedRevision: expectedSupplierRevision);
+      if (next == null) {
+        _supplierValidationErrors[key] = 'Check the saved bill, received goods, product and unit conversion. Nothing was linked twice.';
+        return false;
+      }
+      // A proved exact commit is independent of later purchase-book revisions.
+      if (identical(next, ledger)) return true;
+      // New posting always shares the review writer's queue, including legacy
+      // optional-review callers. A concurrently frozen operation cannot bypass it.
+      {
+        final guard = _supplierStorage;
+        if (guard is! WorkPurchaseEntryRevisionGuard || freshBook == null) return false;
+        final reviewedGuard = guard as WorkPurchaseEntryRevisionGuard;
+        return await reviewedGuard.withReviewedBook(key.$1, key.$2, qa: key.$3,
+          expectedRevision: expectedPurchaseRevision ?? freshBook.revision, action: (book) async {
+            final review = book.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+            final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+            if (!_billGoodsCancellationStateVerified(book, journal)) {
+              throw StateError('Supplier account status is unavailable or conflicts with cancelled matches.');
+            }
+            if (book.billGoodsCancellations.any((c) => c.operationId == link.operationId)) {
+              _supplierValidationErrors[key] = 'This matching review was cancelled. Prepare a new match.';
+              return false;
+            }
+            if (_disposed || _supplierKey != key || (requireSavedReview && review == null) ||
+                (review != null && (review.supplierId != supplierId ||
+                  jsonEncode(review.allocation.toJson()) != jsonEncode(link.toJson())))) {
+              _supplierValidationErrors[key] = 'Resume the exact saved bill goods match. Changed details cannot be linked.';
+              return false;
+            }
+            return saveWorkspaceSupplierLedger(next);
+          });
+      }
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (!_disposed && _supplierKey == key) {
+        _supplierErrors[key] = 'Bill goods match status is unverified. Recover Purchases and the supplier account before retrying this exact match.';
+      }
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
+
+  Future<bool> saveWorkspaceSupplierOpeningRecord(
+    WorkspaceSupplierOpeningRecord record, {
+    required (String, String, bool) scope,
+    required int? expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    if (key == null ||
+        key != scope ||
+        !workspaceSuppliersLoaded ||
+        workspaceSupplierSaving ||
+        _supplierLoads.containsKey(key) ||
+        record.account != key.$1 ||
+        record.store != key.$2 ||
+        record.qa != key.$3) {
+      return false;
+    }
+    final old = _supplierDirectories[key];
+    final previous = old?.openingRecords
+        .where((r) => r.id == record.id)
+        .firstOrNull;
+    if (previous != null &&
+        jsonEncode(previous.toJson()) == jsonEncode(record.toJson())) {
+      dismissWorkspacePurchaseValidation(key);
+      return true;
+    }
+    if (old == null ||
+        previous != null ||
+        _supplierNeedsReload.contains(key) ||
+        old.revision != expectedRevision ||
+        record.revision != old.revision + 1) {
+      _supplierValidationErrors[key] =
+          'Opening records changed. Reopen this supplier before saving again. Your entries are kept.';
+      notifyListeners();
+      return false;
+    }
+    WorkspacePurchaseEntryBook next;
+    try {
+      next = WorkspacePurchaseEntryBook.fromJson(
+        WorkspacePurchaseEntryBook(
+          account: old.account,
+          store: old.store,
+          qa: old.qa,
+          revision: old.revision + 1,
+          profiles: old.profiles,
+          draft: old.draft,
+          copies: old.copies,
+          openingRecords: [...old.openingRecords, record],
+          goodsReceiptDrafts: old.goodsReceiptDrafts,
+          goodsReceiptCancellations: old.goodsReceiptCancellations,
+          billGoodsReviews: old.billGoodsReviews,
+          billGoodsCancellations: old.billGoodsCancellations,
+        ).toJson(),
+      );
+    } on Object {
+      _supplierValidationErrors[key] =
+          'Check the supplier, date, amount and supporting bills. Your entries are kept.';
+      notifyListeners();
+      return false;
+    }
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      await _supplierStorage.save(next, expectedRevision: old.revision);
+      if (_supplierKey != key) {
+        _supplierNeedsReload.add(key);
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (_supplierKey == key) {
+        _supplierErrors[key] =
+            'Opening record could not be saved. Your entries are kept. Retry, or reopen the saved record.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (_supplierKey == key) notifyListeners();
+    }
+  }
+
+  int? get workspacePurchaseEntryRevision => _supplierDirectories[_supplierKey]?.revision;
+  List<WorkspacePurchaseSavedCopy> get workspacePurchaseCopies =>
+    _supplierDirectories[_supplierKey]?.copies ?? const [];
+  List<WorkspaceSupplierGoodsReceiptDraft> get workspaceGoodsReceiptDrafts =>
+      _supplierDirectories[_supplierKey]?.goodsReceiptDrafts ?? const [];
+  List<WorkspaceGoodsReceiptReviewCancellation> get workspaceGoodsReceiptCancellations =>
+      _supplierDirectories[_supplierKey]?.goodsReceiptCancellations ?? const [];
+
+  Future<bool> abandonWorkspaceGoodsReceiptReview(String receiptId, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision, required DateTime cancelledAt, required String reason,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || data.inventoryReceiptBusy ||
+        _supplierNeedsReload.contains(key) || _supplierStorage is! WorkPurchaseReceiptReviewAbandonment ||
+        data.ledgerCheckpointStore == null) { return false; }
+    final cancellation = WorkspaceGoodsReceiptReviewCancellation(receiptId: receiptId,
+      supplierId: supplierId, revision: expectedRevision + 1, cancelledAt: cancelledAt, reason: reason);
+    if (!cancellation.valid) return false;
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    try {
+      final next = await (_supplierStorage as WorkPurchaseReceiptReviewAbandonment)
+        .abandonReviewedReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: expectedRevision,
+          cancellation: cancellation, verifyUncommitted: (review) async {
+            final journal = await data.ledgerCheckpointStore!.read(key.$1, key.$2);
+            return current() && review.supplierId == supplierId &&
+              !(journal?.supplierLedgers.values.any((ledger) => ledger.goodsReceipts.containsKey(receiptId)) ?? false);
+          });
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (next == null) {
+        _supplierValidationErrors[key] = 'Review changed or goods are already recorded. Recover the saved delivery; cancellation cannot reverse received goods.';
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (current()) {
+        _supplierErrors[key] = 'Cancellation status is unverified. Recover Purchases before changing or replacing this receiving review.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
+
+  /// Freeze a receiving review before any Stock or accounting commit. An
+  /// uncertain save must be recovered from this book before posting the receipt.
+  Future<bool> saveWorkspaceGoodsReceiptDraft(WorkspaceSupplierGoodsReceipt receipt, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision,
+  }) async {
+    final key = _supplierKey;
+    final old = _supplierDirectories[key];
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving ||
+        _supplierNeedsReload.contains(key) || old == null || !receipt.valid ||
+        !old.profiles.any((p) => p.id == supplierId)) { return false; }
+    final previous = old.goodsReceiptDrafts.where((r) => r.receipt.id == receipt.id).firstOrNull;
+    if (previous != null) {
+      if (old.goodsReceiptCancellations.any((c) => c.receiptId == receipt.id)) {
+        _supplierValidationErrors[key] = 'This review was cancelled. Start a corrected review with a new delivery reference; saved history is kept.';
+        notifyListeners();
+        return false;
+      }
+      return previous.supplierId == supplierId &&
+          jsonEncode(previous.receipt.toJson()) == jsonEncode(receipt.toJson());
+    }
+    if (old.revision != expectedRevision || old.goodsReceiptDrafts.length >= 1000) {
+      _supplierValidationErrors[key] = 'Receiving reviews changed or storage is full. Recover saved Purchases; do not clear records.';
+      notifyListeners();
+      return false;
+    }
+    final review = WorkspaceSupplierGoodsReceiptDraft(supplierId: supplierId,
+      revision: old.revision + 1, receipt: receipt);
+    final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+      account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
+      profiles: old.profiles, draft: old.draft, copies: old.copies,
+      openingRecords: old.openingRecords, goodsReceiptDrafts: [...old.goodsReceiptDrafts, review],
+      goodsReceiptCancellations: old.goodsReceiptCancellations,
+      billGoodsReviews: old.billGoodsReviews,
+      billGoodsCancellations: old.billGoodsCancellations).toJson());
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(old, _supplierDirectories[key]) || _storeData.inventoryReceiptRecoveryPending) {
+        return false;
+      }
+      final previousReviews = old.goodsReceiptDrafts.where((r) => r.supplierId == supplierId &&
+        !old.goodsReceiptCancellations.any((c) => c.receiptId == r.receipt.id)).toList();
+      if (old.goodsReceiptCancellations.isNotEmpty) {
+        final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+        if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
+        if (journal?.supplierLedgers.values.any((ledger) =>
+            old.goodsReceiptCancellations.any((c) => ledger.goodsReceipts.containsKey(c.receiptId))) ?? false) {
+          _supplierValidationErrors[key] = 'Receipt and cancellation records disagree. Recover the supplier account before starting another arrival; history is kept.';
+          return false;
+        }
+      }
+      if (previousReviews.isNotEmpty) {
+        final inventory = await _inventoryStorage.read(key.$1, key.$2, qa: key.$3);
+        if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return false;
+        if (_supplierStorage is! WorkPurchaseGoodsReceiptReviewGuard ||
+            _inventoryStorage is! WorkInventoryReceiptProjectionGuard || inventory == null) {
+          _supplierValidationErrors[key] = 'Verify the previous delivery’s saved Stock recovery before starting another arrival.';
+          return false;
+        }
+        // Purchase → inventory is the same order used by receipt posting. Keep
+        // the durable review write inside both queues; never re-enter either.
+        final savedReview = await (_supplierStorage as WorkPurchaseGoodsReceiptReviewGuard)
+          .saveReviewedGoodsReceipt(next, expectedRevision: old.revision,
+            withVerifiedStock: (persist) => (_inventoryStorage as WorkInventoryReceiptProjectionGuard)
+              .projectReceipt(key.$1, key.$2, qa: key.$3, expectedRevision: inventory.revision,
+                commit: (savedStock) async {
+                  final journal = await _storeData.ledgerCheckpointStore?.read(key.$1, key.$2);
+                  if (_disposed || _supplierKey != key || !identical(old, _supplierDirectories[key])) return null;
+                  final ledger = journal?.supplierLedgers[supplierId];
+                  if (previousReviews.any((r) =>
+                      jsonEncode(ledger?.goodsReceipts[r.receipt.id]?.toJson()) != jsonEncode(r.receipt.toJson()))) {
+                    _supplierValidationErrors[key] = 'Resume this supplier’s saved delivery review before starting another arrival.';
+                    return null;
+                  }
+                  final authoritative = journal?.inventory;
+                  final quantities = authoritative?.quantities;
+                  final marker = savedStock?.manualReceiptCheckpointRevision;
+                  final products = {for (final p in savedStock?.products ?? const <WorkspaceCatalogueItem>[]) p.id: p};
+                  final movements = {for (final m in savedStock?.movements ?? const <WorkspaceStockMovement>[]) m.id: m};
+                  final known = authoritative?.movements.map((m) => m.id).toSet() ?? <String>{};
+                  final tails = savedStock?.movements.where((m) => !known.contains(m.id)).toList() ?? <WorkspaceStockMovement>[];
+                  // A money-only commit may advance journal revision without
+                  // changing Stock. Prove projection content, not revision equality.
+                  final matches = savedStock != null && journal != null && authoritative != null && quantities != null &&
+                    marker != null && marker > 0 && marker <= journal.revision &&
+                    products.length == savedStock.products.length && movements.length == savedStock.movements.length &&
+                    tails.every((m) => m.referenceKind != WorkspaceStockReferenceKind.manualSupplierReceipt &&
+                      m.referenceKind != WorkspaceStockReferenceKind.manualSupplierReturn) &&
+                    authoritative.movements.every((m) => movements[m.id]?.contentIdentity == m.contentIdentity) &&
+                    quantities.entries.every((e) => products[e.key]?.stock == e.value +
+                      tails.where((m) => m.productId == e.key).fold<int>(0, (sum, m) => sum + m.quantityDelta));
+                  if (!matches) {
+                    _supplierValidationErrors[key] = 'Verify the previous delivery’s saved Stock recovery before starting another arrival.';
+                    return null;
+                  }
+                  if (!await persist()) return null;
+                  return savedStock; // Exact bytes/marker retained, no Stock write.
+                }));
+        if (!savedReview) return false;
+      } else {
+        await _supplierStorage.save(next, expectedRevision: old.revision);
+      }
+      if (_disposed || _supplierKey != key) { _supplierNeedsReload.add(key); return false; }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      if (!_disposed && _supplierKey == key) {
+        _supplierErrors[key] = 'Receiving review save status is unverified. Recover Purchases and reuse the saved delivery identity before posting goods.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
+  List<WorkspacePurchaseSavedCopy> get workspaceLatestPurchaseCopies =>
+      _supplierDirectories[_supplierKey]?.latestReviewedCopies ?? const [];
+  List<WorkspaceSupplierBillGoodsReview> get workspaceBillGoodsReviews =>
+      _supplierDirectories[_supplierKey]?.billGoodsReviews ?? const [];
+  List<WorkspaceBillGoodsReviewCancellation> get workspaceBillGoodsCancellations =>
+      _supplierDirectories[_supplierKey]?.billGoodsCancellations ?? const [];
+  String newWorkspaceBillGoodsLinkId() => _newCounterIdentity('supplier-bill-goods');
+
+  bool _billGoodsCancellationStateVerified(WorkspacePurchaseEntryBook book,
+      WorkspaceLedgerCheckpoint? journal) => journal != null && journal.valid &&
+    journal.finance.accountScope == book.account && journal.finance.workspaceId == book.store &&
+    !book.billGoodsCancellations.any((c) => journal.supplierLedgers.values
+      .any((ledger) => ledger.billGoodsAllocations.containsKey(c.operationId)));
+
+  Future<bool> abandonWorkspaceBillGoodsReview(String operationId, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedRevision, required DateTime cancelledAt, required String reason,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    if (key == null || key != scope || !key.$3 || _productionSession ||
+        !workspaceSuppliersLoaded || workspaceSupplierSaving || data.inventoryReceiptBusy ||
+        data.inventoryReceiptRecoveryPending || data.customerCollectionBusy ||
+        _supplierNeedsReload.contains(key) || _supplierStorage is! WorkPurchaseBillGoodsReviewAbandonment ||
+        data.ledgerCheckpointStore == null) { return false; }
+    final cancellation = WorkspaceBillGoodsReviewCancellation(operationId: operationId,
+      supplierId: supplierId, revision: expectedRevision + 1, cancelledAt: cancelledAt, reason: reason);
+    if (!cancellation.valid) return false;
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    bool current() => !_disposed && _supplierKey == key && identical(data, _storeData);
+    try {
+      final next = await (_supplierStorage as WorkPurchaseBillGoodsReviewAbandonment)
+        .abandonReviewedBillGoods(key.$1, key.$2, qa: key.$3, expectedRevision: expectedRevision,
+          cancellation: cancellation, verifyUncommitted: (review) async {
+            final journal = await data.ledgerCheckpointStore!.read(key.$1, key.$2);
+            if (!current() || journal == null || !journal.valid ||
+                journal.finance.accountScope != key.$1 || journal.finance.workspaceId != key.$2 ||
+                journal.supplierLedgers[supplierId] == null || review.supplierId != supplierId) {
+              throw StateError('Supplier account status is not verified.');
+            }
+            return !journal.supplierLedgers.values.any((ledger) => ledger.billGoodsAllocations.containsKey(operationId));
+          });
+      if (!current()) { _supplierNeedsReload.add(key); return false; }
+      if (next == null) {
+        _supplierValidationErrors[key] = 'Matching review changed or is already posted. Recover its saved status; cancellation cannot reverse a confirmed match.';
+        return false;
+      }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      _supplierNeedsReload.add(key);
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        _supplierErrors[key] = 'Match cancellation status is unverified. Recover Purchases and the supplier account before replacing this review.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (current()) notifyListeners();
+    }
+  }
+
+  /// Saving the exact reviewed match changes neither goods nor money. All
+  /// previous attempts must be recovered before another match can be prepared.
+  Future<bool> saveWorkspaceBillGoodsReview(WorkspaceSupplierBillGoodsAllocation link, {
+    required String supplierId, required (String, String, bool) scope,
+    required int expectedPurchaseRevision, required int expectedSupplierRevision,
+  }) async {
+    final key = _supplierKey;
+    final data = _storeData;
+    final old = _supplierDirectories[key];
+    if (key == null || key != scope || !workspaceSupplierOpeningConfirmationAvailable ||
+        workspaceSupplierSaving || old == null || !link.valid ||
+        _supplierStorage is! WorkPurchaseBillGoodsReviewGuard ||
+        _supplierNeedsReload.contains(key)) { return false; }
+    final previous = old.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+    if (previous == null && (old.revision != expectedPurchaseRevision || old.billGoodsReviews.length >= 1000)) {
+      _supplierValidationErrors[key] = 'Saved matches changed or storage is full. Recover Purchases; records are kept.';
+      notifyListeners();
+      return false;
+    }
+    _supplierWrites.add(key);
+    _supplierErrors.remove(key);
+    _supplierValidationErrors.remove(key);
+    notifyListeners();
+    try {
+      if (previous != null) {
+        final fresh = await _supplierStorage.read(key.$1, key.$2, qa: key.$3);
+        final guard = _supplierStorage;
+        if (fresh == null || guard is! WorkPurchaseEntryRevisionGuard) return false;
+        return await (guard as WorkPurchaseEntryRevisionGuard).withReviewedBook(key.$1, key.$2,
+          qa: key.$3, expectedRevision: fresh.revision, action: (book) async {
+            final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+            if (!_billGoodsCancellationStateVerified(book, journal)) {
+              throw StateError('Cancelled review conflicts with supplier account status.');
+            }
+            final exact = book.billGoodsReviews.where((r) => r.allocation.operationId == link.operationId).singleOrNull;
+            final valid = !_disposed && _supplierKey == key && identical(data, _storeData) &&
+              !book.billGoodsCancellations.any((c) => c.operationId == link.operationId) &&
+              exact?.supplierId == supplierId &&
+              jsonEncode(exact?.allocation.toJson()) == jsonEncode(link.toJson());
+            if (!valid) _supplierValidationErrors[key] = 'This saved match changed or was cancelled. Recover Purchases before preparing another.';
+            return valid;
+          });
+      }
+      if (!await recoverCustomerLedger() || _disposed || _supplierKey != key ||
+          !identical(data, _storeData) || !identical(old, _supplierDirectories[key]) || data.inventoryReceiptRecoveryPending) {
+        return false;
+      }
+      final ledger = workspaceSupplierLedger(supplierId);
+      if (ledger == null || ledger.billGoodsAllocations.containsKey(link.operationId) ||
+          ledger.allocateBillGoods(link, expectedRevision: expectedSupplierRevision) == null) {
+        _supplierValidationErrors[key] = 'Check the saved bill, delivery quantities and unit conversion before saving this match.';
+        return false;
+      }
+      final journal = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+      if (_disposed || _supplierKey != key || !identical(data, _storeData)) return false;
+      if (!_billGoodsCancellationStateVerified(old, journal)) {
+        throw StateError('Cancelled review conflicts with supplier account status.');
+      }
+      if (old.billGoodsReviews.where((r) => r.supplierId == supplierId &&
+          !old.billGoodsCancellations.any((c) => c.operationId == r.allocation.operationId)).any((review) =>
+          jsonEncode(ledger.billGoodsAllocations[review.allocation.operationId]?.toJson()) !=
+            jsonEncode(review.allocation.toJson()))) {
+        _supplierValidationErrors[key] = 'Resume this supplier’s saved bill goods match before preparing another.';
+        return false;
+      }
+      final review = WorkspaceSupplierBillGoodsReview(supplierId: supplierId,
+        revision: old.revision + 1, allocation: link);
+      final next = WorkspacePurchaseEntryBook.fromJson(WorkspacePurchaseEntryBook(
+        account: old.account, store: old.store, qa: old.qa, revision: old.revision + 1,
+        profiles: old.profiles, draft: old.draft, copies: old.copies,
+        openingRecords: old.openingRecords, goodsReceiptDrafts: old.goodsReceiptDrafts,
+        goodsReceiptCancellations: old.goodsReceiptCancellations,
+        billGoodsReviews: [...old.billGoodsReviews, review],
+        billGoodsCancellations: old.billGoodsCancellations).toJson());
+      final guard = _supplierStorage as WorkPurchaseBillGoodsReviewGuard;
+      final saved = await guard.saveReviewedBillGoods(next, expectedRevision: old.revision,
+        verifyCurrent: () async {
+          // Cached recovery can be stale while another instance commits. Read
+          // the authoritative checkpoint inside the purchase queue instead.
+          final checkpoint = await data.ledgerCheckpointStore?.read(key.$1, key.$2);
+          if (_disposed || _supplierKey != key ||
+              !identical(data, _storeData) || !identical(old, _supplierDirectories[key]) || data.inventoryReceiptRecoveryPending) {
+            return false;
+          }
+          final currentLedger = checkpoint?.supplierLedgers[supplierId];
+          if (!_billGoodsCancellationStateVerified(old, checkpoint)) {
+            throw StateError('Supplier account status is unavailable or conflicts with cancelled matches.');
+          }
+          return currentLedger != null &&
+            !checkpoint!.supplierLedgers.values.any((entry) => entry.billGoodsAllocations.containsKey(link.operationId)) &&
+            currentLedger.allocateBillGoods(link, expectedRevision: expectedSupplierRevision) != null &&
+            !old.billGoodsReviews.where((r) => r.supplierId == supplierId &&
+              !old.billGoodsCancellations.any((c) => c.operationId == r.allocation.operationId)).any((review) =>
+              jsonEncode(currentLedger.billGoodsAllocations[review.allocation.operationId]?.toJson()) !=
+                jsonEncode(review.allocation.toJson()));
+        });
+      if (!saved) {
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        _supplierValidationErrors[key] = 'The supplier account changed. Recover the saved bill goods match before preparing another.';
+        return false;
+      }
+      if (_disposed || _supplierKey != key || !identical(data, _storeData)) { _supplierNeedsReload.add(key); return false; }
+      _supplierDirectories[key] = next;
+      return true;
+    } on Object {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      _supplierNeedsReload.add(key);
+      if (!_disposed && _supplierKey == key) {
+        _supplierErrors[key] = 'Bill goods review save status is unverified. Recover Purchases and resume its exact saved match.';
+      }
+      return false;
+    } finally {
+      _supplierWrites.remove(key);
+      if (!_disposed && _supplierKey == key) notifyListeners();
+    }
+  }
+  bool get workspaceInventoryLoaded => _storeData.inventoryLoaded;
+  Future<bool> get workspaceInventorySaved => _storeData.inventoryWrites;
+  bool get workspaceGoodsReceiptBusy => _storeData.inventoryReceiptBusy;
+  bool get workspaceGoodsReceiptRecoveryPending => _storeData.inventoryReceiptRecoveryPending;
+  bool get workspaceSupplierRecoveryRequired => _supplierKey != null && _supplierNeedsReload.contains(_supplierKey);
+  bool get workspaceGoodsReceiptCancellationAvailable => workspaceSupplierOpeningConfirmationAvailable &&
+      _supplierStorage is WorkPurchaseReceiptReviewAbandonment;
+  String newWorkspaceGoodsReceiptId() => _newCounterIdentity('supplier-arrival');
+  String newWorkspaceDeliveryGroupId() => _newCounterIdentity('supplier-delivery');
+  String newWorkspaceDeliveryLineId() => _newCounterIdentity('supplier-delivery-line');
+
+  /// Display-only capacity from original saved entry evidence, never on-hand.
+  /// The authoritative receipt checkpoint revalidates every allocation on save.
+  Map<WorkspaceStockMovement, int> workspaceReceiptPriorStock(String productId) {
+    if (!_storeData.ledgerRecovered || _storeData.inventoryReceiptRecoveryPending) return const {};
+    final allocated = <String, int>{};
+    for (final ledger in _supplierLedgerCheckpointEntries(_storeData).values) {
+      for (final receipt in ledger.goodsReceipts.values) {
+        for (final line in receipt.lines) {
+          for (final entry in line.priorStockUnits.entries) {
+            allocated.update(entry.key, (value) => value + entry.value, ifAbsent: () => entry.value);
+          }
+        }
+      }
+    }
+    return {for (final movement in _storeData.workspaceStockMovements)
+      if (movement.productId == productId && movement.referenceKind == null &&
+          movement.referenceId == null &&
+          {WorkspaceStockMovementKind.openingStock, WorkspaceStockMovementKind.goodsReceived}.contains(movement.kind) &&
+          movement.quantityDelta > (allocated[movement.id] ?? 0))
+        movement: movement.quantityDelta - (allocated[movement.id] ?? 0)};
+  }
+
+  bool _stockEditAvailable() {
+    if (!_storeData.inventoryReceiptBusy && !_storeData.inventoryReceiptRecoveryPending) return true;
+    showError(_storeData.inventoryReceiptRecoveryPending
+      ? 'Goods receipt needs Stock recovery. Your entries are kept; reopen the receipt before changing Stock.'
+      : 'Goods receipt is being saved. Your entries are kept; try again when it finishes.');
+    return false;
+  }
+
+  Future<bool> loadWorkspaceInventory({bool retry = false}) {
+    final data = _storeData;
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (!localInventoryEnabled) {
+      return Future.value(true);
+    }
+    if (data.inventoryLoaded) return Future.value(true);
+    if (data.inventoryLoad != null) return data.inventoryLoad!;
+    if (!retry && data.inventoryError != null) return Future.value(false);
+    if (account == null || store == null || _disposed) {
+      return Future.value(false);
+    }
+    final generation = data.inventoryMutations;
+    final operation = () async {
+      try {
+        final saved = await _inventoryStorage.read(
+          account,
+          store,
+          qa: !_productionSession,
+        );
+        if (!_isStoreScopeCurrent(data, store, account) ||
+            generation != data.inventoryMutations) {
+          return false;
+        }
+        if (saved != null) {
+          final seed = _selectedReviewSeed;
+          final untouchedReviewBaseline =
+              !_productionSession &&
+              seed != null &&
+              seed.storeId == store &&
+              data.inventoryMutations == 0 &&
+              data.workspaceStockMovements.isEmpty &&
+              jsonEncode(
+                    data.workspaceCatalogueItems
+                        .map((p) => p.toInventoryJson())
+                        .toList(),
+                  ) ==
+                  jsonEncode(
+                    seed.products.map((p) => p.toInventoryJson()).toList(),
+                  );
+          // Never overwrite in-session/server inventory with an older local copy.
+          if (!untouchedReviewBaseline &&
+              (data.workspaceCatalogueItems.isNotEmpty ||
+                  data.workspaceStockMovements.isNotEmpty)) {
+            throw const WorkGatewayException(
+              'Saved stock needs reconciliation before editing. Existing records have been kept.',
+            );
+          }
+          data.workspaceCatalogueItems
+            ..clear()
+            ..addAll(saved.products);
+          data.workspaceStockMovements.addAll(saved.movements);
+          data.inventoryRevision = saved.revision;
+          data.inventoryReceiptCheckpointRevision = saved.manualReceiptCheckpointRevision;
+          if (!_productionSession && data.ledgerCheckpointStore != null) {
+            final journal = await data.ledgerCheckpointStore!.read(account, store);
+            if (!_isStoreScopeCurrent(data, store, account) || generation != data.inventoryMutations) return false;
+            final hasReceipts = journal?.supplierLedgers.values.any((ledger) => ledger.goodsReceipts.isNotEmpty) ?? false;
+            final movements = {for (final m in saved.movements) m.id: m};
+            data.inventoryReceiptRecoveryPending = hasReceipts &&
+                (saved.manualReceiptCheckpointRevision == null ||
+                 journal!.inventory!.movements.any((m) => movements[m.id]?.contentIdentity != m.contentIdentity));
+          }
+          retailerProductAdded = saved.products.isNotEmpty;
+        }
+        data.inventoryLoaded = true;
+        data.inventoryError = data.inventoryReceiptRecoveryPending
+            ? 'Goods receipt is saved. Reopen it to recover Stock before making further changes.' : null;
+        return true;
+      } on Object {
+        if (_isStoreScopeCurrent(data, store, account)) {
+          data.inventoryError =
+              'Saved stock could not be recovered. Retry without clearing Store data.';
+        }
+        return false;
+      } finally {
+        data.inventoryLoad = null;
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+      }
+    }();
+    data.inventoryLoad = operation;
+    return operation;
+  }
+
+  void _queueInventorySave() {
+    if (!localInventoryEnabled) {
+      return;
+    }
+    final data = _storeData;
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || store == null) {
+      data.inventoryError =
+          'Store stock cannot be saved without its account and Store.';
+      data.inventoryWrites = Future.value(false);
+      return;
+    }
+    data.inventoryMutations++;
+    // Freeze caller-owned nested content before an asynchronous write.
+    final List<WorkspaceCatalogueItem> frozenProducts;
+    try {
+      frozenProducts = [
+        for (final p in data.workspaceCatalogueItems)
+          WorkspaceCatalogueItem.fromInventoryJson(
+            jsonDecode(jsonEncode(p.toInventoryJson())),
+          ),
+      ];
+    } on Object {
+      // Keep the existing write in sequence. A bad new record must neither
+      // escape into the editor nor report an earlier valid save as this save.
+      data.inventoryWrites = data.inventoryWrites.then((_) {
+        data.inventoryError =
+            'Stock details could not be saved. Review the product and retry.';
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+        return false;
+      });
+      return;
+    }
+    final movements = List<WorkspaceStockMovement>.of(
+      data.workspaceStockMovements,
+    );
+    final at = DateTime.now().toUtc();
+    data.inventoryWrites = data.inventoryWrites.then((previousSucceeded) async {
+      if (!previousSucceeded || !_isStoreScopeCurrent(data, store, account)) {
+        return false;
+      }
+      try {
+        if (!data.inventoryLoaded) {
+          final previous = await _inventoryStorage.read(
+            account,
+            store,
+            qa: !_productionSession,
+          );
+          if (previous != null) {
+            throw const WorkGatewayException(
+              'Recover saved stock before changing it.',
+            );
+          }
+          if (!_isStoreScopeCurrent(data, store, account)) return false;
+          data.inventoryLoaded = true;
+        }
+        final snapshot = WorkspaceSavedInventory(
+          account: account,
+          store: store,
+          qa: !_productionSession,
+          revision: (data.inventoryRevision ?? 0) + 1,
+          savedAt: at,
+          products: frozenProducts,
+          movements: movements,
+          manualReceiptCheckpointRevision: data.inventoryReceiptCheckpointRevision,
+        );
+        await _inventoryStorage.save(
+          snapshot,
+          expectedRevision: data.inventoryRevision,
+        );
+        data.inventoryRevision = snapshot.revision;
+        data.inventoryError = null;
+        return _isStoreScopeCurrent(data, store, account);
+      } on Object {
+        data.inventoryError =
+            'Stock changes are not saved on this device. Keep this screen open and retry.';
+        return false;
+      } finally {
+        if (_isStoreScopeCurrent(data, store, account)) notifyListeners();
+      }
+    });
+  }
+
+  Future<bool> retryWorkspaceInventorySave() async {
+    if (!_stockEditAvailable()) return false;
+    final data = _storeData;
+    await data.inventoryWrites;
+    if (!identical(data, _storeData)) return false;
+    data.inventoryWrites = Future.value(true);
+    data.inventoryError = null;
+    _queueInventorySave();
+    return data.inventoryWrites;
+  }
+
+  final bool _productionSession;
+  StoreReviewSeed? _selectedReviewSeed;
+  Future<bool>? _reviewSelectionSave;
+  late final WorkReviewStoreSelectionStore _reviewSelectionStorage =
+      reviewStoreSelectionStore ??
+      SecureWorkReviewStoreSelectionStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+      );
+  late final WorkUpiDestinationStore _upiDestinationStorage =
+      upiDestinationStore ??
+      SecureWorkUpiDestinationStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+        storeScope: () => _disposed ? null : activeWorkspace?.id,
+      );
+
+  ({String account, String store})? get storeUpiScope =>
+      _disposed ? null : _counterDraftScope;
+
+  ({String account, String store})? get storeInvoiceDeliveryScope =>
+      _disposed ? null : _counterDraftScope;
+
+  late final WorkInvoiceDeliveryPreferenceStore _invoiceDeliveryStorage =
+      invoiceDeliveryPreferenceStore ??
+      SecureWorkInvoiceDeliveryPreferenceStore(
+        accountScope: () => _disposed ? null : _contactAccountScope,
+        storeScope: () => _disposed ? null : activeWorkspace?.id,
+      );
+
+  Future<WorkspaceInvoiceDeliveryPreference> loadInvoiceDeliveryPreference(
+    ({String account, String store}) scope,
+  ) async {
+    if (scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to view invoice delivery.',
+      );
+    }
+    final saved = await _invoiceDeliveryStorage.read(
+      scope.account,
+      scope.store,
+    );
+    if (scope != storeInvoiceDeliveryScope ||
+        (saved != null &&
+            (!saved.valid ||
+                saved.account != scope.account ||
+                saved.store != scope.store))) {
+      throw const WorkGatewayException(
+        'Return to your Store to view invoice delivery.',
+      );
+    }
+    return saved ??
+        WorkspaceInvoiceDeliveryPreference(
+          account: scope.account,
+          store: scope.store,
+        );
+  }
+
+  Future<void> saveInvoiceDeliveryPreference(
+    WorkspaceInvoiceDeliveryPreference preference,
+  ) async {
+    final scope = (account: preference.account, store: preference.store);
+    if (!preference.valid || scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to change invoice delivery.',
+      );
+    }
+    await _invoiceDeliveryStorage.save(preference);
+    if (scope != storeInvoiceDeliveryScope) {
+      throw const WorkGatewayException(
+        'Return to your Store to change invoice delivery.',
+      );
+    }
+    // This stores a preference only. Backend dispatch is deliberately absent.
+    notifyListeners();
+  }
+
+  Future<WorkspaceUpiDestination?> loadStoreUpiDestination(
+    ({String account, String store}) scope,
+  ) async {
+    if (scope != storeUpiScope) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+    final destination = await _upiDestinationStorage.read(
+      scope.account,
+      scope.store,
+    );
+    if (scope != storeUpiScope ||
+        (destination != null &&
+            (!destination.valid ||
+                destination.account != scope.account ||
+                destination.store != scope.store))) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+    return destination;
+  }
+
+  Future<void> saveStoreUpiDestination(
+    WorkspaceUpiDestination destination,
+  ) async {
+    final scope = (account: destination.account, store: destination.store);
+    if (!destination.valid || scope != storeUpiScope) {
+      throw const WorkGatewayException('Check your Store UPI details.');
+    }
+    await _upiDestinationStorage.save(destination);
+    if (scope != storeUpiScope) {
+      throw const WorkGatewayException('Return to your Store to set up UPI.');
+    }
+  }
+
+  late final WorkLedgerFormDraftStore _ledgerFormStorage =
+      ledgerFormDraftStore ??
+      SecureWorkLedgerFormDraftStore(accountScope: () => _contactAccountScope);
+
+  WorkspaceLedgerFormKey? ledgerFormKey(
+    WorkspacePaymentRecord payment,
+    String kind,
+  ) {
+    final finance = workspaceFinance;
+    final ledger = finance?.customerLedgers
+        .where((item) => item.customerId == payment.customerId)
+        .firstOrNull;
+    if (finance == null ||
+        ledger == null ||
+        payment.invoiceId == null ||
+        finance.accountScope != _contactAccountScope ||
+        finance.workspaceId != activeWorkspace?.id) {
+      return null;
+    }
+    return (
+      account: finance.accountScope,
+      store: finance.workspaceId,
+      customer: payment.customerId,
+      invoice: payment.invoiceId!,
+      order: payment.orderId,
+      kind: kind,
+      ledgerRevision: ledger.revision,
+    );
+  }
+
+  WorkspaceLedgerFormKey? supplierPaymentFormKey(
+    WorkspacePurchaseRecord purchase,
+  ) {
+    if (!_receiptCurrent(purchase)) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(purchase.supplierId);
+    final bills = ledger?.entries
+        .where(
+          (entry) =>
+              entry.orderId == purchase.orderId &&
+              entry.kind == WorkspaceSupplierEntryKind.bill,
+        )
+        .toList();
+    if (ledger == null || bills == null || bills.length != 1) {
+      return null;
+    }
+    return (
+      account: ledger.accountScope,
+      store: ledger.workspaceId,
+      customer: ledger.supplierId,
+      invoice: bills.single.billId!,
+      order: purchase.orderId,
+      kind: 'supplierPayment',
+      ledgerRevision: ledger.revision,
+    );
+  }
+
+  String newWorkspaceSupplierMoneyOperationId() => _newCounterIdentity('supplier-money');
+  String newWorkspaceSupplierMoneyAllocationId() => _newCounterIdentity('supplier-money-allocation');
+  String newWorkspaceSupplierGoodsReturnId() => _newCounterIdentity('supplier-goods-return');
+  String newWorkspaceSupplierCreditId() => _newCounterIdentity('supplier-credit');
+  String newWorkspaceSupplierRefundId() => _newCounterIdentity('supplier-refund');
+  String newWorkspaceSupplierShortageId() => _newCounterIdentity('supplier-shortage');
+  final Set<String> _supplierShortageSubmissions = {};
+  /// Recovery reads use the original copy namespace, not hydrated ledger state.
+  /// A new submission still requires the fresh accepted-bill checks below.
+  WorkspaceLedgerFormKey? supplierShortageRecoveryFormKey(WorkspacePurchaseSavedCopy copy) {
+    final scope = workspaceSupplierScope;
+    if (_disposed || scope == null || !copy.valid ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard) { return null; }
+    final key = (account: scope.$1, store: scope.$2, customer: copy.supplier.id,
+      invoice: copy.draft.id, order: 'shortage-copy:${copy.id}', kind: 'supplierShortage', ledgerRevision: copy.revision);
+    return _ledgerFormScopeCurrent(key) ? key : null;
+  }
+  WorkspaceLedgerFormKey? supplierShortageFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard) { return null; }
+    final ledger = workspaceSupplierLedger(copy.supplier.id), accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'shortage-copy:${copy.id}', kind: 'supplierShortage', ledgerRevision: copy.revision);
+  }
+  WorkspaceLedgerFormKey? supplierCreditFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded ||
+        _ledgerFormStorage is! WorkSupplierCreditDraftGuard) { return null; }
+    final ledger = workspaceSupplierLedger(copy.supplier.id), accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) { return null; }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'credit-copy:${copy.id}', kind: 'supplierCredit', ledgerRevision: copy.revision);
+  }
+  /// Stable source namespace also works before account cache/eligibility recovery.
+  WorkspaceLedgerFormKey? supplierRefundRecoveryFormKey({required String supplierId,
+    required WorkspaceSupplierRefundSourceKind sourceKind, required String sourceId,
+    required int openingRevision, String? copyId, int? copyRevision}) {
+    final scope = workspaceSupplierScope;
+    if (_disposed || scope == null || _ledgerFormStorage is! WorkSupplierRefundDraftGuard ||
+        (sourceKind == WorkspaceSupplierRefundSourceKind.manualBillSurplus
+          ? copyId == null || (copyRevision ?? 0) <= 0
+          : copyId != null || copyRevision != null)) { return null; }
+    final key = (account: scope.$1, store: scope.$2, customer: supplierId, invoice: sourceId,
+      order: 'supplier-refund:${!_productionSession ? 'qa' : 'live'}:${sourceKind.name}:${copyId ?? 'account'}',
+      kind: 'supplierRefund', ledgerRevision: copyRevision ?? openingRevision);
+    return _ledgerFormScopeCurrent(key) ? key : null;
+  }
+
+  WorkspaceLedgerFormKey? supplierReceivingInputFormKey(String supplierId) {
+    final scope = workspaceSupplierScope;
+    if (scope == null || !workspaceSuppliersLoaded ||
+        !workspaceSupplierOpeningConfirmationAvailable ||
+        !workspaceSuppliers.any((supplier) => supplier.id == supplierId)) {
+      return null;
+    }
+    return (account: scope.$1, store: scope.$2, customer: supplierId,
+      invoice: 'receiving-input', order: 'receiving-input:${!_productionSession ? 'qa' : 'live'}',
+      kind: 'supplierReceivingInput', ledgerRevision: 1);
+  }
+
+  WorkspaceLedgerFormKey? supplierGoodsReturnFormKey(String supplierId, String receiptId) {
+    if (!workspaceSupplierOpeningConfirmationAvailable ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || !workspaceSuppliersLoaded) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(supplierId), receipt = ledger?.goodsReceipts[receiptId];
+    if (ledger == null || receipt == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id) {
+      return null;
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: supplierId,
+      invoice: receiptId, order: 'return-receipt:$receiptId', kind: 'supplierGoodsReturn', ledgerRevision: 1);
+  }
+  bool get workspaceSupplierMoneyInputAvailable =>
+      workspaceSupplierOpeningConfirmationAvailable &&
+      _ledgerFormStorage is WorkSupplierMoneyDraftGuard;
+  bool get workspaceSupplierAllocationInputAvailable =>
+      workspaceSupplierMoneyInputAvailable && _ledgerFormStorage is WorkSupplierAllocationDraftGuard;
+
+  WorkspaceLedgerFormKey? supplierAllocationFormKey(WorkspacePurchaseSavedCopy copy) {
+    if (!workspaceSupplierAllocationInputAvailable || !workspaceSuppliersLoaded) return null;
+    final ledger = workspaceSupplierLedger(copy.supplier.id);
+    final accepted = ledger?.purchaseBills[copy.draft.id];
+    if (ledger == null || accepted == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id ||
+        jsonEncode(accepted.copy.toJson()) != jsonEncode(copy.toJson())) {
+      return null;
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId, customer: ledger.supplierId,
+      invoice: copy.draft.id, order: 'allocation-copy:${copy.id}', kind: 'supplierAllocation', ledgerRevision: copy.revision);
+  }
+
+  WorkspaceLedgerFormKey? supplierMoneyFormKey(String supplierId, {
+    WorkspacePurchaseSavedCopy? copy, bool advance = false,
+  }) {
+    if (!workspaceSupplierMoneyInputAvailable || !workspaceSuppliersLoaded ||
+        (copy != null && advance)) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(supplierId);
+    final opening = ledger?.openingRecord;
+    if (ledger == null || opening == null || !ledger.valid || !ledger.historyComplete ||
+        ledger.accountScope != _contactAccountScope || ledger.workspaceId != activeWorkspace?.id) {
+      return null;
+    }
+    if (copy != null) {
+      final bill = ledger.purchaseBills[copy.draft.id];
+      if (copy.supplier.id != supplierId || bill == null ||
+          jsonEncode(bill.copy.toJson()) != jsonEncode(copy.toJson())) {
+        return null;
+      }
+    }
+    return (account: ledger.accountScope, store: ledger.workspaceId,
+      customer: supplierId, invoice: copy?.draft.id ?? opening.id,
+      order: copy != null ? 'manual-copy:${copy.id}'
+          : '${advance ? 'account-advance' : 'account-payment'}:${opening.id}',
+      kind: 'supplierMoney', ledgerRevision: copy?.revision ?? opening.revision);
+  }
+
+  bool _ledgerFormScopeCurrent(WorkspaceLedgerFormKey key) {
+    if (_disposed ||
+        key.account != _contactAccountScope ||
+        key.store != activeWorkspace?.id) {
+      return false;
+    }
+    if (key.kind == 'expense') {
+      return key == expenseFormKey();
+    }
+    if (key.kind == 'supplierReceivingInput') {
+      return key == supplierReceivingInputFormKey(key.customer);
+    }
+    if (key.kind == 'supplierPayment') {
+      final ledger = workspaceSupplierLedger(key.customer);
+      return ledger?.revision == key.ledgerRevision &&
+          ledger!.entries.any(
+            (entry) =>
+                entry.kind == WorkspaceSupplierEntryKind.bill &&
+                entry.billId == key.invoice &&
+                entry.orderId == key.order,
+          );
+    }
+    if (key.kind == 'supplierAllocation') {
+      final copy = workspaceSupplierLedger(key.customer)?.purchaseBills[key.invoice]?.copy;
+      return copy != null && supplierAllocationFormKey(copy) == key;
+    }
+    if (key.kind == 'supplierRefund') {
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid &&
+        key.order.startsWith('supplier-refund:${!_productionSession ? 'qa' : 'live'}:');
+    }
+    if (key.kind == 'supplierCredit' || key.kind == 'supplierShortage') {
+      // Stable accepted-copy namespace; native read/submit independently checks
+      // its exact bill and supplier even before cache hydration after restart.
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid;
+    }
+    if (key.kind == 'supplierGoodsReturn') {
+      // A receipt namespace survives ledger revisions and restart before cache
+      // hydration. Native submit/reset independently verify its scoped receipt.
+      return WorkspaceLedgerFormDraft(key: key, revision: 1, fields: const {}).valid &&
+        key.ledgerRevision == 1 && key.order == 'return-receipt:${key.invoice}';
+    }
+    if (key.kind == 'supplierMoney') {
+      final ledger = workspaceSupplierLedger(key.customer);
+      final copy = key.order.startsWith('manual-copy:') ? ledger?.purchaseBills[key.invoice]?.copy : null;
+      if (key.order.startsWith('manual-copy:') && copy == null) return false;
+      return supplierMoneyFormKey(key.customer, copy: copy,
+        advance: key.order.startsWith('account-advance:')) == key;
+    }
+    return workspaceFinance?.customerLedgers
+            .where((l) => l.customerId == key.customer)
+            .firstOrNull
+            ?.revision ==
+        key.ledgerRevision;
+  }
+
+  Future<WorkspaceLedgerFormDraft?> readLedgerForm(
+    WorkspaceLedgerFormKey key,
+  ) async {
+    if (!_ledgerFormScopeCurrent(key)) {
+      throw StateError('Invoice changed before draft recovery.');
+    }
+    final draft = await _ledgerFormStorage.read(key);
+    if (!_ledgerFormScopeCurrent(key)) {
+      throw StateError('Invoice changed during draft recovery.');
+    }
+    return draft;
+  }
+
+  Future<void> saveLedgerForm(
+    WorkspaceLedgerFormDraft draft, {
+    required int? expectedRevision,
+  }) async {
+    if (!_ledgerFormScopeCurrent(draft.key)) {
+      throw StateError('Invoice changed before draft save.');
+    }
+    await _ledgerFormStorage.save(draft, expectedRevision: expectedRevision);
+    if (!_ledgerFormScopeCurrent(draft.key)) {
+      throw StateError('Invoice changed during draft save.');
+    }
+  }
+
+  late final WorkCounterDraftStore _counterDraftStorage =
+      counterDraftStore ??
+      SecureWorkCounterDraftStore(accountScope: () => _contactAccountScope);
+  final _counterDraftRecovery =
+      <({String account, String store}), _CounterDraftRecovery>{};
+  String? _counterSubmissionOrderId;
+
+  ({String account, String store})? get _counterDraftScope {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || account.isEmpty || store == null || store.isEmpty) {
+      return null;
+    }
+    return (account: account, store: store);
+  }
+
+  _CounterDraftRecovery? get _counterRecovery =>
+      _counterDraftRecovery[_counterDraftScope];
+  Object? get counterDraftIdentity => _counterDraftScope;
+  int _counterSaleGeneration = 0;
+  int get counterSaleGeneration => _counterSaleGeneration;
+  bool get counterDraftLoading => _counterRecovery?.loading == true;
+  // Journal-read readiness only; this does not grant editing or submission.
+  bool get counterDraftLoaded =>
+      _counterDraftScope == null || _counterRecovery?.loaded == true;
+  bool get counterDraftSubmitting => _counterRecovery?.submitting == true;
+  bool get counterDraftNeedsReconciliation =>
+      _counterRecovery?.record?.stage == WorkspaceCounterDraftStage.submitting;
+  bool get counterDraftCatalogueChanged =>
+      _counterRecovery?.catalogueChanged == true;
+  String? get counterDraftError => _counterRecovery?.error;
+  String? get counterCustomerInput => _counterRecovery?.customerInput;
+  WorkspaceCounterDraft? get retainedCounterDraft => _counterRecovery?.record;
+  ({String orderId, WorkspaceCustomerInvoice? invoice})?
+  get recoveredCounterSubmission {
+    final recovery = _counterRecovery;
+    final completed = recovery?.completed;
+    return recovery?.record?.stage == WorkspaceCounterDraftStage.retired &&
+            completed != null &&
+            recovery!.record!.submissionOrderId == completed.orderId &&
+            currentWorkspaceOrderId == completed.orderId
+        ? completed
+        : null;
+  }
+
+  bool get counterDraftEditingBlocked =>
+      counterDraftLoading ||
+      counterDraftSubmitting ||
+      counterDraftNeedsReconciliation ||
+      counterDraftCatalogueChanged ||
+      (_counterRecovery != null && !_counterRecovery!.loaded);
+
+  // Exact bill comparison snapshot, not a cryptographic or backend authorization.
+  String get counterBillReviewSignature {
+    final catalogue = {
+      for (final product in workspaceCatalogueItems) product.id: product,
+    };
+    final ids = workspaceOrderQuantities.keys.toList()..sort();
+    return jsonEncode([
+      _contactAccountScope,
+      activeWorkspace?.id,
+      currentWorkspaceOrderId,
+      workspaceOrderCustomer,
+      workspaceOrderBillingDetails.toJson(),
+      workspaceOrderBillingCustomer,
+      workspaceCounterDiscount.toJson(),
+      for (final id in ids)
+        [
+          id,
+          workspaceOrderQuantities[id],
+          catalogue[id]?.title,
+          catalogue[id]?.pack,
+          catalogue[id]?.sellingPrice,
+          catalogue[id]?.available,
+          catalogue[id] == null
+              ? false
+              : catalogue[id]!.stockMode ==
+                        WorkspaceStockMode.availabilityOnly ||
+                    catalogue[id]!.stock >= workspaceOrderQuantities[id]!,
+        ],
+    ]);
+  }
+
+  bool _counterCatalogueMatches(WorkspaceCounterDraft draft) {
+    final catalogue = {
+      for (final item in workspaceCatalogueItems) item.id: item,
+    };
+    return draft.lines.every((line) {
+      final product = catalogue[line.productId];
+      return product != null &&
+          product.available &&
+          product.title == line.name &&
+          product.pack == line.pack &&
+          product.sellingPrice == line.unitPricePaise ~/ 100 &&
+          line.unitPricePaise % 100 == 0 &&
+          (product.stockMode == WorkspaceStockMode.availabilityOnly ||
+              product.stock >= line.quantity);
+    });
+  }
+
+  Future<void> loadWorkspaceCounterDraft({
+    bool retry = false,
+    bool Function()? shouldRestore,
+  }) async {
+    final scope = _counterDraftScope;
+    if (scope == null || _disposed) return;
+    final recovery = _counterDraftRecovery.putIfAbsent(
+      scope,
+      _CounterDraftRecovery.new,
+    );
+    if (recovery.loading ||
+        recovery.submitting ||
+        (recovery.loaded && !retry)) {
+      return;
+    }
+    recovery.loading = true;
+    recovery.error = null;
+    final data = _storeData;
+    // A retry must not replace text already entered after a failed save.
+    final hadEdits =
+        currentWorkspaceOrderId == null &&
+        (workspaceOrderCustomer.isNotEmpty ||
+            workspaceOrderQuantities.isNotEmpty);
+    notifyListeners();
+    try {
+      await recovery.writes;
+      final record = await _counterDraftStorage.read(
+        scope.account,
+        scope.store,
+      );
+      if (_disposed ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return;
+      }
+      if (hadEdits &&
+          recovery.editingId != null &&
+          record != null &&
+          record.stage != WorkspaceCounterDraftStage.retired &&
+          record.id != recovery.editingId) {
+        recovery.loaded = false;
+        recovery.error =
+            'The saved bill changed. Your current details have been kept.';
+        return;
+      }
+      if (record?.id != recovery.record?.id ||
+          record?.submissionOrderId != recovery.completed?.orderId) {
+        recovery.completed = null;
+      }
+      recovery.record = record;
+      if (record?.submissionOrderId != recovery.unappliedOrderId) {
+        recovery.unappliedOrderId = null;
+      }
+      if (!hadEdits && record?.stage == WorkspaceCounterDraftStage.retired) {
+        recovery.editingId = null;
+        recovery.customerInput = null;
+      }
+      recovery.loaded = true;
+      recovery.catalogueChanged =
+          (record?.stage == WorkspaceCounterDraftStage.editing &&
+              !_counterCatalogueMatches(record!)) ||
+          (record?.stage == WorkspaceCounterDraftStage.reviewRequired &&
+              record!.lines.any(
+                (line) => !workspaceCatalogueItems.any(
+                  (product) => product.id == line.productId,
+                ),
+              ));
+      if (record?.stage == WorkspaceCounterDraftStage.submitting) {
+        recovery.error = 'Check this bill’s status before creating another.';
+      } else if (recovery.catalogueChanged) {
+        recovery.error =
+            'Prices or stock changed. Your saved bill is kept for review.';
+      } else if (record?.stage == WorkspaceCounterDraftStage.editing ||
+          record?.stage == WorkspaceCounterDraftStage.reviewRequired) {
+        if (record?.stage == WorkspaceCounterDraftStage.reviewRequired) {
+          recovery.error = 'Bill changed. Review the items and prices.';
+        }
+        recovery.editingId = record!.id;
+        if (!hadEdits &&
+            currentWorkspaceOrderId == null &&
+            (shouldRestore?.call() ?? true)) {
+          recovery.customerInput = record.customer;
+          workspaceOrderCustomer =
+              workspaceCustomerMobile(record.customer) == null
+              ? ''
+              : record.customer;
+          workspaceOrderSource = record.source;
+          workspaceOrderFulfilment = record.fulfilment;
+          workspaceOrderPayment = record.payment;
+          workspaceOrderAddress = record.address;
+          workspaceOrderBillingDetails = record.billingDetails;
+          _storeData.workspaceOrderBillingCustomer = record.billingCustomer;
+          _storeData.counterDiscount = record.discount;
+          workspaceOrderNeedsDelivery = record.fulfilment != 'At the shop';
+          workspaceOrderQuantities
+            ..clear()
+            ..addEntries(
+              record.lines.map(
+                (line) => MapEntry(line.productId, line.quantity),
+              ),
+            );
+        }
+      }
+    } catch (_) {
+      if (!_disposed && _counterDraftScope == scope) {
+        recovery.loaded = false;
+        recovery.error = 'Couldn’t open your saved bill. Try again.';
+      }
+    } finally {
+      recovery.loading = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  WorkspaceCounterDraft? _counterDraftSnapshot({
+    required String account,
+    required String store,
+    required String id,
+    required int revision,
+    WorkspaceCounterDraftStage stage = WorkspaceCounterDraftStage.editing,
+    String? submissionOrderId,
+  }) {
+    final catalogue = {
+      for (final item in workspaceCatalogueItems) item.id: item,
+    };
+    final lines = <WorkspaceOrderItemSnapshot>[];
+    var totalPaise = BigInt.zero;
+    for (final quantity in workspaceOrderQuantities.entries) {
+      final item = catalogue[quantity.key];
+      if (item == null ||
+          quantity.value <= 0 ||
+          item.sellingPrice < 0 ||
+          item.sellingPrice > 92233720368547758) {
+        return null;
+      }
+      final price = item.sellingPrice * 100;
+      if (price > 0 && quantity.value > 9223372036854775807 ~/ price) {
+        return null;
+      }
+      totalPaise += BigInt.from(price) * BigInt.from(quantity.value);
+      if (totalPaise > BigInt.from(9223372036854775807)) return null;
+      lines.add(
+        WorkspaceOrderItemSnapshot(
+          productId: item.id,
+          name: item.title,
+          pack: item.pack,
+          quantity: quantity.value,
+          unitPricePaise: price,
+          lineTotalPaise: price * quantity.value,
+        ),
+      );
+    }
+    return WorkspaceCounterDraft(
+      account: account,
+      store: store,
+      id: id,
+      revision: revision,
+      stage: stage,
+      customer: counterCustomerInput ?? workspaceOrderCustomer,
+      billingDetails: workspaceOrderBillingDetails,
+      billingCustomer: workspaceOrderBillingCustomer,
+      discount: workspaceCounterDiscount,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      submissionOrderId: submissionOrderId,
+      lines: lines,
+    );
+  }
+
+  WorkspaceCounterDraft _counterDraftRevision(
+    WorkspaceCounterDraft draft,
+    int revision, {
+    WorkspaceCounterDraftStage? stage,
+    String? order,
+  }) => WorkspaceCounterDraft(
+    account: draft.account,
+    store: draft.store,
+    id: draft.id,
+    revision: revision,
+    stage: stage ?? draft.stage,
+    customer: draft.customer,
+    billingDetails: draft.billingDetails,
+    billingCustomer: draft.billingCustomer,
+    discount: draft.discount,
+    source: draft.source,
+    fulfilment: draft.fulfilment,
+    payment: draft.payment,
+    address: draft.address,
+    lines: draft.lines,
+    submissionOrderId: order ?? draft.submissionOrderId,
+  );
+
+  Future<bool> saveWorkspaceCounterDraft() async {
+    final scope = _counterDraftScope;
+    if (scope == null) return true;
+    final recovery = _counterRecovery;
+    if (_disposed ||
+        recovery == null ||
+        counterDraftEditingBlocked ||
+        currentWorkspaceOrderId != null) {
+      return false;
+    }
+    recovery.editingId ??= _newCounterIdentity('BILL');
+    final snapshot = _counterDraftSnapshot(
+      account: scope.account,
+      store: scope.store,
+      id: recovery.editingId!,
+      revision: 1,
+    );
+    if (snapshot == null || !snapshot.valid) {
+      recovery.error =
+          'Check this bill’s products, prices and quantities before saving.';
+      notifyListeners();
+      return false;
+    }
+    final task = recovery.writes.then((_) async {
+      try {
+        if (_contactAccountScope != scope.account) return false;
+        final record = _counterDraftRevision(
+          snapshot,
+          (recovery.record?.revision ?? 0) + 1,
+        );
+        await _counterDraftStorage.save(
+          record,
+          expectedRevision: recovery.record?.revision,
+        );
+        recovery.record = record;
+        recovery.error = null;
+        return true;
+      } catch (_) {
+        recovery.error =
+            'This bill is not saved yet. Keep it open and try again.';
+        return false;
+      } finally {
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+    });
+    recovery.writes = task.then<void>((_) {});
+    return task;
+  }
+
+  void updateWorkspaceCounterDetails({
+    String? customer,
+    WorkspaceBillingDetails? billingDetails,
+    String? billingCustomer,
+    String? source,
+    String? fulfilment,
+    String? payment,
+    String? address,
+  }) {
+    if (counterDraftEditingBlocked ||
+        !_canEditCounterOrder(allowCompletedInvoice: false)) {
+      return;
+    }
+    if (customer != null) {
+      workspaceOrderCustomer = customer;
+      _counterRecovery?.customerInput = customer;
+    }
+    if (billingDetails != null) workspaceOrderBillingDetails = billingDetails;
+    if (billingCustomer != null) {
+      _storeData.workspaceOrderBillingCustomer = billingCustomer;
+    }
+    if (source != null) workspaceOrderSource = source;
+    if (fulfilment != null) workspaceOrderFulfilment = fulfilment;
+    if (payment != null) workspaceOrderPayment = payment;
+    if (address != null) workspaceOrderAddress = address;
+    unawaited(saveWorkspaceCounterDraft());
+    notifyListeners();
+  }
+
+  void retainWorkspaceCounterCustomerInput(String value) {
+    if (counterDraftEditingBlocked || _counterRecovery == null) return;
+    _counterRecovery!.customerInput = value;
+    unawaited(saveWorkspaceCounterDraft());
+  }
+
+  WorkspaceBillDiscount get workspaceCounterDiscount =>
+      _storeData.counterDiscount;
+  int get workspaceCounterSubtotalMinor => workspaceOrderTotal * 100;
+  int get workspaceCounterDiscountMinor =>
+      workspaceCounterDiscount.amountFor(workspaceCounterSubtotalMinor);
+  int get workspaceCounterPayableMinor =>
+      workspaceCounterSubtotalMinor - workspaceCounterDiscountMinor;
+  String? get workspaceCounterDiscountError =>
+      workspaceCounterDiscount.validFor(workspaceCounterSubtotalMinor)
+      ? null
+      : 'Reduce or remove the discount. The bill must have an amount to pay.';
+
+  bool updateWorkspaceCounterDiscount(WorkspaceBillDiscount discount) {
+    if (counterDraftEditingBlocked ||
+        !_canEditCounterOrder(allowCompletedInvoice: false)) {
+      return false;
+    }
+    if (!discount.validFor(workspaceCounterSubtotalMinor)) {
+      showError('Discount must be less than the bill subtotal.');
+      return false;
+    }
+    _storeData.counterDiscount = discount;
+    unawaited(saveWorkspaceCounterDraft());
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> discardWorkspaceCounterDraft() async {
+    final scope = _counterDraftScope;
+    if (scope == null) return true;
+    final recovery = _counterRecovery;
+    if (recovery == null ||
+        !recovery.loaded ||
+        recovery.loading ||
+        recovery.submitting ||
+        counterDraftNeedsReconciliation) {
+      return false;
+    }
+    recovery.submitting = true;
+    notifyListeners();
+    try {
+      await recovery.writes;
+      final record = recovery.record;
+      if (record != null &&
+          record.stage != WorkspaceCounterDraftStage.retired) {
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+      }
+      recovery.editingId = null;
+      recovery.customerInput = null;
+      recovery.catalogueChanged = false;
+      recovery.error = null;
+      return !_disposed && _counterDraftScope == scope;
+    } catch (_) {
+      recovery.error =
+          'This bill could not be discarded. Your details are kept.';
+      return false;
+    } finally {
+      recovery.submitting = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
+  submitWorkspaceCounterBill({String? expectedReview}) async {
+    if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
+    final inventoryData = _storeData;
+    if (localInventoryEnabled) {
+      final saved = await inventoryData.inventoryWrites;
+      if (_disposed || !identical(inventoryData, _storeData)) return null;
+      if (!saved || inventoryData.inventoryError != null) {
+        showError(
+          'Save Store stock successfully before creating this invoice. Your bill is kept.',
+        );
+        return null;
+      }
+    }
+    if (workspaceFinance != null) {
+      final ledgerData = _storeData;
+      if (ledgerData.customerCollectionGateway is! WorkCustomerInvoiceGateway) {
+        showError(
+          'Invoice recording is not connected for this Store. Your bill is kept; no invoice or payment was recorded.',
+        );
+        return null;
+      }
+      if (!await recoverCustomerLedger()) {
+        showError(
+          'Customer ledger could not be loaded. Retry when it is available. Your bill is kept.',
+        );
+        return null;
+      }
+      if (!identical(ledgerData, _storeData)) {
+        showError(
+          'The selected Store changed. Return to the original Store to continue its bill.',
+        );
+        return null;
+      }
+      final pendingAction = pendingCustomerCollection != null
+          ? 'collection'
+          : pendingCustomerReturn != null
+          ? 'return'
+          : pendingCustomerRefund != null
+          ? 'refund'
+          : null;
+      if (pendingAction != null) {
+        showError(
+          'A customer $pendingAction needs confirmation. Resolve it before creating this invoice. Your bill is kept.',
+        );
+        return null;
+      }
+    }
+    if (expectedReview != null &&
+        expectedReview != counterBillReviewSignature) {
+      showError('Bill updated. Review the items and total.');
+      return null;
+    }
+    if ((counterCustomerInput != null &&
+            counterCustomerInput != workspaceOrderCustomer) ||
+        workspaceCustomerMobile(workspaceOrderCustomer) == null ||
+        (workspaceOrderBillingCustomer.isNotEmpty &&
+            workspaceCustomerMobile(workspaceOrderCustomer) !=
+                workspaceOrderBillingCustomer) ||
+        workspaceOrderQuantities.isEmpty ||
+        workspaceCounterPayableMinor <= 0 ||
+        workspaceCounterDiscountError != null ||
+        (workspaceOrderFulfilment != 'At the shop' &&
+            workspaceOrderAddress.trim().isEmpty)) {
+      showError('Check the customer, products and delivery details.');
+      return null;
+    }
+    final scope = _counterDraftScope;
+    final data = _storeData;
+    final recovery = _counterRecovery;
+    if (scope != null && (recovery == null || !recovery.loaded)) return null;
+    if (recovery != null) recovery.completed = null;
+    final save = saveWorkspaceCounterDraft();
+    if (recovery != null) recovery.submitting = true;
+    notifyListeners();
+    try {
+      if (!await save ||
+          _disposed ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return null;
+      }
+      if (expectedReview != null &&
+          expectedReview != counterBillReviewSignature) {
+        if (recovery != null) {
+          recovery.error = 'Bill updated. Review the items and total.';
+        } else {
+          showError('Bill updated. Review the items and total.');
+        }
+        return null;
+      }
+      var record = recovery?.record;
+      final id =
+          currentWorkspaceOrderId ??
+          _newCounterIdentity('ORD');
+      if (scope != null && recovery != null) {
+        if (record == null || !_counterCatalogueMatches(record)) {
+          recovery.error =
+              'Prices or stock changed. Review the bill before creating it.';
+          return null;
+        }
+        final submitted = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.submitting,
+          order: id,
+        );
+        recovery.unappliedOrderId = id;
+        await _counterDraftStorage.save(
+          submitted,
+          expectedRevision: record.revision,
+        );
+        recovery.record = submitted;
+        record = submitted;
+        if (_disposed ||
+            _counterDraftScope != scope ||
+            !identical(data, _storeData)) {
+          return null;
+        }
+        final current = _counterDraftSnapshot(
+          account: scope.account,
+          store: scope.store,
+          id: record.id,
+          revision: record.revision,
+          stage: WorkspaceCounterDraftStage.submitting,
+          submissionOrderId: id,
+        );
+        if (current == null ||
+            jsonEncode(current.toJson()) != jsonEncode(record.toJson()) ||
+            !_counterCatalogueMatches(record)) {
+          final review = _counterDraftRevision(
+            record,
+            record.revision + 1,
+            stage: WorkspaceCounterDraftStage.reviewRequired,
+          );
+          await _counterDraftStorage.save(
+            review,
+            expectedRevision: record.revision,
+          );
+          recovery.record = review;
+          recovery.unappliedOrderId = null;
+          recovery.error = 'Bill changed. Review the items and prices.';
+          return null;
+        }
+      }
+      if (recovery != null) recovery.unappliedOrderId = null;
+      _counterSubmissionOrderId = id;
+      final saved = saveWorkspaceOrderDraft(
+        customer: workspaceOrderCustomer,
+        source: workspaceOrderSource,
+        fulfilment: workspaceOrderFulfilment,
+        payment: workspaceOrderPayment,
+        address: workspaceOrderAddress,
+      );
+      if (!saved ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return null;
+      }
+      final invoice = workspaceOrderFulfilment == 'At the shop'
+          ? completeWorkspaceCounterSale()
+          : null;
+      if (workspaceOrderFulfilment == 'At the shop' && invoice == null) {
+        return null;
+      }
+      if (invoice != null && workspaceFinance != null) {
+        if (!await recordWorkspaceInvoiceInLedger(invoice)) return null;
+      }
+      final result = (orderId: id, invoice: invoice);
+      _counterSubmissionOrderId = null;
+      if (recovery != null && record != null) {
+        recovery.completed = result;
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+        recovery.editingId = null;
+        recovery.error = null;
+      }
+      return !_disposed &&
+              _counterDraftScope == scope &&
+              identical(data, _storeData) &&
+              currentWorkspaceOrderId == id
+          ? result
+          : null;
+    } catch (_) {
+      if (recovery != null) {
+        recovery.error = recovery.completed != null
+            ? 'Bill created. Retry saving its status.'
+            : 'The bill could not be confirmed. Your saved details are kept.';
+      }
+      return null;
+    } finally {
+      _counterSubmissionOrderId = null;
+      if (recovery != null) recovery.submitting = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  Future<bool> retryWorkspaceCounterDraft({
+    bool Function()? shouldRestore,
+  }) async {
+    final scope = _counterDraftScope;
+    final recovery = _counterRecovery;
+    if (scope == null ||
+        recovery == null ||
+        recovery.loading ||
+        recovery.submitting) {
+      return false;
+    }
+    final unapplied = recovery.record;
+    if (unapplied?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.unappliedOrderId == unapplied!.submissionOrderId &&
+        currentWorkspaceOrderId == null) {
+      recovery.submitting = true;
+      notifyListeners();
+      try {
+        final review = _counterDraftRevision(
+          unapplied,
+          unapplied.revision + 1,
+          stage: WorkspaceCounterDraftStage.reviewRequired,
+        );
+        await _counterDraftStorage.save(
+          review,
+          expectedRevision: unapplied.revision,
+        );
+        recovery.record = review;
+        recovery.unappliedOrderId = null;
+      } catch (_) {
+        recovery.error = 'No sale was created. Retry to recover this bill.';
+        return false;
+      } finally {
+        recovery.submitting = false;
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+      if (_disposed || _counterDraftScope != scope) return false;
+      await loadWorkspaceCounterDraft(
+        retry: true,
+        shouldRestore: shouldRestore,
+      );
+      return !_disposed &&
+          _counterDraftScope == scope &&
+          !counterDraftEditingBlocked;
+    }
+    if (recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.completed == null &&
+        workspaceFinance != null) {
+      final data = _storeData;
+      final invoice = workspaceInvoices
+          .where((item) => item.orderId == recovery.record!.submissionOrderId)
+          .firstOrNull;
+      if (invoice != null) {
+        recovery.submitting = true;
+        try {
+          final confirmed = await recordWorkspaceInvoiceInLedger(
+            invoice,
+            reconcileOnly: true,
+          );
+          if (!confirmed ||
+              _disposed ||
+              _counterDraftScope != scope ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          recovery.completed = (orderId: invoice.orderId, invoice: invoice);
+        } finally {
+          recovery.submitting = false;
+          if (!_disposed && _counterDraftScope == scope) notifyListeners();
+        }
+      }
+    }
+    if (recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.completed != null &&
+        recovery.completed!.orderId == recovery.record!.submissionOrderId) {
+      recovery.submitting = true;
+      notifyListeners();
+      try {
+        final record = recovery.record!;
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+        recovery.editingId = null;
+        recovery.error = null;
+        return !_disposed && _counterDraftScope == scope;
+      } catch (_) {
+        recovery.error = 'Bill created. Retry saving its status.';
+        return false;
+      } finally {
+        recovery.submitting = false;
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+    }
+    final preserveEdits = recovery.loaded && !counterDraftEditingBlocked;
+    await loadWorkspaceCounterDraft(retry: true, shouldRestore: shouldRestore);
+    if (!_disposed &&
+        _counterDraftScope == scope &&
+        recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.unappliedOrderId == recovery.record?.submissionOrderId &&
+        currentWorkspaceOrderId == null) {
+      return retryWorkspaceCounterDraft(shouldRestore: shouldRestore);
+    }
+    if (_disposed ||
+        _counterDraftScope != scope ||
+        counterDraftEditingBlocked) {
+      return false;
+    }
+    return preserveEdits ? saveWorkspaceCounterDraft() : true;
+  }
+
+  late final WorkIssueCommandStore _issueCommandStorage =
+      issueCommandStore ??
+      SecureWorkIssueCommandStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceIssueDraftKey, WorkIssueSubmission> _issueResponses = {};
+  final Set<WorkspaceIssueDraftKey> _issueResponseLoaded = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueResponseReads = {};
+  final Set<WorkspaceIssueDraftKey> _issueResponseBusy = {};
+  final Set<WorkspaceIssueDraftKey> _issueNotDispatched = {};
+  final Map<WorkspaceIssueDraftKey, String> _issueResponseMessages = {};
+  late final WorkIssueDraftStore _issueDraftStorage =
+      issueDraftStore ??
+      SecureWorkIssueDraftStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceIssueDraftKey, WorkspaceIssueDraft> _issueDrafts = {};
+  final Set<WorkspaceIssueDraftKey> _issueDraftLoaded = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueDraftReads = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueDraftWrites = {};
+  final Map<WorkspaceIssueDraftKey, String> _issueDraftMessages = {};
+  StoreCollectionController? _collection;
+  StoreCollectionController? get currentCollection =>
+      currentWorkspaceOrder?.isCustomerCollection == true &&
+          _collection?.orderId == currentWorkspaceOrderId &&
+          _collection?.storeId == (activeWorkspace?.id ?? workspaceId)
+      ? _collection
+      : null;
+
+  /// A retained display string cannot prove current customer authorisation.
+  /// Keep operational/wire state intact; derive the visible label using the
+  /// same scoped, current authority that protects the central Hand Over action.
+  String workspaceOrderStageLabel(WorkspaceOrderRecord order) {
+    if (!order.isCustomerCollection) return order.stage;
+    if ({'Matched', 'Customer confirmed'}.contains(order.stage)) {
+      final current = currentCollection;
+      return current?.orderId == order.id &&
+              current?.storeId == order.collectionStoreId &&
+              current?.hasCurrentMatch == true
+          ? 'Customer confirmed'
+          : 'Checking order';
+    }
+    return order.stage == 'Awaiting customer'
+        ? 'Waiting for customer'
+        : order.stage;
+  }
+
+  String get currentWorkspaceOrderStageLabel => currentWorkspaceOrder == null
+      ? workspaceOrderStage
+      : workspaceOrderStageLabel(currentWorkspaceOrder!);
+
+  /// Called by the future authenticated order adapter, never by a QR decoder.
+  void attachCollection(StoreCollectionController controller) {
+    if (_collection?.needsReconciliation == true) {
+      throw StateError('Reconcile the current collection update first');
+    }
+    final order = currentWorkspaceOrder;
+    if (order == null ||
+        !order.isCustomerCollection ||
+        controller.orderId != order.id ||
+        controller.storeId != order.collectionStoreId ||
+        controller.storeId != (activeWorkspace?.id ?? workspaceId)) {
+      throw ArgumentError(
+        'Collection context does not match the selected store order',
+      );
+    }
+    _clearCollection();
+    controller._packingIssueBlocked = () =>
+        workspaceOrderHasPackingIssue(controller.orderId);
+    _collection = controller..addListener(_collectionChanged);
+    _collectionChanged();
+  }
+
+  void _collectionChanged() {
+    final controller = currentCollection;
+    final value = controller?.snapshot;
+    if (controller?.hasAuthoritativeSnapshot == true && value != null) {
+      final index = workspaceOrders.indexWhere(
+        (order) =>
+            order.id == value.orderId &&
+            order.collectionStoreId == value.storeId,
+      );
+      if (index >= 0) {
+        workspaceOrderStage = switch (value.state) {
+          ScanPickState.preparing => 'Preparing',
+          ScanPickState.ready => 'Ready for collection',
+          ScanPickState.awaitingCustomer => 'Awaiting customer',
+          ScanPickState.matched => 'Customer confirmed',
+          ScanPickState.collected => 'Collected',
+          ScanPickState.cancelled => 'Cancelled',
+        };
+        workspaceOrders[index] = workspaceOrders[index].copyWith(
+          stage: workspaceOrderStage,
+        );
+        workspaceOrderActionDeadline = null;
+        // These are server projections only. Never apply stock, invoice,
+        // payment or settlement effects again from a collection response.
+      }
+    }
+    notifyListeners();
+  }
+
+  void _clearCollection() {
+    _collection?.removeListener(_collectionChanged);
+    _collection?.dispose();
+    _collection = null;
+  }
+
+  String? _contactDraftScope;
+  bool _contactDraftScopeKnown = false;
+  Future<void>? _contactDraftRecovery;
+  Future<void>? _contactDraftWrite;
+  ({String scope, Map<String, Object?> draft})? _queuedContactDraft;
+  int _contactDraftRevision = 0;
+  final Set<String> _editedDraftFields = {};
+  String? contactDraftMessage;
+  String? _pendingProofScope;
+  Future<void>? _pendingProofRecovery;
+  bool _pendingProofRoute = false;
+  int _pendingProofGeneration = 0;
+  bool _hasRecoveredDraft = false;
+  bool recoveredDocumentStep = false;
+  String? documentRecoveryMessage;
+  String? _documentRecoveryProofId;
+  bool _disposed = false;
+  bool busy = false;
+  String? errorMessage;
+  String? noticeMessage;
+  WorkFeedFilter filter = WorkFeedFilter.forYou;
+  String searchQuery = '';
+  String selectedCity = '';
+  String selectedArea = '';
+  String selectedPincode = '';
+  String? expandedOpportunityId;
+  WorkOpportunity? selectedOpportunity;
+  WorkOpportunity? savedOpportunity;
+  String? applicationId;
+  String? appliedOpportunityId;
+  String? withdrawnApplicationId;
+  final Map<String, String> applicationIdsByOpportunity = <String, String>{};
+  final Set<String> expandedTerms = <String>{};
+
+  String? selectedFamilyId;
+  WorkProfileOption? selectedProfile;
+  String accountDisplayName = '';
+  String authorizedPersonName = '';
+  String businessRelationship = '';
+  String connectedProviderLabel = '';
+  String connectedProviderAccount = '';
+  String primaryMobile = '';
+  bool primaryMobileOtpSent = false;
+  bool primaryMobileVerified = false;
+  String contactEmail = '';
+  bool contactEmailOtpSent = false;
+  bool contactEmailVerified = false;
+  String alternateMobile = '';
+  bool alternateOtpSent = false;
+  bool alternateVerified = false;
+  final Map<WorkContactChannel, int> _contactRevisions = {};
+  final Map<WorkContactChannel, ({String value, bool verified, String? scope})>
+  _contactEditOrigins = {};
+
+  String workName = '';
+  String workArea = '';
+  String primaryActivity = '';
+  final Map<String, String> addedProofs = <String, String>{};
+  final Map<String, WorkPickedProof> pickedProofs = <String, WorkPickedProof>{};
+  final Map<
+    String,
+    ({
+      String reference,
+      WorkPickedProof? file,
+      String? profileId,
+      String? scope,
+    })
+  >
+  _removedProofs = {};
+  WorkProfileSubmission? submittedProfile;
+  final Set<String> _seenApprovalMessages = {};
+  ({String? scope, String caseId, String workspaceId})? _approvalWelcome;
+  bool declarationAccepted = false;
+  WorkReviewStage reviewStage = WorkReviewStage.none;
+  String? reviewCaseId;
+  String? workspaceId;
+  String subscriptionPlan = 'free';
+  String? reviewReason;
+  WorkRemoteReviewStatus? remoteReviewStatus;
+  bool reviewCorrectionDraft = false;
+  bool reviewStatusNeedsRefresh = false;
+  String? _workspaceApplicationId;
+  final Map<String, _WorkspaceApplicationDraft> _workspaceApplications = {};
+  bool get hasUnsubmittedReviewChanges {
+    final submitted = submittedProfile;
+    if (!reviewCorrectionDraft ||
+        reviewCaseId == null ||
+        submitted == null ||
+        submitted.profileId != selectedProfile?.id) {
+      return false;
+    }
+    return submitted.name != workName ||
+        submitted.authorizedPersonName != authorizedPersonName ||
+        submitted.businessRelationship != businessRelationship ||
+        submitted.area != workArea ||
+        submitted.primaryActivity != primaryActivity ||
+        submitted.primaryMobile != primaryMobile ||
+        submitted.email != contactEmail ||
+        submitted.alternateMobile != alternateMobile ||
+        !mapEquals(submitted.proofReferences, addedProofs);
+  }
+
+  String? _profileSubmissionKey;
+  bool gstReminder = false;
+  String gstin = '';
+  bool gstAttachmentAdded = false;
+  String? gstProofReference;
+  bool unsupportedRequestSent = false;
+  String unsupportedWorkspace = '';
+  String unsupportedArea = '';
+  String unsupportedFamily = '';
+  String unsupportedOtherActivity = '';
+
+  WorkWorkspace? _activeWorkspace;
+  int _navigationScopeRevision = 0;
+  /// Changes even across unnotified Store A -> B -> A navigation boundaries.
+  int? get navigationScopeRevision => _disposed ? null : _navigationScopeRevision;
+  WorkWorkspace? get activeWorkspace => _activeWorkspace;
+  set activeWorkspace(WorkWorkspace? value) {
+    if (_activeWorkspace?.id != value?.id ||
+        _activeWorkspace?.profileId != value?.profileId ||
+        _activeWorkspace?.verified != value?.verified) {
+      _navigationScopeRevision++;
+    }
+    final previousId = _activeWorkspace?.id;
+    if (previousId != value?.id) {
+      _clearCollection();
+      if (previousId != null) _storeDataById[previousId] = _storeData;
+      if (value == null) {
+        _storeData = _StoreOperationalData();
+      } else {
+        // First activation may adopt setup fields from this same session.
+        // A different existing store must never inherit the previous data.
+        _storeData =
+            _storeDataById.remove(value.id) ??
+            (previousId == null ? _storeData : _StoreOperationalData());
+      }
+    }
+    _activeWorkspace = value;
+    if (value != null && previousId != value.id && localInventoryEnabled) {
+      scheduleMicrotask(() {
+        if (!_disposed && activeWorkspace?.id == value.id) {
+          unawaited(loadWorkspaceInventory());
+        }
+      });
+    }
+    if (_scopedOrderOperations != null) {
+      final order = currentWorkspaceOrder;
+      if (order != null) _projectSelectedWorkspaceOrder(order);
+    }
+  }
+
+  final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
+
+  bool initialWorkspaceStateLoaded = false;
+  bool _loadingWorkspaceEntry = false;
+  bool _lastWorkspaceFeedEmpty = false;
+  _StoreOperationalData _storeData = _StoreOperationalData();
+  final Map<String, _StoreOperationalData> _storeDataById = {};
+
+  bool _issueReferenceExists(
+    _StoreOperationalData data,
+    WorkspaceIssueRecord issue,
+  ) {
+    if (issue.target == WorkspaceIssueTarget.supplierShipment) {
+      return data.purchaseAccountScope == issue.accountScope &&
+          data.purchases.containsKey(issue.referenceId);
+    }
+    return data.workspaceOrders.any((order) => order.id == issue.referenceId);
+  }
+
+  /// Linked case facts only. No case event may execute a financial, inventory,
+  /// replacement or collection command as a side effect of rendering it.
+  bool applyWorkspaceIssues({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspaceIssueRecord> records,
+  }) {
+    if (_disposed ||
+        accountScope != _contactAccountScope ||
+        accountScope.isEmpty) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        feedRevision <= 0 ||
+        (data.issueAccountScope == accountScope &&
+            feedRevision <= data.issueFeedRevision) ||
+        records.map((issue) => issue.id).toSet().length != records.length) {
+      return false;
+    }
+    for (final issue in records) {
+      if (!issue.valid ||
+          issue.accountScope != accountScope ||
+          issue.workspaceId != storeId ||
+          !_issueReferenceExists(data, issue)) {
+        return false;
+      }
+      if (issue.target == WorkspaceIssueTarget.customerOrder) {
+        final order = data.workspaceOrders.firstWhere(
+          (o) => o.id == issue.referenceId,
+        );
+        if (issue.lines.any(
+          (line) =>
+              line.lineId != line.productId ||
+              order.quantities[line.productId] != line.orderedQuantity,
+        )) {
+          return false;
+        }
+        if (order.hasCompleteItemSnapshot &&
+            issue.lines.any((line) {
+              final original = order.itemSnapshots.firstWhere(
+                (s) => s.productId == line.productId,
+              );
+              return original.name != line.name || original.pack != line.pack;
+            })) {
+          return false;
+        }
+      } else {
+        final purchase = data.purchases[issue.referenceId]!;
+        for (final line in issue.lines) {
+          final original = purchase.lines
+              .where((l) => l.id == line.lineId)
+              .firstOrNull;
+          if (original == null ||
+              original.productId != line.productId ||
+              original.orderedPacks != line.orderedQuantity ||
+              original.name != line.name ||
+              original.pack != line.pack) {
+            return false;
+          }
+        }
+      }
+      final previous = data.issueAccountScope == accountScope
+          ? data.issueHistory[issue.id]
+          : null;
+      if (previous != null &&
+          (previous.referenceId != issue.referenceId ||
+              previous.target != issue.target ||
+              previous.kind != issue.kind ||
+              issue.revision < previous.revision ||
+              issue.updatedAt.isBefore(previous.updatedAt) ||
+              (issue.revision == previous.revision &&
+                  !issue.sameRevisionContent(previous)))) {
+        return false;
+      }
+    }
+    if (data.issueAccountScope != accountScope) data.issueHistory.clear();
+    data.issueAccountScope = accountScope;
+    data.issueFeedRevision = feedRevision;
+    data.issuesStale = false;
+    data.issues
+      ..clear()
+      ..addEntries(records.map((issue) => MapEntry(issue.id, issue)));
+    data.issueHistory.addAll(data.issues);
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  List<WorkspaceIssueRecord> workspaceIssuesFor(
+    WorkspaceIssueTarget target,
+    String referenceId,
+  ) {
+    if (_contactAccountScope == null ||
+        _storeData.issueAccountScope != _contactAccountScope) {
+      return const [];
+    }
+    final records =
+        _storeData.issues.values
+            .where(
+              (issue) =>
+                  issue.target == target &&
+                  issue.referenceId == referenceId &&
+                  _issueReferenceExists(_storeData, issue),
+            )
+            .toList()
+          ..sort((a, b) {
+            final priority = (a.state.closed ? 1 : 0).compareTo(
+              b.state.closed ? 1 : 0,
+            );
+            return priority != 0 ? priority : a.id.compareTo(b.id);
+          });
+    return List.unmodifiable(records);
+  }
+
+  bool get workspaceIssuesStale => _storeData.issuesStale;
+
+  WorkIssueSubmission? workspaceIssueResponse(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueResponses[issue.draftKey] : null;
+  bool workspaceIssueResponseLoaded(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueResponseLoaded.contains(issue.draftKey);
+  bool workspaceIssueResponseBusy(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueResponseBusy.contains(issue.draftKey);
+  String? workspaceIssueResponseMessage(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueResponseMessages[issue.draftKey] : null;
+  bool workspaceIssueMayRetrySend(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) &&
+      (_issueNotDispatched.contains(issue.draftKey) ||
+          workspaceIssueResponse(issue)?.reply?.state ==
+              WorkIssueReplyState.notRecorded);
+
+  bool workspaceIssueResponseLocksDraft(WorkspaceIssueRecord issue) {
+    final saved = workspaceIssueResponse(issue);
+    return workspaceIssueResponseBusy(issue) ||
+        saved?.pending == true ||
+        (saved?.reply?.state == WorkIssueReplyState.applied &&
+            issue.revision < saved!.reply!.revision!);
+  }
+
+  Future<void> loadWorkspaceIssueResponse(WorkspaceIssueRecord issue) async {
+    if (!_issueIsCurrent(issue) ||
+        _issueResponseLoaded.contains(issue.draftKey)) {
+      return;
+    }
+    final key = issue.draftKey;
+    final existing = _issueResponseReads[key];
+    if (existing != null) return existing;
+    final task = () async {
+      try {
+        final saved = await _issueCommandStorage.read(key);
+        if (!_issueIsCurrent(issue)) return;
+        if (saved != null &&
+            (!saved.valid ||
+                saved.command.key != key ||
+                saved.command.draft.referenceId != issue.referenceId ||
+                saved.command.draft.target != issue.target ||
+                saved.command.kind != issue.kind)) {
+          throw const FormatException('Case response identity mismatch');
+        }
+        if (saved != null) _issueResponses[key] = saved;
+        _issueResponseLoaded.add(key);
+        _issueResponseMessages.remove(key);
+      } on Object {
+        if (_issueIsCurrent(issue)) {
+          _issueResponseMessages[key] =
+              'Could not open response status. Try again before sending.';
+        }
+      }
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }();
+    _issueResponseReads[key] = task;
+    await task;
+    _issueResponseReads.remove(key);
+  }
+
+  bool workspaceIssueCanSend(WorkspaceIssueRecord issue) {
+    final draft = workspaceIssueDraft(issue);
+    final saved = workspaceIssueResponse(issue);
+    if (issueCommandGateway == null ||
+        !_issueIsCurrent(issue) ||
+        !workspaceIssueDraftLoaded(issue) ||
+        !workspaceIssueResponseLoaded(issue) ||
+        workspaceIssueResponseLocksDraft(issue) ||
+        workspaceIssuesStale ||
+        issue.revision != _storeData.issues[issue.id]?.revision ||
+        !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+        issue.state != WorkspaceIssueState.retailerReview ||
+        draft == null ||
+        !draft.valid ||
+        draft.expectedRevision != issue.revision ||
+        !issue.permittedResponses.contains(draft.response) ||
+        (draft.response != WorkspaceIssueResponse.acceptRequest &&
+            draft.note.trim().isEmpty)) {
+      return false;
+    }
+    if (saved?.reply?.state == WorkIssueReplyState.rejected &&
+        {
+          WorkIssueResponseError.permissionDenied,
+          WorkIssueResponseError.caseChanged,
+          WorkIssueResponseError.caseClosed,
+          WorkIssueResponseError.responseUnavailable,
+        }.contains(saved?.reply?.error) &&
+        issue.revision <= saved!.command.draft.expectedRevision) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> sendWorkspaceIssueResponse(
+    WorkspaceIssueRecord issue, {
+    required WorkspaceIssueDraft expectedDraft,
+    bool declineConfirmed = false,
+  }) async {
+    if (!workspaceIssueCanSend(issue) ||
+        (expectedDraft.response == WorkspaceIssueResponse.declineRequest &&
+            !declineConfirmed) ||
+        jsonEncode(workspaceIssueDraft(issue)?.toJson()) !=
+            jsonEncode(expectedDraft.toJson())) {
+      return false;
+    }
+    final key = issue.draftKey;
+    _issueResponseBusy.add(key);
+    _issueResponseMessages[key] = 'Preparing response…';
+    notifyListeners();
+    try {
+      await _issueDraftWrites[key];
+      if (!_issueIsCurrent(issue) ||
+          workspaceIssuesStale ||
+          issue.revision != _storeData.issues[issue.id]?.revision ||
+          !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+          jsonEncode(_issueDrafts[key]?.toJson()) !=
+              jsonEncode(expectedDraft.toJson())) {
+        return false;
+      }
+      final random = Random.secure();
+      final command = WorkIssueCommand(
+        operationId:
+            'STORE-ISSUE-${base64UrlEncode(List.generate(16, (_) => random.nextInt(256))).replaceAll('=', '')}',
+        draft: expectedDraft,
+        kind: issue.kind,
+        lines: issue.lines,
+      );
+      if (!command.valid) return false;
+      _issueResponses[key] = WorkIssueSubmission(command);
+      _issueNotDispatched.add(key);
+      return await _performIssueResponse(issue, command, submit: true);
+    } finally {
+      _issueResponseBusy.remove(key);
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }
+  }
+
+  Future<bool> checkWorkspaceIssueResponse(
+    WorkspaceIssueRecord issue, {
+    bool retrySend = false,
+  }) async {
+    final saved = workspaceIssueResponse(issue);
+    if (issueCommandGateway == null ||
+        !_issueIsCurrent(issue) ||
+        saved?.pending != true ||
+        workspaceIssueResponseBusy(issue) ||
+        (retrySend && !workspaceIssueMayRetrySend(issue))) {
+      return false;
+    }
+    final key = issue.draftKey;
+    _issueResponseBusy.add(key);
+    notifyListeners();
+    try {
+      return await _performIssueResponse(
+        issue,
+        saved!.command,
+        submit: retrySend,
+      );
+    } finally {
+      _issueResponseBusy.remove(key);
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }
+  }
+
+  Future<bool> _performIssueResponse(
+    WorkspaceIssueRecord issue,
+    WorkIssueCommand command, {
+    required bool submit,
+  }) async {
+    final key = command.key;
+    if (key.account != _contactAccountScope || _disposed) return false;
+    if (submit) {
+      final pending = WorkIssueSubmission(command);
+      try {
+        await _issueCommandStorage.save(pending);
+      } on Object {
+        _issueResponseMessages[key] = _issueNotDispatched.contains(key)
+            ? 'Could not save response status. Nothing was sent. Retry when ready.'
+            : 'Could not save response status. Check status before trying again.';
+        return false;
+      }
+      if (key.account != _contactAccountScope || _disposed) return false;
+      _issueResponses[key] = pending;
+      _issueNotDispatched.remove(key);
+    }
+    _issueResponseMessages[key] = submit
+        ? 'Sending response…'
+        : 'Checking response…';
+    if (_issueIsCurrent(issue)) notifyListeners();
+    try {
+      final reply =
+          await (submit
+                  ? issueCommandGateway!.submitIssueResponse(command)
+                  : issueCommandGateway!.reconcileIssueResponse(command))
+              .timeout(const Duration(seconds: 20));
+      if (_disposed || key.account != _contactAccountScope) return false;
+      if (!reply.matches(command)) {
+        _issueResponseMessages[key] =
+            'Response status could not be verified. Check status before trying again.';
+        return false;
+      }
+      final result = WorkIssueSubmission(command, reply);
+      // Persist the authoritative receipt before unlocking another response.
+      await _issueCommandStorage.save(result);
+      if (_disposed || key.account != _contactAccountScope) return false;
+      _issueResponses[key] = result;
+      _issueResponseMessages.remove(key);
+      return reply.state == WorkIssueReplyState.applied;
+    } on Object {
+      _issueResponseMessages[key] =
+          'Response status is uncertain. Check status before trying again.';
+      return false;
+    }
+  }
+
+  bool _issueIsCurrent(WorkspaceIssueRecord issue) =>
+      !_disposed &&
+      issue.accountScope == _contactAccountScope &&
+      issue.workspaceId == activeWorkspace?.id &&
+      _storeData.issueAccountScope == issue.accountScope &&
+      _storeData.issues[issue.id]?.referenceId == issue.referenceId &&
+      _storeData.issues[issue.id]?.target == issue.target;
+
+  WorkspaceIssueDraft? workspaceIssueDraft(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueDrafts[issue.draftKey] : null;
+
+  bool workspaceIssueDraftLoaded(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueDraftLoaded.contains(issue.draftKey);
+
+  String? workspaceIssueDraftMessage(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueDraftMessages[issue.draftKey] : null;
+
+  Future<void> loadWorkspaceIssueDraft(WorkspaceIssueRecord issue) async {
+    if (!_issueIsCurrent(issue)) return;
+    final key = issue.draftKey;
+    if (_issueDraftLoaded.contains(key)) return;
+    final pending = _issueDraftReads[key];
+    if (pending != null) return pending;
+    final task = _loadWorkspaceIssueDraft(issue);
+    _issueDraftReads[key] = task;
+    await task;
+    _issueDraftReads.remove(key);
+  }
+
+  Future<void> _loadWorkspaceIssueDraft(WorkspaceIssueRecord issue) async {
+    final key = issue.draftKey;
+    try {
+      final draft = await _issueDraftStorage.read(key);
+      if (!_issueIsCurrent(issue)) return;
+      if (draft != null &&
+          (!draft.valid ||
+              draft.key != key ||
+              draft.referenceId != issue.referenceId ||
+              draft.target != issue.target)) {
+        throw const FormatException('Case draft identity mismatch');
+      }
+      if (draft != null) _issueDrafts[key] = draft;
+      _issueDraftLoaded.add(key);
+      _issueDraftMessages.remove(key);
+    } on Object {
+      if (_issueIsCurrent(issue)) {
+        _issueDraftMessages[key] =
+            'Could not open your saved response. Try again.';
+      }
+    }
+    if (_issueIsCurrent(issue)) notifyListeners();
+  }
+
+  /// An edit is unsent. The original case revision is retained until the
+  /// retailer explicitly reviews a newer case; background updates never rebase it.
+  Future<void> saveWorkspaceIssueDraft(
+    WorkspaceIssueRecord issue, {
+    required WorkspaceIssueResponse? response,
+    required String note,
+    bool reviewedUpdate = false,
+  }) async {
+    if (!_issueIsCurrent(issue) ||
+        !workspaceIssueDraftLoaded(issue) ||
+        workspaceIssueResponseLocksDraft(issue) ||
+        issue.revision != _storeData.issues[issue.id]?.revision ||
+        issue.state != WorkspaceIssueState.retailerReview ||
+        !WorkspaceIssueDraft.acceptsNote(note) ||
+        (response != null && !issue.permittedResponses.contains(response))) {
+      return;
+    }
+    final key = issue.draftKey;
+    final previous = _issueDrafts[key];
+    final draft = WorkspaceIssueDraft(
+      key: key,
+      referenceId: issue.referenceId,
+      target: issue.target,
+      expectedRevision: reviewedUpdate
+          ? issue.revision
+          : previous?.expectedRevision ?? issue.revision,
+      response: response,
+      note: note,
+    );
+    _issueDrafts[key] = draft;
+    _issueDraftMessages[key] = 'Saving draft…';
+    notifyListeners();
+    final preceding = _issueDraftWrites[key];
+    final task = () async {
+      if (preceding != null) await preceding;
+      // Coalesce queued keystrokes, without allowing an older write to win.
+      if (!identical(_issueDrafts[key], draft)) return;
+      try {
+        if (key.account != _contactAccountScope) {
+          throw const FormatException('Account changed before draft save');
+        }
+        await _issueDraftStorage.save(draft);
+        if (identical(_issueDrafts[key], draft)) {
+          _issueDraftMessages[key] = 'Draft saved on this device. Not sent.';
+        }
+      } on Object {
+        if (identical(_issueDrafts[key], draft)) {
+          _issueDraftMessages[key] =
+              'Draft not saved. Keep this screen open and retry.';
+        }
+      }
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }();
+    _issueDraftWrites[key] = task;
+    await task;
+    if (identical(_issueDraftWrites[key], task)) _issueDraftWrites.remove(key);
+  }
+
+  bool workspaceOrderHasPackingIssue(String orderId) =>
+      _storeData.issueAccountScope == _contactAccountScope &&
+      _contactAccountScope != null &&
+      _storeData.issueHistory.values.any(
+        (issue) =>
+            issue.referenceId == orderId &&
+            issue.target == WorkspaceIssueTarget.customerOrder &&
+            !issue.state.closed &&
+            const {
+              WorkspaceIssueKind.packingShortage,
+              WorkspaceIssueKind.substitution,
+            }.contains(issue.kind),
+      );
+
+  void markWorkspaceIssuesStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.issueAccountScope != accountScope) return;
+    data!.issuesStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
+
+  WorkspaceFinanceSnapshot? get workspaceFinance {
+    final finance = _storeData.finance;
+    return _contactAccountScope != null &&
+            finance?.accountScope == _contactAccountScope &&
+            finance?.workspaceId == activeWorkspace?.id
+        ? finance
+        : null;
+  }
+
+  bool get workspaceFinanceStale =>
+      workspaceFinance != null && _storeData.financeStale;
+  bool get workspaceFinanceUsesLegacyReview =>
+      gateway is ReviewWorkGateway && workspaceFinance == null;
+  WorkspacePaymentRecord? workspacePaymentFor(String orderId) =>
+      workspaceFinance == null ? null : _storeData.financePayments[orderId];
+  String workspaceOrderPaymentLabel(WorkspaceOrderRecord order) =>
+      workspacePaymentFor(order.id)?.label ?? order.payment;
+
+  /// One linked ledger snapshot; never infer money from fulfilment or replay
+  /// stock/invoice effects. The future authenticated adapter owns membership.
+  bool applyWorkspaceFinance(WorkspaceFinanceSnapshot snapshot) {
+    if (_disposed ||
+        !snapshot.valid ||
+        snapshot.accountScope != _contactAccountScope) {
+      return false;
+    }
+    final data = snapshot.workspaceId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[snapshot.workspaceId];
+    if (data == null) return false;
+    final old = data.finance;
+    if (old != null &&
+        (old.accountScope != snapshot.accountScope ||
+            snapshot.revision <= old.revision ||
+            snapshot.asOf.isBefore(old.asOf))) {
+      return false;
+    }
+    for (final payment in snapshot.payments) {
+      final previous = data.financePaymentHistory[payment.orderId];
+      if (previous != null &&
+          (previous.customerId != payment.customerId ||
+              payment.revision < previous.revision ||
+              (payment.revision == previous.revision &&
+                  payment.revisionData != previous.revisionData))) {
+        return false;
+      }
+    }
+    for (final payout in snapshot.payouts) {
+      final previous = data.financePayoutHistory[payout.id];
+      if (previous != null &&
+          (previous.operationId != payout.operationId ||
+              previous.amountMinor != payout.amountMinor ||
+              payout.revision < previous.revision ||
+              (payout.revision == previous.revision &&
+                  payout.revisionData != previous.revisionData))) {
+        return false;
+      }
+      if (data.financePayoutHistory.values.any(
+        (p) => p.operationId == payout.operationId && p.id != payout.id,
+      )) {
+        return false;
+      }
+    }
+    for (final ledger in snapshot.customerLedgers) {
+      final previous = data.financeCustomerHistory[ledger.customerId];
+      if (previous != null && !ledger.canFollow(previous)) return false;
+      for (final other in data.financeCustomerHistory.values) {
+        if (other.customerId == ledger.customerId) continue;
+        final knownInvoices = other.entries
+            .map((entry) => entry.invoiceId)
+            .toSet();
+        final knownIds = other.entries.map((entry) => entry.id).toSet();
+        if (ledger.entries.any(
+          (entry) =>
+              knownIds.contains(entry.id) ||
+              knownInvoices.contains(entry.invoiceId),
+        )) {
+          return false;
+        }
+      }
+    }
+    data.finance = snapshot;
+    data.financeStale = false;
+    data.financePayments
+      ..clear()
+      ..addEntries(snapshot.payments.map((p) => MapEntry(p.orderId, p)));
+    data.financePaymentHistory.addAll(data.financePayments);
+    data.financeCustomerHistory.addEntries(
+      snapshot.customerLedgers.map(
+        (ledger) => MapEntry(ledger.customerId, ledger),
+      ),
+    );
+    data.financePayoutHistory.addEntries(
+      snapshot.payouts.map((p) => MapEntry(p.id, p)),
+    );
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  WorkspaceInventoryLedger? _captureLedgerInventory(
+    _StoreOperationalData data,
+  ) {
+    if (data.ledgerInventory == null && data.workspaceStockMovements.isEmpty) {
+      return null;
+    }
+    final finance = data.finance!;
+    final products = {
+      for (final product in data.workspaceCatalogueItems)
+        if (product.stockMode == WorkspaceStockMode.exactQuantity)
+          product.id: product.stock,
+    };
+    final movements = data.workspaceStockMovements.reversed.toList();
+    final at = DateTime.now().toUtc();
+    WorkspaceInventoryLedger? result;
+    if (data.ledgerInventory == null) {
+      final opening = Map<String, int>.of(products);
+      for (final movement in movements) {
+        if (!opening.containsKey(movement.productId)) {
+          throw StateError(
+            'A stock movement has no matching catalogue product.',
+          );
+        }
+        opening[movement.productId] =
+            opening[movement.productId]! - movement.quantityDelta;
+      }
+      result = WorkspaceInventoryLedger(
+        accountScope: finance.accountScope,
+        workspaceId: finance.workspaceId,
+        revision: 1,
+        asOf: at,
+        openingQuantities: opening,
+        movements: movements,
+      );
+    } else {
+      result = data.ledgerInventory!.post(
+        movements,
+        at: at,
+        newProductIds: products.keys.toSet(),
+      );
+    }
+    final quantities = result?.quantities;
+    if (quantities == null ||
+        quantities.length != products.length ||
+        products.entries.any(
+          (product) => quantities[product.key] != product.value,
+        )) {
+      throw StateError(
+        'Stock changes need reconciliation before ledger posting.',
+      );
+    }
+    return result;
+  }
+
+  bool _canRestoreLedgerInventory(
+    _StoreOperationalData data,
+    WorkspaceInventoryLedger inventory,
+  ) {
+    final products = {
+      for (final product in data.workspaceCatalogueItems)
+        if (product.stockMode == WorkspaceStockMode.exactQuantity)
+          product.id: product.stock,
+    };
+    if (!inventory.valid ||
+        inventory.openingQuantities.keys.any(
+          (id) => !products.containsKey(id),
+        )) {
+      return false;
+    }
+    final recorded = {
+      for (final movement in inventory.movements) movement.id: movement,
+    };
+    if (data.workspaceStockMovements.any(
+      (movement) =>
+          recorded[movement.id] != null &&
+          recorded[movement.id]!.contentIdentity != movement.contentIdentity,
+    )) {
+      return false;
+    }
+    final quantities = inventory.quantities!;
+    // A durable catalogue snapshot may precede later invoice movements.
+    // Older hydration appended recovered events to a newest-first list. Prove
+    // membership/content against each SKU's checkpoint order, not incidental
+    // list order. Other SKUs may have receipts saved during blocked recovery.
+    // A gap, duplicate or changed event must not become a valid prefix.
+    final localMovements = data.workspaceStockMovements
+        .where((m) => inventory.openingQuantities.containsKey(m.productId))
+        .toList();
+    final localById = {
+      for (final movement in localMovements) movement.id: movement,
+    };
+    if (localById.length != localMovements.length) return false;
+    final remaining = <String, int>{};
+    for (final movement in localMovements) {
+      remaining.update(
+        movement.productId,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    final prefixQuantities = Map<String, int>.of(inventory.openingQuantities);
+    var matchesPrefix = localMovements.length <= inventory.movements.length;
+    for (final movement in inventory.movements) {
+      if (!matchesPrefix) break;
+      final count = remaining[movement.productId] ?? 0;
+      if (count == 0) continue;
+      matchesPrefix =
+          localById[movement.id]?.contentIdentity == movement.contentIdentity;
+      remaining[movement.productId] = count - 1;
+      prefixQuantities[movement.productId] =
+          prefixQuantities[movement.productId]! + movement.quantityDelta;
+    }
+    if (matchesPrefix &&
+        remaining.values.every((count) => count == 0) &&
+        prefixQuantities.entries.every(
+          (entry) => products[entry.key] == entry.value,
+        )) {
+      return true;
+    }
+    if (quantities.entries.every(
+      (product) => products[product.key] == product.value,
+    )) {
+      return true;
+    }
+    return data.workspaceStockMovements.every(
+          (movement) =>
+              !inventory.openingQuantities.containsKey(movement.productId),
+        ) &&
+        inventory.openingQuantities.entries.every(
+          (product) => products[product.key] == product.value,
+        );
+  }
+
+  void _restoreLedgerInventory(
+    _StoreOperationalData data,
+    WorkspaceInventoryLedger inventory,
+  ) {
+    final quantities = inventory.quantities!;
+    for (var i = 0; i < data.workspaceCatalogueItems.length; i++) {
+      final product = data.workspaceCatalogueItems[i];
+      final quantity = quantities[product.id];
+      if (quantity != null &&
+          product.stockMode == WorkspaceStockMode.exactQuantity) {
+        data.workspaceCatalogueItems[i] = product.copyWith(
+          stock: quantity,
+          available: product.available && quantity > 0,
+        );
+      }
+    }
+    final recordedIds = inventory.movements.map((m) => m.id).toSet();
+    final unrecorded = data.workspaceStockMovements
+        .where((m) => !recordedIds.contains(m.id))
+        .toList();
+    // Keep local additions, then the checkpoint's authoritative newest-first
+    // history. Appending only missing events inverted receipt/sale order and
+    // made the next saved inventory snapshot fail recovery after restart.
+    data.workspaceStockMovements
+      ..clear()
+      ..addAll(unrecorded)
+      ..addAll(inventory.movements.reversed);
+    data.ledgerInventory = inventory;
+  }
+
+  Future<bool> recordWorkspaceInvoiceInLedger(
+    WorkspaceCustomerInvoice invoice, {
+    bool reconcileOnly = false,
+  }) async {
+    final data = _storeData;
+    final finance = workspaceFinance;
+    final adapter = data.customerCollectionGateway;
+    if (finance == null ||
+        adapter == null ||
+        adapter is! WorkCustomerInvoiceGateway ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null ||
+        !workspaceInvoices.any((known) => identical(known, invoice))) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    if (data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    try {
+      final invoiceAdapter = adapter as WorkCustomerInvoiceGateway;
+      final reply =
+          await (reconcileOnly
+                  ? invoiceAdapter.reconcileInvoice(
+                      accountScope: finance.accountScope,
+                      storeId: finance.workspaceId,
+                      invoice: invoice,
+                    )
+                  : invoiceAdapter.recordInvoice(
+                      accountScope: finance.accountScope,
+                      storeId: finance.workspaceId,
+                      invoice: invoice,
+                    ))
+              .timeout(const Duration(seconds: 15));
+      if (!_isStoreScopeCurrent(
+        data,
+        finance.workspaceId,
+        finance.accountScope,
+      )) {
+        return false;
+      }
+      final payment = reply.payments
+          .where(
+            (p) => p.invoiceId == invoice.id && p.orderId == invoice.orderId,
+          )
+          .firstOrNull;
+      if (!reply.valid ||
+          reply.accountScope != finance.accountScope ||
+          reply.workspaceId != finance.workspaceId ||
+          payment == null ||
+          payment.amountMinor != invoice.payableMinor ||
+          !reply.customerLedgers.any(
+            (l) =>
+                l.customerId == payment.customerId &&
+                l.entries.any(
+                  (e) =>
+                      e.invoiceId == invoice.id &&
+                      e.orderId == invoice.orderId &&
+                      e.kind == WorkspaceLedgerEntryKind.invoice &&
+                      e.state == WorkspaceLedgerPostingState.posted &&
+                      e.amountMinor == invoice.payableMinor,
+                ),
+          )) {
+        throw StateError('Invoice reply could not be verified.');
+      }
+      final originalOrder = workspaceOrders
+          .where((o) => o.id == invoice.orderId)
+          .firstOrNull;
+      final retainedOrder = originalOrder == null
+          ? null
+          : WorkspaceOrderRecord.fromLedgerJson(originalOrder.toLedgerJson());
+      final bills = Map<String, WorkspaceOrderRecord>.of(
+        data.ledgerBilledOrders,
+      );
+      final invoices = Map<String, WorkspaceCustomerInvoice>.of(
+        data.ledgerBilledInvoices,
+      );
+      if (!bills.containsKey(invoice.id) && retainedOrder != null) {
+        bills[invoice.id] = retainedOrder;
+        invoices[invoice.id] = WorkspaceCustomerInvoice.fromLedgerJson(
+          invoice.toLedgerJson(),
+        );
+      }
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: reply,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: Map.unmodifiable(bills),
+        billedInvoices: Map.unmodifiable(invoices),
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      if (reply.revision < data.finance!.revision ||
+          (reply.revision == data.finance!.revision &&
+              jsonEncode(checkpoint.toJson()['finance']) !=
+                  jsonEncode(
+                    WorkspaceLedgerCheckpoint(
+                      revision: 1,
+                      finance: data.finance!,
+                    ).toJson()['finance'],
+                  ))) {
+        throw StateError('Invoice revision changed without a valid successor.');
+      }
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      data.ledgerBilledOrders = checkpoint.billedOrders;
+      data.ledgerBilledInvoices = checkpoint.billedInvoices;
+      if (!_isStoreScopeCurrent(
+        data,
+        finance.workspaceId,
+        finance.accountScope,
+      )) {
+        return false;
+      }
+      if (data.finance?.revision != reply.revision &&
+          !applyWorkspaceFinance(reply)) {
+        throw StateError('Invoice projection needs recovery.');
+      }
+      return true;
+    } catch (_) {
+      if (!_disposed && identical(data, _storeData)) {
+        showError(
+          'Invoice ledger update is not confirmed. Keep this bill for recovery; do not create it again.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) notifyListeners();
+    }
+  }
+
+  bool get customerCollectionAvailable =>
+      _storeData.customerCollectionGateway != null &&
+      _storeData.ledgerRecoveryError == null &&
+      _storeData.pendingCustomerReturn == null &&
+      _storeData.pendingCustomerRefund == null &&
+      !workspaceFinanceStale;
+  String? get customerLedgerRecoveryError => _storeData.ledgerRecoveryError;
+  bool get customerCreditAvailable => customerCollectionAvailable &&
+      !customerCollectionBusy && pendingCustomerCollection == null &&
+      _storeData.customerCollectionGateway is StoreReviewCustomerCollectionGateway;
+
+  Future<bool> applyCustomerCredit({required String customerId,
+    required String sourceInvoiceId, required String targetInvoiceId,
+    required int amountMinor, required int expectedRevision}) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData) ||
+        !customerCreditAvailable || data.ledgerCheckpointStore == null) { return false; }
+    final before = data.finance!;
+    final adapter = data.customerCollectionGateway as StoreReviewCustomerCollectionGateway;
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    var saving = false;
+    try {
+      final next = adapter.previewCreditAllocation(customerId: customerId,
+        sourceInvoiceId: sourceInvoiceId, targetInvoiceId: targetInvoiceId,
+        amountMinor: amountMinor, expectedRevision: expectedRevision,
+        operationId: StoreCollectionController._id());
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1, finance: next,
+        inventory: data.ledgerInventory, billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices, purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data), expenses: _expenseCheckpointEntries(data));
+      saving = true;
+      await data.ledgerCheckpointStore!.save(checkpoint, expectedRevision: data.ledgerCheckpointRevision);
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      if (!_isStoreScopeCurrent(data, before.workspaceId, before.accountScope) ||
+          !adapter.acceptSavedCredit(before, next) || !applyWorkspaceFinance(next)) {
+        throw StateError('Saved credit requires recovery.');
+      }
+      showNotice('Customer credit applied. No money was collected or refunded.');
+      return true;
+    } catch (_) {
+      if (saving) {
+        // A save may have completed despite a lost acknowledgement. Reopen the
+        // atomic checkpoint before another allocation; never retry blindly.
+        data.ledgerRecovered = false;
+        data.ledgerRecovery = null;
+        data.financeStale = true;
+        data.ledgerRecoveryError = 'Reopen saved records to check the credit update before trying again.';
+        data.customerCollectionGateway = StoreReviewCustomerCollectionGateway(data.finance!);
+      }
+      if (!_disposed && identical(data, _storeData)) { showNotice(saving
+          ? 'Credit update needs checking. Reopen saved records before trying again.'
+          : 'Credit or invoice changed. Reopen and check the available amount.'); }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) notifyListeners();
+    }
+  }
+  bool get workspaceInvoiceHistoryLoaded => _storeData.ledgerRecovered;
+  bool get customerCollectionBusy => _storeData.customerCollectionBusy;
+  WorkspaceCustomerRefund? get pendingCustomerRefund =>
+      _storeData.pendingCustomerRefund;
+  bool get customerReturnSaved => _storeData.returnIntentSaved;
+  bool get customerRefundSaved => _storeData.refundIntentSaved;
+  bool get customerRefundAvailable =>
+      customerCollectionAvailable &&
+      !customerCollectionBusy &&
+      pendingCustomerCollection == null &&
+      _storeData.customerCollectionGateway is WorkCustomerRefundGateway;
+  WorkspacePendingCustomerReturn? get pendingCustomerReturn =>
+      _storeData.pendingCustomerReturn;
+  WorkspaceCustomerCollection? get pendingCustomerCollection =>
+      _storeData.pendingCustomerCollection;
+
+  bool bindCustomerCollectionGateway({
+    required String accountScope,
+    required String storeId,
+    required WorkCustomerCollectionGateway adapter,
+    WorkLedgerCheckpointStore? checkpointStore,
+  }) {
+    if (_disposed ||
+        accountScope != _contactAccountScope ||
+        storeId != activeWorkspace?.id ||
+        _storeData.customerCollectionBusy ||
+        _storeData.pendingCustomerCollection != null ||
+        _storeData.pendingCustomerReturn != null ||
+        _storeData.pendingCustomerRefund != null) {
+      return false;
+    }
+    _storeData.customerCollectionGateway = adapter;
+    _storeData.ledgerRecovered = false;
+    _storeData.ledgerRecovery = null;
+    _storeData.ledgerCheckpointStore =
+        checkpointStore ??
+        SecureWorkLedgerCheckpointStore(
+          accountScope: () => _contactAccountScope,
+        );
+    return true;
+  }
+
+  Future<bool> recoverCustomerLedger() {
+    final data = _storeData;
+    if (_contactAccountScope == null ||
+        activeWorkspace == null ||
+        data.ledgerCheckpointStore == null) {
+      return Future.value(false);
+    }
+    if (data.ledgerRecovered) return Future.value(true);
+    return data.ledgerRecovery ??= _recoverCustomerLedger(data);
+  }
+
+  Future<bool> _recoverCustomerLedger(_StoreOperationalData data) async {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null ||
+        store == null ||
+        data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    try {
+      if (_selectedReviewSeed?.storeId == store &&
+          !await loadWorkspaceInventory(retry: true)) {
+        throw StateError('Recover saved product details before the ledger.');
+      }
+      if (!_isStoreScopeCurrent(data, store, account)) return false;
+      final saved = await data.ledgerCheckpointStore!.read(account, store);
+      if (!_isStoreScopeCurrent(data, store, account)) return false;
+      if (saved != null) {
+        final current = data.finance;
+        final adapter = data.customerCollectionGateway;
+        for (final order in saved.billedOrders.values) {
+          final existing = data.workspaceOrders
+              .where((o) => o.id == order.id)
+              .firstOrNull;
+          if (existing != null &&
+              jsonEncode(existing.toLedgerJson()) !=
+                  jsonEncode(order.toLedgerJson())) {
+            throw StateError(
+              'Original bill conflicts with current order details.',
+            );
+          }
+        }
+        for (final invoice in saved.billedInvoices.values) {
+          final existing = data.workspaceInvoices
+              .where((i) => i.id == invoice.id)
+              .firstOrNull;
+          if (existing != null &&
+              jsonEncode(existing.toLedgerJson()) !=
+                  jsonEncode(invoice.toLedgerJson())) {
+            throw StateError(
+              'Original invoice conflicts with current bill details.',
+            );
+          }
+        }
+
+        if (saved.inventory != null &&
+            (adapter is! StoreReviewCustomerCollectionGateway ||
+                !_canRestoreLedgerInventory(data, saved.inventory!))) {
+          throw StateError('Saved stock needs catalogue reconciliation.');
+        }
+        // The review loader regenerates seed timestamps on restart. Replace only
+        // that exact untouched synthetic projection, keeping orders/cart intact.
+        if (current != null &&
+            adapter is StoreReviewCustomerCollectionGateway &&
+            adapter.restoreCheckpoint(saved.finance, current)) {
+          data.finance = null;
+          data.financePayments.clear();
+          data.financePaymentHistory.clear();
+          data.financePayoutHistory.clear();
+          data.financeCustomerHistory.clear();
+        }
+        if (data.finance == null ||
+            data.finance!.revision < saved.finance.revision) {
+          if (!applyWorkspaceFinance(saved.finance)) {
+            throw StateError('Saved projection could not be restored.');
+          }
+          data.financeStale = adapter is! StoreReviewCustomerCollectionGateway;
+        }
+        data.ledgerBilledOrders = saved.billedOrders;
+        data.ledgerBilledInvoices = saved.billedInvoices;
+        final receipts = {...saved.purchaseReceipts};
+        if (canLoadStoreReviewSeed && saved.inventory != null) {
+          for (final purchase in data.purchases.values) {
+            if (receipts.containsKey(purchase.shipmentId)) continue;
+            final legacy = _legacyReviewReceipt(purchase, saved.inventory!);
+            if (legacy != null) receipts[purchase.shipmentId] = legacy;
+          }
+        }
+        final restoredReceipts = <String, WorkspacePurchaseRecord>{};
+        for (final receipt in receipts.values) {
+          final currentPurchase = data.purchases[receipt.shipmentId];
+          if (currentPurchase == null) continue;
+          if (!receipt.belongsTo(currentPurchase)) {
+            throw StateError('Saved receipt conflicts with purchase identity.');
+          }
+          final currentReceipt = WorkspaceConfirmedPurchaseReceipt.fromPurchase(
+            currentPurchase,
+          );
+          if (currentReceipt.valid && currentReceipt.canFollow(receipt)) {
+            continue;
+          }
+          if (currentReceipt.valid && !receipt.canFollow(currentReceipt)) {
+            throw StateError(
+              'Saved receipt conflicts with current confirmation.',
+            );
+          }
+          restoredReceipts[receipt.shipmentId] = receipt.applyTo(
+            currentPurchase,
+          );
+        }
+        data.ledgerPurchaseReceipts = Map.unmodifiable(receipts);
+        data.purchases.addAll(restoredReceipts);
+        data.purchaseLastRecords.addAll(restoredReceipts);
+        for (final register in saved.moneyRegisters.values) {
+          final key = (register.accountScope, register.registerId);
+          final current = data.moneyRegisters[key];
+          if (current != null && current.canFollow(register)) {
+            continue;
+          }
+          if (current != null && !register.canFollow(current)) {
+            throw StateError('Saved register conflicts with current history.');
+          }
+          data.moneyRegisters[key] = register;
+        }
+        for (final expense in saved.expenses.values) {
+          final key = (expense.accountScope, expense.operationId);
+          final current = data.expenses[key];
+          if (current != null &&
+              jsonEncode(current.toJson()) != jsonEncode(expense.toJson())) {
+            throw StateError(
+              'Saved expense identity conflicts with current history.',
+            );
+          }
+          data.expenses[key] = expense;
+        }
+        for (final ledger in saved.supplierLedgers.values) {
+          final key = (ledger.accountScope, ledger.supplierId);
+          final current = data.supplierLedgers[key];
+          if (current != null && current.canFollow(ledger)) {
+            continue;
+          }
+          if (current != null && !ledger.canFollow(current)) {
+            throw StateError(
+              'Saved supplier history conflicts with current records.',
+            );
+          }
+          data.supplierLedgers[key] = ledger;
+          if (adapter is! StoreReviewCustomerCollectionGateway) {
+            data.staleSupplierLedgers.add(key);
+          }
+        }
+        if (adapter is StoreReviewCustomerCollectionGateway) {
+          for (final order in saved.billedOrders.values) {
+            if (!data.workspaceOrders.any((o) => o.id == order.id)) {
+              data.workspaceOrders.add(order);
+            }
+          }
+          for (final invoice in saved.billedInvoices.values) {
+            if (!data.workspaceInvoices.any((i) => i.id == invoice.id)) {
+              data.workspaceInvoices.add(invoice);
+            }
+          }
+        }
+        data.pendingCustomerCollection = saved.pending;
+        data.pendingCustomerReturn = saved.pendingReturn;
+        data.pendingCustomerRefund = saved.pendingRefund;
+        data.refundMayHaveSubmitted = saved.pendingRefund != null;
+        data.refundIntentSaved = saved.pendingRefund != null;
+        data.returnMayHaveSubmitted = saved.pendingReturn != null;
+        data.returnIntentSaved = saved.pendingReturn != null;
+        data.collectionMayHaveSubmitted = saved.pending != null;
+        data.ledgerCheckpointRevision = saved.revision;
+        if (saved.inventory != null) {
+          _restoreLedgerInventory(data, saved.inventory!);
+        }
+      }
+      data.ledgerRecovered = true;
+      data.ledgerRecoveryError = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (_isStoreScopeCurrent(data, store, account)) {
+        data.ledgerRecoveryError =
+            'Saved ledger could not be recovered. Its data is kept; retry recovery before recording a collection.';
+        notifyListeners();
+      }
+      return false;
+    } finally {
+      data.ledgerRecovery = null;
+    }
+  }
+
+  // Older review APKs saved the confirmed receipt in the stock journal's
+  // exact operation identity/reason, but omitted a separate receipt snapshot.
+  // Recover only that known single-line, one-unit-per-pack review format.
+  // Neither editable counts nor an unexplained stock balance is evidence.
+  WorkspaceConfirmedPurchaseReceipt? _legacyReviewReceipt(
+    WorkspacePurchaseRecord purchase,
+    WorkspaceInventoryLedger inventory,
+  ) {
+    if (!canLoadStoreReviewSeed ||
+        purchase.lines.length != 1 ||
+        inventory.accountScope != purchase.accountScope ||
+        inventory.workspaceId != purchase.workspaceId) {
+      return null;
+    }
+    final line = purchase.lines.single;
+    final reference = jsonEncode([
+      'purchase-receipt',
+      purchase.accountScope,
+      purchase.workspaceId,
+      purchase.supplierId,
+      purchase.orderId,
+      purchase.shipmentId,
+      line.id,
+    ]);
+    final movements = inventory.movements
+        .where(
+          (movement) =>
+              movement.referenceKind ==
+                  WorkspaceStockReferenceKind.supplierReceipt &&
+              movement.referenceId == reference &&
+              movement.kind == WorkspaceStockMovementKind.goodsReceived,
+        )
+        .toList();
+    if (movements.isEmpty) return null;
+    try {
+      int revision(WorkspaceStockMovement movement) {
+        final id = jsonDecode(movement.id);
+        if (id is! List ||
+            id.length != 2 ||
+            id[0] != reference ||
+            id[1] is! int ||
+            (id[1] as int) <= 0) {
+          throw const FormatException(
+            'Unrecognized historical receipt identity',
+          );
+        }
+        return id[1] as int;
+      }
+
+      movements.sort((a, b) => revision(a).compareTo(revision(b)));
+      var received = 0;
+      var lastRevision = 0;
+      String? receiptReference;
+      DateTime? confirmedAt;
+      final pattern = RegExp(
+        '^Supplier receipt (TEST-${RegExp.escape(purchase.shipmentId)}-[0-9]+): ([0-9]+) packs × 1 units\$',
+      );
+      for (final movement in movements) {
+        final match = pattern.firstMatch(movement.reason);
+        if (match == null ||
+            movement.productId != line.productId ||
+            movement.quantityDelta <= 0 ||
+            revision(movement) <= lastRevision ||
+            (confirmedAt != null &&
+                movement.occurredAt.isBefore(confirmedAt))) {
+          return null;
+        }
+        received += movement.quantityDelta;
+        if (int.parse(match[2]!) != received || received > line.orderedPacks) {
+          return null;
+        }
+        lastRevision = revision(movement);
+        receiptReference = match[1];
+        confirmedAt = movement.occurredAt;
+      }
+      return WorkspaceConfirmedPurchaseReceipt(
+        accountScope: purchase.accountScope,
+        workspaceId: purchase.workspaceId,
+        supplierId: purchase.supplierId,
+        orderId: purchase.orderId,
+        shipmentId: purchase.shipmentId,
+        purchaseId: purchase.purchaseId,
+        revision: lastRevision,
+        reference: receiptReference!,
+        confirmedAt: confirmedAt!,
+        lines: [
+          WorkspacePurchaseLine(
+            id: line.id,
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            orderedPacks: line.orderedPacks,
+            unitPriceMinor: line.unitPriceMinor,
+            receivedPacks: received,
+          ),
+        ],
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get customerReturnAvailable =>
+      customerCollectionAvailable &&
+      !customerCollectionBusy &&
+      pendingCustomerCollection == null &&
+      pendingCustomerReturn == null &&
+      _storeData.customerCollectionGateway is WorkCustomerReturnGateway;
+
+  Future<bool> recordCustomerReturn({
+    required String invoiceId,
+    required List<WorkspaceCustomerReturnLine> lines,
+    required String reason,
+    String? reasonCode,
+    int? expectedCreditMinor,
+    int? expectedLedgerRevision,
+  }) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    final finance = workspaceFinance;
+    if (finance == null ||
+        workspaceFinanceStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null ||
+        data.pendingCustomerCollection != null ||
+        data.customerCollectionGateway is! WorkCustomerReturnGateway) {
+      return false;
+    }
+    final payment = finance.payments
+        .where((p) => p.invoiceId == invoiceId)
+        .firstOrNull;
+    final order = workspaceOrders
+        .where((o) => o.id == payment?.orderId)
+        .firstOrNull;
+    final ledger = finance.customerLedgers
+        .where((l) => l.customerId == payment?.customerId)
+        .firstOrNull;
+    if (payment == null || order == null || ledger == null) return false;
+    final credits = ledger.entries.where(
+      (entry) =>
+          entry.invoiceId == invoiceId &&
+          entry.kind == WorkspaceLedgerEntryKind.creditNote,
+    );
+    if (credits.any(
+      (entry) =>
+          entry.customerReturn == null ||
+          entry.state == WorkspaceLedgerPostingState.pending,
+    )) {
+      return false;
+    }
+    final request = WorkspaceCustomerReturn(
+      accountScope: finance.accountScope,
+      workspaceId: finance.workspaceId,
+      customerId: payment.customerId,
+      invoiceId: invoiceId,
+      orderId: payment.orderId,
+      operationId: StoreCollectionController._id(),
+      expectedRevision: ledger.revision,
+      reason: reason.trim(),
+      reasonCode: reasonCode,
+      lines: lines,
+    );
+    final credit = request.creditMinorFor(
+      order,
+      priorReturns: [
+        for (final entry in credits)
+          if (entry.state == WorkspaceLedgerPostingState.posted)
+            entry.customerReturn!,
+      ],
+    );
+    if ((expectedLedgerRevision != null &&
+            expectedLedgerRevision != ledger.revision) ||
+        (expectedCreditMinor != null && credit != expectedCreditMinor) ||
+        credit == null ||
+        credit <= 0 ||
+        lines.any(
+          (line) => !workspaceCatalogueItems.any(
+            (product) =>
+                product.id == line.productId &&
+                (line.restockQuantity == 0 ||
+                    product.stockMode == WorkspaceStockMode.exactQuantity),
+          ),
+        )) {
+      return false;
+    }
+    final intent = WorkspacePendingCustomerReturn(
+      request: request,
+      creditMinor: credit,
+      originalItems: order.itemSnapshots,
+    );
+    data.pendingCustomerReturn = intent;
+    data.returnMayHaveSubmitted = false;
+    data.returnIntentSaved = false;
+    return _sendCustomerReturn(data, intent, order, reconcile: false);
+  }
+
+  Future<bool> reconcileCustomerReturn() async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    final intent = data.pendingCustomerReturn;
+    if (intent == null ||
+        data.customerCollectionBusy ||
+        data.customerCollectionGateway is! WorkCustomerReturnGateway) {
+      return false;
+    }
+    final order = workspaceOrders
+        .where((o) => o.id == intent.request.orderId)
+        .firstOrNull;
+    if (order == null &&
+        (!data.returnMayHaveSubmitted || intent.originalItems.isEmpty)) {
+      showError(
+        'The original bill must be recovered before confirming this return.',
+      );
+      return false;
+    }
+    return _sendCustomerReturn(
+      data,
+      intent,
+      order,
+      reconcile: data.returnMayHaveSubmitted,
+    );
+  }
+
+  Future<bool> _sendCustomerReturn(
+    _StoreOperationalData data,
+    WorkspacePendingCustomerReturn intent,
+    WorkspaceOrderRecord? order, {
+    required bool reconcile,
+  }) async {
+    final request = intent.request;
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    try {
+      var inventory =
+          _captureLedgerInventory(data) ??
+          WorkspaceInventoryLedger(
+            accountScope: request.accountScope,
+            workspaceId: request.workspaceId,
+            revision: 1,
+            asOf: DateTime.now().toUtc(),
+            openingQuantities: {
+              for (final product in workspaceCatalogueItems)
+                if (product.stockMode == WorkspaceStockMode.exactQuantity)
+                  product.id: product.stock,
+            },
+            movements: const [],
+          );
+      final journal = data.ledgerCheckpointStore!;
+      if (!reconcile) {
+        final pending = WorkspaceLedgerCheckpoint(
+          revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+          finance: data.finance!,
+          pendingReturn: intent,
+          inventory: inventory,
+          billedOrders: data.ledgerBilledOrders,
+          billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
+        );
+        await journal.save(
+          pending,
+          expectedRevision: data.ledgerCheckpointRevision,
+        );
+        data.ledgerCheckpointRevision = pending.revision;
+        data.returnIntentSaved = true;
+        data.ledgerInventory = inventory;
+        if (!_isStoreScopeCurrent(
+          data,
+          request.workspaceId,
+          request.accountScope,
+        )) {
+          return false;
+        }
+      }
+      final adapter =
+          data.customerCollectionGateway as WorkCustomerReturnGateway;
+      data.returnMayHaveSubmitted = true;
+      final reply =
+          await (reconcile
+                  ? adapter.reconcileReturn(request)
+                  : adapter.recordReturn(request, order!))
+              .timeout(const Duration(seconds: 15));
+      if (!_isStoreScopeCurrent(
+        data,
+        request.workspaceId,
+        request.accountScope,
+      )) {
+        return false;
+      }
+      final entries = reply.customerLedgers
+          .where((l) => l.customerId == request.customerId)
+          .expand((l) => l.entries)
+          .where((entry) => entry.operationId == request.operationId)
+          .toList();
+      if (!reply.valid ||
+          reply.accountScope != request.accountScope ||
+          reply.workspaceId != request.workspaceId ||
+          entries.length != 1 ||
+          entries.single.amountMinor != intent.creditMinor ||
+          entries.single.customerReturn == null ||
+          jsonEncode(entries.single.customerReturn!.toJson()) !=
+              jsonEncode(request.toJson())) {
+        throw StateError('The return response does not match the saved bill.');
+      }
+      final movements = intent.originalItems.isNotEmpty
+          ? entries.single.returnStockMovementsFromSavedItems(
+              intent.originalItems,
+            )
+          : order == null
+          ? null
+          : entries.single.returnStockMovements(order);
+      if (movements == null) {
+        throw StateError('Return stock details are unavailable.');
+      }
+      inventory = _captureLedgerInventory(data) ?? inventory;
+      final nextInventory = inventory.post(movements, at: reply.asOf);
+      if (nextInventory == null) {
+        throw StateError('Stock requires reconciliation.');
+      }
+      final completed = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: reply,
+        inventory: nextInventory,
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await journal.save(
+        completed,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = completed.revision;
+      if (!_isStoreScopeCurrent(
+        data,
+        request.workspaceId,
+        request.accountScope,
+      )) {
+        return false;
+      }
+      if (!applyWorkspaceFinance(reply)) {
+        throw StateError('Saved return needs projection recovery.');
+      }
+      _restoreLedgerInventory(data, nextInventory);
+      data.pendingCustomerReturn = null;
+      data.returnIntentSaved = false;
+      showNotice(
+        'Return recorded. Customer dues and sellable stock are updated.',
+      );
+      return true;
+    } catch (_) {
+      if (!_disposed && identical(data, _storeData)) {
+        showNotice(
+          data.returnIntentSaved
+              ? 'Return not confirmed. Its details are saved; check its status before entering it again.'
+              : 'Return details could not be saved. Keep this bill open and retry; do not enter another return.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) notifyListeners();
+    }
+  }
+
+  Future<bool> recordCustomerRefund({
+    required String customerId,
+    required String invoiceId,
+    required int amountMinor,
+    required WorkspacePaymentChannel channel,
+    String? reference,
+    String? sourceCollectionId,
+  }) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() ||
+        !identical(data, _storeData) ||
+        !customerRefundAvailable) {
+      return false;
+    }
+    final finance = workspaceFinance;
+    final ledger = finance?.customerLedgers
+        .where((l) => l.customerId == customerId)
+        .firstOrNull;
+    final payment = finance?.payments
+        .where((p) => p.customerId == customerId && p.invoiceId == invoiceId)
+        .firstOrNull;
+    final balance = ledger?.invoiceBalance(invoiceId);
+    if (finance == null ||
+        ledger == null ||
+        payment == null ||
+        balance == null ||
+        amountMinor <= 0 ||
+        amountMinor > balance.refundableMinor ||
+        payment.channel == WorkspacePaymentChannel.platform) {
+      return false;
+    }
+    final request = WorkspaceCustomerRefund(
+      accountScope: finance.accountScope,
+      workspaceId: finance.workspaceId,
+      customerId: customerId,
+      invoiceId: invoiceId,
+      orderId: payment.orderId,
+      operationId: StoreCollectionController._id(),
+      expectedRevision: ledger.revision,
+      amountMinor: amountMinor,
+      channel: channel,
+      reference: reference?.trim(),
+      sourceCollectionId: sourceCollectionId,
+    );
+    if (!request.valid || !ledger.permitsReceiptRefund(request)) {
+      return false;
+    }
+    data.pendingCustomerRefund = request;
+    data.refundMayHaveSubmitted = false;
+    data.refundIntentSaved = false;
+    return _sendCustomerRefund(data, request, reconcile: false);
+  }
+
+  Future<bool> reconcileCustomerRefund() async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    final request = data.pendingCustomerRefund;
+    if (request == null ||
+        data.customerCollectionBusy ||
+        data.customerCollectionGateway is! WorkCustomerRefundGateway) {
+      return false;
+    }
+    return _sendCustomerRefund(
+      data,
+      request,
+      reconcile: data.refundMayHaveSubmitted,
+    );
+  }
+
+  Future<bool> _sendCustomerRefund(
+    _StoreOperationalData data,
+    WorkspaceCustomerRefund request, {
+    required bool reconcile,
+  }) async {
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    try {
+      final journal = data.ledgerCheckpointStore!;
+      if (!reconcile) {
+        final pending = WorkspaceLedgerCheckpoint(
+          revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+          finance: data.finance!,
+          inventory: data.ledgerInventory,
+          billedOrders: data.ledgerBilledOrders,
+          billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
+          pendingRefund: request,
+        );
+        await journal.save(
+          pending,
+          expectedRevision: data.ledgerCheckpointRevision,
+        );
+        data.ledgerCheckpointRevision = pending.revision;
+        data.refundIntentSaved = true;
+        if (!_isStoreScopeCurrent(
+          data,
+          request.workspaceId,
+          request.accountScope,
+        )) {
+          return false;
+        }
+      }
+      final adapter =
+          data.customerCollectionGateway as WorkCustomerRefundGateway;
+      final before = data.finance!.payments
+          .where(
+            (p) =>
+                p.invoiceId == request.invoiceId &&
+                p.orderId == request.orderId &&
+                p.customerId == request.customerId,
+          )
+          .firstOrNull;
+      data.refundMayHaveSubmitted = true;
+      final reply =
+          await (reconcile
+                  ? adapter.reconcileRefund(request)
+                  : adapter.recordRefund(request))
+              .timeout(const Duration(seconds: 15));
+      if (!_isStoreScopeCurrent(
+        data,
+        request.workspaceId,
+        request.accountScope,
+      )) {
+        return false;
+      }
+      final entries = reply.customerLedgers
+          .where((l) => l.customerId == request.customerId)
+          .expand((l) => l.entries)
+          .where((e) => e.operationId == request.operationId)
+          .toList();
+      final after = reply.payments
+          .where(
+            (p) =>
+                p.invoiceId == request.invoiceId &&
+                p.orderId == request.orderId &&
+                p.customerId == request.customerId,
+          )
+          .firstOrNull;
+      if (!reply.valid ||
+          reply.accountScope != request.accountScope ||
+          reply.workspaceId != request.workspaceId ||
+          entries.length != 1 ||
+          entries.single.kind != WorkspaceLedgerEntryKind.refund ||
+          entries.single.state != WorkspaceLedgerPostingState.posted ||
+          entries.single.customerRefund?.identityData != request.identityData ||
+          before == null ||
+          after == null ||
+          after.amountMinor != before.amountMinor ||
+          after.paidMinor != before.paidMinor ||
+          after.dueMinor != before.dueMinor ||
+          after.refundedMinor != before.refundedMinor + request.amountMinor) {
+        throw StateError('Refund response does not match the saved invoice.');
+      }
+      final completed = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: reply,
+        inventory: data.ledgerInventory,
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await journal.save(
+        completed,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = completed.revision;
+      if (!_isStoreScopeCurrent(
+        data,
+        request.workspaceId,
+        request.accountScope,
+      )) {
+        return false;
+      }
+      if (!applyWorkspaceFinance(reply)) {
+        throw StateError('Saved refund needs projection recovery.');
+      }
+      data.pendingCustomerRefund = null;
+      data.refundIntentSaved = false;
+      showNotice('Refund recorded against the invoice.');
+      return true;
+    } catch (_) {
+      if (!_disposed && identical(data, _storeData)) {
+        showNotice(
+          data.refundIntentSaved
+              ? 'Refund not confirmed. Its details are saved; check its status before recording it again.'
+              : 'Refund details could not be saved. Keep this bill open and retry.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> recordCustomerCollection({
+    required String customerId,
+    required String invoiceId,
+    required int amountMinor,
+    required WorkspacePaymentChannel channel,
+    String? reference,
+  }) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    final finance = workspaceFinance;
+    if (!customerCollectionAvailable ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null ||
+        finance == null) {
+      return false;
+    }
+    final ledger = finance.customerLedgers
+        .where((l) => l.customerId == customerId)
+        .firstOrNull;
+    final payment = finance.payments
+        .where((p) => p.customerId == customerId && p.invoiceId == invoiceId)
+        .firstOrNull;
+    if (ledger == null ||
+        !ledger.historyComplete ||
+        payment == null ||
+        amountMinor > payment.dueMinor) {
+      return false;
+    }
+    final request = WorkspaceCustomerCollection(
+      accountScope: finance.accountScope,
+      workspaceId: finance.workspaceId,
+      customerId: customerId,
+      invoiceId: invoiceId,
+      orderId: payment.orderId,
+      operationId: StoreCollectionController._id(),
+      expectedRevision: ledger.revision,
+      amountMinor: amountMinor,
+      channel: channel,
+      reference: reference?.trim(),
+    );
+    if (!request.valid) return false;
+    data.pendingCustomerCollection = request;
+    data.collectionMayHaveSubmitted = false;
+    return _sendCustomerCollection(data, request, reconcile: false);
+  }
+
+  Future<bool> reconcileCustomerCollection() async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() || !identical(data, _storeData)) {
+      return false;
+    }
+    final request = data.pendingCustomerCollection;
+    if (request == null ||
+        data.customerCollectionBusy ||
+        data.customerCollectionGateway == null) {
+      return false;
+    }
+    return _sendCustomerCollection(
+      data,
+      request,
+      reconcile: data.collectionMayHaveSubmitted,
+    );
+  }
+
+  Future<bool> _sendCustomerCollection(
+    _StoreOperationalData data,
+    WorkspaceCustomerCollection request, {
+    required bool reconcile,
+  }) async {
+    data.customerCollectionBusy = true;
+    notifyListeners();
+    try {
+      final adapter = data.customerCollectionGateway!;
+      final journal = data.ledgerCheckpointStore!;
+      if (!reconcile) {
+        final pendingCheckpoint = WorkspaceLedgerCheckpoint(
+          revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+          finance: data.finance!,
+          inventory: data.ledgerInventory,
+          billedOrders: data.ledgerBilledOrders,
+          billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
+          pending: request,
+        );
+        await journal.save(
+          pendingCheckpoint,
+          expectedRevision: data.ledgerCheckpointRevision,
+        );
+        data.ledgerCheckpointRevision = pendingCheckpoint.revision;
+        if (!_isStoreScopeCurrent(
+          data,
+          request.workspaceId,
+          request.accountScope,
+        )) {
+          return false;
+        }
+      }
+      final originalPayment = data.finance?.payments
+          .where(
+            (p) =>
+                p.orderId == request.orderId &&
+                p.customerId == request.customerId &&
+                p.invoiceId == request.invoiceId,
+          )
+          .firstOrNull;
+      data.collectionMayHaveSubmitted = true;
+      final reply =
+          await (reconcile
+                  ? adapter.reconcileCollection(request)
+                  : adapter.recordCollection(request))
+              .timeout(const Duration(seconds: 15));
+      if (_disposed || request.accountScope != _contactAccountScope) {
+        return false;
+      }
+      final ledger = reply.customerLedgers
+          .where((l) => l.customerId == request.customerId)
+          .firstOrNull;
+      final matching = ledger?.entries.where(
+        (entry) =>
+            entry.operationId == request.operationId &&
+            entry.invoiceId == request.invoiceId &&
+            entry.orderId == request.orderId &&
+            entry.kind == WorkspaceLedgerEntryKind.collection &&
+            entry.state == WorkspaceLedgerPostingState.posted &&
+            entry.channel == request.channel &&
+            entry.paymentReference == request.reference &&
+            entry.amountMinor == request.amountMinor,
+      );
+      final updatedPayment = reply.payments
+          .where(
+            (p) =>
+                p.orderId == request.orderId &&
+                p.customerId == request.customerId &&
+                p.invoiceId == request.invoiceId,
+          )
+          .firstOrNull;
+      if (reply.accountScope != request.accountScope ||
+          reply.workspaceId != request.workspaceId ||
+          matching?.length != 1 ||
+          originalPayment == null ||
+          updatedPayment == null ||
+          updatedPayment.amountMinor != originalPayment.amountMinor ||
+          updatedPayment.dueMinor !=
+              originalPayment.dueMinor - request.amountMinor ||
+          updatedPayment.paidMinor !=
+              originalPayment.paidMinor + request.amountMinor ||
+          updatedPayment.refundedMinor != originalPayment.refundedMinor ||
+          !reply.valid) {
+        throw StateError('Collection reply could not be verified.');
+      }
+      final completed = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: reply,
+        inventory: data.ledgerInventory,
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await journal.save(
+        completed,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = completed.revision;
+      if (_disposed ||
+          request.accountScope != _contactAccountScope ||
+          !applyWorkspaceFinance(reply)) {
+        throw StateError('Saved collection awaits projection recovery.');
+      }
+      data.pendingCustomerCollection = null;
+      if (identical(data, _storeData)) {
+        showNotice('Collection recorded against the invoice.');
+      }
+      return true;
+    } catch (_) {
+      if (!_disposed && identical(data, _storeData)) {
+        showNotice(
+          'Collection not confirmed. Check its status before recording again.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) notifyListeners();
+    }
+  }
+
+  void markWorkspaceFinanceStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.finance?.accountScope != accountScope) return;
+    data!.financeStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
+
+  /// Accept only a separately authenticated, linked purchase projection.
+  /// This is not membership validation, a Buy-history import or a stock write.
+  bool applyWorkspacePurchases({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspacePurchaseRecord> records,
+    bool complete = false,
+    String? nextCursor,
+  }) {
+    if (_disposed ||
+        accountScope.isEmpty ||
+        accountScope != _contactAccountScope ||
+        feedRevision <= 0 ||
+        (complete && nextCursor != null)) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        records.any(
+          (record) =>
+              !record.valid ||
+              record.accountScope != accountScope ||
+              record.workspaceId != storeId,
+        ) ||
+        records.map((record) => record.shipmentId).toSet().length !=
+            records.length) {
+      return false;
+    }
+    final sameAccount = data.purchaseAccountScope == accountScope;
+    if (sameAccount && feedRevision <= data.purchaseFeedRevision) return false;
+    final reconciled = <WorkspacePurchaseRecord>[];
+    for (final record in records) {
+      final saved = data.ledgerPurchaseReceipts[record.shipmentId];
+      if (saved == null || !sameAccount) {
+        reconciled.add(record);
+        continue;
+      }
+      if (!saved.belongsTo(record)) return false;
+      final incoming = WorkspaceConfirmedPurchaseReceipt.fromPurchase(record);
+      if (incoming.valid &&
+          !incoming.canFollow(saved) &&
+          !saved.canFollow(incoming)) {
+        return false;
+      }
+      reconciled.add(
+        incoming.valid && incoming.canFollow(saved)
+            ? record
+            : saved.applyTo(record),
+      );
+    }
+    records = reconciled;
+    final previous = sameAccount
+        ? data.purchaseLastRecords
+        : <String, WorkspacePurchaseRecord>{};
+    for (final record in records) {
+      final old = previous[record.shipmentId];
+      if (old != null &&
+          (old.orderId != record.orderId ||
+              old.supplierId != record.supplierId ||
+              old.purchaseId != record.purchaseId ||
+              old.createdAt != record.createdAt)) {
+        return false;
+      }
+    }
+    final next = complete || !sameAccount
+        ? <String, WorkspacePurchaseRecord>{}
+        : {...data.purchases};
+    for (final record in records) {
+      final old = previous[record.shipmentId];
+      if (old != null &&
+          record.revision <= old.revision &&
+          !data.purchases.containsKey(record.shipmentId)) {
+        continue;
+      }
+      next[record.shipmentId] = old != null && record.revision <= old.revision
+          ? old
+          : record;
+    }
+    if (!sameAccount) data.purchaseLastRecords.clear();
+    for (final record in records) {
+      final old = data.purchaseLastRecords[record.shipmentId];
+      if (old == null || record.revision > old.revision) {
+        data.purchaseLastRecords[record.shipmentId] = record;
+      }
+    }
+    data.purchaseAccountScope = accountScope;
+    data.purchaseFeedRevision = feedRevision;
+    data.purchasesComplete = complete;
+    data.purchasesNextCursor = nextCursor;
+    data.purchases
+      ..clear()
+      ..addAll(next);
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  /// Supplier money updates are independent of shipment/receipt projections.
+  WorkspaceLedgerFormKey? expenseFormKey() {
+    final finance = workspaceFinance;
+    if (finance == null || workspaceFinanceStale) {
+      return null;
+    }
+    return (
+      account: finance.accountScope,
+      store: finance.workspaceId,
+      customer: 'store-expenses',
+      invoice: 'manual-expenses',
+      order: 'manual-expenses',
+      kind: 'expense',
+      ledgerRevision: workspaceExpenses.length + 1,
+    );
+  }
+
+  bool get canRecordStoreReviewExpense {
+    final adapter = _scopedOrderOperations?.gateway;
+    return canLoadStoreReviewSeed &&
+        adapter is StoreReviewOrderGateway &&
+        adapter.seed.accountScope == _contactAccountScope &&
+        adapter.seed.storeId == activeWorkspace?.id;
+  }
+
+  Future<bool> recordStoreReviewExpense({
+    required WorkspaceLedgerFormKey key,
+    required int amountMinor,
+    required String category,
+    required String method,
+    required String reference,
+    required String note,
+  }) async {
+    if (!canRecordStoreReviewExpense ||
+        !await recoverCustomerLedger() ||
+        !canRecordStoreReviewExpense ||
+        key.account != _contactAccountScope ||
+        key.store != activeWorkspace?.id ||
+        key.kind != 'expense' ||
+        key.customer != 'store-expenses' ||
+        key.invoice != 'manual-expenses' ||
+        key.order != 'manual-expenses') {
+      return false;
+    }
+    final id = jsonEncode([
+      'expense',
+      key.account,
+      key.store,
+      key.ledgerRevision,
+    ]);
+    final existing = workspaceExpenses
+        .where((expense) => expense.operationId == id)
+        .firstOrNull;
+    if (existing != null) {
+      return existing.amountMinor == amountMinor &&
+          existing.category == category &&
+          existing.method == method &&
+          existing.reference == reference &&
+          existing.note == note;
+    }
+    if (key != expenseFormKey()) {
+      return false;
+    }
+    return saveWorkspaceExpenseRecord(
+      WorkspaceExpenseRecord(
+        accountScope: key.account,
+        workspaceId: key.store,
+        operationId: id,
+        amountMinor: amountMinor,
+        category: category,
+        method: method,
+        reference: reference,
+        note: note,
+        occurredAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  List<WorkspaceExpenseRecord> get workspaceExpenses => List.unmodifiable(
+    _storeData.expenses.values
+        .where(
+          (expense) =>
+              expense.accountScope == _contactAccountScope &&
+              expense.workspaceId == activeWorkspace?.id,
+        )
+        .toList()
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt)),
+  );
+
+  WorkspaceMoneyStatement? get workspaceMoneyStatement {
+    final finance = workspaceFinance;
+    if (finance == null ||
+        workspaceFinanceStale ||
+        _storeData.staleSupplierLedgers.any(
+          (key) => key.$1 == finance.accountScope,
+        )) {
+      return null;
+    }
+    return WorkspaceMoneyStatement.fromLedgers(
+      finance: finance,
+      suppliers: _storeData.supplierLedgers.values
+          .where(
+            (ledger) =>
+                ledger.accountScope == finance.accountScope &&
+                ledger.workspaceId == finance.workspaceId,
+          )
+          .toList(),
+      expenses: workspaceExpenses,
+      start: workspaceMoneyPeriodStart,
+      end: DateTime.now(),
+    );
+  }
+
+  Future<bool> saveWorkspaceExpenseRecord(
+    WorkspaceExpenseRecord expense,
+  ) async {
+    final data = _storeData;
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        expense.accountScope == _contactAccountScope &&
+        expense.workspaceId == activeWorkspace?.id;
+    if (!current() ||
+        !expense.valid ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy || data.inventoryReceiptRecoveryPending) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final key = (expense.accountScope, expense.operationId);
+    final existing = data.expenses[key];
+    if (existing != null) {
+      return jsonEncode(existing.toJson()) == jsonEncode(expense.toJson());
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: Map.unmodifiable({
+          ..._expenseCheckpointEntries(data),
+          expense.operationId: expense,
+        }),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (!current()) {
+        return false;
+      }
+      data.expenses[key] = expense;
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Expense save unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  List<WorkspaceMoneyRegisterSnapshot> get workspaceMoneyRegisters =>
+      List.unmodifiable(
+        _storeData.moneyRegisters.values.where(
+          (register) =>
+              register.accountScope == _contactAccountScope &&
+              register.workspaceId == activeWorkspace?.id,
+        ),
+      );
+
+  Future<bool> saveWorkspaceMoneyRegister(
+    WorkspaceMoneyRegisterSnapshot register,
+  ) async {
+    final data = _storeData;
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        register.accountScope == _contactAccountScope &&
+        register.workspaceId == activeWorkspace?.id;
+    if (!current() ||
+        !register.valid ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final key = (register.accountScope, register.registerId);
+    final previous = data.moneyRegisters[key];
+    if (previous != null) {
+      if (!register.canFollow(previous)) {
+        return false;
+      }
+      if (register.revision == previous.revision) {
+        return true;
+      }
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+        moneyRegisters: Map.unmodifiable({
+          ..._moneyRegisterCheckpointEntries(data),
+          register.registerId: register,
+        }),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (!current()) {
+        return false;
+      }
+      data.moneyRegisters[key] = register;
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Register save unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Map<String, WorkspaceExpenseRecord> _expenseCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final expense in data.expenses.values)
+      if (expense.accountScope == data.finance?.accountScope)
+        expense.operationId: expense,
+  });
+
+  Map<String, WorkspaceMoneyRegisterSnapshot> _moneyRegisterCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final register in data.moneyRegisters.values)
+      if (register.accountScope == data.finance?.accountScope &&
+          register.workspaceId == data.finance?.workspaceId)
+        register.registerId: register,
+  });
+
+  Map<String, WorkspaceSupplierLedger> _supplierLedgerCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final ledger in data.supplierLedgers.values)
+      if (ledger.accountScope == data.finance?.accountScope)
+        ledger.supplierId: ledger,
+  });
+
+  bool applyWorkspaceSupplierLedger(WorkspaceSupplierLedger ledger) {
+    if (_disposed ||
+        !ledger.valid ||
+        ledger.accountScope != _contactAccountScope) {
+      return false;
+    }
+    final data = ledger.workspaceId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[ledger.workspaceId];
+    if (data == null) {
+      return false;
+    }
+    final key = (ledger.accountScope, ledger.supplierId);
+    final previous = data.supplierLedgers[key];
+    if (previous != null && !ledger.canFollow(previous)) {
+      return false;
+    }
+    data.supplierLedgers[key] = ledger;
+    data.staleSupplierLedgers.remove(key);
+    if (identical(data, _storeData)) {
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Persist a confirmed supplier projection using the same Store journal.
+  /// This records evidence supplied by an adapter; it does not transfer money.
+  Future<bool> saveWorkspaceSupplierLedger(
+    WorkspaceSupplierLedger ledger,
+  ) async {
+    final data = _storeData;
+    if (data.inventoryReceiptRecoveryPending) {
+      showError('Recover this supplier’s goods receipt and Stock before changing its account.');
+      return false;
+    }
+    if (_disposed ||
+        !ledger.valid ||
+        ledger.accountScope != _contactAccountScope ||
+        ledger.workspaceId != activeWorkspace?.id ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        _disposed ||
+        !identical(data, _storeData) ||
+        ledger.accountScope != _contactAccountScope ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final previous =
+        data.supplierLedgers[(ledger.accountScope, ledger.supplierId)];
+    final previousCount = previous?.entries.length ?? 0;
+    if (ledger.entries.skip(previousCount).any((entry) =>
+        entry.origin != WorkspaceSupplierEntryOrigin.moolSocialOrder &&
+        (entry.kind == WorkspaceSupplierEntryKind.payment ||
+          entry.kind == WorkspaceSupplierEntryKind.advance) && entry.moneyReview == null)) {
+      return false;
+    }
+    if (previous != null && !ledger.canFollow(previous)) {
+      return false;
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
+        supplierLedgers: Map.unmodifiable({
+          ..._supplierLedgerCheckpointEntries(data),
+          ledger.supplierId: ledger,
+        }),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (_disposed ||
+          !identical(data, _storeData) ||
+          ledger.accountScope != _contactAccountScope ||
+          ledger.workspaceId != activeWorkspace?.id) {
+        return false;
+      }
+      return applyWorkspaceSupplierLedger(ledger);
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (!_disposed &&
+          identical(data, _storeData) &&
+          ledger.accountScope == _contactAccountScope) {
+        showNotice(
+          'Supplier update status is unverified. Recover its saved account before retrying the same update.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Record reviewed manual money without manufacturing an order/shipment.
+  /// Caller retains the frozen entry across failed/lost replies. Recovery reads
+  /// the authoritative journal before an exact retry can succeed without a write.
+  Future<bool> recordWorkspaceSupplierMoney(String supplierId, {
+    required String accountScope,
+    required String workspaceId,
+    required WorkspaceSupplierLedgerEntry entry,
+    required int expectedRevision,
+  }) async {
+    final data = _storeData;
+    bool current() => !_disposed && identical(data, _storeData) &&
+        accountScope == _contactAccountScope && workspaceId == activeWorkspace?.id &&
+        workspaceSupplierOpeningConfirmationAvailable && workspaceSuppliersLoaded &&
+        !workspaceSupplierSaving && !data.inventoryReceiptBusy;
+    if (!current() || !entry.valid || expectedRevision <= 0 ||
+        data.customerCollectionBusy || data.inventoryReceiptRecoveryPending ||
+        !await recoverCustomerLedger() || !current()) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(supplierId);
+    if (ledger == null || ledger.accountScope != accountScope ||
+        ledger.workspaceId != workspaceId) {
+      return false;
+    }
+    final next = ledger.recordReviewedMoney(entry, expectedRevision: expectedRevision);
+    if (next == null) return false;
+    if (identical(next, ledger)) return true;
+    if (entry.postedAt.isAfter(DateTime.now())) return false;
+    return await saveWorkspaceSupplierLedger(next) && current();
+  }
+
+  /// The encrypted form lock retains the exact frozen attempt across journal
+  /// posting. A later account revision revalidates capacity; the money payload
+  /// and operation identity are never regenerated or silently edited.
+  Future<bool> recordWorkspaceSupplierMoneyDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAttempt attempt) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(key) || !attempt.valid ||
+        _ledgerFormStorage is! WorkSupplierMoneyDraftGuard) {
+      return false;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierMoneyDraftGuard).withFrozenSupplierMoney(
+        key, jsonEncode(attempt.toJson()), () async {
+          if (!await recoverCustomerLedger() || !_ledgerFormScopeCurrent(key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final ledger = workspaceSupplierLedger(key.customer);
+          if (ledger == null || attempt.expectedRevision > ledger.revision) return false;
+          return recordWorkspaceSupplierMoney(key.customer, accountScope: key.account,
+            workspaceId: key.store, entry: attempt.entry, expectedRevision: ledger.revision);
+        });
+    } on Object {
+      showNotice('Payment status needs recovery. Reopen its saved attempt before retrying; do not record it again.');
+      return false;
+    }
+  }
+
+  /// Attribute an existing account money fact to an accepted bill. No new
+  /// payment, finance projection or Stock movement is generated by this link.
+  Future<bool> allocateWorkspaceSupplierMoney(WorkspaceSupplierBillMoneyAllocation link,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    bool current() => !_disposed && identical(data, _storeData) &&
+      link.accountScope == _contactAccountScope && link.workspaceId == activeWorkspace?.id &&
+      workspaceSupplierOpeningConfirmationAvailable && workspaceSuppliersLoaded &&
+      !workspaceSupplierSaving && !data.inventoryReceiptBusy;
+    if (!current() || !workspaceSupplierMoneyInputAvailable || !link.valid ||
+        data.customerCollectionBusy || data.inventoryReceiptRecoveryPending ||
+        !await recoverCustomerLedger() || !current()) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(link.supplierId);
+    if (ledger == null) return false;
+    final next = ledger.allocateRecordedMoney(link, expectedRevision: expectedRevision);
+    if (next == null) return false;
+    if (identical(next, ledger)) return true;
+    if (link.recordedAt.isAfter(DateTime.now())) return false;
+    return await saveWorkspaceSupplierLedger(next) && current();
+  }
+
+  Future<WorkspaceLedgerCheckpoint?> _freshSupplierAllocationCheckpoint(WorkspaceLedgerFormKey key) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData) &&
+      !workspaceSupplierSaving && !data.inventoryReceiptBusy && !data.inventoryReceiptRecoveryPending &&
+      !data.customerCollectionBusy;
+    if (!current() || data.ledgerCheckpointStore == null) return null;
+    final recovery = data.ledgerRecovery;
+    if (recovery != null && !await recovery) return null;
+    if (!current()) return null;
+    data.ledgerRecovered = false;
+    if (!await recoverCustomerLedger() || !current()) return null;
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!current() || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store ||
+        saved.revision != data.ledgerCheckpointRevision) {
+      return null;
+    }
+    return saved;
+  }
+
+  WorkspaceSupplierBillMoneyAllocation? _matchingSupplierAllocation(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierMoneyAllocationIntent intent) {
+    final found = saved.supplierLedgers.values.expand((ledger) => ledger.billMoneyAllocations.values)
+      .where((item) => item.operationId == intent.operationId).toList();
+    if (found.isEmpty) return null;
+    if (found.length != 1 || jsonEncode(found.single.intentToJson()) != jsonEncode(intent.intentToJson())) {
+      throw const WorkGatewayException('Saved allocation conflicts with this request. Keep both records for review.');
+    }
+    return found.single;
+  }
+
+  Future<bool> recoverWorkspaceSupplierAllocationStatus(WorkspaceLedgerFormKey key) async {
+    try { return await _freshSupplierAllocationCheckpoint(key) != null; }
+    on Object {
+      showNotice('Saved bill allocation is unavailable. Its request is kept; retry recovery before editing.');
+      return false;
+    }
+  }
+
+  Future<WorkspaceSupplierGoodsReturn?> readWorkspaceSupplierGoodsReturnStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierGoodsReturnIntent intent) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(key) || key.kind != 'supplierGoodsReturn' ||
+        data.ledgerCheckpointStore == null || intent.accountScope != key.account ||
+        intent.workspaceId != key.store || intent.supplierId != key.customer || intent.receiptId != key.invoice) {
+      throw const WorkGatewayException('Return to the original supplier receipt.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_ledgerFormScopeCurrent(key) || !identical(data, _storeData) || saved == null ||
+        !saved.valid || saved.supplierLedgers[key.customer]?.goodsReceipts[key.invoice] == null) {
+      throw const WorkGatewayException('Saved return status is unavailable. Keep the request and retry.');
+    }
+    final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+      .where((record) => record.operationId == intent.operationId).toList();
+    if (matches.isEmpty) return null;
+    if (matches.length != 1 || !intent.matches(matches.single)) {
+      throw const WorkGatewayException('Saved goods return differs. Keep both records for review.');
+    }
+    return matches.single;
+  }
+
+  WorkspaceSupplierCreditNote? _matchingWorkspaceSupplierCredit(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierCreditIntent intent) {
+    final notes = saved.supplierLedgers.values.expand((l) => l.creditNotes.values)
+      .where((n) => n.operationId == intent.operationId).toList();
+    final entries = saved.supplierLedgers.values.expand((l) => l.entries)
+      .where((e) => e.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) => l.goodsReturns.containsKey(intent.operationId) ||
+      l.shortageClaims.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId));
+    if (notes.isEmpty && entries.isEmpty && !other) return null;
+    if (other || notes.length != 1 || entries.length != 1 || !intent.matches(notes.single)) {
+      throw const WorkGatewayException('Saved supplier credit differs. Keep both records for review.');
+    }
+    return notes.single;
+  }
+
+  bool _supplierShortageIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierShortageIntent intent) =>
+    _ledgerFormScopeCurrent(key) && key.kind == 'supplierShortage' && intent.valid &&
+    key.account == intent.accountScope && key.store == intent.workspaceId && key.customer == intent.supplierId &&
+    key.invoice == intent.billId && key.ledgerRevision == intent.copyRevision && key.order == 'shortage-copy:${intent.copyId}';
+
+  WorkspaceSupplierShortageClaim? _matchingWorkspaceSupplierShortage(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierShortageIntent intent) {
+    final claims = saved.supplierLedgers.values.expand((l) => l.shortageClaims.values)
+      .where((c) => c.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) =>
+      l.entries.any((e) => e.operationId == intent.operationId) || l.creditNotes.containsKey(intent.operationId) ||
+      l.goodsReturns.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId) ||
+      l.billGoodsAllocations.containsKey(intent.operationId));
+    if (claims.isEmpty && !other) return null;
+    if (other || claims.length != 1 || !intent.matches(claims.single)) {
+      throw const WorkGatewayException('Saved shortage differs. Keep this review and recover the supplier account.');
+    }
+    return claims.single;
+  }
+
+  Future<WorkspaceSupplierShortageClaim?> readWorkspaceSupplierShortageStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierShortageIntent intent) async {
+    final data = _storeData;
+    if (!_supplierShortageIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier bill.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierShortageIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store) {
+      throw const WorkGatewayException('Saved shortage status is unavailable. Keep the review and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierShortage(saved, intent);
+    if (matched != null) return matched;
+    final ledger = saved.supplierLedgers[key.customer], bill = ledger?.purchaseBills[key.invoice];
+    if (bill == null || bill.copy.id != intent.copyId || bill.copy.revision != intent.copyRevision ||
+        ledger?.openingRecord?.id != intent.openingId || ledger?.openingRecord?.revision != intent.openingRevision) {
+      throw const WorkGatewayException('The original bill or opening balance is unavailable. Keep the shortage review.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierShortageDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierShortageIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierShortageIntentScope(key, intent);
+    final token = jsonEncode([key.account, key.store, intent.operationId]);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierShortageDraftGuard || data.ledgerCheckpointStore == null ||
+        !_supplierShortageSubmissions.add(token)) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierShortageDraftGuard).withFrozenSupplierShortage(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          if (_matchingWorkspaceSupplierShortage(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null || now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          final next = ledger.recordReviewedShortage(intent, recordedAt: now,
+            expectedRevision: ledger.revision, attributionReviewed: true);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              recovered.finance.accountScope != key.account || recovered.finance.workspaceId != key.store ||
+              _matchingWorkspaceSupplierShortage(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          return await recoverCustomerLedger() && current();
+        });
+    } on Object {
+      showNotice('Shortage status is unverified. Keep the saved review and recover the supplier account.');
+      return false;
+    } finally {
+      _supplierShortageSubmissions.remove(token);
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierShortageDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierShortageDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierShortageDraftGuard).resetConfirmedSupplierShortageDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierShortageStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The shortage review is kept. Verify its saved status before starting another.');
+      return false;
+    }
+  }
+
+  bool _supplierCreditIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) =>
+    _ledgerFormScopeCurrent(key) && key.kind == 'supplierCredit' && intent.valid &&
+    key.account == intent.accountScope && key.store == intent.workspaceId && key.customer == intent.supplierId &&
+    key.invoice == intent.billId && key.ledgerRevision == intent.copyRevision && key.order == 'credit-copy:${intent.copyId}';
+
+  Future<WorkspaceSupplierCreditNote?> readWorkspaceSupplierCreditStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierCreditIntent intent) async {
+    final data = _storeData;
+    if (!_supplierCreditIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier bill.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierCreditIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid) {
+      throw const WorkGatewayException('Saved credit status is unavailable. Keep the request and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierCredit(saved, intent);
+    if (matched != null) return matched;
+    final bill = saved.supplierLedgers[key.customer]?.purchaseBills[key.invoice];
+    if (bill == null || bill.copy.id != intent.copyId || bill.copy.revision != intent.copyRevision) {
+      throw const WorkGatewayException('The original bill is unavailable. Keep the saved credit request.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierCreditDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierCreditIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierCreditIntentScope(key, intent);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierCreditDraftGuard || data.ledgerCheckpointStore == null) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).withFrozenSupplierCredit(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          // Exact committed retry precedes current capacity and book dependencies.
+          if (_matchingWorkspaceSupplierCredit(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null || now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          final next = ledger.recordSupplierCredit(intent.commit(revision: ledger.revision + 1, at: now),
+            expectedRevision: ledger.revision);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              _matchingWorkspaceSupplierCredit(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          return await recoverCustomerLedger() && current();
+        });
+    } on Object {
+      showNotice('Supplier credit status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierCreditDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierCreditDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierCreditDraftGuard).resetConfirmedSupplierCreditDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierCreditStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The supplier credit request is kept. Verify it before starting another.');
+      return false;
+    }
+  }
+
+  bool _supplierRefundIntentScope(WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) =>
+    _ledgerFormScopeCurrent(key) && intent.valid && key == intent.formKey && intent.qa == !_productionSession;
+
+  WorkspaceSupplierRefund? _matchingWorkspaceSupplierRefund(
+      WorkspaceLedgerCheckpoint saved, WorkspaceSupplierRefundIntent intent) {
+    final matches = saved.supplierLedgers.values.expand((l) => l.refunds.values)
+      .where((r) => r.intent.operationId == intent.operationId).toList();
+    final entries = saved.supplierLedgers.values.expand((l) => l.entries)
+      .where((e) => e.operationId == intent.operationId).toList();
+    final other = saved.supplierLedgers.values.any((l) =>
+      l.creditNotes.containsKey(intent.operationId) || l.goodsReturns.containsKey(intent.operationId) ||
+      l.shortageClaims.containsKey(intent.operationId) || l.billMoneyAllocations.containsKey(intent.operationId) ||
+      l.billGoodsAllocations.containsKey(intent.operationId) || l.goodsReceipts.containsKey(intent.operationId)) ||
+      saved.finance.customerLedgers.any((l) => l.entries.any((e) => e.operationId == intent.operationId));
+    if (matches.isEmpty && entries.isEmpty && !other) return null;
+    if (other || matches.length != 1 || entries.length != 1 ||
+        jsonEncode(matches.single.intent.toJson()) != jsonEncode(intent.toJson()) ||
+        jsonEncode(matches.single.entry.toJson()) != jsonEncode(entries.single.toJson())) {
+      throw const WorkGatewayException('Saved supplier refund differs. Keep the request for review.');
+    }
+    return matches.single;
+  }
+
+  Future<WorkspaceSupplierRefund?> readWorkspaceSupplierRefundStatus(
+      WorkspaceLedgerFormKey key, WorkspaceSupplierRefundIntent intent) async {
+    final data = _storeData;
+    if (!_supplierRefundIntentScope(key, intent) || data.ledgerCheckpointStore == null) {
+      throw const WorkGatewayException('Return to the original supplier refund.');
+    }
+    final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+    if (!_supplierRefundIntentScope(key, intent) || !identical(data, _storeData) || saved == null || !saved.valid ||
+        saved.finance.accountScope != key.account || saved.finance.workspaceId != key.store) {
+      throw const WorkGatewayException('Saved refund status is unavailable. Keep the request and retry.');
+    }
+    final matched = _matchingWorkspaceSupplierRefund(saved, intent);
+    if (matched != null) return matched;
+    final ledger = saved.supplierLedgers[key.customer];
+    if (ledger == null || ledger.openingRecord?.id != intent.openingId ||
+        ledger.openingRecord?.revision != intent.openingRevision || ledger.openingRecord?.qa != intent.qa) {
+      throw const WorkGatewayException('The original supplier account is unavailable. Keep the refund request.');
+    }
+    return null;
+  }
+
+  Future<bool> recordWorkspaceSupplierRefundDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierRefundIntent intent) async {
+    final data = _storeData;
+    bool current() => identical(data, _storeData) && _supplierRefundIntentScope(key, intent);
+    if (!current() || intent.requestedAt.isAfter(DateTime.now()) ||
+        _ledgerFormStorage is! WorkSupplierRefundDraftGuard || data.ledgerCheckpointStore == null) { return false; }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).withFrozenSupplierRefund(
+        key, jsonEncode(intent.toJson()), () async {
+          // Already recorded is independent of unrelated Stock/cache recovery.
+          if (await readWorkspaceSupplierRefundStatus(key, intent) != null) return current();
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null || !current()) return false;
+          if (_matchingWorkspaceSupplierRefund(saved, intent) != null) return true;
+          if (!workspaceSupplierOpeningConfirmationAvailable || !workspaceSuppliersLoaded) return false;
+          final ledger = saved.supplierLedgers[key.customer], now = DateTime.now().toUtc();
+          if (ledger == null) return false;
+          final next = ledger.recordReviewedRefund(intent, expectedRevision: ledger.revision, recordedAt: now);
+          if (next == null) return false;
+          if (await saveWorkspaceSupplierLedger(next) && current()) return true;
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null || !recovered.valid ||
+              _matchingWorkspaceSupplierRefund(recovered, intent) == null) { return false; }
+          data.ledgerRecovered = false;
+          try {
+            if (!await recoverCustomerLedger() && current()) {
+              showNotice('Supplier refund recorded. Account refresh is pending; do not record it again.');
+            }
+          } on Object {
+            if (current()) showNotice('Supplier refund recorded. Account refresh is pending; retry refresh.');
+          }
+          return current();
+        });
+    } on Object {
+      showNotice('Supplier refund status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierRefundDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierRefundDraftGuard ||
+        data.ledgerCheckpointStore == null) { return false; }
+    try {
+      await (_ledgerFormStorage as WorkSupplierRefundDraftGuard).resetConfirmedSupplierRefundDraft(next,
+        expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          return identical(data, _storeData) && await readWorkspaceSupplierRefundStatus(next.key, intent) != null &&
+            _ledgerFormScopeCurrent(next.key);
+        });
+      return identical(data, _storeData) && _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The supplier refund is kept. Verify it before recording another.');
+      return false;
+    }
+  }
+
+  Future<bool> recordWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierGoodsReturnIntent intent) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(key) && identical(data, _storeData);
+    if (!current() || !intent.valid || intent.requestedAt.isAfter(DateTime.now()) ||
+        key.kind != 'supplierGoodsReturn' || key.ledgerRevision != 1 ||
+        intent.accountScope != key.account || intent.workspaceId != key.store ||
+        intent.supplierId != key.customer || intent.receiptId != key.invoice ||
+        key.order != 'return-receipt:${intent.receiptId}' ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    WorkspaceSupplierGoodsReturn? matching(WorkspaceLedgerCheckpoint saved) {
+      final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+        .where((record) => record.operationId == intent.operationId).toList();
+      if (matches.isEmpty) return null;
+      if (matches.length != 1 || !intent.matches(matches.single)) {
+        throw const WorkGatewayException('Saved goods return differs. Keep both records for review.');
+      }
+      return matches.single;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).withFrozenSupplierGoodsReturn(
+        key, jsonEncode(intent.toJson()), () async {
+          final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || saved == null) return false;
+          final ledger = saved.supplierLedgers[key.customer];
+          if (ledger == null || !ledger.goodsReceipts.containsKey(intent.receiptId)) return false;
+          final existing = matching(saved), now = DateTime.now().toUtc();
+          final book = existing == null
+            ? await _supplierStorage.read(key.account, key.store, qa: !_productionSession) : null;
+          if (!current() || (existing == null && book == null)) return false;
+          if (existing == null && (now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt))) return false;
+          final record = existing ?? intent.commit(revision: ledger.revision + 1, at: now);
+          final result = await confirmWorkspaceSupplierGoodsReturned(record, scope: _supplierKey!,
+            expectedPurchaseRevision: book?.revision ?? 0, expectedSupplierRevision: ledger.revision);
+          if (result == WorkspaceGoodsReceiptSaveResult.saved) return current();
+          // Another instance may have committed after our read. Only retry its
+          // exact saved request and original commit metadata, never a new ID.
+          final recovered = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          if (!current() || recovered == null) return false;
+          final proof = matching(recovered);
+          if (proof == null) return false;
+          return await confirmWorkspaceSupplierGoodsReturned(proof, scope: _supplierKey!,
+            expectedPurchaseRevision: book?.revision ?? 0,
+            expectedSupplierRevision: recovered.supplierLedgers[key.customer]!.revision) ==
+              WorkspaceGoodsReceiptSaveResult.saved && current();
+        });
+    } on Object {
+      showNotice('Goods return status is unverified. Keep the saved request and retry recovery.');
+      return false;
+    }
+  }
+
+  Future<bool> cancelUnpostedWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision, required WorkspaceSupplierGoodsReturnIntent intent,
+      required DateTime cancelledAt}) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    final key = next.key;
+    if (!current() || key.kind != 'supplierGoodsReturn' || key.ledgerRevision != 1 ||
+        intent.accountScope != key.account || intent.workspaceId != key.store ||
+        intent.supplierId != key.customer || intent.receiptId != key.invoice ||
+        key.order != 'return-receipt:${intent.receiptId}' ||
+        _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard || data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    // Fail closed even for an ID retained in another operation namespace.
+    bool containsOperation(Object? value) {
+      if (value is String) return value == intent.operationId;
+      if (value is List) return value.any(containsOperation);
+      if (value is Map) return value.keys.any(containsOperation) || value.values.any(containsOperation);
+      return false;
+    }
+    try {
+      await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).cancelUnpostedSupplierGoodsReturnDraft(
+        next, expectedRevision: expectedRevision, intent: intent, cancelledAt: cancelledAt, isCurrent: current,
+        verifyUnposted: (_) async {
+          // Called while the posting form queue is held, not from its cache.
+          final saved = await data.ledgerCheckpointStore!.read(key.account, key.store);
+          return current() && saved != null && saved.valid &&
+            saved.supplierLedgers[key.customer]?.goodsReceipts[key.invoice] != null &&
+            !containsOperation(saved.toJson());
+        });
+      return current();
+    } on Object {
+      showNotice('Return review is kept. Recover its saved status before correcting; recorded goods are not reversed.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierGoodsReturnDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    bool current() => _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    if (!current() || _ledgerFormStorage is! WorkSupplierGoodsReturnDraftGuard ||
+        data.ledgerCheckpointStore == null) {
+      return false;
+    }
+    try {
+      await (_ledgerFormStorage as WorkSupplierGoodsReturnDraftGuard).resetConfirmedSupplierGoodsReturnDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          final saved = await data.ledgerCheckpointStore!.read(next.key.account, next.key.store);
+          if (!current() || saved == null) return false;
+          final matches = saved.supplierLedgers.values.expand((ledger) => ledger.goodsReturns.values)
+            .where((record) => record.operationId == intent.operationId).toList();
+          return matches.length == 1 && intent.matches(matches.single);
+        });
+      return current();
+    } on Object {
+      showNotice('The goods return is kept. Verify its saved status before starting another.');
+      return false;
+    }
+  }
+
+  Future<bool> recordWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormKey key,
+      WorkspaceSupplierMoneyAllocationIntent intent) async {
+    if (!_ledgerFormScopeCurrent(key) || !intent.valid ||
+        intent.requestedAt.isAfter(DateTime.now()) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) {
+      return false;
+    }
+    try {
+      return await (_ledgerFormStorage as WorkSupplierAllocationDraftGuard).withFrozenSupplierAllocation(
+        key, jsonEncode(intent.intentToJson()), () async {
+          final saved = await _freshSupplierAllocationCheckpoint(key);
+          if (saved == null) return false;
+          if (_matchingSupplierAllocation(saved, intent) != null) return true;
+          final ledger = saved.supplierLedgers[key.customer];
+          if (ledger == null || intent.accountScope != key.account || intent.workspaceId != key.store ||
+              intent.supplierId != key.customer || intent.billId != key.invoice ||
+              intent.copyRevision != key.ledgerRevision || key.order != 'allocation-copy:${intent.copyId}') {
+            return false;
+          }
+          final now = DateTime.now().toUtc();
+          if (now.isBefore(ledger.asOf) || now.isBefore(intent.requestedAt)) return false;
+          return allocateWorkspaceSupplierMoney(intent.commit(revision: ledger.revision + 1, at: now,
+              sourceEntryCount: intent.sourceKind == WorkspaceSupplierMoneySourceKind.manualBillSurplus
+                ? ledger.entries.length : null),
+            expectedRevision: ledger.revision);
+        });
+    } on Object {
+      showNotice('Bill allocation is unverified. Recover this saved request before retrying; do not create another.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierAllocationDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierAllocationDraftGuard) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierAllocationDraftGuard).resetConfirmedSupplierAllocationDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (intent) async {
+          final saved = await _freshSupplierAllocationCheckpoint(next.key);
+          return saved != null && _matchingSupplierAllocation(saved, intent) != null;
+        });
+      return _ledgerFormScopeCurrent(next.key);
+    } on Object {
+      showNotice('The recorded allocation is kept. Recover its saved status before starting another.');
+      return false;
+    }
+  }
+
+  Future<bool> resetConfirmedWorkspaceSupplierMoneyDraft(WorkspaceLedgerFormDraft next,
+      {required int expectedRevision}) async {
+    final data = _storeData;
+    if (!_ledgerFormScopeCurrent(next.key) || _ledgerFormStorage is! WorkSupplierMoneyDraftGuard) return false;
+    try {
+      await (_ledgerFormStorage as WorkSupplierMoneyDraftGuard).resetConfirmedSupplierMoneyDraft(
+        next, expectedRevision: expectedRevision, verifyCommitted: (entry) async {
+          if (!await recoverCustomerLedger() || !_ledgerFormScopeCurrent(next.key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final saved = await data.ledgerCheckpointStore!.read(next.key.account, next.key.store);
+          if (saved == null || !_ledgerFormScopeCurrent(next.key) ||
+              !identical(data, _storeData)) {
+            return false;
+          }
+          final authoritative = saved.supplierLedgers[next.key.customer];
+          if (authoritative == null || authoritative.accountScope != next.key.account ||
+              authoritative.workspaceId != next.key.store || !authoritative.valid) {
+            return false;
+          }
+          final matches = authoritative.entries
+            .where((item) => item.operationId == entry.operationId).toList();
+          return matches.length == 1 &&
+            jsonEncode(matches.single.toJson()) == jsonEncode(entry.toJson());
+        });
+      return _ledgerFormScopeCurrent(next.key) && identical(data, _storeData);
+    } on Object {
+      showNotice('The recorded payment is kept. Retry opening it before starting another payment.');
+      return false;
+    }
+  }
+
+  Future<bool> recordStoreReviewSupplierPayment(
+    WorkspacePurchaseRecord purchase, {
+    required String operationId,
+    required String reference,
+    required String paymentMethod,
+    required int amountMinor,
+    required int expectedRevision,
+  }) async {
+    if (!canConfirmStoreReviewReceipt(purchase) ||
+        !await recoverCustomerLedger() ||
+        !canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final adapter = _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+    if (!adapter.seed.purchases.any(
+      (item) =>
+          item.orderId == purchase.orderId &&
+          item.shipmentId == purchase.shipmentId &&
+          item.supplierId == purchase.supplierId,
+    )) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(purchase.supplierId);
+    if (ledger == null) {
+      return false;
+    }
+    final next = const StoreReviewSupplierPaymentGateway().record(
+      ledger: ledger,
+      purchase: purchase,
+      operationId: operationId,
+      reference: reference,
+      paymentMethod: paymentMethod,
+      amountMinor: amountMinor,
+      expectedRevision: expectedRevision,
+    );
+    return next != null && await saveWorkspaceSupplierLedger(next);
+  }
+
+  WorkspaceSupplierLedger? workspaceSupplierLedger(String supplierId) {
+    final account = _contactAccountScope;
+    if (account == null || _disposed) {
+      return null;
+    }
+    final key = (account, supplierId);
+    return _storeData.staleSupplierLedgers.contains(key)
+        ? null
+        : _storeData.supplierLedgers[key];
+  }
+
+  bool get workspacePurchasesConnected =>
+      _contactAccountScope != null &&
+      _storeData.purchaseAccountScope == _contactAccountScope;
+  bool get workspacePurchasesComplete =>
+      workspacePurchasesConnected && _storeData.purchasesComplete;
+  List<WorkspacePurchaseRecord> get workspacePurchases {
+    if (!workspacePurchasesConnected) return const [];
+    final records = _storeData.purchases.values.toList()
+      ..sort((a, b) {
+        final date = b.createdAt.compareTo(a.createdAt);
+        return date == 0 ? a.shipmentId.compareTo(b.shipmentId) : date;
+      });
+    return List.unmodifiable(records);
+  }
+
+  int get workspaceIncomingPurchaseCount =>
+      workspacePurchases.where((record) => record.stage.incoming).length;
+  String? get focusedWorkspacePurchaseId => _storeData.focusedPurchaseId;
+  WorkspacePurchaseRecord? get focusedWorkspacePurchase =>
+      workspacePurchasesConnected
+      ? _storeData.purchases[_storeData.focusedPurchaseId]
+      : null;
+  bool selectWorkspacePurchase(String shipmentId) {
+    if (!workspacePurchasesConnected ||
+        !_storeData.purchases.containsKey(shipmentId)) {
+      return false;
+    }
+    _storeData.focusedPurchaseId = shipmentId;
+    notifyListeners();
+    return true;
+  }
+
+  WorkspacePurchaseRecord? workspacePurchaseForStockMovement(
+    WorkspaceStockMovement movement,
+  ) {
+    if (movement.referenceKind != WorkspaceStockReferenceKind.supplierReceipt ||
+        !workspacePurchasesConnected) {
+      return null;
+    }
+    try {
+      final link = jsonDecode(movement.referenceId ?? '');
+      if (link is List &&
+          link.length == 7 &&
+          link.first == 'purchase-receipt') {
+        if (link[1] != _contactAccountScope || link[2] != activeWorkspace?.id) {
+          return null;
+        }
+        final purchase = _storeData.purchases[link[5]];
+        return purchase != null &&
+                purchase.supplierId == link[3] &&
+                purchase.orderId == link[4] &&
+                purchase.lines.any((line) => line.id == link[6])
+            ? purchase
+            : null;
+      }
+    } catch (_) {
+      // Older movements contain a display receipt reference, not a linked key.
+    }
+    final matches = workspacePurchases.where(
+      (purchase) =>
+          purchase.receiptReference != null &&
+          purchase.receiptReference == movement.referenceId,
+    );
+    return matches.length == 1 ? matches.single : null;
+  }
+
+  void clearWorkspacePurchaseSelection() {
+    _storeData.focusedPurchaseId = null;
+    notifyListeners();
+  }
+
+  /// Apply separately confirmed cumulative receipt facts, never draft counts or
+  /// delivery status. The adapter supplies explicit Store SKU/pack mappings.
+  /// Receiving stock leaves supplier bills, payments and settlement unchanged.
+  Future<bool> recordWorkspacePurchaseReceipt(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+  }) => _recordWorkspacePurchaseStock(
+    purchase,
+    stockProductIds: stockProductIds,
+    unitsPerPack: unitsPerPack,
+  );
+
+  Future<bool> recordWorkspaceSupplierReturn(
+    WorkspacePurchaseRecord purchase, {
+    required WorkspaceSupplierReturnConfirmation confirmation,
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+  }) => _recordWorkspacePurchaseStock(
+    purchase,
+    returned: confirmation,
+    stockProductIds: stockProductIds,
+    unitsPerPack: unitsPerPack,
+  );
+
+  Future<bool> _recordWorkspacePurchaseStock(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+    WorkspaceSupplierReturnConfirmation? returned,
+  }) async {
+    final data = _storeData;
+    final expectedPurchase = data.purchases[purchase.shipmentId];
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        _receiptCurrent(purchase) &&
+        identical(data.purchases[purchase.shipmentId], expectedPurchase);
+    if (!current() ||
+        expectedPurchase == null ||
+        !WorkspaceConfirmedPurchaseReceipt.fromPurchase(
+          purchase,
+        ).belongsTo(expectedPurchase) ||
+        purchase.revision < expectedPurchase.revision ||
+        (returned != null && !returned.belongsTo(purchase)) ||
+        !{
+          WorkspaceReceiptState.partial,
+          WorkspaceReceiptState.confirmed,
+        }.contains(purchase.receiptState) ||
+        purchase.receiptReference?.trim().isNotEmpty != true ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final now = DateTime.now().toUtc();
+      final inventory =
+          _captureLedgerInventory(data) ??
+          WorkspaceInventoryLedger(
+            accountScope: purchase.accountScope,
+            workspaceId: purchase.workspaceId,
+            revision: 1,
+            asOf: now,
+            openingQuantities: {
+              for (final product in data.workspaceCatalogueItems)
+                if (product.stockMode == WorkspaceStockMode.exactQuantity)
+                  product.id: product.stock,
+            },
+            movements: const [],
+          );
+      final movements = <WorkspaceStockMovement>[];
+      if (purchase.lines.isEmpty) {
+        return false;
+      }
+      for (final line in purchase.lines) {
+        final packs = returned == null
+            ? line.receivedPacks
+            : returned.returnedPacks[line.id];
+        if (returned != null && packs == null) {
+          continue;
+        }
+        final productId = stockProductIds[line.id];
+        final factor = unitsPerPack[line.id];
+        if (packs == null ||
+            packs < 0 ||
+            packs > line.orderedPacks ||
+            factor == null ||
+            factor <= 0 ||
+            productId == null ||
+            !inventory.openingQuantities.containsKey(productId)) {
+          return false;
+        }
+        final reference = jsonEncode([
+          'purchase-receipt',
+          purchase.accountScope,
+          purchase.workspaceId,
+          purchase.supplierId,
+          purchase.orderId,
+          purchase.shipmentId,
+          line.id,
+        ]);
+        final prior = inventory.movements
+            .where(
+              (movement) =>
+                  movement.referenceKind ==
+                      WorkspaceStockReferenceKind.supplierReceipt &&
+                  movement.referenceId == reference,
+            )
+            .toList();
+        // Never remap already received supplier packs onto another Store SKU.
+        if (prior.any(
+          (movement) =>
+              movement.productId != productId ||
+              !movement.reason.endsWith('packs × $factor units'),
+        )) {
+          return false;
+        }
+        final receivedUnits = prior
+            .where(
+              (item) => item.kind == WorkspaceStockMovementKind.goodsReceived,
+            )
+            .fold<int>(0, (sum, item) => sum + item.quantityDelta);
+        final returnedUnits = -prior
+            .where(
+              (item) => item.kind == WorkspaceStockMovementKind.supplierReturn,
+            )
+            .fold<int>(0, (sum, item) => sum + item.quantityDelta);
+        if (returned != null && packs * factor > receivedUnits) {
+          return false;
+        }
+        final delta =
+            packs * factor - (returned == null ? receivedUnits : returnedUnits);
+        final id = returned == null
+            ? jsonEncode([reference, purchase.revision])
+            : jsonEncode([reference, 'supplier-return', returned.revision]);
+        final reason = returned == null
+            ? 'Supplier receipt ${purchase.receiptReference}: $packs packs × $factor units'
+            : 'Supplier return ${returned.reference}: $packs packs × $factor units';
+        final replay = prior.where((movement) => movement.id == id);
+        if (replay.isNotEmpty) {
+          if (replay.single.reason != reason) {
+            return false;
+          }
+          continue;
+        }
+        if (delta < 0 ||
+            (returned != null &&
+                prior.any((movement) {
+                  if (movement.kind !=
+                      WorkspaceStockMovementKind.supplierReturn) {
+                    return false;
+                  }
+                  final previousKey = jsonDecode(movement.id) as List;
+                  return (previousKey.last as int) >= returned.revision;
+                }))) {
+          return false;
+        }
+        if (delta == 0) {
+          continue;
+        }
+        final product = data.workspaceCatalogueItems.singleWhere(
+          (item) => item.id == productId,
+        );
+        movements.add(
+          WorkspaceStockMovement(
+            id: id,
+            productId: productId,
+            productLabel: product.title,
+            kind: returned == null
+                ? WorkspaceStockMovementKind.goodsReceived
+                : WorkspaceStockMovementKind.supplierReturn,
+            quantityDelta: returned == null ? delta : -delta,
+            reason: reason,
+            occurredAt: returned?.confirmedAt ?? purchase.updatedAt,
+            referenceKind: WorkspaceStockReferenceKind.supplierReceipt,
+            referenceId: reference,
+          ),
+        );
+      }
+      final priorReceipt = data.ledgerPurchaseReceipts[purchase.shipmentId];
+      // Returning goods does not reconfirm their receipt or adopt a newer
+      // purchase-feed timestamp as the original receipt confirmation time.
+      final receipt = returned != null && priorReceipt != null
+          ? priorReceipt
+          : WorkspaceConfirmedPurchaseReceipt.fromPurchase(purchase);
+      if (!receipt.valid ||
+          !receipt.belongsTo(purchase) ||
+          (priorReceipt != null && !receipt.canFollow(priorReceipt))) {
+        return false;
+      }
+      final receiptChanged =
+          priorReceipt == null ||
+          jsonEncode(receipt.toJson()) != jsonEncode(priorReceipt.toJson());
+      if (movements.isEmpty && !receiptChanged) return true;
+      final next = movements.isEmpty
+          ? inventory
+          : inventory.post(movements, at: now);
+      if (next == null) {
+        return false;
+      }
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: next,
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: Map.unmodifiable({
+          ...data.ledgerPurchaseReceipts,
+          purchase.shipmentId: receipt,
+        }),
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      if (!current()) {
+        return false;
+      }
+      _restoreLedgerInventory(data, next);
+      data.ledgerPurchaseReceipts = checkpoint.purchaseReceipts;
+      final confirmedPurchase = receipt.applyTo(purchase);
+      data.purchases[purchase.shipmentId] = confirmedPurchase;
+      data.purchaseLastRecords[purchase.shipmentId] = confirmedPurchase;
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Receipt stock update unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  final Set<WorkspaceReceiptDraftKey> _reviewReceiptsBusy = {};
+
+  bool canConfirmStoreReviewReceipt(WorkspacePurchaseRecord purchase) =>
+      canLoadStoreReviewSeed &&
+      _receiptCurrent(purchase) &&
+      _scopedOrderOperations?.gateway is StoreReviewOrderGateway;
+
+  Future<bool> confirmStoreReviewReceipt(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!canConfirmStoreReviewReceipt(purchase) ||
+        !await recoverCustomerLedger() ||
+        !canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final key = _receiptKey(purchase);
+    if (!_reviewReceiptsBusy.add(key)) {
+      return false;
+    }
+    try {
+      final writing = _receiptWrites[key];
+      if (writing != null) {
+        await writing;
+      }
+      if (!canConfirmStoreReviewReceipt(purchase)) {
+        return false;
+      }
+      final draft = _receiptDrafts[key];
+      if (draft == null ||
+          _receiptSavedRevisions[key] != draft.revision ||
+          _receiptUnconfirmedWrites.containsKey(key)) {
+        _receiptMessages[key] = 'Save the delivery counts before confirming.';
+        return false;
+      }
+      final adapter =
+          _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+      final confirmed = StoreReviewReceiptGateway(
+        adapter.seed,
+      ).confirm(_storeData.purchases[purchase.shipmentId]!, draft);
+      if (confirmed == null) {
+        _receiptMessages[key] =
+            'Check the pack counts. Delivery issues need review before stock confirmation.';
+        return false;
+      }
+      final saved = await recordWorkspacePurchaseReceipt(
+        confirmed,
+        // The fixture explicitly defines one purchased pack as one Store unit.
+        stockProductIds: {
+          for (final line in confirmed.lines) line.id: line.productId,
+        },
+        unitsPerPack: {for (final line in confirmed.lines) line.id: 1},
+      );
+      if (_receiptCurrent(confirmed)) {
+        _receiptMessages[key] = saved
+            ? 'Test receipt confirmed. Stock updated; no payment or message sent.'
+            : 'Stock update unconfirmed. Retry to recover the saved receipt.';
+      }
+      return saved;
+    } finally {
+      _reviewReceiptsBusy.remove(key);
+      if (!_disposed && _receiptCurrent(purchase)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> confirmStoreReviewSupplierReturn(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final key = _receiptKey(purchase);
+    if (!_reviewReceiptsBusy.add(key)) {
+      return false;
+    }
+    try {
+      final writing = _receiptWrites[key];
+      if (writing != null) {
+        await writing;
+      }
+      if (!canConfirmStoreReviewReceipt(purchase)) {
+        return false;
+      }
+      final draft = _receiptDrafts[key];
+      if (draft == null ||
+          _receiptSavedRevisions[key] != draft.revision ||
+          _receiptUnconfirmedWrites.containsKey(key)) {
+        return false;
+      }
+      final adapter =
+          _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+      final confirmation = StoreReviewReceiptGateway(
+        adapter.seed,
+      ).confirmReturn(purchase, draft);
+      if (confirmation == null) {
+        _receiptMessages[key] =
+            'Enter the total packs returned for this delivery.';
+        return false;
+      }
+      final saved = await recordWorkspaceSupplierReturn(
+        purchase,
+        confirmation: confirmation,
+        stockProductIds: {
+          for (final line in purchase.lines) line.id: line.productId,
+        },
+        unitsPerPack: {for (final line in purchase.lines) line.id: 1},
+      );
+      if (_receiptCurrent(purchase)) {
+        _receiptMessages[key] = saved
+            ? 'Test return recorded in stock. Supplier credit or refund remains separate.'
+            : 'Return not confirmed. Check received packs and available stock; recover saved status before retrying.';
+      }
+      return saved;
+    } finally {
+      _reviewReceiptsBusy.remove(key);
+      if (!_disposed && _receiptCurrent(purchase)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  late final WorkReceiptDraftStore _receiptDraftStorage =
+      receiptDraftStore ??
+      SecureWorkReceiptDraftStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceReceiptDraftKey, WorkspaceReceiptDraft> _receiptDrafts =
+      {};
+  final Set<WorkspaceReceiptDraftKey> _receiptDraftLoaded = {};
+  final Map<WorkspaceReceiptDraftKey, int> _receiptSavedRevisions = {};
+  final Map<WorkspaceReceiptDraftKey, Future<void>> _receiptReads = {};
+  final Map<WorkspaceReceiptDraftKey, Future<void>> _receiptWrites = {};
+  final Map<WorkspaceReceiptDraftKey, WorkspaceReceiptDraft>
+  _receiptUnconfirmedWrites = {};
+  final Map<WorkspaceReceiptDraftKey, String> _receiptMessages = {};
+
+  WorkspaceReceiptDraftKey _receiptKey(WorkspacePurchaseRecord purchase) => (
+    account: purchase.accountScope,
+    store: purchase.workspaceId,
+    shipment: purchase.shipmentId,
+  );
+
+  bool _receiptCurrent(WorkspacePurchaseRecord purchase) {
+    if (_disposed ||
+        purchase.accountScope != _contactAccountScope ||
+        purchase.workspaceId != activeWorkspace?.id ||
+        !workspacePurchasesConnected) {
+      return false;
+    }
+    final current = _storeData.purchases[purchase.shipmentId];
+    return current != null &&
+        current.orderId == purchase.orderId &&
+        current.supplierId == purchase.supplierId &&
+        current.purchaseId == purchase.purchaseId;
+  }
+
+  WorkspaceReceiptDraft? workspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase,
+  ) => _receiptCurrent(purchase) ? _receiptDrafts[_receiptKey(purchase)] : null;
+
+  bool workspaceReceiptDraftLoaded(WorkspacePurchaseRecord purchase) =>
+      _receiptCurrent(purchase) &&
+      _receiptDraftLoaded.contains(_receiptKey(purchase));
+
+  String? workspaceReceiptDraftMessage(WorkspacePurchaseRecord purchase) =>
+      _receiptCurrent(purchase)
+      ? _receiptMessages[_receiptKey(purchase)]
+      : null;
+
+  Future<void> loadWorkspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!_receiptCurrent(purchase)) return;
+    final key = _receiptKey(purchase);
+    if (_receiptDraftLoaded.contains(key)) return;
+    final pending = _receiptReads[key];
+    if (pending != null) return pending;
+    final task = () async {
+      try {
+        final draft = await _receiptDraftStorage.read(key);
+        if (!_receiptCurrent(purchase)) return;
+        if (draft != null && (!draft.valid || !draft.belongsTo(purchase))) {
+          throw const FormatException('Receiving draft identity mismatch');
+        }
+        if (draft != null) {
+          _receiptDrafts[key] = draft;
+          _receiptSavedRevisions[key] = draft.revision;
+        }
+        _receiptDraftLoaded.add(key);
+        _receiptMessages.remove(key);
+      } on Object {
+        if (_receiptCurrent(purchase)) {
+          _receiptMessages[key] =
+              'Could not open your delivery draft. Try again.';
+        }
+      }
+      if (_receiptCurrent(purchase)) notifyListeners();
+    }();
+    _receiptReads[key] = task;
+    await task;
+    if (identical(_receiptReads[key], task)) _receiptReads.remove(key);
+  }
+
+  /// Local observations only. A supplier update never changes the original
+  /// checked lines/revision, and a delivery draft never posts receipt or stock.
+  Future<void> saveWorkspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    required String note,
+    Map<String, String>? returnedPacks,
+  }) async {
+    if (!_receiptCurrent(purchase) ||
+        !workspaceReceiptDraftLoaded(purchase) ||
+        purchase.revision !=
+            _storeData.purchases[purchase.shipmentId]?.revision) {
+      return;
+    }
+    final key = _receiptKey(purchase);
+    final previous = _receiptDrafts[key];
+    final base =
+        previous ??
+        WorkspaceReceiptDraft(
+          key: key,
+          supplierId: purchase.supplierId,
+          orderId: purchase.orderId,
+          purchaseId: purchase.purchaseId,
+          shipmentRevision: purchase.revision,
+          revision: 1,
+          lines: purchase.lines,
+          countedPacks: const {},
+          problems: const {},
+        );
+    final draft = base.edit(
+      revision: base.revision,
+      countedPacks: countedPacks,
+      returnedPacks: returnedPacks,
+      problems: problems,
+      note: note,
+    );
+    if (!draft.valid) return;
+    _receiptDrafts[key] = draft;
+    _receiptMessages[key] = 'Saving draft…';
+    notifyListeners();
+    final preceding = _receiptWrites[key];
+    final task = () async {
+      if (preceding != null) await preceding;
+      if (!identical(_receiptDrafts[key], draft)) return;
+      try {
+        if (_contactAccountScope != key.account) {
+          throw const FormatException('Account changed before draft save');
+        }
+        final uncertain = _receiptUnconfirmedWrites[key];
+        if (uncertain != null) {
+          final retained = await _receiptDraftStorage.read(key);
+          if (retained != null &&
+              jsonEncode(retained.toJson()) == jsonEncode(uncertain.toJson())) {
+            _receiptSavedRevisions[key] = retained.revision;
+          } else if (retained?.revision != _receiptSavedRevisions[key]) {
+            throw const FormatException(
+              'A different receiving draft was saved',
+            );
+          }
+          _receiptUnconfirmedWrites.remove(key);
+        }
+        final expected = _receiptSavedRevisions[key];
+        final candidate = draft.edit(
+          revision: (expected ?? 0) + 1,
+          countedPacks: draft.countedPacks,
+          problems: draft.problems,
+          note: draft.note,
+        );
+        _receiptUnconfirmedWrites[key] = candidate;
+        await _receiptDraftStorage.save(candidate, expectedRevision: expected);
+        _receiptSavedRevisions[key] = candidate.revision;
+        _receiptUnconfirmedWrites.remove(key);
+        if (identical(_receiptDrafts[key], draft)) {
+          _receiptDrafts[key] = candidate;
+          _receiptMessages[key] = 'Draft saved on this device. Not sent.';
+        }
+      } on Object {
+        if (identical(_receiptDrafts[key], draft)) {
+          _receiptMessages[key] =
+              'Draft not saved. Your edits remain here. Retry saving.';
+        }
+      }
+      if (_receiptCurrent(purchase)) notifyListeners();
+    }();
+    _receiptWrites[key] = task;
+    await task;
+    if (identical(_receiptWrites[key], task)) _receiptWrites.remove(key);
+  }
+
+  WorkOrderOperations? get _scopedOrderOperations {
+    final operations = _storeData.orderOperations;
+    return operations != null &&
+            !operations.isDisposed &&
+            operations.accountScope == _contactAccountScope &&
+            operations.workspaceId == (activeWorkspace?.id ?? workspaceId)
+        ? operations
+        : null;
+  }
+
+  bool hasScopedWorkspaceOrder(String orderId) =>
+      _storeData.projectedOrderRevisions.containsKey(orderId);
+
+  WorkOrderOperationState? workspaceOrderOperationState(String orderId) =>
+      _scopedOrderOperations?.state(orderId);
+
+  bool workspaceOrderHasTimeRequest(String orderId) =>
+      _scopedOrderOperations?.pending(orderId)?.action ==
+      WorkOrderAction.requestTime;
+
+  /// Called by the authenticated Store adapter, not by a route or a review
+  /// status label. Session owns the controller after successful binding.
+  bool bindWorkspaceOrderOperations(WorkOrderOperations operations) {
+    final storeId = activeWorkspace?.id ?? workspaceId;
+    if (_disposed ||
+        operations.isDisposed ||
+        !operations.recoveryReady ||
+        _contactAccountScope == null ||
+        operations.accountScope != _contactAccountScope ||
+        operations.workspaceId != storeId ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true ||
+        _storeData.orderOperations != null) {
+      return false;
+    }
+    final data = _storeData;
+    data.orderOperations = operations;
+    void project(String orderId) {
+      if (_disposed ||
+          operations.accountScope != _contactAccountScope ||
+          !identical(data.orderOperations, operations)) {
+        return;
+      }
+      final snapshot = operations.order(orderId);
+      if (snapshot != null &&
+          snapshot.revision > (data.projectedOrderRevisions[orderId] ?? -1)) {
+        final order = snapshot.order!;
+        // Collection authorisation stays with the collection controller.
+        if (order.isCustomerCollection) return;
+        final index = data.workspaceOrders.indexWhere(
+          (item) => item.id == orderId,
+        );
+        if (index >= 0) {
+          if (data.workspaceOrders[index].isCustomerCollection) return;
+          data.workspaceOrders[index] = order;
+        } else {
+          data.workspaceOrders.insert(0, order);
+        }
+        data.projectedOrderRevisions[orderId] = snapshot.revision;
+        final deliveryKey = '${operations.workspaceId}::$orderId';
+        if (snapshot.delivery case final delivery?) {
+          data._deliveryByOrder[deliveryKey] = delivery;
+        } else {
+          data._deliveryByOrder.remove(deliveryKey);
+        }
+        if (identical(data, _storeData) && currentWorkspaceOrderId == orderId) {
+          _projectSelectedWorkspaceOrder(order);
+        }
+      }
+      if (identical(data, _storeData)) notifyListeners();
+    }
+
+    operations.addListener(() {
+      final orderId = operations.changedOrderId;
+      if (orderId != null) project(orderId);
+    });
+    for (final snapshot in operations.orders) {
+      project(snapshot.orderId);
+    }
+    notifyListeners();
+    return true;
+  }
+
+  void _projectSelectedWorkspaceOrder(WorkspaceOrderRecord order) {
+    _preparePackingContents(order, workspacePackedProductIds);
+    workspaceOrderCustomer = order.customer;
+    workspaceOrderItems = order.items;
+    workspaceOrderQuantities
+      ..clear()
+      ..addAll(order.quantities);
+    workspaceOrderAmount = order.remainderPaise == 0
+        ? order.amount.toString()
+        : '${order.amount}.${order.remainderPaise.toString().padLeft(2, '0')}';
+    workspaceOrderSource = order.source;
+    workspaceOrderFulfilment = order.fulfilment;
+    workspaceOrderPayment = order.payment;
+    workspaceOrderAddress = order.address;
+    workspaceOrderBillingDetails = order.billingDetails;
+    _storeData.counterDiscount = order.discount;
+    workspaceOrderStage = order.stage;
+    workspaceOrderNeedsDelivery = order.needsDelivery;
+    workspaceOrderActionDeadline = order.actionDeadline;
+    workspaceDeliveryAssignment = _deliveryByOrder[_orderScope(order.id)];
+    // No stock, invoice, payout or sales total is derived from this projection.
+  }
+
+  Future<bool> submitWorkspaceOrderAction(
+    String orderId,
+    WorkOrderAction action, {
+    String? reason,
+  }) async {
+    final operations = _scopedOrderOperations;
+    final order = operations?.order(orderId)?.order;
+    if (operations == null ||
+        order == null ||
+        currentWorkspaceOrderId != orderId ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true) {
+      return false;
+    }
+    if (action == WorkOrderAction.ready &&
+        workspaceOrderHasPackingIssue(orderId)) {
+      showError('Resolve the item issue before marking this order ready.');
+      return false;
+    }
+    if (action == WorkOrderAction.ready && !workspacePackingComplete) {
+      showError('Mark every product packed before the order is ready.');
+      return false;
+    }
+    if (action == WorkOrderAction.accept &&
+        order.actionDeadline != null &&
+        !order.actionDeadline!.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Waiting for an order update.');
+      return false;
+    }
+    if (action == WorkOrderAction.reject &&
+        (reason == null || reason.trim().isEmpty)) {
+      showError('Choose a reason before rejecting the order.');
+      return false;
+    }
+    final applied = await operations.act(orderId, action, reason: reason);
+    _showScopedOrderResolution(operations, orderId, applied);
+    return applied;
+  }
+
+  Future<bool> retryWorkspaceOrderAction(String orderId) async {
+    final operations = _scopedOrderOperations;
+    if (operations == null) return false;
+    final applied = await operations.retry(orderId);
+    _showScopedOrderResolution(operations, orderId, applied);
+    return applied;
+  }
+
+  void _showScopedOrderResolution(
+    WorkOrderOperations operations,
+    String orderId,
+    bool applied,
+  ) {
+    if (!applied &&
+        operations.pending(orderId) == null &&
+        identical(_scopedOrderOperations, operations) &&
+        currentWorkspaceOrderId == orderId) {
+      showError('This change was not approved. Review the current order.');
+    }
+  }
+
+  Object? _busyStoreOperation;
+  WorkOrderTimeRequest? _pendingOrderTime;
+  _StoreOperationalData? _orderTimeData;
+  String? _orderTimeAccountScope;
+
+  bool get hasPendingOrderTime =>
+      _pendingOrderTime != null &&
+      identical(_orderTimeData, _storeData) &&
+      _orderTimeAccountScope == _contactAccountScope &&
+      _pendingOrderTime!.workspaceId == (activeWorkspace?.id ?? workspaceId);
+
+  int? get pendingOrderTimeMinutes => hasPendingOrderTime
+      ? _pendingOrderTime!.additionalMinutes
+      : _scopedOrderOperations
+            ?.pending(currentWorkspaceOrderId ?? '')
+            ?.additionalMinutes;
+
+  // The legacy global lock remains separate; a scoped A must not lock B.
+  bool get hasPendingCurrentOrderTime =>
+      hasPendingOrderTime ||
+      workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '');
+
+  bool get orderTimeRequestBusy =>
+      busy ||
+      (workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '') &&
+          workspaceOrderOperationState(currentWorkspaceOrderId ?? '') !=
+              WorkOrderOperationState.uncertain);
+
+  bool get orderTimeServiceAvailable =>
+      hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')
+      ? _scopedOrderOperations?.timeRequestsAvailable == true ||
+            workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '')
+      : gateway is WorkOrderTimeGateway;
+
+  Future<bool> requestWorkspaceOrderTime(
+    String orderId,
+    int additionalMinutes,
+  ) async {
+    if (hasScopedWorkspaceOrder(orderId)) {
+      final operations = _scopedOrderOperations;
+      if (operations == null ||
+          currentWorkspaceOrderId != orderId ||
+          busy ||
+          workspaceOperationsSyncing ||
+          workspaceHandoverBusy ||
+          hasPendingOrderTime ||
+          _collection?.needsReconciliation == true) {
+        return false;
+      }
+      if (!operations.timeRequestsAvailable &&
+          !workspaceOrderHasTimeRequest(orderId)) {
+        showError(
+          'More time is not available for this order yet. The current time still applies.',
+        );
+        return false;
+      }
+      final pending = operations.pending(orderId);
+      if (pending != null && pending.action != WorkOrderAction.requestTime) {
+        return false;
+      }
+      final applied = pending != null
+          ? await operations.retry(orderId)
+          : await operations.act(
+              orderId,
+              WorkOrderAction.requestTime,
+              additionalMinutes: additionalMinutes,
+            );
+      if (identical(_scopedOrderOperations, operations) &&
+          currentWorkspaceOrderId == orderId &&
+          !applied &&
+          operations.pending(orderId) == null) {
+        showError(
+          'More time was not approved. The current time still applies.',
+        );
+      }
+      return applied;
+    }
+    if (busy) return false;
+    final order = currentWorkspaceOrder;
+    final storeId = activeWorkspace?.id ?? workspaceId;
+    final deadline = order?.actionDeadline;
+    if (order == null ||
+        order.id != orderId ||
+        order.stage != 'Confirmed' ||
+        order.isCustomerCollection ||
+        storeId == null ||
+        deadline == null) {
+      showError('This order has changed. Review its current status.');
+      return false;
+    }
+    if (!hasPendingOrderTime && !{2, 5}.contains(additionalMinutes)) {
+      showError('Choose 2 or 5 additional minutes.');
+      return false;
+    }
+    if (!hasPendingOrderTime && !deadline.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Wait for the order update.');
+      return false;
+    }
+    if (!orderTimeServiceAvailable) {
+      showError(
+        'Cannot request more time right now. The current time still applies.',
+      );
+      return false;
+    }
+    final request = hasPendingOrderTime
+        ? _pendingOrderTime!
+        : WorkOrderTimeRequest(
+            workspaceId: storeId,
+            orderId: order.id,
+            operationId:
+                'ORDER-TIME-$storeId-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+            expectedAcceptanceDeadline: deadline,
+            additionalMinutes: additionalMinutes,
+          );
+    if (request.orderId != order.id ||
+        request.expectedAcceptanceDeadline != deadline) {
+      showError('Confirm the previous time request before making another.');
+      return false;
+    }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    _pendingOrderTime = request;
+    _orderTimeData = data;
+    _orderTimeAccountScope = scope;
+    bool current() =>
+        _isStoreScopeCurrent(data, storeId, scope) &&
+        currentWorkspaceOrderId == request.orderId &&
+        identical(_pendingOrderTime, request);
+    final token = _beginBusyStoreOperation();
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = await (gateway as WorkOrderTimeGateway)
+          .requestOrderTime(request)
+          .timeout(const Duration(seconds: 15));
+      if (!current()) return false;
+      final latest = currentWorkspaceOrder!;
+      if (latest.stage != 'Confirmed' ||
+          latest.actionDeadline != request.expectedAcceptanceDeadline ||
+          result.workspaceId != request.workspaceId ||
+          result.orderId != request.orderId ||
+          result.operationId != request.operationId) {
+        showError('The time request needs an order update. Retry to check it.');
+        return false;
+      }
+      if (!result.approved) {
+        _pendingOrderTime = null;
+        showError(
+          'More time was not approved. The current time still applies.',
+        );
+        return false;
+      }
+      final acceptance = result.acceptanceDeadline;
+      final fulfilment = result.fulfilmentDeadline;
+      if (acceptance == null ||
+          fulfilment == null ||
+          !acceptance.isAfter(DateTime.now()) ||
+          !acceptance.isAfter(request.expectedAcceptanceDeadline) ||
+          acceptance.isAfter(
+            request.expectedAcceptanceDeadline.add(
+              Duration(minutes: request.additionalMinutes),
+            ),
+          ) ||
+          !fulfilment.isAfter(acceptance)) {
+        showError('The updated time is not confirmed. Retry to check it.');
+        return false;
+      }
+      final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+      if (index < 0) return false;
+      workspaceOrders[index] = latest.copyWith(
+        actionDeadline: acceptance,
+        fulfilmentDeadline: fulfilment,
+      );
+      workspaceOrderActionDeadline = acceptance;
+      _pendingOrderTime = null;
+      showNotice(
+        'Time confirmed. Check the updated acceptance and fulfilment times.',
+      );
+      return true;
+    } catch (_) {
+      if (current()) {
+        showError(
+          'The request could not be confirmed. Retry to check the same request.',
+        );
+      }
+      return false;
+    } finally {
+      if (!_disposed) _finishBusyStoreOperation(token);
+    }
+  }
+
+  bool _isStoreScopeCurrent(
+    _StoreOperationalData data,
+    String id,
+    String? scope,
+  ) =>
+      !_disposed &&
+      identical(data, _storeData) &&
+      id == (activeWorkspace?.id ?? workspaceId) &&
+      scope == _contactAccountScope;
+
+  Object _beginBusyStoreOperation() {
+    final token = Object();
+    _busyStoreOperation = token;
+    busy = true;
+    return token;
+  }
+
+  void _finishBusyStoreOperation(Object token) {
+    if (!identical(token, _busyStoreOperation)) return;
+    _busyStoreOperation = null;
+    busy = false;
+    notifyListeners();
+  }
+
+  void _finishOperationalRequest(
+    _StoreOperationalData data,
+    String id,
+    String? scope,
+  ) {
+    data.pendingOperationalRequests--;
+    data.workspaceOperationsSyncing = data.pendingOperationalRequests > 0;
+    if (_isStoreScopeCurrent(data, id, scope)) notifyListeners();
+  }
+
+  bool get retailerProductAdded => _storeData.retailerProductAdded;
+  set retailerProductAdded(bool value) =>
+      _storeData.retailerProductAdded = value;
+  int get retailerQuantity => _storeData.retailerQuantity;
+  set retailerQuantity(int value) => _storeData.retailerQuantity = value;
+  int get retailerBuyPrice => _storeData.retailerBuyPrice;
+  set retailerBuyPrice(int value) => _storeData.retailerBuyPrice = value;
+  int get retailerSellPrice => _storeData.retailerSellPrice;
+  set retailerSellPrice(int value) => _storeData.retailerSellPrice = value;
+  bool get retailerHomeDelivery => _storeData.retailerHomeDelivery;
+  set retailerHomeDelivery(bool value) =>
+      _storeData.retailerHomeDelivery = value;
+  bool get retailerStoreCollection => _storeData.retailerStoreCollection;
+  set retailerStoreCollection(bool value) =>
+      _storeData.retailerStoreCollection = value;
+  bool get retailerPublishAfterSetup => _storeData.retailerPublishAfterSetup;
+  set retailerPublishAfterSetup(bool value) =>
+      _storeData.retailerPublishAfterSetup = value;
+  bool get retailerSetupSaved => _storeData.retailerSetupSaved;
+  set retailerSetupSaved(bool value) => _storeData.retailerSetupSaved = value;
+  String get workspaceSearchQuery => _storeData.workspaceSearchQuery;
+  set workspaceSearchQuery(String value) =>
+      _storeData.workspaceSearchQuery = value;
+  WorkspaceStoreState get workspaceStoreState => _storeData.workspaceStoreState;
+  set workspaceStoreState(WorkspaceStoreState value) =>
+      _storeData.workspaceStoreState = value;
+  WorkspaceDashboardState get workspaceDashboardState =>
+      _storeData.workspaceDashboardState;
+  set workspaceDashboardState(WorkspaceDashboardState value) =>
+      _storeData.workspaceDashboardState = value;
+  DateTime? get workspaceLastUpdatedAt => _storeData.workspaceLastUpdatedAt;
+  set workspaceLastUpdatedAt(DateTime? value) =>
+      _storeData.workspaceLastUpdatedAt = value;
+  String get workspaceDashboardError => _storeData.workspaceDashboardError;
+  set workspaceDashboardError(String value) =>
+      _storeData.workspaceDashboardError = value;
+  bool get workspaceAcceptingOrders => _storeData.workspaceAcceptingOrders;
+  set workspaceAcceptingOrders(bool value) =>
+      _storeData.workspaceAcceptingOrders = value;
+  String get workspaceFulfilmentMode => _storeData.workspaceFulfilmentMode;
+  set workspaceFulfilmentMode(String value) =>
+      _storeData.workspaceFulfilmentMode = value;
+  int get workspaceBusyMinutes => _storeData.workspaceBusyMinutes;
+  set workspaceBusyMinutes(int value) =>
+      _storeData.workspaceBusyMinutes = value;
+  String get workspaceReopensAt => _storeData.workspaceReopensAt;
+  set workspaceReopensAt(String value) => _storeData.workspaceReopensAt = value;
+  String get workspaceOpeningTime => _storeData.workspaceOpeningTime;
+  set workspaceOpeningTime(String value) =>
+      _storeData.workspaceOpeningTime = value;
+  String get workspaceClosingTime => _storeData.workspaceClosingTime;
+  set workspaceClosingTime(String value) =>
+      _storeData.workspaceClosingTime = value;
+  int get workspaceMaximumActiveOrders =>
+      _storeData.workspaceMaximumActiveOrders;
+  set workspaceMaximumActiveOrders(int value) =>
+      _storeData.workspaceMaximumActiveOrders = value;
+  bool get workspaceOrderAlertSound => _storeData.workspaceOrderAlertSound;
+  set workspaceOrderAlertSound(bool value) =>
+      _storeData.workspaceOrderAlertSound = value;
+  bool get workspaceOrderAlertVibration =>
+      _storeData.workspaceOrderAlertVibration;
+  set workspaceOrderAlertVibration(bool value) =>
+      _storeData.workspaceOrderAlertVibration = value;
+  bool get workspaceVisibleToCustomers =>
+      _storeData.workspaceVisibleToCustomers;
+  set workspaceVisibleToCustomers(bool value) =>
+      _storeData.workspaceVisibleToCustomers = value;
+  String get workspaceOrderCustomer => _storeData.workspaceOrderCustomer;
+  set workspaceOrderCustomer(String value) =>
+      _storeData.workspaceOrderCustomer = value;
+  String get workspaceOrderItems => _storeData.workspaceOrderItems;
+  set workspaceOrderItems(String value) =>
+      _storeData.workspaceOrderItems = value;
+  String get workspaceOrderAmount => _storeData.workspaceOrderAmount;
+  set workspaceOrderAmount(String value) =>
+      _storeData.workspaceOrderAmount = value;
+  bool get workspaceOrderNeedsDelivery =>
+      _storeData.workspaceOrderNeedsDelivery;
+  set workspaceOrderNeedsDelivery(bool value) =>
+      _storeData.workspaceOrderNeedsDelivery = value;
+  String get workspaceOrderSource => _storeData.workspaceOrderSource;
+  set workspaceOrderSource(String value) =>
+      _storeData.workspaceOrderSource = value;
+  String get workspaceOrderFulfilment => _storeData.workspaceOrderFulfilment;
+  set workspaceOrderFulfilment(String value) =>
+      _storeData.workspaceOrderFulfilment = value;
+  String get workspaceOrderPayment => _storeData.workspaceOrderPayment;
+  set workspaceOrderPayment(String value) =>
+      _storeData.workspaceOrderPayment = value;
+  WorkspaceBillingDetails get workspaceOrderBillingDetails =>
+      _storeData.workspaceOrderBillingDetails;
+  String get workspaceOrderBillingCustomer =>
+      _storeData.workspaceOrderBillingCustomer;
+  set workspaceOrderBillingDetails(WorkspaceBillingDetails value) {
+    _storeData.workspaceOrderBillingDetails = value;
+    _storeData.workspaceOrderBillingCustomer =
+        workspaceCustomerMobile(workspaceOrderCustomer) ?? '';
+  }
+
+  String get workspaceOrderAddress => _storeData.workspaceOrderAddress;
+  set workspaceOrderAddress(String value) =>
+      _storeData.workspaceOrderAddress = value;
+  String get workspaceOrderStage => _storeData.workspaceOrderStage;
+  set workspaceOrderStage(String value) =>
+      _storeData.workspaceOrderStage = value;
+  int get workspaceOrderExtraMinutes => _storeData.workspaceOrderExtraMinutes;
+  set workspaceOrderExtraMinutes(int value) =>
+      _storeData.workspaceOrderExtraMinutes = value;
+  DateTime? get workspaceOrderActionDeadline =>
+      _storeData.workspaceOrderActionDeadline;
+  set workspaceOrderActionDeadline(DateTime? value) =>
+      _storeData.workspaceOrderActionDeadline = value;
+  String get workspaceOrderFilter => _storeData.workspaceOrderFilter;
+  set workspaceOrderFilter(String value) =>
+      _storeData.workspaceOrderFilter = value;
+  String get workspaceCustomerPeriod => _storeData.workspaceCustomerPeriod;
+  set workspaceCustomerPeriod(String value) =>
+      _storeData.workspaceCustomerPeriod = value;
+  String get workspaceCustomerSearch => _storeData.workspaceCustomerSearch;
+  set workspaceCustomerSearch(String value) =>
+      _storeData.workspaceCustomerSearch = value;
+  String get workspaceCustomerFilter => _storeData.workspaceCustomerFilter;
+  set workspaceCustomerFilter(String value) =>
+      _storeData.workspaceCustomerFilter = value;
+  String get workspaceMoneyPeriod => _storeData.workspaceMoneyPeriod;
+  set workspaceMoneyPeriod(String value) =>
+      _storeData.workspaceMoneyPeriod = value;
+  DateTime? get workspaceCustomerCustomStart =>
+      _storeData.workspaceCustomerCustomStart;
+  set workspaceCustomerCustomStart(DateTime? value) =>
+      _storeData.workspaceCustomerCustomStart = value;
+  DateTime? get workspaceCustomerCustomEnd =>
+      _storeData.workspaceCustomerCustomEnd;
+  set workspaceCustomerCustomEnd(DateTime? value) =>
+      _storeData.workspaceCustomerCustomEnd = value;
+  int get workspaceSalesToday => _storeData.workspaceSalesToday;
+  set workspaceSalesToday(int value) {
+    _storeData.workspaceSalesToday = value;
+    _storeData.salesTodayRemainderPaise = 0;
+  }
+
+  int get workspaceSalesTodayMinor =>
+      workspaceSalesToday * 100 + _storeData.salesTodayRemainderPaise;
+  void _addCompletedSaleMinor(int amountMinor) {
+    final total = workspaceSalesTodayMinor + amountMinor;
+    _storeData.workspaceSalesToday = total ~/ 100;
+    _storeData.salesTodayRemainderPaise = total % 100;
+  }
+
+  int get workspaceCompletedSalesCount =>
+      _storeData.workspaceCompletedSalesCount;
+  set workspaceCompletedSalesCount(int value) =>
+      _storeData.workspaceCompletedSalesCount = value;
+  int get workspacePlatformAdjustments =>
+      _storeData.workspacePlatformAdjustments;
+  set workspacePlatformAdjustments(int value) =>
+      _storeData.workspacePlatformAdjustments = value;
+  int get workspaceDeliveryAdjustments =>
+      _storeData.workspaceDeliveryAdjustments;
+  set workspaceDeliveryAdjustments(int value) =>
+      _storeData.workspaceDeliveryAdjustments = value;
+  int get workspaceRefunds => _storeData.workspaceRefunds;
+  set workspaceRefunds(int value) => _storeData.workspaceRefunds = value;
+  int get workspaceTaxWithheld => _storeData.workspaceTaxWithheld;
+  set workspaceTaxWithheld(int value) =>
+      _storeData.workspaceTaxWithheld = value;
+  int get workspaceSettlementBalance => _storeData.workspaceSettlementBalance;
+  set workspaceSettlementBalance(int value) =>
+      _storeData.workspaceSettlementBalance = value;
+  int get workspaceSettlementRequested =>
+      _storeData.workspaceSettlementRequested;
+  set workspaceSettlementRequested(int value) =>
+      _storeData.workspaceSettlementRequested = value;
+  String? get workspaceSettlementReference =>
+      _storeData.workspaceSettlementReference;
+  set workspaceSettlementReference(String? value) =>
+      _storeData.workspaceSettlementReference = value;
+  String get workspacePayoutBankName => _storeData.workspacePayoutBankName;
+  set workspacePayoutBankName(String value) =>
+      _storeData.workspacePayoutBankName = value;
+  String get workspacePayoutAccountEnding =>
+      _storeData.workspacePayoutAccountEnding;
+  set workspacePayoutAccountEnding(String value) =>
+      _storeData.workspacePayoutAccountEnding = value;
+  List<WorkspaceCatalogueItem> get workspaceCatalogueItems =>
+      _storeData.workspaceCatalogueItems;
+
+  bool catalogueManagesProductPhoto(WorkspaceCatalogueItem product) =>
+      product.cataloguePhoto != null ||
+      referenceCatalogue.any(
+        (entry) => entry.canonicalId == product.canonicalId,
+      );
+
+  /// Captures the current signed session and Store, without another sign-in.
+  /// A returned loader cannot be reused after leaving that scope.
+  WorkPrivateProductPhotoStore? get privateProductPhotos {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (_disposed || account == null || store == null) return null;
+    return WorkPrivateProductPhotoStore(
+      accountId: account,
+      storeId: store,
+      evaluationOnly: !_productionSession,
+      supportDirectory: productPhotoSupportDirectory,
+      isCurrent: () =>
+          !_disposed &&
+          _contactAccountScope == account &&
+          activeWorkspace?.id == store,
+    );
+  }
+
+  WorkspaceProductDefaults get workspaceProductDefaults =>
+      _storeData.productDefaults;
+  WorkspaceStorePublicationDetails get workspacePublicationDetails =>
+      _storeData.publicationDetails;
+
+  /// Store-owned projection for publication adapters. This getter is not a live
+  /// catalogue registration or an acknowledgement that the Store is public.
+  BuyV2StoreListing? get workspacePublicStoreDetails {
+    final workspace = activeWorkspace;
+    if (workspace == null || workspace.id.trim().isEmpty) return null;
+    return workspacePublicationDetails.toPublicStore(
+      id: workspace.id,
+      name: workspace.name,
+      area: workspace.area,
+    );
+  }
+
+  bool saveWorkspacePublicationDetails(
+    WorkspaceStorePublicationDetails details, {
+    String? expectedStoreId,
+  }) {
+    final current = activeWorkspace?.id ?? workspaceId;
+    if (current?.trim().isNotEmpty != true ||
+        expectedStoreId != null && current != expectedStoreId ||
+        details.inputErrors.isNotEmpty) {
+      return false;
+    }
+    // Snapshot immutable selections; later edits to a caller's Set cannot change
+    // another Store's accepted methods or saved return rules.
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson(
+      details.toJson(),
+    );
+    _persistOperationalState('publicationDetails');
+    notifyListeners();
+    return true;
+  }
+
+  bool saveWorkspaceProductDefaults(WorkspaceProductDefaults value) {
+    if ((activeWorkspace?.id ?? workspaceId)?.trim().isNotEmpty != true ||
+        !value.valid) {
+      showError(
+        'Choose your Store and enter a low-stock count from 0 to 999999999.',
+      );
+      return false;
+    }
+    _storeData.productDefaults = value;
+    // The inline editor owns its compact confirmation; avoid a duplicate banner.
+    clearMessages();
+    _persistOperationalState('productDefaults');
+    return true;
+  }
+
+  /// Customer preference only; the backend must authorise and quote these terms
+  /// for the authenticated buyer. Never match by display name or auto-grant credit.
+  bool saveWorkspaceCustomerPaymentTerms({
+    required String expectedStoreId,
+    required String customerId,
+    required List<WorkspacePaymentTerm>? terms,
+  }) {
+    if ((activeWorkspace?.id ?? workspaceId) != expectedStoreId ||
+        !workspaceCustomerBook.any((c) => c.id == customerId)) {
+      return false;
+    }
+    final current = workspacePublicationDetails;
+    final overrides = Map<String, List<WorkspacePaymentTerm>>.of(
+      current.customerPaymentTerms,
+    );
+    if (terms == null) {
+      overrides.remove(customerId);
+    } else {
+      overrides[customerId] = terms;
+    }
+    try {
+      return saveWorkspacePublicationDetails(
+        WorkspaceStorePublicationDetails.fromJson({
+          ...current.toJson(),
+          'customerPaymentTerms': {
+            for (final e in overrides.entries)
+              e.key: e.value.map((t) => t.toJson()).toList(),
+          },
+        }),
+        expectedStoreId: expectedStoreId,
+      );
+    } on FormatException {
+      return false;
+    }
+  }
+
+  List<WorkspaceStockMovement> get workspaceStockMovements =>
+      _storeData.workspaceStockMovements;
+
+  _StockHistoryState? get _currentStockHistory {
+    final state = _storeData.stockHistory;
+    return state?.query.accountScope == _contactAccountScope &&
+            state?.query.workspaceId == activeWorkspace?.id
+        ? state
+        : null;
+  }
+
+  List<WorkspaceStockMovement> get workspaceStockHistory => List.unmodifiable(
+    _currentStockHistory?.records ?? const <WorkspaceStockMovement>[],
+  );
+  WorkspaceStockHistoryQuery? get workspaceStockHistoryQuery =>
+      _currentStockHistory?.query;
+  bool get workspaceStockHistoryLoaded => _currentStockHistory?.loaded == true;
+  bool get workspaceStockHistoryBusy => _currentStockHistory?.busy == true;
+  bool get workspaceStockHistoryNeedsRefresh =>
+      _currentStockHistory?.needsRefresh == true;
+  bool get workspaceStockHistoryHasMore =>
+      _currentStockHistory?.nextCursor != null;
+  String? get workspaceStockHistoryError => _currentStockHistory?.error;
+  int? get workspaceStockHistoryTotal => _currentStockHistory?.totalCount;
+
+  WorkspaceStockHistoryQuery? workspaceStockHistoryScope({
+    DateTime? from,
+    DateTime? until,
+    String? productId,
+  }) {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || account.isEmpty || store == null) return null;
+    return WorkspaceStockHistoryQuery(
+      accountScope: account,
+      workspaceId: store,
+      from: from,
+      until: until,
+      productId: productId,
+    );
+  }
+
+  Future<bool> loadWorkspaceStockHistory(
+    WorkspaceStockHistoryQuery query, {
+    bool more = false,
+  }) async {
+    if (_disposed ||
+        stockHistoryGateway == null ||
+        !query.valid ||
+        query.accountScope != _contactAccountScope ||
+        query.workspaceId != activeWorkspace?.id) {
+      return false;
+    }
+    final data = _storeData;
+    var state = data.stockHistory;
+    if (more) {
+      if (state == null ||
+          state.query.key != query.key ||
+          state.busy ||
+          !state.loaded ||
+          state.nextCursor == null ||
+          state.needsRefresh) {
+        return false;
+      }
+    } else {
+      if (state?.query.key == query.key && state?.busy == true) return false;
+      state = _StockHistoryState(query);
+      data.stockHistory = state;
+    }
+    final requested = state;
+    final cursor = more ? requested.nextCursor : null;
+    requested.busy = true;
+    requested.error = null;
+    notifyListeners();
+    try {
+      final page = await stockHistoryGateway!
+          .readStockHistory(
+            query,
+            cursor: cursor,
+            snapshotId: more ? requested.snapshotId : null,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (_disposed ||
+          query.accountScope != _contactAccountScope ||
+          !identical(data.stockHistory, requested)) {
+        return false;
+      }
+      final count = requested.records.length + page.records.length;
+      final duplicate = page.records.any(
+        (row) => requested.recordIds.contains(row.id),
+      );
+      if (!page.valid ||
+          page.query.key != query.key ||
+          page.cursor != cursor ||
+          (more && page.snapshotId != requested.snapshotId) ||
+          duplicate ||
+          (page.nextCursor != null &&
+              requested.usedCursors.contains(page.nextCursor)) ||
+          (more &&
+              requested.totalCount != null &&
+              page.totalCount != requested.totalCount) ||
+          (page.totalCount != null &&
+              (page.nextCursor == null
+                  ? page.totalCount != count
+                  : page.totalCount! <= count)) ||
+          (requested.records.isNotEmpty &&
+              page.records.isNotEmpty &&
+              WorkspaceStockMovement.compareNewest(
+                    requested.records.last,
+                    page.records.first,
+                  ) >
+                  0)) {
+        requested.needsRefresh = true;
+        requested.error = 'Stock history changed. Refresh to continue.';
+        return false;
+      }
+      requested.records.addAll(page.records);
+      requested.recordIds.addAll(page.records.map((row) => row.id));
+      if (cursor != null) requested.usedCursors.add(cursor);
+      requested.snapshotId = page.snapshotId;
+      requested.nextCursor = page.nextCursor;
+      requested.totalCount = page.totalCount;
+      requested.loaded = true;
+      return true;
+    } on Object {
+      if (!_disposed &&
+          query.accountScope == _contactAccountScope &&
+          identical(data.stockHistory, requested)) {
+        requested.error = 'Could not load stock changes. Try again.';
+      }
+      return false;
+    } finally {
+      requested.busy = false;
+      if (!_disposed &&
+          query.accountScope == _contactAccountScope &&
+          identical(_storeData.stockHistory, requested)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Map<String, int> get workspaceOrderQuantities =>
+      _storeData.workspaceOrderQuantities;
+  Set<String> get workspaceCatalogueShortlist => _storeData.catalogueShortlist;
+  List<String> get workspaceCatalogueSearchHistory =>
+      _storeData.catalogueSearchHistory;
+  List<String> workspaceRecentSearches(String context) => context == 'catalogue'
+      ? workspaceCatalogueSearchHistory
+      : _storeData.contextualSearchHistory.putIfAbsent(context, () => []);
+  // Frontend browsing state is Store-scoped and survives route changes. A
+  // dedicated durable shortlist adapter is deferred; never overwrite inventory
+  // through the legacy whole-Store save merely because a bookmark was tapped.
+  void notifyWorkspaceCatalogueBrowsingChanged() {
+    notifyListeners();
+  }
+
+  List<WorkspaceOrderRecord> get workspaceOrders => _storeData.workspaceOrders;
+  Set<String> get workspacePackedProductIds =>
+      _storeData.workspacePackedProductIds;
+  Map<String, Set<String>> get _packingByOrder => _storeData._packingByOrder;
+  Map<String, ({String items, Map<String, int> quantities})>
+  get _packingContentsByOrder => _storeData._packingContentsByOrder;
+  Map<String, WorkspaceDeliveryAssignment> get _deliveryByOrder =>
+      _storeData._deliveryByOrder;
+  List<WorkspaceCustomerInvoice> get workspaceInvoices =>
+      _storeData.workspaceInvoices;
+  List<WorkspaceStoreOffer> get workspaceOffers => _storeData.workspaceOffers;
+  Map<String, String> get workspaceOfferDraft => _storeData.workspaceOfferDraft;
+  String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
+  set currentWorkspaceOrderId(String? value) =>
+      _storeData.currentWorkspaceOrderId = value;
+  WorkspaceDeliveryAssignment? get workspaceDeliveryAssignment =>
+      _storeData.workspaceDeliveryAssignment;
+  set workspaceDeliveryAssignment(WorkspaceDeliveryAssignment? value) =>
+      _storeData.workspaceDeliveryAssignment = value;
+  bool get workspaceOperationsSyncing => _storeData.workspaceOperationsSyncing;
+  set workspaceOperationsSyncing(bool value) =>
+      _storeData.workspaceOperationsSyncing = value;
+  String? get workspaceOperationsSyncError =>
+      _storeData.workspaceOperationsSyncError;
+  set workspaceOperationsSyncError(String? value) =>
+      _storeData.workspaceOperationsSyncError = value;
+  bool get workspaceHandoverBusy => _storeData.workspaceHandoverBusy;
+  set workspaceHandoverBusy(bool value) =>
+      _storeData.workspaceHandoverBusy = value;
+  List<WorkspaceActivityEntry> get workspaceActivity =>
+      _storeData.workspaceActivity;
+  WorkspaceGroupBuy? get activeGroupBuy => workspaceGroupOffersConnected
+      ? selectedWorkspaceGroupOffer?.details
+      : gateway is ReviewWorkGateway
+      ? _storeData.activeGroupBuy
+      : null;
+  set activeGroupBuy(WorkspaceGroupBuy? value) =>
+      _storeData.activeGroupBuy = value;
+
+  bool get workspaceGroupOffersConnected =>
+      _contactAccountScope != null &&
+      _storeData.groupAccountScope == _contactAccountScope;
+  bool get workspaceGroupOffersStale =>
+      workspaceGroupOffersConnected && _storeData.groupOffersStale;
+  bool get workspaceGroupOffersComplete =>
+      workspaceGroupOffersConnected && _storeData.groupOffersComplete;
+  List<WorkspaceGroupOffer> get workspaceGroupOffers =>
+      workspaceGroupOffersConnected
+      ? List.unmodifiable(_storeData.groupOffers.values)
+      : const [];
+  String? get selectedWorkspaceGroupOfferId =>
+      workspaceGroupOffersConnected ? _storeData.selectedGroupOfferId : null;
+  WorkspaceGroupOffer? get selectedWorkspaceGroupOffer =>
+      workspaceGroupOffersConnected
+      ? _storeData.groupOffers[_storeData.selectedGroupOfferId]
+      : null;
+
+  bool matchesWorkspaceGroupScope({
+    required String accountScope,
+    required String storeId,
+  }) =>
+      !_disposed &&
+      workspaceGroupOffersConnected &&
+      accountScope == _contactAccountScope &&
+      storeId == activeWorkspace?.id;
+
+  bool selectWorkspaceGroupOffer(
+    String id, {
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (!matchesWorkspaceGroupScope(
+          accountScope: accountScope,
+          storeId: storeId,
+        ) ||
+        !_storeData.groupOffers.containsKey(id)) {
+      return false;
+    }
+    _storeData.selectedGroupOfferId = id;
+    notifyListeners();
+    return true;
+  }
+
+  /// Trusted adapter input only; this does not authenticate a retailer, publish
+  /// a deal, charge a payment, receive stock or complete a delivery.
+  bool applyWorkspaceGroupOffers({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspaceGroupOffer> records,
+    required bool complete,
+  }) {
+    if (_disposed ||
+        accountScope.isEmpty ||
+        accountScope != _contactAccountScope ||
+        feedRevision <= 0) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        records.any(
+          (record) =>
+              !record.valid ||
+              record.accountScope != accountScope ||
+              record.workspaceId != storeId,
+        ) ||
+        records.map((record) => record.id).toSet().length != records.length) {
+      return false;
+    }
+    final sameAccount = data.groupAccountScope == accountScope;
+    if (sameAccount && feedRevision <= data.groupFeedRevision) return false;
+    final previous = sameAccount
+        ? data.groupOfferHistory
+        : <String, WorkspaceGroupOffer>{};
+    for (final record in records) {
+      final old = previous[record.id];
+      if (old != null &&
+          (old.supplierId != record.supplierId ||
+              old.supplierType != record.supplierType ||
+              old.productId != record.productId ||
+              old.details.unitLabel != record.details.unitLabel ||
+              record.updatedAt.isBefore(old.updatedAt))) {
+        return false;
+      }
+    }
+    final next = complete || !sameAccount
+        ? <String, WorkspaceGroupOffer>{}
+        : {...data.groupOffers};
+    for (final record in records) {
+      final old = previous[record.id];
+      if (old != null &&
+          record.revision <= old.revision &&
+          !data.groupOffers.containsKey(record.id)) {
+        continue;
+      }
+      next[record.id] = old != null && record.revision <= old.revision
+          ? old
+          : record;
+    }
+    if (!sameAccount) {
+      data.groupOfferHistory.clear();
+      data.selectedGroupOfferId = null;
+    }
+    for (final record in next.values) {
+      data.groupOfferHistory[record.id] = record;
+    }
+    data.groupAccountScope = accountScope;
+    data.groupFeedRevision = feedRevision;
+    data.groupOffersComplete = complete;
+    data.groupOffersStale = false;
+    final ordered = <String, WorkspaceGroupOffer>{
+      if (sameAccount)
+        for (final id in data.groupOffers.keys)
+          if (next.containsKey(id)) id: next[id]!,
+      ...next,
+    };
+    data.groupOffers
+      ..clear()
+      ..addAll(ordered);
+    data.selectedGroupOfferId ??= ordered.keys.firstOrNull;
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  void markWorkspaceGroupOffersStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.groupAccountScope != accountScope) return;
+    data!.groupOffersStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
+
+  int get workspaceDeliveryRadiusKm => _storeData.workspaceDeliveryRadiusKm;
+  set workspaceDeliveryRadiusKm(int value) =>
+      _storeData.workspaceDeliveryRadiusKm = value;
+  int get workspaceDeliveryFee => _storeData.workspaceDeliveryFee;
+  set workspaceDeliveryFee(int value) =>
+      _storeData.workspaceDeliveryFee = value;
+  int get workspaceFreeDeliveryAbove => _storeData.workspaceFreeDeliveryAbove;
+  set workspaceFreeDeliveryAbove(int value) =>
+      _storeData.workspaceFreeDeliveryAbove = value;
+  String get workspaceDeliveryCity => _storeData.workspaceDeliveryCity;
+  set workspaceDeliveryCity(String value) =>
+      _storeData.workspaceDeliveryCity = value;
+  String get workspaceDeliveryArea => _storeData.workspaceDeliveryArea;
+  set workspaceDeliveryArea(String value) =>
+      _storeData.workspaceDeliveryArea = value;
+  String get workspaceDeliveryPincode => _storeData.workspaceDeliveryPincode;
+  set workspaceDeliveryPincode(String value) =>
+      _storeData.workspaceDeliveryPincode = value;
+  bool get workspacePickupEnabled => _storeData.workspacePickupEnabled;
+  set workspacePickupEnabled(bool value) =>
+      _storeData.workspacePickupEnabled = value;
+  bool get workspaceStaffAccessEnabled =>
+      _storeData.workspaceStaffAccessEnabled;
+  set workspaceStaffAccessEnabled(bool value) =>
+      _storeData.workspaceStaffAccessEnabled = value;
+  int get workspaceCounterCount => _storeData.workspaceCounterCount;
+  set workspaceCounterCount(int value) =>
+      _storeData.workspaceCounterCount = value;
+  String? get workspacePaidRequirementReference =>
+      _storeData.workspacePaidRequirementReference;
+  set workspacePaidRequirementReference(String? value) =>
+      _storeData.workspacePaidRequirementReference = value;
+  WorkspacePaidRequirementState get workspacePaidRequirementState =>
+      _storeData.workspacePaidRequirementState;
+  set workspacePaidRequirementState(WorkspacePaidRequirementState value) =>
+      _storeData.workspacePaidRequirementState = value;
+  Set<String> get dismissedWorkspaceAlerts =>
+      _storeData.dismissedWorkspaceAlerts;
+  Set<String> get workspaceCustomersFollowingStore =>
+      _storeData.workspaceCustomersFollowingStore;
+  Set<String> get workspaceCustomersAllowingMessages =>
+      _storeData.workspaceCustomersAllowingMessages;
+  Map<String, DateTime> get workspaceCustomerLastContactAt =>
+      _storeData.workspaceCustomerLastContactAt;
+
+  int get workspaceOrderItemCount => workspaceOrderQuantities.values.fold(
+    0,
+    (total, quantity) => total + quantity,
+  );
+
+  int get workspaceOrderDisplayItemCount {
+    final selected = workspaceOrderItemCount;
+    if (selected > 0) return selected;
+    final summary = workspaceOrderItems.trim();
+    if (summary.isEmpty) return 0;
+    final quantities = RegExp(
+      r'×\s*(\d+)',
+    ).allMatches(summary).map((match) => int.tryParse(match.group(1)!) ?? 0);
+    final total = quantities.fold(0, (sum, quantity) => sum + quantity);
+    return total > 0 ? total : summary.split(',').length;
+  }
+
+  int get workspaceOrderTotal =>
+      workspaceCatalogueItems.fold(0, (total, product) {
+        return total +
+            product.sellingPrice * (workspaceOrderQuantities[product.id] ?? 0);
+      });
+
+  Iterable<WorkspaceCatalogueItem> get workspaceLowStockProducts =>
+      workspaceCatalogueItems.where(
+        (product) =>
+            product.stockMode == WorkspaceStockMode.exactQuantity &&
+            product.available &&
+            product.stock <= product.lowStockThreshold,
+      );
+
+  int get workspaceLowStockCount => workspaceLowStockProducts.length;
+
+  int get workspaceOutOfStockCount => workspaceCatalogueItems
+      .where(
+        (product) =>
+            !product.available ||
+            (product.stockMode == WorkspaceStockMode.exactQuantity &&
+                product.stock <= 0),
+      )
+      .length;
+
+  int get workspaceAvailableUnitCount => workspaceCatalogueItems
+      .where(
+        (product) =>
+            product.stockMode == WorkspaceStockMode.exactQuantity &&
+            product.available,
+      )
+      .fold<int>(0, (total, product) => total + product.stock);
+
+  int get workspaceReservedUnitCount => workspaceOrders
+      .where(
+        (order) =>
+            order.stockReserved &&
+            order.stage != 'Completed' &&
+            order.stage != 'Cancelled',
+      )
+      .expand((order) => order.quantities.entries)
+      .fold<int>(0, (total, entry) => total + entry.value);
+
+  int get workspacePublishedProductCount =>
+      workspaceCatalogueItems.where((product) => product.published).length;
+
+  WorkspacePublicationReport get workspacePublicationReport =>
+      WorkspacePublicationContract.inspect(
+        store: activeWorkspace,
+        products: workspaceCatalogueItems,
+        details: workspacePublicationDetails,
+      );
+
+  int reservedWorkspaceUnitsFor(String productId) => workspaceOrders
+      .where(
+        (order) =>
+            order.stockReserved &&
+            order.stage != 'Completed' &&
+            order.stage != 'Cancelled',
+      )
+      .fold<int>(
+        0,
+        (total, order) => total + (order.quantities[productId] ?? 0),
+      );
+
+  int? workspaceDaysOfStockFor(WorkspaceCatalogueItem product) {
+    if (product.stockMode != WorkspaceStockMode.exactQuantity) return null;
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final sold = workspaceOrders
+        .where(
+          (order) =>
+              order.stage == 'Completed' && !order.createdAt.isBefore(cutoff),
+        )
+        .fold<int>(
+          0,
+          (total, order) => total + (order.quantities[product.id] ?? 0),
+        );
+    if (sold <= 0) return null;
+    final daily = sold / 30;
+    return (product.stock / daily).floor();
+  }
+
+  int suggestedWorkspaceRestockFor(WorkspaceCatalogueItem product) {
+    if (product.stockMode != WorkspaceStockMode.exactQuantity) return 0;
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final sold = workspaceOrders
+        .where(
+          (order) =>
+              order.stage == 'Completed' && !order.createdAt.isBefore(cutoff),
+        )
+        .fold<int>(
+          0,
+          (total, order) => total + (order.quantities[product.id] ?? 0),
+        );
+    final target = sold > 0
+        ? ((sold / 30) * 14).ceil()
+        : product.lowStockThreshold * 2;
+    return (target - product.stock).clamp(0, 1 << 31).toInt();
+  }
+
+  bool get hasActiveWorkspaceOrder =>
+      workspaceOrderCustomer.isNotEmpty &&
+      currentWorkspaceOrder?.isClosed != true &&
+      workspaceOrderStage != 'Completed' &&
+      workspaceOrderStage != 'Delivered' &&
+      workspaceOrderStage != 'Cancelled';
+
+  WorkspaceOrderRecord? get currentWorkspaceOrder => workspaceOrders
+      .where((order) => order.id == currentWorkspaceOrderId)
+      .firstOrNull;
+
+  bool isSelectedWorkspaceOrder(WorkspaceOrderRecord order) =>
+      order.id == currentWorkspaceOrderId ||
+      (currentWorkspaceOrderId == null &&
+          workspaceOrders.isEmpty &&
+          order.id == 'current-store-order');
+
+  String _orderScope(String id) =>
+      '${activeWorkspace?.id ?? workspaceId ?? ''}::$id';
+
+  void _rememberActiveOrder() {
+    if (currentWorkspaceOrderId case final id?) {
+      _packingByOrder[_orderScope(id)] = Set.of(workspacePackedProductIds);
+      final assignment = workspaceDeliveryAssignment;
+      if (assignment != null && assignment.orderId == id) {
+        _deliveryByOrder[_orderScope(id)] = assignment;
+      }
+    }
+  }
+
+  bool selectWorkspaceOrder(String orderId) {
+    if (counterDraftSubmitting) return false;
+    if (hasPendingOrderTime && currentWorkspaceOrderId != orderId) {
+      showNotice('Confirm the time request before switching orders.');
+      return false;
+    }
+    if (currentWorkspaceOrderId != orderId &&
+        _collection?.needsReconciliation == true) {
+      showNotice('Confirming this collection. Please wait for the update.');
+      return false;
+    }
+    if (busy || workspaceOperationsSyncing || workspaceHandoverBusy) {
+      return false;
+    }
+    final order = workspaceOrders
+        .where((item) => item.id == orderId)
+        .firstOrNull;
+    if (order == null) return false;
+    if (currentWorkspaceOrderId == orderId) return true;
+    if (currentWorkspaceOrderId == null &&
+        (workspaceOrderQuantities.isNotEmpty ||
+            workspaceOrderCustomer.isNotEmpty)) {
+      showNotice(
+        'Finish or discard the current bill before opening another order.',
+      );
+      return false;
+    }
+    _rememberActiveOrder();
+    _clearCollection();
+    currentWorkspaceOrderId = order.id;
+    workspaceOrderCustomer = order.customer;
+    workspaceOrderItems = order.items;
+    workspaceOrderQuantities
+      ..clear()
+      ..addAll(order.quantities);
+    workspaceOrderAmount = order.remainderPaise == 0
+        ? order.amount.toString()
+        : '${order.amount}.${order.remainderPaise.toString().padLeft(2, '0')}';
+    workspaceOrderSource = order.source;
+    workspaceOrderFulfilment = order.fulfilment;
+    workspaceOrderPayment = order.payment;
+    workspaceOrderAddress = order.address;
+    workspaceOrderBillingDetails = order.billingDetails;
+    _storeData.counterDiscount = order.discount;
+    workspaceOrderStage = order.stage;
+    workspaceOrderNeedsDelivery = order.needsDelivery;
+    workspaceOrderExtraMinutes = order.extraMinutes;
+    workspaceOrderActionDeadline = order.actionDeadline;
+    workspacePackedProductIds
+      ..clear()
+      ..addAll(_packingByOrder[_orderScope(orderId)] ?? const <String>{});
+    workspaceDeliveryAssignment = _deliveryByOrder[_orderScope(orderId)];
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  List<WorkspaceOrderRecord> get visibleWorkspaceOrders {
+    if (workspaceOrders.isNotEmpty) {
+      return List<WorkspaceOrderRecord>.unmodifiable(workspaceOrders);
+    }
+    if (workspaceOrderCustomer.trim().isEmpty ||
+        workspaceOrderStage == 'No order') {
+      return const <WorkspaceOrderRecord>[];
+    }
+    return [
+      WorkspaceOrderRecord(
+        id: currentWorkspaceOrderId ?? 'current-store-order',
+        customer: workspaceOrderCustomer,
+        items: workspaceOrderItems,
+        quantities: Map<String, int>.unmodifiable(workspaceOrderQuantities),
+        amount: int.tryParse(workspaceOrderAmount) ?? 0,
+        source: workspaceOrderSource,
+        fulfilment: workspaceOrderFulfilment,
+        payment: workspaceOrderPayment,
+        address: workspaceOrderAddress,
+        stage: workspaceOrderStage,
+        needsDelivery: workspaceOrderNeedsDelivery,
+        createdAt: DateTime.now(),
+        actionDeadline: workspaceOrderActionDeadline,
+      ),
+    ];
+  }
+
+  List<WorkspaceOrderRecord> get filteredWorkspaceCustomerOrders {
+    final now = DateTime.now();
+    final start = switch (workspaceCustomerPeriod) {
+      'Week' => now.subtract(const Duration(days: 7)),
+      'Month' => DateTime(now.year, now.month, 1),
+      'Quarter' => DateTime(now.year, now.month - 2, 1),
+      'Financial year' => DateTime(
+        now.month >= 4 ? now.year : now.year - 1,
+        4,
+        1,
+      ),
+      'Custom' => workspaceCustomerCustomStart,
+      _ => null,
+    };
+    final end = workspaceCustomerPeriod == 'Custom'
+        ? workspaceCustomerCustomEnd
+        : null;
+    return visibleWorkspaceOrders
+        .where((order) {
+          if (start != null && order.createdAt.isBefore(start)) return false;
+          if (end != null &&
+              order.createdAt.isAfter(end.add(const Duration(days: 1)))) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
+  }
+
+  String workspaceCustomerId(String customer) {
+    return workspaceCustomerMobile(customer) ?? customer.trim().toLowerCase();
+  }
+
+  List<WorkspaceCustomerRecord> get workspaceCustomerBook {
+    final grouped = <String, List<WorkspaceOrderRecord>>{};
+    for (final order in visibleWorkspaceOrders.where(
+      (order) => order.stage != 'Cancelled',
+    )) {
+      final id =
+          workspacePaymentFor(order.id)?.customerId ??
+          workspaceCustomerId(order.customer);
+      grouped.putIfAbsent(id, () => <WorkspaceOrderRecord>[]).add(order);
+    }
+    final customers = <WorkspaceCustomerRecord>[];
+    for (final entry in grouped.entries) {
+      final orders = [...entry.value]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final raw = orders.first.customer.trim();
+      final parts = raw
+          .split('·')
+          .map((part) => part.trim())
+          .where((part) => part.isNotEmpty)
+          .toList(growable: false);
+      final mobile = workspaceCustomerMobile(raw) ?? '';
+      final firstPart = parts.firstOrNull ?? raw;
+      final name = firstPart.isEmpty
+          ? 'Customer'
+          : RegExp(r'^\+?[\d\s-]+$').hasMatch(firstPart)
+          ? 'Customer ending ${entry.key.length >= 4 ? entry.key.substring(entry.key.length - 4) : entry.key}'
+          : firstPart;
+      final totalSpend = orders
+          .where((order) => order.stage == 'Completed')
+          .fold<int>(0, (total, order) => total + order.payableMinor);
+      final amountDue = orders
+          .where((order) => order.payment.toLowerCase().contains('due'))
+          .fold<int>(0, (total, order) => total + order.payableMinor);
+      final finance = workspaceFinance;
+      final ledger = finance?.customerLedgers
+          .where((l) => l.customerId == entry.key)
+          .firstOrNull;
+      final confirmedBalance =
+          ledger?.closingBalanceMinor ??
+          (finance?.historyComplete == true
+              ? finance!.payments
+                    .where((p) => p.customerId == entry.key)
+                    .fold<int>(0, (sum, p) => sum + p.dueMinor)
+              : null);
+      customers.add(
+        WorkspaceCustomerRecord(
+          id: entry.key,
+          name: name,
+          mobile: mobile,
+          orders: List<WorkspaceOrderRecord>.unmodifiable(orders),
+          totalSpend: totalSpend ~/ 100,
+          totalSpendRemainderPaise: totalSpend % 100,
+          amountDue: amountDue ~/ 100,
+          amountDueRemainderPaise: amountDue % 100,
+          confirmedBalanceMinor: confirmedBalance,
+          balanceAvailable: finance == null || confirmedBalance != null,
+          lastPurchaseAt: orders.first.createdAt,
+          followingStore: workspaceCustomersFollowingStore.contains(entry.key),
+          messagesAllowed: workspaceCustomersAllowingMessages.contains(
+            entry.key,
+          ),
+          lastContactAt: workspaceCustomerLastContactAt[entry.key],
+        ),
+      );
+    }
+    customers.sort((a, b) => b.lastPurchaseAt.compareTo(a.lastPurchaseAt));
+    return List<WorkspaceCustomerRecord>.unmodifiable(customers);
+  }
+
+  List<WorkspaceCustomerRecord> get visibleWorkspaceCustomers {
+    final query = workspaceCustomerSearch.trim().toLowerCase();
+    return workspaceCustomerBook
+        .where((customer) {
+          final searchMatch =
+              query.isEmpty ||
+              '${customer.name} ${customer.mobile}'.toLowerCase().contains(
+                query,
+              );
+          final filterMatch = switch (workspaceCustomerFilter) {
+            'Repeat' => customer.repeatCustomer,
+            'Payment due' => customer.hasDues,
+            'Following Store' => customer.followingStore,
+            'Messages allowed' => customer.messagesAllowed,
+            _ => true,
+          };
+          return searchMatch && filterMatch;
+        })
+        .toList(growable: false);
+  }
+
+  void updateWorkspaceCustomerSearch(String value) {
+    workspaceCustomerSearch = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerFilter(String value) {
+    workspaceCustomerFilter = value;
+    notifyListeners();
+  }
+
+  void markWorkspaceCustomerContacted(String customerId) {
+    workspaceCustomerLastContactAt[customerId] = DateTime.now();
+    notifyListeners();
+  }
+
+  DateTime? get workspaceMoneyPeriodStart {
+    final now = DateTime.now();
+    return switch (workspaceMoneyPeriod) {
+      'Today' => DateTime(now.year, now.month, now.day),
+      'Week' => now.subtract(const Duration(days: 7)),
+      'Month' => DateTime(now.year, now.month, 1),
+      'Financial year' => DateTime(
+        now.month >= 4 ? now.year : now.year - 1,
+        4,
+        1,
+      ),
+      _ => null,
+    };
+  }
+
+  List<WorkspacePurchaseRecord> get filteredWorkspacePurchases {
+    final start = workspaceMoneyPeriodStart;
+    return workspacePurchases
+        .where((record) => start == null || !record.createdAt.isBefore(start))
+        .toList(growable: false);
+  }
+
+  List<WorkspaceOrderRecord> get filteredWorkspaceMoneyOrders {
+    final start = workspaceMoneyPeriodStart;
+    return visibleWorkspaceOrders
+        .where((order) {
+          return start == null || !order.createdAt.isBefore(start);
+        })
+        .toList(growable: false);
+  }
+
+  List<WorkspacePackingLine> get workspacePackingLines {
+    final current = currentWorkspaceOrder;
+    final anonymous = current == null && currentWorkspaceOrderId == null &&
+        workspaceOrders.isEmpty ? visibleWorkspaceOrders.singleOrNull : null;
+    return _packingLines(current ?? anonymous, workspacePackedProductIds);
+  }
+
+  List<WorkspacePackingLine> workspacePackingLinesForOrder(
+    WorkspaceOrderRecord order,
+  ) => _packingLines(
+    order,
+    isSelectedWorkspaceOrder(order)
+        ? workspacePackedProductIds
+        : _packingByOrder[_orderScope(order.id)] ?? const <String>{},
+  );
+
+  List<WorkspacePackingLine> _packingLines(
+    WorkspaceOrderRecord? order,
+    Set<String> packedIds,
+  ) {
+    if (order != null && !_packingContentsMatch(order)) packedIds = const {};
+    if (order != null && order.quantities.isNotEmpty) {
+      return order.quantities.entries
+          .map((entry) {
+            final product = workspaceCatalogueItems
+                .where((item) => item.id == entry.key)
+                .firstOrNull;
+            return WorkspacePackingLine(
+              id: entry.key,
+              label: product?.title ?? entry.key,
+              quantity: entry.value,
+              packed: packedIds.contains(entry.key),
+            );
+          })
+          .toList(growable: false);
+    }
+    final parts = (order?.items ?? workspaceOrderItems)
+        .split(RegExp(r'\s+[·,]\s+'))
+        .where((part) => part.trim().isNotEmpty)
+        .toList(growable: false);
+    return [
+      for (var index = 0; index < parts.length; index++)
+        WorkspacePackingLine(
+          id: 'summary-$index',
+          label: parts[index].replaceFirst(RegExp(r'\s*×\s*\d+\s*$'), ''),
+          quantity:
+              int.tryParse(
+                RegExp(r'×\s*(\d+)').firstMatch(parts[index])?.group(1) ?? '',
+              ) ??
+              1,
+          packed: packedIds.contains('summary-$index'),
+        ),
+    ];
+  }
+
+  double get workspacePackingProgress {
+    final lines = workspacePackingLines;
+    if (lines.isEmpty) return 0;
+    return lines.where((line) => line.packed).length / lines.length;
+  }
+
+  bool get workspacePackingComplete =>
+      workspacePackingLines.isNotEmpty &&
+      workspacePackingLines.every((line) => line.packed);
+
+  bool get workspaceCanMarkReady =>
+      workspacePackingComplete &&
+      !workspaceOrderHasPackingIssue(currentWorkspaceOrderId ?? '');
+
+  WorkspaceCustomerInvoice? get latestWorkspaceInvoice {
+    // Recovery appends records; list position is not chronological authority.
+    // Do not reorder the stored history merely to select the home summary.
+    WorkspaceCustomerInvoice? latest;
+    for (final invoice in workspaceInvoices) {
+      if (latest == null || invoice.issuedAt.isAfter(latest.issuedAt)) {
+        latest = invoice;
+      }
+    }
+    return latest;
+  }
+
+  int get workspaceSettlementEligible {
+    if (!workspaceFinanceUsesLegacyReview) return 0;
+    final balance =
+        workspaceSettlementBalance -
+        workspacePlatformAdjustments -
+        workspaceDeliveryAdjustments -
+        workspaceRefunds -
+        workspaceTaxWithheld;
+    return balance < 0 ? 0 : balance;
+  }
+
+  String get workspaceOrderRemainingLabel {
+    final deadline = workspaceOrderActionDeadline;
+    if (deadline == null) return 'Review now';
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining.isNegative) return 'Action due';
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
   List<WorkOpportunity> get filteredOpportunities {
     final normalized = searchQuery.trim().toLowerCase();
+    final city = selectedCity.trim().toLowerCase();
+    final area = selectedArea.trim().toLowerCase();
+    final pincode = selectedPincode.trim();
+    final validPincode = RegExp(r'^\d{6}$').hasMatch(pincode);
     return workOpportunities.where((opportunity) {
       final filterMatch =
           filter == WorkFeedFilter.forYou ||
@@ -69,9 +9078,62 @@ class WorkSession extends ChangeNotifier {
             opportunity.kind,
             opportunity.location,
             opportunity.requiredWork,
+            opportunity.qualificationHeadline,
+            opportunity.city,
+            opportunity.area,
+            opportunity.pincode,
+            opportunity.posterType.label,
           ].join(' ').toLowerCase().contains(normalized);
-      return filterMatch && searchMatch;
+      final cityMatch = city.isEmpty || opportunity.city.toLowerCase() == city;
+      final areaMatch = area.isEmpty || opportunity.area.toLowerCase() == area;
+      final pincodeMatch =
+          pincode.isEmpty ||
+          (validPincode && opportunity.pincode == selectedPincode.trim());
+      return filterMatch &&
+          searchMatch &&
+          cityMatch &&
+          areaMatch &&
+          pincodeMatch;
     }).toList();
+  }
+
+  int get activeOpportunityFilterCount => [
+    selectedCity,
+    selectedArea,
+    selectedPincode,
+  ].where((value) => value.trim().isNotEmpty).length;
+
+  bool get hasOpportunityLocationFilter =>
+      selectedCity.trim().isNotEmpty ||
+      selectedArea.trim().isNotEmpty ||
+      selectedPincode.trim().isNotEmpty;
+
+  List<WorkOpportunity> get relatedOpportunities {
+    if (!hasOpportunityLocationFilter) return const <WorkOpportunity>[];
+    final exactIds = filteredOpportunities
+        .map((opportunity) => opportunity.id)
+        .toSet();
+    final normalized = searchQuery.trim().toLowerCase();
+    return workOpportunities
+        .where((opportunity) {
+          if (exactIds.contains(opportunity.id)) return false;
+          final filterMatch =
+              filter == WorkFeedFilter.forYou ||
+              opportunity.filters.contains(filter);
+          final searchMatch =
+              normalized.isEmpty ||
+              [
+                opportunity.title,
+                opportunity.publisher,
+                opportunity.kind,
+                opportunity.requiredWork,
+                opportunity.qualificationHeadline,
+                opportunity.posterType.label,
+              ].join(' ').toLowerCase().contains(normalized);
+          return filterMatch && searchMatch;
+        })
+        .take(4)
+        .toList(growable: false);
   }
 
   List<String> get familyIds => workProfiles
@@ -87,17 +9149,77 @@ class WorkSession extends ChangeNotifier {
       .firstWhere((profile) => profile.familyId == familyId)
       .familyLabel;
 
-  bool get requiredProofsAdded => workProofs
+  WorkGstMatchCategory? get selectedGstMatchCategory =>
+      selectedProfile?.gstMatchCategory;
+
+  WorkDocumentChecklistItem? get selectedGstChecklistItem => selectedProfile
+      ?.verificationDocuments
+      .where((document) => document.title == 'GST registration certificate')
+      .firstOrNull;
+
+  List<WorkProofRequirement> get selectedWorkspaceDocuments {
+    final profile = selectedProfile;
+    if (profile == null) return workProofs;
+    final documents = <WorkProofRequirement>[];
+    for (var index = 0; index < profile.verificationDocuments.length; index++) {
+      final document = profile.verificationDocuments[index];
+      final id = document.title == 'GST registration certificate'
+          ? 'gst'
+          : index == 0
+          ? 'personal-kyc'
+          : document.title == 'Payout bank account proof'
+          ? 'payout-bank-account'
+          : document.title.toLowerCase().contains('address')
+          ? 'shop-front'
+          : document.title.toLowerCase().contains('authority') ||
+                document.title.toLowerCase().contains('authorised')
+          ? 'owner-authority'
+          : '${profile.id}-document-$index';
+      documents.add(
+        WorkProofRequirement(
+          id: id,
+          label:
+              id == 'owner-authority' &&
+                  businessRelationship == 'Authorized representative'
+              ? 'Authorization letter'
+              : document.title,
+          detail:
+              id == 'owner-authority' &&
+                  businessRelationship == 'Authorized representative'
+              ? 'A letter signed by the owner authorizing you to manage this business.'
+              : document.detail,
+          importance: document.importance,
+        ),
+      );
+    }
+    return List<WorkProofRequirement>.unmodifiable(documents);
+  }
+
+  bool get requiredProofsAdded => selectedWorkspaceDocuments
       .where((proof) => proof.required)
       .every((proof) => addedProofs.containsKey(proof.id));
 
-  bool get hasVerifiedWorkspace =>
-      activeWorkspace?.verified == true &&
-      {
-        WorkReviewStage.approved,
-        WorkReviewStage.setup,
-        WorkReviewStage.live,
-      }.contains(reviewStage);
+  bool get hasVerifiedWorkspace => activeWorkspace?.verified == true;
+
+  bool takeWorkspaceApprovalWelcome() {
+    final welcome = _approvalWelcome;
+    if (welcome == null ||
+        welcome.scope != _contactAccountScope ||
+        welcome.caseId != reviewCaseId ||
+        welcome.workspaceId != workspaceId ||
+        welcome.workspaceId != activeWorkspace?.id ||
+        !hasVerifiedWorkspace ||
+        (remoteReviewStatus != WorkRemoteReviewStatus.approved &&
+            remoteReviewStatus != WorkRemoteReviewStatus.live)) {
+      return false;
+    }
+    _approvalWelcome = null;
+    final key = jsonEncode([welcome.caseId, welcome.workspaceId]);
+    if (!_seenApprovalMessages.add(key)) return false;
+    // A dismissal acknowledgement is not authority for Workspace approval.
+    _queueContactDraft();
+    return true;
+  }
 
   bool get retailerReady =>
       retailerProductAdded &&
@@ -140,8 +9262,1913 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateWorkspaceSearch(String value) {
+    workspaceSearchQuery = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceOrderFilter(String value) {
+    workspaceOrderFilter = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerPeriod(String value) {
+    workspaceCustomerPeriod = value;
+    notifyListeners();
+  }
+
+  void setWorkspaceCustomerCustomPeriod(DateTime start, DateTime end) {
+    workspaceCustomerPeriod = 'Custom';
+    workspaceCustomerCustomStart = DateTime(start.year, start.month, start.day);
+    workspaceCustomerCustomEnd = DateTime(end.year, end.month, end.day);
+    notifyListeners();
+  }
+
+  void setWorkspaceMoneyPeriod(String value) {
+    workspaceMoneyPeriod = value;
+    notifyListeners();
+  }
+
+  bool prepareRepeatWorkspaceOrder() => prepareRepeatWorkspaceOrderFor();
+
+  bool prepareRepeatWorkspaceOrderFor({String? customerId}) {
+    final eligibleOrders = customerId == null
+        ? visibleWorkspaceOrders
+        : visibleWorkspaceOrders
+              .where(
+                (order) => workspaceCustomerId(order.customer) == customerId,
+              )
+              .toList(growable: false);
+    final source =
+        eligibleOrders
+            .where((order) => order.stage == 'Completed')
+            .firstOrNull ??
+        eligibleOrders.firstOrNull;
+    if (source == null) {
+      showError('No previous basket is available for this customer yet.');
+      return false;
+    }
+    final repeatQuantities = Map<String, int>.from(source.quantities);
+    var unavailableLines = 0;
+    if (repeatQuantities.isEmpty) {
+      final lines = source.items
+          .split(RegExp(r'\s+[·,]\s+'))
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty);
+      for (final line in lines) {
+        final quantity =
+            int.tryParse(
+              RegExp(r'×\s*(\d+)').firstMatch(line)?.group(1) ?? '',
+            ) ??
+            1;
+        final words = line
+            .replaceAll(RegExp(r'×\s*\d+'), '')
+            .toLowerCase()
+            .split(RegExp(r'[^a-z0-9]+'))
+            .where((word) => word.length > 2)
+            .toSet();
+        final product = workspaceCatalogueItems.where((item) {
+          final candidate = '${item.brand} ${item.title}'.toLowerCase();
+          return words.isNotEmpty && words.every(candidate.contains);
+        }).firstOrNull;
+        if (product == null ||
+            !product.available ||
+            (product.stockMode == WorkspaceStockMode.exactQuantity &&
+                product.stock <= 0)) {
+          unavailableLines++;
+          continue;
+        }
+        repeatQuantities[product.id] =
+            product.stockMode == WorkspaceStockMode.availabilityOnly
+            ? quantity.clamp(1, 99)
+            : quantity.clamp(1, product.stock);
+      }
+    }
+    for (final entry in repeatQuantities.entries.toList(growable: false)) {
+      final product = workspaceCatalogueItems
+          .where((item) => item.id == entry.key)
+          .firstOrNull;
+      if (product == null ||
+          !product.available ||
+          (product.stockMode == WorkspaceStockMode.exactQuantity &&
+              product.stock <= 0)) {
+        repeatQuantities.remove(entry.key);
+        unavailableLines++;
+        continue;
+      }
+      repeatQuantities[entry.key] =
+          product.stockMode == WorkspaceStockMode.availabilityOnly
+          ? entry.value.clamp(1, 99)
+          : entry.value.clamp(1, product.stock);
+    }
+    if (repeatQuantities.isEmpty) {
+      showError(
+        'The previous basket is saved, but its products are not available in your current catalogue.',
+      );
+      return false;
+    }
+    if (!startNewWorkspaceOrder()) return false;
+    workspaceOrderSource = 'Repeat order';
+    workspaceOrderFulfilment = source.needsDelivery
+        ? source.fulfilment
+        : 'At the shop';
+    workspaceOrderNeedsDelivery = source.needsDelivery;
+    workspaceOrderCustomer = source.customer;
+    workspaceOrderAddress = source.address;
+    workspaceOrderBillingDetails = source.billingDetails;
+    workspaceOrderQuantities.addAll(repeatQuantities);
+    noticeMessage = unavailableLines == 0
+        ? 'Previous basket added. Confirm quantities before completing the sale.'
+        : 'Available products were added. Review the basket before completing the sale.';
+    notifyListeners();
+    return true;
+  }
+
+  void activateWorkspace(WorkWorkspace workspace) {
+    if (hasPendingOrderTime) {
+      showNotice('Confirm the time request before switching stores.');
+      return;
+    }
+    final current = activeWorkspace;
+    if (current == null || current.id == workspace.id) return;
+    if (_collection?.needsReconciliation == true) {
+      showNotice('Confirming this collection. Please wait for the update.');
+      return;
+    }
+    if (busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true) {
+      showNotice('Finishing this store update. Please wait before switching.');
+      return;
+    }
+    _rememberWorkspaceApplication();
+    _clearWorkspaceApplication();
+    _clearCollection();
+    otherWorkspaces.removeWhere((item) => item.id == workspace.id);
+    otherWorkspaces.add(current);
+    activeWorkspace = workspace;
+    workspaceId = workspace.id;
+    workName = workspace.name;
+    workArea = workspace.area;
+    selectedProfile = workProfiles
+        .where((profile) => profile.id == workspace.profileId)
+        .firstOrNull;
+    selectedFamilyId = selectedProfile?.familyId;
+    reviewStage = WorkReviewStage.approved;
+    remoteReviewStatus = WorkRemoteReviewStatus.approved;
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+  }
+
+  Map<String, Object?> _operationalState() => {
+    'productDefaults': workspaceProductDefaults.toJson(),
+    'publicationDetails': workspacePublicationDetails.toJson(),
+    'storeState': workspaceStoreState.name,
+    'acceptingOrders': workspaceAcceptingOrders,
+    'visibleToCustomers': workspaceVisibleToCustomers,
+    'fulfilmentMode': workspaceFulfilmentMode,
+    'busyMinutes': workspaceBusyMinutes,
+    'reopensAt': workspaceReopensAt,
+    'openingTime': workspaceOpeningTime,
+    'closingTime': workspaceClosingTime,
+    'maximumActiveOrders': workspaceMaximumActiveOrders,
+    'orderAlertSound': workspaceOrderAlertSound,
+    'orderAlertVibration': workspaceOrderAlertVibration,
+    'catalogue': [
+      for (final product in workspaceCatalogueItems)
+        {
+          'id': product.id,
+          'canonicalId': product.canonicalId,
+          if (product.stockEntry != null)
+            'stockEntry': product.stockEntry!.toJson(),
+          if (product.packMeasure != null)
+            'packMeasure': product.packMeasure!.toJson(),
+          if (product.wholesaleOffer != null)
+            'wholesaleOffer': product.wholesaleOffer!.toJson(),
+          'retailEnabled': product.retailEnabled,
+          'categoryId': product.categoryId,
+          'brand': product.brand,
+          'title': product.title,
+          'variant': product.variant,
+          'pack': product.pack,
+          'sku': product.sku,
+          'barcode': product.barcode,
+          if (product.cataloguePhoto != null)
+            'cataloguePhoto': product.cataloguePhoto!.toJson(),
+          if (product.compliance != null)
+            'compliance': product.compliance!.toJson(),
+          'composition': product.composition,
+          if (!product.content.isEmpty) 'content': product.content.toJson(),
+          'regulatoryNote': product.regulatoryNote,
+          'requiresPrescription': product.requiresPrescription,
+          'visualLabel': product.visualLabel,
+          'visualKind': product.visualKind,
+          'unitPrice': product.unitPrice,
+          'purchasePrice': product.purchasePrice,
+          'sellingPrice': product.sellingPrice,
+          'mrp': product.mrp,
+          'stock': product.stock,
+          'deliveryPromise': product.deliveryPromise,
+          'origin': product.origin,
+          'minimumOrder': product.minimumOrder,
+          'returnPolicy': product.returnPolicy,
+          'available': product.available,
+          'publicListing': product.publicListing,
+          'catalogueFactsRequireReview': product.catalogueFactsRequireReview,
+          'stockMode': product.stockMode.name,
+          'lowStockThreshold': product.lowStockThreshold,
+        },
+    ],
+    'stockMovements': [
+      for (final movement in workspaceStockMovements)
+        {
+          'id': movement.id,
+          'productId': movement.productId,
+          'productLabel': movement.productLabel,
+          'kind': movement.kind.name,
+          'quantityDelta': movement.quantityDelta,
+          'reason': movement.reason,
+          'occurredAt': movement.occurredAt.toUtc().toIso8601String(),
+          if (movement.referenceKind != null)
+            'referenceKind': movement.referenceKind!.name,
+          if (movement.referenceId != null) 'referenceId': movement.referenceId,
+        },
+    ],
+    'orders': [
+      for (final order in workspaceOrders)
+        {
+          'id': order.id,
+          'customer': order.customer,
+          'items': order.items,
+          'quantities': order.quantities,
+          if (order.itemSnapshots.isNotEmpty)
+            'itemSnapshots': [
+              for (final line in order.itemSnapshots)
+                {
+                  'productId': line.productId,
+                  'name': line.name,
+                  'pack': line.pack,
+                  'quantity': line.quantity,
+                  'unitPricePaise': line.unitPricePaise,
+                  'lineTotalPaise': line.lineTotalPaise,
+                },
+            ],
+          'amount': order.amount,
+          'remainderPaise': order.remainderPaise,
+          'discount': order.discount.toJson(),
+          'discountMinor': order.discountMinor,
+          'billingDetails': order.billingDetails.toJson(),
+          'source': order.source,
+          'fulfilment': order.fulfilment,
+          'payment': order.payment,
+          'address': order.address,
+          'stage': order.stage,
+          if (order.rejectionReason != null)
+            'rejectionReason': order.rejectionReason,
+          'needsDelivery': order.needsDelivery,
+          'createdAt': order.createdAt.toUtc().toIso8601String(),
+          'actionDeadline': order.actionDeadline?.toUtc().toIso8601String(),
+          if (order.fulfilmentDeadline != null)
+            'fulfilmentDeadline': order.fulfilmentDeadline!
+                .toUtc()
+                .toIso8601String(),
+          'extraMinutes': order.extraMinutes,
+          'stockReserved': order.stockReserved,
+          if (order.isCustomerCollection)
+            'collectionStoreId': order.collectionStoreId,
+        },
+    ],
+    'invoices': [
+      for (final invoice in workspaceInvoices)
+        {
+          'id': invoice.id,
+          'orderId': invoice.orderId,
+          'customer': invoice.customer,
+          'items': invoice.items,
+          'amount': invoice.amount,
+          'remainderPaise': invoice.remainderPaise,
+          'discount': invoice.discount.toJson(),
+          'discountMinor': invoice.discountMinor,
+          'billingDetails': invoice.billingDetails.toJson(),
+          'sellerName': invoice.sellerName,
+          if (invoice.seller != null) 'seller': invoice.seller!.toJson(),
+          'payment': invoice.payment,
+          'issuedAt': invoice.issuedAt.toUtc().toIso8601String(),
+          'sharedChannels': invoice.sharedChannels.toList(growable: false),
+        },
+    ],
+    // MoolSocial-owned coverage/pricing are not retailer-editable snapshot fields.
+    'deliveryCity': workspaceDeliveryCity,
+    'deliveryArea': workspaceDeliveryArea,
+    'deliveryPincode': workspaceDeliveryPincode,
+    'pickupEnabled': workspacePickupEnabled,
+    'staffAccessEnabled': workspaceStaffAccessEnabled,
+    'counterCount': workspaceCounterCount,
+    'salesToday': workspaceSalesToday,
+    'salesTodayRemainderPaise': _storeData.salesTodayRemainderPaise,
+    'completedSalesCount': workspaceCompletedSalesCount,
+    'settlementBalance': workspaceSettlementBalance,
+    'settlementRequested': workspaceSettlementRequested,
+    'moolSocialFees': workspacePlatformAdjustments,
+    'deliveryAdjustments': workspaceDeliveryAdjustments,
+    'payoutBankName': workspacePayoutBankName,
+    'payoutAccountEnding': workspacePayoutAccountEnding,
+  };
+
+  void _persistOperationalState(String reason) {
+    if (_storeData.orderOperations != null) {
+      // Never send a legacy whole-Store overwrite over authoritative per-order
+      // data. Other operational domains require their scoped adapters first.
+      workspaceOperationsSyncError =
+          'These changes remain on this device. Store sync is not available yet.';
+      notifyListeners();
+      return;
+    }
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty) return;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    final snapshot = _operationalState();
+    data.pendingOperationalRequests++;
+    workspaceOperationsSyncing = true;
+    workspaceOperationsSyncError = null;
+    notifyListeners();
+    final key = 'OPS-$id-${DateTime.now().microsecondsSinceEpoch}';
+    unawaited(
+      gateway
+          .saveOperationalState(
+            WorkOperationalSnapshot(
+              workspaceId: id,
+              reason: reason,
+              state: snapshot,
+              idempotencyKey: key,
+            ),
+          )
+          .then((_) {
+            if (!_isStoreScopeCurrent(data, id, scope)) return;
+            workspaceOperationsSyncError = null;
+          })
+          .catchError((Object error) {
+            if (!_isStoreScopeCurrent(data, id, scope)) return;
+            workspaceOperationsSyncError = error is WorkGatewayException
+                ? error.message
+                : 'Store changes could not sync. Your draft remains on this device.';
+          })
+          .whenComplete(() => _finishOperationalRequest(data, id, scope)),
+    );
+  }
+
+  void saveWorkspaceAvailability({
+    required bool acceptingOrders,
+    required String fulfilmentMode,
+    required int busyMinutes,
+    required String reopensAt,
+  }) {
+    workspaceAcceptingOrders = acceptingOrders;
+    workspaceFulfilmentMode = fulfilmentMode;
+    workspaceBusyMinutes = busyMinutes;
+    workspaceReopensAt = acceptingOrders ? '' : reopensAt;
+    workspaceStoreState = acceptingOrders
+        ? WorkspaceStoreState.open
+        : reopensAt.isEmpty
+        ? WorkspaceStoreState.off
+        : WorkspaceStoreState.paused;
+    workspaceLastUpdatedAt = DateTime.now();
+    _recordWorkspaceActivity(
+      acceptingOrders
+          ? busyMinutes > 0
+                ? 'Store marked busy with $busyMinutes minutes extra preparation.'
+                : 'Store opened for customer orders.'
+          : 'New customer orders paused${reopensAt.isEmpty ? '.' : ' until $reopensAt.'}',
+    );
+    showNotice(
+      acceptingOrders
+          ? 'Store availability updated for customers.'
+          : 'Store paused. Customers can see when ordering resumes.',
+    );
+    _persistOperationalState('availability');
+  }
+
+  void saveWorkspaceTradingControls({
+    required String openingTime,
+    required String closingTime,
+    required int maximumActiveOrders,
+    required bool alertSound,
+    required bool alertVibration,
+  }) {
+    // 0 means explicitly unlimited; positive values are retailer-entered limits.
+    // This is a planning preference, not admission control for incoming orders.
+    if (maximumActiveOrders < 0) {
+      showError('Enter an active-order limit or choose Unlimited.');
+      return;
+    }
+    workspaceOpeningTime = openingTime.trim();
+    workspaceClosingTime = closingTime.trim();
+    workspaceMaximumActiveOrders = maximumActiveOrders;
+    workspaceOrderAlertSound = alertSound;
+    workspaceOrderAlertVibration = alertVibration;
+    _recordWorkspaceActivity('Store hours and order alerts updated.');
+    _persistOperationalState('trading-controls');
+    notifyListeners();
+  }
+
+  void dismissWorkspaceAlert(String alertId) {
+    dismissedWorkspaceAlerts.add(alertId);
+    notifyListeners();
+  }
+
+  void setWorkspacePackingLine(String id, bool packed) {
+    if (currentWorkspaceOrder case final order?) {
+      _preparePackingContents(order, workspacePackedProductIds);
+    }
+    if (packed) {
+      workspacePackedProductIds.add(id);
+    } else {
+      workspacePackedProductIds.remove(id);
+    }
+    notifyListeners();
+  }
+
+  bool _packingContentsMatch(WorkspaceOrderRecord order) {
+    final contents = _packingContentsByOrder[_orderScope(order.id)];
+    return contents == null ||
+        (contents.items == order.items &&
+            mapEquals(contents.quantities, order.quantities));
+  }
+
+  void _preparePackingContents(
+    WorkspaceOrderRecord order,
+    Set<String> packedIds,
+  ) {
+    if (!_packingContentsMatch(order)) packedIds.clear();
+    _packingContentsByOrder[_orderScope(order.id)] = (
+      items: order.items,
+      quantities: Map.of(order.quantities),
+    );
+  }
+
+  bool setWorkspaceOrderPackingLine({
+    required String? storeId,
+    required String orderId,
+    required String lineId,
+    required int quantity,
+    required bool packed,
+  }) {
+    if (storeId != (activeWorkspace?.id ?? workspaceId) ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy) {
+      return false;
+    }
+    final order = visibleWorkspaceOrders
+        .where((record) => record.id == orderId)
+        .firstOrNull;
+    if (order == null ||
+        order.stage != 'Preparing' ||
+        order.isCustomerCollection ||
+        (isSelectedWorkspaceOrder(order) &&
+            workspaceOrderStage != 'Preparing') ||
+        !workspacePackingLinesForOrder(
+          order,
+        ).any((line) => line.id == lineId && line.quantity == quantity)) {
+      return false;
+    }
+    final packedIds = isSelectedWorkspaceOrder(order)
+        ? workspacePackedProductIds
+        : _packingByOrder.putIfAbsent(_orderScope(orderId), () => <String>{});
+    _preparePackingContents(order, packedIds);
+    if (packed) {
+      packedIds.add(lineId);
+    } else {
+      packedIds.remove(lineId);
+    }
+    notifyListeners();
+    return true;
+  }
+
+  void saveWorkspaceDeliverySettings({
+    String? city,
+    String? area,
+    String? pincode,
+    bool? pickupEnabled,
+  }) {
+    // Retailers own pickup location/preferences, not MoolSocial coverage/pricing.
+    final nextCity = (city ?? workspaceDeliveryCity).trim();
+    final nextArea = (area ?? workspaceDeliveryArea).trim();
+    final nextPincode = (pincode ?? workspaceDeliveryPincode).trim();
+    if (nextCity.isEmpty ||
+        nextArea.isEmpty ||
+        !RegExp(r'^[1-9][0-9]{5}$').hasMatch(nextPincode)) {
+      showError('Check the Store city, area and PIN code before saving.');
+      return;
+    }
+    workspaceDeliveryCity = city?.trim() ?? workspaceDeliveryCity;
+    workspaceDeliveryArea = area?.trim() ?? workspaceDeliveryArea;
+    workspaceDeliveryPincode = pincode?.trim() ?? workspaceDeliveryPincode;
+    workspacePickupEnabled = pickupEnabled ?? workspacePickupEnabled;
+    _recordWorkspaceActivity('Store pickup location and preferences updated.');
+    showNotice('Store pickup details updated.');
+    _persistOperationalState('delivery-settings');
+  }
+
+  void saveWorkspaceStaffSettings({
+    required bool staffAccessEnabled,
+    required int counterCount,
+  }) {
+    if (counterCount < 1 || counterCount > 20) {
+      showError('Enter a whole counter count from 1 to 20.');
+      return;
+    }
+    workspaceStaffAccessEnabled = staffAccessEnabled;
+    workspaceCounterCount = counterCount;
+    _recordWorkspaceActivity('Store counter and staff access updated.');
+    showNotice('Staff and counter settings updated.');
+    _persistOperationalState('staff-settings');
+  }
+
+  WorkspaceCustomerInvoice _createInvoice(WorkspaceOrderRecord order) {
+    final existing = workspaceInvoices
+        .where((invoice) => invoice.orderId == order.id)
+        .firstOrNull;
+    if (existing != null) return existing;
+    final sellerStoreId = activeWorkspace?.id ?? workspaceId;
+    final sellerDetails = workspacePublicationDetails;
+    final invoice = WorkspaceCustomerInvoice(
+      id: 'INV-${order.id}',
+      orderId: order.id,
+      customer: order.customer,
+      sellerName: activeWorkspace?.name ?? workName,
+      seller: sellerStoreId?.trim().isNotEmpty == true
+          ? WorkspaceInvoiceSeller(
+              storeId: sellerStoreId!,
+              legalName: sellerDetails.legalName.trim(),
+              storeAddress: sellerDetails.address.trim(),
+              billingAddress: sellerDetails.billingAddress.trim(),
+            )
+          : null,
+      billingDetails: order.billingDetails,
+      items: order.items,
+      amount: order.amount,
+      remainderPaise: order.remainderPaise,
+      discount: order.discount,
+      discountMinor: order.discountMinor,
+      payment: order.payment,
+      issuedAt: DateTime.now(),
+    );
+    workspaceInvoices.insert(0, invoice);
+    _recordWorkspaceActivity(
+      'Invoice ${invoice.id} created for ${invoice.customer}.',
+    );
+    return invoice;
+  }
+
+  WorkspaceCustomerInvoice? completeWorkspaceCounterSale() {
+    if (!_canEditCounterOrder()) {
+      return null;
+    }
+    final completedInvoice = workspaceInvoices
+        .where((invoice) => invoice.orderId == currentWorkspaceOrderId)
+        .firstOrNull;
+    if (completedInvoice != null) return completedInvoice;
+    if (workspaceOrderQuantities.isEmpty ||
+        workspaceOrderCustomer.trim().isEmpty ||
+        workspaceCounterPayableMinor <= 0 ||
+        workspaceCounterDiscountError != null) {
+      showError('Add a customer and products before creating the invoice.');
+      return null;
+    }
+    var order = _ensureCurrentOrderRecord();
+    if (!order.stockReserved) {
+      if (!_reserveOrderStock(order)) return null;
+      order = order.copyWith(stockReserved: true);
+    }
+    workspaceOrderStage = 'Completed';
+    workspaceOrderActionDeadline = null;
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    final completed = order.copyWith(stage: 'Completed', stockReserved: true);
+    if (index >= 0) workspaceOrders[index] = completed;
+    _addCompletedSaleMinor(order.payableMinor);
+    // A counter invoice records a sale, not money collected by MoolSocial.
+    // Settlement remains the authoritative balance supplied for the Store.
+    workspaceCompletedSalesCount++;
+    final invoice = _createInvoice(completed);
+    showNotice('Sale completed. Invoice ${invoice.id} is ready to send.');
+    _persistOperationalState('counter-sale-completed');
+    notifyListeners();
+    return invoice;
+  }
+
+  void markWorkspaceInvoiceShared(String invoiceId, String channel) {
+    final index = workspaceInvoices.indexWhere(
+      (invoice) => invoice.id == invoiceId,
+    );
+    if (index < 0) return;
+    final invoice = workspaceInvoices[index];
+    workspaceInvoices[index] = invoice.copyWith(
+      sharedChannels: {...invoice.sharedChannels, channel},
+    );
+    _recordWorkspaceActivity(
+      '${invoice.id} sent through $channel and added to the customer relationship history.',
+    );
+    showNotice('Invoice ready in $channel. Customer history is updated.');
+    _persistOperationalState('invoice-shared');
+  }
+
+  bool setWorkspaceVisibility(bool visible) {
+    if (visible && !workspacePublicationReport.ready) {
+      showError(
+        'Store not published. Check Publication requirements in Store settings.',
+      );
+      return false;
+    }
+    workspaceVisibleToCustomers = visible;
+    workspaceLastUpdatedAt = DateTime.now();
+    _recordWorkspaceActivity(
+      visible
+          ? 'Store published for customer discovery.'
+          : 'Store removed from customer discovery.',
+    );
+    showNotice(
+      visible
+          ? 'Your store is now visible to customers.'
+          : 'Your store is hidden from customer discovery.',
+    );
+    _persistOperationalState('visibility');
+    return true;
+  }
+
+  void setWorkspaceDashboardState(
+    WorkspaceDashboardState state, {
+    String error = '',
+    DateTime? lastUpdatedAt,
+  }) {
+    workspaceDashboardState = state;
+    workspaceDashboardError = error.trim();
+    workspaceLastUpdatedAt = lastUpdatedAt ?? workspaceLastUpdatedAt;
+    notifyListeners();
+  }
+
+  void retryWorkspaceDashboard() {
+    // No operational-feed reader is connected yet. Application-review data
+    // cannot refresh orders, stock or payments, and a spinner is not a request.
+    setWorkspaceDashboardState(
+      WorkspaceDashboardState.failed,
+      error:
+          'Live store updates are unavailable. Your saved records are unchanged.',
+    );
+  }
+
+  /// Read-only command preview; reuse the model's existing item allocation.
+  List<WorkspaceOrderItemSnapshot> get workspaceCounterPurchasedItems =>
+      _counterPurchasedItems();
+
+  List<WorkspaceOrderItemSnapshot> _counterPurchasedItems() {
+    final lines = <WorkspaceOrderItemSnapshot>[
+      for (final product in workspaceCatalogueItems)
+        if ((workspaceOrderQuantities[product.id] ?? 0) > 0)
+          WorkspaceOrderItemSnapshot(
+            productId: product.id,
+            name: product.title,
+            pack: product.pack,
+            quantity: workspaceOrderQuantities[product.id]!,
+            unitPricePaise: product.sellingPrice * 100,
+            lineTotalPaise:
+                product.sellingPrice *
+                100 *
+                workspaceOrderQuantities[product.id]!,
+          ),
+    ];
+    if (workspaceCounterDiscount.isEmpty ||
+        workspaceCounterDiscountError != null) {
+      return List.unmodifiable(lines);
+    }
+    final subtotal = BigInt.from(workspaceCounterSubtotalMinor);
+    final discount = BigInt.from(workspaceCounterDiscountMinor);
+    var cumulative = BigInt.zero;
+    var allocated = 0;
+    return List.unmodifiable([
+      for (final line in lines)
+        (() {
+          cumulative += BigInt.from(line.lineTotalPaise);
+          final next = (discount * cumulative ~/ subtotal).toInt();
+          final share = next - allocated;
+          allocated = next;
+          return WorkspaceOrderItemSnapshot(
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            quantity: line.quantity,
+            unitPricePaise: line.unitPricePaise,
+            lineTotalPaise: line.lineTotalPaise - share,
+          );
+        })(),
+    ]);
+  }
+
+  bool saveWorkspaceOrderDraft({
+    required String customer,
+    required String source,
+    required String fulfilment,
+    required String payment,
+    required String address,
+  }) {
+    if (!_canEditCounterOrder()) return false;
+    if (workspaceCounterDiscountError != null) {
+      showError(workspaceCounterDiscountError!);
+      return false;
+    }
+    if (workspaceInvoices.any(
+      (invoice) => invoice.orderId == currentWorkspaceOrderId,
+    )) {
+      showNotice('This sale is complete. Start a new bill for another sale.');
+      return false;
+    }
+    workspaceOrderCustomer = customer.trim();
+    workspaceOrderSource = source;
+    workspaceOrderFulfilment = fulfilment;
+    workspaceOrderPayment = payment;
+    workspaceOrderAddress = address.trim();
+    workspaceOrderNeedsDelivery = const {
+      'Mool delivery',
+      'Own delivery',
+    }.contains(fulfilment);
+    workspaceOrderItems = workspaceCatalogueItems
+        .where((product) => (workspaceOrderQuantities[product.id] ?? 0) > 0)
+        .map(
+          (product) =>
+              '${product.title} × ${workspaceOrderQuantities[product.id]}',
+        )
+        .join(', ');
+    workspaceOrderAmount = workspaceCounterPayableMinor % 100 == 0
+        ? '${workspaceCounterPayableMinor ~/ 100}'
+        : '${workspaceCounterPayableMinor ~/ 100}.${(workspaceCounterPayableMinor % 100).toString().padLeft(2, '0')}';
+    workspaceOrderStage = 'Confirmed';
+    workspaceOrderExtraMinutes = 0;
+    workspacePackedProductIds.clear();
+    // A locally recorded sale is not a server-assigned acceptance window.
+    workspaceOrderActionDeadline = null;
+    final orderId =
+        currentWorkspaceOrderId ??
+        _counterSubmissionOrderId ??
+        _newCounterIdentity('ORD');
+    currentWorkspaceOrderId = orderId;
+    final record = WorkspaceOrderRecord(
+      id: orderId,
+      customer: workspaceOrderCustomer,
+      billingDetails: workspaceOrderBillingDetails,
+      items: workspaceOrderItems,
+      quantities: Map<String, int>.from(workspaceOrderQuantities),
+      itemSnapshots: _counterPurchasedItems(),
+      amount: workspaceCounterPayableMinor ~/ 100,
+      remainderPaise: workspaceCounterPayableMinor % 100,
+      discount: workspaceCounterDiscount,
+      discountMinor: workspaceCounterDiscountMinor,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      stage: workspaceOrderStage,
+      needsDelivery: workspaceOrderNeedsDelivery,
+      createdAt: DateTime.now(),
+      actionDeadline: workspaceOrderActionDeadline,
+    );
+    final existingIndex = workspaceOrders.indexWhere(
+      (order) => order.id == orderId,
+    );
+    if (existingIndex == -1) {
+      workspaceOrders.insert(0, record);
+    } else {
+      workspaceOrders[existingIndex] = record;
+    }
+    _recordWorkspaceActivity(
+      '$source order saved · $workspaceOrderItemCount products · ₹$workspaceOrderAmount.',
+    );
+    showNotice(
+      workspaceOrderNeedsDelivery
+          ? 'Order saved. Add the delivery address when the customer confirms.'
+          : 'Counter order saved for customer confirmation.',
+    );
+    _persistOperationalState('order-created');
+    return true;
+  }
+
+  // Counter editing must never rewrite an incoming order's purchased facts.
+  // Inspect the stored order, not the mutable composer source/stage fields.
+  bool _canEditCounterOrder({bool allowCompletedInvoice = true}) {
+    if (!_stockEditAvailable()) return false;
+    if ((_counterSubmissionOrderId == null &&
+            (counterDraftSubmitting || counterDraftNeedsReconciliation)) ||
+        hasPendingOrderTime ||
+        busy ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      showError('Wait for the current order update before changing this bill.');
+      return false;
+    }
+    final order = currentWorkspaceOrder;
+    if (currentWorkspaceOrderId != null && order == null) {
+      showError(
+        'This order is unavailable. Start a new bill for a counter sale.',
+      );
+      return false;
+    }
+    if (order == null) return true;
+    if (order.source == 'App' || order.isCustomerCollection) {
+      showError(
+        'Use this order’s actions. Start a new bill for a counter sale.',
+      );
+      return false;
+    }
+    if (allowCompletedInvoice &&
+        order.stage == 'Completed' &&
+        workspaceInvoices.any((invoice) => invoice.orderId == order.id)) {
+      return true; // A duplicate completion may return its existing invoice.
+    }
+    if (order.stage != 'Confirmed' || order.stockReserved) {
+      showError(
+        'This order cannot be edited. Start a new bill for another sale.',
+      );
+      return false;
+    }
+    return true;
+  }
+
+  WorkspaceOrderRecord _ensureCurrentOrderRecord() {
+    final existing = currentWorkspaceOrder;
+    if (existing != null) return existing;
+    final id =
+        currentWorkspaceOrderId ??
+        _newCounterIdentity('ORD');
+    currentWorkspaceOrderId = id;
+    final created = WorkspaceOrderRecord(
+      id: id,
+      customer: workspaceOrderCustomer,
+      items: workspaceOrderItems,
+      quantities: Map<String, int>.from(workspaceOrderQuantities),
+      itemSnapshots: _counterPurchasedItems(),
+      amount: workspaceCounterDiscount.isEmpty
+          ? int.tryParse(workspaceOrderAmount) ?? 0
+          : workspaceCounterPayableMinor ~/ 100,
+      remainderPaise: workspaceCounterDiscount.isEmpty
+          ? 0
+          : workspaceCounterPayableMinor % 100,
+      discount: workspaceCounterDiscount,
+      discountMinor: workspaceCounterDiscountMinor,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      stage: workspaceOrderStage,
+      needsDelivery: workspaceOrderNeedsDelivery,
+      createdAt: DateTime.now(),
+      actionDeadline: workspaceOrderActionDeadline,
+    );
+    workspaceOrders.insert(0, created);
+    return created;
+  }
+
+  bool _reserveOrderStock(WorkspaceOrderRecord order) {
+    if (!_stockEditAvailable()) return false;
+    for (final entry in order.quantities.entries) {
+      final product = workspaceCatalogueItems
+          .where((item) => item.id == entry.key)
+          .firstOrNull;
+      if (product == null ||
+          !product.available ||
+          (product.stockMode == WorkspaceStockMode.exactQuantity &&
+              product.stock < entry.value)) {
+        showError(
+          product == null
+              ? 'A product in this order is no longer in the catalogue.'
+              : product.stockMode == WorkspaceStockMode.availabilityOnly
+              ? '${product.title} is currently unavailable.'
+              : '${product.title} has only ${product.stock} available.',
+        );
+        return false;
+      }
+    }
+    for (final entry in order.quantities.entries) {
+      final index = workspaceCatalogueItems.indexWhere(
+        (item) => item.id == entry.key,
+      );
+      if (index < 0) continue;
+      final product = workspaceCatalogueItems[index];
+      if (product.stockMode == WorkspaceStockMode.availabilityOnly) continue;
+      workspaceCatalogueItems[index] = product.copyWith(
+        stock: product.stock - entry.value,
+        available: product.stock - entry.value > 0,
+      );
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.reserved,
+        quantityDelta: -entry.value,
+        reason: 'Reserved for ${order.id}',
+        referenceKind: WorkspaceStockReferenceKind.order,
+        referenceId: order.id,
+      );
+    }
+    return true;
+  }
+
+  void _releaseOrderStock(WorkspaceOrderRecord order) {
+    for (final entry in order.quantities.entries) {
+      final index = workspaceCatalogueItems.indexWhere(
+        (item) => item.id == entry.key,
+      );
+      if (index < 0) continue;
+      final product = workspaceCatalogueItems[index];
+      if (product.stockMode == WorkspaceStockMode.availabilityOnly) continue;
+      workspaceCatalogueItems[index] = product.copyWith(
+        stock: product.stock + entry.value,
+        available: true,
+      );
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.released,
+        quantityDelta: entry.value,
+        reason: 'Released after ${order.id} was cancelled',
+        referenceKind: WorkspaceStockReferenceKind.order,
+        referenceId: order.id,
+      );
+    }
+  }
+
+  void advanceWorkspaceOrder() {
+    final scopedId = currentWorkspaceOrderId;
+    if (scopedId != null && hasScopedWorkspaceOrder(scopedId)) {
+      final action = switch (currentWorkspaceOrder?.stage) {
+        'Confirmed' => WorkOrderAction.accept,
+        'Preparing' => WorkOrderAction.ready,
+        _ => null,
+      };
+      if (action != null) {
+        unawaited(submitWorkspaceOrderAction(scopedId, action));
+      }
+      return;
+    }
+    if (hasPendingOrderTime) {
+      showError('Confirm the time request before accepting this order.');
+      return;
+    }
+    if (currentWorkspaceOrder?.isCustomerCollection == true) {
+      showError('Use the collection card for this paid order.');
+      return;
+    }
+    final previous = workspaceOrderStage;
+    final current = currentWorkspaceOrder;
+    if (current != null && current.stage != previous) {
+      showError('This order has changed. Review its current status.');
+      return;
+    }
+    if (!const {
+      'Confirmed',
+      'Preparing',
+      'Ready',
+      'Ready for pickup',
+      'Delivery requested',
+    }.contains(previous)) {
+      return;
+    }
+    final acceptanceDeadline =
+        current?.actionDeadline ?? workspaceOrderActionDeadline;
+    if (previous == 'Confirmed' &&
+        acceptanceDeadline != null &&
+        !acceptanceDeadline.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Waiting for an order update.');
+      return;
+    }
+    var order = _ensureCurrentOrderRecord();
+    if (previous == 'Confirmed' && !order.stockReserved) {
+      if (!_reserveOrderStock(order)) return;
+      order = order.copyWith(stockReserved: true);
+    }
+    if (previous == 'Delivery requested') {
+      showError('Confirm the customer delivery OTP before handover.');
+      return;
+    }
+    if (previous == 'Preparing' && workspaceOrderHasPackingIssue(order.id)) {
+      showError('Resolve the item issue before marking this order ready.');
+      return;
+    }
+    if (previous == 'Preparing' && !workspacePackingComplete) {
+      showError('Mark every product packed before the order is ready.');
+      return;
+    }
+    if (previous == 'Ready for pickup' ||
+        (previous == 'Ready' && !workspaceOrderNeedsDelivery)) {
+      _completeWorkspaceOrder(order, activity: 'Customer pickup confirmed.');
+      return;
+    }
+    if (previous == 'Ready' &&
+        workspaceOrderNeedsDelivery &&
+        workspaceOrderAddress.trim().isEmpty) {
+      showError('Add the confirmed customer delivery address first.');
+      return;
+    }
+    workspaceOrderStage = switch (previous) {
+      'Confirmed' => 'Preparing',
+      'Preparing' when workspaceOrderNeedsDelivery => 'Ready',
+      'Preparing' => 'Ready for pickup',
+      'Ready' when workspaceOrderNeedsDelivery => 'Delivery requested',
+      'Ready' => 'Completed',
+      'Delivery requested' => 'Delivery requested',
+      _ => workspaceOrderStage,
+    };
+    // Keep an authoritative target when supplied. Accepting or packing an
+    // order must not manufacture a new delivery promise or reset the clock.
+    workspaceOrderActionDeadline = switch (workspaceOrderStage) {
+      'Preparing' || 'Ready' || 'Ready for pickup' => order.fulfilmentDeadline,
+      'Delivery requested' => workspaceDeliveryAssignment?.eta,
+      _ => null,
+    };
+    order = order.copyWith(
+      stage: workspaceOrderStage,
+      actionDeadline: workspaceOrderActionDeadline,
+      clearActionDeadline: workspaceOrderActionDeadline == null,
+      stockReserved: order.stockReserved || previous == 'Confirmed',
+    );
+    final orderIndex = workspaceOrders.indexWhere(
+      (item) => item.id == order.id,
+    );
+    if (orderIndex >= 0) workspaceOrders[orderIndex] = order;
+    _recordWorkspaceActivity('Order moved to $workspaceOrderStage.');
+    showNotice('Order is now ${workspaceOrderStage.toLowerCase()}.');
+    _persistOperationalState('order-$workspaceOrderStage');
+    if (workspaceOrderStage == 'Delivery requested') {
+      unawaited(_requestWorkspaceDeliveryAssignment(order.id));
+    }
+  }
+
+  WorkspaceCustomerInvoice _completeWorkspaceOrder(
+    WorkspaceOrderRecord order, {
+    required String activity,
+  }) {
+    if (order.isCustomerCollection) {
+      throw StateError('Customer collection requires authoritative completion');
+    }
+    final existing = workspaceInvoices
+        .where((invoice) => invoice.orderId == order.id)
+        .firstOrNull;
+    if (existing != null) return existing;
+    workspaceOrderStage = 'Completed';
+    workspaceOrderActionDeadline = null;
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    final completed = order.copyWith(stage: 'Completed');
+    if (index >= 0) workspaceOrders[index] = completed;
+    _addCompletedSaleMinor(order.payableMinor);
+    // Fulfilment creates no platform funds. Settlement remains a separately
+    // supplied balance, regardless of the order's payment label.
+    workspaceCompletedSalesCount++;
+    final invoice = _createInvoice(completed);
+    _recordWorkspaceActivity(activity);
+    showNotice('Order completed. Invoice ${invoice.id} is ready.');
+    _persistOperationalState('order-completed');
+    notifyListeners();
+    return invoice;
+  }
+
+  Future<void> _requestWorkspaceDeliveryAssignment(String orderId) async {
+    if (hasScopedWorkspaceOrder(orderId)) {
+      showError('Delivery updates for this order are not available yet.');
+      return;
+    }
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty) return;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == orderId;
+    data.pendingOperationalRequests++;
+    workspaceOperationsSyncing = true;
+    notifyListeners();
+    try {
+      final result = await gateway.requestDeliveryAssignment(
+        workspaceId: id,
+        orderId: orderId,
+        address: workspaceOrderAddress,
+        idempotencyKey:
+            'DEL-$id-$orderId-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!current()) return;
+      workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: orderId,
+        partnerName: result.partnerName,
+        vehicleLabel: result.vehicleLabel,
+        eta: result.eta,
+        stage: result.stage,
+      );
+      workspaceOrderActionDeadline = result.eta;
+      showNotice('Delivery partner assigned. Track arrival at your store.');
+    } on WorkGatewayException catch (error) {
+      if (current()) {
+        workspaceOperationsSyncError = error.message;
+        showError(error.message);
+      }
+    } finally {
+      _finishOperationalRequest(data, id, scope);
+    }
+  }
+
+  Future<bool> verifyWorkspaceHandover(String otp) async {
+    if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
+      showError('Handover confirmation for this order is not available yet.');
+      return false;
+    }
+    if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
+    final id = activeWorkspace?.id ?? workspaceId;
+    final order = currentWorkspaceOrder;
+    if (id == null || id.isEmpty || order == null || workspaceHandoverBusy) {
+      return false;
+    }
+    final normalized = otp.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      showError('Enter the 6-digit delivery OTP shared by the customer.');
+      return false;
+    }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    // Capture independent facts before awaiting the provider. A same-ID record
+    // replacement or mutable quantity change is not the submitted handover.
+    final submittedLedger = jsonEncode(order.toLedgerJson());
+    final customer = workspaceOrderCustomer;
+    final address = workspaceOrderAddress;
+    final stage = workspaceOrderStage;
+    final fulfilment = workspaceOrderFulfilment;
+    final needsDelivery = workspaceOrderNeedsDelivery;
+    final assignment = workspaceDeliveryAssignment;
+    // A repeated confirmation may acknowledge an already completed pickup, but
+    // only its original invoice makes that existing completion idempotent.
+    final completedInvoice = order.stage == 'Completed'
+        ? workspaceInvoices
+              .where((invoice) => invoice.orderId == order.id)
+              .firstOrNull
+        : null;
+    bool sameContext() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == order.id;
+    bool current() =>
+        sameContext() &&
+        identical(currentWorkspaceOrder, order) &&
+        (!order.isClosed ||
+            (completedInvoice != null &&
+                identical(
+                  workspaceInvoices
+                      .where((invoice) => invoice.orderId == order.id)
+                      .firstOrNull,
+                  completedInvoice,
+                ))) &&
+        submittedLedger == jsonEncode(order.toLedgerJson()) &&
+        customer == workspaceOrderCustomer &&
+        address == workspaceOrderAddress &&
+        stage == workspaceOrderStage &&
+        fulfilment == workspaceOrderFulfilment &&
+        needsDelivery == workspaceOrderNeedsDelivery &&
+        identical(assignment, workspaceDeliveryAssignment);
+    if (!current()) return false;
+    workspaceHandoverBusy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      await gateway.verifyOrderHandover(
+        workspaceId: id,
+        orderId: order.id,
+        otp: normalized,
+        idempotencyKey:
+            'HANDOVER-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!current()) return false;
+      _completeWorkspaceOrder(
+        order,
+        activity: 'Order handover confirmed by customer OTP.',
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) showError(error.message);
+      return false;
+    } finally {
+      data.workspaceHandoverBusy = false;
+      // A stale reply still releases this request's busy state in its original
+      // current context. It must not notify a different account/Store/order.
+      if (sameContext()) notifyListeners();
+    }
+  }
+
+  Future<bool> verifyWorkspacePickup(String code) async {
+    if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
+      showError('Collection confirmation for this order is not available yet.');
+      return false;
+    }
+    if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
+    final id = activeWorkspace?.id ?? workspaceId;
+    final order = currentWorkspaceOrder;
+    if (id == null ||
+        id.isEmpty ||
+        order == null ||
+        workspaceOrderStage != 'Ready for pickup' ||
+        workspaceHandoverBusy) {
+      return false;
+    }
+    final normalized = code.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      showError('Enter the 6-digit pickup code shared with the customer.');
+      return false;
+    }
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() =>
+        _isStoreScopeCurrent(data, id, scope) &&
+        currentWorkspaceOrderId == order.id;
+    workspaceHandoverBusy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      await gateway.verifyOrderHandover(
+        workspaceId: id,
+        orderId: order.id,
+        otp: normalized,
+        idempotencyKey:
+            'PICKUP-$id-${order.id}-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!current()) return false;
+      _completeWorkspaceOrder(
+        order,
+        activity: 'Customer pickup confirmed with the order pickup code.',
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) {
+        showError(error.message.replaceAll('delivery OTP', 'pickup code'));
+      }
+      return false;
+    } finally {
+      data.workspaceHandoverBusy = false;
+      if (current()) notifyListeners();
+    }
+  }
+
+  Future<void> retryWorkspaceDeliveryAssignment() async {
+    final order = currentWorkspaceOrder;
+    if (order == null ||
+        workspaceOrderStage != 'Delivery requested' ||
+        workspaceOperationsSyncing) {
+      return;
+    }
+    workspaceOperationsSyncError = null;
+    await _requestWorkspaceDeliveryAssignment(order.id);
+  }
+
+  Future<void> requestWorkspaceSettlement({int? amount}) async {
+    if (!workspaceFinanceUsesLegacyReview) {
+      showError(
+        'Settlement requests are not connected yet. No money has moved.',
+      );
+      return;
+    }
+    final eligible = workspaceSettlementEligible;
+    if (eligible <= 0) {
+      showError('No completed-sale balance is available for settlement yet.');
+      return;
+    }
+    final requestedAmount = (amount ?? eligible).clamp(1, eligible).toInt();
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = await gateway.requestSettlement(
+        workspaceId: id,
+        amount: requestedAmount,
+        idempotencyKey: 'SET-$id-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!current()) return;
+      final accepted = result.acceptedAmount.clamp(0, requestedAmount).toInt();
+      workspaceSettlementRequested += accepted;
+      final remaining = workspaceSettlementBalance - accepted;
+      workspaceSettlementBalance = remaining < 0 ? 0 : remaining;
+      workspaceSettlementReference = result.reference;
+      _recordWorkspaceActivity(
+        'Settlement ${result.reference} requested for ₹$accepted.',
+      );
+      showNotice('Settlement request received for processing.');
+      _persistOperationalState('settlement-requested');
+    } on WorkGatewayException catch (error) {
+      if (current()) showError(error.message);
+    } finally {
+      _finishBusyStoreOperation(token);
+    }
+  }
+
+  void addWorkspaceOffer({
+    required String title,
+    required String detail,
+    required DateTime validUntil,
+    String? productId,
+    String audience = 'Customers who allow Store offers',
+    int orderCap = 0,
+  }) {
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Offer publishing is not available yet. Your details are still here.',
+      );
+      return;
+    }
+    workspaceOffers.insert(
+      0,
+      WorkspaceStoreOffer(
+        id: 'OFFER-${DateTime.now().millisecondsSinceEpoch}',
+        title: title.trim(),
+        detail: detail.trim(),
+        validUntil: validUntil,
+        active: true,
+        productId: productId,
+        audience: audience,
+        orderCap: orderCap,
+      ),
+    );
+    _recordWorkspaceActivity('Store offer published: ${title.trim()}.');
+    showNotice('Offer published for your Store customers.');
+    _persistOperationalState('offer-published');
+  }
+
+  Future<bool> createWorkspacePaidRequirement({
+    required String position,
+    required String work,
+    required String candidateRequirement,
+    required String location,
+    required int peopleNeeded,
+    required int paymentAmount,
+    required String paymentFormat,
+    required DateTime deadline,
+  }) async {
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return false;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
+    clearMessages();
+    notifyListeners();
+    try {
+      final reference = await gateway.createPaidRequirement(
+        WorkPaidRequirementSubmission(
+          workspaceId: id,
+          values: {
+            'position': position.trim(),
+            'work': work.trim(),
+            'candidateRequirement': candidateRequirement.trim(),
+            'location': location.trim(),
+            'peopleNeeded': peopleNeeded,
+            'paymentAmount': paymentAmount,
+            'paymentFormat': paymentFormat,
+            'deadline': deadline.toUtc().toIso8601String(),
+            'funded': true,
+            'publisherType': 'workspace',
+          },
+          idempotencyKey:
+              'WORK-REQ-$id-${DateTime.now().microsecondsSinceEpoch}',
+        ),
+      );
+      if (!current()) return false;
+      workspacePaidRequirementReference = reference;
+      workspacePaidRequirementState = WorkspacePaidRequirementState.published;
+      _recordWorkspaceActivity('Paid work $reference published for $position.');
+      showNotice('Paid work published to Earn Today.');
+      _persistOperationalState('paid-work-published');
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) showError(error.message);
+      return false;
+    } finally {
+      _finishBusyStoreOperation(token);
+    }
+  }
+
+  void extendWorkspaceOrder(int minutes) {
+    unawaited(
+      requestWorkspaceOrderTime(currentWorkspaceOrderId ?? '', minutes),
+    );
+  }
+
+  void cancelWorkspaceOrder({String? reason}) {
+    if (!_stockEditAvailable()) return;
+    final scopedId = currentWorkspaceOrderId;
+    if (scopedId != null && hasScopedWorkspaceOrder(scopedId)) {
+      unawaited(
+        submitWorkspaceOrderAction(
+          scopedId,
+          WorkOrderAction.reject,
+          reason: reason,
+        ),
+      );
+      return;
+    }
+    if (hasPendingOrderTime) {
+      showError('Confirm the time request before changing this order.');
+      return;
+    }
+    final order = _ensureCurrentOrderRecord();
+    if (order.stockReserved) _releaseOrderStock(order);
+    workspaceOrderStage = 'Cancelled';
+    final index = workspaceOrders.indexWhere((item) => item.id == order.id);
+    if (index >= 0) {
+      workspaceOrders[index] = order.copyWith(
+        stage: 'Cancelled',
+        stockReserved: false,
+        rejectionReason: reason?.trim(),
+      );
+    }
+    _recordWorkspaceActivity('Customer order cancelled.');
+    showNotice('Order cancelled. Stock remains available.');
+    _persistOperationalState('order-cancelled');
+  }
+
+  bool startNewWorkspaceOrder() {
+    if (counterDraftSubmitting ||
+        hasPendingOrderTime ||
+        busy ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      showNotice(
+        'Wait for the current order update before starting a new bill.',
+      );
+      return false;
+    }
+    _counterSaleGeneration++;
+    _rememberActiveOrder();
+    _clearCollection();
+    if (_counterRecovery?.record?.stage == WorkspaceCounterDraftStage.retired) {
+      _counterRecovery?.customerInput = null;
+    }
+    workspaceOrderCustomer = '';
+    workspaceOrderItems = '';
+    workspaceOrderAmount = '';
+    workspaceOrderNeedsDelivery = false;
+    workspaceOrderSource = 'Counter';
+    workspaceOrderFulfilment = 'At the shop';
+    workspaceOrderPayment = 'Cash';
+    workspaceOrderAddress = '';
+    workspaceOrderBillingDetails = const WorkspaceBillingDetails();
+    _storeData.counterDiscount = const WorkspaceBillDiscount.none();
+    workspaceOrderStage = 'No order';
+    workspaceOrderExtraMinutes = 0;
+    workspaceOrderActionDeadline = null;
+    workspacePackedProductIds.clear();
+    workspaceDeliveryAssignment = null;
+    currentWorkspaceOrderId = null;
+    workspaceOrderQuantities.clear();
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  void _recordWorkspaceStockMovement({
+    required WorkspaceCatalogueItem product,
+    required WorkspaceStockMovementKind kind,
+    required int quantityDelta,
+    required String reason,
+    WorkspaceStockReferenceKind? referenceKind,
+    String? referenceId,
+  }) {
+    if (quantityDelta == 0) return;
+    workspaceStockMovements.insert(
+      0,
+      WorkspaceStockMovement(
+        id: 'STK-${DateTime.now().microsecondsSinceEpoch}-${++_storeData.stockMovementSequence}',
+        productId: product.id,
+        productLabel: '${product.title} · ${product.pack}',
+        kind: kind,
+        quantityDelta: quantityDelta,
+        reason: reason,
+        occurredAt: DateTime.now(),
+        referenceKind: referenceKind,
+        referenceId: referenceId,
+      ),
+    );
+  }
+
+  bool addOrUpdateWorkspaceProduct(
+    WorkspaceCatalogueItem product, {
+    String stockReason = 'Product quantity updated',
+    WorkspaceStockEntryMethod? stockEntryMethod,
+  }) {
+    if (!_stockEditAvailable()) return false;
+    final index = workspaceCatalogueItems.indexWhere(
+      (item) => item.id == product.id,
+    );
+    if (index == -1) {
+      product = _withOriginalStockEntry(product, stockEntryMethod);
+      workspaceCatalogueItems.add(product);
+      _recordWorkspaceActivity('${product.title} added to your catalogue.');
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.openingStock,
+        quantityDelta: product.stockMode == WorkspaceStockMode.exactQuantity
+            ? product.stock : 0,
+        reason: 'Opening quantity',
+      );
+    } else {
+      final previous = workspaceCatalogueItems[index];
+      if (previous.stockEntry != null) {
+        product = product.copyWith(stockEntry: previous.stockEntry);
+      } else if (product.stockEntry != null) {
+        throw const FormatException('Existing stock origin cannot be inferred.');
+      }
+      workspaceCatalogueItems[index] = product;
+      _recordWorkspaceActivity('${product.title} price and stock updated.');
+      _recordWorkspaceStockMovement(
+        product: product,
+        kind: WorkspaceStockMovementKind.adjustment,
+        quantityDelta: product.stock - previous.stock,
+        reason: stockReason,
+      );
+    }
+    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    if (workspaceCatalogueItems.isNotEmpty) {
+      final first = workspaceCatalogueItems.first;
+      retailerQuantity = first.stock;
+      retailerBuyPrice = first.purchasePrice;
+      retailerSellPrice = first.sellingPrice;
+    }
+    showNotice(
+      product.publicListing
+          ? '${product.title} saved. Publication checks are still required.'
+          : '${product.title} saved for store use only.',
+    );
+    _persistOperationalState('catalogue-updated');
+    _queueInventorySave();
+    return true;
+  }
+
+  bool importWorkspaceProducts(
+    List<WorkspaceCatalogueItem> products, {
+    bool addOnly = false,
+    WorkspaceStockEntryMethod? stockEntryMethod,
+  }) {
+    if (!_stockEditAvailable()) return false;
+    if (addOnly) {
+      // Validate the complete local batch before recording any inventory or
+      // movement. CSV Add products must never act as an implicit stock update.
+      final ids = workspaceCatalogueItems.map((p) => p.id).toSet();
+      final skus = workspaceCatalogueItems
+          .map((p) => p.sku.trim().toLowerCase())
+          .toSet();
+      final barcodes = workspaceCatalogueItems
+          .map((p) => p.barcode.trim())
+          .where((b) => b.isNotEmpty)
+          .toSet();
+      final identities = workspaceCatalogueItems
+          .map(WorkspaceProductImport.identity)
+          .toSet();
+      for (final product in products) {
+        final issue = validateWorkspaceProductValues(
+          title: product.title.trim(),
+          brand: product.brand.trim(),
+          pack: product.pack.trim(),
+          category: product.categoryId.trim(),
+          sku: product.sku.trim(),
+          purchase: product.purchasePrice,
+          selling: product.sellingPrice,
+          stock: product.stock,
+          mrp: product.mrp,
+          lowStockThreshold: product.lowStockThreshold,
+          minimumOrder: product.minimumOrder,
+          delivery: product.deliveryPromise.trim(),
+        );
+        if (issue != null) throw FormatException('${product.sku}: $issue');
+        if (product.id.trim().isEmpty || product.publicListing) {
+          throw const FormatException(
+            'Imported products need an identity and must be saved privately first.',
+          );
+        }
+        final sku = product.sku.trim().toLowerCase();
+        final barcode = product.barcode.trim();
+        final identity = WorkspaceProductImport.identity(product);
+        if (ids.contains(product.id) ||
+            skus.contains(sku) ||
+            (barcode.isNotEmpty && barcodes.contains(barcode)) ||
+            identities.contains(identity)) {
+          throw FormatException(
+            '${product.sku}: product already exists in Store stock or this batch. '
+            'No products were saved. Review the import again.',
+          );
+        }
+        ids.add(product.id);
+        skus.add(sku);
+        if (barcode.isNotEmpty) barcodes.add(barcode);
+        identities.add(identity);
+      }
+    }
+    final byId = <String, int>{};
+    final bySku = <String, int>{};
+    for (var i = 0; i < workspaceCatalogueItems.length; i++) {
+      byId.putIfAbsent(workspaceCatalogueItems[i].id, () => i);
+      bySku.putIfAbsent(workspaceCatalogueItems[i].sku, () => i);
+    }
+    // Prepare every snapshot before mutation. JSON/generic import is unknown;
+    // only the explicit CSV-only caller supplies csv after reviewed row fixes.
+    final prepared = <WorkspaceCatalogueItem>[];
+    for (var product in products) {
+      final previous = workspaceCatalogueItems.where((p) =>
+          p.id == product.id || p.sku == product.sku).firstOrNull;
+      if (previous?.stockEntry != null) {
+        if (previous!.id != product.id) {
+          throw const FormatException('Keep the original Store product identity.');
+        }
+        product = product.copyWith(stockEntry: previous.stockEntry);
+      } else if (previous != null && product.stockEntry != null) {
+        throw const FormatException('Existing stock origin cannot be inferred.');
+      } else if (previous == null) {
+        product = _withOriginalStockEntry(product, stockEntryMethod);
+      }
+      prepared.add(product);
+    }
+    for (final product in prepared) {
+      final idIndex = byId[product.id], skuIndex = bySku[product.sku];
+      final index = idIndex == null
+          ? skuIndex ?? -1
+          : skuIndex == null
+          ? idIndex
+          : (idIndex < skuIndex ? idIndex : skuIndex);
+      if (index < 0) {
+        workspaceCatalogueItems.add(product);
+        byId[product.id] = workspaceCatalogueItems.length - 1;
+        bySku[product.sku] = workspaceCatalogueItems.length - 1;
+        _recordWorkspaceStockMovement(
+          product: product,
+          kind: WorkspaceStockMovementKind.goodsReceived,
+          quantityDelta: product.stockMode == WorkspaceStockMode.exactQuantity
+              ? product.stock : 0,
+          reason: 'Imported product quantity',
+        );
+      } else {
+        final previous = workspaceCatalogueItems[index];
+        workspaceCatalogueItems[index] = product;
+        if (previous.id != product.id) byId.remove(previous.id);
+        if (previous.sku != product.sku) bySku.remove(previous.sku);
+        byId[product.id] = index;
+        bySku[product.sku] = index;
+        _recordWorkspaceStockMovement(
+          product: product,
+          kind: WorkspaceStockMovementKind.goodsReceived,
+          quantityDelta: product.stock - previous.stock,
+          reason: 'Imported product quantity',
+        );
+      }
+    }
+    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    _recordWorkspaceActivity('${products.length} catalogue products imported.');
+    showNotice('${products.length} products imported into your catalogue.');
+    _persistOperationalState('catalogue-imported');
+    _queueInventorySave();
+    return true;
+  }
+
+  WorkspaceCatalogueItem _withOriginalStockEntry(
+    WorkspaceCatalogueItem product,
+    WorkspaceStockEntryMethod? method,
+  ) {
+    if (method == null) {
+      if (product.stockEntry != null) {
+        throw const FormatException('Use the original stock-entry flow.');
+      }
+      return product; // No guess for legacy/generic/purchase product setup.
+    }
+    final at = DateTime.now().toUtc();
+    final entry = WorkspaceStockEntry(
+      method: method, productId: product.id, sku: product.sku, pack: product.pack,
+      stockMode: product.stockMode,
+      quantity: product.stockMode == WorkspaceStockMode.exactQuantity
+          ? product.stock : null,
+      purchasePriceRupees: product.purchasePrice,
+      recordedAt: at, stockAsOf: at,
+      packMeasure: product.packMeasure,
+    );
+    if (!entry.valid) {
+      throw const FormatException('Review the original stock quantity and purchase price.');
+    }
+    return product.copyWith(stockEntry: entry);
+  }
+
+  bool retireWorkspaceProduct(String productId) {
+    if (!_stockEditAvailable()) return false;
+    final index = workspaceCatalogueItems.indexWhere(
+      (product) => product.id == productId,
+    );
+    if (index < 0) return false;
+    final product = workspaceCatalogueItems[index];
+    if (!product.counterSaleAllowed) return true;
+    workspaceCatalogueItems[index] = product.copyWith(
+      counterSaleEnabled: false,
+    );
+    _recordWorkspaceActivity('${product.title} paused for Counter sale.');
+    showNotice('Counter sale paused. Stock and public visibility unchanged.');
+    _persistOperationalState('catalogue-retired');
+    _queueInventorySave();
+    return true;
+  }
+
+  bool restoreWorkspaceProduct(String productId) {
+    if (!_stockEditAvailable()) return false;
+    final index = workspaceCatalogueItems.indexWhere((p) => p.id == productId);
+    if (index < 0) return false;
+    final product = workspaceCatalogueItems[index];
+    if (product.counterSaleAllowed) return true;
+    workspaceCatalogueItems[index] = product.copyWith(
+      counterSaleEnabled: true,
+      available: product.counterSaleEnabled == null ? true : product.available,
+    );
+    _recordWorkspaceActivity('${product.title} restored for Counter sale.');
+    showNotice(product.stock > 0 ||
+            product.stockMode == WorkspaceStockMode.availabilityOnly
+        ? 'Counter sale resumed. Public visibility unchanged.'
+        : 'Counter sale resumed. Add stock before selling. Public visibility unchanged.');
+    _persistOperationalState('catalogue-restored');
+    _queueInventorySave();
+    return true;
+  }
+
+  bool updateWorkspaceStock({
+    required String productId,
+    required int quantity,
+    required String reason,
+    WorkspaceStockMovementKind kind = WorkspaceStockMovementKind.adjustment,
+  }) {
+    if (!_stockEditAvailable()) return false;
+    final cleanReason = reason.trim();
+    if (cleanReason.isEmpty) {
+      showError('Choose why the quantity changed.');
+      return false;
+    }
+    final index = workspaceCatalogueItems.indexWhere(
+      (product) => product.id == productId,
+    );
+    if (index < 0) {
+      showError('This product is no longer in your catalogue.');
+      return false;
+    }
+    final product = workspaceCatalogueItems[index];
+    final nextQuantity = quantity.clamp(0, 1 << 31).toInt();
+    workspaceCatalogueItems[index] = product.copyWith(
+      stock: nextQuantity,
+      available: product.stockMode == WorkspaceStockMode.availabilityOnly
+          ? product.available
+          : nextQuantity > 0,
+    );
+    _recordWorkspaceStockMovement(
+      product: product,
+      kind: kind,
+      quantityDelta: nextQuantity - product.stock,
+      reason: cleanReason,
+    );
+    _recordWorkspaceActivity('${product.title} quantity updated.');
+    showNotice('${product.title} quantity is now $nextQuantity.');
+    _persistOperationalState('stock-adjusted');
+    notifyListeners();
+    return true;
+  }
+
+  void adjustWorkspaceOrderQuantity(String productId, int change) {
+    if (counterDraftEditingBlocked) return;
+    if (!_canEditCounterOrder(allowCompletedInvoice: false)) return;
+    final product = workspaceCatalogueItems
+        .where((item) => item.id == productId)
+        .firstOrNull;
+    if (product == null) return;
+    if (change > 0 && !product.canSellAtCounter) {
+      showError('This product is not available in your store inventory.');
+      return;
+    }
+    final current = workspaceOrderQuantities[productId] ?? 0;
+    final maximum = product.stockMode == WorkspaceStockMode.availabilityOnly
+        ? 99
+        : product.stock;
+    final next = (current + change).clamp(0, maximum);
+    if (next == 0) {
+      workspaceOrderQuantities.remove(productId);
+    } else {
+      workspaceOrderQuantities[productId] = next;
+    }
+    if (_counterRecovery?.loaded == true && currentWorkspaceOrderId == null) {
+      unawaited(saveWorkspaceCounterDraft());
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void _recordWorkspaceActivity(String message) {
+    workspaceActivity.insert(
+      0,
+      WorkspaceActivityEntry(message: message, time: DateTime.now()),
+    );
+    if (workspaceActivity.length > 8) workspaceActivity.removeLast();
+  }
+
+  void setOpportunityLocationFilters({
+    String? city,
+    String? area,
+    String? pincode,
+  }) {
+    selectedCity = city?.trim() ?? '';
+    selectedArea = area?.trim() ?? '';
+    selectedPincode = pincode?.trim() ?? '';
+    clearMessages();
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _counterDraftRecovery.clear();
+    _workspaceApplications.clear();
+    _clearCollection();
+    for (final data in {..._storeDataById.values, _storeData}) {
+      final operations = data.orderOperations;
+      if (operations != null && !operations.isDisposed) operations.dispose();
+    }
+    _storeDataById.clear();
+    _storeData = _StoreOperationalData();
+    _busyStoreOperation = null;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  void clearOpportunityFilters() {
+    selectedCity = '';
+    selectedArea = '';
+    selectedPincode = '';
+    clearMessages();
+    notifyListeners();
+  }
+
   Future<void> refreshFeed() async {
-    await _run(gateway.loadFeed, success: 'Verified work is up to date.');
+    if (busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      return;
+    }
+    final requestedScope = _contactAccountScope;
+    bool current() => !_disposed && requestedScope == _contactAccountScope;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final records = await gateway.loadFeed();
+      if (!current()) return;
+      _lastWorkspaceFeedEmpty = records.isEmpty;
+      _restoreWorkspaceState(records);
+      initialWorkspaceStateLoaded = true;
+      noticeMessage = 'Work opportunities refreshed.';
+    } on WorkGatewayException catch (error) {
+      if (current()) errorMessage = error.message;
+    } finally {
+      busy = false;
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  Future<void> loadInitialWorkspaceState() async {
+    if (initialWorkspaceStateLoaded || busy || _loadingWorkspaceEntry) return;
+    final account = _contactAccountScope;
+    _loadingWorkspaceEntry = true;
+    try {
+      await refreshFeed();
+      if (_disposed || account != _contactAccountScope) return;
+      if (initialWorkspaceStateLoaded &&
+          _lastWorkspaceFeedEmpty &&
+          activeWorkspace == null &&
+          _reviewStoreRecoveryEnabled) {
+        // The feed read is finished. Bind the saved review Store using the
+        // normal controller gates, without bypassing the busy-operation guard.
+        initialWorkspaceStateLoaded = false;
+        _lastWorkspaceFeedEmpty = false;
+        await _restoreSelectedReviewStore();
+        if (_disposed || account != _contactAccountScope) return;
+        initialWorkspaceStateLoaded = true;
+      }
+      if (noticeMessage == 'Work opportunities refreshed.') clearMessages();
+    } on WorkGatewayException catch (error) {
+      if (!_disposed && account == _contactAccountScope) {
+        errorMessage = error.message;
+      }
+    } finally {
+      _loadingWorkspaceEntry = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   void toggleOpportunity(String id) {
@@ -150,10 +11177,14 @@ class WorkSession extends ChangeNotifier {
   }
 
   void openOpportunity(String id) {
-    selectedOpportunity = workOpportunities.firstWhere(
+    final opportunity = workOpportunities.firstWhere(
       (opportunity) => opportunity.id == id,
       orElse: () => workOpportunities.first,
     );
+    selectedOpportunity = opportunity;
+    applicationId = applicationIdsByOpportunity[opportunity.id];
+    appliedOpportunityId = applicationId == null ? null : opportunity.id;
+    withdrawnApplicationId = null;
     expandedTerms.clear();
     clearMessages();
   }
@@ -177,8 +11208,18 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final existingApplicationId = applicationIdsByOpportunity[opportunity.id];
+    if (existingApplicationId != null) {
+      applicationId = existingApplicationId;
+      appliedOpportunityId = opportunity.id;
+      errorMessage = null;
+      noticeMessage =
+          'Your application for this opportunity is already submitted.';
+      notifyListeners();
+      return true;
+    }
     savedOpportunity = opportunity;
-    if (!hasVerifiedWorkspace) {
+    if (opportunity.requiresWorkspace && !hasVerifiedWorkspace) {
       noticeMessage = 'Opportunity saved. Start My Work, then return to apply.';
       errorMessage = null;
       notifyListeners();
@@ -186,10 +11227,39 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        applicationId = await gateway.apply(opportunity.id);
+        final createdApplicationId = await gateway.apply(opportunity.id);
+        applicationIdsByOpportunity[opportunity.id] = createdApplicationId;
+        applicationId = createdApplicationId;
+        appliedOpportunityId = opportunity.id;
+        withdrawnApplicationId = null;
       },
       success:
           'Application sent. The opportunity, terms and payout remain saved.',
+    );
+  }
+
+  Future<bool> withdrawSelectedOpportunity() async {
+    final opportunity = selectedOpportunity;
+    final currentApplicationId = opportunity == null
+        ? null
+        : applicationIdsByOpportunity[opportunity.id];
+    if (opportunity == null || currentApplicationId == null) {
+      errorMessage =
+          'There is no application to withdraw for this opportunity.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    return _runBool(
+      () async {
+        await gateway.withdraw(currentApplicationId, opportunity.id);
+        applicationIdsByOpportunity.remove(opportunity.id);
+        applicationId = null;
+        appliedOpportunityId = null;
+        withdrawnApplicationId = currentApplicationId;
+      },
+      success:
+          'Application withdrawn. You can apply again while this opportunity remains available.',
     );
   }
 
@@ -199,7 +11269,228 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startAnotherWork() {
+  Map<String, Object?> _applicationDetails() => {
+    'profileId': selectedProfile?.id,
+    'personName': authorizedPersonName,
+    'relationship': businessRelationship,
+    'phone': primaryMobile,
+    'email': contactEmail,
+    'alternate': alternateMobile,
+    'name': workName,
+    'area': workArea,
+    'activity': primaryActivity,
+    'proofs': Map<String, String>.unmodifiable(addedProofs),
+    'files': {
+      if (_workspaceApplications[_workspaceApplicationId]?.details['files']
+          case final Map previous)
+        for (final entry in previous.entries)
+          if (entry.key is String &&
+              entry.value is Map &&
+              addedProofs[entry.key] != null &&
+              (entry.value as Map)['reference'] == addedProofs[entry.key] &&
+              !pickedProofs.containsKey(entry.key))
+            entry.key as String: entry.value,
+      for (final entry in pickedProofs.entries)
+        if (addedProofs.containsKey(entry.key) &&
+            entry.value.recoveryRecord != null)
+          entry.key: {
+            ...entry.value.recoveryRecord!,
+            'reference': addedProofs[entry.key],
+          },
+    },
+    'caseId': reviewCaseId,
+    'plan': subscriptionPlan,
+    'correction': reviewCorrectionDraft,
+    'submissionKey': _profileSubmissionKey,
+    'editedFields': _editedDraftFields.toList(),
+    'gstin': gstin,
+    'gstReference': gstProofReference,
+    'gstReminder': gstReminder,
+  };
+
+  void _rememberWorkspaceApplication() {
+    if (_disposed ||
+        selectedProfile == null ||
+        remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+        remoteReviewStatus == WorkRemoteReviewStatus.live ||
+        (_workspaceApplicationId == null &&
+            {
+              WorkReviewStage.approved,
+              WorkReviewStage.live,
+              WorkReviewStage.setup,
+            }.contains(reviewStage))) {
+      return;
+    }
+    _workspaceApplicationId ??=
+        'draft-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
+    _workspaceApplications[_workspaceApplicationId!] =
+        _WorkspaceApplicationDraft(
+          id: _workspaceApplicationId!,
+          scope: _contactAccountScope,
+          details: Map.unmodifiable(_applicationDetails()),
+          submitted: submittedProfile,
+          files: Map.unmodifiable(pickedProofs),
+          confirmed: {
+            for (final channel in WorkContactChannel.values)
+              if (workspaceContactVerified(channel)) channel,
+          },
+          status: remoteReviewStatus,
+          reason: reviewReason,
+          needsStatusRefresh: reviewStatusNeedsRefresh,
+        );
+  }
+
+  /// Called before opening the existing chooser; does not grant Store access.
+  void retainWorkspaceApplication() => _queueContactDraft();
+
+  List<({String id, String name, String status, String profileLabel})>
+  get savedWorkspaceApplications => [
+    for (final application in _workspaceApplications.values.toList().reversed)
+      if (application.scope == _contactAccountScope)
+        (
+          id: application.id,
+          name:
+              (application.details['name'] as String?)?.trim().isNotEmpty ==
+                  true
+              ? application.details['name'] as String
+              : 'Your Workspace',
+          profileLabel:
+              workProfiles
+                  .where(
+                    (profile) => profile.id == application.details['profileId'],
+                  )
+                  .firstOrNull
+                  ?.label ??
+              'Workspace',
+          status: application.caseId == null
+              ? 'Continue setup'
+              : application.needsStatusRefresh
+              ? 'Application saved'
+              : switch (application.status) {
+                  WorkRemoteReviewStatus.rejected => 'Not approved',
+                  WorkRemoteReviewStatus.suspended => 'Workspace unavailable',
+                  _ =>
+                    application.reason?.trim().isNotEmpty == true
+                        ? 'More information needed'
+                        : 'Under review',
+                },
+        ),
+  ];
+
+  bool get _canChangeWorkspaceApplication =>
+      !busy &&
+      !workspaceOperationsSyncing &&
+      !workspaceHandoverBusy &&
+      !hasPendingOrderTime &&
+      _collection?.busy != true &&
+      _collection?.needsReconciliation != true;
+
+  bool resumeWorkspaceApplication(String id) {
+    final application = _workspaceApplications[id];
+    if (application == null || application.scope != _contactAccountScope) {
+      showError('This application is unavailable. Refresh your Workspaces.');
+      return false;
+    }
+    if (!_canChangeWorkspaceApplication) {
+      showNotice('Finishing your current update. Please wait.');
+      return false;
+    }
+    _rememberWorkspaceApplication();
+    _restoreWorkspaceApplication(application);
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  String get workspaceApplicationRoute =>
+      reviewCaseId != null || workspaceContactsReady
+      ? '/app/work/workspace/proof'
+      : '/app/work/workspace/contact';
+
+  void _restoreWorkspaceApplication(_WorkspaceApplicationDraft application) {
+    final data = application.details;
+    String value(String key) => data[key] is String ? data[key] as String : '';
+    _clearWorkspaceApplication();
+    _workspaceApplicationId = application.id;
+    selectedProfile = workProfiles
+        .where((profile) => profile.id == data['profileId'])
+        .firstOrNull;
+    selectedFamilyId = selectedProfile?.familyId;
+    authorizedPersonName = value('personName');
+    businessRelationship = value('relationship');
+    primaryMobile = value('phone');
+    contactEmail = value('email');
+    alternateMobile = value('alternate');
+    workName = value('name');
+    workArea = value('area');
+    primaryActivity = value('activity');
+    final allowed = selectedWorkspaceDocuments.map((proof) => proof.id).toSet();
+    if (data['proofs'] case final Map proofs) {
+      for (final entry in proofs.entries) {
+        if (entry.key is String &&
+            entry.value is String &&
+            allowed.contains(entry.key)) {
+          addedProofs[entry.key as String] = entry.value as String;
+        }
+      }
+    }
+    pickedProofs.addEntries(
+      application.files.entries.where(
+        (entry) => addedProofs.containsKey(entry.key),
+      ),
+    );
+    if (data['files'] case final Map files) {
+      if (files.keys.any(
+        (key) => addedProofs.containsKey(key) && !pickedProofs.containsKey(key),
+      )) {
+        documentRecoveryMessage =
+            'A saved document could not be reopened. Add it again to preview it.';
+      }
+    }
+    primaryMobileVerified = application.confirmed.contains(
+      WorkContactChannel.primaryMobile,
+    );
+    contactEmailVerified = application.confirmed.contains(
+      WorkContactChannel.email,
+    );
+    alternateVerified = application.confirmed.contains(
+      WorkContactChannel.alternateMobile,
+    );
+    _editedDraftFields
+      ..clear()
+      ..addAll((data['editedFields'] as List? ?? const []).whereType<String>());
+    submittedProfile = application.submitted;
+    reviewCaseId = application.caseId;
+    subscriptionPlan = value('plan').isEmpty ? 'free' : value('plan');
+    reviewCorrectionDraft = data['correction'] == true && reviewCaseId != null;
+    _profileSubmissionKey = value('submissionKey').isEmpty
+        ? null
+        : value('submissionKey');
+    remoteReviewStatus = application.status;
+    reviewReason = application.reason;
+    reviewStatusNeedsRefresh = application.needsStatusRefresh;
+    reviewStage = reviewCaseId == null
+        ? WorkReviewStage.drafting
+        : WorkReviewStage.gstPending;
+    gstin = value('gstin');
+    gstProofReference = value('gstReference').isEmpty
+        ? null
+        : value('gstReference');
+    gstAttachmentAdded = gstProofReference != null;
+    gstReminder = data['gstReminder'] == true;
+  }
+
+  void _clearWorkspaceApplication() {
+    _workspaceApplicationId = null;
+    _removedProofs.clear();
+    _contactEditOrigins.clear();
+    for (final channel in WorkContactChannel.values) {
+      _invalidateContactChallenge(channel);
+    }
+    recoveredDocumentStep = false;
+    reviewStatusNeedsRefresh = false;
+    documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
     alternateMobile = '';
@@ -208,83 +11499,723 @@ class WorkSession extends ChangeNotifier {
     workName = '';
     workArea = '';
     primaryActivity = '';
-    addedProofs
-      ..clear()
-      ..['personal-kyc'] = 'ACCOUNT-KYC';
+    addedProofs.clear();
+    pickedProofs.clear();
+    businessRelationship = '';
+    submittedProfile = null;
     declarationAccepted = false;
     reviewCaseId = null;
-    workspaceId = null;
+    workspaceId = activeWorkspace?.id;
+    subscriptionPlan = 'free';
+    reviewReason = null;
+    remoteReviewStatus = null;
+    reviewCorrectionDraft = false;
+    _profileSubmissionKey = null;
     reviewStage = WorkReviewStage.drafting;
     gstReminder = false;
     gstin = '';
     gstAttachmentAdded = false;
+    gstProofReference = null;
+  }
+
+  bool startAnotherWork() {
+    if (!_canChangeWorkspaceApplication) {
+      showNotice('Finishing your current update. Please wait.');
+      return false;
+    }
+    _rememberWorkspaceApplication();
+    _clearWorkspaceApplication();
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
+    return true;
   }
 
   void selectFamily(String familyId) {
+    if (busy) return;
+    _removedProofs.clear();
+    if (selectedFamilyId != familyId) {
+      documentRecoveryMessage = _documentRecoveryProofId = null;
+    }
     selectedFamilyId = familyId;
     selectedProfile = null;
-    alternateOtpSent = false;
-    alternateVerified = false;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
 
   void selectProfile(String profileId) {
-    selectedProfile = workProfiles.firstWhere(
+    if (busy) return;
+    final nextProfile = workProfiles.firstWhere(
       (profile) => profile.id == profileId,
     );
+    if (selectedProfile?.id != nextProfile.id) {
+      if (reviewCaseId == null) _profileSubmissionKey = null;
+      _removedProofs.clear();
+      documentRecoveryMessage = _documentRecoveryProofId = null;
+      addedProofs.removeWhere((id, _) => id != 'personal-kyc');
+      declarationAccepted = false;
+    }
+    selectedProfile = nextProfile;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
 
   void changeFamily() {
+    if (busy) return;
+    _removedProofs.clear();
+    documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+  }
+
+  void hydrateAccountSnapshot(WorkAccountSnapshot snapshot) {
+    accountDisplayName = snapshot.displayName.trim();
+    if (authorizedPersonName.isEmpty &&
+        !_editedDraftFields.contains('personName')) {
+      authorizedPersonName = accountDisplayName;
+    }
+    connectedProviderLabel = snapshot.providerLabel.trim();
+    connectedProviderAccount = snapshot.providerAccount.trim();
+    if (primaryMobile.isEmpty && !_editedDraftFields.contains('phone')) {
+      final digits = snapshot.mobile.replaceAll(RegExp(r'\D'), '');
+      final normalized = digits.length > 10
+          ? digits.substring(digits.length - 10)
+          : digits;
+      if (normalized.length == 10) {
+        primaryMobile = normalized;
+        primaryMobileVerified = snapshot.mobileConfirmed;
+      }
+    }
+    if (contactEmail.isEmpty && !_editedDraftFields.contains('email')) {
+      final normalized = snapshot.email.trim().toLowerCase();
+      if (_validEmail(normalized)) {
+        contactEmail = normalized;
+        contactEmailVerified = snapshot.emailConfirmed;
+      }
+    }
+    final phone = snapshot.mobile.replaceAll(RegExp(r'\D'), '');
+    final accountPhone = phone.length > 10
+        ? phone.substring(phone.length - 10)
+        : phone;
+    if (primaryMobile.isNotEmpty &&
+        primaryMobile == accountPhone &&
+        snapshot.mobileConfirmed) {
+      primaryMobileVerified = true;
+    }
+    if (contactEmail.isNotEmpty &&
+        contactEmail == snapshot.email.trim().toLowerCase() &&
+        snapshot.emailConfirmed) {
+      contactEmailVerified = true;
+    }
+  }
+
+  bool get workspaceContactsReady =>
+      normalizeWorkspaceMobile(primaryMobile) != null &&
+      primaryMobileVerified &&
+      _validEmail(contactEmail) &&
+      contactEmailVerified &&
+      (alternateMobile.isEmpty ||
+          (normalizeWorkspaceMobile(alternateMobile) != null &&
+              alternateVerified));
+
+  void savePersonName(String value) {
+    _editedDraftFields.add('personName');
+    if (authorizedPersonName != value.trim()) declarationAccepted = false;
+    authorizedPersonName = value.trim();
+    _queueContactDraft();
+  }
+
+  void saveBusinessRelationship(String value) {
+    if (businessRelationship != value) declarationAccepted = false;
+    businessRelationship = value;
+    _queueContactDraft();
+    notifyListeners();
+  }
+
+  void _queueContactDraft() {
+    final store = contactDraftStore;
+    final scope = store?.accountScope;
+    if (_disposed || (_contactDraftScopeKnown && scope != _contactDraftScope)) {
+      return;
+    }
+    _rememberWorkspaceApplication();
+    if (store == null || scope == null || _disposed) return;
+    if (_contactDraftScopeKnown && scope != _contactDraftScope) return;
+    _contactDraftScopeKnown = true;
+    _contactDraftScope = scope;
+    _contactDraftRevision++;
+    _queuedContactDraft = (
+      scope: scope,
+      draft: {
+        'version': 2,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+        'profileId': selectedProfile?.id,
+        'personName': authorizedPersonName,
+        'relationship': businessRelationship,
+        'phone': primaryMobile,
+        'email': contactEmail,
+        'alternate': alternateMobile,
+        'name': workName,
+        'area': workArea,
+        'activity': primaryActivity,
+        'editedFields': _editedDraftFields.toList(),
+        'dismissedWorkspaceWelcomes': _seenApprovalMessages.toList(),
+        'workspaceApplicationId': _workspaceApplicationId,
+        'applications': [
+          for (final application in _workspaceApplications.values)
+            if (application.scope == scope)
+              {
+                'id': application.id,
+                'details': application.details,
+                if (application.submitted != null)
+                  'submitted': _savedSubmission(application.submitted!),
+              },
+        ],
+      },
+    );
+    unawaited(flushContactDraft());
+  }
+
+  Map<String, Object?> _savedSubmission(WorkProfileSubmission value) => {
+    'profileId': value.profileId,
+    'personName': value.authorizedPersonName,
+    'relationship': value.businessRelationship,
+    'phone': value.primaryMobile,
+    'email': value.email,
+    'alternate': value.alternateMobile,
+    'name': value.name,
+    'area': value.area,
+    'activity': value.primaryActivity,
+    'proofs': value.proofReferences,
+    'submissionKey': value.idempotencyKey,
+  };
+
+  WorkProfileSubmission? _readSavedSubmission(Object? raw, String profileId) {
+    if (raw is! Map || raw['profileId'] != profileId) return null;
+    final profile = workProfiles.where((p) => p.id == profileId).firstOrNull;
+    if (profile == null) return null;
+    String value(String key) => raw[key] is String ? raw[key] as String : '';
+    final proofs = <String, String>{};
+    if (raw['proofs'] case final Map references) {
+      for (final entry in references.entries) {
+        if (entry.key is String && entry.value is String) {
+          proofs[entry.key as String] = entry.value as String;
+        }
+      }
+    }
+    return WorkProfileSubmission(
+      familyId: profile.familyId,
+      profileId: profile.id,
+      authorizedPersonName: value('personName'),
+      businessRelationship: value('relationship'),
+      name: value('name'),
+      area: value('area'),
+      primaryActivity: value('activity'),
+      primaryMobile: value('phone'),
+      email: value('email'),
+      alternateMobile: value('alternate'),
+      alternateMobileVerified: false,
+      proofReferences: Map.unmodifiable(proofs),
+      idempotencyKey: value('submissionKey'),
+    );
+  }
+
+  /// Coalesces edits without blocking typing. Verification secrets are excluded.
+  void retryContactDraftSave() => _queueContactDraft();
+
+  Future<void> flushContactDraft() {
+    if (_contactDraftWrite != null) return _contactDraftWrite!;
+    if (_queuedContactDraft == null || contactDraftStore == null) {
+      return Future.value();
+    }
+    return _contactDraftWrite = _drainContactDraft().whenComplete(() {
+      _contactDraftWrite = null;
+      if (_queuedContactDraft != null) unawaited(flushContactDraft());
+    });
+  }
+
+  Future<void> _drainContactDraft() async {
+    final store = contactDraftStore!;
+    while (_queuedContactDraft != null) {
+      final pending = _queuedContactDraft!;
+      _queuedContactDraft = null;
+      try {
+        await store.save(pending.scope, pending.draft);
+        if (pending.scope == store.accountScope &&
+            contactDraftMessage != null) {
+          contactDraftMessage = null;
+          notifyListeners();
+        }
+      } on Object {
+        if (!_disposed && pending.scope == store.accountScope) {
+          contactDraftMessage =
+              'Your changes could not be saved on this phone. Keep this page open and try again.';
+          notifyListeners();
+        }
+      }
+    }
+  }
+
+  Future<void> _recoverContactDraft(bool accountReady) async {
+    final store = contactDraftStore;
+    if (store == null) return;
+    final scope = accountReady ? store.accountScope : null;
+    if (!_contactDraftScopeKnown || scope != _contactDraftScope) {
+      if (_contactDraftScopeKnown) {
+        _workspaceApplications.clear();
+        _workspaceApplicationId = null;
+        reviewStatusNeedsRefresh = false;
+        _clearCollection();
+        authorizedPersonName = businessRelationship = '';
+        accountDisplayName = connectedProviderLabel = connectedProviderAccount =
+            '';
+        workName = workArea = primaryActivity = '';
+        primaryMobile = contactEmail = alternateMobile = '';
+        primaryMobileVerified = contactEmailVerified = alternateVerified =
+            false;
+        primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+        selectedProfile = null;
+        selectedFamilyId = null;
+        addedProofs.clear();
+        pickedProofs.clear();
+        _removedProofs.clear();
+        submittedProfile = null;
+        _approvalWelcome = null;
+        _seenApprovalMessages.clear();
+        _profileSubmissionKey = null;
+        activeWorkspace = null;
+        _storeDataById.clear();
+        _storeData = _StoreOperationalData();
+        _selectedReviewSeed = null;
+        _reviewSelectionSave = null;
+        _busyStoreOperation = null;
+        busy = false;
+        otherWorkspaces.clear();
+        initialWorkspaceStateLoaded = false;
+        reviewCaseId = workspaceId = reviewReason = null;
+        remoteReviewStatus = null;
+        reviewCorrectionDraft = false;
+        reviewStage = WorkReviewStage.none;
+        declarationAccepted = false;
+        _contactEditOrigins.clear();
+        _editedDraftFields.clear();
+        for (final channel in WorkContactChannel.values) {
+          _invalidateContactChallenge(channel);
+        }
+      }
+      _contactDraftScopeKnown = true;
+      _contactDraftScope = scope;
+      _contactDraftRevision++;
+      _queuedContactDraft = null;
+      _contactDraftRecovery = null;
+      contactDraftMessage = null;
+    }
+    if (scope == null) return;
+    final revision = _contactDraftRevision;
+    _contactDraftRecovery ??= _readContactDraft(store, scope, revision);
+    await _contactDraftRecovery;
+  }
+
+  Future<void> _readContactDraft(
+    WorkPendingProofStore store,
+    String scope,
+    int revision,
+  ) async {
+    bool current() =>
+        !_disposed &&
+        scope == store.accountScope &&
+        scope == _contactDraftScope &&
+        revision == _contactDraftRevision;
+    try {
+      final draft = await store.read(scope);
+      if (draft == null || !current() || !{1, 2}.contains(draft['version'])) {
+        return;
+      }
+      if (draft['dismissedWorkspaceWelcomes'] case final List messages) {
+        _seenApprovalMessages.addAll(messages.whereType<String>());
+      }
+      final savedAt = DateTime.tryParse(draft['savedAt'] as String? ?? '');
+      if (savedAt == null ||
+          DateTime.now().difference(savedAt).isNegative ||
+          DateTime.now().difference(savedAt) > const Duration(days: 30)) {
+        return;
+      }
+      String field(String key) =>
+          draft[key] is String ? draft[key] as String : '';
+      authorizedPersonName = field('personName');
+      businessRelationship = field('relationship');
+      primaryMobile = field('phone');
+      contactEmail = field('email');
+      alternateMobile = field('alternate');
+      workName = field('name');
+      workArea = field('area');
+      primaryActivity = field('activity');
+      if (draft['editedFields'] case final List fields) {
+        _editedDraftFields.addAll(fields.whereType<String>());
+      }
+      selectedProfile = workProfiles
+          .where((p) => p.id == draft['profileId'])
+          .firstOrNull;
+      selectedFamilyId = selectedProfile?.familyId;
+      // Local draft flags are not authority for identity or Workspace approval.
+      primaryMobileVerified = contactEmailVerified = alternateVerified = false;
+      primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+      declarationAccepted = false;
+      if (draft['version'] == 2 && draft['applications'] is List) {
+        for (final raw in draft['applications'] as List) {
+          if (raw is! Map || raw['details'] is! Map || raw['id'] is! String) {
+            continue;
+          }
+          final id = raw['id'] as String;
+          final details = Map<String, Object?>.from(raw['details'] as Map);
+          final profile = workProfiles
+              .where((p) => p.id == details['profileId'])
+              .firstOrNull;
+          if (id.isEmpty ||
+              profile == null ||
+              (details['caseId'] != null && details['caseId'] is! String)) {
+            continue;
+          }
+          final files = <String, WorkPickedProof>{};
+          final picker = proofPicker;
+          if (picker is WorkRetainedProofPicker &&
+              details['files'] is Map &&
+              details['proofs'] is Map) {
+            final references = details['proofs'] as Map;
+            for (final entry in (details['files'] as Map).entries) {
+              if (entry.key is! String || entry.value is! Map) continue;
+              final record = Map<String, Object?>.from(entry.value as Map);
+              if (references[entry.key] is! String ||
+                  record['reference'] != references[entry.key]) {
+                continue;
+              }
+              final proof = await picker.restoreRecorded(record);
+              if (!current()) return;
+              if (proof != null) files[entry.key as String] = proof;
+            }
+          }
+          if (!current()) return;
+          final savedSubmission = _readSavedSubmission(
+            raw['submitted'],
+            profile.id,
+          );
+          final reviewGateway = gateway;
+          if (reviewGateway is ReviewWorkGateway &&
+              savedSubmission != null &&
+              details['caseId'] is String) {
+            reviewGateway.restoreDeviceReviewCase(
+              details['caseId'] as String,
+              accountScope: scope,
+            );
+          }
+          _workspaceApplications[id] = _WorkspaceApplicationDraft(
+            id: id,
+            scope: scope,
+            details: Map.unmodifiable(details),
+            submitted: savedSubmission,
+            files: Map.unmodifiable(files),
+            needsStatusRefresh: details['caseId'] != null,
+          );
+        }
+        final application =
+            _workspaceApplications[draft['workspaceApplicationId']];
+        if (application != null) _restoreWorkspaceApplication(application);
+      }
+    } on Object {
+      if (current()) {
+        contactDraftMessage =
+            'Saved details could not be restored. Please enter your details to continue.';
+      }
+    }
+  }
+
+  String workspaceContactValue(WorkContactChannel channel) => switch (channel) {
+    WorkContactChannel.primaryMobile => primaryMobile,
+    WorkContactChannel.email => contactEmail,
+    WorkContactChannel.alternateMobile => alternateMobile,
+  };
+
+  bool workspaceContactVerified(WorkContactChannel channel) =>
+      switch (channel) {
+        WorkContactChannel.primaryMobile => primaryMobileVerified,
+        WorkContactChannel.email => contactEmailVerified,
+        WorkContactChannel.alternateMobile => alternateVerified,
+      };
+
+  bool isEditingWorkspaceContact(WorkContactChannel channel) =>
+      _contactEditOrigins.containsKey(channel);
+
+  String? get _contactAccountScope =>
+      contactDraftStore?.accountScope ?? pendingProofStore?.accountScope;
+
+  void _invalidateContactChallenge(WorkContactChannel channel) {
+    _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobileOtpSent = false;
+      case WorkContactChannel.email:
+        contactEmailOtpSent = false;
+      case WorkContactChannel.alternateMobile:
+        alternateOtpSent = false;
+    }
+  }
+
+  void beginWorkspaceContactEdit(WorkContactChannel channel) {
+    if (busy) return;
+    _contactEditOrigins.putIfAbsent(
+      channel,
+      () => (
+        value: workspaceContactValue(channel),
+        verified: workspaceContactVerified(channel),
+        scope: _contactAccountScope,
+      ),
+    );
+    _invalidateContactChallenge(channel);
+    clearMessages();
+    notifyListeners();
+  }
+
+  void cancelWorkspaceContactEdit(WorkContactChannel channel) {
+    final original = _contactEditOrigins.remove(channel);
+    if (original == null) return;
+    _invalidateContactChallenge(channel);
+    if (original.scope != _contactAccountScope) {
+      editWorkspaceContact(channel, '');
+      errorMessage = 'Sign in again to confirm your contact details.';
+      notifyListeners();
+      return;
+    }
+    editWorkspaceContact(channel, original.value);
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobileVerified = original.verified;
+      case WorkContactChannel.email:
+        contactEmailVerified = original.verified;
+      case WorkContactChannel.alternateMobile:
+        alternateVerified = original.verified;
+    }
+    clearMessages();
+    notifyListeners();
+  }
+
+  void editWorkspaceContact(WorkContactChannel channel, String value) {
+    _editedDraftFields.add(switch (channel) {
+      WorkContactChannel.primaryMobile => 'phone',
+      WorkContactChannel.email => 'email',
+      WorkContactChannel.alternateMobile => 'alternate',
+    });
+    final normalized = channel == WorkContactChannel.email
+        ? value.trim().toLowerCase()
+        : normalizeWorkspaceMobile(value) ?? value.trim();
+    final previous = switch (channel) {
+      WorkContactChannel.primaryMobile => primaryMobile,
+      WorkContactChannel.email => contactEmail,
+      WorkContactChannel.alternateMobile => alternateMobile,
+    };
+    if (normalized == previous) {
+      _queueContactDraft();
+      return;
+    }
+    _contactRevisions[channel] = (_contactRevisions[channel] ?? 0) + 1;
+    declarationAccepted = false;
+    switch (channel) {
+      case WorkContactChannel.primaryMobile:
+        primaryMobile = normalized;
+        primaryMobileOtpSent = false;
+        primaryMobileVerified = false;
+      case WorkContactChannel.email:
+        contactEmail = normalized;
+        contactEmailOtpSent = false;
+        contactEmailVerified = false;
+      case WorkContactChannel.alternateMobile:
+        alternateMobile = normalized;
+        alternateOtpSent = false;
+        alternateVerified = false;
+    }
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+  }
+
+  Future<bool> sendPrimaryMobileOtp(String mobile) async {
+    if (busy) return false;
+    final normalized = normalizeWorkspaceMobile(mobile);
+    if (normalized == null) {
+      errorMessage = 'Enter a valid 10-digit phone number.';
+      notifyListeners();
+      return false;
+    }
+    editWorkspaceContact(WorkContactChannel.primaryMobile, normalized);
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.primaryMobile,
+      normalized,
+      onSent: () {
+        primaryMobileOtpSent = true;
+        primaryMobileVerified = false;
+      },
+    );
+  }
+
+  Future<bool> verifyPrimaryMobileOtp(String code) =>
+      _verifyWorkspaceContactOtp(
+        WorkContactChannel.primaryMobile,
+        primaryMobile,
+        code,
+        onVerified: () => primaryMobileVerified = true,
+      );
+
+  Future<bool> sendContactEmailOtp(String email) async {
+    if (busy) return false;
+    final normalized = email.trim().toLowerCase();
+    if (!_validEmail(normalized)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+    editWorkspaceContact(WorkContactChannel.email, normalized);
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.email,
+      normalized,
+      onSent: () {
+        contactEmailOtpSent = true;
+        contactEmailVerified = false;
+      },
+    );
+  }
+
+  Future<bool> verifyContactEmailOtp(String code) => _verifyWorkspaceContactOtp(
+    WorkContactChannel.email,
+    contactEmail,
+    code,
+    onVerified: () => contactEmailVerified = true,
+  );
+
+  void changePrimaryMobile() {
+    _contactRevisions[WorkContactChannel.primaryMobile] =
+        (_contactRevisions[WorkContactChannel.primaryMobile] ?? 0) + 1;
+    declarationAccepted = false;
+    primaryMobile = '';
+    primaryMobileOtpSent = false;
+    primaryMobileVerified = false;
+    clearMessages();
+    notifyListeners();
+  }
+
+  void changeContactEmail() {
+    _contactRevisions[WorkContactChannel.email] =
+        (_contactRevisions[WorkContactChannel.email] ?? 0) + 1;
+    declarationAccepted = false;
+    contactEmail = '';
+    contactEmailOtpSent = false;
+    contactEmailVerified = false;
     clearMessages();
     notifyListeners();
   }
 
   Future<bool> sendAlternateOtp(String mobile) async {
-    final normalized = mobile.replaceAll(RegExp(r'\D'), '');
-    if (normalized.length != 10) {
+    if (busy) return false;
+    final normalized = normalizeWorkspaceMobile(mobile);
+    if (normalized == null) {
       errorMessage = 'Enter a valid 10-digit alternate mobile number.';
       notifyListeners();
       return false;
     }
-    if (normalized == '9829012321') {
-      errorMessage = 'This is already your verified account number.';
+    if (normalized == normalizeWorkspaceMobile(primaryMobile)) {
+      errorMessage = 'This is already the number customers can reach you on.';
       notifyListeners();
       return false;
     }
-    alternateMobile = normalized;
-    return _runBool(() async {
-      await gateway.sendOtp(normalized);
-      alternateOtpSent = true;
-      alternateVerified = false;
-    }, success: 'OTP sent to +91 $normalized.');
+    editWorkspaceContact(WorkContactChannel.alternateMobile, normalized);
+    return _sendWorkspaceContactOtp(
+      WorkContactChannel.alternateMobile,
+      normalized,
+      onSent: () {
+        alternateOtpSent = true;
+        alternateVerified = false;
+      },
+    );
   }
 
-  bool verifyAlternateOtp(String code) {
-    if (!alternateOtpSent) {
-      errorMessage = 'Send the OTP before verification.';
+  Future<bool> verifyAlternateOtp(String code) => _verifyWorkspaceContactOtp(
+    WorkContactChannel.alternateMobile,
+    alternateMobile,
+    code,
+    onVerified: () => alternateVerified = true,
+  );
+
+  Future<bool> _sendWorkspaceContactOtp(
+    WorkContactChannel channel,
+    String value, {
+    required VoidCallback onSent,
+  }) {
+    final revision = _contactRevisions[channel] ?? 0;
+    final scope = _contactAccountScope;
+    return _runBool(() async {
+      await gateway.sendContactOtp(channel: channel, value: value);
+      if (_disposed ||
+          revision != (_contactRevisions[channel] ?? 0) ||
+          scope != _contactAccountScope ||
+          workspaceContactValue(channel) != value) {
+        throw const WorkGatewayException(
+          'Contact changed. Request a new code.',
+        );
+      }
+      onSent();
+    }, success: null);
+  }
+
+  Future<bool> _verifyWorkspaceContactOtp(
+    WorkContactChannel channel,
+    String value,
+    String code, {
+    required VoidCallback onVerified,
+  }) async {
+    final sent = switch (channel) {
+      WorkContactChannel.primaryMobile => primaryMobileOtpSent,
+      WorkContactChannel.email => contactEmailOtpSent,
+      WorkContactChannel.alternateMobile => alternateOtpSent,
+    };
+    if (!sent) {
+      errorMessage = 'Send a code before confirming this contact.';
       notifyListeners();
       return false;
     }
-    if (code.trim() != '123456') {
-      errorMessage = 'Enter the 6-digit OTP sent to the alternate number.';
+    final normalizedCode = code.replaceAll(RegExp(r'\D'), '');
+    if (normalizedCode.length != 6) {
+      errorMessage = 'Enter all 6 digits of the code.';
       notifyListeners();
       return false;
     }
-    alternateVerified = true;
-    errorMessage = null;
-    noticeMessage = 'Alternate work number verified.';
-    notifyListeners();
-    return true;
+    final revision = _contactRevisions[channel] ?? 0;
+    final scope = _contactAccountScope;
+    return _runBool(() async {
+      await gateway.verifyContactOtp(
+        channel: channel,
+        value: value,
+        code: normalizedCode,
+      );
+      if (_disposed ||
+          revision != (_contactRevisions[channel] ?? 0) ||
+          scope != _contactAccountScope ||
+          workspaceContactValue(channel) != value) {
+        throw const WorkGatewayException(
+          'Contact changed. Request a new code.',
+        );
+      }
+      onVerified();
+      _contactEditOrigins.remove(channel);
+    }, success: null);
   }
 
   void removeAlternateMobile() {
+    declarationAccepted = false;
+    _contactRevisions[WorkContactChannel.alternateMobile] =
+        (_contactRevisions[WorkContactChannel.alternateMobile] ?? 0) + 1;
     alternateMobile = '';
     alternateOtpSent = false;
     alternateVerified = false;
@@ -294,15 +12225,43 @@ class WorkSession extends ChangeNotifier {
 
   bool continueToProof() {
     if (selectedProfile == null) {
-      errorMessage = 'Choose the exact work profile you operate.';
+      errorMessage = 'Choose the work profile that best matches what you do.';
+      notifyListeners();
+      return false;
+    }
+    if (normalizeWorkspaceMobile(primaryMobile) == null) {
+      errorMessage = 'Enter a valid 10-digit phone number.';
+      notifyListeners();
+      return false;
+    }
+    if (!primaryMobileVerified) {
+      errorMessage =
+          'Confirm the phone number customers can reach you on before continuing.';
+      notifyListeners();
+      return false;
+    }
+    if (!_validEmail(contactEmail)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
+    if (!contactEmailVerified) {
+      errorMessage = 'Confirm your email address before continuing.';
+      notifyListeners();
+      return false;
+    }
+    if (alternateMobile.isNotEmpty &&
+        normalizeWorkspaceMobile(alternateMobile) == null) {
+      errorMessage = 'Enter a valid 10-digit alternate mobile number.';
       notifyListeners();
       return false;
     }
     if (alternateMobile.isNotEmpty && !alternateVerified) {
-      errorMessage = 'Verify or remove the alternate work number.';
+      errorMessage = 'Confirm or remove the alternate contact number.';
       notifyListeners();
       return false;
     }
+    _contactEditOrigins.clear();
     reviewStage = WorkReviewStage.drafting;
     clearMessages();
     notifyListeners();
@@ -313,14 +12272,15 @@ class WorkSession extends ChangeNotifier {
     required String workspace,
     required String family,
     required String area,
+    String otherActivity = '',
   }) async {
     if (workspace.trim().length < 3) {
-      errorMessage = 'Describe the work profile you need.';
+      errorMessage = 'Enter your business, profession or service.';
       notifyListeners();
       return false;
     }
     if (family.trim().isEmpty) {
-      errorMessage = 'Choose the closest work area.';
+      errorMessage = 'Choose the closest category.';
       notifyListeners();
       return false;
     }
@@ -329,13 +12289,29 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (family.trim() == 'Other' && otherActivity.trim().length < 3) {
+      errorMessage = 'Enter the activity you want to offer.';
+      notifyListeners();
+      return false;
+    }
     unsupportedWorkspace = workspace.trim();
     unsupportedFamily = family.trim();
     unsupportedArea = area.trim();
+    unsupportedOtherActivity = family.trim() == 'Other'
+        ? otherActivity.trim()
+        : '';
+    if (gateway is! ReviewWorkGateway) {
+      unsupportedRequestSent = false;
+      errorMessage =
+          'This request cannot be sent yet. Your details are still here.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
     unsupportedRequestSent = true;
     errorMessage = null;
     noticeMessage =
-        'Request sent. No workspace was created. We will update My Work and Chat.';
+        'Thank you—MoolSocial will review your request and update you in Workspace and Chat.';
     notifyListeners();
     return true;
   }
@@ -345,26 +12321,45 @@ class WorkSession extends ChangeNotifier {
     required String area,
     required String activity,
   }) {
+    if (workName != name.trim() ||
+        workArea != area.trim() ||
+        primaryActivity != activity.trim()) {
+      declarationAccepted = false;
+    }
     workName = name.trim();
     workArea = area.trim();
     primaryActivity = activity.trim();
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
 
+  String? get detailsNameError => workName.trim().length < 3
+      ? 'Enter the business name shown on its PAN card.'
+      : null;
+
+  String? get detailsAreaError {
+    final area = workArea.trim();
+    final pin = area.replaceAll(RegExp(r'\s'), '');
+    if (RegExp(r'^[0-9]+$').hasMatch(pin)) {
+      return RegExp(r'^[1-9][0-9]{5}$').hasMatch(pin)
+          ? null
+          : 'Enter a 6-digit PIN code, or use your city name.';
+    }
+    if (area.length < 3 || !RegExp(r'\p{L}', unicode: true).hasMatch(area)) {
+      return 'Enter your city name or a 6-digit PIN code.';
+    }
+    return null;
+  }
+
+  String? get detailsActivityError => primaryActivity.trim().length < 3
+      ? 'Describe the primary activity.'
+      : null;
+
   bool validateDetails() {
-    if (workName.length < 3) {
-      errorMessage = 'Enter the work or business name.';
-      notifyListeners();
-      return false;
-    }
-    if (workArea.length < 3) {
-      errorMessage = 'Enter an operating city or PIN code.';
-      notifyListeners();
-      return false;
-    }
-    if (primaryActivity.length < 3) {
-      errorMessage = 'Describe the primary activity.';
+    final error = detailsNameError ?? detailsAreaError ?? detailsActivityError;
+    if (error != null) {
+      errorMessage = error;
       notifyListeners();
       return false;
     }
@@ -373,16 +12368,342 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  Future<bool> addProof(String proofId, String source) async {
-    return _runBool(() async {
-      addedProofs[proofId] = await gateway.saveProof(proofId, source);
-    }, success: 'Proof added. You can review it before submission.');
+  Map<String, Object?> _pendingDocumentDraft(
+    String proofId,
+    WorkProofSource source,
+  ) => {
+    'version': 1,
+    'workspaceApplicationId': _workspaceApplicationId,
+    'savedAt': DateTime.now().toUtc().toIso8601String(),
+    'profileId': selectedProfile?.id,
+    'proofId': proofId,
+    'source': source.name,
+    'personName': authorizedPersonName,
+    'relationship': businessRelationship,
+    'name': workName,
+    'area': workArea,
+    'activity': primaryActivity,
+    'phone': primaryMobile,
+    'email': contactEmail,
+    'alternate': alternateMobile,
+    'phoneConfirmed': primaryMobileVerified,
+    'emailConfirmed': contactEmailVerified,
+    'alternateConfirmed': alternateVerified,
+    'proofs': Map<String, String>.of(addedProofs),
+    'caseId': reviewCaseId,
+    'reason': reviewReason,
+    'correction': reviewCorrectionDraft,
+  };
+
+  /// Resumes only the document operation owned by the currently signed-in
+  /// account. This does not restore sign-in, OTP secrets or approval authority.
+  Future<bool> recoverPendingProof({required bool accountReady}) async {
+    final store = pendingProofStore;
+    if (store == null) {
+      await _recoverContactDraft(accountReady);
+      return false;
+    }
+    final scope = accountReady ? store.accountScope : null;
+    if (_pendingProofScope != scope) {
+      if (_pendingProofScope != null) {
+        _workspaceApplications.clear();
+        _workspaceApplicationId = null;
+        reviewStatusNeedsRefresh = false;
+      }
+      _pendingProofGeneration++;
+      _pendingProofScope = scope;
+      _pendingProofRecovery = null;
+      _pendingProofRoute = false;
+      if (_hasRecoveredDraft) {
+        selectedProfile = null;
+        selectedFamilyId = null;
+        authorizedPersonName = businessRelationship = '';
+        workName = workArea = primaryActivity = '';
+        primaryMobile = contactEmail = alternateMobile = '';
+        primaryMobileVerified = contactEmailVerified = alternateVerified =
+            false;
+        addedProofs.clear();
+        pickedProofs.clear();
+        reviewCaseId = reviewReason = null;
+        reviewCorrectionDraft = false;
+        recoveredDocumentStep = false;
+        documentRecoveryMessage = _documentRecoveryProofId = null;
+        _hasRecoveredDraft = false;
+      }
+    }
+    await _recoverContactDraft(accountReady);
+    if (scope == null) return false;
+    final generation = _pendingProofGeneration;
+    _pendingProofRecovery ??= _restorePendingDocument(store, scope, generation);
+    await _pendingProofRecovery;
+    if (_disposed ||
+        generation != _pendingProofGeneration ||
+        scope != store.accountScope ||
+        scope != _pendingProofScope) {
+      return false;
+    }
+    final redirect = _pendingProofRoute;
+    _pendingProofRoute = false;
+    return redirect;
+  }
+
+  Future<void> _restorePendingDocument(
+    WorkPendingProofStore store,
+    String scope,
+    int generation,
+  ) async {
+    bool current() =>
+        !_disposed &&
+        generation == _pendingProofGeneration &&
+        scope == store.accountScope &&
+        scope == _pendingProofScope;
+    try {
+      final draft = await store.read(scope);
+      if (draft == null || !current()) return;
+      final applicationId = draft['workspaceApplicationId'];
+      if (applicationId is String &&
+          _workspaceApplicationId != null &&
+          applicationId != _workspaceApplicationId) {
+        // An old picker checkpoint must not replace a newer application.
+        return;
+      }
+      final timestamp = DateTime.tryParse(draft['savedAt'] as String? ?? '');
+      final age = timestamp == null
+          ? null
+          : DateTime.now().difference(timestamp);
+      final profile = workProfiles
+          .where((p) => p.id == draft['profileId'])
+          .firstOrNull;
+      final source = WorkProofSource.values
+          .where((s) => s.name == draft['source'])
+          .firstOrNull;
+      if (draft['version'] != 1 ||
+          age == null ||
+          age.isNegative ||
+          age > const Duration(hours: 24) ||
+          profile == null ||
+          source == null) {
+        await store.clear(scope);
+        return;
+      }
+      String field(String name) =>
+          draft[name] is String ? draft[name] as String : '';
+      if (applicationId is String) _workspaceApplicationId = applicationId;
+      selectedProfile = profile;
+      selectedFamilyId = profile.familyId;
+      authorizedPersonName = field('personName');
+      businessRelationship = field('relationship');
+      workName = field('name');
+      workArea = field('area');
+      primaryActivity = field('activity');
+      primaryMobile = field('phone');
+      contactEmail = field('email');
+      alternateMobile = field('alternate');
+      primaryMobileVerified =
+          gateway is ReviewWorkGateway &&
+          primaryMobile.isNotEmpty &&
+          draft['phoneConfirmed'] == true;
+      contactEmailVerified =
+          gateway is ReviewWorkGateway &&
+          contactEmail.isNotEmpty &&
+          draft['emailConfirmed'] == true;
+      alternateVerified =
+          gateway is ReviewWorkGateway &&
+          alternateMobile.isNotEmpty &&
+          draft['alternateConfirmed'] == true;
+      primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
+      declarationAccepted = false;
+      final proofId = field('proofId');
+      final allowed = selectedWorkspaceDocuments.map((p) => p.id).toSet();
+      addedProofs.clear();
+      if (draft['proofs'] case final Map references) {
+        for (final entry in references.entries) {
+          if (allowed.contains(entry.key) && entry.value is String) {
+            addedProofs[entry.key as String] = entry.value as String;
+          }
+        }
+      }
+      reviewCaseId = field('caseId').isEmpty ? null : field('caseId');
+      reviewReason = field('reason').isEmpty ? null : field('reason');
+      reviewCorrectionDraft =
+          reviewCaseId != null && draft['correction'] == true;
+      remoteReviewStatus = reviewCaseId == null
+          ? null
+          : WorkRemoteReviewStatus.pending;
+      reviewStage = reviewCaseId == null
+          ? WorkReviewStage.drafting
+          : WorkReviewStage.gstPending;
+      recoveredDocumentStep = true;
+      _hasRecoveredDraft = true;
+      _pendingProofRoute = true;
+      noticeMessage =
+          'Your details are restored. Add or review your documents to continue.';
+      if (allowed.contains(proofId)) {
+        final label = selectedWorkspaceDocuments
+            .firstWhere((document) => document.id == proofId)
+            .label;
+        _documentRecoveryProofId = proofId;
+        documentRecoveryMessage =
+            'Your details are saved. Please add $label again.';
+        noticeMessage = null;
+      }
+      if (allowed.contains(proofId) &&
+          proofPicker is WorkRecoverableProofPicker) {
+        final proof = await (proofPicker as WorkRecoverableProofPicker).recover(
+          source,
+        );
+        if (!current()) return;
+        if (proof != null) {
+          final reference = await gateway.saveProof(proofId, proof);
+          if (!current()) return;
+          addedProofs[proofId] = reference;
+          pickedProofs[proofId] = proof;
+          documentRecoveryMessage = _documentRecoveryProofId = null;
+          noticeMessage = 'Document restored. Review it before submitting.';
+        }
+      }
+      if (current()) {
+        _queueContactDraft();
+        await store.clear(scope);
+      }
+    } on WorkGatewayException catch (error) {
+      if (current()) {
+        documentRecoveryMessage = null;
+        errorMessage = error.message;
+        noticeMessage = null;
+      }
+    } on Object {
+      if (current()) {
+        documentRecoveryMessage = null;
+        errorMessage =
+            'Your document could not be restored. Please add it again.';
+        noticeMessage = null;
+      }
+    }
+    if (current()) notifyListeners();
+  }
+
+  Future<bool> addProof(String proofId, WorkProofSource source) async {
+    if (busy) return false;
+    _rememberWorkspaceApplication();
+    final applicationId = _workspaceApplicationId;
+    final accountScope = _contactAccountScope;
+    final profileId = selectedProfile?.id;
+    bool current() =>
+        !_disposed &&
+        applicationId == _workspaceApplicationId &&
+        accountScope == _contactAccountScope &&
+        profileId == selectedProfile?.id;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    final store = pendingProofStore;
+    final scope = store?.accountScope;
+    try {
+      if (store != null) {
+        if (scope == null) {
+          throw const WorkGatewayException(
+            'Sign in again before adding a document.',
+          );
+        }
+        await store.save(scope, _pendingDocumentDraft(proofId, source));
+        if (!current() || scope != store.accountScope) return false;
+      }
+      final proof = await proofPicker.pick(source);
+      if (!current() || (store != null && scope != store.accountScope)) {
+        return false;
+      }
+      if (proof == null) return false;
+      final reference = await gateway.saveProof(proofId, proof);
+      if (!current() || (store != null && scope != store.accountScope)) {
+        return false;
+      }
+      addedProofs[proofId] = reference;
+      pickedProofs[proofId] = proof;
+      _removedProofs.remove(proofId);
+      if (_documentRecoveryProofId == proofId) {
+        documentRecoveryMessage = _documentRecoveryProofId = null;
+      }
+      declarationAccepted = false;
+      // The document row reports the attachment without moving the whole page.
+      noticeMessage = null;
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current() && !error.cancelled) errorMessage = error.message;
+      return false;
+    } on Object {
+      if (current()) {
+        errorMessage = 'The document could not be added. Please try again.';
+      }
+      return false;
+    } finally {
+      if (current() &&
+          store != null &&
+          scope != null &&
+          scope == store.accountScope) {
+        try {
+          await store.clear(scope);
+        } on Object {
+          /* Retain recovery until storage is available. */
+        }
+      }
+      if (current()) {
+        _queueContactDraft();
+        busy = false;
+        notifyListeners();
+      }
+    }
   }
 
   void removeProof(String proofId) {
-    if (proofId == 'personal-kyc') return;
+    final reference = addedProofs[proofId];
+    if (busy ||
+        reference == null ||
+        (reviewCaseId != null && !reviewCorrectionDraft)) {
+      return;
+    }
+    _removedProofs[proofId] = (
+      reference: reference,
+      file: pickedProofs[proofId],
+      profileId: selectedProfile?.id,
+      scope: _contactAccountScope,
+    );
     addedProofs.remove(proofId);
-    showNotice('Proof removed. Add a replacement before review if required.');
+    pickedProofs.remove(proofId);
+    declarationAccepted = false;
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool canUndoProofRemoval(String proofId) {
+    final removed = _removedProofs[proofId];
+    return !busy &&
+        removed != null &&
+        !addedProofs.containsKey(proofId) &&
+        removed.scope == _contactAccountScope &&
+        removed.profileId == selectedProfile?.id &&
+        selectedWorkspaceDocuments.any((proof) => proof.id == proofId) &&
+        (reviewCaseId == null || reviewCorrectionDraft);
+  }
+
+  String? removedProofName(String proofId) => canUndoProofRemoval(proofId)
+      ? _removedProofs[proofId]!.file?.fileName ??
+            selectedWorkspaceDocuments
+                .firstWhere((proof) => proof.id == proofId)
+                .label
+      : null;
+
+  bool undoProofRemoval(String proofId) {
+    if (!canUndoProofRemoval(proofId)) return false;
+    final removed = _removedProofs.remove(proofId)!;
+    addedProofs[proofId] = removed.reference;
+    if (removed.file != null) pickedProofs[proofId] = removed.file!;
+    declarationAccepted = false;
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+    return true;
   }
 
   void setDeclaration(bool value) {
@@ -391,10 +12712,92 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool beginReviewCorrection() {
+    if (reviewStatusNeedsRefresh) {
+      showError(
+        'Wait for the current application update before making changes.',
+      );
+      return false;
+    }
+    if (remoteReviewStatus == WorkRemoteReviewStatus.suspended) {
+      errorMessage =
+          'This Workspace is unavailable. Contact MoolSocial Support for the next step.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+        remoteReviewStatus == WorkRemoteReviewStatus.live) {
+      errorMessage =
+          'This Workspace is already approved. Open its dashboard to manage it.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (remoteReviewStatus == WorkRemoteReviewStatus.rejected) {
+      errorMessage =
+          'This application was not approved. Contact MoolSocial about the review decision.';
+      notifyListeners();
+      return false;
+    }
+    if (reviewCaseId == null) {
+      errorMessage = 'Submit the Workspace before sending a correction.';
+      noticeMessage = null;
+      notifyListeners();
+      return false;
+    }
+    if (reviewReason?.trim().isNotEmpty != true) {
+      errorMessage =
+          'MoolSocial is reviewing your application. No changes are needed now.';
+      notifyListeners();
+      return false;
+    }
+    if (gateway is! ReviewWorkGateway) {
+      errorMessage =
+          'Contact MoolSocial in Chat to provide the requested clarification. Your application remains saved.';
+      notifyListeners();
+      return false;
+    }
+    reviewCorrectionDraft = true;
+    declarationAccepted = false;
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  WorkProfileSubmission _currentProfileSubmission() {
+    final profile = selectedProfile!;
+    _profileSubmissionKey ??=
+        'work-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+    return WorkProfileSubmission(
+      familyId: profile.familyId,
+      profileId: profile.id,
+      name: workName,
+      authorizedPersonName: authorizedPersonName,
+      businessRelationship: businessRelationship,
+      area: workArea,
+      primaryActivity: primaryActivity,
+      proofReferences: Map<String, String>.unmodifiable(addedProofs),
+      primaryMobile: primaryMobile,
+      email: contactEmail,
+      alternateMobile: alternateMobile,
+      connectedProvider: connectedProviderLabel,
+      connectedProviderAccount: connectedProviderAccount,
+      alternateMobileVerified: alternateVerified,
+      idempotencyKey: _profileSubmissionKey!,
+    );
+  }
+
   Future<bool> submitProfile() async {
+    if (reviewStatusNeedsRefresh && reviewCaseId != null) {
+      showError('Check your application update before submitting changes.');
+      return false;
+    }
     if (!validateDetails()) return false;
-    if (!requiredProofsAdded) {
-      errorMessage = 'Add every required proof before submission.';
+    if (!workspaceContactsReady) {
+      errorMessage =
+          'Confirm your phone number and email before submitting this Workspace.';
       notifyListeners();
       return false;
     }
@@ -403,21 +12806,69 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (reviewCaseId != null) {
+    final existingCaseId = reviewCaseId;
+    if (existingCaseId != null && !reviewCorrectionDraft) {
       noticeMessage =
-          'This work profile is already under review as $reviewCaseId.';
+          'This Workspace is already under review as $existingCaseId.';
       errorMessage = null;
       notifyListeners();
       return true;
     }
-    return _runBool(
-      () async {
-        reviewCaseId = await gateway.submitProfile();
-        reviewStage = WorkReviewStage.gstPending;
-      },
-      success:
-          'Work profile sent for review. Your personal account remains active.',
-    );
+    if (busy) return false;
+    final requestedScope = _contactAccountScope;
+    final submission = _currentProfileSubmission();
+    _queueContactDraft();
+    final requestedApplication = _workspaceApplicationId;
+    bool current() =>
+        !_disposed &&
+        requestedApplication == _workspaceApplicationId &&
+        requestedScope == _contactAccountScope &&
+        selectedProfile?.id == submission.profileId &&
+        reviewCaseId == existingCaseId;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    try {
+      final result = existingCaseId == null
+          ? await gateway.submitProfile(submission)
+          : await gateway.submitCorrection(existingCaseId, submission);
+      if (!current()) return false;
+      if (result.caseId.trim().isEmpty ||
+          _workspaceApplications.values.any(
+            (application) =>
+                application.id != requestedApplication &&
+                application.caseId == result.caseId,
+          ) ||
+          (existingCaseId != null && result.caseId != existingCaseId) ||
+          (result.profileId != null &&
+              result.profileId != submission.profileId)) {
+        throw const WorkGatewayException(
+          'The response could not be matched to this application. Please retry.',
+        );
+      }
+      submittedProfile = submission;
+      reviewCaseId = result.caseId;
+      subscriptionPlan = result.plan;
+      reviewReason = result.reason;
+      remoteReviewStatus = result.status;
+      reviewStatusNeedsRefresh = false;
+      reviewStage = WorkReviewStage.gstPending;
+      reviewCorrectionDraft = false;
+      // The acknowledged case changes the pre-request guard. Save the exact
+      // validated result here, before leaving this synchronous success block.
+      _queueContactDraft();
+      noticeMessage = existingCaseId == null
+          ? 'Application submitted.'
+          : 'Your updated information was submitted.';
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) errorMessage = error.message;
+      return false;
+    } finally {
+      busy = false;
+      if (current()) _queueContactDraft();
+      if (!_disposed) notifyListeners();
+    }
   }
 
   void remindGstLater() {
@@ -428,10 +12879,25 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void attachGst() {
-    gstAttachmentAdded = true;
+  Future<bool> addGstProof(WorkProofSource source) async {
+    if (busy) return false;
+    busy = true;
     clearMessages();
     notifyListeners();
+    try {
+      final proof = await proofPicker.pick(source);
+      if (proof == null) return false;
+      gstProofReference = await gateway.saveProof('gst', proof);
+      gstAttachmentAdded = true;
+      noticeMessage = 'GST certificate received for this review.';
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (!error.cancelled) errorMessage = error.message;
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> submitGstProof(String value) async {
@@ -449,10 +12915,22 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     return _runBool(() async {
-      await gateway.submitGst();
+      final caseId = reviewCaseId;
+      if (caseId == null) {
+        throw const WorkGatewayException(
+          'Submit the Workspace profile before adding a GST certificate.',
+        );
+      }
+      final proofReference = gstProofReference;
+      if (proofReference == null) {
+        throw const WorkGatewayException(
+          'Attach the GST certificate before submission.',
+        );
+      }
+      await gateway.submitGst(caseId, normalized, proofReference);
       gstin = normalized;
       gstReminder = false;
-    }, success: 'GST proof added to the active review.');
+    }, success: 'GST certificate added to your Workspace review.');
   }
 
   Future<bool> checkReview() async {
@@ -461,22 +12939,111 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    return _runBool(
-      () async {
-        workspaceId = await gateway.checkReview();
-        reviewStage = WorkReviewStage.approved;
-        activeWorkspace = WorkWorkspace(
-          id: workspaceId!,
-          name: workName,
-          profileLabel: selectedProfile?.label ?? 'Work profile',
-          area: workArea,
-          verified: true,
-          gstReminder: gstReminder && gstin.isEmpty,
+    if (busy) return false;
+    busy = true;
+    clearMessages();
+    notifyListeners();
+    final requestedCase = reviewCaseId!;
+    final requestedScope = _contactAccountScope;
+    final requestedProfile = selectedProfile?.id;
+    final requestedApplication = _workspaceApplicationId;
+    bool current() =>
+        !_disposed &&
+        requestedApplication == _workspaceApplicationId &&
+        reviewCaseId == requestedCase &&
+        requestedScope == _contactAccountScope &&
+        requestedProfile == selectedProfile?.id;
+    try {
+      final result = await gateway.checkReview(requestedCase);
+      if (!current()) return false;
+      if (result.caseId != requestedCase ||
+          (result.profileId != null && result.profileId != requestedProfile)) {
+        throw const WorkGatewayException(
+          'The review update could not be matched to this application. Please retry.',
         );
-      },
-      success:
-          'Work profile approved. Finish the exact setup before customers can see it.',
-    );
+      }
+      if ((result.status == WorkRemoteReviewStatus.approved ||
+              result.status == WorkRemoteReviewStatus.live) &&
+          (result.workspaceId?.trim().isEmpty ?? true)) {
+        throw const WorkGatewayException(
+          'Approval was received without a Workspace. Try checking again.',
+          retryable: true,
+        );
+      }
+      subscriptionPlan = result.plan;
+      reviewReason = result.reason;
+      remoteReviewStatus = result.status;
+      reviewStatusNeedsRefresh = false;
+      switch (result.status) {
+        case WorkRemoteReviewStatus.pending:
+          reviewStage = WorkReviewStage.gstPending;
+          noticeMessage = null;
+          return false;
+        case WorkRemoteReviewStatus.rejected:
+          errorMessage = null;
+          return false;
+        case WorkRemoteReviewStatus.suspended:
+          errorMessage = result.reason?.trim().isNotEmpty == true
+              ? result.reason
+              : 'This Workspace is temporarily unavailable. Contact MoolSocial Support.';
+          return false;
+        case WorkRemoteReviewStatus.approved:
+        case WorkRemoteReviewStatus.live:
+          final approvedWorkspaceId = result.workspaceId!;
+          workspaceId = approvedWorkspaceId;
+          _workspaceApplications.removeWhere(
+            (_, application) =>
+                application.id == requestedApplication ||
+                application.caseId == requestedCase,
+          );
+          reviewCorrectionDraft = false;
+          reviewStage = result.status == WorkRemoteReviewStatus.live
+              ? WorkReviewStage.live
+              : WorkReviewStage.approved;
+          final previousWorkspace = activeWorkspace;
+          if (previousWorkspace != null &&
+              previousWorkspace.id != approvedWorkspaceId &&
+              otherWorkspaces.every(
+                (workspace) => workspace.id != previousWorkspace.id,
+              )) {
+            otherWorkspaces.add(previousWorkspace);
+          }
+          activeWorkspace = WorkWorkspace(
+            id: approvedWorkspaceId,
+            name: previousWorkspace?.id == approvedWorkspaceId
+                ? previousWorkspace!.name
+                : result.name?.trim().isNotEmpty == true
+                ? result.name!.trim()
+                : submittedProfile?.name.trim().isNotEmpty == true
+                ? submittedProfile!.name.trim()
+                : workName.trim().isNotEmpty
+                ? workName.trim()
+                : selectedProfile?.label ?? 'Your Workspace',
+            profileLabel: selectedProfile?.label ?? 'Work profile',
+            profileId: selectedProfile?.id,
+            area: result.area ?? submittedProfile?.area ?? workArea,
+            verified: true,
+            gstReminder: gstReminder && gstin.isEmpty,
+          );
+          _approvalWelcome = (
+            scope: requestedScope,
+            caseId: requestedCase,
+            workspaceId: approvedWorkspaceId,
+          );
+          noticeMessage = null;
+          return true;
+      }
+    } on WorkGatewayException catch (error) {
+      if (current()) {
+        errorMessage = error.message;
+        noticeMessage = null;
+      }
+      return false;
+    } finally {
+      busy = false;
+      if (current()) _queueContactDraft();
+      if (!_disposed) notifyListeners();
+    }
   }
 
   void beginRetailerSetup() {
@@ -485,8 +13052,20 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void reviseRejectedProfile() {
+    if (remoteReviewStatus != WorkRemoteReviewStatus.rejected) return;
+    clearMessages();
+    noticeMessage = 'Contact MoolSocial about this application.';
+    notifyListeners();
+  }
+
   void addRetailerProduct() {
     retailerProductAdded = true;
+    if (workspaceCatalogueItems.isEmpty) {
+      workspaceCatalogueItems.add(
+        workspaceMasterCatalogue.first.copyWith(publicListing: false),
+      );
+    }
     clearMessages();
     notifyListeners();
   }
@@ -495,10 +13074,23 @@ class WorkSession extends ChangeNotifier {
     required int quantity,
     required int buyPrice,
     required int sellPrice,
+    bool updateCatalogue = true,
   }) {
+    if (!_stockEditAvailable()) return;
     retailerQuantity = quantity;
     retailerBuyPrice = buyPrice;
     retailerSellPrice = sellPrice;
+    if (updateCatalogue &&
+        retailerProductAdded &&
+        workspaceCatalogueItems.isNotEmpty) {
+      workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+        stock: quantity,
+        purchasePrice: buyPrice,
+        sellingPrice: sellPrice,
+        unitPrice: '₹$sellPrice/${workspaceCatalogueItems.first.pack}',
+        available: quantity > 0,
+      );
+    }
     clearMessages();
     notifyListeners();
   }
@@ -513,7 +13105,187 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRetailerPublishAfterSetup(bool value) {
+    retailerPublishAfterSetup = value;
+    clearMessages();
+    notifyListeners();
+  }
+
+  bool prepareWorkspaceOrder({
+    required String source,
+    required String fulfilment,
+  }) {
+    // Re-entering POS resumes the selected Store's unfinished bill. Only the
+    // explicit new-sale/discard actions may reset its customer and quantities.
+    if (source == 'Counter' &&
+        fulfilment == 'At the shop' &&
+        workspaceOrderSource == source &&
+        workspaceOrderFulfilment == fulfilment &&
+        currentWorkspaceOrderId == null &&
+        (workspaceOrderCustomer.trim().isNotEmpty ||
+            workspaceOrderQuantities.isNotEmpty)) {
+      return true;
+    }
+    if (!startNewWorkspaceOrder()) return false;
+    workspaceOrderSource = source;
+    workspaceOrderFulfilment = fulfilment;
+    workspaceOrderNeedsDelivery = const {
+      'Mool delivery',
+      'Own delivery',
+    }.contains(fulfilment);
+    notifyListeners();
+    return true;
+  }
+
+  void applyConfirmedWorkspaceGroupBuyPayment({
+    required String productName,
+    required String specification,
+    required int targetQuantity,
+    required int securedQuantity,
+    required String unitLabel,
+    required int regularUnitPrice,
+    required int groupUnitPrice,
+    required int facilitationFee,
+    required int deliveryFee,
+    required int confirmationAmount,
+    required String paymentReference,
+    required String closingLabel,
+    required String storeDeliveryLabel,
+  }) {
+    // Legacy review fixture only. A reference is not payment authority.
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Group purchase payment could not be verified. No offer was published.',
+      );
+      return;
+    }
+    if (paymentReference.trim().isEmpty) {
+      showError(
+        'Group Bulk Buying becomes active only after payment confirmation is received.',
+      );
+      return;
+    }
+    final storeName = activeWorkspace?.name ?? workName;
+    activeGroupBuy = WorkspaceGroupBuy(
+      id: 'GB-${DateTime.now().millisecondsSinceEpoch}',
+      productName: productName.trim(),
+      specification: specification.trim(),
+      leadRetailer: storeName,
+      confirmedRetailers: [storeName],
+      targetQuantity: targetQuantity,
+      securedQuantity: securedQuantity,
+      unitLabel: unitLabel.trim(),
+      regularUnitPrice: regularUnitPrice,
+      groupUnitPrice: groupUnitPrice,
+      facilitationFee: facilitationFee,
+      deliveryFee: deliveryFee,
+      confirmationAmount: confirmationAmount,
+      closingLabel: closingLabel.trim(),
+      storeDeliveryLabel: storeDeliveryLabel.trim(),
+      paymentConfirmed: true,
+      participants: [
+        WorkspaceGroupBuyParticipant(
+          businessName: storeName,
+          locality: activeWorkspace?.area ?? workArea,
+          quantity: securedQuantity,
+          unitLabel: unitLabel.trim(),
+          milestone: 'Payment confirmed',
+        ),
+      ],
+    );
+    _recordWorkspaceActivity(
+      '$storeName confirmed $securedQuantity $unitLabel of $productName for Group Bulk Buying.',
+    );
+    showNotice(
+      'Payment confirmed. This Group Bulk Buying offer is now visible to eligible retailers.',
+    );
+    _persistOperationalState('group-buy-confirmed');
+  }
+
+  Future<bool> createWorkspaceGroupBuy({
+    required String productName,
+    required String specification,
+    required int targetQuantity,
+    required int securedQuantity,
+    required String unitLabel,
+    required int regularUnitPrice,
+    required int groupUnitPrice,
+    required int facilitationFee,
+    required int deliveryFee,
+    required int confirmationAmount,
+    required String closingLabel,
+    required String storeDeliveryLabel,
+  }) async {
+    // Production needs a scoped, revisioned payment/publication response;
+    // the legacy gateway returns only a String and cannot establish either.
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Group purchase payment is not available yet. Your details are still here.',
+      );
+      return false;
+    }
+    final id = activeWorkspace?.id ?? workspaceId;
+    if (id == null || id.isEmpty || busy) return false;
+    final data = _storeData;
+    final scope = _contactAccountScope;
+    bool current() => _isStoreScopeCurrent(data, id, scope);
+    final token = _beginBusyStoreOperation();
+    clearMessages();
+    notifyListeners();
+    final values = <String, Object?>{
+      'productName': productName,
+      'specification': specification,
+      'targetQuantity': targetQuantity,
+      'securedQuantity': securedQuantity,
+      'unitLabel': unitLabel,
+      'regularUnitPrice': regularUnitPrice,
+      'groupUnitPrice': groupUnitPrice,
+      'facilitationFee': facilitationFee,
+      'deliveryFee': deliveryFee,
+      'confirmationAmount': confirmationAmount,
+      'closingLabel': closingLabel,
+      'storeDeliveryLabel': storeDeliveryLabel,
+    };
+    try {
+      final reference = await gateway.createGroupBuy(
+        WorkGroupBuySubmission(
+          workspaceId: id,
+          values: values,
+          idempotencyKey: 'GROUP-$id-${DateTime.now().microsecondsSinceEpoch}',
+        ),
+      );
+      if (!current()) return false;
+      applyConfirmedWorkspaceGroupBuyPayment(
+        productName: productName,
+        specification: specification,
+        targetQuantity: targetQuantity,
+        securedQuantity: securedQuantity,
+        unitLabel: unitLabel,
+        regularUnitPrice: regularUnitPrice,
+        groupUnitPrice: groupUnitPrice,
+        facilitationFee: facilitationFee,
+        deliveryFee: deliveryFee,
+        confirmationAmount: confirmationAmount,
+        paymentReference: reference,
+        closingLabel: closingLabel,
+        storeDeliveryLabel: storeDeliveryLabel,
+      );
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) showError(error.message);
+      return false;
+    } finally {
+      _finishBusyStoreOperation(token);
+    }
+  }
+
   Future<bool> finishRetailerSetup() async {
+    if (retailerPublishAfterSetup && !workspacePublicationReport.ready) {
+      showError(
+        'Store not published. Complete Publication requirements, or save setup without publishing.',
+      );
+      return false;
+    }
     if (!retailerProductAdded) {
       errorMessage = 'Add at least one product from the verified catalogue.';
       notifyListeners();
@@ -549,13 +13321,248 @@ class WorkSession extends ChangeNotifier {
     }
     return _runBool(
       () async {
-        await gateway.finishSetup();
+        final approvedWorkspaceId = workspaceId;
+        if (approvedWorkspaceId == null) {
+          throw const WorkGatewayException(
+            'Wait for Workspace approval before finishing setup.',
+          );
+        }
+        await gateway.finishSetup(
+          workspaceId: approvedWorkspaceId,
+          quantity: retailerQuantity,
+          buyPrice: retailerBuyPrice,
+          sellPrice: retailerSellPrice,
+          homeDelivery: retailerHomeDelivery,
+          storeCollection: retailerStoreCollection,
+        );
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
+        if (retailerPublishAfterSetup && workspaceCatalogueItems.isNotEmpty) {
+          workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+            publicListing: true,
+          );
+        }
+        workspaceVisibleToCustomers = retailerPublishAfterSetup;
+        workspaceAcceptingOrders = retailerPublishAfterSetup;
+        workspaceStoreState = retailerPublishAfterSetup
+            ? WorkspaceStoreState.open
+            : WorkspaceStoreState.off;
+        workspaceLastUpdatedAt = DateTime.now();
+        _recordWorkspaceActivity(
+          retailerPublishAfterSetup
+              ? 'Store setup completed and opened for customers.'
+              : 'Store setup completed and kept off.',
+        );
       },
-      success:
-          'Shop setup complete. Your available product and fulfilment choices are live.',
+      success: retailerPublishAfterSetup
+          ? 'Shop setup complete. Your available products are open for customers.'
+          : 'Shop setup complete. Your store remains off until you choose Open.',
     );
+  }
+
+  bool get _reviewStoreRecoveryEnabled =>
+      !_productionSession &&
+      SecureWorkReviewStoreSelectionStore.enabled &&
+      gateway is ReviewWorkGateway &&
+      _contactAccountScope?.trim().isNotEmpty == true;
+
+  /// Awaitable save result for the explicit review-Store selection.
+  Future<bool> get storeReviewSelectionSaved =>
+      _reviewSelectionSave ?? Future<bool>.value(false);
+
+  Future<bool> _saveSelectedReviewStore(StoreReviewSeed seed) async {
+    bool current() =>
+        !_disposed &&
+        _reviewStoreRecoveryEnabled &&
+        _contactAccountScope == seed.accountScope &&
+        activeWorkspace?.id == seed.storeId;
+    if (!current()) return false;
+    try {
+      await _reviewSelectionStorage.save(seed);
+      return current();
+    } on Object {
+      if (current()) {
+        showError(
+          'The test Store selection was not saved. Keep this session open; its bills have not been removed.',
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _restoreSelectedReviewStore() async {
+    if (!_reviewStoreRecoveryEnabled || activeWorkspace != null) return;
+    final account = _contactAccountScope!;
+    StoreReviewSeed? seed;
+    try {
+      seed = await _reviewSelectionStorage.archiveLegacySelectionForEntry(
+        account,
+      );
+    } on Object {
+      if (_disposed || account != _contactAccountScope) return;
+      throw const WorkGatewayException(
+        'The saved test Store could not be reopened. Retry without clearing its saved bills.',
+      );
+    }
+    if (_disposed ||
+        !_reviewStoreRecoveryEnabled ||
+        account != _contactAccountScope ||
+        activeWorkspace != null ||
+        seed == null) {
+      return;
+    }
+    if (seed.accountScope != account) {
+      throw const WorkGatewayException(
+        'Return to the same review account to reopen this test Store.',
+      );
+    }
+    // Legacy workload selection is archived before opening an empty evaluation
+    // identity. Only saved inventory may repopulate it; never restore seed stock.
+    // Production sessions and gateways never enter this branch.
+    _activateStoreReviewSeed(seed, restoring: true);
+    await _recoverReviewSupplierLedgers(seed);
+  }
+
+  /// Explicit review-APK action. Never seed the currently approved Store or
+  /// use a production gateway; fixtures occupy their own stable Store IDs.
+  bool get canLoadStoreReviewSeed =>
+      !_productionSession &&
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      gateway is ReviewWorkGateway &&
+      _contactAccountScope?.trim().isNotEmpty == true &&
+      activeWorkspace != null;
+
+  bool loadStoreReviewSeed(int orderCount, {DateTime? now}) {
+    if (!canLoadStoreReviewSeed ||
+        !{0, 12, 100, 1000}.contains(orderCount) ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        counterDraftSubmitting ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true) {
+      return false;
+    }
+    final seed = StoreReviewSeed(
+      accountScope: _contactAccountScope!,
+      orderCount: orderCount,
+      now: now ?? DateTime.now(),
+    );
+    return _activateStoreReviewSeed(seed);
+  }
+
+  bool _activateStoreReviewSeed(
+    StoreReviewSeed seed, {
+    bool restoring = false,
+  }) {
+    // No reset of a fixture in this session: retain edits and selected order.
+    if (activeWorkspace?.id == seed.storeId) {
+      final previousSeed = _selectedReviewSeed;
+      if (previousSeed != null) {
+        _reviewSelectionSave = _saveSelectedReviewStore(previousSeed);
+      }
+      return true;
+    }
+    final previous = activeWorkspace;
+    final exists = _storeDataById.containsKey(seed.storeId);
+    if (previous != null &&
+        !otherWorkspaces.any((store) => store.id == previous.id)) {
+      otherWorkspaces.add(previous);
+    }
+    otherWorkspaces.removeWhere((store) => store.id == seed.storeId);
+    activeWorkspace = seed.workspace;
+    _selectedReviewSeed = seed;
+    if (restoring) {
+      selectedProfile = workProfiles.firstWhere(
+        (profile) => profile.id == seed.workspace.profileId,
+      );
+      workName = seed.label;
+      workArea = seed.workspace.area;
+      workspaceId = seed.storeId;
+      reviewStage = WorkReviewStage.live;
+    }
+    if (!exists) {
+      workspaceCatalogueItems.addAll(seed.products);
+      workspaceOrders.addAll(seed.orders);
+      retailerSetupSaved = true;
+      retailerProductAdded = seed.products.isNotEmpty;
+      workspaceStoreState = WorkspaceStoreState.open;
+      workspaceAcceptingOrders = true;
+      workspaceVisibleToCustomers = true;
+      // Apply the same validated projections that backend adapters will use.
+      if (!applyWorkspaceFinance(seed.finance) ||
+          !applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.purchases,
+            complete: true,
+          ) ||
+          !applyWorkspaceGroupOffers(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.offers,
+            complete: true,
+          )) {
+        throw StateError('Invalid Store review projections');
+      }
+      final gateway = StoreReviewOrderGateway(seed);
+      bindCustomerCollectionGateway(
+        accountScope: seed.accountScope,
+        storeId: seed.storeId,
+        adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+      );
+      if (!restoring) unawaited(_recoverReviewSupplierLedgers(seed));
+      final operations = WorkOrderOperations(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        gateway: gateway,
+      );
+      for (final snapshot in gateway.snapshots) {
+        operations.observe(snapshot);
+      }
+      if (!bindWorkspaceOrderOperations(operations)) {
+        operations.dispose();
+        throw StateError('Review order controller could not be bound');
+      }
+      if (seed.orders.isNotEmpty) selectWorkspaceOrder(seed.orders.first.id);
+    }
+    if (!restoring) _reviewSelectionSave = _saveSelectedReviewStore(seed);
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _recoverReviewSupplierLedgers(StoreReviewSeed seed) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() ||
+        _disposed ||
+        !identical(data, _storeData) ||
+        _contactAccountScope != seed.accountScope ||
+        activeWorkspace?.id != seed.storeId) {
+      return;
+    }
+    // Recover saved transactions before introducing missing review fixtures.
+    // A relaunch must never replace an existing supplier's ledger history.
+    for (final ledger in seed.supplierLedgers) {
+      final key = (ledger.accountScope, ledger.supplierId);
+      if (!data.supplierLedgers.containsKey(key)) {
+        applyWorkspaceSupplierLedger(ledger);
+      }
+    }
+  }
+
+  bool setStoreReviewOrderResponse(StoreReviewOrderResponse response) {
+    final adapter = _scopedOrderOperations?.gateway;
+    if (!canLoadStoreReviewSeed ||
+        adapter is! StoreReviewOrderGateway ||
+        adapter.seed.storeId != activeWorkspace?.id) {
+      return false;
+    }
+    adapter.nextResponse = response;
+    return true;
   }
 
   void seedVerifiedWorkspace() {
@@ -570,9 +13577,26 @@ class WorkSession extends ChangeNotifier {
       id: 'WK-510001',
       name: 'Mahadev Fresh Mart',
       profileLabel: 'Grocery / Kirana Shop',
+      profileId: 'retailer-grocery',
       area: 'Sardarpura, Jodhpur',
       verified: true,
     );
+    workspaceCatalogueItems
+      ..clear()
+      ..add(
+        workspaceMasterCatalogue.first.copyWith(
+          stock: 8,
+          available: true,
+          publicListing: true,
+        ),
+      );
+    workspaceStockMovements.clear();
+    workspaceStoreState = WorkspaceStoreState.off;
+    workspaceAcceptingOrders = false;
+    workspaceVisibleToCustomers = false;
+    workspaceLastUpdatedAt = DateTime.now();
+    workspacePayoutBankName = 'State Bank of India';
+    workspacePayoutAccountEnding = '2486';
     notifyListeners();
   }
 
@@ -585,13 +13609,15 @@ class WorkSession extends ChangeNotifier {
           id: 'WK-510002',
           name: 'Creator Work',
           profileLabel: 'Creator',
+          profileId: 'creator',
           area: 'Remote India',
           verified: true,
         ),
         WorkWorkspace(
           id: 'WK-510003',
-          name: 'Delivery Work',
-          profileLabel: 'Ride / Delivery Captain',
+          name: 'Quick Delivery Work',
+          profileLabel: 'Quick Delivery Biker',
+          profileId: 'quick-delivery-biker',
           area: 'Jodhpur',
           verified: true,
         ),
@@ -599,16 +13625,183 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _run(
-    Future<void> Function() action, {
-    required String success,
-  }) async {
-    await _runBool(action, success: success);
+  void _restoreWorkspaceState(List<WorkReviewResult> records) {
+    if (records.isEmpty) return;
+    _rememberWorkspaceApplication();
+    final currentApplication = _workspaceApplicationId;
+    for (final record in records) {
+      if (record.caseId.trim().isEmpty) continue;
+      if (record.status == WorkRemoteReviewStatus.approved ||
+          record.status == WorkRemoteReviewStatus.live) {
+        // Only the gateway's approved records can create accessible Workspaces.
+        if (record.workspaceId?.trim().isNotEmpty == true &&
+            record.name != null &&
+            record.area != null &&
+            workProfiles.any((profile) => profile.id == record.profileId)) {
+          _workspaceApplications.removeWhere(
+            (_, value) => value.caseId == record.caseId,
+          );
+        }
+        continue;
+      }
+      final previous = _workspaceApplications.values
+          .where(
+            (application) =>
+                application.scope == _contactAccountScope &&
+                application.caseId == record.caseId,
+          )
+          .firstOrNull;
+      final profileId = previous?.details['profileId'] ?? record.profileId;
+      if (!workProfiles.any((profile) => profile.id == profileId)) continue;
+      if (record.profileId != null && record.profileId != profileId) continue;
+      final id = previous?.id ?? 'application-${record.caseId}';
+      _workspaceApplications[id] = _WorkspaceApplicationDraft(
+        id: id,
+        scope: _contactAccountScope,
+        details: Map.unmodifiable({
+          if (previous != null)
+            ...previous.details
+          else ...{
+            'profileId': profileId,
+            'name': record.name ?? '',
+            'area': record.area ?? '',
+            'activity': record.primaryActivity ?? '',
+          },
+          'caseId': record.caseId,
+          'plan': record.plan,
+        }),
+        submitted: previous?.submitted,
+        files: previous?.files ?? const {},
+        confirmed: previous?.confirmed ?? const {},
+        status: record.status,
+        reason: record.reason,
+      );
+    }
+    _restoreWorkspaceRecords(records);
+    final application =
+        _workspaceApplications[currentApplication] ??
+        (activeWorkspace == null
+            ? _workspaceApplications.values
+                  .where((value) => value.caseId == reviewCaseId)
+                  .firstOrNull
+            : null);
+    if (application != null) {
+      _restoreWorkspaceApplication(application);
+    } else {
+      _workspaceApplicationId = null;
+    }
+    _queueContactDraft();
+  }
+
+  void _restoreWorkspaceRecords(List<WorkReviewResult> records) {
+    if (records.isEmpty) return;
+    final preferredId = activeWorkspace?.id;
+    WorkWorkspace? restoredActive;
+    final restoredOthers = <WorkWorkspace>[];
+    WorkReviewResult? pending;
+    WorkReviewResult? stopped;
+    for (final record in records) {
+      if (record.status == WorkRemoteReviewStatus.pending) {
+        pending ??= record;
+        continue;
+      }
+      if (record.status == WorkRemoteReviewStatus.rejected ||
+          record.status == WorkRemoteReviewStatus.suspended) {
+        stopped ??= record;
+        continue;
+      }
+      if (record.status != WorkRemoteReviewStatus.approved &&
+          record.status != WorkRemoteReviewStatus.live) {
+        continue;
+      }
+      final id = record.workspaceId;
+      final name = record.name;
+      final area = record.area;
+      final profileId = record.profileId;
+      if (id == null || name == null || area == null || profileId == null) {
+        continue;
+      }
+      final option = workProfiles
+          .where((item) => item.id == profileId)
+          .firstOrNull;
+      if (option == null) continue;
+      final workspace = WorkWorkspace(
+        id: id,
+        name: name,
+        profileLabel: option.label,
+        profileId: option.id,
+        area: area,
+        verified: true,
+      );
+      if (restoredActive == null ||
+          id == preferredId ||
+          (restoredActive.id != preferredId &&
+              record.status == WorkRemoteReviewStatus.live)) {
+        if (restoredActive != null) restoredOthers.add(restoredActive);
+        restoredActive = workspace;
+        selectedProfile = option;
+        workName = name;
+        workArea = area;
+        primaryActivity = record.primaryActivity ?? '';
+        reviewCaseId = record.caseId;
+        workspaceId = id;
+        subscriptionPlan = record.plan;
+        remoteReviewStatus = record.status;
+        _approvalWelcome = (
+          scope: _contactAccountScope,
+          caseId: record.caseId,
+          workspaceId: id,
+        );
+        reviewStage = record.status == WorkRemoteReviewStatus.live
+            ? WorkReviewStage.live
+            : WorkReviewStage.approved;
+      } else {
+        restoredOthers.add(workspace);
+      }
+    }
+    if (restoredActive != null) {
+      activeWorkspace = restoredActive;
+      otherWorkspaces
+        ..clear()
+        ..addAll(restoredOthers);
+      return;
+    }
+    if (pending != null) {
+      final option = workProfiles
+          .where((item) => item.id == pending!.profileId)
+          .firstOrNull;
+      selectedProfile = option;
+      selectedFamilyId = option?.familyId;
+      workName = pending.name ?? workName;
+      workArea = pending.area ?? workArea;
+      primaryActivity = pending.primaryActivity ?? primaryActivity;
+      reviewCaseId = pending.caseId;
+      subscriptionPlan = pending.plan;
+      reviewReason = pending.reason;
+      remoteReviewStatus = pending.status;
+      reviewStage = WorkReviewStage.gstPending;
+      return;
+    }
+    if (stopped != null) {
+      final option = workProfiles
+          .where((item) => item.id == stopped!.profileId)
+          .firstOrNull;
+      selectedProfile = option;
+      selectedFamilyId = option?.familyId;
+      workName = stopped.name ?? workName;
+      workArea = stopped.area ?? workArea;
+      primaryActivity = stopped.primaryActivity ?? primaryActivity;
+      reviewCaseId = stopped.caseId;
+      subscriptionPlan = stopped.plan;
+      reviewReason = stopped.reason;
+      remoteReviewStatus = stopped.status;
+      reviewStage = WorkReviewStage.gstPending;
+    }
   }
 
   Future<bool> _runBool(
     Future<void> Function() action, {
-    required String success,
+    required String? success,
   }) async {
     if (busy) return false;
     busy = true;
@@ -629,3 +13822,6 @@ class WorkSession extends ChangeNotifier {
     }
   }
 }
+
+bool _validEmail(String value) =>
+    RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value);

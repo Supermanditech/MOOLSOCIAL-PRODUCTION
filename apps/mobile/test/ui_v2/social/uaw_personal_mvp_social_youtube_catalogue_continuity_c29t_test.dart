@@ -5,7 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
+import 'package:moolsocial/features/shared/shared_models.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
+import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -13,7 +17,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'C29T reopens Videos and Shorts from snapshots while refresh is pending',
+    'C29T reopens fresh Videos and Shorts without another provider load',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
@@ -39,19 +43,27 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
-      final pendingVideos = Completer<List<Screen04YouTubePublicVideo>>();
-      final pendingShorts = Completer<List<Screen04YouTubePublicVideo>>();
+      var videoReloads = 0;
+      var shortReloads = 0;
       await _mount(
         tester,
         owners.consumer(
           subAction: 'videos',
           store: store,
-          videosLoader: () => pendingVideos.future,
-          shortsLoader: () => pendingShorts.future,
+          videosLoader: () async {
+            videoReloads += 1;
+            return const [];
+          },
+          shortsLoader: () async {
+            shortReloads += 1;
+            return const [];
+          },
         ),
       );
       await tester.pump();
 
+      expect(videoReloads, 0);
+      expect(shortReloads, 0);
       expect(find.text('Provider title video-1'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-youtube-videos-state-loading')),
@@ -68,34 +80,294 @@ void main() {
         find.byKey(const Key('screen04-youtube-shorts-state-loading')),
         findsNothing,
       );
-
-      pendingVideos.completeError(StateError('offline'));
-      pendingShorts.completeError(StateError('offline'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(
-        find.byKey(const Key('screen04-youtube-shorts-refresh-error')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('screen04-shorts-page-view')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('screen04-rail-videos')));
-      await tester.pump();
-      expect(find.text('Provider title video-1'), findsOneWidget);
-      expect(
-        find.byKey(const Key('screen04-youtube-videos-refresh-error')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('screen04-youtube-videos-state-error')),
-        findsNothing,
-      );
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Social tab and Create draft survive a main-action remount', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-state', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-state', duration: 'PT30S')]);
+    var providerLoads = 0;
+    Future<List<Screen04YouTubePublicVideo>> loader() async {
+      providerLoads += 1;
+      return const [];
+    }
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        initialState: 'text',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('screen04-create-post-text')),
+      'Keep this exact unfinished post',
+    );
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(providerLoads, 0);
+    expect(find.byKey(const Key('social-v2-create-workbench')), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
+          .controller
+          ?.text,
+      'Keep this exact unfinished post',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('account boundary removes the prior user Create draft', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore();
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        initialState: 'text',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('screen04-create-post-text')),
+      'Private draft from the prior account',
+    );
+    await tester.pump();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    unawaited(
+      resetSocialV2RetainedStateForAuthenticationBoundary(owners.shared),
+    );
+    socialCreateDraftState.beginPrincipalBindingAttempt();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'create',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('active YouTube video survives a main-action remount', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-watch', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-watch', duration: 'PT30S')]);
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'videos',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Provider title video-watch'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(find.text('Provider title video-watch'), findsWidgets);
+  });
+
+  testWidgets(
+    'YouTube search query and results survive a main-action remount',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final owners = _Owners();
+      addTearDown(owners.dispose);
+      final store = Screen04YouTubeCatalogueSnapshotStore()
+        ..replaceVideos([_publicVideo('video-search', duration: 'PT4M')])
+        ..replaceShorts([_publicVideo('short-search', duration: 'PT30S')]);
+      Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+      var searchCalls = 0;
+      Future<List<Screen04YouTubePublicVideo>> searchLoader(
+        String query,
+      ) async {
+        searchCalls += 1;
+        return [_publicVideo('search-result', duration: 'PT3M')];
+      }
+
+      await _mount(
+        tester,
+        owners.consumer(
+          subAction: 'videos',
+          store: store,
+          videosLoader: loader,
+          shortsLoader: loader,
+          searchLoader: searchLoader,
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const Key('screen04-youtube-search-input')),
+        'India news',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      expect(searchCalls, 1);
+      expect(find.text('Provider title search-result'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await _mount(
+        tester,
+        owners.consumer(
+          subAction: null,
+          store: store,
+          videosLoader: loader,
+          shortsLoader: loader,
+          searchLoader: searchLoader,
+        ),
+      );
+      await tester.pump();
+
+      expect(searchCalls, 1);
+      expect(
+        find.byKey(const Key('screen04-youtube-search-surface')),
+        findsOneWidget,
+      );
+      expect(find.text('Provider title search-result'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const Key('screen04-youtube-search-input')),
+            )
+            .controller
+            ?.text,
+        'India news',
+      );
+    },
+  );
+
+  testWidgets('loaded Feed survives a main-action remount without reloading', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final gateway = _CountingFeedGateway();
+    final owners = _Owners(
+      shared: SharedSession(socialContentGateway: gateway),
+    );
+    addTearDown(owners.dispose);
+    final store = Screen04YouTubeCatalogueSnapshotStore()
+      ..replaceVideos([_publicVideo('video-feed', duration: 'PT4M')])
+      ..replaceShorts([_publicVideo('short-feed', duration: 'PT30S')]);
+    Future<List<Screen04YouTubePublicVideo>> loader() async => const [];
+
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: 'feed',
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.feedCalls, 1);
+    expect(owners.shared.socialFeedLoaded, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await _mount(
+      tester,
+      owners.consumer(
+        subAction: null,
+        store: store,
+        videosLoader: loader,
+        shortsLoader: loader,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-moolsocial-feed-brand')),
+      findsOneWidget,
+    );
+    expect(gateway.feedCalls, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('C29T expired snapshot uses only the in-surface cold start', (
     tester,
@@ -129,7 +401,7 @@ void main() {
 
     expect(
       find.byKey(const Key('screen04-youtube-videos-state-loading')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('screen04-youtube-home-header')),
@@ -143,7 +415,7 @@ void main() {
       find.byKey(const Key('screen04-youtube-home-account')),
       findsOneWidget,
     );
-    expect(find.text('Provider title expired'), findsNothing);
+    expect(find.text('Provider title expired'), findsOneWidget);
     expect(find.byType(Dialog), findsNothing);
     expect(find.byType(BottomSheet), findsNothing);
 
@@ -321,6 +593,96 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'RT-04A-02 stale process-death catalogue survives offline refresh',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      var now = DateTime.utc(2026, 8, 25, 6);
+      final persistence = _CatalogueKeyValueStoreFake();
+      final firstRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final firstStore = Screen04YouTubeCatalogueSnapshotStore(now: () => now);
+      await firstStore.configureDurability(firstRepository);
+      firstStore.replaceVideos([
+        _publicVideo('offline-video', duration: 'PT4M'),
+      ]);
+      firstStore.replaceShorts([
+        _publicVideo('offline-short', duration: 'PT30S'),
+      ]);
+      await firstStore.settleDurableWrites();
+
+      now = now.add(const Duration(minutes: 6));
+      final relaunchedRepository = DurableYouTubePublicCatalogueRepository(
+        persistence: persistence,
+        now: () => now,
+      );
+      final relaunchedStore = Screen04YouTubeCatalogueSnapshotStore(
+        now: () => now,
+      );
+      final hydration = await relaunchedStore.configureDurability(
+        relaunchedRepository,
+      );
+      expect(hydration.degraded, isFalse);
+      expect(relaunchedStore.readFreshVideos(), isNull);
+      expect(relaunchedStore.readFreshShorts(), isNull);
+
+      final videoOwners = _Owners();
+      addTearDown(videoOwners.dispose);
+      await _mount(
+        tester,
+        videoOwners.consumer(
+          subAction: 'videos',
+          store: relaunchedStore,
+          videosLoader: () => Future.error(StateError('offline')),
+          shortsLoader: () => Future.error(StateError('offline')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Provider title offline-video'), findsOneWidget);
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-refresh-error')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-youtube-videos-state-error')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      final shortsOwners = _Owners();
+      addTearDown(shortsOwners.dispose);
+      await _mount(
+        tester,
+        shortsOwners.consumer(
+          subAction: 'shorts',
+          store: relaunchedStore,
+          videosLoader: () => Future.error(StateError('offline')),
+          shortsLoader: () => Future.error(StateError('offline')),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        find.byKey(const ValueKey('screen04-youtube-short-offline-short')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-youtube-shorts-refresh-error')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 Future<void> _mount(WidgetTester tester, Widget child) => tester.pumpWidget(
@@ -353,18 +715,21 @@ Screen04YouTubePublicVideo _publicVideo(
 );
 
 class _Owners {
+  _Owners({SharedSession? shared}) : shared = shared ?? SharedSession();
+
   final journey = JourneySession();
   final creator = CreatorSession();
   final retailer = RetailerSession();
-  final shared = SharedSession();
+  final SharedSession shared;
 
   SocialUniversalV2 consumer({
-    required String subAction,
+    String? subAction,
     String? initialState,
     String? initialItem,
     required Screen04YouTubeCatalogueSnapshotStore store,
     required Screen04YouTubePublicVideoLoader videosLoader,
     required Screen04YouTubePublicVideoLoader shortsLoader,
+    Screen04YouTubePublicSearchLoader? searchLoader,
   }) => SocialUniversalV2(
     session: journey,
     creatorSession: creator,
@@ -377,6 +742,7 @@ class _Owners {
     youtubeCreatorAccessOverride: false,
     youtubeVideosLoader: videosLoader,
     youtubeShortsLoader: shortsLoader,
+    youtubeSearchLoader: searchLoader,
     youtubeCatalogueSnapshotStore: store,
   );
 
@@ -386,4 +752,45 @@ class _Owners {
     retailer.dispose();
     shared.dispose();
   }
+}
+
+final class _CatalogueKeyValueStoreFake
+    implements YouTubePublicCatalogueKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<bool> writeString(String key, String value) async {
+    values[key] = value;
+    return true;
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    values.remove(key);
+    return true;
+  }
+}
+
+class _CountingFeedGateway implements SocialContentGateway {
+  int feedCalls = 0;
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    feedCalls += 1;
+    return const SocialFeedPage(items: []);
+  }
+
+  @override
+  Future<SocialPublishedItem> interact({
+    required String postId,
+    required String interaction,
+    int? choiceIndex,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
+      Future.error(UnsupportedError('Not used by this test.'));
 }

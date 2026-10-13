@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-CROSS-AGENT-INCREMENTAL-TICKET-001",
+  "baselineTag": "moolsocial-add-product-screen1-start-20260920",
+  "uiFounderReview": {
+    "state": "pending",
+    "acceptedScopes": [],
+    "reachableBuyDestinations": [],
+    "blockedBackendScopes": ["store.add_product"],
+    "medicineOwner": "care"
+  },
+  "lanes": [{
+    "id": "codex_ui",
+    "branchPrefix": "work/codex-ui/add-product-screen1-20260920",
+    "packageId": "com.moolsocial.app.runtime",
+    "deviceSerial": "2b3e0f71",
+    "minimumVersionCodeExclusive": 2026092002
+  }],
+  "rules": {
+    "oneOpenTicketPerLane": true,
+    "oneOpenTicketPerPackage": true,
+    "ticketStartMustEqualBaseline": true,
+    "laterPhasesMustDescendFromBaseline": true,
+    "baselineTagMustBeAnnotatedAndRemoteExact": true,
+    "candidateVersionMustIncrease": true,
+    "backendRequiresFounderAcceptedUiScope": true,
+    "handoffRequiresCleanWorktree": true,
+    "acceptedTicketBecomesNextBaseline": true
+  }
+}

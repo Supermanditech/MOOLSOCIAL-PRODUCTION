@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -172,6 +173,404 @@ void main() {
   );
 
   test(
+    'authenticated gateway transports privacy safety and request state',
+    () async {
+      final transport = _RecordingTransport([
+        _ok({
+          'whoCanMessage': 'everyone',
+          'messageRequestsEnabled': true,
+          'shareLastSeen': true,
+          'readReceipts': true,
+          'updatedAt': '2026-08-29T00:00:00.000Z',
+        }),
+        _ok({
+          'whoCanMessage': 'connections',
+          'messageRequestsEnabled': false,
+          'shareLastSeen': false,
+          'readReceipts': false,
+          'updatedAt': '2026-08-29T00:01:00.000Z',
+        }),
+        _ok([
+          {
+            'userId': 'member-2',
+            'name': 'Member Two',
+            'handle': '@membertwo',
+            'blockedAt': '2026-08-29T00:02:00.000Z',
+          },
+        ]),
+        _ok({'blocked': true}),
+        _ok([
+          {
+            'thread': {
+              'id': 'request-1',
+              'title': 'New member',
+              'subtitle': '@newmember',
+              'preview': 'Hello',
+              'updatedAt': '2026-08-29T00:03:00.000Z',
+              'type': 'people',
+              'unreadCount': 1,
+              'verified': false,
+              'targetUserId': 'member-3',
+              'requestStatus': 'pending',
+            },
+            'requestedByUserId': 'member-3',
+            'requestedAt': '2026-08-29T00:03:00.000Z',
+          },
+        ]),
+        _ok({'threadId': 'request-1', 'accepted': true}),
+      ]);
+      final credentials = _RecordingCredentials();
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: credentials,
+        transport: transport,
+        random: Random(2),
+      );
+
+      expect(
+        (await gateway.getPrivacySettings()).whoCanMessage,
+        ChatMessagePermission.everyone,
+      );
+      final saved = await gateway.updatePrivacySettings(
+        const ChatPrivacySettings(
+          whoCanMessage: ChatMessagePermission.connections,
+          messageRequestsEnabled: false,
+          shareLastSeen: false,
+          readReceipts: false,
+        ),
+      );
+      expect(saved.whoCanMessage, ChatMessagePermission.connections);
+      expect((await gateway.listBlockedAccounts()).single.userId, 'member-2');
+      expect(
+        await gateway.setBlockedAccount(
+          targetUserId: 'member-2',
+          blocked: true,
+        ),
+        isTrue,
+      );
+      expect(
+        (await gateway.listMessageRequests()).single.thread.id,
+        'request-1',
+      );
+      expect(
+        await gateway.resolveMessageRequest(
+          threadId: 'request-1',
+          accepted: true,
+        ),
+        isTrue,
+      );
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getPrivacySettings',
+        'updatePrivacySettings',
+        'listBlockedAccounts',
+        'setBlockedAccount',
+        'listMessageRequests',
+        'resolveMessageRequest',
+      ]);
+      expect(
+        credentials.modes
+            .where((mode) => mode == SocialAppCheckTokenMode.limitedUse)
+            .length,
+        3,
+      );
+    },
+  );
+
+  test(
+    'authenticated gateway transports call availability and lifecycle',
+    () async {
+      final record = {
+        'id': 'call-1',
+        'threadId': 'thread-1',
+        'kind': 'voice',
+        'callerUserId': 'user-1',
+        'recipientUserId': 'user-2',
+        'status': 'ringing',
+        'createdAt': '2026-08-29T03:00:00.000Z',
+        'updatedAt': '2026-08-29T03:00:00.000Z',
+      };
+      final transport = _RecordingTransport([
+        _ok({
+          'voiceCallsEnabled': true,
+          'videoCallsEnabled': false,
+          'updatedAt': '2026-08-29T03:00:00.000Z',
+        }),
+        _ok({
+          'voiceCallsEnabled': false,
+          'videoCallsEnabled': false,
+          'updatedAt': '2026-08-29T03:01:00.000Z',
+        }),
+        _ok({'state': 'active', 'updatedAt': '2026-08-29T03:01:00.000Z'}),
+        _ok({
+          'threadId': 'thread-1',
+          'kind': 'voice',
+          'recipientUserId': 'user-2',
+          'recipientName': 'Member',
+          'canStart': false,
+          'status': 'calls_off',
+          'message': 'Member has turned off voice calls.',
+        }),
+        _ok(record),
+        _ok({...record, 'status': 'accepted'}),
+        _ok({...record, 'status': 'ended'}),
+        _ok([record]),
+      ]);
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        random: Random(3),
+      );
+
+      expect((await gateway.getCallPreferences()).videoCallsEnabled, isFalse);
+      await gateway.updateCallPreferences(
+        const ChatCallPreferences(
+          voiceCallsEnabled: false,
+          videoCallsEnabled: false,
+        ),
+      );
+      await gateway.setPresence(ChatPresenceState.active);
+      final availability = await gateway.getCallAvailability(
+        threadId: 'thread-1',
+        kind: ChatCallKind.voice,
+      );
+      expect(availability.status, ChatCallAvailabilityStatus.callsOff);
+      expect(
+        (await gateway.startCall(
+          threadId: 'thread-1',
+          kind: ChatCallKind.voice,
+          idempotencyKey: 'chat-call-retry-0001',
+        )).status,
+        ChatCallStatus.ringing,
+      );
+      expect(
+        (await gateway.respondToCall(callId: 'call-1', accepted: true)).status,
+        ChatCallStatus.accepted,
+      );
+      expect(
+        (await gateway.endCall(callId: 'call-1')).status,
+        ChatCallStatus.ended,
+      );
+      expect((await gateway.listIncomingCalls()).single.id, 'call-1');
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getCallPreferences',
+        'updateCallPreferences',
+        'setPresence',
+        'getCallAvailability',
+        'startCall',
+        'respondToCall',
+        'endCall',
+        'listIncomingCalls',
+      ]);
+    },
+  );
+
+  test('authenticated gateway finalizes one private attachment', () async {
+    const uploadId = '00000000-0000-4000-8000-000000000002';
+    final headers = {
+      'content-type': 'audio/mp4',
+      'content-length': '4',
+      'x-goog-if-generation-match': '0',
+      'x-goog-meta-moolsocial-schema': 'chat-attachment-v1',
+      'x-goog-meta-moolsocial-kind': 'voice',
+      'x-goog-meta-moolsocial-owner': 'owner-digest',
+      'x-goog-meta-moolsocial-thread': 'thread-digest',
+      'x-goog-meta-moolsocial-name': 'name-digest',
+      'x-goog-meta-moolsocial-size': '4',
+      'x-goog-meta-moolsocial-duration': '2000',
+    };
+    final transport = _RecordingTransport([
+      _ok({
+        'uploadId': uploadId,
+        'uploadUrl': 'https://storage.googleapis.com/private-upload',
+        'expiresAt': '2026-08-29T04:05:00.000Z',
+        'requiredHeaders': headers,
+      }),
+      _ok({
+        'id': 'voice-1',
+        'senderName': 'You',
+        'text': '',
+        'createdAt': '2026-08-29T04:00:00.000Z',
+        'mine': true,
+        'reactionCount': 0,
+        'reactedByMe': false,
+        'attachment': {
+          'id': uploadId,
+          'kind': 'voice',
+          'name': 'Voice message.m4a',
+          'contentType': 'audio/mp4',
+          'sizeBytes': 4,
+          'durationMilliseconds': 2000,
+          'readUrl': 'https://storage.googleapis.com/private-read',
+          'readUrlExpiresAt': '2026-08-29T04:05:00.000Z',
+        },
+      }),
+    ]);
+    final upload = _RecordingAttachmentUploadTransport();
+    final gateway = AuthenticatedChatGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+      ),
+      credentials: _RecordingCredentials(),
+      transport: transport,
+      attachmentUploadTransport: upload,
+      random: Random(4),
+    );
+    final delivered = await gateway.sendAttachment(
+      threadId: 'thread-1',
+      attachment: ChatPickedAttachment(
+        kind: ChatAttachmentKind.voice,
+        name: 'Voice message.m4a',
+        contentType: 'audio/mp4',
+        bytes: Uint8List.fromList([1, 2, 3, 4]),
+        duration: const Duration(seconds: 2),
+      ),
+      caption: '',
+      idempotencyKey: 'chat-attachment-retry-0001',
+    );
+    expect(delivered.attachment?.kind, ChatAttachmentKind.voice);
+    expect(upload.puts, 1);
+    expect(transport.bodies.map((body) => body['operation']), [
+      'prepareAttachmentUpload',
+      'sendAttachmentMessage',
+    ]);
+  });
+
+  test('authenticated gateway transports group membership lifecycle', () async {
+    final info = {
+      'threadId': 'group-1',
+      'title': 'Home Group',
+      'description': 'Coordinate together.',
+      'members': [
+        {
+          'userId': 'user-1',
+          'name': 'You',
+          'handle': '@you',
+          'isAdmin': true,
+          'isMe': true,
+        },
+        {
+          'userId': 'user-2',
+          'name': 'Member',
+          'handle': '@member',
+          'isAdmin': false,
+          'isMe': false,
+        },
+      ],
+      'invitePermission': 'admins',
+      'canInvite': true,
+      'canManage': true,
+      'canLeave': true,
+    };
+    final invite = {
+      'id': 'invite-1',
+      'threadId': 'group-1',
+      'groupTitle': 'Home Group',
+      'invitedByUserId': 'user-1',
+      'invitedByName': 'You',
+      'invitedAt': '2026-08-29T05:00:00.000Z',
+    };
+    final transport = _RecordingTransport([
+      _ok(info),
+      _ok(invite),
+      _ok({...info, 'invitePermission': 'members'}),
+      _ok({'threadId': 'group-1', 'left': true}),
+      _ok([invite]),
+      _ok({'inviteId': 'invite-1', 'accepted': true, 'threadId': 'group-1'}),
+    ]);
+    final gateway = AuthenticatedChatGateway(
+      endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+      ),
+      credentials: _RecordingCredentials(),
+      transport: transport,
+      random: Random(5),
+    );
+    expect((await gateway.getGroupInfo(threadId: 'group-1')).canManage, isTrue);
+    expect(
+      (await gateway.inviteGroupMember(
+        threadId: 'group-1',
+        targetUserId: 'user-3',
+      )).id,
+      'invite-1',
+    );
+    expect(
+      (await gateway.updateGroupPermissions(
+        threadId: 'group-1',
+        invitePermission: ChatGroupInvitePermission.members,
+      )).invitePermission,
+      ChatGroupInvitePermission.members,
+    );
+    expect(await gateway.leaveGroup(threadId: 'group-1'), isTrue);
+    expect((await gateway.listGroupInvites()).single.id, 'invite-1');
+    expect(
+      await gateway.respondToGroupInvite(inviteId: 'invite-1', accepted: true),
+      isTrue,
+    );
+    expect(transport.bodies.map((body) => body['operation']), [
+      'getGroupInfo',
+      'inviteGroupMember',
+      'updateGroupPermissions',
+      'leaveGroup',
+      'listGroupInvites',
+      'respondToGroupInvite',
+    ]);
+  });
+
+  test(
+    'authenticated gateway transports notifications and quiet hours',
+    () async {
+      final settings = {
+        'messagesEnabled': true,
+        'callsEnabled': true,
+        'groupInvitesEnabled': false,
+        'showPreview': false,
+        'quietHoursEnabled': true,
+        'quietStartMinutes': 1320,
+        'quietEndMinutes': 420,
+        'utcOffsetMinutes': 330,
+        'updatedAt': '2026-08-29T06:00:00.000Z',
+      };
+      final transport = _RecordingTransport([
+        _ok(settings),
+        _ok(settings),
+        _ok({'registered': true}),
+        _ok({'registered': false}),
+      ]);
+      final gateway = AuthenticatedChatGateway(
+        endpoint: Uri.parse(
+          'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialChat',
+        ),
+        credentials: _RecordingCredentials(),
+        transport: transport,
+        random: Random(6),
+      );
+      final loaded = await gateway.getNotificationPreferences();
+      expect(loaded.quietStartMinutes, 1320);
+      await gateway.updateNotificationPreferences(loaded);
+      final token = List.filled(64, 'a').join();
+      expect(
+        await gateway.registerNotificationDevice(
+          token: token,
+          platform: 'android',
+        ),
+        isTrue,
+      );
+      expect(await gateway.unregisterNotificationDevice(token: token), isFalse);
+      expect(transport.bodies.map((body) => body['operation']), [
+        'getNotificationPreferences',
+        'updateNotificationPreferences',
+        'registerNotificationDevice',
+        'unregisterNotificationDevice',
+      ]);
+    },
+  );
+
+  test(
     'production Chat loads only gateway-owned threads and messages',
     () async {
       final gateway = _ChatGateway();
@@ -329,7 +728,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byTooltip('Read'), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-delivery-status-message-read')),
+        findsOneWidget,
+      );
+      expect(find.text('Seen'), findsOneWidget);
+      expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+      await tester.longPress(
+        find.byKey(const Key('chat-message-message-read')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
       expect(find.byKey(const Key('chat-reply-message-read')), findsOneWidget);
       expect(find.byKey(const Key('chat-react-message-read')), findsOneWidget);
       expect(
@@ -390,6 +799,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-message-1')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-forward-picker')), findsOneWidget);
@@ -398,13 +809,37 @@ void main() {
       find.byKey(const Key('chat-forward-target-thread-2')),
       findsOneWidget,
     );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-forward-picker')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(gateway.forwardRequests, isEmpty);
+
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-forward-confirmation')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-forward-confirmation')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(gateway.forwardRequests, isEmpty);
+
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-message-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-cancel')));
     await tester.pumpAndSettle();
     expect(gateway.forwardRequests, isEmpty);
 
+    await tester.longPress(find.byKey(const Key('chat-message-message-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-message-1')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('chat-forward-target-thread-2')));
@@ -541,6 +976,7 @@ void main() {
       find.byKey(const Key('chat-message-field')),
       'Old recipient draft',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const Key('chat-send')));
     await tester.pump();
     expect(session.busy, isTrue);
@@ -590,7 +1026,7 @@ void main() {
           .text,
       isEmpty,
     );
-    expect(find.text('Message delivered.'), findsOneWidget);
+    expect(find.text('Message delivered.'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -919,6 +1355,11 @@ class _RecordingCredentials implements SocialContentCredentials {
   Future<String> firebaseIdToken() async => 'test-value';
 }
 
+SocialContentResponse _ok(Object? data) => SocialContentResponse(
+  statusCode: 200,
+  body: jsonEncode({'ok': true, 'data': data}),
+);
+
 class _RecordingTransport implements SocialContentTransport {
   _RecordingTransport(this.responses);
 
@@ -933,5 +1374,20 @@ class _RecordingTransport implements SocialContentTransport {
   }) async {
     bodies.add(Map<String, Object?>.from(body));
     return responses.removeAt(0);
+  }
+}
+
+class _RecordingAttachmentUploadTransport implements ChatPhotoUploadTransport {
+  int puts = 0;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    puts += 1;
+    expect(url.host, 'storage.googleapis.com');
+    expect(headers['content-length'], '${bytes.length}');
   }
 }

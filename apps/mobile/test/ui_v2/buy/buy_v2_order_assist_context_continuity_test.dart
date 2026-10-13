@@ -1,3 +1,12 @@
+import 'buy_v2_screen_test.dart' show r66VisualCaptureRoot, captureR66Visual;
+import 'package:flutter/rendering.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/buy/buy_v2_customer_copy.dart';
+import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
+import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -5,6 +14,15 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+class _R6634IdentitySession extends BuyV2Session {
+  _R6634IdentitySession(this.fixture) : super(core: BuySession());
+  final BuyV2Order fixture;
+  @override
+  List<BuyV2Order> get visibleOrders => [fixture];
+  @override
+  List<BuyV2Order> get orders => [fixture];
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +33,7 @@ void main() {
     BuyV2Session session, {
     double textScale = 1,
     bool reducedMotion = false,
+    VoidCallback? onOpenChat,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -30,8 +49,155 @@ void main() {
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
+        onOpenChat: onOpenChat,
       ),
     );
+  }
+
+  for (var route = 0; route < 3; route++) {
+    for (var variant = 0; variant < 3; variant++) {
+      final routeName = [
+        'new Orders',
+        'retained Orders',
+        'supplier chat',
+      ][route];
+      final stateName = [
+        'normal',
+        'long name',
+        '200 percent with keyboard',
+      ][variant];
+      testWidgets(
+        'R6634 C02-${route * 3 + variant + 1} $routeName $stateName',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          tester.platformDispatcher.textScaleFactorTestValue = variant == 2
+              ? 2
+              : 1;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          const storeId = 'buy-catalogue-dev-v1-shop-store-000001';
+          const skuId = '$storeId-sku-0001';
+          final name = variant == 1
+              ? 'Sardarpura Family Grocery and Household Supplies'
+              : 'Mool Market 000001';
+          final product = BuyV2Catalogue.products.first.copyWith(
+            id: skuId,
+            storeId: storeId,
+            seller: name,
+          );
+          final order = BuyV2Order(
+            id: 'R6634-NAME',
+            destination: BuyV2Destination.shop,
+            title: 'Shop order',
+            itemSummary: '1 product',
+            total: 37,
+            partner: name,
+            partnerType: 'Retailer',
+            promise: 'Delivery in 20 min',
+            destinationLabel: 'Jodhpur',
+            progress: .4,
+            status: BuyV2OrderStatus.preparing,
+            productIds: const [skuId],
+            lines: route == 1
+                ? const []
+                : [BuyV2CartLine(product: product, quantity: 1)],
+          );
+          final expected = variant == 1 ? name : 'Mool Market 1';
+          expect(order.customerPartner, expected);
+          expect(order.partner, name, reason: 'Stored identity is immutable');
+          final location = const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+            order: order,
+          );
+          final uri = Uri.parse(location);
+          expect(uri.queryParameters['supplier'], expected);
+          if (route < 2) {
+            final session = _R6634IdentitySession(order);
+            addTearDown(session.dispose);
+            await tester.pumpWidget(
+              MaterialApp(
+                builder: (context, child) => r66VisualCaptureRoot(child!),
+                theme: MoolTheme.light(),
+                home: Scaffold(
+                  body: BuyV2OrdersView(
+                    session: session,
+                    onOpenOrderHelp: (_) {},
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text(expected), findsOneWidget);
+            expect(find.byTooltip(expected), findsOneWidget);
+            expect(find.text('Mool Market 000001'), findsNothing);
+            expect(
+              find.byKey(const ValueKey('buy-order-primary-R6634-NAME')),
+              findsOneWidget,
+            );
+          } else {
+            final journey = JourneySession(
+              store: MemoryJourneyStore(
+                snapshot: const JourneySnapshot(
+                  languageCode: 'en',
+                  areaMode: 'manual',
+                  areaLabel: 'Sardarpura',
+                  setupComplete: true,
+                ),
+              ),
+              otpGateway: ReviewOtpGateway(signedIn: true),
+            );
+            await journey.start();
+            final chat = ChatSession();
+            addTearDown(journey.dispose);
+            addTearDown(chat.dispose);
+            await tester.pumpWidget(
+              r66VisualCaptureRoot(
+                MoolSocialApp(
+                  session: journey,
+                  chatSession: chat,
+                  initialLocation: location,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+            expect(
+              tester
+                  .widget<Text>(find.byKey(const Key('chat-page-title')))
+                  .data,
+              expected,
+            );
+            expect(find.text('Order R6634-NAME'), findsOneWidget);
+            expect(
+              tester
+                  .renderObject<RenderParagraph>(
+                    find.byKey(const Key('chat-page-title')),
+                  )
+                  .didExceedMaxLines,
+              isFalse,
+            );
+            expect(
+              tester
+                  .renderObject<RenderParagraph>(find.text('Order R6634-NAME'))
+                  .didExceedMaxLines,
+              isFalse,
+            );
+            if (variant == 2) {
+              await tester.tap(find.byKey(const Key('chat-message-field')));
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const Key('chat-message-field')).hitTestable(),
+                findsOneWidget,
+              );
+              FocusManager.instance.primaryFocus?.unfocus();
+              await tester.pumpAndSettle();
+            }
+          }
+          await captureR66Visual(tester, 'r6634-c02-$route-$variant');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   test('Tracking and Items Assist own the exact selected order', () {
@@ -70,7 +236,7 @@ void main() {
     expect(session.assistOrder.id, isNot('PO-240783'));
   });
 
-  testWidgets('Wholesale Help renders and opens its exact order', (
+  testWidgets('retired Wholesale Assist renders exact Tracking and Chat Help', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -79,21 +245,73 @@ void main() {
     addTearDown(session.dispose);
     expect(session.openTracking('PO-240783'), isTrue);
     session.openAssist();
+    var chatOpens = 0;
 
-    await tester.pumpWidget(app(session));
+    await tester.pumpWidget(app(session, onOpenChat: () => chatOpens += 1));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('PO-240783'), findsOneWidget);
     expect(find.textContaining('MS-240782'), findsNothing);
-    final currentOrder = find.byKey(const ValueKey('buy-assist-current-order'));
-    expect(currentOrder, findsOneWidget);
-    await tester.tap(currentOrder);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+    expect(
+      find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+      findsOneWidget,
+    );
+    final help = find.byKey(const ValueKey('buy-tracking-help'));
+    await tester.scrollUntilVisible(
+      help,
+      240,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await Scrollable.ensureVisible(tester.element(help), alignment: .3);
     await tester.pumpAndSettle();
-    expect(session.view, BuyV2View.tracking);
+    expect(help.hitTestable(), findsOneWidget);
+    await tester.tap(help);
+    await tester.pumpAndSettle();
+    expect(chatOpens, 1);
+    expect(session.view, BuyV2View.assist);
     expect(session.selectedOrder.id, 'PO-240783');
   });
 
-  testWidgets('320px 140% reduced-motion Assist remains stable', (
+  testWidgets('retired Assist deep link restores exact order Tracking', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = newSession();
+    addTearDown(session.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialDestination: BuyV2Destination.orders,
+          initialView: BuyV2View.assist,
+          orderId: 'PO-240783',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(session.view, BuyV2View.tracking);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+    expect(session.selectedOrder.id, 'PO-240783');
+    expect(find.textContaining('PO-240783'), findsOneWidget);
+    expect(
+      find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('320px 140% retired Assist renders stable exact Tracking', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 568));
@@ -106,10 +324,11 @@ void main() {
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pump();
 
-    final currentOrder = find.byKey(const ValueKey('buy-assist-current-order'));
-    expect(currentOrder, findsOneWidget);
+    final tracking = find.byKey(const PageStorageKey('buy-tracking-RX-240784'));
+    expect(tracking, findsOneWidget);
+    expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
     expect(find.textContaining('RX-240784'), findsOneWidget);
-    expect(tester.getSize(currentOrder).width, lessThanOrEqualTo(300));
+    expect(tester.getSize(tracking).width, lessThanOrEqualTo(320));
     expect(tester.takeException(), isNull);
   });
 

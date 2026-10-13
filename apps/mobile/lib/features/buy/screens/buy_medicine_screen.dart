@@ -38,7 +38,7 @@ class _BuyMedicineScreenState extends State<BuyMedicineScreen> {
         session: widget.session,
         title: 'Medicines & pharmacy',
         subtitle: 'Licensed sellers · prescription rules shown',
-        fallbackBackRoute: '/app/buy?sub=medicine',
+        fallbackBackRoute: '/app/book',
         body: ListView(
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.md,

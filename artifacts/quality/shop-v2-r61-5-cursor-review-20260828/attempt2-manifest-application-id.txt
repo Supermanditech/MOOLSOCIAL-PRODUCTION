@@ -1,0 +1,4 @@
+applicationId=com.moolsocial.app.cursorreview
+versionName=1.0.0-r61.5-cursorreview
+versionCode=2026082807
+pluginIntegrity=passed_after_windows_output_parser_fix

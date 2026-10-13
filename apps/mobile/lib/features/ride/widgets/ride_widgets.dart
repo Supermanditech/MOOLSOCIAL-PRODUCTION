@@ -3,12 +3,52 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
+import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
+import '../../../ui_v2/profile/global_profile_panel_v2.dart';
 import '../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../ride_models.dart';
 import '../ride_session.dart';
 
 String rideMoney(int value) => '₹$value';
+
+GlobalProfileContextAction _travelProfileContext(
+  RideSession session,
+  ValueChanged<String> onOpenRoute,
+) {
+  final trip = session.trip;
+  if (trip != null && !session.rideCancelled) {
+    final stageLabel = switch (session.stage) {
+      RideTripStage.captainArriving => 'Captain is arriving',
+      RideTripStage.liveTrip => 'Ride in progress',
+      RideTripStage.paymentApproval => 'Fare ready for approval',
+      RideTripStage.receipt => 'Ride completed',
+    };
+    return GlobalProfileContextAction(
+      id: 'travel-active-ride',
+      title: 'Your ${trip.package.name} ride',
+      detail: '$stageLabel · ${trip.drop}',
+      actionLabel: session.stage == RideTripStage.receipt
+          ? 'View receipt'
+          : 'Open ride',
+      icon: Icons.local_taxi_outlined,
+      accentColor: const Color(0xFF0284C7),
+      gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+      onPressed: () => onOpenRoute('/app/ride/trip/${trip.id}'),
+    );
+  }
+
+  return GlobalProfileContextAction(
+    id: 'travel-bus-discovery',
+    title: 'Plan a bus journey',
+    detail: 'Compare routes, timings, seats and fares before checkout.',
+    actionLabel: 'Search buses',
+    icon: Icons.directions_bus_filled_outlined,
+    accentColor: const Color(0xFF0284C7),
+    gradientColors: const [Color(0xFF075985), Color(0xFF0EA5E9)],
+    onPressed: () => onOpenRoute('/app/book/bus'),
+  );
+}
 
 class RidePageScaffold extends StatelessWidget {
   const RidePageScaffold({
@@ -138,45 +178,18 @@ class RidePageScaffold extends StatelessWidget {
           leading: showBack
               ? Padding(
                   padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                  child: IconButton.outlined(
-                    key: const Key('ride-back'),
-                    tooltip: 'Go back',
+                  child: MoolNativeBackButton(
+                    keyName: 'ride-back',
                     onPressed: leaveContentDepth,
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 19,
-                    ),
                   ),
                 )
               : null,
           titleSpacing: showBack ? 4 : MoolSpacing.md,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -.35,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          title: MoolServiceHeaderTitle(
+            title: title,
+            subtitle: subtitle,
+            titleKey: const Key('ride-page-title'),
+            subtitleKey: const Key('ride-page-subtitle'),
           ),
           actions: [
             MoolGlobalChatShortcut(
@@ -199,6 +212,18 @@ class RidePageScaffold extends StatelessWidget {
                     icon: const Icon(Icons.shield_outlined),
                   ),
             ),
+            if (!showBack)
+              Padding(
+                padding: const EdgeInsets.only(right: MoolSpacing.sm),
+                child: MoolGlobalProfileShortcutV2(
+                  keyName: 'ride-global-profile',
+                  onPressed: () => showGlobalProfilePanelV2(
+                    context,
+                    contextAction: _travelProfileContext(session, openGlobal),
+                    onOpenRoute: openGlobal,
+                  ),
+                ),
+              ),
           ],
         ),
         body: SafeArea(
@@ -238,6 +263,7 @@ class RidePageScaffold extends StatelessWidget {
         bottomNavigationBar: MoolDestinationNavigationV2(
           activeId: 'ride',
           destinationLabel: 'Travel',
+          familyRootSelected: false,
           selectedLocalIndex: switch (activeSubAction) {
             'auto' => 1,
             'cab' => 2,

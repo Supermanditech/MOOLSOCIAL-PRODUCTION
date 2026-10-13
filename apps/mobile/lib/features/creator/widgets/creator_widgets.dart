@@ -39,14 +39,12 @@ class CreatorPageScaffold extends StatelessWidget {
         leading: showBack
             ? Padding(
                 padding: const EdgeInsets.only(left: MoolSpacing.sm),
-                child: IconButton.outlined(
-                  key: const Key('creator-back'),
-                  tooltip: 'Go back',
+                child: MoolNativeBackButton(
+                  keyName: 'creator-back',
                   onPressed: () {
                     session.clearMessages();
                     context.go(returnRoute);
                   },
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
                 ),
               )
             : null,

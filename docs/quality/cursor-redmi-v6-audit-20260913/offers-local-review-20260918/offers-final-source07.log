@@ -1,0 +1,13 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: (setUpAll)
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 390.0 1.0
+00:04 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced false
+00:07 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced false
+00:09 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced false
+00:09 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 320.0 2.0
+00:10 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced false
+00:12 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 844.0 1.0
+00:13 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced true
+00:14 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_offers_visual_review_test.dart: Offers cinema toolbar media 844.0 2.0
+00:16 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced true
+00:17 +10: All tests passed!

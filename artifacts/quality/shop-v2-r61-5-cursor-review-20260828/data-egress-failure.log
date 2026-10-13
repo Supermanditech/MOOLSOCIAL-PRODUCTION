@@ -1,0 +1,9 @@
+apps\mobile\lib\ui_v2\buy\buy_v2_shop_chat.dart: unapproved clipboard write
+Exception: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828\scripts\check-buy-data-egress-boundary.ps1:296
+Line |
+ 296 |    throw (
+     |    ~~~~~~~
+     | Buy data-egress boundary failed with 1 violation(s). Do not log, persist, copy, share or embed
+     | customer/order/prescription/payment data without an approved data classification, consent, redaction, retention
+     | and transport contract.
+

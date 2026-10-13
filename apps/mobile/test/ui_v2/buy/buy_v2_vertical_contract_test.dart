@@ -36,7 +36,13 @@ void main() {
         expect(product.id.trim(), isNotEmpty, reason: product.id);
         expect(product.canonicalId.trim(), isNotEmpty, reason: product.id);
         expect(product.title.trim(), isNotEmpty, reason: product.id);
-        expect(product.brand.trim(), isNotEmpty, reason: product.id);
+        expect(
+          product.brandLabel,
+          product.brand.trim().isEmpty
+              ? 'Brand not provided'
+              : product.brand.trim(),
+          reason: product.id,
+        );
         expect(product.variant.trim(), isNotEmpty, reason: product.id);
         expect(product.pack.trim(), isNotEmpty, reason: product.id);
         expect(product.price, greaterThan(0), reason: product.id);

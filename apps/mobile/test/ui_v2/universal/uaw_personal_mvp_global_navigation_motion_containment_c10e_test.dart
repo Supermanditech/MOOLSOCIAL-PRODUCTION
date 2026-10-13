@@ -128,7 +128,11 @@ void main() {
       owner: Key('ride-booking-screen'),
     ),
     (name: 'Book', route: '/app/book/doctor', owner: Key('book-doctor')),
-    (name: 'Work', route: '/app/work/my-work', owner: Key('my-work-screen')),
+    (
+      name: 'Work',
+      route: '/app/work/my-work',
+      owner: Key('work-choose-screen'),
+    ),
   ]) {
     testWidgets('${destination.name} keeps one connected shell owner', (
       tester,

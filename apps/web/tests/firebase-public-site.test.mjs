@@ -35,6 +35,52 @@ async function readPage(path) {
   return readFile(new URL(path, publicRoot), "utf8");
 }
 
+test("ships exact Android association and broker return fallbacks", async () => {
+  const [assetLinksRaw, xReturn, instagramReturn, returnScript] =
+    await Promise.all([
+      readPage(".well-known/assetlinks.json"),
+      readPage("app/auth/x/index.html"),
+      readPage("app/auth/instagram/index.html"),
+      readPage("app/auth/return.js"),
+    ]);
+  const assetLinks = JSON.parse(assetLinksRaw);
+
+  assert.deepEqual(assetLinks, [
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: "com.moolsocial.app",
+        sha256_cert_fingerprints: [
+          "47:B2:8C:7D:DE:2B:61:CA:B6:A7:74:8C:90:19:A3:B5:73:76:B3:BE:1D:C1:63:D4:82:53:BB:A3:5B:63:CD:D9",
+          "C5:62:68:F2:F8:50:96:D1:87:5B:E4:6A:84:3F:9F:E9:C9:28:AB:02:C3:8A:A1:26:CA:52:6F:69:31:A2:2E:9A",
+        ],
+      },
+    },
+  ]);
+  assert.match(xReturn, /data-provider="x"/);
+  assert.match(xReturn, /href="moolsocial:\/\/auth\/x"/);
+  assert.match(xReturn, /href="\/app\/auth\/return\.css"/);
+  assert.match(xReturn, /src="\/app\/auth\/return\.js"/);
+  assert.match(instagramReturn, /data-provider="instagram"/);
+  assert.match(
+    instagramReturn,
+    /href="moolsocial:\/\/auth\/instagram"/,
+  );
+  assert.match(instagramReturn, /href="\/app\/auth\/return\.css"/);
+  assert.match(instagramReturn, /src="\/app\/auth\/return\.js"/);
+  assert.doesNotMatch(`${xReturn}\n${instagramReturn}`, /(?:href|src)="\.\.\/return\./);
+  assert.match(returnScript, /allowedProviders = new Set\(\['x', 'instagram'\]\)/);
+  assert.match(returnScript, /window\.location\.hash !== ''/);
+  assert.match(returnScript, /state\.length !== 43/);
+  assert.match(returnScript, /hasCode === hasError/);
+  assert.match(returnScript, /window\.location\.replace\(appReturn\)/);
+  assert.doesNotMatch(
+    `${xReturn}\n${instagramReturn}\n${returnScript}`,
+    /access_token|refresh_token|client_secret/i,
+  );
+});
+
 function customerCopy(html) {
   const attributes = [...html.matchAll(/\b(?:aria-label|title|placeholder|alt)="([^"]*)"/gi)]
     .map((match) => match[1])

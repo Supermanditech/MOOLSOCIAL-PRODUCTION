@@ -1,0 +1,1145 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:pdf/pdf.dart';
+import 'dart:io';
+import 'package:excel_community/excel_community.dart' as xls;
+import 'package:moolsocial/features/work/work_stock_export.dart';
+import 'package:moolsocial/features/work/work_downloads.dart';
+import 'package:moolsocial/features/work/work_invoice_pdf.dart';
+import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
+import 'commerce_downloads_test.dart' show pdfBytes;
+import 'work_invoice_pdf_test.dart' show request;
+
+class SupplierStatementPickerFixture extends FilePickerPlatform {
+  final calls = <String>[];
+  bool cancelled = false;
+  @override
+  Future<Uri?> saveFile({required String fileName, required Uint8List bytes,
+    required String mimeType, String? dialogTitle, String? initialDirectory,
+    Function(FilePickerStatus)? onFileSaving,
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions()}) async {
+    calls.add('$fileName|$mimeType|$dialogTitle');
+    return cancelled ? null : Uri.parse('content://host-evidence/$fileName');
+  }
+}
+
+class AccountStore implements WorkPendingProofStore {
+  @override
+  String? accountScope = 'review-account';
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+
+WorkspaceFinanceSnapshot finance({int revision = 1}) =>
+    WorkspaceFinanceSnapshot(
+      accountScope: 'review-account',
+      workspaceId: 'review-store',
+      revision: revision,
+      asOf: DateTime(2026, 9, 22),
+      salesTodayMinor: 0,
+      duesMinor: 0,
+      availableMinor: 0,
+      heldMinor: 0,
+      requestedMinor: 0,
+      paidOutMinor: 0,
+      feesMinor: 0,
+      deliveryAdjustmentsMinor: 0,
+      refundsMinor: 0,
+      taxWithheldMinor: 0,
+      payments: const [],
+      payouts: const [],
+      historyComplete: true,
+    );
+WorkSession session(AccountStore account) {
+  final work =
+      WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: account)
+        ..activeWorkspace = const WorkWorkspace(
+          id: 'review-store',
+          name: 'Annapurna Stores',
+          profileId: 'retailer-grocery',
+          profileLabel: 'Grocery',
+          area: 'Jaipur',
+          verified: true,
+        );
+  expect(work.applyWorkspaceFinance(finance()), isTrue);
+  final r = request();
+  work.workspaceInvoices.add(r.invoice);
+  work.workspaceOrders.add(
+    WorkspaceOrderRecord(
+      id: r.invoice.orderId,
+      customer: r.invoice.customer,
+      items: r.invoice.items,
+      quantities: const {},
+      amount: r.invoice.amount,
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'Cash',
+      address: '',
+      stage: 'New',
+      needsDelivery: false,
+      createdAt: r.invoice.issuedAt,
+      itemSnapshots: r.items,
+    ),
+  );
+  addTearDown(work.dispose);
+  return work;
+}
+
+class PdfSource implements WorkInvoicePdfSource {
+  PdfSource({this.beforeReturn, this.wrongIdentity = false});
+  final void Function()? beforeReturn;
+  final bool wrongIdentity;
+  WorkInvoicePdfRequest? received;
+  @override
+  Future<WorkInvoicePdfDocument> load(WorkInvoicePdfRequest request) async {
+    received = request;
+    beforeReturn?.call();
+    return WorkInvoicePdfDocument(
+      identity: wrongIdentity ? 'wrong' : request.identity,
+      fileName: request.invoice.pdfFileName,
+      bytes: pdfBytes(),
+      reviewOnly: true,
+    );
+  }
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  test('ANALYTICSPDF shares provider eligibility with the screen', () {
+    WorkspaceAnalyticsMetric metric(String id, WorkspaceAnalyticsUnit unit,
+        WorkspaceAnalyticsBasis basis, {String? cohort}) => WorkspaceAnalyticsMetric(
+      id: id, state: WorkspaceAnalyticsState.verified, coverage: WorkspaceAnalyticsCoverage.partial,
+      basis: basis, unit: unit, source: 'HOST aggregate provider', value: 0,
+      asOf: DateTime.utc(2026, 10, 7), cohortId: cohort);
+    expect(storeAnalyticsMetricEligible('visitors', metric('visitors', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.currentPosition)), isFalse);
+    expect(storeAnalyticsMetricEligible('visible-skus', metric('visible-skus', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity)), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity, cohort: 'HOST-cohort')), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.percent,
+      WorkspaceAnalyticsBasis.periodActivity)), isFalse);
+    expect(storeAnalyticsMetricEligible('order-conversion', metric('order-conversion', WorkspaceAnalyticsUnit.percent,
+      WorkspaceAnalyticsBasis.periodActivity, cohort: 'HOST-cohort')), isTrue);
+    expect(storeAnalyticsMetricEligible('visitors', metric('visitors', WorkspaceAnalyticsUnit.count,
+      WorkspaceAnalyticsBasis.periodActivity)), isTrue, reason: 'Verified zero remains exportable.');
+    expect(storeAnalyticsMetricEligible('visitors', null), isFalse);
+  });
+  test('ANALYTICSPDF freezes exact values coverage and selected snapshot', () async {
+    // Isolated host fixture, never runtime commerce or device acceptance.
+    final at = DateTime.utc(2026, 10, 7, 9);
+    final rows = <StoreAnalyticsReportRow>[
+      const StoreAnalyticsReportRow(area: 'Stock', label: 'Stock cost',
+        value: '₹1,00,00,00,000.09', basis: 'Current position',
+        source: 'Saved inventory - captured, not historical',
+        coverage: 'Saved records only', meaning: 'Not audited valuation'),
+      const StoreAnalyticsReportRow(area: 'Sales', label: 'Billed', value: '₹0',
+        basis: 'Selected period', source: 'Saved invoices',
+        coverage: 'Device history only', meaning: 'Before returns'),
+      const StoreAnalyticsReportRow(area: 'Money', label: 'Supplier dues',
+        value: 'Unavailable', basis: 'Current position', source: 'Not connected',
+        coverage: 'Unknown', meaning: 'Not zero'),
+    ];
+    final request = WorkspaceAnalyticsRequest(accountScope: 'HOST-account',
+      storeId: 'HOST-store', start: at.subtract(const Duration(days: 1)), end: at);
+    final statement = StoreAnalyticsStatement(request: request,
+      storeName: 'HOST Store', capturedAt: at, rows: rows, reviewOnly: true);
+    rows.clear();
+    expect(statement.report.rows.length, 3);
+    expect(statement.report.rows.first[1], '₹1,00,00,00,000.09');
+    expect(statement.report.rows[1][1], '₹0');
+    expect(statement.report.rows[2][1], 'Unavailable');
+    expect(statement.report.disclosure, contains('not backend-synchronised'));
+    expect(statement.fileName, matches(RegExp(r'^store-analytics-[A-F0-9]{16}\.pdf$')));
+    expect(() => statement.report.rows.first[1] = '0', throwsUnsupportedError);
+    expect(() => StoreAnalyticsStatement(request: request, storeName: 'HOST',
+      capturedAt: at.subtract(const Duration(days: 2)), rows: const []), throwsFormatException);
+    final pdf = await statement.report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+  });
+  test('ANALYTICSPDF uses scoped system picker and truthful cancellation', () async {
+    final previous = FilePickerPlatform.instance;
+    final picker = SupplierStatementPickerFixture();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    expect(await saveStoreStockFile(pdfBytes(), 'store-analytics-1234567890ABCDEF.pdf',
+      StoreStockExportFormat.pdf), isTrue);
+    expect(picker.calls.single, contains('Save Store analytics'));
+    picker.cancelled = true;
+    expect(await saveStoreStockFile(pdfBytes(), 'store-analytics-1234567890ABCDEF.pdf',
+      StoreStockExportFormat.pdf), isFalse);
+  });
+  test('PURCHASEACCOUNTING captured status distinguishes confirmed unavailable and revisions', () async {
+    // Host-only evidence. Never written into a device evaluation Store.
+    final at = DateTime.utc(2026, 10, 1);
+    final supplier = WorkspaceSupplierProfile(id: 'HOST-accounting-supplier', name: 'HOST supplier',
+      createdAt: at, updatedAt: at);
+    final draft = WorkspacePurchaseEntryDraft(id: 'HOST-accounting-bill', supplierId: supplier.id,
+      invoiceReference: 'HOST-BILL-1', invoiceDate: '02/10/2026', createdAt: at, updatedAt: at,
+      goods: [{'name': 'HOST rice', 'pack': '1 kg', 'quantity': '1', 'cost': '40', 'productId': ''}],
+      details: {'invoiceTotal': '40'});
+    WorkspacePurchaseSavedCopy copy(int revision) => WorkspacePurchaseSavedCopy(id: 'HOST-copy-$revision',
+      storeName: 'HOST Store', revision: revision, savedAt: at, supplier: supplier, draft: draft, labels: const {});
+    const scope = ('HOST-account', 'HOST-store', true);
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening-status', basisId: 'HOST-status-basis',
+      account: scope.$1, store: scope.$2, qa: scope.$3, supplierId: supplier.id, revision: 1,
+      asOfDate: '2026-10-01', savedAt: at, amountMinor: 0, supplierCredit: false,
+      sourceNote: 'HOST verified zero', bills: const []);
+    final ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: scope.$1,
+      workspaceId: scope.$2, supplierId: supplier.id, supplierName: supplier.name, qa: true, confirmedAt: at)!;
+    StorePurchaseAccountingSnapshot capture({WorkspaceSupplierLedger? source, bool recovered = true,
+      WorkspacePurchaseSavedCopy? displayed, (String, String, bool)? identity = scope}) =>
+      StorePurchaseAccountingSnapshot.capture(copy: displayed ?? copy(1), scope: identity,
+        recovered: recovered, ledger: source);
+    expect(capture().state, StorePurchaseAccountingState.unconfirmed);
+    expect(capture(source: ledger).state, StorePurchaseAccountingState.unconfirmed);
+    expect(capture(source: ledger, recovered: false).state, StorePurchaseAccountingState.unavailable);
+    expect(capture(source: ledger, identity: ('foreign', scope.$2, true)).state, StorePurchaseAccountingState.unavailable);
+    expect(capture(source: ledger, identity: (scope.$1, scope.$2, false)).state, StorePurchaseAccountingState.unavailable);
+    final before = jsonEncode(ledger.toJson());
+    final accepted = WorkspaceSupplierBillAcceptance(copy: copy(1), acceptedAt: DateTime.utc(2026, 10, 2),
+      openingTreatment: WorkspaceOpeningBillInclusion.excluded);
+    final posted = ledger.acceptReviewedBill(accepted, expectedRevision: ledger.revision)!;
+    final confirmed = capture(source: posted);
+    expect(confirmed.state, StorePurchaseAccountingState.confirmed);
+    expect(confirmed.label, 'Recorded in supplier account');
+    expect(confirmed.voucher, 'No system voucher assigned');
+    expect(confirmed.copyHeading, 'Purchase entry - Saved copy');
+    expect(confirmed.copyExplanation,
+      'Supplier copy kept separately. Downloading this copy does not change stock, dues or payments.');
+    for (final snapshot in [confirmed, capture(), capture(recovered: false),
+      capture(source: posted, displayed: copy(2))]) {
+      expect(snapshot.copyHeading, isNot(contains('Not posted')),
+        reason: 'A saved copy heading must not contradict its captured account status.');
+    }
+    expect(StorePurchaseAccountingSnapshot.draft.copyHeading,
+      'Purchase entry - Recorded copy (Draft)');
+    expect(capture(source: posted, displayed: copy(2)).state, StorePurchaseAccountingState.otherRevision);
+    expect(confirmed.sameEvidence(capture(source: ledger)), isFalse);
+    expect(confirmed.sameEvidence(capture(source: posted)), isTrue);
+    expect(confirmed.matches(draft, supplier, 1, scope.$2), isTrue);
+    expect(confirmed.matches(draft, supplier, 2, scope.$2), isFalse);
+    final bytes = await generateStorePurchaseRecordedCopy(draft: draft, supplier: supplier,
+      storeName: 'HOST Store', storeId: scope.$2, revision: 1, labels: const {}, isSavedCopy: true,
+      accounting: confirmed);
+    expect(ascii.decode(bytes.take(4).toList()), '%PDF');
+    expect(jsonEncode(ledger.toJson()), before, reason: 'Presentation must not mutate the accounting source.');
+  });
+  test('SUPPLIERSTATEMENTSAVER uses installed picker for strict PDF CSV and cancellation', () async {
+    final original = FilePickerPlatform.instance;
+    final picker = SupplierStatementPickerFixture();
+    FilePickerPlatform.instance = picker;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const native = MethodChannel('com.moolsocial.app/store_stock_download');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    var nativeCalls = 0;
+    messenger.setMockMethodCallHandler(native, (call) async { nativeCalls++; return true; });
+    addTearDown(() {
+      FilePickerPlatform.instance = original; debugDefaultTargetPlatformOverride = null;
+      messenger.setMockMethodCallHandler(native, null);
+    });
+    for (final format in [StoreStockExportFormat.pdf, StoreStockExportFormat.csv]) {
+      final name = 'supplier-statement-0123456789abcdef.${format.extension}';
+      expect(await saveStoreStockFile(Uint8List.fromList([1, 2]), name, format), isTrue);
+      expect(picker.calls.last, '$name|${format.mimeType}|Save supplier statement');
+    }
+    picker.cancelled = true;
+    expect(await saveStoreStockFile(Uint8List(1), 'supplier-statement-0123456789abcdef.pdf', StoreStockExportFormat.pdf), isFalse);
+    expect(nativeCalls, 0);
+    for (final name in ['supplier-statement-invalid.pdf', 'supplier-statement-0123456789abcdef.csv']) {
+      await saveStoreStockFile(Uint8List(1), name, StoreStockExportFormat.pdf);
+    }
+    expect(nativeCalls, 2, reason: 'Unmatched/mismatched names do not bypass the native filename guard.');
+    expect(picker.calls, hasLength(3));
+  });
+  StoreSupplierStatement supplierStatementFixture() {
+    // Host-only report fixture, never inserted into OPPO evaluation records.
+    final opening = WorkspaceSupplierOpeningRecord(id: 'HOST-opening', basisId: 'HOST-basis',
+      account: 'review-account', store: 'review-store', qa: true, supplierId: 'HOST-supplier',
+      revision: 1, asOfDate: '2026-10-01', savedAt: DateTime.utc(2026, 10, 1),
+      amountMinor: 10000, supplierCredit: true, sourceNote: 'HOST reviewed advance', bills: const []);
+    final ledger = WorkspaceSupplierLedger.confirmedOpening(opening, accountScope: opening.account,
+      workspaceId: opening.store, supplierId: opening.supplierId, supplierName: 'HOST Evaluation supplier',
+      qa: true, confirmedAt: opening.savedAt)!;
+    final intent = WorkspaceSupplierRefundIntent(operationId: 'HOST-refund', accountScope: opening.account,
+      workspaceId: opening.store, supplierId: opening.supplierId, qa: true,
+      sourceKind: WorkspaceSupplierRefundSourceKind.openingAdvance, sourceId: opening.id,
+      openingId: opening.id, openingRevision: opening.revision, reference: 'HOST-REFUND-40',
+      occurredOn: '2026-10-02', paymentMethod: 'Bank transfer', amountMinor: 4000,
+      requestedAt: DateTime.utc(2026, 10, 3));
+    final posted = ledger.recordReviewedRefund(intent, expectedRevision: 1, recordedAt: intent.requestedAt)!;
+    return StoreSupplierStatement(source: posted, storeName: 'HOST Evaluation Store',
+      from: DateTime(2026, 10, 1), until: DateTime(2026, 10, 4),
+      generatedAt: DateTime.utc(2026, 10, 4), reviewOnly: true);
+  }
+  test('SUPPLIERSTATEMENTEXPORT CSV and PDF retain preview rows and snapshot identity', () async {
+    final snapshot = supplierStatementFixture(), document = supplierStatementFixture().report;
+    expect(document.rows, snapshot.rows);
+    final csv = utf8.decode(await document.generate(StoreStockExportFormat.csv));
+    expect(csv, contains('HOST-REFUND-40')); expect(csv, contains('02/10/2026'));
+    expect(csv, contains(snapshot.reference)); expect(csv, contains('Closing balance'));
+    expect(document.summary, isEmpty, reason: 'No summary-only cover page.');
+    expect(csv, contains('HOST-supplier')); expect(csv, contains('review-store'));
+    expect(csv, contains('HOST-refund'));
+    expect(document.metadata.where((row) => row.first.toString().startsWith('Entry identity')), isEmpty,
+      reason: 'PDF headers must not repeat internal entry identities.');
+    expect(document.machineMetadata.single.last, contains('HOST-refund'));
+    expect(() => document.machineMetadata.add(['Changed', 'identity']), throwsUnsupportedError);
+    expect(() => document.machineMetadata.single[1] = 'Changed', throwsUnsupportedError);
+    expect(StoreSupplierStatement.previousDay(DateTime(2026, 3, 1)), DateTime(2026, 2, 28));
+    final pdf = await document.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    expect(document.rows, snapshot.rows);
+    const output = String.fromEnvironment('MOOL_SUPPLIER_STATEMENT_TEST_DIR');
+    if (output.isNotEmpty) {
+      final directory = Directory(output)..createSync(recursive: true);
+      final file = File('${directory.path}/host-supplier-statement.pdf');
+      if (file.existsSync()) throw StateError('Preserve prior report evidence; choose a new directory.');
+      file.writeAsBytesSync(pdf);
+    }
+  });
+  test('SUPPLIERSTATEMENTBOUNDARY final table has no spacer-only PDF page', () async {
+    // Separately labelled host fixture reproduces the actual BV export geometry.
+    // It does not create evaluation-store records or prove device acceptance.
+    final report = StoreTabularReport(
+      title: 'Supplier account statement',
+      metadata: const [
+        ['Document', 'Supplier account statement'],
+        ['Store', 'TEST Store · product entry'],
+        ['Supplier', 'EVAL-DUE-SUPPLY-04OCT'],
+        ['Period', '04/10/2026 to 05/10/2026'],
+        ['Added to dues', '₹1,025.00'], ['Reduced dues', '₹300.00'],
+        ['Records available at', '2026-10-05T16:00:56.076182'],
+        ['Ledger revision', 21], ['Statement reference', 'a7df261c30328185'],
+        ['Coverage', 'Confirmed starting balance and recorded entries'],
+        ['Store identity', 'QA-STORE-V1-0-f6a08c5ac9b55b5b'],
+        ['Supplier identity', 'local-supplier-608dc1863c370ca28c5c10dc0059e52e'],
+      ],
+      disclosure: 'Evaluation only. Supporting purchase records, not a bank statement or GST return. '
+          'Positive balance: dues. Negative balance: credit with supplier. '
+          'Business dates are used when recorded; legacy entries use the local recording date. '
+          'Later-entered backdated records can restate a period. Goods movements and linked money are not counted twice.',
+      headers: const ['Date', 'Particulars', 'Reference', 'Added to dues (₹)',
+        'Reduced dues (₹)', 'Dues / credit (₹)', 'Details'],
+      moneyColumns: const {3, 4, 5},
+      rows: const [
+        ['', 'Opening balance', '', '', '', 1000, 'Dues (+), credit with supplier (-)'],
+        ['04/10/2026', 'Advance paid', 'EVAL-ADV-0410-L', '', 300, 700, 'Cash'],
+        ['04/10/2026', 'Purchase bill', 'EVAL-ADV-BILL-0410-L', 300, '', 1000, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-MANUAL-BILL-0410-U', 320, '', 1320, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-CAT-BILL-0410-Y', 165, '', 1485, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-CSV-BILL-0410-AD', 80, '', 1565, ''],
+        ['04/10/2026', 'Purchase bill', 'EVAL-TOGETHER-BILL-0410-AH', 80, '', 1645, ''],
+        ['05/10/2026', 'Purchase bill', 'EVAL-PURCHASE-0510-BH-01', 80, '', 1725, ''],
+        ['', 'Closing balance', '', '', '', 1725, ''],
+        ['04/10/2026', 'Recorded money linked', 'EVAL-ADV-BILL-0410-L', '', '', '',
+          '₹300.00 · not another payment; no account-balance change'],
+      ],
+    );
+    final bytes = await report.generate(StoreStockExportFormat.pdf);
+    final pageObjects = RegExp(r'/Type\s*/Page\b').allMatches(latin1.decode(bytes));
+    expect(pageObjects.length, 1, reason: 'All ten rows fit; terminal spacing must not create a header/footer-only page.');
+    expect(report.rows.length, 10);
+  });
+  for (final size in [const Size(320, 568), const Size(915, 412)]) {
+    testWidgets('SUPPLIERSTATEMENTUI enlarged preview stale scope and unapplied dates $size', (tester) async {
+      tester.view.physicalSize = size; tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      final changes = ValueNotifier<int>(0); addTearDown(changes.dispose);
+      var saves = 0;
+      await tester.pumpWidget(MaterialApp(home: MediaQuery(data: MediaQueryData(size: size,
+        textScaler: TextScaler.linear(size.width > 500 ? 2 : 1.4)), child: Scaffold(body: StoreSupplierStatementPanel(
+          statement: supplierStatementFixture(), isCurrent: () => true, changes: changes,
+          saveFile: (bytes, name, format) async { saves++; return true; })))));
+      await tester.pumpAndSettle();
+      expect(find.text('Opening -₹100.00 · Closing -₹60.00'), findsOneWidget);
+      final download = find.byKey(const ValueKey('supplier-statement-download-csv'));
+      await tester.ensureVisible(download); await tester.pumpAndSettle();
+      expect(download.hitTestable(), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('supplier-statement-from')), '02/10/2026'); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(download).onPressed, isNull);
+      final apply = find.text('Apply dates'); await tester.ensureVisible(apply); await tester.pumpAndSettle();
+      await tester.tap(apply); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(download).onPressed, isNotNull);
+      await tester.ensureVisible(download); await tester.pumpAndSettle();
+      await tester.tap(download);
+      changes.value++; // Invalidate while async CSV generation is outstanding.
+      await tester.runAsync(() async { await Future<void>.delayed(const Duration(milliseconds: 200)); });
+      await tester.pumpAndSettle();
+      expect(saves, 0); expect(find.text('Records changed. Close and reopen the statement.'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  test('PDFGROUP sections reject omitted fields duplicate or missing records', () {
+    StoreTabularReport grouped(List<StoreReportPdfGroup> groups) => StoreTabularReport(
+      title: 'Evaluation', disclosure: 'Evaluation only', metadata: const [],
+      headers: const ['Date', 'Invoice', 'Customer', 'Amount'],
+      rows: const [['2026-09-27', 'invoice', 'customer', 100]],
+      moneyColumns: const {3}, pdfGroups: groups);
+    final complete = StoreReportPdfGroup('Invoices', [0, 1, 2, 3], [0]);
+    expect(() => grouped([complete]).validatePdfGroups(), returnsNormally);
+    for (final groups in [
+      [StoreReportPdfGroup('Missing amount', [0, 1, 2], [0])],
+      [complete, complete],
+      [StoreReportPdfGroup('Missing record', [0, 1, 2, 3], [])],
+    ]) {
+      expect(() => grouped(groups).validatePdfGroups(), throwsFormatException);
+    }
+  });
+  StoreSalesStatement sales(List<WorkspaceCustomerInvoice> invoices) => StoreSalesStatement(
+    accountId: 'review-account', storeId: 'review-store', storeName: 'QA Store — evaluation only',
+    from: DateTime(2026, 9, 1), until: DateTime(2026, 10), generatedAt: DateTime(2026, 9, 27), invoices: invoices);
+  test('SALESSTATEMENT period totals and unavailable accounting remain distinct', () {
+    final report = sales([request().invoice]);
+    expect(report.billedMinor, 24000);
+    expect(report.discountMinor, 0);
+    expect(report.recorded(WorkspaceLedgerEntryKind.collection), isNull);
+    expect(report.report.rows.single[5], isNull);
+    expect(report.report.summary.firstWhere((r) => r.first == 'Seller GSTIN').last, contains('Unavailable'));
+    final outside = WorkspaceCustomerInvoice(id: 'old', orderId: 'old-order', customer: 'QA', items: '', amount: 99, payment: 'Cash', issuedAt: DateTime(2026, 8, 31));
+    expect(sales([outside, request().invoice]).selected, hasLength(1));
+    expect(sales([]).billedMinor, 0);
+    expect(sales([]).recorded(WorkspaceLedgerEntryKind.collection), isNull);
+  });
+  test('SALESSTATEMENT rejects duplicates foreign sellers and future invoices', () {
+    expect(() => sales([request().invoice, request().invoice]), throwsFormatException);
+    for (final foreign in [true, false]) {
+      final invoice = WorkspaceCustomerInvoice(id: 'invalid', orderId: 'order', customer: 'QA', items: '', amount: 1, payment: 'Cash',
+        seller: WorkspaceInvoiceSeller(storeId: foreign ? 'another-store' : 'review-store'),
+        issuedAt: foreign ? DateTime(2026, 9, 1) : DateTime(2026, 10));
+      expect(() => sales([invoice]), throwsFormatException);
+    }
+  });
+  test('SALESSTATEMENT A4 summary and full multi-page annexure', () async {
+    final invoices = List.generate(65, (i) => WorkspaceCustomerInvoice(
+      id: 'QA-INVOICE-2026-${i.toString().padLeft(4, '0')}', orderId: 'QA-ORDER-$i',
+      customer: 'Evaluation customer with a long business name $i', items: 'QA item',
+      amount: 10000000, remainderPaise: 25, payment: 'Cash', issuedAt: DateTime(2026, 9, 15), seller: request().invoice.seller));
+    final report = sales(invoices);
+    expect(report.report.rows, hasLength(65));
+    expect(report.billedMinor, 65000001625);
+    final bytes = await report.report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      Directory(output).createSync(recursive: true);
+      File('$output/sales-statement-qa.pdf').writeAsBytesSync(bytes);
+    }
+  });
+  testWidgets('SALESSTATEMENT preview invalidates on changed scope without saving', (tester) async {
+    tester.view.physicalSize = const Size(800, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final changes = ValueNotifier(0);
+    addTearDown(changes.dispose);
+    var saves = 0, closes = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreSalesStatementPanel(
+      statement: sales([request().invoice]), isCurrent: () => true, changes: changes,
+      onClose: () => closes++,
+      saveFile: (bytes, name, format) async { saves++; return true; }))));
+    expect(find.text('Other statements'), findsNothing);
+    expect(find.byKey(const Key('sales-statement-download')), findsOneWidget);
+    for (final key in ['sales-statement-download', 'sales-statement-print']) {
+      expect(tester.getRect(find.byKey(Key(key))).bottom, lessThanOrEqualTo(360));
+      expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+    }
+    changes.value++;
+    await tester.pump();
+    expect(find.text('Records changed. Close and reopen the statement.'), findsOneWidget);
+    expect(find.byKey(const Key('sales-statement-download')), findsNothing);
+    await tester.tap(find.byTooltip('Close statement'));
+    expect(closes, 1);
+    expect(saves, 0);
+  });
+  test(
+    'PRINT stock current and complete empty ledger support reported media',
+    () async {
+      final current = StoreStockSnapshot(
+        storeId: 'store',
+        storeName: 'QA Store',
+        scope: 'Selected QA stock',
+        generatedAt: DateTime.utc(2026, 9, 24),
+        products: [workspaceMasterCatalogue.first],
+      );
+      final ledger = StoreStockLedgerSnapshot(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'QA Store',
+        snapshotId: 'qa-snapshot',
+        from: DateTime.utc(2026, 9, 1),
+        until: DateTime.utc(2026, 9, 24),
+        observedAt: DateTime.utc(2026, 9, 24),
+        complete: true,
+        reviewOnly: true,
+        lines: [],
+      );
+      for (final paper in [
+        StorePrintPaper.a4,
+        StorePrintPaper.receipt58,
+        StorePrintPaper.receipt80,
+      ]) {
+        for (final entry in [
+          ('current', await current.forPrint(paper.initialFormat, null)),
+          ('ledger', await ledger.forPrint(paper.initialFormat, null)),
+        ]) {
+          expect(ascii.decode(entry.$2.take(5).toList()), '%PDF-');
+          const output = String.fromEnvironment(
+            'MOOL_CUSTOMER_REPORT_TEST_DIR',
+          );
+          if (output.isNotEmpty) {
+            Directory(output).createSync(recursive: true);
+            File(
+              '$output/stock-${entry.$1}-${paper.name}.pdf',
+            ).writeAsBytesSync(entry.$2);
+          }
+        }
+      }
+      await expectLater(
+        current.forPrint(PdfPageFormat.a4, [999]),
+        throwsFormatException,
+      );
+    },
+  );
+  testWidgets('PRINT stock action cancels on source change', (tester) async {
+    final changes = ChangeNotifier();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final result = Completer<String>();
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+      call,
+    ) async {
+      calls.add(call.method);
+      return call.method == 'print' ? result.future : null;
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, null);
+      changes.dispose();
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StoreStockDownloadControls(
+            storeId: 'store',
+            storeName: 'Store',
+            accountId: 'account',
+            filteredProducts: [workspaceMasterCatalogue.first],
+            filterDescription: 'QA selected',
+            isCurrent: () => true,
+            scopeChanges: changes,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('work-stock-print')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('store-print-paper-receipt58')));
+    await tester.pumpAndSettle();
+    expect(calls, ['print']);
+    changes.notifyListeners();
+    await tester.pump();
+    expect(calls, ['print', 'cancel']);
+    result.complete('completed');
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Stock changed. Reopen the statement before printing.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+  WorkspaceCustomerLedger customer({
+    String id = 'customer-01',
+    String account = 'account',
+    int? opening = 1000,
+    bool complete = true,
+    bool transactions = true,
+    String? returnReason,
+  }) {
+    final kinds = [
+      WorkspaceLedgerEntryKind.invoice,
+      WorkspaceLedgerEntryKind.collection,
+      WorkspaceLedgerEntryKind.creditNote,
+      WorkspaceLedgerEntryKind.refund,
+      WorkspaceLedgerEntryKind.collection,
+      WorkspaceLedgerEntryKind.refund,
+    ];
+    final amounts = [10000, 4000, 8000, 500, 250, 200];
+    return WorkspaceCustomerLedger(
+      accountScope: account,
+      workspaceId: 'store',
+      customerId: id,
+      customerName: 'Customer $id',
+      revision: 1,
+      asOf: DateTime.utc(2026, 9, 10),
+      openingBalanceMinor: opening,
+      historyComplete: complete,
+      entries: transactions
+          ? [
+              for (var i = 0; i < kinds.length; i++)
+                WorkspaceCustomerLedgerEntry(
+                  id: 'voucher-$id-$i',
+                  operationId: 'operation-$id-$i',
+                  invoiceId: 'invoice-$id',
+                  orderId: 'order-$id',
+                  sequence: i + 1,
+                  occurredAt: DateTime.utc(2026, 9, i + 2),
+                  kind: kinds[i],
+                  amountMinor: amounts[i],
+                  customerReturn: i == 2 && returnReason != null
+                      ? WorkspaceCustomerReturn(
+                          accountScope: account, workspaceId: 'store',
+                          customerId: id, invoiceId: 'invoice-$id',
+                          orderId: 'order-$id', operationId: 'operation-$id-$i',
+                          expectedRevision: 1, reason: returnReason,
+                          reasonCode: 'other',
+                          lines: [const WorkspaceCustomerReturnLine(
+                            productId: 'qa-product', quantity: 1, restockQuantity: 0)],
+                        )
+                      : null,
+                  state: i == 4
+                      ? WorkspaceLedgerPostingState.pending
+                      : i == 5
+                      ? WorkspaceLedgerPostingState.failed
+                      : WorkspaceLedgerPostingState.posted,
+                ),
+            ]
+          : [],
+    );
+  }
+
+  test('SALESSTATEMENT separates posted collections and refuses later-day zero', () {
+    final f = WorkspaceFinanceSnapshot(accountScope: 'account', workspaceId: 'store',
+      revision: 1, asOf: DateTime.utc(2026, 9, 10), salesTodayMinor: 0, duesMinor: 0,
+      availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: [], payouts: [], customerLedgers: [customer()], historyComplete: true);
+    expect(f.valid, isTrue);
+    StoreSalesStatement make(DateTime from, {String account = 'account'}) => StoreSalesStatement(
+      accountId: account, storeId: 'store', storeName: 'QA', from: from,
+      until: DateTime.utc(2026, 10), generatedAt: DateTime.utc(2026, 9, 27), invoices: [], finance: f);
+    final period = make(DateTime.utc(2026, 9));
+    expect(period.recorded(WorkspaceLedgerEntryKind.collection), 4000);
+    expect(period.recorded(WorkspaceLedgerEntryKind.creditNote), 8000);
+    expect(period.recorded(WorkspaceLedgerEntryKind.refund), 500);
+    expect(period.billedMinor, 0);
+    expect(period.report.rows, hasLength(2));
+    expect(period.report.rows.map((r) => r[7]), ['Credit note', 'Refund recorded']);
+    expect(period.report.rows.first[8], isNull); // Legacy reason not invented.
+    expect(period.report.rows.first[9], 80);
+    expect(period.report.rows.last[10], 5);
+    expect(period.report.rows.every((r) => r[4] == ''), isTrue);
+    expect(period.report.rows.map((r) => r[11]),
+        ['voucher-customer-01-2', 'voucher-customer-01-3']);
+    expect(make(DateTime.utc(2026, 9, 5)).adjustments, hasLength(1));
+    expect(make(DateTime.utc(2026, 9, 6)).adjustments, isEmpty);
+    expect(make(DateTime.utc(2026, 9), account: 'other').adjustments, isEmpty);
+    expect(make(DateTime.utc(2026, 9, 27)).recorded(WorkspaceLedgerEntryKind.collection), isNull);
+    expect(make(DateTime.utc(2026, 9), account: 'other').recorded(WorkspaceLedgerEntryKind.collection), isNull);
+  });
+  test('SALESSTATEMENT adjustment exports retain old invoice links and reasons', () async {
+    const reason = '=Evaluation reason, "damaged pack"';
+    final ledger = customer(returnReason: reason);
+    final f = WorkspaceFinanceSnapshot(accountScope: 'account', workspaceId: 'store',
+      revision: 1, asOf: DateTime.utc(2026, 9, 10), salesTodayMinor: 0, duesMinor: 0,
+      availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+      feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payments: [], payouts: [], customerLedgers: [ledger], historyComplete: true);
+    expect(f.valid, isTrue);
+    final statement = StoreSalesStatement(accountId: 'account', storeId: 'store',
+      storeName: 'Evaluation Store', from: DateTime.utc(2026, 9),
+      until: DateTime.utc(2026, 9, 6), generatedAt: DateTime.utc(2026, 9, 27),
+      reviewOnly: true, finance: f, invoices: [WorkspaceCustomerInvoice(
+        id: 'invoice-customer-01', orderId: 'order-customer-01', customer: 'Customer customer-01',
+        items: 'Evaluation item', amount: 100, payment: 'Cash', issuedAt: DateTime.utc(2026, 8, 31))]);
+    expect(statement.selected, isEmpty);
+    final report = statement.report;
+    expect(report.rows, hasLength(2));
+    expect(() => report.validatePdfGroups(), returnsNormally);
+    expect(report.pdfGroups.singleWhere((g) => g.title == 'Returns and recorded refunds')
+        .rowIndexes, [0, 1]);
+    expect(report.pdfGroups.expand((g) => g.rowIndexes), [0, 1]);
+    expect(report.rows.first[1], 'invoice-customer-01');
+    expect(report.rows.first[8], reason);
+    expect(report.rows.last[8], 'Not linked to a specific return');
+    expect(report.rows.fold<num>(0, (sum, r) => sum + (r[9] is num ? r[9] as num : 0)) * 100,
+      statement.recorded(WorkspaceLedgerEntryKind.creditNote));
+    expect(report.rows.fold<num>(0, (sum, r) => sum + (r[10] is num ? r[10] as num : 0)) * 100,
+      statement.recorded(WorkspaceLedgerEntryKind.refund));
+    final csv = utf8.decode(await report.generate(StoreStockExportFormat.csv));
+    expect(csv, contains("'=Evaluation reason"));
+    expect(csv, contains('voucher-customer-01-2'));
+    expect(csv, isNot(contains('voucher-customer-01-5')));
+    final excel = xls.Excel.decodeBytes(await report.generate(StoreStockExportFormat.excel));
+    final last = excel.tables.values.single.rows.last;
+    // Excel may decode an integral decimal as IntCellValue; it must stay numeric.
+    expect(last[10]!.value, anyOf(isA<xls.DoubleCellValue>(), isA<xls.IntCellValue>()));
+    expect(last[10]!.value.toString(), '5');
+    expect(last[10]!.cellStyle!.numberFormat.formatCode, '#,##0.00');
+    final pdf = await report.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      Directory(output).createSync(recursive: true);
+      File('$output/sales-adjustments-qa.pdf').writeAsBytesSync(pdf);
+    }
+  });
+  testWidgets(
+    'PRINT customer statement action cancels stale source and never claims queued completion',
+    (tester) async {
+      final changes = ChangeNotifier();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var result = Completer<String>();
+      final calls = <String>[];
+      messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, (
+        call,
+      ) async {
+        calls.add(call.method);
+        if (call.method == 'print') return result.future;
+        return null;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(StoreDocumentPrinter.channel, null);
+        changes.dispose();
+      });
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StoreCustomerReportsPanel(
+                accountId: 'account',
+                storeId: 'store',
+                storeName: 'Store',
+                ledgers: [customer()],
+                isCurrent: () => true,
+                scopeChanges: changes,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('customer-statement-customer-01')),
+      );
+      await tester.pumpAndSettle();
+      Future<void> start() async {
+        await tester.tap(find.byKey(const Key('customer-statement-print')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('store-print-paper-a4')));
+        await tester.pumpAndSettle();
+      }
+
+      await start();
+      expect(calls, ['print']);
+      changes.notifyListeners();
+      await tester.pump();
+      expect(calls, ['print', 'cancel']);
+      result.complete('completed');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Records changed. Reopen the statement before printing.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('reports completion'), findsNothing);
+      result = Completer<String>();
+      await start();
+      result.complete('submitted');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Sent to the print queue. Check the printer for completion.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  test(
+    'D2 ledger uses posted entries and preserves vouchers and pending amounts',
+    () {
+      final report = StoreCustomerStatement(
+        ledger: customer(),
+        storeName: 'Store',
+      );
+      expect(report.ready, isTrue);
+      expect(report.opening, 1000);
+      expect(report.closing, -500);
+      expect(report.rows.last[5], 5);
+      expect(report.rows.last[6], 'Cr');
+      expect(report.rows[1][2], 'voucher-customer-01-0');
+      expect(report.rows[5][3], isNull);
+      expect(report.rows[5][4], isNull);
+      expect(report.rows[5][5], 5);
+      expect(report.rows[5][11], 2.5);
+      expect(
+        report.rows.every(
+          (r) => r.length == StoreCustomerStatement.headers.length,
+        ),
+        isTrue,
+      );
+    },
+  );
+  test(
+    'D2 dated opening includes prior posted activity and rejects missing coverage',
+    () {
+      final report = StoreCustomerStatement(
+        ledger: customer(),
+        storeName: 'Store',
+        coverageFrom: DateTime.utc(2026, 9, 1),
+        from: DateTime.utc(2026, 9, 4),
+        until: DateTime.utc(2026, 9, 6),
+      );
+      expect(report.ready, isTrue);
+      expect(report.opening, 7000);
+      expect(report.closing, -500);
+      expect(report.entries.length, 2);
+      final missing = StoreCustomerStatement(
+        ledger: customer(),
+        storeName: 'Store',
+        from: report.from,
+        until: report.until,
+      );
+      expect(missing.ready, isFalse);
+      expect(missing.opening, isNull);
+      expect(() => missing.document, throwsFormatException);
+      expect(
+        StoreCustomerStatement(
+          ledger: customer(),
+          storeName: 'Store',
+          coverageFrom: DateTime.utc(2026, 9, 3),
+          from: report.from,
+          until: report.until,
+        ).ready,
+        isFalse,
+      );
+    },
+  );
+  test(
+    'D2 incomplete history never invents balances or becomes downloadable',
+    () {
+      final report = StoreCustomerStatement(
+        ledger: customer(opening: null, complete: false),
+        storeName: 'Store',
+      );
+      expect(report.ledger.valid, isTrue);
+      expect(report.entries.length, 6);
+      expect(report.closing, isNull);
+      expect(report.rows.every((r) => r[5] == null), isTrue);
+      expect(() => report.document, throwsFormatException);
+    },
+  );
+  test(
+    'D2 outstanding separates receivables from credit and requires complete scope',
+    () {
+      final ledgers = [
+        customer(),
+        customer(id: 'other', opening: 2000, transactions: false),
+      ];
+      StoreTabularReport build(
+        List<WorkspaceCustomerLedger> rows,
+        bool complete,
+      ) => customerOutstandingReport(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'Store',
+        ledgers: rows,
+        allCustomersComplete: complete,
+      );
+      expect(build(ledgers, true).rows.last.sublist(2, 4), [20, 5]);
+      expect(() => build(ledgers, false), throwsFormatException);
+      expect(
+        () => build([customer(account: 'wrong')], true),
+        throwsFormatException,
+      );
+      expect(
+        () => build([customer(), customer()], true),
+        throwsFormatException,
+      );
+      expect(
+        () => build([customer(complete: false)], true),
+        throwsFormatException,
+      );
+    },
+  );
+  test(
+    'PRINT statement A4 and thermal retain scoped report and validate selection',
+    () async {
+      final report = StoreCustomerStatement(
+        ledger: customer(),
+        storeName: 'QA Store',
+      ).document;
+      final original = jsonEncode(report.rows);
+      for (final paper in [
+        PdfPageFormat.a4,
+        StorePrintPaper.receipt58.initialFormat,
+        StorePrintPaper.receipt80.initialFormat,
+      ]) {
+        final bytes = await report.forPrint(paper, null);
+        expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+        expect(jsonEncode(report.rows), original);
+        final selected = await report.forPrint(paper, [0]);
+        expect(selected, isNotEmpty);
+        const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+        if (output.isNotEmpty) {
+          final dir = Directory(output)..createSync(recursive: true);
+          File(
+            '${dir.path}/print-statement-${(paper.width / PdfPageFormat.mm).round()}.pdf',
+          ).writeAsBytesSync(bytes);
+        }
+      }
+      await expectLater(
+        report.forPrint(PdfPageFormat.a4, [999]),
+        throwsFormatException,
+      );
+      await expectLater(
+        report.forPrint(const PdfPageFormat(10, 200), null),
+        throwsFormatException,
+      );
+      for (final row in <List<Object?>>[
+        ['missing fields'],
+        [...report.rows.first, 'unexpected field'],
+      ]) {
+        final malformed = StoreTabularReport(
+          title: report.title,
+          disclosure: report.disclosure,
+          metadata: report.metadata,
+          headers: report.headers,
+          rows: [row],
+          moneyColumns: report.moneyColumns,
+        );
+        await expectLater(
+          malformed.forPrint(PdfPageFormat.a4, null),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test('D2 exports preserve typed values and all statement fields', () async {
+    final document = StoreCustomerStatement(
+      ledger: customer(),
+      storeName: '=Unsafe name',
+    ).document;
+    final csv = utf8.decode(
+      await document.generate(StoreStockExportFormat.csv),
+    );
+    expect(csv, contains("'=Unsafe name"));
+    expect(csv, contains('Opening Balance'));
+    expect(csv, contains('Closing Balance'));
+    expect(csv, contains('voucher-customer-01-0'));
+    final excel = await document.generate(StoreStockExportFormat.excel);
+    final sheet = xls.Excel.decodeBytes(excel)['Customer statement'];
+    expect(sheet.cell(xls.CellIndex.indexByString('A7')).value, isNull);
+    expect(sheet.cell(xls.CellIndex.indexByString('J8')).value, isNull);
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('D8')).value,
+      xls.IntCellValue(100),
+    );
+    expect(
+      sheet.cell(xls.CellIndex.indexByString('G14')).value,
+      xls.TextCellValue('Cr'),
+    );
+    final pdf = await document.generate(StoreStockExportFormat.pdf);
+    expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
+    const output = String.fromEnvironment('MOOL_CUSTOMER_REPORT_TEST_DIR');
+    if (output.isNotEmpty) {
+      final summary = customerOutstandingReport(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'Test Store',
+        ledgers: [
+          customer(),
+          customer(id: '002', opening: 2000, transactions: false),
+        ],
+        allCustomersComplete: true,
+      );
+      await Directory(output).create(recursive: true);
+      for (final entry in [
+        ('customer-statement', document),
+        ('customer-outstanding', summary),
+      ]) {
+        for (final format in StoreStockExportFormat.values) {
+          await File(
+            '$output/${entry.$1}.${format.extension}',
+          ).writeAsBytes(await entry.$2.generate(format));
+        }
+      }
+    }
+  });
+  test(
+    'D2 outstanding period uses period closing rather than current closing',
+    () {
+      final l = customer();
+      final period = StoreCustomerStatement(
+        ledger: l,
+        storeName: 'Store',
+        from: DateTime.utc(2026, 9, 1),
+        until: DateTime.utc(2026, 9, 4),
+        coverageFrom: DateTime.utc(2026, 9, 1),
+      );
+      final report = customerOutstandingReport(
+        accountId: 'account',
+        storeId: 'store',
+        storeName: 'Store',
+        ledgers: [l],
+        allCustomersComplete: true,
+        periodStatements: {l.customerId: period},
+      );
+      expect(report.rows.last.sublist(2, 4), [70, 0]);
+      expect(
+        () => customerOutstandingReport(
+          accountId: 'account',
+          storeId: 'store',
+          storeName: 'Store',
+          ledgers: [l],
+          allCustomersComplete: true,
+          periodStatements: {},
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => customerOutstandingReport(
+          accountId: 'account',
+          storeId: 'store',
+          storeName: 'Store',
+          ledgers: [],
+          allCustomersComplete: true,
+        ),
+        throwsFormatException,
+      );
+      expect(
+        customerOutstandingReport(
+          accountId: 'account',
+          storeId: 'store',
+          storeName: 'Store',
+          ledgers: [],
+          allCustomersComplete: true,
+          emptyAsOf: l.asOf,
+        ).rows.single[2],
+        0,
+      );
+    },
+  );
+  const scope = CommerceDownloadScope('review-account', store: 'review-store');
+  const query = CommerceDownloadQuery(scope: scope);
+  test(
+    'Store adapter uses saved seller, exact rows and scoped approved PDF request',
+    () async {
+      final account = AccountStore();
+      final work = session(account);
+      final pdf = PdfSource();
+      final source = StoreCommerceDownloadSource(work, pdfSource: pdf);
+      final page = await source.load(query);
+      expect(page.items, hasLength(1));
+      final download = await page.items.single.load();
+      expect(download.valid, isTrue);
+      expect(
+        pdf.received!.invoice.toLedgerJson(),
+        request().invoice.toLedgerJson(),
+      );
+      expect(pdf.received!.items.length, 2);
+      expect(pdf.received!.accountId, scope.account);
+      expect(pdf.received!.storeId, scope.store);
+      expect(pdf.received!.paymentStatus, 'Payment status unavailable');
+      expect(download.bytes, pdfBytes());
+      account.accountScope = 'different-account';
+      await expectLater(page.items.single.load(), throwsFormatException);
+      await expectLater(source.load(query), throwsFormatException);
+    },
+  );
+  test('release source does not silently mint an issued invoice', () async {
+    final source = StoreCommerceDownloadSource(session(AccountStore()));
+    final page = await source.load(query);
+    expect(page.items.single.unavailableReason, 'PDF not available yet');
+    expect(page.items.single.notice, isNull);
+  });
+  test(
+    'Store paging 50 records with query and revision-bound cursor',
+    () async {
+      final work = session(AccountStore());
+      for (var i = 0; i < 55; i++) {
+        work.workspaceInvoices.add(
+          WorkspaceCustomerInvoice(
+            id: 'INV-$i',
+            orderId: 'order-$i',
+            customer: 'Review customer',
+            items: '1 item',
+            amount: 100,
+            payment: 'Cash',
+            issuedAt: DateTime(2026, 9, 22),
+          ),
+        );
+      }
+      final source = StoreCommerceDownloadSource(work);
+      final first = await source.load(query);
+      expect(first.items.length, 50);
+      final second = await source.load(query, cursor: first.nextCursor);
+      expect(second.items.length, 6);
+      expect(second.nextCursor, isNull);
+      expect(
+        {
+          ...first.items.map((i) => i.id),
+          ...second.items.map((i) => i.id),
+        }.length,
+        56,
+      );
+      await expectLater(
+        source.load(
+          const CommerceDownloadQuery(scope: scope, search: 'changed'),
+          cursor: first.nextCursor,
+        ),
+        throwsFormatException,
+      );
+      work.workspaceInvoices.removeLast();
+      await expectLater(
+        source.load(query, cursor: first.nextCursor),
+        throwsFormatException,
+      );
+      expect(
+        (await source.load(
+          const CommerceDownloadQuery(
+            scope: scope,
+            kind: CommerceDownloadKind.platformFee,
+          ),
+        )).items,
+        isEmpty,
+      );
+    },
+  );
+  test(
+    'rejects response after payment revision changes or wrong document identity',
+    () async {
+      final work = session(AccountStore());
+      for (final source in [
+        PdfSource(wrongIdentity: true),
+        PdfSource(
+          beforeReturn: () {
+            expect(work.applyWorkspaceFinance(finance(revision: 2)), isTrue);
+          },
+        ),
+      ]) {
+        final page = await StoreCommerceDownloadSource(
+          work,
+          pdfSource: source,
+        ).load(query);
+        await expectLater(page.items.single.load(), throwsFormatException);
+      }
+    },
+  );
+}

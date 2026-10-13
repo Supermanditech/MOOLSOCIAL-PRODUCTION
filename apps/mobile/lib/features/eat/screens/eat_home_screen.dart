@@ -23,7 +23,18 @@ class _EatHomeScreenState extends State<EatHomeScreen> {
   String _selectedCuisine = 'All';
 
   @override
+  void initState() {
+    super.initState();
+    _searchFocusNode.addListener(_handleSearchFocusChanged);
+  }
+
+  void _handleSearchFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _searchFocusNode.removeListener(_handleSearchFocusChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -31,116 +42,125 @@ class _EatHomeScreenState extends State<EatHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.session,
-      builder: (context, _) {
-        final restaurants = widget.session
-            .visibleRestaurants(_searchController.text)
-            .where(
-              (restaurant) => switch (_selectedCuisine) {
-                'North Indian' => restaurant.cuisine == 'North Indian',
-                'Cafe' => restaurant.cuisine == 'Cafe',
-                'Dining' =>
-                  restaurant.cuisine.toLowerCase().contains('dining') ||
-                      restaurant.cuisine.toLowerCase().contains('rooftop') ||
-                      restaurant.cuisine.toLowerCase().contains('multi'),
-                _ => true,
-              },
-            )
-            .toList();
-        return EatPageScaffold(
-          key: const Key('eat-home-screen'),
-          session: widget.session,
-          title: 'Order Food',
-          subtitle: 'Sardarpura · Jodhpur · open now',
-          activeLocalAction: 'order',
-          fallbackBackRoute: '/app/eat',
-          showBack: false,
-          body: ListView(
-            key: const Key('eat-home-discovery-list'),
-            padding: const EdgeInsets.fromLTRB(
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xs,
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xxl,
-            ),
-            children: [
-              const MoolServiceCard(
-                key: Key('eat-home-location'),
-                title: 'Sardarpura, Jodhpur',
-                subtitle: 'Delivering to Home',
-                icon: Icons.location_on_rounded,
-                accent: _eatAccent,
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              MoolServiceSearchField(
-                key: const Key('eat-home-search-surface'),
-                fieldKey: const Key('eat-home-search'),
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                hintText: 'Search food, cuisine or restaurant',
-                semanticLabel: 'Search food and restaurants',
-                onChanged: (_) => setState(() {}),
-                trailing: _searchController.text.isEmpty
-                    ? IconButton(
-                        key: const Key('eat-home-voice'),
-                        tooltip: 'Use voice search',
-                        onPressed: () => _showVoiceSearch(context),
-                        icon: const Icon(Icons.mic_none_rounded),
-                      )
-                    : IconButton(
-                        key: const Key('eat-home-clear'),
-                        tooltip: 'Clear search',
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              const _PrimaryRoutes(),
-              const SizedBox(height: MoolServiceHomeTokens.sectionGap),
-              MoolServiceSectionHeader(
-                title: 'Food near you',
-                subtitle: restaurants.isEmpty
-                    ? 'Try another cuisine or search'
-                    : '${restaurants.length} places · price and time shown before you choose',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              _ContextChoices(
-                selectedCuisine: _selectedCuisine,
-                onSelected: (value) => setState(() => _selectedCuisine = value),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              if (restaurants.isEmpty)
-                _EmptyRestaurants(
-                  onClear: () {
-                    _searchController.clear();
-                    setState(() => _selectedCuisine = 'All');
-                  },
-                )
-              else
-                for (final restaurant in restaurants)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: MoolServiceHomeTokens.cardGap,
-                    ),
-                    child: _RestaurantChoice(
-                      restaurant: restaurant,
-                      onTap: () {
-                        widget.session.selectRestaurant(restaurant.id);
-                        if (widget.session.selectedRestaurantId ==
-                            restaurant.id) {
-                          context.go('/app/eat/order');
-                        }
-                      },
-                    ),
-                  ),
-            ],
-          ),
-        );
+    return PopScope<Object?>(
+      canPop: !_searchFocusNode.hasFocus,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _searchFocusNode.hasFocus) {
+          _searchFocusNode.unfocus();
+        }
       },
+      child: AnimatedBuilder(
+        animation: widget.session,
+        builder: (context, _) {
+          final restaurants = widget.session
+              .visibleRestaurants(_searchController.text)
+              .where(
+                (restaurant) => switch (_selectedCuisine) {
+                  'North Indian' => restaurant.cuisine == 'North Indian',
+                  'Cafe' => restaurant.cuisine == 'Cafe',
+                  'Dining' =>
+                    restaurant.cuisine.toLowerCase().contains('dining') ||
+                        restaurant.cuisine.toLowerCase().contains('rooftop') ||
+                        restaurant.cuisine.toLowerCase().contains('multi'),
+                  _ => true,
+                },
+              )
+              .toList();
+          return EatPageScaffold(
+            key: const Key('eat-home-screen'),
+            session: widget.session,
+            title: 'Order Food',
+            subtitle: 'Sardarpura · Jodhpur · open now',
+            activeLocalAction: 'order',
+            fallbackBackRoute: '/app/eat',
+            showBack: false,
+            body: ListView(
+              key: const Key('eat-home-discovery-list'),
+              padding: const EdgeInsets.fromLTRB(
+                MoolServiceHomeTokens.pagePadding,
+                MoolSpacing.xs,
+                MoolServiceHomeTokens.pagePadding,
+                MoolSpacing.xxl,
+              ),
+              children: [
+                const MoolServiceCard(
+                  key: Key('eat-home-location'),
+                  title: 'Sardarpura, Jodhpur',
+                  subtitle: 'Delivering to Home',
+                  icon: Icons.location_on_rounded,
+                  accent: _eatAccent,
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                MoolServiceSearchField(
+                  key: const Key('eat-home-search-surface'),
+                  fieldKey: const Key('eat-home-search'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  hintText: 'Search food or restaurants',
+                  semanticLabel: 'Search food and restaurants',
+                  onChanged: (_) => setState(() {}),
+                  trailing: _searchController.text.isEmpty
+                      ? IconButton(
+                          key: const Key('eat-home-voice'),
+                          tooltip: 'Use voice search',
+                          onPressed: () => _showVoiceSearch(context),
+                          icon: const Icon(Icons.mic_none_rounded),
+                        )
+                      : IconButton(
+                          key: const Key('eat-home-clear'),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                const _PrimaryRoutes(),
+                const SizedBox(height: MoolServiceHomeTokens.sectionGap),
+                MoolServiceSectionHeader(
+                  title: 'Food near you',
+                  subtitle: restaurants.isEmpty
+                      ? 'Try another cuisine or search'
+                      : '${restaurants.length} places · price and time shown before you choose',
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                _ContextChoices(
+                  selectedCuisine: _selectedCuisine,
+                  onSelected: (value) =>
+                      setState(() => _selectedCuisine = value),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                if (restaurants.isEmpty)
+                  _EmptyRestaurants(
+                    onClear: () {
+                      _searchController.clear();
+                      setState(() => _selectedCuisine = 'All');
+                    },
+                  )
+                else
+                  for (final restaurant in restaurants)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: MoolServiceHomeTokens.cardGap,
+                      ),
+                      child: _RestaurantChoice(
+                        restaurant: restaurant,
+                        onTap: () {
+                          widget.session.selectRestaurant(restaurant.id);
+                          if (widget.session.selectedRestaurantId ==
+                              restaurant.id) {
+                            context.go('/app/eat/order');
+                          }
+                        },
+                      ),
+                    ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

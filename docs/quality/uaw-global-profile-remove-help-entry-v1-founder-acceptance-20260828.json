@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-GLOBAL-PROFILE-REMOVE-HELP-ENTRY-V1-20260828",
+  "workId": "global-profile-remove-help-entry-v1-20260828",
+  "lane": "codex_ui",
+  "acceptedCommit": "85c033e025eb88bbe2da66e9f65dadee2e3dfbfe",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-08-28T21:24:55.2696853+05:30",
+  "privateValuesEmitted": false
+}

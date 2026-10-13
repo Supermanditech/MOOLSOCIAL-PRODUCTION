@@ -1,3 +1,5 @@
+
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -11,6 +13,41 @@ if (-not (Test-Path -LiteralPath $referenceRoot -PathType Container)) {
 
 if (-not (Test-Path -LiteralPath $checksumsPath -PathType Leaf)) {
   throw "Founder FINAL Buy checksum file is missing: $checksumsPath"
+}
+
+function Get-BuyReferenceSha256 {
+  param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+  return (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($Bytes)))).ToLowerInvariant()
+}
+
+function Test-BuyReferenceBytes {
+  param(
+    [Parameter(Mandatory = $true)][byte[]]$Bytes,
+    [Parameter(Mandatory = $true)][string]$Expected
+  )
+  $expectedLower = $Expected.ToLowerInvariant()
+  if ((Get-BuyReferenceSha256 $Bytes) -ceq $expectedLower) { return $true }
+  try {
+    $utf8 = [Text.UTF8Encoding]::new($false, $true)
+    $text = $utf8.GetString($Bytes)
+    $canonical = $utf8.GetBytes($text.Replace("`r`n", "`n"))
+    return (Get-BuyReferenceSha256 $canonical) -ceq $expectedLower
+  } catch {
+    return $false
+  }
+}
+
+$fixtureUtf8 = [Text.UTF8Encoding]::new($false)
+$fixtureLf = $fixtureUtf8.GetBytes("locked`n")
+$fixtureCrlf = $fixtureUtf8.GetBytes("locked`r`n")
+$fixtureChanged = $fixtureUtf8.GetBytes("changed`n")
+$fixtureExpected = Get-BuyReferenceSha256 $fixtureLf
+if (
+  -not (Test-BuyReferenceBytes $fixtureLf $fixtureExpected) -or
+  -not (Test-BuyReferenceBytes $fixtureCrlf $fixtureExpected) -or
+  (Test-BuyReferenceBytes $fixtureChanged $fixtureExpected)
+) {
+  throw 'Buy approved sealed-parallel fixture failed.'
 }
 
 $expected = @{}
@@ -47,8 +84,9 @@ if ($missingFromReference.Count -gt 0) {
 
 foreach ($relative in $expectedFiles) {
   $path = Join-Path $referenceRoot ($relative -replace '/', '\')
-  $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
-  if ($actualHash -ne $expected[$relative]) {
+  $actualBytes = [IO.File]::ReadAllBytes($path)
+  $actualHash = Get-BuyReferenceSha256 $actualBytes
+  if (-not (Test-BuyReferenceBytes $actualBytes $expected[$relative])) {
     throw "Immutable Buy reference changed: $relative expected=$($expected[$relative]) actual=$actualHash"
   }
 }

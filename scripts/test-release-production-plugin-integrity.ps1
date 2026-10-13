@@ -46,11 +46,14 @@ function New-AabFixture(
 }
 
 $positiveApkPass = $false
+$echoedApkPass = $false
 $missingApkRejected = $false
+$missingShareApkRejected = $false
 $forbiddenApkRejected = $false
 $missingMappingRejected = $false
 $positiveAabPass = $false
 $missingAabRejected = $false
+$missingShareAabRejected = $false
 $forbiddenAabRejected = $false
 try {
   [void](New-Item -ItemType Directory -Path $fixtureRoot)
@@ -61,6 +64,7 @@ try {
   $mappingText = @'
 io.flutter.plugins.GeneratedPluginRegistrant -> a.b:
 io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin -> je.d:
+dev.fluttercommunity.plus.share.SharePlusPlugin -> sp.a:
 com.moolsocial.app.MainActivity -> c.d:
 dev.flutter.plugins.integration_test.IntegrationTestPlugin -> x.y:
 '@
@@ -83,10 +87,13 @@ $leaf = Split-Path -Leaf $args[-1]
 if ($args[0] -ceq 'dex' -and $args[1] -ceq 'packages') {
   'C d io.flutter.plugins.GeneratedPluginRegistrant'
   'C d com.moolsocial.app.MainActivity'
-  if ($args -contains '--proguard-mappings' -and $leaf -notlike '*missing*') {
+  if ($args -contains '--proguard-mappings' -and $leaf -notlike '*missing-firebase*') {
     'C d io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin'
   } else {
     'C d je.d'
+  }
+  if ($leaf -notlike '*missing-share*') {
+    'C d dev.fluttercommunity.plus.share.SharePlusPlugin'
   }
   if ($leaf -like '*forbidden*') {
     'C d dev.flutter.plugins.integration_test.IntegrationTestPlugin'
@@ -94,7 +101,14 @@ if ($args[0] -ceq 'dex' -and $args[1] -ceq 'packages') {
   exit 0
 }
 if ($args[0] -ceq 'manifest' -and $args[1] -ceq 'application-id') {
-  'com.moolsocial.app'
+  if ($leaf -like '*echoed-package*') {
+    'C:\fixture>setlocal'
+    'C:\fixture>java ApkAnalyzerCli manifest application-id echoed-package.apk'
+    'com.moolsocial.app.cursorreview'
+    'C:\fixture>endlocal'
+  } else {
+    'com.moolsocial.app'
+  }
   exit 0
 }
 exit 9
@@ -105,9 +119,17 @@ exit 9
     [Text.UTF8Encoding]::new($false)
   )
   $positiveApk = Join-Path $fixtureRoot 'positive.apk'
-  $missingApk = Join-Path $fixtureRoot 'missing.apk'
+  $echoedApk = Join-Path $fixtureRoot 'echoed-package.apk'
+  $missingApk = Join-Path $fixtureRoot 'missing-firebase.apk'
+  $missingShareApk = Join-Path $fixtureRoot 'missing-share.apk'
   $forbiddenApk = Join-Path $fixtureRoot 'forbidden.apk'
-  foreach ($path in @($positiveApk, $missingApk, $forbiddenApk)) {
+  foreach ($path in @(
+      $positiveApk,
+      $echoedApk,
+      $missingApk,
+      $missingShareApk,
+      $forbiddenApk
+    )) {
     [IO.File]::WriteAllText($path, 'fixture', [Text.UTF8Encoding]::new($false))
   }
   $apkGate = Join-Path $root 'scripts/check-apk-production-plugin-integrity.ps1'
@@ -115,11 +137,21 @@ exit 9
     -RepositoryRoot $root -ApkAnalyzerPath $analyzer `
     -ProguardFolderPath $mappingFolder -RequireMappingAware | Out-Null
   $positiveApkPass = $true
+  & $apkGate -ApkPath $echoedApk -CandidateId 'FIXTURE-ECHOED-PACKAGE' `
+    -RepositoryRoot $root -ApkAnalyzerPath $analyzer `
+    -ProguardFolderPath $mappingFolder -RequireMappingAware `
+    -ExpectedApplicationId 'com.moolsocial.app.cursorreview' | Out-Null
+  $echoedApkPass = $true
   try {
     & $apkGate -ApkPath $missingApk -CandidateId 'FIXTURE-MISSING' `
       -RepositoryRoot $root -ApkAnalyzerPath $analyzer `
       -ProguardFolderPath $mappingFolder -RequireMappingAware | Out-Null
   } catch { $missingApkRejected = $true }
+  try {
+    & $apkGate -ApkPath $missingShareApk -CandidateId 'FIXTURE-MISSING-SHARE' `
+      -RepositoryRoot $root -ApkAnalyzerPath $analyzer `
+      -ProguardFolderPath $mappingFolder -RequireMappingAware | Out-Null
+  } catch { $missingShareApkRejected = $true }
   try {
     & $apkGate -ApkPath $forbiddenApk -CandidateId 'FIXTURE-FORBIDDEN' `
       -RepositoryRoot $root -ApkAnalyzerPath $analyzer `
@@ -132,11 +164,19 @@ exit 9
   } catch { $missingMappingRejected = $true }
 
   $positiveAab = Join-Path $fixtureRoot 'positive.aab'
-  $missingAab = Join-Path $fixtureRoot 'missing.aab'
+  $missingAab = Join-Path $fixtureRoot 'missing-firebase.aab'
+  $missingShareAab = Join-Path $fixtureRoot 'missing-share.aab'
   $forbiddenAab = Join-Path $fixtureRoot 'forbidden.aab'
-  New-AabFixture $positiveAab @('La/b;', 'Lje/d;', 'Lc/d;')
-  New-AabFixture $missingAab @('La/b;', 'Lc/d;')
-  New-AabFixture $forbiddenAab @('La/b;', 'Lje/d;', 'Lc/d;', 'Lx/y;')
+  New-AabFixture $positiveAab @('La/b;', 'Lje/d;', 'Lsp/a;', 'Lc/d;')
+  New-AabFixture $missingAab @('La/b;', 'Lsp/a;', 'Lc/d;')
+  New-AabFixture $missingShareAab @('La/b;', 'Lje/d;', 'Lc/d;')
+  New-AabFixture $forbiddenAab @(
+    'La/b;',
+    'Lje/d;',
+    'Lsp/a;',
+    'Lc/d;',
+    'Lx/y;'
+  )
   $aabGate = Join-Path $root 'scripts/check-aab-production-plugin-integrity.ps1'
   & $aabGate -AabPath $positiveAab -CandidateId 'FIXTURE-POSITIVE' `
     -RepositoryRoot $root -ProguardFolderPath $mappingFolder | Out-Null
@@ -145,6 +185,11 @@ exit 9
     & $aabGate -AabPath $missingAab -CandidateId 'FIXTURE-MISSING' `
       -RepositoryRoot $root -ProguardFolderPath $mappingFolder | Out-Null
   } catch { $missingAabRejected = $true }
+  try {
+    & $aabGate -AabPath $missingShareAab `
+      -CandidateId 'FIXTURE-MISSING-SHARE' `
+      -RepositoryRoot $root -ProguardFolderPath $mappingFolder | Out-Null
+  } catch { $missingShareAabRejected = $true }
   try {
     & $aabGate -AabPath $forbiddenAab -CandidateId 'FIXTURE-FORBIDDEN' `
       -RepositoryRoot $root -ProguardFolderPath $mappingFolder | Out-Null
@@ -160,15 +205,18 @@ exit 9
 }
 
 Assert-PluginFixture $positiveApkPass 'mapping-aware APK positive fixture failed.'
+Assert-PluginFixture $echoedApkPass 'echoed package APK fixture failed.'
 Assert-PluginFixture $missingApkRejected 'missing Firebase Core APK fixture passed.'
+Assert-PluginFixture $missingShareApkRejected 'missing Share Plus APK fixture passed.'
 Assert-PluginFixture $forbiddenApkRejected 'integration_test APK fixture passed.'
 Assert-PluginFixture $missingMappingRejected 'missing mapping APK fixture passed.'
 Assert-PluginFixture $positiveAabPass 'mapping-aware AAB positive fixture failed.'
 Assert-PluginFixture $missingAabRejected 'missing Firebase Core AAB fixture passed.'
+Assert-PluginFixture $missingShareAabRejected 'missing Share Plus AAB fixture passed.'
 Assert-PluginFixture $forbiddenAabRejected 'integration_test AAB fixture passed.'
 
 Write-Output (
   'Release production plugin-integrity fixtures passed: ' +
-  'apkPositive=1; apkNegative=3; aabPositive=1; aabNegative=2; ' +
-  'mappingAware=true; integrationTestForbidden=true.'
+  'apkPositive=2; apkNegative=4; aabPositive=1; aabNegative=3; ' +
+  'mappingAware=true; sharePlusRequired=true; integrationTestForbidden=true.'
 )

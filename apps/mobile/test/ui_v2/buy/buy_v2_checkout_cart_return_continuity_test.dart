@@ -1,13 +1,840 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat, Tristate, SemanticsAction;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
+
+// These protected checkout images explicitly include two current deliveries.
+// Ordinary seed history remains inactive; provenance is tested independently.
+class _CheckoutActiveDeliveryReferenceSession extends BuyV2Session {
+  _CheckoutActiveDeliveryReferenceSession() : super(core: BuySession());
+  @override
+  List<BuyV2Order> get activeDeliveryOrders => orders
+      .where((order) => order.collection == null)
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => !orderIsCompleted(order))
+      .toList(growable: false);
+}
+
+class _R66OrderCustomerStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'r66-order-group-customer';
+
+  BuyV2CustomerStateSnapshot? snapshot;
+  int writes = 0;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    writes += 1;
+    snapshot = value;
+    return true;
+  }
+}
+
+class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
+  @override
+  String? ownerScope = 'account-a';
+  bool acceptWrites = true;
+  final Map<String, BuyV2GstInvoiceProfileSnapshot> snapshots = {};
+
+  @override
+  Future<BuyV2GstInvoiceProfileSnapshot?> read() async {
+    final scope = ownerScope;
+    return scope == null ? null : snapshots[scope];
+  }
+
+  @override
+  Future<bool> write(BuyV2GstInvoiceProfileSnapshot snapshot) async {
+    final scope = ownerScope;
+    if (scope == null || !acceptWrites) return false;
+    snapshots[scope] = snapshot;
+    return true;
+  }
+}
+
+class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  String? customerMessage;
+  BuyV2CommercialPaymentTerm Function(BuyV2CommercialPaymentTerm)? amend;
+
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async {
+    if (state != BuyV2CommerceLoadState.ready) {
+      return BuyV2CommercialPaymentTermsSnapshot(
+        state: state,
+        customerMessage: customerMessage,
+      );
+    }
+    int totalFor(BuyV2FulfilmentGroup group) =>
+        quotedTotalsByFulfilmentKey[group.key] ?? group.total;
+    return BuyV2CommercialPaymentTermsSnapshot(
+      state: state,
+      terms: [
+        for (final group in groups)
+          if (group.destination != BuyV2Destination.wholesale)
+            BuyV2CommercialPaymentTerm(
+              id: 'retail-advance-${group.destination.name}',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.retailAdvance,
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group),
+              balanceDue: 0,
+              balanceDueLabel: 'Paid in full',
+              sourceId: 'retail-terms-source',
+            )
+          else ...[
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-advance',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group),
+              balanceDue: 0,
+              balanceDueLabel: 'Paid in full',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-booking-delivery',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+              orderTotal: totalFor(group),
+              amountDueNow: totalFor(group) ~/ 4,
+              balanceDue: totalFor(group) - (totalFor(group) ~/ 4),
+              balanceDueLabel: 'at delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'wholesale-credit-30',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.supplierCredit,
+              orderTotal: totalFor(group),
+              amountDueNow: 0,
+              balanceDue: totalFor(group),
+              balanceDueLabel: 'within 30 days of delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 30,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'invalid-msme-credit-90',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.supplierCredit,
+              orderTotal: totalFor(group),
+              amountDueNow: 0,
+              balanceDue: totalFor(group),
+              balanceDueLabel: 'within 90 days of delivery',
+              sourceId: 'workspace-terms-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 90,
+            ),
+            BuyV2CommercialPaymentTerm(
+              id: 'regulated-credit-90',
+              fulfilmentKey: group.key,
+              destination: group.destination,
+              supplierName: group.partner,
+              kind: BuyV2CommercialPaymentTermKind.regulatedCredit,
+              orderTotal: totalFor(group),
+              amountDueNow: 0,
+              balanceDue: totalFor(group),
+              balanceDueLabel: 'to the financier over 90 days',
+              sourceId: 'regulated-credit-source',
+              supplierIsMicroOrSmall: true,
+              netDays: 90,
+              financierName: 'Partner Bank',
+              annualPercentageRate: 12.5,
+              keyFactsUri: Uri.parse('https://bank.example/kfs/offer-1'),
+            ),
+          ],
+      ].map((term) => amend?.call(term) ?? term).toList(),
+    );
+  }
+}
+
+BuyV2CommercialPaymentTerm _amendPaymentTerm(
+  BuyV2CommercialPaymentTerm term, {
+  int? amountDueNow,
+  String? balanceDueLabel,
+  int? netDays,
+  String? sourceId,
+  Set<String>? acceptedPaymentMethods,
+  double? annualPercentageRate,
+}) => BuyV2CommercialPaymentTerm(
+  id: term.id,
+  fulfilmentKey: term.fulfilmentKey,
+  destination: term.destination,
+  supplierName: term.supplierName,
+  kind: term.kind,
+  orderTotal: term.orderTotal,
+  amountDueNow: amountDueNow ?? term.amountDueNow,
+  balanceDue: term.orderTotal - (amountDueNow ?? term.amountDueNow),
+  balanceDueLabel: balanceDueLabel ?? term.balanceDueLabel,
+  sourceId: sourceId ?? term.sourceId,
+  supplierIsMicroOrSmall: term.supplierIsMicroOrSmall,
+  advancePercent: term.advancePercent,
+  upiTransactionLimit: term.upiTransactionLimit,
+  acceptedPaymentMethods: acceptedPaymentMethods ?? term.acceptedPaymentMethods,
+  netDays: netDays ?? term.netDays,
+  financierName: term.financierName,
+  annualPercentageRate: annualPercentageRate ?? term.annualPercentageRate,
+  keyFactsUri: term.keyFactsUri,
+);
+
+class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  String? customerMessage;
+  String? changedGroup;
+  int extraDeliveryFee = 0;
+  BuyV2Address? lastAddress;
+
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({
+    required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address,
+    required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits,
+    required Map<String, int> tipAmountsByFulfilmentKey,
+  }) async {
+    lastAddress = address;
+    if (state != BuyV2CommerceLoadState.ready) {
+      return BuyV2CheckoutQuoteSnapshot(
+        state: state,
+        customerMessage: customerMessage,
+      );
+    }
+    final couponByDestination = {
+      for (final benefit in selectedBenefits)
+        if (benefit.kind == BuyV2CartBenefitKind.coupon)
+          benefit.destination: benefit.savingAmount,
+    };
+    final lines = <BuyV2CheckoutQuoteLine>[];
+    for (final group in groups) {
+      final availableCoupon = couponByDestination[group.destination] ?? 0;
+      final coupon = availableCoupon > group.total
+          ? group.total
+          : availableCoupon;
+      couponByDestination[group.destination] = availableCoupon - coupon;
+      final tax = group.total * 5 ~/ 100;
+      final freight = group.destination == BuyV2Destination.wholesale ? 20 : 0;
+      final deliveryFee =
+          (group.destination == BuyV2Destination.shop ? 10 : 0) +
+          (changedGroup == group.key ? extraDeliveryFee : 0);
+      final tip = tipAmountsByFulfilmentKey[group.key] ?? 0;
+      lines.add(
+        BuyV2CheckoutQuoteLine(
+          fulfilmentKey: group.key,
+          itemSubtotal: group.total,
+          couponSaving: coupon,
+          tax: tax,
+          freight: freight,
+          deliveryFee: deliveryFee,
+          tip: tip,
+          paymentCharge: 0,
+          total: group.total - coupon + tax + freight + deliveryFee + tip,
+        ),
+      );
+    }
+    final evaluatedAt = DateTime.now();
+    return BuyV2CheckoutQuoteSnapshot(
+      state: state,
+      quote: BuyV2CheckoutQuote(
+        id: 'QUOTE-TEST-1',
+        sourceId: 'checkout-quote-source',
+        evaluatedAt: evaluatedAt,
+        validUntil: evaluatedAt.add(const Duration(minutes: 15)),
+        lines: lines,
+        total: lines.fold(0, (total, line) => total + line.total),
+      ),
+    );
+  }
+}
+
+class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
+  String? deadline;
+  int? price;
+  bool unavailable = false;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final facts = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+      product,
+    );
+    if (product.id != 's-milk') return facts;
+    return facts.copyWith(
+      deliveryPromise: 'Delivery time confirmed at checkout',
+      promisedByLabel: deadline,
+      price: price,
+      orderabilityLabel: unavailable ? 'Unavailable' : facts.orderabilityLabel,
+      sourceId: 'r669-delivery-estimate-test-provider',
+    );
+  }
+}
+
+class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
+  String? unavailableProductId;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(
+    BuyV2Product product,
+  ) => const BuyV2CatalogueProductFactsAdapter()
+      .snapshotFor(product)
+      .copyWith(
+        orderabilityLabel: product.id == unavailableProductId
+            ? 'Unavailable'
+            : 'Available',
+        deliveryPromise: product.id == unavailableProductId
+            ? 'Delivery time confirmed at checkout'
+            : product.deliveryPromise,
+        promisedByLabel: product.id == unavailableProductId
+            ? ''
+            : 'by tomorrow 4:00 PM',
+        dispatchPromise: product.destination == BuyV2Destination.wholesale
+            ? 'Dispatch within one business day'
+            : 'Dispatch after packing',
+        deliveryProviderName: product.destination == BuyV2Destination.wholesale
+            ? 'Rajasthan Freight Network'
+            : 'Mool Local Delivery',
+        deliveryServiceLevel: product.destination == BuyV2Destination.wholesale
+            ? 'Business freight · tracked'
+            : 'Local tracked delivery',
+        sourceId: 'provider-delivery-promise-source',
+      );
+}
+
+class _BalancePaymentAdapter implements BuyV2BalancePaymentAdapter {
+  int startCalls = 0;
+  int reconcileCalls = 0;
+  int amountDue = 100;
+
+  @override
+  Future<BuyV2BalancePaymentResult> loadBalance({
+    required String orderId,
+  }) async => BuyV2BalancePaymentResult(
+    state: BuyV2BalancePaymentState.due,
+    amountDue: amountDue,
+    dueLabel: 'due today',
+    customerMessage: 'The supplier confirmed this balance is due.',
+  );
+
+  @override
+  Future<BuyV2BalancePaymentResult> startPayment({
+    required String orderId,
+    required int amountDue,
+    required String idempotencyKey,
+  }) async {
+    startCalls += 1;
+    return BuyV2BalancePaymentResult(
+      state: BuyV2BalancePaymentState.paymentActionRequired,
+      amountDue: amountDue,
+      dueLabel: 'due today',
+      customerMessage: 'Continue to the payment app.',
+      paymentReference: 'BALANCE-PAY-1',
+      paymentActionUri: Uri.parse('upi://pay?pa=supplier@example'),
+    );
+  }
+
+  @override
+  Future<BuyV2BalancePaymentResult> reconcilePayment({
+    required String orderId,
+    required String paymentReference,
+  }) async {
+    reconcileCalls += 1;
+    return const BuyV2BalancePaymentResult(
+      state: BuyV2BalancePaymentState.paid,
+      amountDue: 0,
+      dueLabel: 'Paid now',
+      customerMessage: 'Balance payment confirmed.',
+      paymentReference: 'BALANCE-PAY-1',
+    );
+  }
+}
+
+class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
+  BuyV2DeliveryExceptionSnapshot snapshot =
+      const BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        customerMessage: 'Choose another delivery time.',
+        exceptionId: 'DELIVERY-EX-1',
+        kind: BuyV2DeliveryExceptionKind.rescheduleAvailable,
+        headline: 'Delivery needs a new time',
+        detail: 'The previous delivery attempt could not be completed.',
+        rescheduleSlots: ['Tomorrow · 10 am–12 pm', 'Tomorrow · 2–4 pm'],
+      );
+  int rescheduleCalls = 0;
+  int disputeCalls = 0;
+  bool failLoad = false;
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> loadException({
+    required String orderId,
+  }) async {
+    if (failLoad) throw StateError('Receipt service unavailable');
+    return snapshot;
+  }
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> rescheduleDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String slot,
+  }) async {
+    rescheduleCalls += 1;
+    snapshot = BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Delivery rescheduled for $slot.',
+      exceptionId: exceptionId,
+      kind: BuyV2DeliveryExceptionKind.dispatchDelayed,
+      headline: 'New delivery time confirmed',
+      detail: slot,
+    );
+    return snapshot;
+  }
+
+  @override
+  Future<BuyV2DeliveryExceptionSnapshot> disputeProofOfDelivery({
+    required String orderId,
+    required String exceptionId,
+    required String proofReference,
+  }) async {
+    disputeCalls += 1;
+    snapshot = BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Delivery problem reported for review.',
+      exceptionId: exceptionId,
+      kind: BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed,
+      headline: 'Proof of delivery is under review',
+      detail: 'Keep this order available while the delivery is checked.',
+      proofReference: proofReference,
+      itemisedReceipt: snapshot.itemisedReceipt,
+    );
+    return snapshot;
+  }
+}
+
+Future<bool> _submitAndCompleteReviewPayment(BuyV2Session session) async {
+  if (await session.submitOrder()) return true;
+  if (session.checkoutSubmissionState !=
+      BuyV2CheckoutSubmissionState.paymentActionRequired) {
+    return false;
+  }
+  if (!await session.continuePayment((_) async => true)) return false;
+  return session.reconcilePayment();
+}
+
+Future<void> _captureR66Checkout(
+  WidgetTester tester,
+  int amount,
+  double width,
+  double scale,
+  String stage,
+) async {
+  if (!const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')) return;
+  const requestedStage = String.fromEnvironment(
+    'BUY_R66_CHECKOUT_CAPTURE_STAGE',
+  );
+  if (!['address', 'payment', 'confirm', 'action'].contains(requestedStage)) {
+    throw StateError('Choose one exact checkout capture stage');
+  }
+  if (stage != requestedStage) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-checkout-review-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-checkout-review-v3-20260905');
+    await directory.create(recursive: true);
+    final output = File(
+      '${directory.path}/$stage-INR$amount-width$width-text$scale.png',
+    );
+    if (await output.exists()) {
+      throw StateError('Checkout capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Checkout capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
+// Supply one consistent catalogue price; exercise real basket/payment guards.
+class _R66CheckoutAmountFixture extends BuyV2Session {
+  _R66CheckoutAmountFixture(this.amount, {required super.core})
+    : super(commerceAdapter: prepaidCommerceFixture());
+  final int amount;
+
+  @override
+  BuyV2Product? findProduct(String id) {
+    final item = super.findProduct(id);
+    return id == 'w-notebook' ? item?.copyWith(price: amount) : item;
+  }
+}
+
+// Isolated UI orchestration double: no payment/provider or order is created.
+class _ChangingCheckoutCommitFixture extends BuyV2Session {
+  _ChangingCheckoutCommitFixture(this.change) : super(core: BuySession());
+  final String change;
+  int? updatedAmount;
+  int handoffs = 0;
+
+  @override
+  int get checkoutAmountDueNow => updatedAmount ?? super.checkoutAmountDueNow;
+
+  @override
+  Future<bool> submitOrder() async {
+    await Future<void>.delayed(Duration.zero);
+    if (change == 'amount') updatedAmount = checkoutAmountDueNow + 1;
+    if (change == 'method') selectedPayment = 'Card';
+    if (change == 'surface') view = BuyV2View.cart;
+    checkoutSubmissionState =
+        BuyV2CheckoutSubmissionState.paymentActionRequired;
+    notifyListeners();
+    return false;
+  }
+
+  @override
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+    handoffs++;
+    return false;
+  }
+}
+
+class _T08OrderSummarySession extends BuyV2Session {
+  _T08OrderSummarySession(this.records, this.balances)
+    : super(core: BuySession(), reviewDataEnabled: false);
+  final List<BuyV2Order> records;
+  final Map<String, BuyV2BalancePaymentResult> balances;
+  @override
+  List<BuyV2Order> get visibleOrders => records;
+  @override
+  List<BuyV2Order> get visibleOrderHistory => records;
+  @override
+  bool get catalogueAvailable => true;
+  @override
+  BuyV2BalancePaymentResult? balancePaymentFor(String orderId) =>
+      balances[orderId];
+}
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T08 mixed order payment summaries at $scale text', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      BuyV2Order order(String id, String? status, int balance) => BuyV2Order(
+        id: id,
+        destination: BuyV2Destination.shop,
+        title: 'Order $id',
+        itemSummary: '1 product',
+        total: 500,
+        partner: 'Store $id',
+        partnerType: 'Store',
+        promise: 'Awaiting update',
+        destinationLabel: 'Home',
+        progress: .4,
+        status: BuyV2OrderStatus.preparing,
+        purchaseId: 'mixed-purchase',
+        paymentStatusLabel: status,
+        balanceDue: balance,
+        balanceDueLabel: 'at delivery',
+      );
+      final records = [
+        order('paid', 'Paid', 0),
+        order('advance', 'Advance paid', 300),
+        order('pending', 'Payment pending', 300),
+        order('missing', null, 0),
+        order('settled', 'Payment pending', 300),
+        order('zero-pending', 'Paid', 300),
+      ];
+      final session = _T08OrderSummarySession(records, {
+        'settled': const BuyV2BalancePaymentResult(
+          state: BuyV2BalancePaymentState.paid,
+          amountDue: 0,
+          dueLabel: 'Paid',
+          customerMessage: 'Confirmed',
+        ),
+        'zero-pending': const BuyV2BalancePaymentResult(
+          state: BuyV2BalancePaymentState.paymentPending,
+          amountDue: 0,
+          dueLabel: 'Checking',
+          customerMessage: 'Awaiting verification',
+          paymentReference: 'pending-ref',
+        ),
+      });
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: Scaffold(
+            body: BuyV2OrdersView(session: session, onOpenOrderHelp: (_) {}),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final record in records) {
+        final summary = find.byKey(
+          ValueKey('buy-order-payment-summary-${record.id}'),
+        );
+        await tester.scrollUntilVisible(
+          summary,
+          180,
+          scrollable: find.byType(Scrollable).first,
+        );
+        final texts = tester
+            .widgetList<Text>(
+              find.descendant(of: summary, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? '')
+            .join('\n');
+        switch (record.id) {
+          case 'paid':
+            expect(texts, contains('Paid'));
+          case 'advance':
+            expect(texts, contains('Advance paid'));
+            expect(texts, contains('₹300 balance'));
+          case 'pending':
+            expect(texts, contains('Payment pending'));
+            expect(texts, contains('₹300 balance'));
+          case 'missing':
+            expect(texts, contains('Payment status unavailable'));
+            expect(texts, isNot(contains('Paid')));
+          case 'settled':
+            expect(texts, contains('Balance paid'));
+            expect(texts, isNot(contains('pending')));
+            expect(texts, isNot(contains('₹300')));
+          case 'zero-pending':
+            expect(texts, contains('Payment pending'));
+            expect(texts, isNot(contains('Paid')));
+            expect(texts, isNot(contains('No balance')));
+        }
+        expect(
+          find.descendant(
+            of: summary,
+            matching: find.byType(ButtonStyleButton),
+          ),
+          findsNothing,
+        );
+        final details = find.byKey(ValueKey('buy-order-details-${record.id}'));
+        await tester.ensureVisible(details);
+        await tester.pumpAndSettle();
+        expect(details.hitTestable(), findsOneWidget);
+        await tester.tap(details);
+        await tester.pumpAndSettle();
+        final card = find.byKey(ValueKey('buy-order-card-${record.id}'));
+        expect(
+          find.descendant(
+            of: card,
+            matching: find.byTooltip('Hide order details'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: card, matching: find.text(record.id)),
+          findsOneWidget,
+        );
+        final expandedPaymentTexts = tester
+            .widgetList<Text>(
+              find.descendant(of: summary, matching: find.byType(Text)),
+            )
+            .map((text) => text.data ?? '')
+            .join('\n');
+        expect(expandedPaymentTexts, texts);
+        if (record.id == 'advance' || record.id == 'pending') {
+          expect(
+            find.descendant(
+              of: find.byKey(ValueKey('buy-order-card-${record.id}')),
+              matching: find.text('at delivery'),
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 't08-${record.id}-$scale');
+      }
+    });
+  }
+  _purchaseOrderControllerCases();
+  _purchaseOrderPanelCases();
+  for (final fault in [
+    'none',
+    'store',
+    'variant',
+    'quantity',
+    'total',
+    'duplicate',
+    'expired',
+    'reference',
+    'revision-reason',
+  ]) {
+    test('R6633 D17 PO review exact binding $fault', () {
+      final product = BuyV2Catalogue.products
+          .firstWhere(
+            (product) => product.destination == BuyV2Destination.wholesale,
+          )
+          .copyWith(storeId: 'po-store');
+      final basket = [BuyV2CartLine(product: product, quantity: 2)];
+      final line = BuyV2PurchaseOrderLine(
+        productId: product.id,
+        variant: fault == 'variant' ? 'different-variant' : product.variant,
+        pack: product.pack,
+        quantity: fault == 'quantity' ? 3 : 2,
+        unitPriceMinor: product.price * 100,
+      );
+      final lines = fault == 'duplicate' ? [line, line] : [line];
+      final subtotal = lines.fold<int>(0, (sum, l) => sum + l.totalMinor);
+      final doc = BuyV2PurchaseOrderDocument(
+        id: 'draft-1',
+        revision: 'revision-1',
+        supplierStoreId: fault == 'store' ? 'another-store' : 'po-store',
+        supplierName: product.seller,
+        state: fault == 'reference'
+            ? BuyV2PurchaseOrderState.accepted
+            : fault == 'revision-reason'
+            ? BuyV2PurchaseOrderState.revised
+            : BuyV2PurchaseOrderState.draft,
+        reference: fault == 'revision-reason' ? 'PO-1' : null,
+        lines: lines,
+        itemSubtotalMinor: subtotal,
+        chargesMinor: 100,
+        totalMinor: subtotal + (fault == 'total' ? 101 : 100),
+        terms: 'Payment is separate; reviewed supplier terms.',
+      );
+      final now = DateTime.utc(2026, 9, 24);
+      final review = BuyV2PurchaseOrderReview(
+        requestId: 'request-1',
+        revision: 'review-1',
+        buyerAccountId: 'buyer-1',
+        buyerName: 'Buyer',
+        address: const BuyV2Address(
+          id: 'address-1',
+          kind: BuyV2AddressKind.home,
+          label: 'Home',
+          recipient: 'Buyer',
+          phone: '9000000000',
+          line: 'Test address',
+          area: 'Test area',
+          pinCode: '342003',
+          landmark: '',
+        ),
+        validUntil: fault == 'expired'
+            ? now
+            : now.add(const Duration(minutes: 5)),
+        documents: [doc],
+      );
+      expect(review.matches(basket, now), fault == 'none');
+      expect(() => review.documents.clear(), throwsUnsupportedError);
+      expect(() => doc.lines.clear(), throwsUnsupportedError);
+    });
+  }
+
+  test('R6633 D11 native handoff is isolated from review fixtures', () {
+    final production = BuyV2Session(
+      core: BuySession(),
+      reviewDataEnabled: false,
+    );
+    final review = BuyV2Session(core: BuySession(), reviewDataEnabled: true);
+    addTearDown(production.dispose);
+    addTearDown(review.dispose);
+    expect(
+      BuyV2Screen(session: production).resolvedPaymentHandoff,
+      same(buyV2LaunchExternalPayment),
+    );
+    expect(BuyV2Screen(session: review).resolvedPaymentHandoff, isNull);
+    Future<bool> override(Uri uri) async => false;
+    expect(
+      BuyV2Screen(
+        session: review,
+        paymentHandoff: override,
+      ).resolvedPaymentHandoff,
+      same(override),
+    );
+  });
+
+  for (final outcome in ['opened', 'unavailable', 'exception']) {
+    testWidgets('R6633 D11 native payment launcher $outcome', (tester) async {
+      const channel = MethodChannel('plugins.flutter.io/url_launcher');
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call);
+        if (outcome == 'exception') {
+          throw PlatformException(code: 'unavailable');
+        }
+        return outcome == 'opened';
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      for (final uri in [
+        Uri.parse('https://payments.example/checkout?ref=1'),
+        Uri.parse('upi://pay?pa=test%40bank&tr=1'),
+      ]) {
+        expect(await buyV2LaunchExternalPayment(uri), outcome == 'opened');
+        expect(calls.last.method, 'launch');
+        expect((calls.last.arguments as Map)['url'], uri.toString());
+        expect((calls.last.arguments as Map)['useWebView'], isFalse);
+      }
+      final count = calls.length;
+      for (final uri in [
+        Uri.parse('file:///tmp/payment'),
+        Uri.parse('https:///missing-host'),
+        Uri.parse('https://user:secret@payments.example/checkout'),
+      ]) {
+        expect(await buyV2LaunchExternalPayment(uri), isFalse);
+      }
+      expect(calls.length, count);
+    });
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Widget app(
@@ -16,6 +843,8 @@ void main() {
     double textScale = 1,
     bool reducedMotion = false,
     EdgeInsets safeArea = EdgeInsets.zero,
+    EdgeInsets viewInsets = EdgeInsets.zero,
+    BuyV2PaymentHandoff? paymentHandoff,
   }) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -25,18 +854,1029 @@ void main() {
           size: size,
           padding: safeArea,
           viewPadding: safeArea,
+          viewInsets: viewInsets,
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
-        child: child!,
+        child:
+            (const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE') ||
+                const bool.fromEnvironment('BUY_CHECKOUT_REVIEW_DRAFT_CAPTURE'))
+            ? RepaintBoundary(
+                key: const ValueKey('r66-checkout-review-capture'),
+                child: child!,
+              )
+            : r66VisualCaptureRoot(child!),
       ),
       home: BuyV2Screen(
         session: session,
         initialDestination: session.destination,
         initialView: session.view,
         initialCartScope: session.cartScope,
+        paymentHandoff: paymentHandoff,
       ),
     );
+  }
+
+  testWidgets('T14 ordinary reassembly preserves idle pending payment', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final adapter = prepaidCommerceFixture();
+    final store = _R66OrderCustomerStore();
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      customerStateStore: store,
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
+    expect(await session.submitOrder(), isFalse);
+    session.openCart();
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final screen = find.byType(BuyV2Screen);
+    final state = tester.state(screen);
+    final attempt = session.legacyCheckoutAttempt;
+    expect(attempt, isNotNull);
+    final request = attempt!.payment.request;
+    final snapshot = store.snapshot;
+    final writes = store.writes;
+    final dynamic countedAdapter = adapter;
+    final placements = countedAdapter.placementCalls;
+    final reconciliations = countedAdapter.reconciliationCalls;
+    final total = session.checkoutPayableTotal;
+    final payment = session.selectedPayment;
+    expect(session.checkoutBusy, isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    // Rendering reassembly waits for endOfFrame; drive that frame in the test.
+    final reassembled = tester.binding.reassembleApplication();
+    await tester.pump();
+    await reassembled;
+    await tester.pumpAndSettle();
+    expect(tester.state(screen), same(state));
+    expect(tester.widget<BuyV2Screen>(screen).session, same(session));
+    expect(session.legacyCheckoutAttempt, same(attempt));
+    expect(session.legacyCheckoutAttempt!.payment.request, same(request));
+    expect(store.snapshot, same(snapshot));
+    expect(store.writes, writes);
+    expect(countedAdapter.placementCalls, placements);
+    expect(countedAdapter.reconciliationCalls, reconciliations);
+    expect(session.view, BuyV2View.cart);
+    expect(session.quantityFor('s-tomato'), 1);
+    expect(session.cartProductSelected('s-tomato'), isTrue);
+    expect(session.checkoutPayableTotal, total);
+    expect(session.selectedPayment, payment);
+    expect(session.checkoutBusy, isFalse);
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(session.cartChangesBlocked, isTrue);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('buy-cart-empty')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T14 fresh basket reveals lines after old Shop filter text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.chooseCartDisplayFilter('shop');
+        session.clearCart();
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.addProduct('missing-product'), isFalse);
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart();
+        expect(session.cartDisplayFilter, 'all');
+        expect(session.visibleCartLines.single.product.id, 'w-notebook');
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        expect(find.text('No Shop products in Cart.'), findsNothing);
+        final wholesale = find.byKey(
+          const ValueKey('buy-cart-line-w-notebook'),
+        );
+        expect(wholesale, findsOneWidget);
+        session.chooseCartDisplayFilter('shop');
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.cartDisplayFilter, 'shop');
+        expect(session.visibleCartLines.single.product.id, 's-tomato');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'T14 Cart visible Back preserves product and basket text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        session.openProduct('s-tomato');
+        session.openCart();
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final back = find.byKey(const ValueKey('buy-cart-back'));
+        expect(back.hitTestable(), findsOneWidget);
+        expect(tester.getSize(back).height, greaterThanOrEqualTo(44));
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, 's-tomato');
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'T14 Shop filter whole Cart delete confirms scope text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart();
+        session.chooseCartDisplayFilter('shop');
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final bin = find.byKey(const ValueKey('buy-cart-empty'));
+        await tester.tap(bin);
+        await tester.pumpAndSettle();
+        expect(find.text('Empty entire Cart?'), findsOneWidget);
+        final cancel = find.byKey(const ValueKey('buy-cart-clear-cancel'));
+        await tester.ensureVisible(cancel);
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        await tester.tap(bin);
+        await tester.pumpAndSettle();
+        final confirm = find.byKey(const ValueKey('buy-cart-clear-confirm'));
+        await tester.ensureVisible(confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 0);
+        expect(session.view, BuyV2View.catalogue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'T10 held Cart explains payment and disables edits text $scale',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: prepaidCommerceFixture(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.addProduct('s-tomato'), isTrue);
+          session.openCart(scope: BuyV2CartScope.shop);
+          expect(session.openCheckout(), isTrue);
+          expect(session.choosePayment('Card'), isTrue);
+          expect(await session.submitOrder(), isFalse);
+          expect(session.checkoutRequiresResolution, isTrue);
+          final attempt = session.legacyCheckoutAttempt;
+          final total = session.checkoutPayableTotal;
+          session.openCart(scope: BuyV2CartScope.shop);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          expect(session.cartChangesBlocked, isTrue);
+          expect(
+            find.byKey(const ValueKey('buy-cart-payment-recovery-notice')),
+            findsOneWidget,
+          );
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const ValueKey('buy-cart-empty')),
+                )
+                .onPressed,
+            isNull,
+          );
+          final line = find.byKey(const ValueKey('buy-cart-line-s-tomato'));
+          await tester.scrollUntilVisible(
+            line,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          final quantities = tester
+              .widgetList<IconButton>(
+                find.descendant(of: line, matching: find.byType(IconButton)),
+              )
+              .where(
+                (button) =>
+                    const ['Add one', 'Remove one'].contains(button.tooltip),
+              );
+          expect(quantities, hasLength(2));
+          expect(
+            quantities.every((button) => button.onPressed == null),
+            isTrue,
+          );
+          final instruction = find.byKey(
+            const ValueKey('buy-cart-instruction-custom-delivery'),
+          );
+          await tester.scrollUntilVisible(
+            instruction,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          expect(tester.widget<TextButton>(instruction).onPressed, isNull);
+          expect(session.addProduct('s-rice'), isFalse);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          final review = find.widgetWithText(FilledButton, 'Review payment');
+          await tester.ensureVisible(review);
+          await tester.pumpAndSettle();
+          await captureR66Visual(tester, 't10-held-cart-$scale');
+          await tester.tap(review);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          expect(session.checkoutPayableTotal, total);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          await captureR66Visual(tester, 't10-held-checkout-$scale');
+          session.openDestination(BuyV2Destination.shop);
+          await tester.pumpAndSettle();
+          final productControl = find.byKey(
+            const ValueKey('buy-grid-edit-quantity-s-tomato'),
+          );
+          await tester.scrollUntilVisible(
+            productControl,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          final cardQuantities = tester.widgetList<IconButton>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton &&
+                  const [
+                    'Add one',
+                    'Remove from Cart',
+                  ].contains(widget.tooltip),
+            ),
+          );
+          expect(cardQuantities, hasLength(2));
+          expect(
+            cardQuantities.every((button) => button.onPressed == null),
+            isTrue,
+          );
+          expect(tester.widget<TextButton>(productControl).onPressed, isNull);
+          final heldPill =
+              tester
+                      .widget<DecoratedBox>(
+                        find.byKey(const ValueKey('buy-compact-quantity-pill')),
+                      )
+                      .decoration
+                  as BoxDecoration;
+          expect(heldPill.color, BuyV2Colors.canvas);
+          expect(heldPill.border, Border.all(color: BuyV2Colors.line));
+          await tester.tap(productControl);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.quantityFor('s-tomato'), 1);
+          await captureR66Visual(tester, 't10-held-shop-$scale');
+          final add = find.byKey(const ValueKey('buy-add-s-rice'));
+          await tester.scrollUntilVisible(
+            add,
+            180,
+            scrollable: find
+                .byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                )
+                .first,
+          );
+          expect(
+            tester
+                .widget<InkWell>(
+                  find.descendant(of: add, matching: find.byType(InkWell)),
+                )
+                .onTap,
+            isNull,
+          );
+          expect(
+            tester
+                .getSemantics(add)
+                .getSemanticsData()
+                .hasAction(SemanticsAction.tap),
+            isFalse,
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('s-rice'), 0);
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.notice, contains('payment'));
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          await captureR66Visual(tester, 't10-held-add-disabled-$scale');
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-offers-payment-hold')),
+            findsOneWidget,
+          );
+          session.openDestination(BuyV2Destination.shop);
+          session.openProduct('s-rice');
+          session.openProduct('s-tomato');
+          session.openDestination(BuyV2Destination.shop);
+          await tester.pumpAndSettle();
+          unawaited(
+            showBuyV2RecentlyViewed(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-recently-viewed-payment-hold')),
+            findsOneWidget,
+          );
+          for (final id in ['s-rice', 's-tomato']) {
+            final action = find.byKey(ValueKey('buy-recently-viewed-add-$id'));
+            final recentScroll = find.descendant(
+              of: find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              ),
+            );
+            expect(recentScroll, findsOneWidget);
+            // Fixture positioning: each lookup starts at the list's beginning.
+            final position = tester
+                .state<ScrollableState>(recentScroll)
+                .position;
+            position.jumpTo(position.minScrollExtent);
+            await tester.pumpAndSettle();
+            await tester.scrollUntilVisible(
+              action,
+              100,
+              scrollable: recentScroll,
+            );
+            await tester.pumpAndSettle();
+            expect(action.hitTestable(), findsOneWidget);
+            final button = tester.widget<ButtonStyleButton>(action);
+            expect(button.onPressed, isNull);
+            await tester.ensureVisible(action);
+            await tester.pumpAndSettle();
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(ValueKey('buy-recently-viewed-rejection-$id')),
+              findsNothing,
+            );
+          }
+          expect(session.quantityFor('s-rice'), 0);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.legacyCheckoutAttempt, same(attempt));
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'T10 fresh mixed Cart retains edits and Checkout Back text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart(scope: BuyV2CartScope.all);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        expect(session.cartChangesBlocked, isFalse);
+        expect(find.text('Review payment'), findsNothing);
+        expect(
+          tester
+              .widget<IconButton>(find.byKey(const ValueKey('buy-cart-empty')))
+              .onPressed,
+          isNotNull,
+        );
+        final line = find.byKey(const ValueKey('buy-cart-line-s-tomato'));
+        await tester.scrollUntilVisible(
+          line,
+          180,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        final plus = find.descendant(
+          of: line,
+          matching: find.byTooltip('Add one'),
+        );
+        await Scrollable.ensureVisible(tester.element(plus), alignment: 0.2);
+        await tester.pumpAndSettle();
+        expect(plus.hitTestable(), findsOneWidget);
+        await tester.tap(plus);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 2);
+        final instruction = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-delivery'),
+        );
+        await tester.scrollUntilVisible(
+          instruction,
+          180,
+          scrollable: find
+              .byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              )
+              .first,
+        );
+        await Scrollable.ensureVisible(
+          tester.element(instruction),
+          alignment: 0.2,
+        );
+        await tester.pumpAndSettle();
+        expect(instruction.hitTestable(), findsOneWidget);
+        await tester.tap(instruction);
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-cart-instruction-note-delivery')),
+          'Use the side entrance for all items',
+        );
+        final save = find.byKey(
+          const ValueKey('buy-cart-instruction-save-delivery'),
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.publicDeliveryInstruction,
+          'Use the side entrance for all items',
+        );
+        expect(find.text('Supplier terms'), findsNothing);
+        final total = session.scopedPayableTotal;
+        final checkout = find.widgetWithText(FilledButton, 'Checkout');
+        await tester.ensureVisible(checkout);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 't10-fresh-mixed-cart-$scale');
+        await tester.tap(checkout);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        expect(session.checkoutPayableTotal, total);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-return-cart')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.quantityFor('s-tomato'), 2);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(session.scopedPayableTotal, total);
+        expect(
+          session.publicDeliveryInstruction,
+          'Use the side entrance for all items',
+        );
+        expect(session.checkoutRequiresResolution, isFalse);
+        final empty = find.byKey(const ValueKey('buy-cart-empty'));
+        await tester.ensureVisible(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-cart-clear-cancel')));
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 3);
+        expect(session.scopedPayableTotal, total);
+        await tester.tap(empty);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-cart-clear-confirm')));
+        await tester.pumpAndSettle();
+        expect(session.itemCount, 0);
+        expect(session.scopedPayableTotal, 0);
+        expect(find.widgetWithText(FilledButton, 'Checkout'), findsNothing);
+        await captureR66Visual(tester, 't10-fresh-empty-cart-$scale');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final change in ['amount', 'method', 'surface']) {
+    testWidgets('T02 changed $change never automatically opens payment', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = _ChangingCheckoutCommitFixture(change);
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      await tester.pumpWidget(app(session, paymentHandoff: (_) async => true));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-address')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.handoffs, 0);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.confirmedOrders, isEmpty);
+      if (change != 'surface') {
+        // This double has no original request: never offer an unbound payment.
+        expect(session.checkoutRecoveryAmountKnown, isFalse);
+        expect(find.text('Check payment'), findsOne);
+        await tester.tap(
+          find.byKey(const ValueKey('buy-checkout-primary-address')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.handoffs, 0);
+      } else {
+        expect(session.view, BuyV2View.cart);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final restoredStep in BuyV2CheckoutStep.values) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T02 unified Checkout restores ${restoredStep.name} at $scale',
+        (tester) async {
+          const size = Size(320, 800);
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final session = BuyV2Session(core: BuySession());
+          addTearDown(session.dispose);
+          expect(session.addProduct('s-milk'), isTrue);
+          expect(session.addProduct('w-notebook'), isTrue);
+          session.openCart(scope: BuyV2CartScope.all);
+          expect(session.openCheckout(), isTrue);
+          expect(session.showCheckoutStep(restoredStep), isTrue);
+          final originalAddress = session.selectedAddressId;
+          final originalPayment = session.selectedPayment;
+          final originalLines = {
+            for (final line in session.checkoutLines)
+              line.product.id: line.quantity,
+          };
+          final originalOrders = session.orders.length;
+          await tester.pumpWidget(app(session, size: size, textScale: scale));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-checkout-heading')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-checkout-return-cart')),
+            findsOne,
+          );
+          expect(find.text('Continue to payment'), findsNothing);
+          expect(find.text('Review order'), findsNothing);
+
+          Future<void> reveal(Finder target, double delta) async {
+            await tester.scrollUntilVisible(
+              target,
+              delta,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      const PageStorageKey('buy-checkout-unified'),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOne);
+          }
+
+          final address = find.byKey(
+            const ValueKey('buy-checkout-confirm-address'),
+          );
+          await reveal(address, -150);
+          await tester.tap(address);
+          await tester.pumpAndSettle();
+          final addressCancel = find.byKey(
+            const ValueKey('buy-checkout-address-cancel'),
+          );
+          await reveal(addressCancel, 150);
+          await tester.tap(addressCancel);
+          await tester.pumpAndSettle();
+          expect(session.selectedAddressId, originalAddress);
+
+          final payment = find.byKey(
+            const ValueKey('buy-checkout-confirm-payment'),
+          );
+          await reveal(payment, 150);
+          await tester.tap(payment);
+          await tester.pumpAndSettle();
+          final paymentCancel = find.byKey(
+            const ValueKey('buy-checkout-payment-cancel'),
+          );
+          await reveal(paymentCancel, 150);
+          await tester.tap(paymentCancel);
+          await tester.pumpAndSettle();
+          expect(session.selectedPayment, originalPayment);
+          expect(session.orders.length, originalOrders);
+          expect(session.checkoutStep, restoredStep);
+          final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
+          await reveal(back, -150);
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect({
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          }, originalLines);
+          expect(session.selectedAddressId, originalAddress);
+          expect(session.selectedPayment, originalPayment);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (var route = 0; route < 6; route++) {
+    if (route == 4) {
+      continue;
+    } // Collection uses the existing correlated gateway harness.
+    for (var state = 0; state < 3; state++) {
+      final routeName = [
+        'Bulk cart review',
+        'address last field validation',
+        'Edit basket scrolled',
+        'Offers rapid switching',
+        'collected receipt',
+        'partial problem receipt',
+      ][route];
+      final stateName = [
+        'normal Android',
+        '200 percent text',
+        'keyboard cancel back',
+      ][state];
+      testWidgets('R6634 C05-${route * 3 + state + 1} $routeName $stateName', (
+        tester,
+      ) async {
+        const size = Size(320, 844);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final adapter = _DeliveryExceptionAdapter()
+          ..snapshot = const BuyV2DeliveryExceptionSnapshot(
+            state: BuyV2CommerceLoadState.ready,
+            customerMessage:
+                'Test provider: delivery receipt available for review.',
+            exceptionId: 'test-partial-receipt',
+            kind: BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+            headline: 'Delivery marked complete',
+            detail:
+                'Check all purchased items. Report a delivery problem if items are missing.',
+            proofReference: 'TEST-RECEIPT-1',
+          );
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          deliveryExceptionAdapter: adapter,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        if (route == 5) {
+          expect(session.openTracking(session.orders.first.id), isTrue);
+        } else {
+          session.openDestination(BuyV2Destination.wholesale);
+          session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+          expect(session.product('w-rice').offerClass, BuyV2OfferClass.bulk);
+          expect(session.addProduct('w-rice'), isTrue);
+          if (route == 2) {
+            for (final id in [
+              'w-onion',
+              'w-potato',
+              'w-notebook',
+              'w-tomato',
+            ]) {
+              expect(session.addProduct(id), isTrue);
+            }
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+        }
+        final count = session.itemCount;
+        await tester.pumpWidget(
+          app(
+            session,
+            size: size,
+            textScale: state == 1 ? 2 : 1,
+            safeArea: const EdgeInsets.symmetric(vertical: 24),
+          ),
+        );
+        await tester.pumpAndSettle();
+        Future<void> reveal(Finder target, {Finder? scroll}) async {
+          await tester.scrollUntilVisible(
+            target,
+            140,
+            maxScrolls: 60,
+            scrollable: scroll ?? find.byType(Scrollable).first,
+          );
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(target).bottom,
+            lessThanOrEqualTo(size.height - 24),
+          );
+        }
+
+        if (route == 0 || route == 2) {
+          if (route == 2) {
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -500),
+            );
+            await tester.pumpAndSettle();
+          }
+          final checkout = find.text('Checkout');
+          await reveal(checkout);
+          await tester.tap(checkout);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-checkout-heading')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-checkout-return-cart')),
+            findsOne,
+          );
+          expect(find.text('Continue to payment'), findsNothing);
+          expect(find.text('Review order'), findsNothing);
+          expect(session.checkoutItemCount, count);
+          // The persistent Cart return is available on every idle Checkout.
+          // Edit basket is contextual recovery for unavailable eligibility.
+          final edit = find.byKey(const ValueKey('buy-checkout-return-cart'));
+          await reveal(edit);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.cartScope, BuyV2CartScope.wholesale);
+          expect(session.itemCount, count);
+          if (state == 2) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.itemCount, count);
+          }
+        } else if (route == 1) {
+          final before = session.addresses.length;
+          showBuyV2AddressSheet(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          );
+          await tester.pumpAndSettle();
+          final add = find.byKey(const ValueKey('buy-address-add'));
+          await reveal(
+            add,
+            scroll: find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-address-sheet-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final form = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-address-add-form-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          for (final entry in {
+            'recipient': 'Meera Sharma',
+            'phone': '9876543210',
+            'line': '12 Market Road',
+            'area': 'Jodhpur',
+            'pin': '12',
+            'landmark': 'Near market gate',
+          }.entries) {
+            final field = find.byKey(ValueKey('buy-address-add-${entry.key}'));
+            await reveal(field, scroll: form);
+            await tester.enterText(field, entry.value);
+            await tester.pumpAndSettle();
+          }
+          if (state == 2) {
+            expect(tester.testTextInput.isVisible, isTrue);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                safeArea: const EdgeInsets.symmetric(vertical: 24),
+                viewInsets: const EdgeInsets.only(bottom: 280),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final last = find.byKey(const ValueKey('buy-address-add-landmark'));
+            await reveal(last, scroll: form);
+            expect(tester.getRect(last).bottom, lessThanOrEqualTo(564));
+            tester.testTextInput.hide();
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                safeArea: const EdgeInsets.symmetric(vertical: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          final submit = find.byKey(const ValueKey('buy-address-add-submit'));
+          await reveal(submit, scroll: form);
+          await tester.tap(submit);
+          await tester.pumpAndSettle();
+          expect(session.addresses.length, before);
+          expect(find.text('Enter a valid 6-digit PIN code.'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.addresses.length, before);
+          expect(session.itemCount, count);
+        } else if (route == 3) {
+          final offers = find.byKey(const ValueKey('buy-local-tab-offers'));
+          await captureR66Visual(tester, 't14-c05-offers-navigation-$state');
+          if (offers.hitTestable().evaluate().isEmpty) {
+            final parkedViewport = find.byKey(
+              const PageStorageKey('buy-compact-cart-local-navigation-scroll'),
+            );
+            final localViewport = find.descendant(
+              of: find.byKey(const ValueKey('buy-local-destination-tabs')),
+              matching: find.byKey(
+                const Key('moolsocial-local-navigation-compact-overflow'),
+              ),
+            );
+            final overflow = parkedViewport.evaluate().isNotEmpty
+                ? parkedViewport
+                : localViewport;
+            expect(overflow, findsOneWidget);
+            // Reveal the control in the actual scroll owner, preserving real
+            // gesture progress and checking the whole target, not just its center.
+            for (var attempt = 0; attempt < 6; attempt++) {
+              final visible = tester.getRect(overflow);
+              final target = tester.getRect(offers);
+              final fullyVisible =
+                  target.left >= visible.left - .5 &&
+                  target.right <= visible.right + .5 &&
+                  target.top >= visible.top - .5 &&
+                  target.bottom <= visible.bottom + .5;
+              if (fullyVisible && offers.hitTestable().evaluate().isNotEmpty) {
+                break;
+              }
+              expect(fullyVisible, isFalse);
+              expect(target.width, lessThanOrEqualTo(visible.width + .5));
+              expect(target.top, greaterThanOrEqualTo(visible.top - .5));
+              expect(target.bottom, lessThanOrEqualTo(visible.bottom + .5));
+              final direction = target.left < visible.left ? 120.0 : -120.0;
+              await tester.drag(overflow, Offset(direction, 0));
+              await tester.pumpAndSettle();
+              expect(
+                (tester.getRect(offers).left - target.left).abs(),
+                greaterThan(.5),
+                reason: 'A real swipe must move toward the clipped Offers tab',
+              );
+            }
+            final viewport = tester.getRect(overflow);
+            final target = tester.getRect(offers);
+            expect(target.left, greaterThanOrEqualTo(viewport.left - .1));
+            expect(target.right, lessThanOrEqualTo(viewport.right + .1));
+            expect(target.top, greaterThanOrEqualTo(viewport.top - .1));
+            expect(target.bottom, lessThanOrEqualTo(viewport.bottom + .1));
+          }
+          expect(offers.hitTestable(), findsOneWidget);
+          await tester.tap(offers);
+          await tester.pumpAndSettle();
+          await captureR66Visual(tester, 't14-c05-offers-before-switch-$state');
+          for (var n = 0; n < 8; n++) {
+            final mool = n.isEven;
+            final target = find.byKey(
+              ValueKey('buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}'),
+            );
+            expect(target.hitTestable(), findsOneWidget);
+            await tester.tap(target);
+            await tester.pump(const Duration(milliseconds: 16));
+            expect(session.featuredOffersMoolSocial, mool);
+            for (final key in ['moolsocial', 'suppliers']) {
+              final button = find.byKey(ValueKey('buy-offer-group-$key'));
+              expect(button.hitTestable(), findsOneWidget);
+              final texts = find.descendant(
+                of: button,
+                matching: find.byType(Text),
+              );
+              for (final element in texts.evaluate()) {
+                expect(
+                  tester
+                      .renderObject<RenderParagraph>(
+                        find.byWidget(element.widget),
+                      )
+                      .didExceedMaxLines,
+                  isFalse,
+                );
+              }
+            }
+          }
+          await tester.pumpAndSettle();
+          expect(session.featuredOffersMoolSocial, isFalse);
+          expect(
+            find.byKey(const ValueKey('buy-product-s-tomato')),
+            findsOneWidget,
+          );
+          if (state == 2) {
+            await tester.tap(find.byKey(const ValueKey('buy-offers-filter')));
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-offer-filter-all')),
+              findsOneWidget,
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.itemCount, count);
+          }
+        } else {
+          final orderId = session.selectedOrderId;
+          final dispute = find.byKey(
+            const ValueKey('buy-delivery-dispute-proof'),
+          );
+          await reveal(dispute);
+          await tester.tap(dispute);
+          await tester.pumpAndSettle();
+          expect(adapter.disputeCalls, 1);
+          expect(session.selectedOrderId, orderId);
+          expect(
+            find.text('Proof of delivery is under review'),
+            findsOneWidget,
+          );
+          expect(find.text('Proof reference · TEST-RECEIPT-1'), findsOneWidget);
+          // A disputed receipt is not a claim that missing items were delivered.
+          expect(
+            find.byKey(const ValueKey('buy-delivery-dispute-proof')),
+            findsNothing,
+          );
+          if (state == 2) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(adapter.disputeCalls, 1);
+          }
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   BuyV2Product productFor(BuyV2Destination destination) =>
@@ -45,8 +1885,16 @@ void main() {
             product.destination == destination && !product.requiresPrescription,
       );
 
-  BuyV2Session mixedSession() {
-    final session = BuyV2Session(core: BuySession());
+  BuyV2Session mixedSession({
+    bool activeDeliveryReference = false,
+    BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
+  }) {
+    final session = activeDeliveryReference
+        ? _CheckoutActiveDeliveryReferenceSession()
+        : BuyV2Session(
+            core: BuySession(),
+            gstInvoiceProfileStore: gstInvoiceProfileStore,
+          );
     for (final destination in const [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
@@ -55,6 +1903,1456 @@ void main() {
       expect(session.addProduct(productFor(destination).id), isTrue);
     }
     return session;
+  }
+
+  Future<void> openInvoiceBusinessEditor(WidgetTester tester) async {
+    final change = find.byKey(const ValueKey('buy-invoice-change'));
+    await tester.ensureVisible(change);
+    await tester.pumpAndSettle();
+    await tester.tap(change);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-invoice-add-business')));
+    await tester.pumpAndSettle();
+  }
+
+  void advanceCheckoutToConfirm(BuyV2Session session) {
+    expect(session.continueCheckoutFromAddress(), isTrue);
+    expect(session.continueCheckoutFromPayment(), isTrue);
+    expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+  }
+
+  Future<BuyV2Session> receiptSession(_DeliveryExceptionAdapter adapter) async {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      deliveryExceptionAdapter: adapter,
+      commerceAdapter: prepaidCommerceFixture(),
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    return session;
+  }
+
+  BuyV2DeliveryExceptionSnapshot receiptSnapshot(
+    BuyV2Order order, {
+    String fault = 'none',
+    int received = 1,
+  }) {
+    final purchased = order.lines.single;
+    final line = BuyV2ReceiptLine(
+      productId: fault == 'product' ? 'another-product' : purchased.product.id,
+      variant: fault == 'variant'
+          ? 'another-variant'
+          : purchased.product.variant,
+      pack: fault == 'pack' ? 'another-pack' : purchased.product.pack,
+      orderedQuantity: fault == 'quantity' ? 3 : purchased.quantity,
+      receivedQuantity: received,
+    );
+    return BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Check your items and report any delivery problem.',
+      exceptionId: 'receipt-exception',
+      kind: fault == 'kind'
+          ? BuyV2DeliveryExceptionKind.dispatchDelayed
+          : BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Delivery receipt',
+      detail: 'Received quantities are shown below.',
+      proofReference: fault == 'proof' ? '' : 'RECEIPT-123',
+      itemisedReceipt: BuyV2ItemisedReceipt(
+        orderId: fault == 'order' ? 'another-order' : order.id,
+        purchaseId: fault == 'purchase'
+            ? 'another-purchase'
+            : order.purchaseId!,
+        lines: fault == 'missing' ? [] : [line, if (fault == 'duplicate') line],
+      ),
+    );
+  }
+
+  for (final fault in [
+    'none',
+    'full',
+    'zero',
+    'product',
+    'variant',
+    'pack',
+    'quantity',
+    'order',
+    'purchase',
+    'missing',
+    'duplicate',
+    'negative',
+    'excess',
+    'proof',
+    'kind',
+  ]) {
+    test('R6634 C05 itemised receipt validates and recovers $fault', () async {
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(
+        order,
+        fault: fault,
+        received: switch (fault) {
+          'full' => 2,
+          'zero' => 0,
+          'negative' => -1,
+          'excess' => 3,
+          _ => 1,
+        },
+      );
+      final accepted = ['none', 'full', 'zero'].contains(fault);
+      expect(await session.restoreDeliveryException(order.id), accepted);
+      if (!accepted) {
+        expect(session.deliveryExceptionFor(order.id)!.itemisedReceipt, isNull);
+        expect(
+          session.deliveryExceptionFor(order.id)!.state,
+          BuyV2CommerceLoadState.unavailable,
+        );
+        adapter.snapshot = receiptSnapshot(order);
+        expect(await session.restoreDeliveryException(order.id), isTrue);
+      }
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isTrue);
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isFalse);
+      expect(adapter.disputeCalls, 1);
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+    });
+  }
+
+  test(
+    'T03 saved address refresh changes consent only for affected supplier fees',
+    () async {
+      final terms = _PaymentTermsAdapter();
+      final quotes = _CheckoutQuoteAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: terms,
+        checkoutQuoteAdapter: quotes,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      final first = productFor(BuyV2Destination.wholesale);
+      final second = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.wholesale &&
+            product.seller != first.seller,
+      );
+      for (final product in [first, second]) {
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCheckoutQuote();
+      await session.refreshCommercialPaymentTerms();
+      final groups = session.checkoutFulfilmentGroups;
+      expect(groups, hasLength(2));
+      for (final group in groups) {
+        expect(
+          session.chooseCommercialPaymentTerm(
+            session
+                .commercialPaymentTermsFor(group.key)
+                .firstWhere(
+                  (term) =>
+                      term.kind ==
+                      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+                ),
+          ),
+          isTrue,
+        );
+      }
+      final unaffected = session.selectedCommercialPaymentTermFor(
+        groups.last.key,
+      )!;
+      quotes.changedGroup = groups.first.key;
+      quotes.extraDeliveryFee = 11;
+      expect(session.chooseAddress('work'), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      await session.refreshCheckoutQuote();
+      await session.refreshCommercialPaymentTerms();
+      expect(quotes.lastAddress?.id, 'work');
+      expect(
+        session.selectedCommercialPaymentTermFor(groups.first.key),
+        isNull,
+      );
+      expect(
+        session.selectedCommercialPaymentTermFor(groups.last.key)?.id,
+        unaffected.id,
+      );
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    },
+  );
+
+  test(
+    'T03 empty instructions are optional and pending payment locks receiving details',
+    () async {
+      final session = BuyV2Session(
+        core: BuySession(),
+        commerceAdapter: prepaidCommerceFixture(),
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.deliveryInstructionTextFor(BuyV2Destination.shop), isNull);
+      expect(session.choosePayment('Card'), isTrue);
+      expect(await session.submitOrder(), isFalse);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      final address = session.selectedAddress;
+      expect(session.chooseAddress('work'), isFalse);
+      expect(session.updateAddress(address), isFalse);
+      expect(session.removeAddress(address.id), isFalse);
+      session.addAddress(address);
+      expect(session.selectedAddress, address);
+      expect(await session.continuePayment((_) async => true), isTrue);
+      expect(await session.reconcilePayment(), isTrue);
+      expect(session.confirmedOrders, hasLength(1));
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6634 C05 itemised receipt native review $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 844);
+      addTearDown(tester.view.reset);
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(order);
+      expect(await session.restoreDeliveryException(order.id), isTrue);
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const ValueKey('r66-cart-capture'),
+          child: app(session, size: const Size(320, 844), textScale: scale),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final quantities = find.text('Received 1 of 2 · Missing 1');
+      await tester.scrollUntilVisible(
+        quantities,
+        180,
+        scrollable: find.byType(Scrollable).first,
+        maxScrolls: 40,
+      );
+      await tester.ensureVisible(quantities);
+      await tester.pumpAndSettle();
+      expect(quantities, findsOneWidget);
+      expect(find.text('Items received'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final receiptCard = find.byKey(
+        const ValueKey('buy-delivery-exception-proofOfDeliveryAvailable'),
+      );
+      await tester.ensureVisible(receiptCard);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.text('Delivery receipt')).dy,
+        greaterThanOrEqualTo(0),
+      );
+      if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
+        await captureR66Visual(tester, 'receipt-partial-text$scale');
+      }
+      final action = find.byKey(const ValueKey('buy-delivery-dispute-proof'));
+      await tester.ensureVisible(action);
+      await tester.pumpAndSettle();
+      final label = find.descendant(
+        of: action,
+        matching: find.text('Report a delivery problem'),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: TextDirection.ltr,
+        textScaler: TextScaler.linear(scale),
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height, greaterThanOrEqualTo(painter.height));
+      expect(
+        tester.getRect(action).contains(tester.getRect(label).center),
+        isTrue,
+      );
+      expect(
+        tester.getRect(label).bottom,
+        lessThanOrEqualTo(tester.getRect(action).bottom),
+      );
+      painter.dispose();
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(adapter.disputeCalls, 1);
+      expect(quantities, findsOneWidget);
+      expect(action, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('R6634 C05 itemised receipt handles multiple purchased lines', () async {
+    final session = await receiptSession(_DeliveryExceptionAdapter());
+    final original = session.confirmedOrders.single;
+    final second = BuyV2CartLine(
+      product: session.product('s-milk'),
+      quantity: 3,
+    );
+    final order = BuyV2Order(
+      id: original.id,
+      purchaseId: original.purchaseId,
+      destination: original.destination,
+      title: original.title,
+      itemSummary: original.itemSummary,
+      total: original.total,
+      partner: original.partner,
+      partnerType: original.partnerType,
+      promise: original.promise,
+      destinationLabel: original.destinationLabel,
+      progress: original.progress,
+      status: original.status,
+      lines: [...original.lines, second],
+    );
+    final first = receiptSnapshot(original).itemisedReceipt!.lines.single;
+    final other = BuyV2ReceiptLine(
+      productId: second.product.id,
+      variant: second.product.variant,
+      pack: second.product.pack,
+      orderedQuantity: 3,
+      receivedQuantity: 3,
+    );
+    BuyV2ItemisedReceipt receipt(List<BuyV2ReceiptLine> lines) =>
+        BuyV2ItemisedReceipt(
+          orderId: order.id,
+          purchaseId: order.purchaseId!,
+          lines: lines,
+        );
+    expect(receipt([other, first]).matchesOrder(order), isTrue);
+    expect(receipt([first, first]).matchesOrder(order), isFalse);
+    expect(receipt([first]).matchesOrder(order), isFalse);
+    final source = [other, first];
+    final retained = receipt(source);
+    source.clear();
+    expect(retained.matchesOrder(order), isTrue);
+    expect(() => retained.lines.clear(), throwsUnsupportedError);
+  });
+
+  test(
+    'R6634 C05 itemised receipt offline recovery preserves payment',
+    () async {
+      final adapter = _DeliveryExceptionAdapter();
+      final session = await receiptSession(adapter);
+      final order = session.confirmedOrders.single;
+      adapter.snapshot = receiptSnapshot(order);
+      adapter.failLoad = true;
+      expect(await session.restoreDeliveryException(order.id), isFalse);
+      expect(
+        session.deliveryExceptionFor(order.id)!.state,
+        BuyV2CommerceLoadState.offline,
+      );
+      expect(await session.disputeProofOfDelivery(order.id), isFalse);
+      expect(adapter.disputeCalls, 0);
+      adapter.failLoad = false;
+      expect(await session.restoreDeliveryException(order.id), isTrue);
+      expect(
+        session.orders.firstWhere((value) => value.id == order.id),
+        same(order),
+      );
+      expect(
+        session.deliveryExceptionFor(order.id)!.itemisedReceipt,
+        isNotNull,
+      );
+    },
+  );
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 final delivery estimate recovery $size $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final facts = _R669PendingEstimateFacts();
+        final session = BuyV2Session(core: core, productFactsAdapter: facts);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-milk'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart(scope: BuyV2CartScope.all);
+        expect(session.openCheckout(), isTrue);
+        advanceCheckoutToConfirm(session);
+        final orderCount = session.orders.length;
+        final total = session.scopedPayableTotal;
+        facts.unavailable = true;
+        expect(session.refreshProductFacts('s-milk'), isTrue);
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        expect(session.confirmOrder(), isFalse);
+        expect(await session.submitOrder(), isFalse);
+        expect(session.openCheckout(), isTrue);
+        expect(session.orders.length, orderCount);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const ValueKey('r66-cart-capture'),
+            child: app(
+              session,
+              size: size,
+              textScale: scale,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+        final check = find.byKey(
+          const ValueKey('buy-checkout-eligibility-retry'),
+        );
+        await tester.scrollUntilVisible(
+          check,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(check.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsOneWidget,
+        );
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        final group = session.checkoutFulfilmentGroups.firstWhere(
+          (group) => group.productIds.contains('s-milk'),
+        );
+        final delivery = find.byKey(
+          ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+        );
+        final unavailable = find.descendant(
+          of: delivery,
+          matching: find.text('Delivery time confirmed after Store acceptance'),
+        );
+        await tester.scrollUntilVisible(
+          unavailable,
+          160,
+          maxScrolls: 50,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(unavailable.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.renderObject<RenderParagraph>(unavailable).didExceedMaxLines,
+          isFalse,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-unavailable-${size.width}-$scale',
+        );
+        facts.deadline = '11 September, 2–4 PM';
+        facts.unavailable = false;
+        await tester.scrollUntilVisible(
+          check,
+          -120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.text('11 September, 2–4 PM'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-ready-${size.width}-$scale',
+        );
+        expect(session.orders.length, orderCount);
+        expect(session.scopedPayableTotal, total);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('T14 orderable missing estimate keeps final Place order', (
+    tester,
+  ) async {
+    final core = BuySession();
+    final facts = _R669PendingEstimateFacts();
+    final session = BuyV2Session(core: core, productFactsAdapter: facts);
+    final originalOrders = session.orders.length;
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-milk'), isTrue);
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+    expect(
+      find.descendant(of: dock, matching: find.text('Place order')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dock, matching: find.text('Check delivery')),
+      findsNothing,
+    );
+    expect(session.orders.length, originalOrders);
+    expect(session.quantityFor('s-milk'), 1);
+  });
+
+  test('R669 missing estimate preserves required price review', () async {
+    final core = BuySession();
+    final facts = _R669PendingEstimateFacts();
+    final session = BuyV2Session(core: core, productFactsAdapter: facts);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    session.addProduct('s-milk');
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final orderCount = session.orders.length;
+    facts.price = 77;
+    expect(await session.submitOrder(), isFalse);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    facts.deadline = '11 September, 2–4 PM';
+    expect(session.refreshCheckoutDeliveryEstimates(), isTrue);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.orders.length, orderCount);
+  });
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 cart subtotal and mixed invoice scope $size $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
+        try {
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+            catalogueNow: () => DateTime(2026, 9, 29),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.addProduct('w-notebook'), isTrue);
+          expect(
+            session.addProduct(productFor(BuyV2Destination.shop).id),
+            isTrue,
+          );
+          session.openCart(scope: BuyV2CartScope.all);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: const ValueKey('r66-cart-capture'),
+              child: app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.chooseCartBenefit(
+            session
+                .cartBenefits(
+                  kind: BuyV2CartBenefitKind.coupon,
+                  destination: BuyV2Destination.wholesale,
+                )
+                .last,
+          );
+          final subtotal = session.scopedCartTotal;
+          expect(session.scopedCouponSaving, 300);
+          expect(session.scopedPayableTotal, subtotal - 300);
+          final quantities = {
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          };
+          final orderCount = session.orders.length;
+          await tester.pump(const Duration(seconds: 3));
+          await tester.pumpAndSettle();
+          expect(session.notice, isNull);
+          final scope = find.byKey(const ValueKey('buy-cart-filter-all'));
+          expect(
+            find.descendant(of: scope, matching: find.text('All')),
+            findsOneWidget,
+          );
+          expect(find.text('₹ Total'), findsNothing);
+          final header = tester.widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-header-value-motion')),
+          );
+          expect(header.text, contains('${session.cartLines.length} products'));
+          final dock = find.byKey(const ValueKey('buy-cart-action-bar'));
+          if (size.width > size.height) {
+            await captureR66Visual(
+              tester,
+              'r669-cart-subtotal-header-${size.width}-$scale',
+            );
+            await tester.scrollUntilVisible(
+              dock,
+              180,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('buy-cart-all')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+          }
+          expect(
+            find.descendant(
+              of: dock,
+              matching: find.text(buyV2Money(subtotal - 300)),
+            ),
+            findsOneWidget,
+          );
+          await captureR66Visual(
+            tester,
+            'r669-cart-subtotal-${size.width}-$scale',
+          );
+          expect(session.openCheckout(), isTrue);
+          advanceCheckoutToConfirm(session);
+          await tester.pumpAndSettle();
+          Future<void> reveal(Finder target, {double delta = 140}) async {
+            await tester.scrollUntilVisible(
+              target,
+              delta,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(PageStorageKey('buy-checkout-unified')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+          }
+
+          final change = find.byKey(const ValueKey('buy-invoice-change'));
+          await reveal(change);
+          expect(
+            find.byKey(const ValueKey('buy-invoice-details')),
+            findsOneWidget,
+          );
+          expect(find.text('Invoice details'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-invoice-details')),
+              matching: find.byType(Switch),
+            ),
+            findsNothing,
+          );
+          await captureR66Visual(
+            tester,
+            'r669-invoice-combined-${size.width}-$scale',
+          );
+          await tester.tap(change);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-invoice-personal')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-gst-invoice-sheet')),
+            findsNothing,
+          );
+          final returnCart = find.byKey(
+            const ValueKey('buy-checkout-return-cart'),
+          );
+          await reveal(returnCart, delta: -140);
+          await tester.tap(returnCart);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.scopedPayableTotal, subtotal - 300);
+          expect({
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          }, quantities);
+          expect(session.orders.length, orderCount);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
+  }
+
+  for (final width in [320.0, 360.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final amount in [1, 1000000, 10000000]) {
+        testWidgets(
+          'R66 checkout complete action INR$amount at $width text$scale',
+          (tester) async {
+            final size = Size(width, 800);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = _R66CheckoutAmountFixture(amount, core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            expect(
+              session.addProduct('w-notebook'),
+              isTrue,
+              reason:
+                  'Amount fixture: ${session.notice}; ${session.commerceLoadState}',
+            );
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            expect(session.openCheckout(), isTrue);
+            expect(session.choosePayment('UPI'), isTrue);
+            expect(session.scopedCartTotal, amount);
+            expect(session.checkoutAmountDueNow, amount);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 32),
+                paymentHandoff: (_) async => true,
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            void expectCompleteFooter(String label) {
+              expect(
+                find.byKey(const ValueKey('buy-checkout-heading')),
+                findsNothing,
+              );
+              final text = find.descendant(
+                of: find.byKey(const ValueKey('buy-checkout-return-cart')),
+                matching: find.text('Cart'),
+              );
+              expect(text, findsOneWidget);
+              final paragraph = tester.renderObject<RenderParagraph>(text);
+              expect(paragraph.didExceedMaxLines, isFalse);
+              final natural = TextPainter(
+                text: paragraph.text,
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout(maxWidth: paragraph.size.width);
+              expect(
+                paragraph.size.height + .1,
+                greaterThanOrEqualTo(natural.height),
+              );
+              natural.dispose();
+              expect(tester.getRect(text).right, lessThanOrEqualTo(width));
+              final bar = find.byKey(const ValueKey('buy-checkout-action-bar'));
+              final action = find.byKey(
+                ValueKey('buy-checkout-primary-${session.checkoutStep.name}'),
+              );
+              final actionRect = tester.getRect(action);
+              expect(actionRect.height, greaterThanOrEqualTo(44));
+              expect(actionRect.left, greaterThanOrEqualTo(0));
+              expect(actionRect.right, lessThanOrEqualTo(width));
+              expect(actionRect.bottom, lessThanOrEqualTo(768));
+              expect(
+                find.descendant(of: action, matching: find.text(label)),
+                findsOneWidget,
+              );
+              expect(
+                find.descendant(
+                  of: bar,
+                  matching: find.text(buyV2Money(amount)),
+                ),
+                findsOneWidget,
+              );
+              for (final finder
+                  in find
+                      .descendant(of: bar, matching: find.byType(RichText))
+                      .evaluate()
+                      .map(
+                        (element) => find.byElementPredicate(
+                          (candidate) => identical(candidate, element),
+                        ),
+                      )) {
+                final paragraph = tester.renderObject<RenderParagraph>(finder);
+                expect(
+                  paragraph.didExceedMaxLines,
+                  isFalse,
+                  reason: paragraph.text.toPlainText(),
+                );
+                final natural = TextPainter(
+                  text: paragraph.text,
+                  textDirection: paragraph.textDirection,
+                  textScaler: paragraph.textScaler,
+                )..layout(maxWidth: paragraph.size.width);
+                expect(
+                  paragraph.size.height + .1,
+                  greaterThanOrEqualTo(natural.height),
+                  reason: paragraph.text.toPlainText(),
+                );
+                natural.dispose();
+                final textRect = tester.getRect(finder);
+                expect(textRect.left, greaterThanOrEqualTo(0));
+                expect(textRect.right, lessThanOrEqualTo(width));
+                expect(textRect.bottom, lessThanOrEqualTo(768));
+              }
+              expect(tester.takeException(), isNull);
+            }
+
+            for (final step in BuyV2CheckoutStep.values) {
+              expect(session.showCheckoutStep(step), isTrue);
+              await tester.pumpAndSettle();
+              expectCompleteFooter('Place order');
+              expect(find.text('Continue to payment'), findsNothing);
+              expect(find.text('Review order'), findsNothing);
+              await _captureR66Checkout(
+                tester,
+                amount,
+                width,
+                scale,
+                step.name,
+              );
+            }
+            expect(await session.submitOrder(), isFalse);
+            await tester.pumpAndSettle();
+            expect(
+              session.checkoutSubmissionState,
+              BuyV2CheckoutSubmissionState.paymentActionRequired,
+            );
+            expectCompleteFooter('Pay ${buyV2Money(amount)}');
+            expect(session.checkoutPaymentActionAmount, amount);
+            await _captureR66Checkout(tester, amount, width, scale, 'action');
+            expect(session.confirmedOrders, isEmpty);
+            expect(session.quantityFor('w-notebook'), 1);
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets(
+    'R66 checkout hides footer for IME without losing stage or Back',
+    (tester) async {
+      const size = Size(320, 568);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      expect(session.choosePayment('UPI'), isTrue);
+      for (final step in [
+        BuyV2CheckoutStep.address,
+        BuyV2CheckoutStep.payment,
+      ]) {
+        if (step == BuyV2CheckoutStep.payment) {
+          expect(session.continueCheckoutFromAddress(), isTrue);
+        }
+        for (final keyboard in [true, false]) {
+          await tester.pumpWidget(
+            app(
+              session,
+              size: size,
+              textScale: 2,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              viewInsets: EdgeInsets.only(bottom: keyboard ? 260 : 0),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-checkout-action-bar')),
+            keyboard ? findsNothing : findsOneWidget,
+          );
+          expect(session.checkoutStep, step);
+          expect(session.cartScope, BuyV2CartScope.wholesale);
+          expect(session.selectedPayment, 'UPI');
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        }
+      }
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-return-cart')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  Future<BuyV2Session> mountPaymentAction(
+    WidgetTester tester,
+    String provider, {
+    BuyV2PaymentHandoff? handoff,
+  }) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.addProduct('w-notebook'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpWidget(app(session, paymentHandoff: handoff));
+    await tester.pumpAndSettle();
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment(provider), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.submitOrder(), isFalse);
+    await tester.pumpAndSettle();
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentActionRequired,
+    );
+    return session;
+  }
+
+  for (final provider in ['UPI', 'Card']) {
+    testWidgets('R66 missing $provider handoff cannot simulate payment', (
+      tester,
+    ) async {
+      final session = await mountPaymentAction(tester, provider);
+      final reference = session.paymentReference;
+      final attempt = session.checkoutIdempotencyKey;
+      expect(find.text('Payment unavailable right now'), findsOneWidget);
+      expect(find.text('Ready for secure payment'), findsNothing);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-payment-handoff-completed')),
+        findsNothing,
+      );
+      expect(find.text('Payment completed'), findsNothing);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(session.paymentReference, reference);
+      expect(session.checkoutIdempotencyKey, attempt);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.quantityFor('w-notebook'), 1);
+      final cancel = find.byKey(const ValueKey('buy-checkout-cancel-payment'));
+      await tester.ensureVisible(cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      );
+      expect(find.text('Check payment'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentPending,
+      );
+      expect(session.paymentReference, reference);
+      expect(session.checkoutIdempotencyKey, attempt);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R66 injected handoff launches once and remains unconfirmed', (
+    tester,
+  ) async {
+    final opened = <Uri>[];
+    final session = await mountPaymentAction(
+      tester,
+      'UPI',
+      handoff: (uri) async {
+        opened.add(uri);
+        return true;
+      },
+    );
+    expect(find.text('Ready for secure payment'), findsOneWidget);
+    final expectedUri = session.paymentActionUri;
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-payment')),
+    );
+    await tester.pumpAndSettle();
+    expect(opened, [expectedUri]);
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentPending,
+    );
+    expect(session.confirmedOrders, isEmpty);
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(session.quantityFor('w-notebook'), 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final provider in ['UPI', 'Card']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'T14 $provider secure handoff return keeps original payment at $scale text',
+        (tester) async {
+          final opened = <Uri>[];
+          final session = await mountPaymentAction(
+            tester,
+            provider,
+            handoff: (uri) async {
+              opened.add(uri);
+              return true;
+            },
+          );
+          await tester.pumpWidget(
+            app(
+              session,
+              textScale: scale,
+              paymentHandoff: (uri) async {
+                opened.add(uri);
+                return true;
+              },
+            ),
+          );
+          await tester.pumpAndSettle();
+          final reference = session.paymentReference;
+          final attempt = session.checkoutIdempotencyKey;
+          final uri = session.paymentActionUri;
+          final scroll = find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-unified')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            find.byKey(
+              const ValueKey(
+                'buy-checkout-payment-state-paymentActionRequired',
+              ),
+            ),
+            180,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
+          if (provider == 'Card') {
+            expect(
+              find.textContaining(
+                'Enter card details in the secure payment provider flow.',
+              ),
+              findsWidgets,
+            );
+          }
+          expect(find.byType(TextField), findsNothing);
+          await tester.tap(
+            find.byKey(const ValueKey('buy-checkout-primary-payment')),
+          );
+          await tester.pumpAndSettle();
+          expect(opened, [uri]);
+          expect(
+            session.checkoutSubmissionState,
+            BuyV2CheckoutSubmissionState.paymentPending,
+          );
+          await tester.scrollUntilVisible(
+            find.byKey(
+              const ValueKey('buy-checkout-payment-state-paymentPending'),
+            ),
+            180,
+            scrollable: scroll,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              'Return here and tap Check payment for an update. Do not pay again.',
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-checkout-primary-payment')),
+          );
+          await tester.pumpAndSettle();
+          expect(opened, [uri]);
+          expect(session.paymentReference, reference);
+          expect(session.checkoutIdempotencyKey, attempt);
+          expect(session.confirmedOrders, isEmpty);
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('R66 confirmed purchase opens only its own retained deliveries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _R66OrderCustomerStore();
+    final earlierCore = BuySession();
+    final earlier = BuyV2Session(
+      core: earlierCore,
+      customerStateStore: store,
+      commerceAdapter: prepaidCommerceFixture(),
+    );
+    expect(earlier.addProduct('s-tomato'), isTrue);
+    earlier.openCart(scope: BuyV2CartScope.shop);
+    expect(earlier.openCheckout(), isTrue);
+    expect(earlier.choosePayment('Card'), isTrue);
+    advanceCheckoutToConfirm(earlier);
+    expect(await _submitAndCompleteReviewPayment(earlier), isTrue);
+    final previousPurchase = earlier.confirmedPurchaseId!;
+    final previousOrder = earlier.confirmedOrders.single;
+    await tester.pump();
+    earlier.dispose();
+    earlierCore.dispose();
+    // Independent provider fixtures must issue distinct timestamp references.
+    await tester.pump(const Duration(milliseconds: 1));
+
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: store,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      commerceAdapter: prepaidCommerceFixture(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    final retail = session.product('s-tomato');
+    final anotherStore = BuyV2Catalogue.products.firstWhere(
+      (product) =>
+          product.destination == BuyV2Destination.shop &&
+          product.seller != retail.seller &&
+          !product.requiresPrescription,
+    );
+    expect(session.addProduct(retail.id), isTrue);
+    expect(session.addProduct(anotherStore.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Card'), isTrue);
+    advanceCheckoutToConfirm(session);
+    final total = session.checkoutPayableTotal;
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.checkoutRequiresResolution, isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.confirmation);
+    expect(session.confirmedOrders, hasLength(2));
+    final purchase = session.confirmedPurchaseId!;
+    expect(purchase, isNot(previousPurchase));
+    final details = find.byKey(
+      const ValueKey('buy-confirmation-order-details'),
+    );
+    await tester.scrollUntilVisible(
+      details,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2ConfirmationView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+    final group = find.byKey(ValueKey('buy-purchase-group-$purchase'));
+    expect(group, findsOneWidget);
+    expect(
+      find.descendant(
+        of: group,
+        matching: find.text('2 deliveries · ${buyV2Money(total)}'),
+      ),
+      findsOneWidget,
+    );
+    final oldGroup = find.byKey(
+      ValueKey('buy-purchase-group-$previousPurchase'),
+    );
+    expect(
+      oldGroup,
+      findsNothing,
+      reason:
+          'A single order keeps purchase identity in its details without a duplicate banner',
+    );
+    expect(find.text(buyV2Money(previousOrder.total)), findsWidgets);
+    final delivery = session.confirmedOrders.first;
+    final track = find.byKey(ValueKey('buy-order-primary-${delivery.id}'));
+    await tester.scrollUntilVisible(
+      track,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2OrdersView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(track);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrderId, delivery.id);
+    expect(session.selectedOrderOrNull!.purchaseId, purchase);
+    expect(session.selectedOrderOrNull!.total, delivery.total);
+    expect(session.selectedOrderOrNull!.partner, delivery.partner);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    for (final scope in [
+      BuyV2CartScope.shop,
+      BuyV2CartScope.wholesale,
+      BuyV2CartScope.all,
+    ]) {
+      testWidgets(
+        'T14 actual Cart viewport returns ${scope.name} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          session.addProduct('s-tomato');
+          session.addProduct('w-notebook');
+          session.openCart(scope: scope);
+          await tester.pumpWidget(app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          final cartScrollable = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-cart-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          var position = tester.state<ScrollableState>(cartScrollable).position;
+          expect(position.maxScrollExtent, greaterThan(120));
+          position.jumpTo(120);
+          await tester.pumpAndSettle();
+          final offset = position.pixels;
+          final total = session.scopedPayableTotal;
+          final address = session.selectedAddress.id;
+          await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          final returnCart = find.byKey(
+            const ValueKey('buy-checkout-return-cart'),
+          );
+          await tester.ensureVisible(returnCart);
+          await tester.pumpAndSettle();
+          await tester.tap(returnCart);
+          await tester.pumpAndSettle();
+          position = tester.state<ScrollableState>(cartScrollable).position;
+          expect(position.pixels, closeTo(offset, 1));
+          expect(session.cartScope, scope);
+          expect(session.scopedPayableTotal, total);
+          expect(session.selectedAddress.id, address);
+          expect(session.quantityFor('s-tomato'), 1);
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('T14 collapsed Cart preserves Checkout return text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      session.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final cartScroll = find
+          .descendant(
+            of: find.byKey(const ValueKey('buy-cart-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final collapse = find.byTooltip('Collapse coupons and offers');
+      await tester.scrollUntilVisible(collapse, 180, scrollable: cartScroll);
+      await Scrollable.ensureVisible(tester.element(collapse), alignment: .2);
+      await tester.pumpAndSettle();
+      await tester.tap(collapse);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-cart-coupons')), findsOneWidget);
+      expect(collapse, findsNothing);
+      var position = tester.state<ScrollableState>(cartScroll).position;
+      position.jumpTo(120);
+      await tester.pumpAndSettle();
+      final offset = position.pixels;
+      final total = session.scopedPayableTotal;
+      await tester.tap(find.widgetWithText(FilledButton, 'Checkout'));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      final back = find.byKey(const ValueKey('buy-checkout-return-cart'));
+      await tester.ensureVisible(back);
+      await tester.tap(back);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      position = tester.state<ScrollableState>(cartScroll).position;
+      expect(position.pixels, closeTo(offset, 1));
+      final collapsedHeader = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(
+        collapsedHeader,
+        180,
+        scrollable: cartScroll,
+      );
+      expect(collapsedHeader, findsOneWidget);
+      expect(collapse, findsNothing);
+      expect(session.scopedPayableTotal, total);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+      // Another Cart scope starts expanded; returning to this scope retains
+      // its collapsed choice without leaking it to a fresh session.
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapse,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-cart-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(collapse, findsOneWidget);
+      session.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapsedHeader,
+        180,
+        scrollable: cartScroll,
+      );
+      expect(collapsedHeader, findsOneWidget);
+      expect(collapse, findsNothing);
+      final freshCore = BuySession();
+      final fresh = BuyV2Session(core: freshCore);
+      addTearDown(fresh.dispose);
+      addTearDown(freshCore.dispose);
+      fresh.addProduct('s-tomato');
+      fresh.openCart(scope: BuyV2CartScope.all);
+      await tester.pumpWidget(app(fresh, textScale: scale));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        collapse,
+        180,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-cart-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(collapse, findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('T14 Wholesale freight remains readable text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('w-notebook');
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final freight = find.text('Freight included');
+      expect(freight, findsOneWidget);
+      expect(find.textContaining('GST invoice at checkout'), findsNothing);
+      final text = tester.widget<Text>(freight);
+      expect(text.style!.fontSize, greaterThanOrEqualTo(10));
+      expect(text.maxLines, isNull);
+      final checkout = find.widgetWithText(FilledButton, 'Checkout');
+      expect(tester.getRect(checkout).height, greaterThanOrEqualTo(44));
+      expect(tester.getRect(freight).bottom, lessThanOrEqualTo(800));
+      await captureR66Visual(tester, 't14-sweep-wholesale-freight-$scale');
+      await tester.tap(checkout);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('visible Checkout return restores every exact Cart scope', (
@@ -148,6 +3446,1417 @@ void main() {
     );
   });
 
+  // Historical founder-regression name retained for exact ledger selection.
+  // Current behavior is Profile-led recipient selection; tax is never optional.
+  testWidgets('T01B adds optional GST details without buyer categories', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _MemoryGstInvoiceProfileStore();
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    for (final line in session.cartLines.toList()) {
+      session.selectCartProduct(
+        line.product.id,
+        line.product.destination == BuyV2Destination.shop,
+      );
+    }
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final total = session.checkoutPayableTotal;
+    final quantities = {
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    };
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice details'), findsOneWidget);
+    expect(find.text('Personal purchase'), findsOneWidget);
+    expect(find.text('Place order'), findsOneWidget);
+    await openInvoiceBusinessEditor(tester);
+    expect(session.view, BuyV2View.account);
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+      'Shree Balaji Retail',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+      '08ABCDE1234F1Z5',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+      '12 Market Road, Jodhpur 342003',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
+    expect(find.text('Review business invoice'), findsOneWidget);
+    expect(find.text('Place order'), findsNothing);
+    expect(
+      store.snapshots['account-a']!.profiles.single.gstin,
+      '08ABCDE1234F1Z5',
+    );
+    expect(session.checkoutPayableTotal, total);
+    expect({
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    }, quantities);
+    final change = find.byKey(const ValueKey('buy-invoice-change'));
+    await tester.ensureVisible(change);
+    await tester.tap(change);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-invoice-personal')));
+    await tester.pumpAndSettle();
+    expect(find.text('Place order'), findsOneWidget);
+    expect(
+      store.snapshots['account-a']!.profiles.single.gstin,
+      '08ABCDE1234F1Z5',
+    );
+    expect(session.checkoutPayableTotal, total);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Retail advance and Wholesale terms retain exact payment schedule',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        commerceAdapter: prepaidCommerceFixture(),
+      );
+      addTearDown(session.dispose);
+      final shop = productFor(BuyV2Destination.shop);
+      final wholesale = productFor(BuyV2Destination.wholesale);
+      expect(session.addProduct(shop.id), isTrue);
+      expect(session.addProduct(wholesale.id), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
+      await session.refreshCommercialPaymentTerms();
+
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        findsOneWidget,
+      );
+      expect(find.text('Full advance'), findsWidgets);
+      expect(find.textContaining('Supplier credit · 30 days'), findsOneWidget);
+      expect(
+        find.textContaining('Partner Bank credit · 90 days'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Supplier credit · 90 days'), findsNothing);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+
+      final booking = find.byKey(
+        const ValueKey('buy-payment-term-wholesale-booking-delivery'),
+      );
+      await tester.ensureVisible(booking);
+      await tester.tap(booking);
+      await tester.pumpAndSettle();
+      expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+      expect(session.checkoutBalanceDue, greaterThan(0));
+      expect(
+        find.byKey(const ValueKey('buy-checkout-amount-due-now')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-checkout-balance-due')),
+        findsNothing,
+      );
+      final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
+        (group) => group.destination == BuyV2Destination.wholesale,
+      );
+      expect(
+        find.byKey(ValueKey('buy-payment-term-summary-${wholesaleGroup.key}')),
+        findsOneWidget,
+      );
+      expect(booking, findsNothing);
+      await Scrollable.ensureVisible(
+        tester.element(
+          find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        ),
+        alignment: 0.15,
+      );
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'buy-t03-selected-terms');
+      final change = find.byKey(
+        ValueKey('buy-payment-term-change-${wholesaleGroup.key}'),
+      );
+      final changeStyle = tester.widget<TextButton>(change).style!;
+      expect(changeStyle.textStyle!.resolve({})!.fontFamily, 'Inter');
+      expect(
+        changeStyle.foregroundColor!.resolve({}),
+        BuyV2ActionStyle.primaryForeground,
+      );
+      expect(tester.getSize(change).height, greaterThanOrEqualTo(44));
+      await tester.ensureVisible(change);
+      await tester.pumpAndSettle();
+      await tester.tap(change);
+      await tester.pumpAndSettle();
+      expect(booking, findsOneWidget);
+      await Scrollable.ensureVisible(
+        tester.element(
+          find.byKey(const ValueKey('buy-checkout-payment-terms')),
+        ),
+        alignment: 0.15,
+      );
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'buy-t03-change-terms');
+      await tester.ensureVisible(booking);
+      await tester.pumpAndSettle();
+      await tester.tap(booking);
+      await tester.pumpAndSettle();
+
+      expect(
+        await _submitAndCompleteReviewPayment(session),
+        isTrue,
+        reason:
+            'notice=${session.notice}; state=${session.checkoutSubmissionState}; terms=${session.checkoutPaymentTermsReviewRequired}',
+      );
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.confirmation);
+      expect(
+        find.byKey(const ValueKey('buy-confirmation-payment-schedule')),
+        findsOneWidget,
+      );
+      final wholesaleOrder = session.confirmedOrders.firstWhere(
+        (order) => order.destination == BuyV2Destination.wholesale,
+      );
+      expect(wholesaleOrder.paymentTermLabel, contains('balance at delivery'));
+      expect(wholesaleOrder.amountPaidNow, greaterThan(0));
+      expect(wholesaleOrder.balanceDue, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test(
+    'T03 equivalent payment methods retain consent and mutable changes revoke it',
+    () async {
+      final adapter = _PaymentTermsAdapter()
+        ..amend = (term) =>
+            _amendPaymentTerm(term, acceptedPaymentMethods: {'UPI', 'Card'});
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.amend = (current) =>
+          _amendPaymentTerm(current, acceptedPaymentMethods: {'Card', 'UPI'});
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
+      final unchanged = session.selectedCommercialPaymentTermFor(group.key)!;
+      unchanged.acceptedPaymentMethods.remove('Card');
+      expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    },
+  );
+
+  testWidgets(
+    'T03 unavailable delivery facts identify only affected Store items',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final facts = _DeliveryPromiseFactsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: facts,
+      );
+      addTearDown(session.dispose);
+      final first = productFor(BuyV2Destination.shop);
+      final second = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            product.seller != first.seller,
+      );
+      for (final product in [first, second]) {
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.chooseAddress('work'), isTrue);
+      facts.unavailableProductId = first.id;
+      expect(session.refreshCheckoutDeliveryEstimates(), isFalse);
+      expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      final groups = session.checkoutFulfilmentGroups;
+      final affected = groups.firstWhere(
+        (group) => group.lines.any((line) => line.product.id == first.id),
+      );
+      final unaffected = groups.firstWhere(
+        (group) => group.lines.any((line) => line.product.id == second.id),
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${affected.key}'),
+          ),
+          matching: find.textContaining(
+            'Delivery time confirmed after Store acceptance',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            ValueKey('buy-checkout-confirm-delivery-${unaffected.key}'),
+          ),
+          matching: find.textContaining(
+            'Delivery time confirmed after Store acceptance',
+          ),
+        ),
+        findsNothing,
+      );
+      facts.unavailableProductId = null;
+      expect(session.refreshCheckoutDeliveryEstimates(), isTrue);
+      expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final change in [
+    'advance',
+    'due date',
+    'credit days',
+    'eligibility',
+    'source',
+    'financier disclosure',
+  ]) {
+    test(
+      'T03 changed $change requires consent only for its supplier',
+      () async {
+        final adapter = _PaymentTermsAdapter();
+        final session = BuyV2Session(
+          core: BuySession(),
+          commercialPaymentTermsAdapter: adapter,
+          productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        );
+        addTearDown(session.dispose);
+        final first = productFor(BuyV2Destination.wholesale);
+        final second = BuyV2Catalogue.products.firstWhere(
+          (product) =>
+              product.destination == BuyV2Destination.wholesale &&
+              product.seller != first.seller,
+        );
+        for (final product in [
+          first,
+          second,
+          productFor(BuyV2Destination.shop),
+        ]) {
+          expect(session.addProduct(product.id), isTrue);
+        }
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        final groups = session.checkoutFulfilmentGroups;
+        expect(groups, hasLength(3));
+        final target = groups.firstWhere(
+          (group) => group.partner == first.seller,
+        );
+        final kind = change == 'credit days'
+            ? BuyV2CommercialPaymentTermKind.supplierCredit
+            : change == 'financier disclosure'
+            ? BuyV2CommercialPaymentTermKind.regulatedCredit
+            : BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery;
+        for (final group in groups.where(
+          (group) => group.destination == BuyV2Destination.wholesale,
+        )) {
+          expect(
+            session.chooseCommercialPaymentTerm(
+              session
+                  .commercialPaymentTermsFor(group.key)
+                  .firstWhere((term) => term.kind == kind),
+            ),
+            isTrue,
+          );
+        }
+        final accepted = session.selectedCommercialPaymentTermFor(target.key)!;
+        final unaffected = {
+          for (final group in groups.where((group) => group.key != target.key))
+            group.key: session.selectedCommercialPaymentTermFor(group.key)!.id,
+        };
+        adapter.amend = (term) {
+          if (term.fulfilmentKey != target.key || term.id != accepted.id) {
+            return term;
+          }
+          return switch (change) {
+            'advance' => _amendPaymentTerm(
+              term,
+              amountDueNow: term.amountDueNow + 1,
+            ),
+            'due date' => _amendPaymentTerm(
+              term,
+              balanceDueLabel: 'before dispatch',
+            ),
+            'credit days' => _amendPaymentTerm(
+              term,
+              netDays: 20,
+              balanceDueLabel: 'within 20 days of delivery',
+            ),
+            'eligibility' => _amendPaymentTerm(
+              term,
+              acceptedPaymentMethods: {'UPI'},
+            ),
+            'source' => _amendPaymentTerm(
+              term,
+              sourceId: 'revised-supplier-agreement',
+            ),
+            _ => _amendPaymentTerm(term, annualPercentageRate: 13.5),
+          };
+        };
+        expect(await session.refreshCommercialPaymentTerms(), isFalse);
+        expect(session.selectedCommercialPaymentTermFor(target.key), isNull);
+        for (final entry in unaffected.entries) {
+          expect(
+            session.selectedCommercialPaymentTermFor(entry.key)?.id,
+            entry.value,
+          );
+        }
+        expect(session.chooseCommercialPaymentTerm(accepted), isFalse);
+        expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+        final refreshed = session
+            .commercialPaymentTermsFor(target.key)
+            .firstWhere((term) => term.id == accepted.id);
+        expect(session.chooseCommercialPaymentTerm(refreshed), isTrue);
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+      },
+    );
+  }
+
+  test(
+    'T03 unavailable terms retry retains an unchanged accepted agreement',
+    () async {
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.state = BuyV2CommerceLoadState.offline;
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+      adapter.state = BuyV2CommerceLoadState.ready;
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
+      expect(session.selectedCommercialPaymentTermFor(group.key)?.id, term.id);
+    },
+  );
+
+  test(
+    'T03 supplier payment eligibility removes only the affected agreement',
+    () async {
+      final adapter = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: BuySession(),
+        commercialPaymentTermsAdapter: adapter,
+      );
+      addTearDown(session.dispose);
+      expect(
+        session.addProduct(productFor(BuyV2Destination.wholesale).id),
+        isTrue,
+      );
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final term = session.commercialPaymentTermsFor(group.key).first;
+      expect(session.chooseCommercialPaymentTerm(term), isTrue);
+      adapter.amend = (current) => current.id == term.id
+          ? _amendPaymentTerm(current, acceptedPaymentMethods: {'Card'})
+          : current;
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(session.selectedCommercialPaymentTermFor(group.key), isNull);
+      expect(
+        session
+            .commercialPaymentTermsFor(group.key)
+            .any((current) => current.id == term.id),
+        isFalse,
+      );
+      expect(session.chooseCommercialPaymentTerm(term), isFalse);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'T03 Retail prepaid and optional instructions stay usable at $scale',
+      (tester) async {
+        const size = Size(320, 568);
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final session = BuyV2Session(
+          core: BuySession(),
+          commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+          productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+        );
+        addTearDown(session.dispose);
+        expect(
+          session.addProduct(productFor(BuyV2Destination.shop).id),
+          isTrue,
+        );
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        expect(session.choosePayment('Cash on Delivery'), isFalse);
+        expect(session.cashOnDeliveryEligibleForCheckout, isFalse);
+        expect(session.selectedPayment, 'UPI');
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          isNull,
+        );
+        await tester.pumpWidget(
+          app(session, size: size, textScale: scale, reducedMotion: true),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Cash on Delivery'), findsNothing);
+        expect(find.textContaining('Supplier credit'), findsNothing);
+        expect(find.text('Pay in full online'), findsOneWidget);
+        final instructions = find.byKey(
+          const PageStorageKey('buy-checkout-instructions'),
+        );
+        await tester.ensureVisible(instructions);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: instructions,
+            matching: find.text('Delivery instructions · optional'),
+          ),
+        );
+        await tester.pump();
+        final add = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-delivery'),
+        );
+        expect(add.hitTestable(), findsOneWidget);
+        expect(find.text('Clear'), findsNothing);
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(find.text('Clear'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('buy-cart-instruction-delivery-none')),
+          findsNothing,
+        );
+        final field = find.byKey(
+          const ValueKey('buy-cart-instruction-note-delivery'),
+        );
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, 'Ring once at the front gate.');
+        final save = find.byKey(
+          const ValueKey('buy-cart-instruction-save-delivery'),
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        session.openCart(scope: BuyV2CartScope.shop);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        expect(session.openCheckout(), isTrue);
+        await session.refreshCommercialPaymentTerms();
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        await Scrollable.ensureVisible(
+          tester.element(
+            find.byKey(const PageStorageKey('buy-checkout-instructions')),
+          ),
+          alignment: 0.15,
+        );
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'buy-t03-instructions-$scale');
+        final reopenedInstructions = find.byKey(
+          const PageStorageKey('buy-checkout-instructions'),
+        );
+        final reopenedAdd = find.byKey(
+          const ValueKey('buy-cart-instruction-custom-delivery'),
+        );
+        if (reopenedAdd.hitTestable().evaluate().isEmpty) {
+          await tester.tap(
+            find.descendant(
+              of: reopenedInstructions,
+              matching: find.text('Delivery instructions · optional'),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await tester.ensureVisible(reopenedAdd);
+        await tester.pumpAndSettle();
+        expect(find.text('Clear'), findsNothing);
+        await tester.tap(reopenedAdd);
+        await tester.pumpAndSettle();
+        final clear = find.byKey(
+          const ValueKey('buy-cart-instruction-clear-draft-delivery'),
+        );
+        expect(find.text('Clear'), findsOneWidget);
+        await tester.ensureVisible(clear);
+        await tester.pumpAndSettle();
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          'Ring once at the front gate.',
+        );
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(
+          session.deliveryInstructionTextFor(BuyV2Destination.shop),
+          isNull,
+        );
+        expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+        expect(find.text('Clear'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('payment terms offline state blocks Checkout and retries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _PaymentTermsAdapter()
+      ..state = BuyV2CommerceLoadState.offline
+      ..customerMessage = 'Reconnect to check supplier payment terms.';
+    final session = BuyV2Session(
+      core: BuySession(),
+      commercialPaymentTermsAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    await session.refreshCommercialPaymentTerms();
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-payment-terms-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-checkout-payment-terms-retry')),
+      findsOneWidget,
+    );
+    expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'R6633 D09-C1 assigned timing change invalidates the quoted total',
+    () async {
+      final facts = _R669PendingEstimateFacts()..deadline = 'Tomorrow 4 PM';
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: facts,
+        checkoutQuoteAdapter: _CheckoutQuoteAdapter(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-milk'), isTrue);
+      session.openCart();
+      expect(session.openCheckout(), isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isFalse);
+      final key = session.checkoutFulfilmentGroups.single.key;
+      facts.deadline = 'Tomorrow 8 PM';
+      expect(session.refreshProductFacts('s-milk'), isTrue);
+      expect(session.checkoutFulfilmentGroups.single.key, key);
+      expect(session.checkoutQuoteReviewRequired, isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isFalse);
+    },
+  );
+
+  testWidgets('live Checkout quote retains tax freight delivery and total', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final quoteAdapter = _CheckoutQuoteAdapter();
+    final session = BuyV2Session(
+      commerceAdapter: prepaidCommerceFixture(),
+      core: BuySession(),
+      checkoutQuoteAdapter: quoteAdapter,
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.wholesale).id),
+      isTrue,
+    );
+    session.openCart();
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final wholesaleGroup = session.checkoutFulfilmentGroups.firstWhere(
+      (group) => group.destination == BuyV2Destination.wholesale,
+    );
+    final wholesaleAdvance = session
+        .commercialPaymentTermsFor(wholesaleGroup.key)
+        .firstWhere(
+          (term) =>
+              term.kind == BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+        );
+    expect(session.chooseCommercialPaymentTerm(wholesaleAdvance), isTrue);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-live-quote')),
+      findsOneWidget,
+    );
+    expect(find.text('GST and taxes'), findsOneWidget);
+    expect(find.text('Freight'), findsOneWidget);
+    expect(find.text('Delivery fee'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-validity')),
+      findsOneWidget,
+    );
+    final quotedTotal = session.checkoutQuote!.total;
+    expect(quotedTotal, greaterThan(session.checkoutTotal));
+
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    await tester.pumpAndSettle();
+    expect(session.confirmedTotal, quotedTotal);
+    expect(
+      session.confirmedOrders.fold<int>(
+        0,
+        (total, order) => total + order.total,
+      ),
+      quotedTotal,
+    );
+    expect(session.confirmedOrders.any((order) => order.tax > 0), isTrue);
+    expect(session.confirmedOrders.any((order) => order.freight > 0), isTrue);
+    expect(
+      session.confirmedOrders.any((order) => order.deliveryFee > 0),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Checkout quote offline state blocks payment and retries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _CheckoutQuoteAdapter()
+      ..state = BuyV2CommerceLoadState.offline
+      ..customerMessage = 'Reconnect to check the current total.';
+    final session = BuyV2Session(
+      core: BuySession(),
+      checkoutQuoteAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.refreshCheckoutQuote(), isFalse);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-offline')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-checkout-quote-retry')),
+      findsOneWidget,
+    );
+    expect(session.checkoutQuoteReviewRequired, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'provider promise continues from product to Checkout and Tracking',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(
+        commerceAdapter: prepaidCommerceFixture(),
+        core: BuySession(),
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      final product = productFor(BuyV2Destination.wholesale);
+      session.openDestination(BuyV2Destination.wholesale);
+      expect(session.openProduct(product.id), isTrue);
+
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      final automatic = find.byKey(
+        ValueKey('buy-automatic-fulfilment-${product.id}'),
+      );
+      await tester.scrollUntilVisible(
+        automatic,
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
+      expect(find.text('Business freight · tracked'), findsOneWidget);
+
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
+      await tester.pumpAndSettle();
+      expect(find.text('Dispatch estimate'), findsOneWidget);
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(find.text('Delivery estimate'), findsOneWidget);
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
+      final order = session.confirmedOrders.single;
+      expect(order.deliveryPartnerName, 'Rajasthan Freight Network');
+      expect(order.dispatchPromise, 'Dispatch within one business day');
+      expect(session.openTracking(order.id), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.text('Rajasthan Freight Network'), findsOneWidget);
+      expect(find.text('Business freight · tracked'), findsOneWidget);
+      expect(find.text('Dispatch within one business day'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('R66 missing balance handoff preserves the unpaid balance', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final balanceAdapter = _BalancePaymentAdapter();
+    final core = BuySession();
+    final session = BuyV2Session(
+      commerceAdapter: prepaidCommerceFixture(),
+      core: core,
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      balancePaymentAdapter: balanceAdapter,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.wholesale).id),
+      isTrue,
+    );
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    final booking = session
+        .commercialPaymentTermsFor(group.key)
+        .firstWhere(
+          (term) =>
+              term.kind ==
+              BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+        );
+    expect(session.chooseCommercialPaymentTerm(booking), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    final order = session.confirmedOrders.single;
+    balanceAdapter.amountDue = order.balanceDue;
+    expect(session.openTracking(order.id), isTrue);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-tracking-balance-pay-balance')),
+    );
+    await tester.pumpAndSettle();
+    expect(balanceAdapter.startCalls, 1);
+    expect(find.text('Balance payment unavailable'), findsOneWidget);
+    expect(find.text('Ready for payment'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-tracking-balance-continue-payment')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(balanceAdapter.reconcileCalls, 0);
+    expect(order.balanceDue, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'later balance pays once and reconciles without duplicate payment',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final balanceAdapter = _BalancePaymentAdapter();
+      final session = BuyV2Session(
+        commerceAdapter: prepaidCommerceFixture(),
+        core: BuySession(),
+        commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+        balancePaymentAdapter: balanceAdapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+      );
+      addTearDown(session.dispose);
+      final product = productFor(BuyV2Destination.wholesale);
+      expect(session.addProduct(product.id), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      await session.refreshCommercialPaymentTerms();
+      final group = session.checkoutFulfilmentGroups.single;
+      final booking = session
+          .commercialPaymentTermsFor(group.key)
+          .firstWhere(
+            (term) =>
+                term.kind ==
+                BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+          );
+      expect(session.chooseCommercialPaymentTerm(booking), isTrue);
+      expect(await _submitAndCompleteReviewPayment(session), isTrue);
+      final order = session.confirmedOrders.single;
+      balanceAdapter.amountDue = order.balanceDue;
+      expect(session.openTracking(order.id), isTrue);
+
+      await tester.pumpWidget(app(session, paymentHandoff: (_) async => true));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-tracking-balance-payment')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-tracking-balance-payment')),
+          matching: find.text('Balance due'),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-pay-balance')),
+      );
+      await tester.pumpAndSettle();
+      expect(balanceAdapter.startCalls, 1);
+      expect(await session.startBalancePayment(order.id), isFalse);
+
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-continue-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Payment pending'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-balance-check-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(balanceAdapter.reconcileCalls, 1);
+      expect(find.text('Balance paid'), findsOneWidget);
+      expect(find.text('No balance remains.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('corrected tax invoice exposes exact legal and GST details', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final product = productFor(BuyV2Destination.shop);
+    final line = BuyV2CartLine(product: product, quantity: 1);
+    final order = BuyV2Order(
+      id: 'ORDER-TAX-1',
+      destination: BuyV2Destination.shop,
+      title: 'Shop order',
+      itemSummary: '1 product',
+      total: line.total + 90,
+      partner: product.seller,
+      partnerType: product.partnerRole,
+      promise: product.deliveryPromise,
+      destinationLabel: 'Sardarpura · 342003',
+      progress: 1,
+      status: BuyV2OrderStatus.delivered,
+      lines: [line],
+      tax: 90,
+      taxInvoiceState: BuyV2TaxInvoiceState.corrected,
+      taxInvoiceDetails: BuyV2TaxInvoiceDetails(
+        invoiceNumber: 'TAX-INV-1001-R1',
+        issuedAt: DateTime(2026, 8, 29, 18, 30),
+        sellerLegalName: 'Mool Retail Partner Private Limited',
+        sellerAddress: 'Jodhpur, Rajasthan 342003',
+        sellerGstin: '08ABCDE1234F1Z5',
+        buyerGstin: '08AAAAA0000A1Z5',
+        placeOfSupply: 'Rajasthan (08)',
+        sourceId: 'seller-tax-invoice-source',
+        revisionLabel: 'Corrected seller address',
+        lines: const [
+          BuyV2TaxInvoiceLine(
+            description: 'Shop products',
+            hsnSac: '19059090',
+            taxableValue: 1000,
+            gstRate: 9,
+            cgst: 45,
+            sgst: 45,
+            igst: 0,
+            cess: 0,
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.4)),
+          child: child!,
+        ),
+        home: BuyV2InvoicePage(order: order),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Corrected tax invoice'), findsOneWidget);
+    expect(find.text('TAX-INV-1001-R1'), findsWidgets);
+    expect(find.text('08ABCDE1234F1Z5'), findsOneWidget);
+    expect(find.text('08AAAAA0000A1Z5'), findsOneWidget);
+    expect(find.text('Rajasthan (08)'), findsOneWidget);
+    expect(find.text('19059090'), findsOneWidget);
+    expect(find.text('CGST'), findsOneWidget);
+    expect(find.text('SGST'), findsOneWidget);
+    final download = find.byKey(
+      const ValueKey('buy-download-invoice-ORDER-TAX-1'),
+    );
+    await tester.scrollUntilVisible(
+      download,
+      240,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(tester.widget<FilledButton>(download).onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('delivery exception reschedules and disputes proof in place', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final adapter = _DeliveryExceptionAdapter();
+    final session = BuyV2Session(
+      core: BuySession(),
+      deliveryExceptionAdapter: adapter,
+    );
+    addTearDown(session.dispose);
+    final order = session.orders.first;
+    expect(session.openTracking(order.id), isTrue);
+
+    await tester.pumpWidget(app(session, textScale: 1.4));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-delivery-exception-rescheduleAvailable')),
+      findsOneWidget,
+    );
+    const slot = 'Tomorrow · 10 am–12 pm';
+    final slotChoice = find.byKey(const ValueKey('buy-delivery-slot-$slot'));
+    await tester.scrollUntilVisible(
+      slotChoice,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(slotChoice);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-delivery-confirm-reschedule')),
+    );
+    await tester.pumpAndSettle();
+    expect(adapter.rescheduleCalls, 1);
+    expect(find.text('New delivery time confirmed'), findsOneWidget);
+
+    adapter.snapshot = const BuyV2DeliveryExceptionSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      customerMessage: 'Proof of delivery is available.',
+      exceptionId: 'DELIVERY-EX-2',
+      kind: BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable,
+      headline: 'Delivery marked complete',
+      detail: 'Review the recorded proof if this does not look right.',
+      proofReference: 'POD-REF-1001',
+    );
+    expect(await session.restoreDeliveryException(order.id), isTrue);
+    await tester.pumpAndSettle();
+    expect(find.text('Proof reference · POD-REF-1001'), findsOneWidget);
+    final dispute = find.byKey(const ValueKey('buy-delivery-dispute-proof'));
+    await tester.ensureVisible(dispute);
+    await tester.tap(dispute);
+    await tester.pumpAndSettle();
+    expect(adapter.disputeCalls, 1);
+    expect(find.text('Proof of delivery is under review'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey('buy-delivery-exception-proofOfDeliveryDisputed'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'GST profiles restore per account and reject false save success',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final first = BuyV2GstInvoiceController(store: store);
+      addTearDown(first.dispose);
+
+      expect(
+        await first.save(
+          destination: BuyV2Destination.wholesale,
+          legalName: 'Shree Balaji Retail',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '12 Market Road, Jodhpur 342003',
+          remember: true,
+        ),
+        isTrue,
+      );
+      expect(first.savedProfiles, hasLength(1));
+
+      final restored = BuyV2GstInvoiceController(store: store);
+      addTearDown(restored.dispose);
+      await restored.restore();
+      expect(restored.savedProfiles.single.legalName, 'Shree Balaji Retail');
+      restored.selectSaved(
+        BuyV2Destination.shop,
+        restored.savedProfiles.single,
+      );
+
+      store.acceptWrites = false;
+      expect(
+        await restored.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Changed before acknowledgement',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '12 Market Road, Jodhpur 342003',
+          remember: true,
+        ),
+        isFalse,
+      );
+      expect(
+        restored.detailsFor(BuyV2Destination.shop)?.legalName,
+        'Shree Balaji Retail',
+      );
+      expect(restored.message, 'GST details could not be saved. Try again.');
+
+      store.ownerScope = 'account-b';
+      final otherAccount = BuyV2GstInvoiceController(store: store);
+      addTearDown(otherAccount.dispose);
+      await otherAccount.restore();
+      expect(otherAccount.savedProfiles, isEmpty);
+
+      store.ownerScope = 'account-a';
+      store.acceptWrites = true;
+      expect(await restored.removeSaved(restored.savedProfiles.single), isTrue);
+      expect(restored.savedProfiles, isEmpty);
+      expect(restored.detailsFor(BuyV2Destination.shop), isNull);
+    },
+  );
+
+  testWidgets('GST save failure keeps entered details and supports retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _MemoryGstInvoiceProfileStore()..acceptWrites = false;
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+      'Shree Balaji Retail',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+      '08ABCDE1234F1Z5',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+      '12 Market Road, Jodhpur 342003',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsOneWidget);
+    expect(
+      find.text('GST details could not be saved. Try again.'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('buy-gst-legal-name')))
+          .controller
+          ?.text,
+      'Shree Balaji Retail',
+    );
+
+    store.acceptWrites = true;
+    await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsNothing);
+    expect(find.textContaining('Shree Balaji Retail'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('T01B GST action stays reachable across Android and iOS insets', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const viewports = [
+      (
+        label: 'Redmi navigation',
+        size: Size(360, 800),
+        safeArea: EdgeInsets.only(top: 34, bottom: 81),
+        viewInsets: EdgeInsets.zero,
+        textScale: 1.0,
+      ),
+      (
+        label: 'compact Android keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 24, bottom: 24),
+        viewInsets: EdgeInsets.only(bottom: 260),
+        textScale: 1.4,
+      ),
+      (
+        label: 'modern iOS keyboard',
+        size: Size(390, 844),
+        safeArea: EdgeInsets.only(top: 47, bottom: 34),
+        viewInsets: EdgeInsets.only(bottom: 336),
+        textScale: 1.2,
+      ),
+      (
+        label: 'compact iOS keyboard',
+        size: Size(320, 568),
+        safeArea: EdgeInsets.only(top: 20),
+        viewInsets: EdgeInsets.only(bottom: 216),
+        textScale: 1.0,
+      ),
+    ];
+
+    for (final viewport in viewports) {
+      tester.view.physicalSize = viewport.size;
+      tester.view.padding = FakeViewPadding(
+        left: viewport.safeArea.left,
+        top: viewport.safeArea.top,
+        right: viewport.safeArea.right,
+        bottom: viewport.safeArea.bottom,
+      );
+      tester.view.viewPadding = FakeViewPadding(
+        left: viewport.safeArea.left,
+        top: viewport.safeArea.top,
+        right: viewport.safeArea.right,
+        bottom: viewport.safeArea.bottom,
+      );
+      final gstStore = _MemoryGstInvoiceProfileStore();
+      final session = mixedSession(gstInvoiceProfileStore: gstStore);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      // The display filter preserves the mixed purchase selection. This test
+      // exercises one invoice destination, selected explicitly by the buyer.
+      for (final line in session.cartLines.toList()) {
+        session.selectCartProduct(
+          line.product.id,
+          line.product.destination == BuyV2Destination.wholesale,
+        );
+      }
+      expect(session.openCheckout(), isTrue, reason: viewport.label);
+      advanceCheckoutToConfirm(session);
+
+      await tester.pumpWidget(
+        app(
+          session,
+          size: viewport.size,
+          safeArea: viewport.safeArea,
+          viewInsets: viewport.viewInsets,
+          textScale: viewport.textScale,
+          reducedMotion: true,
+        ),
+      );
+      await tester.pump();
+      await openInvoiceBusinessEditor(tester);
+
+      final save = find.byKey(const ValueKey('buy-gst-save'));
+      expect(save, findsOneWidget, reason: viewport.label);
+      final saveRect = tester.getRect(save);
+      final usableBottom =
+          viewport.size.height -
+          viewport.safeArea.bottom -
+          viewport.viewInsets.bottom;
+      expect(
+        saveRect.bottom,
+        lessThanOrEqualTo(usableBottom + 1),
+        reason: '${viewport.label} bottom-safe action',
+      );
+      expect(
+        saveRect.height,
+        greaterThanOrEqualTo(44),
+        reason: '${viewport.label} action height',
+      );
+      expect(
+        find.byKey(const ValueKey('buy-gst-form-scroll')),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Shree Balaji Retail',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-gstin')),
+        '08ABCDE1234F1Z5',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '12 Market Road, Jodhpur 342003',
+      );
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('08ABCDE1234F1Z5'),
+        findsOneWidget,
+        reason: viewport.label,
+      );
+      expect(tester.takeException(), isNull, reason: viewport.label);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      session.dispose();
+    }
+  });
+
+  testWidgets('T01B GST fields are named and follow keyboard order', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final semantics = tester.ensureSemantics();
+    final session = mixedSession();
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    // The display filter preserves the mixed purchase selection. This test
+    // exercises one invoice destination, selected explicitly by the buyer.
+    for (final line in session.cartLines.toList()) {
+      session.selectCartProduct(
+        line.product.id,
+        line.product.destination == BuyV2Destination.wholesale,
+      );
+    }
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+
+    await tester.pumpWidget(app(session, reducedMotion: true));
+    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
+
+    for (final target in const [
+      (key: 'buy-gst-legal-name', label: 'Legal name'),
+      (key: 'buy-gst-gstin', label: 'GSTIN'),
+      (key: 'buy-gst-billing-address', label: 'Billing address'),
+    ]) {
+      final field = find.byKey(ValueKey(target.key));
+      expect(field, findsOneWidget, reason: target.label);
+      final data = tester.getSemantics(field).getSemanticsData();
+      expect(data.label, contains(target.label), reason: target.label);
+      expect(data.flagsCollection.isTextField, isTrue, reason: target.label);
+      expect(data.hasAction(SemanticsAction.tap), isTrue, reason: target.label);
+      expect(
+        data.hasAction(SemanticsAction.focus),
+        isTrue,
+        reason: target.label,
+      );
+    }
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('buy-gst-gstin')))
+          .getSemanticsData()
+          .maxValueLength,
+      15,
+    );
+
+    final legalName = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-legal-name')),
+    );
+    final gstin = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-gstin')),
+    );
+    final billingAddress = tester.widget<TextField>(
+      find.byKey(const ValueKey('buy-gst-billing-address')),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('buy-gst-legal-name')));
+    await tester.pump();
+    expect(legalName.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(gstin.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isTrue);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(billingAddress.focusNode!.hasFocus, isFalse);
+
+    final save = find.bySemanticsLabel('Save details');
+    expect(save, findsOneWidget);
+    final saveData = tester.getSemantics(save).getSemanticsData();
+    expect(saveData.flagsCollection.isButton, isTrue);
+    expect(saveData.flagsCollection.isEnabled, Tristate.isTrue);
+    expect(tester.getSize(save).height, greaterThanOrEqualTo(44));
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
   testWidgets('320px 140% reduced motion keeps one static compact owner', (
     tester,
   ) async {
@@ -178,58 +4887,78 @@ void main() {
     );
     expect(semanticNode.rect.width, lessThan(150));
     expect(semanticNode.rect.height, greaterThanOrEqualTo(44));
-    expect(find.textContaining('Medicine fulfilment ·'), findsOneWidget);
-    expect(find.textContaining('Shop fulfilment ·'), findsNothing);
+    advanceCheckoutToConfirm(session);
+    await tester.pump();
+    expect(find.text('Order items'), findsOneWidget);
+    expect(session.checkoutFulfilmentGroups, hasLength(1));
+    expect(
+      session.checkoutFulfilmentGroups.single.destination,
+      BuyV2Destination.medicine,
+    );
+    expect(
+      find.byKey(
+        ValueKey(
+          'buy-checkout-confirm-delivery-${session.checkoutFulfilmentGroups.single.key}',
+        ),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
 
-  testWidgets(
-    'R58.8.6 responsive Android and iOS candidate captures',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-
-      for (final viewport in const [
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          label: '320x568-android',
-        ),
-        (
-          size: Size(360, 800),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.0,
-          reduced: false,
-          label: '360x800-android',
-        ),
-        (
-          size: Size(390, 844),
-          safe: EdgeInsets.only(top: 47, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          label: '390x844-ios',
-        ),
-        (
-          size: Size(430, 932),
-          safe: EdgeInsets.only(top: 59, bottom: 34),
-          textScale: 1.0,
-          reduced: false,
-          label: '430x932-ios',
-        ),
-        (
-          size: Size(320, 568),
-          safe: EdgeInsets.symmetric(vertical: 24),
-          textScale: 1.4,
-          reduced: true,
-          label: '320x568-a11y140-reduced',
-        ),
-      ]) {
+  for (final viewport in const [
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      label: '320x568-android',
+    ),
+    (
+      size: Size(360, 800),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.0,
+      reduced: false,
+      label: '360x800-android',
+    ),
+    (
+      size: Size(390, 844),
+      safe: EdgeInsets.only(top: 47, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      label: '390x844-ios',
+    ),
+    (
+      size: Size(430, 932),
+      safe: EdgeInsets.only(top: 59, bottom: 34),
+      textScale: 1.0,
+      reduced: false,
+      label: '430x932-ios',
+    ),
+    (
+      size: Size(320, 568),
+      safe: EdgeInsets.symmetric(vertical: 24),
+      textScale: 1.4,
+      reduced: true,
+      label: '320x568-a11y140-reduced',
+    ),
+  ]) {
+    testWidgets(
+      'R58.8.6 responsive ${viewport.label} candidate capture',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
         tester.view.physicalSize = viewport.size;
-        final session = mixedSession();
+        final session = mixedSession(activeDeliveryReference: true);
+        expect(session.activeDeliveryOrders, hasLength(2));
+        addTearDown(session.dispose);
         session.openCart(scope: BuyV2CartScope.shop);
+        for (final line in session.cartLines.toList()) {
+          if (line.product.destination != BuyV2Destination.shop) {
+            session.selectCartProduct(line.product.id, false);
+          }
+        }
         expect(session.openCheckout(), isTrue);
 
         await tester.pumpWidget(
@@ -242,7 +4971,6 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-
         final owner = find.byKey(const ValueKey('buy-checkout-return-cart'));
         expect(owner, findsOneWidget, reason: viewport.label);
         expect(
@@ -251,19 +4979,1096 @@ void main() {
           reason: viewport.label,
         );
         expect(tester.takeException(), isNull, reason: viewport.label);
+        expect(owner.hitTestable(), findsOneWidget, reason: viewport.label);
+        expect(session.view, BuyV2View.checkout, reason: viewport.label);
+        expect(find.text('Checkout'), findsNothing, reason: viewport.label);
+        expect(find.text('Review order'), findsNothing, reason: viewport.label);
+        if (const bool.fromEnvironment('BUY_CHECKOUT_REVIEW_DRAFT_CAPTURE')) {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(
+            find.byKey(const ValueKey('r66-checkout-review-capture')),
+          );
+          await tester.runAsync(() async {
+            final directory = Directory(
+              const String.fromEnvironment(
+                'BUY_CHECKOUT_REVIEW_DRAFT_DIRECTORY',
+                defaultValue: 'build/checkout-review-20261001/drafts',
+              ),
+            );
+            await directory.create(recursive: true);
+            final file = File(
+              '${directory.path}/buy-v2-t02-checkout-${viewport.label}.png',
+            );
+            if (await file.exists()) throw StateError('Draft already exists');
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              final bytes = await image.toByteData(format: ImageByteFormat.png);
+              if (bytes == null) throw StateError('Draft encoding failed');
+              await file.writeAsBytes(bytes.buffer.asUint8List());
+            } finally {
+              image.dispose();
+            }
+          });
+          return;
+        }
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/'
-            'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
+            'candidate_captures/cursor-t14-context-references-20261007/'
+            'public-checkout-${viewport.label}.png',
           ),
         );
-
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-        session.dispose();
-      }
+      },
+      tags: 'protected-reference',
+    );
+  }
+  test(
+    'T14 invoice unregistered business restores explicit registration and personal preference',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final first = BuyV2GstInvoiceController(store: store);
+      addTearDown(first.dispose);
+      expect(
+        await first.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Unregistered Traders',
+          gstin: '',
+          billingAddress: '22 Market Road, Jaipur 302001',
+          remember: true,
+          registration: BuyV2BusinessInvoiceRegistration.unregistered,
+        ),
+        isTrue,
+      );
+      final restored = BuyV2GstInvoiceController(store: store);
+      addTearDown(restored.dispose);
+      await restored.restore();
+      expect(
+        restored.detailsFor(BuyV2Destination.shop)!.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
+      expect(restored.detailsFor(BuyV2Destination.shop)!.gstin, isEmpty);
+      restored.setRequested(BuyV2Destination.shop, false);
+      await restored.restore(force: true);
+      expect(restored.requestedFor(BuyV2Destination.shop), isFalse);
+      expect(
+        store.snapshots['account-a']!.profiles.single.legalName,
+        'Unregistered Traders',
+      );
+      expect(
+        await restored.save(
+          destination: BuyV2Destination.shop,
+          legalName: 'Invalid Registered',
+          gstin: '',
+          billingAddress: '22 Market Road, Jaipur 302001',
+          remember: true,
+        ),
+        isFalse,
+      );
+      expect(
+        store.snapshots['account-a']!.profiles.single.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
     },
-    tags: 'protected-reference',
   );
+
+  test(
+    'T14 invoice corrupt registered profile cannot become unregistered',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Broken Registered',
+            gstin: '',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+        ],
+      );
+      final controller = BuyV2GstInvoiceController(store: store);
+      addTearDown(controller.dispose);
+      await controller.restore();
+      expect(controller.loadFailed, isTrue);
+      expect(controller.savedProfiles, isEmpty);
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot();
+      await controller.restore(force: true);
+      expect(controller.loadFailed, isFalse);
+    },
+  );
+
+  test(
+    'T14 invoice multiple saved registrations require explicit recipient',
+    () async {
+      final store = _MemoryGstInvoiceProfileStore();
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Business One',
+            gstin: '08ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-2',
+            legalName: 'Business Two',
+            gstin: '27ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Mumbai 400001',
+          ),
+        ],
+      );
+      final controller = BuyV2GstInvoiceController(store: store);
+      addTearDown(controller.dispose);
+      await controller.restore();
+      expect(controller.requestedFor(BuyV2Destination.shop), isTrue);
+      expect(controller.detailsFor(BuyV2Destination.shop), isNull);
+      expect(controller.applySavedBusinessProfile(), isFalse);
+      controller.selectSaved(
+        BuyV2Destination.shop,
+        controller.savedProfiles.last,
+      );
+      controller.useForDestinations(BuyV2Destination.shop, [
+        BuyV2Destination.wholesale,
+      ]);
+      expect(
+        controller.detailsFor(BuyV2Destination.wholesale)!.id,
+        'gst-profile-2',
+      );
+      store.ownerScope = 'account-b';
+      await controller.restore(force: true);
+      expect(controller.savedProfiles, isEmpty);
+      expect(controller.detailsFor(BuyV2Destination.shop), isNull);
+    },
+  );
+
+  for (final closeScale in [1.0, 2.0]) {
+    testWidgets(
+      closeScale == 1.0
+          ? 'T14 invoice cancel Profile preserves personal recipient and Cart'
+          : 'T14 invoice enlarged close preserves draft and Cart',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 711));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final store = _MemoryGstInvoiceProfileStore();
+        final session = mixedSession(gstInvoiceProfileStore: store);
+        addTearDown(session.dispose);
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        advanceCheckoutToConfirm(session);
+        final total = session.checkoutPayableTotal;
+        final quantities = {
+          for (final line in session.cartLines) line.product.id: line.quantity,
+        };
+        await tester.pumpWidget(
+          app(session, size: const Size(320, 711), textScale: closeScale),
+        );
+        await tester.pumpAndSettle();
+        await openInvoiceBusinessEditor(tester);
+        expect(session.view, BuyV2View.account);
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-gst-legal-name')),
+          'Unsaved business draft',
+        );
+        final close = find.byKey(const ValueKey('buy-invoice-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.getSize(close).width, greaterThanOrEqualTo(44));
+        expect(tester.getSize(close).height, greaterThanOrEqualTo(44));
+        expect(
+          tester.widget<IconButton>(close).tooltip,
+          'Close invoice details',
+        );
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.checkout);
+        expect(find.text('Personal purchase'), findsOneWidget);
+        expect(store.snapshots, isEmpty);
+        expect(session.checkoutPayableTotal, total);
+        expect({
+          for (final line in session.cartLines) line.product.id: line.quantity,
+        }, quantities);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'T14 invoice unregistered business editor omits GSTIN and persists type',
+    (tester) async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final session = mixedSession(gstInvoiceProfileStore: store);
+      addTearDown(session.dispose);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      advanceCheckoutToConfirm(session);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      await openInvoiceBusinessEditor(tester);
+      await tester.tap(find.byKey(const ValueKey('buy-invoice-registration')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Business without GST registration').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-gst-gstin')), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-legal-name')),
+        'Unregistered Traders',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('buy-gst-billing-address')),
+        '22 Market Road, Jaipur 302001',
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.checkout);
+      expect(
+        store.snapshots['account-a']!.profiles.single.registration,
+        BuyV2BusinessInvoiceRegistration.unregistered,
+      );
+      expect(find.textContaining('Not GST-registered'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'T14 invoice pending payment locks changes and retains original recipient',
+    (tester) async {
+      final store = _MemoryGstInvoiceProfileStore();
+      final session = BuyV2Session(
+        core: BuySession(),
+        gstInvoiceProfileStore: store,
+        commerceAdapter: prepaidCommerceFixture(),
+      );
+      addTearDown(session.dispose);
+      expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      expect(session.openCheckout(), isTrue);
+      expect(session.choosePayment('Card'), isTrue);
+      advanceCheckoutToConfirm(session);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      await session.submitOrder();
+      await tester.pumpAndSettle();
+      expect(session.checkoutRequiresResolution, isTrue);
+      final reference = session.checkoutIdempotencyKey;
+      final total = session.checkoutPaymentActionAmount;
+      store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+        profiles: [
+          BuyV2GstInvoiceProfileRecord(
+            id: 'gst-profile-1',
+            legalName: 'Future Business',
+            gstin: '08ABCDE1234F1Z5',
+            billingAddress: '22 Market Road, Jaipur 302001',
+          ),
+        ],
+      );
+      session.refreshGstProfile();
+      await tester.pumpAndSettle();
+      final controller = tester
+          .widget<BuyV2CheckoutView>(find.byType(BuyV2CheckoutView))
+          .gstInvoiceController;
+      expect(controller.requestedFor(BuyV2Destination.shop), isFalse);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const ValueKey('buy-invoice-change')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(session.checkoutIdempotencyKey, reference);
+      expect(session.checkoutPaymentActionAmount, total);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('T14 invoice account change rejects stale Profile return', (
+    tester,
+  ) async {
+    final store = _MemoryGstInvoiceProfileStore();
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final quantities = {
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    };
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await openInvoiceBusinessEditor(tester);
+    store.ownerScope = 'account-b';
+    Navigator.of(
+      tester.element(find.byKey(const ValueKey('buy-gst-invoice-sheet'))),
+    ).pop();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.account);
+    expect(store.snapshots, isEmpty);
+    expect({
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    }, quantities);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('T14 invoice compact summary readable at 320px 200 percent', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 568));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _MemoryGstInvoiceProfileStore();
+    store.snapshots['account-a'] = const BuyV2GstInvoiceProfileSnapshot(
+      profiles: [
+        BuyV2GstInvoiceProfileRecord(
+          id: 'gst-profile-1',
+          legalName: 'Very Long Registered Business Name',
+          gstin: '08ABCDE1234F1Z5',
+          billingAddress: '22 Market Road, Jaipur 302001',
+        ),
+      ],
+    );
+    final session = mixedSession(gstInvoiceProfileStore: store);
+    addTearDown(session.dispose);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    await tester.pumpWidget(
+      app(
+        session,
+        size: const Size(320, 568),
+        textScale: 2,
+        reducedMotion: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('buy-invoice-details'));
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: row, matching: find.byType(Switch)),
+      findsNothing,
+    );
+    final label = find.textContaining('Very Long Registered Business Name');
+    expect(
+      tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+      isFalse,
+    );
+    expect(tester.getRect(row).right, lessThanOrEqualTo(320));
+    expect(
+      tester.getSize(find.byKey(const ValueKey('buy-invoice-change'))).height,
+      greaterThanOrEqualTo(44),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [320.0, 360.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final amount in [1000000, 10000000]) {
+        testWidgets(
+          'T14 billing strip Cart INR$amount width$width scale$scale',
+          (tester) async {
+            final size = Size(width, 800);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            addTearDown(core.dispose);
+            final session = _R66CheckoutAmountFixture(amount, core: core);
+            addTearDown(session.dispose);
+            expect(session.addProduct('w-notebook'), isTrue);
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 32),
+                reducedMotion: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final strip = find.byKey(const ValueKey('buy-cart-action-bar'));
+            final button = find.descendant(
+              of: strip,
+              matching: find.byType(FilledButton),
+            );
+            expect(button, findsOneWidget);
+            final stripRect = tester.getRect(strip);
+            final buttonRect = tester.getRect(button);
+            expect(stripRect.width, width);
+            expect(buttonRect.right, closeTo(stripRect.right - 14, .1));
+            expect(buttonRect.width, greaterThanOrEqualTo(44));
+            expect(buttonRect.height, greaterThanOrEqualTo(44));
+            expect(
+              find.descendant(
+                of: strip,
+                matching: find.text(buyV2Money(amount)),
+              ),
+              findsOneWidget,
+            );
+            for (final e
+                in find
+                    .descendant(of: strip, matching: find.byType(RichText))
+                    .evaluate()) {
+              final paragraph = e.renderObject as RenderParagraph;
+              expect(
+                paragraph.didExceedMaxLines,
+                isFalse,
+                reason: paragraph.text.toPlainText(),
+              );
+              expect(paragraph.text.toPlainText(), isNot(contains('…')));
+            }
+            if (scale == 1) {
+              final amountRect = tester.getRect(
+                find.descendant(
+                  of: strip,
+                  matching: find.text(buyV2Money(amount)),
+                ),
+              );
+              expect(amountRect.right, lessThanOrEqualTo(buttonRect.left - 9));
+              expect(amountRect.center.dy, lessThan(buttonRect.bottom));
+            }
+            await tester.tap(button);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.checkout);
+            expect(session.checkoutPayableTotal, amount);
+            expect(session.scopedItemCount, 1);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+}
+
+class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
+  final product = BuyV2Catalogue.products
+      .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+      .copyWith(storeId: 'po-store');
+  final now = DateTime.utc(2026, 9, 24);
+  static const address = BuyV2Address(
+    id: 'po-address',
+    kind: BuyV2AddressKind.work,
+    label: 'Work',
+    recipient: 'Buyer',
+    phone: '9000000000',
+    line: 'Test address',
+    area: 'Test area',
+    pinCode: '342003',
+    landmark: '',
+  );
+  BuyV2StoreListing? collectionStore;
+  int basketQuantity = 2;
+  List<BuyV2CartLine> get basket => [
+    BuyV2CartLine(product: product, quantity: basketQuantity),
+  ];
+  BuyV2PurchaseOrderState state = BuyV2PurchaseOrderState.draft;
+  String buyer = 'buyer-a';
+  int quantity = 2;
+  int issueCalls = 0;
+  bool failIssue = false;
+  Completer<BuyV2PurchaseOrderReview>? pending;
+  String? approvedRevision;
+  BuyV2PurchaseOrderReview snapshot() {
+    final subtotal = product.price * 100 * quantity;
+    return BuyV2PurchaseOrderReview(
+      requestId: 'request-a',
+      revision: 'review-2',
+      buyerAccountId: buyer,
+      buyerName: 'Buyer A',
+      address: collectionStore == null ? address : null,
+      collectionStore: collectionStore,
+      validUntil: now.add(const Duration(minutes: 10)),
+      documents: [
+        BuyV2PurchaseOrderDocument(
+          id: 'document-a',
+          revision: 'terms-2',
+          supplierStoreId: 'po-store',
+          supplierName: product.seller,
+          state: state,
+          reference: state == BuyV2PurchaseOrderState.draft ? null : 'PO-A',
+          decisionMessage: state == BuyV2PurchaseOrderState.revised
+              ? 'Quantity revised'
+              : null,
+          lines: [
+            BuyV2PurchaseOrderLine(
+              productId: product.id,
+              variant: product.variant,
+              pack: product.pack,
+              quantity: quantity,
+              requestedQuantity: basketQuantity,
+              unitPriceMinor: product.price * 100,
+            ),
+          ],
+          itemSubtotalMinor: subtotal,
+          chargesMinor: 0,
+          totalMinor: subtotal,
+          terms: 'Payment after supplier acceptance',
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> review({
+    required List<BuyV2CartLine> lines,
+    BuyV2Address? address,
+    BuyV2StoreListing? collectionStore,
+  }) async => snapshot();
+  @override
+  Future<BuyV2PurchaseOrderReview> issue({
+    required String requestId,
+    required String expectedRevision,
+  }) async {
+    issueCalls++;
+    if (failIssue) throw StateError('connection lost');
+    return pending == null ? snapshot() : pending!.future;
+  }
+
+  @override
+  Future<BuyV2PurchaseOrderReview> refresh({required String requestId}) async =>
+      snapshot();
+  @override
+  Future<BuyV2PurchaseOrderReview> approveRevision({
+    required String requestId,
+    required String expectedRevision,
+    required String documentId,
+    required String documentRevision,
+  }) async {
+    approvedRevision = documentRevision;
+    return snapshot();
+  }
+}
+
+void _purchaseOrderControllerCases() {
+  group('R6633 D17 PO controller', () {
+    late _PurchaseOrderFixture source;
+    late ValueNotifier<BuyV2CollectionIdentity?> identity;
+    late BuyV2PurchaseOrderController controller;
+    setUp(() {
+      source = _PurchaseOrderFixture();
+      identity = ValueNotifier(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      controller = BuyV2PurchaseOrderController(
+        identity: identity,
+        adapter: source,
+        now: () => source.now,
+      );
+    });
+    tearDown(() {
+      controller.dispose();
+      identity.dispose();
+    });
+    Future<bool> prepare() =>
+        controller.prepare(source.basket, _PurchaseOrderFixture.address);
+    Future<bool> issue() =>
+        controller.issue(source.basket, _PurchaseOrderFixture.address);
+
+    const store = BuyV2StoreListing(
+      id: 'po-store',
+      name: 'Supplier Store',
+      area: 'Test area',
+      address: 'Collection counter',
+      regionId: 'test-region',
+    );
+    test('delivery approval cannot authorize collection', () async {
+      expect(
+        await controller.prepare(source.basket, _PurchaseOrderFixture.address),
+        isTrue,
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: store),
+        isFalse,
+      );
+      expect(
+        await controller.issue(source.basket, null, collectionStore: store),
+        isFalse,
+      );
+      expect(source.issueCalls, 0);
+    });
+    test('collection approval binds the actual branch address', () async {
+      source.collectionStore = store;
+      expect(
+        await controller.prepare(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      const changed = BuyV2StoreListing(
+        id: 'po-store',
+        name: 'Supplier Store',
+        area: 'Test area',
+        address: 'Different counter',
+        regionId: 'test-region',
+      );
+      expect(
+        controller.currentFor(source.basket, null, collectionStore: changed),
+        isFalse,
+      );
+      expect(
+        await controller.issue(source.basket, null, collectionStore: changed),
+        isFalse,
+      );
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      expect(
+        await controller.issue(source.basket, null, collectionStore: store),
+        isTrue,
+      );
+      expect(source.issueCalls, 1);
+    });
+    test(
+      'missing ambiguous and wrong-store destinations are rejected',
+      () async {
+        expect(await controller.prepare(source.basket, null), isFalse);
+        expect(
+          await controller.prepare(
+            source.basket,
+            _PurchaseOrderFixture.address,
+            collectionStore: store,
+          ),
+          isFalse,
+        );
+        source.collectionStore = const BuyV2StoreListing(
+          id: 'another-store',
+          name: 'Another Store',
+          area: 'Test area',
+          address: 'Other address',
+          regionId: 'test-region',
+        );
+        expect(
+          await controller.prepare(
+            source.basket,
+            null,
+            collectionStore: source.collectionStore,
+          ),
+          isFalse,
+        );
+        expect(source.issueCalls, 0);
+      },
+    );
+    test('collection quote correlation includes accepted PO revision', () {
+      BuyV2CollectionBasket basket({String? request, String? revision}) =>
+          BuyV2CollectionBasket(
+            identity: identity.value!,
+            store: store,
+            lines: [
+              BuyV2CartLine(
+                product: source.product,
+                quantity: source.product.minimumOrder,
+              ),
+            ],
+            paymentMethod: 'UPI',
+            purchaseOrderRequestId: request,
+            purchaseOrderRevision: revision,
+          );
+      final old = basket();
+      final accepted = basket(request: 'po-request', revision: 'r1');
+      expect(accepted.fingerprint, isNot(old.fingerprint));
+      expect(
+        basket(request: 'po-request', revision: 'r2').fingerprint,
+        isNot(accepted.fingerprint),
+      );
+      expect(() => basket(request: 'po-request'), throwsFormatException);
+      expect(
+        () => basket(request: 'po-request', revision: ''),
+        throwsFormatException,
+      );
+    });
+
+    test(
+      'one issue in flight; acceptance remains separate from payment',
+      () async {
+        expect(await prepare(), isTrue);
+        source.pending = Completer();
+        final result = issue();
+        expect(await issue(), isFalse);
+        expect(source.issueCalls, 1);
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        source.pending!.complete(source.snapshot());
+        expect(await result, isTrue);
+        expect(await issue(), isFalse);
+        source.state = BuyV2PurchaseOrderState.accepted;
+        expect(await controller.refresh(), isTrue);
+        expect(
+          controller.review!.documents.single.state,
+          BuyV2PurchaseOrderState.accepted,
+        );
+      },
+    );
+    test('late response cannot cross account/session change', () async {
+      expect(await prepare(), isTrue);
+      source.pending = Completer();
+      final result = issue();
+      identity.value = const BuyV2CollectionIdentity(
+        accountId: 'buyer-b',
+        sessionId: 'session-b',
+      );
+      source.pending!.complete(source.snapshot());
+      expect(await result, isFalse);
+      expect(controller.review, isNull);
+      expect(controller.busy, isFalse);
+    });
+    test('uncertain issue reconciles instead of issuing twice', () async {
+      expect(await prepare(), isTrue);
+      source.failIssue = true;
+      expect(await issue(), isFalse);
+      expect(controller.needsReconciliation, isTrue);
+      expect(await issue(), isFalse);
+      expect(source.issueCalls, 1);
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      expect(await controller.refresh(), isTrue);
+      expect(controller.needsReconciliation, isFalse);
+    });
+    test('changed quantities require explicit revision approval', () async {
+      expect(await prepare(), isTrue);
+      source.state = BuyV2PurchaseOrderState.revised;
+      source.quantity = 3;
+      expect(await controller.refresh(), isTrue);
+      expect(controller.review!.documents.single.lines.single.quantity, 3);
+      source.state = BuyV2PurchaseOrderState.accepted;
+      expect(
+        await controller.approveRevision(
+          'document-a',
+          source.basket,
+          _PurchaseOrderFixture.address,
+        ),
+        isTrue,
+      );
+      expect(source.approvedRevision, 'terms-2');
+    });
+    test('silent changed terms never become accepted', () async {
+      expect(await prepare(), isTrue);
+      source.state = BuyV2PurchaseOrderState.accepted;
+      source.quantity = 3;
+      expect(await issue(), isFalse);
+      expect(controller.needsReconciliation, isTrue);
+      expect(controller.review!.documents.single.lines.single.quantity, 2);
+    });
+    test('failed review cannot reuse a previous approval', () async {
+      expect(await prepare(), isTrue);
+      source.buyer = 'buyer-b';
+      expect(await prepare(), isFalse);
+      source.buyer = 'buyer-a';
+      expect(await issue(), isFalse);
+      expect(source.issueCalls, 0);
+    });
+
+    test('wrong buyer and changed basket rejected', () async {
+      source.buyer = 'buyer-b';
+      expect(await prepare(), isFalse);
+      source.buyer = 'buyer-a';
+      expect(await prepare(), isTrue);
+      expect(
+        await controller.issue([
+          BuyV2CartLine(product: source.product, quantity: 4),
+        ], _PurchaseOrderFixture.address),
+        isFalse,
+      );
+      expect(source.issueCalls, 0);
+    });
+  });
+}
+
+class _PurchaseOrderPanelSession extends BuyV2Session {
+  _PurchaseOrderPanelSession(
+    this.source,
+    ValueNotifier<BuyV2CollectionIdentity?> identity,
+  ) : super(
+        core: BuySession(),
+        collectionIdentity: identity,
+        purchaseOrderAdapter: source,
+        catalogueNow: () => source.now,
+      );
+  final _PurchaseOrderFixture source;
+  @override
+  bool get collectionCheckoutSelected => source.collectionStore != null;
+  @override
+  BuyV2StoreListing? get collectionCheckoutStore => source.collectionStore;
+  @override
+  List<BuyV2CartLine> get checkoutLines => source.basket;
+  @override
+  BuyV2Address? get selectedAddressOrNull => _PurchaseOrderFixture.address;
+  @override
+  BuyV2Product? findProduct(String productId) => productId == source.product.id
+      ? source.product
+      : super.findProduct(productId);
+}
+
+void _purchaseOrderPanelCases() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'R6633 D17 uncertain panel blocks replacement review at $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final source = _PurchaseOrderFixture();
+        final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+          const BuyV2CollectionIdentity(
+            accountId: 'buyer-a',
+            sessionId: 'session-a',
+          ),
+        );
+        final session = _PurchaseOrderPanelSession(source, identity);
+        addTearDown(session.dispose);
+        addTearDown(identity.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: BuyV2PurchaseOrderPanel(
+                  session: session,
+                  compact: false,
+                ),
+              ),
+            ),
+          ),
+        );
+        Future<void> tap(String key) async {
+          final target = find.byKey(ValueKey(key));
+          await tester.ensureVisible(target);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await tap('buy-po-review');
+        source.failIssue = true;
+        await tap('buy-po-issue');
+        expect(session.purchaseOrder!.needsReconciliation, isTrue);
+        expect(source.issueCalls, 1);
+        expect(find.text('Submission status unconfirmed'), findsOneWidget);
+        expect(find.text('Previous terms · review required'), findsNothing);
+        expect(
+          find.text(
+            'Order agreement status needs checking. Do not submit again.',
+          ),
+          findsOneWidget,
+        );
+        for (final key in ['buy-po-issue', 'buy-po-review-updated']) {
+          expect(
+            tester.widget<TextButton>(find.byKey(ValueKey(key))).onPressed,
+            isNull,
+          );
+        }
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        await tap('buy-po-refresh');
+        expect(session.purchaseOrder!.needsReconciliation, isFalse);
+        expect(find.text('Awaiting supplier response'), findsOneWidget);
+        expect(find.byKey(const ValueKey('buy-po-issue')), findsNothing);
+        expect(source.issueCalls, 1);
+        expect(session.purchaseOrderReviewRequired, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'R6633 D17 collection confirm shows PO before quote refresh at $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 700);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final source = _PurchaseOrderFixture()
+          ..collectionStore = const BuyV2StoreListing(
+            id: 'po-store',
+            name: 'Supplier Store',
+            area: 'Test area',
+            address: 'Collection counter',
+            regionId: 'test-region',
+          );
+        final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+          const BuyV2CollectionIdentity(
+            accountId: 'buyer-a',
+            sessionId: 'session-a',
+          ),
+        );
+        final session = _PurchaseOrderPanelSession(source, identity)
+          ..checkoutStep = BuyV2CheckoutStep.confirm;
+        final gst = BuyV2GstInvoiceController();
+        addTearDown(gst.dispose);
+        addTearDown(session.dispose);
+        addTearDown(identity.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: Scaffold(
+              bottomNavigationBar: const SizedBox(height: 48),
+              body: Navigator(
+                onGenerateRoute: (_) => MaterialPageRoute<void>(
+                  builder: (_) => BuyV2CheckoutView(
+                    session: session,
+                    gstInvoiceController: gst,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(BuyV2PurchaseOrderPanel), findsOneWidget);
+        final action = find.byKey(
+          const ValueKey('buy-checkout-primary-confirm'),
+        );
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        Future<void> tap(String key) async {
+          final target = find.byKey(ValueKey(key));
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        Future<void> captureCollection(String state) async {
+          if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+          await tester.ensureVisible(find.text('Order agreement'));
+          await tester.pumpAndSettle();
+          await captureR66Visual(tester, 'po-collection-$state-text$scale');
+        }
+
+        expect(find.text('Supplier terms'), findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-purchase-order-panel')),
+          findsNothing,
+        );
+        await tap('buy-checkout-order-agreement');
+        expect(find.byType(BottomSheet), findsOneWidget);
+        await tap('buy-po-review');
+        await captureCollection('draft');
+        source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+        await tap('buy-po-issue');
+        expect(session.purchaseOrderReviewRequired, isTrue);
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        source.state = BuyV2PurchaseOrderState.accepted;
+        await tap('buy-po-refresh');
+        await captureCollection('accepted');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.purchaseOrderReviewRequired, isFalse);
+        expect(find.text('Check total'), findsOneWidget);
+        // No collection gateway is installed in this fixture: approval alone
+        // must not fabricate a quote or enable payment.
+        expect(tester.widget<FilledButton>(action).onPressed, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('R6633 D17 checkout PO approval and revised basket at $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 700);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final source = _PurchaseOrderFixture();
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'session-a',
+        ),
+      );
+      final session = _PurchaseOrderPanelSession(source, identity);
+      addTearDown(session.dispose);
+      addTearDown(identity.dispose);
+      Widget panel() => MaterialApp(
+        theme: MoolTheme.light(),
+        home: RepaintBoundary(
+          key: const ValueKey('r66-cart-capture'),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: BuyV2PurchaseOrderPanel(session: session, compact: false),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(panel());
+      Future<void> capture(String state) async {
+        if (!const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) return;
+        final scroll = tester.state<ScrollableState>(
+          find.byType(Scrollable).first,
+        );
+        scroll.position.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(scroll.position.pixels, 0);
+        expect(
+          tester.getTopLeft(find.text('Order agreement')).dy,
+          greaterThanOrEqualTo(0),
+        );
+        await captureR66Visual(tester, 'po-$state-text$scale');
+        expect(scroll.position.pixels, 0);
+        expect(
+          tester.getTopLeft(find.text('Order agreement')).dy,
+          greaterThanOrEqualTo(0),
+        );
+      }
+
+      Future<void> tap(String key) async {
+        final target = find.byKey(ValueKey(key));
+        await tester.ensureVisible(target);
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(await session.submitOrder(), isFalse);
+      await tap('buy-po-review');
+      expect(find.text('Buyer: Buyer A'), findsOneWidget);
+      expect(find.text('Draft for your approval'), findsOneWidget);
+      await capture('draft');
+      source.state = BuyV2PurchaseOrderState.awaitingSupplier;
+      await tap('buy-po-issue');
+      expect(find.text('Awaiting supplier response'), findsOneWidget);
+      expect(source.issueCalls, 1);
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      source.state = BuyV2PurchaseOrderState.revised;
+      source.quantity = 3;
+      await tap('buy-po-refresh');
+      expect(find.text('Revised terms need your approval'), findsOneWidget);
+      await capture('revised');
+      source.state = BuyV2PurchaseOrderState.accepted;
+      await tap('buy-po-approve-document-a');
+      expect(find.text('Supplier accepted'), findsOneWidget);
+      await capture('accepted');
+      expect(source.approvedRevision, 'terms-2');
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      source.basketQuantity = 3;
+      expect(session.purchaseOrderReviewRequired, isFalse);
+      source.basketQuantity = 4;
+      await tester.pumpWidget(panel());
+      await tester.pumpAndSettle();
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(find.text('Supplier accepted'), findsNothing);
+      expect(find.text('Previous terms · review required'), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-po-issue')), findsNothing);
+      source.state = BuyV2PurchaseOrderState.draft;
+      source.quantity = 4;
+      await tap('buy-po-review-updated');
+      expect(find.text('Draft for your approval'), findsOneWidget);
+      expect(
+        session.purchaseOrder!.review!.documents.single.lines.single.quantity,
+        4,
+      );
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(find.byKey(const ValueKey('buy-po-review-updated')), findsNothing);
+      expect(source.issueCalls, 1);
+      identity.value = null;
+      await tester.pumpAndSettle();
+      expect(find.text('PO-A'), findsNothing);
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const ValueKey('buy-po-review')))
+            .onPressed,
+        isNull,
+      );
+      expect(session.purchaseOrderReviewRequired, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

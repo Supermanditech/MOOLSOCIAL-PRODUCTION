@@ -160,7 +160,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 140));
     await tester.pump();
     final settledTop = tester.getTopLeft(sheet).dy;
-    expect((settledTop - midArrivalTop).abs(), lessThan(24));
+    // The same bounded overshoot scales with the expanded 12-product sheet.
+    expect(
+      (settledTop - midArrivalTop).abs(),
+      lessThan(tester.getSize(sheet).height * .1),
+    );
+    expect(await tester.pumpAndSettle(), lessThanOrEqualTo(3));
+    expect(tester.binding.transientCallbackCount, 0);
 
     await tester.binding.handlePopRoute();
     await tester.pump();
@@ -182,20 +188,19 @@ void main() {
   ) async {
     final session = BuyV2Session(core: BuySession());
     addTearDown(session.dispose);
-    final featured = BuyV2Catalogue.products
-        .where((product) => product.destination == BuyV2Destination.shop)
-        .take(4)
-        .toList(growable: false);
+    final plan = session.monthlyBasketPlan;
+    expect(plan, hasLength(12));
+    expect(plan.fold<int>(0, (total, line) => total + line.quantity), 21);
 
     await openHousehold(tester, session);
     await tester.tap(find.byKey(const ValueKey('buy-household-add-to-cart')));
     await tester.pump();
-    for (final product in featured) {
-      expect(session.quantityFor(product.id), product.minimumOrder);
+    for (final line in plan) {
+      expect(session.quantityFor(line.product.id), line.quantity);
     }
     await tester.pumpAndSettle();
-    for (final product in featured) {
-      expect(session.quantityFor(product.id), product.minimumOrder);
+    for (final line in plan) {
+      expect(session.quantityFor(line.product.id), line.quantity);
     }
 
     session.chooseCategory('fruits-vegetables');
@@ -203,10 +208,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-household-see-products')));
     await tester.pump();
     expect(session.selectedCategoryId, 'all');
-    expect(session.notice, 'Basket products are shown below');
+    expect(
+      session.notice,
+      'Choose Quick or Scheduled to view each basket group.',
+    );
     await tester.pumpAndSettle();
     expect(session.selectedCategoryId, 'all');
-    expect(session.notice, 'Basket products are shown below');
+    expect(
+      session.notice,
+      'Choose Quick or Scheduled to view each basket group.',
+    );
   });
 
   testWidgets(
@@ -223,7 +234,10 @@ void main() {
       expect(find.bySemanticsLabel('Saved products in Shop'), findsOneWidget);
       expect(find.text(shop.title), findsOneWidget);
       expect(find.text(medicine.title), findsNothing);
-      expect(find.bySemanticsLabel('Open ${shop.title}'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Open ${shop.title}, ${shop.pack}'),
+        findsOneWidget,
+      );
       expect(find.byTooltip('Remove ${shop.title} from Saved'), findsOneWidget);
 
       session.openDestination(BuyV2Destination.medicine);
@@ -237,7 +251,7 @@ void main() {
       expect(session.isSaved(medicine.id), isTrue);
       expect(tester.binding.transientCallbackCount, greaterThan(0));
       await tester.pumpAndSettle();
-      expect(find.text('No Saved products yet'), findsOneWidget);
+      expect(find.text('No saved products yet'), findsOneWidget);
       expect(
         find.text('Save products from the Shop grid for instant access.'),
         findsOneWidget,
@@ -288,7 +302,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-saved-info-sheet')));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Saved products in Shop'), findsOneWidget);
-    expect(find.text('No Saved products yet'), findsOneWidget);
+    expect(find.text('No saved products yet'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
     expect(tester.testTextInput.isVisible, isFalse);
     expect(tester.takeException(), isNull);

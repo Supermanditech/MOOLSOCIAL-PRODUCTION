@@ -63,9 +63,10 @@ $lock = Get-Content -LiteralPath (
   Resolve-BridgeOwner $null 'apps/mobile/pubspec.lock'
 ) -Raw
 
-Assert-Bridge `
-  (-not $gradle.Contains('com.google.android.gms:play-services-auth')) `
-  'the rejected direct legacy Play Services Auth dependency is present.'
+Assert-ContainsOnce `
+  $gradle `
+  'implementation("com.google.android.gms:play-services-auth:21.6.0")' `
+  'the bounded Play Services Auth fallback dependency'
 Assert-Bridge `
   ([regex]::IsMatch(
     $lock,
@@ -80,24 +81,63 @@ foreach ($token in @(
   'MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_DESTROY_BEGIN',
   'MOOLSOCIAL_GOOGLE_IDENTITY_BRIDGE_IMPLEMENTATION_BEGIN',
   'Official google_sign_in owns the Android Credential Manager integration.',
-  'GeneratedPluginRegistrant registers the official Google identity plugin.',
-  'No legacy activity-result identity bridge is permitted in the FIX11 path.'
+  'Credential Manager remains primary; the Play Services bridge handles',
+  'Play Services fallback is bounded to false Credential Manager cancellations.'
 )) {
   Assert-Bridge $activity.Contains($token) "plugin seam token is missing: $token"
 }
+foreach ($token in @(
+  'import com.google.android.gms.auth.api.signin.GoogleSignIn',
+  'import com.google.android.gms.auth.api.signin.GoogleSignInOptions',
+  'import com.google.android.gms.common.api.ApiException',
+  'private val googleIdentityChannel = "com.moolsocial.app/google_identity_fallback"',
+  'private val googleIdentityRequestCode = 6110',
+  'private var pendingGoogleIdentityResult: MethodChannel.Result? = null',
+  '"authenticateIdToken" ->',
+  '"signOut" -> signOutGoogleIdentity(result)',
+  '.requestIdToken(serverClientId)',
+  'startActivityForResult(',
+  'if (requestCode == googleIdentityRequestCode)',
+  'GoogleSignIn.getSignedInAccountFromIntent(data)',
+  'pendingGoogleIdentityResult?.error('
+)) {
+  Assert-Bridge $activity.Contains($token) `
+    "bounded Android fallback token is missing: $token"
+}
 foreach ($forbidden in @(
-  'com.moolsocial.app/google_identity',
-  'GoogleSignInOptions',
-  'startActivityForResult',
-  'onActivityResult(',
-  'GoogleSignIn.getSignedInAccountFromIntent'
+  'account.email',
+  'account.displayName',
+  'Log.i("MoolSocialGoogle", idToken',
+  'Log.d("MoolSocialGoogle", idToken'
 )) {
   Assert-Bridge (-not $activity.Contains($forbidden)) `
-    "legacy native bridge token is present: $forbidden"
+    "private Google identity logging is present: $forbidden"
+}
+$activityResultTokens = @(
+  'startActivityForResult',
+  'onActivityResult('
+)
+if (@($activityResultTokens | Where-Object { $activity.Contains($_) }).Count -gt 0) {
+  foreach ($token in @(
+    'private val invoiceChannel = "com.moolsocial.app/invoice"',
+    'private val createInvoiceRequestCode = 6108',
+    'Intent.ACTION_CREATE_DOCUMENT',
+    'startActivityForResult(intent, createInvoiceRequestCode)',
+    'override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?)',
+    'if (requestCode != createInvoiceRequestCode)'
+  )) {
+    Assert-ContainsOnce $activity $token `
+      "non-Google document-result boundary changed: $token"
+  }
 }
 foreach ($token in @(
   'GoogleSignIn.instance.initialize(',
   'GoogleSignIn.instance.authenticate()',
+  "'com.moolsocial.app/google_identity_fallback'",
+  "'auth-google-native-legacy-fallback-started'",
+  "'auth-google-native-legacy-identity-returned'",
+  "'auth-google-native-legacy-fallback-failed'",
+  '_isAndroid()',
   "'auth-google-native-initialize-started'",
   "'auth-google-native-ui-requested'",
   "'auth-google-native-identity-returned'",
@@ -112,17 +152,11 @@ foreach ($token in @(
   Assert-Bridge $gateway.Contains($token) `
     "Credential Manager/Firebase token is missing: $token"
 }
-foreach ($forbidden in @(
-  'com.moolsocial.app/google_identity',
-  'useAndroidCompatibilityFlow',
-  'authenticateAndroidCompatibilityIdToken'
-)) {
-  Assert-Bridge (-not $gateway.Contains($forbidden)) `
-    "legacy Dart bridge token is present: $forbidden"
-}
 foreach ($token in @(
   'official Credential Manager path initializes once before authentication',
   'Credential Manager cancellation emits no-identity stage',
+  'Android cancellation uses the bounded Play Services fallback',
+  'Android sign-out clears primary and fallback identity state',
   'Google stage telemetry spans native identity and Firebase exchange',
   'Google Firebase rejection preserves only the exact safe exception code',
   'Google Firebase telemetry rejects a non-code payload',
@@ -133,9 +167,9 @@ foreach ($token in @(
 
 Write-Output (
   'Google Android identity bridge readiness passed: ' +
-  'credentialManagerPlugin=true; legacyBridge=false; ' +
+  'credentialManagerPrimary=true; playServicesFallback=true; ' +
   'firebaseCredentialExchange=true; cancellationBounded=true; ' +
-  'stageTelemetry=true; exactSafeFirebaseCode=true; ' +
+  'signOutCleanup=true; stageTelemetry=true; exactSafeFirebaseCode=true; ' +
   'failuresSanitized=true; retrySafe=true; ' +
   'credentialValuesEmitted=false.'
 )

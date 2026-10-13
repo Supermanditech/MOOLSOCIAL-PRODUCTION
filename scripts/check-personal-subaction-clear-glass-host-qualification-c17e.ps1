@@ -3,6 +3,8 @@ param(
   [string]$RepositoryRoot,
   [switch]$RequireTwoHostCycles
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
@@ -21,13 +23,13 @@ function Get-C17SourceFingerprint {
     Get-ChildItem -LiteralPath $resolvedRoot -Recurse -File
   }
   $records = foreach ($file in @($files | Sort-Object FullName)) {
-    $relativePath = [IO.Path]::GetRelativePath($Root, $file.FullName).Replace('\', '/')
+    $relativePath = (Get-MoolSocialPortableRelativePath -RelativeTo ($Root) -Path ($file.FullName)).Replace('\', '/')
     "$((Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash)  $relativePath"
   }
   $bytes = [Text.Encoding]::UTF8.GetBytes(($records -join "`n"))
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
-    return [Convert]::ToHexString($sha.ComputeHash($bytes))
+    return (ConvertTo-MoolSocialPortableHex -Bytes ($sha.ComputeHash($bytes)))
   } finally {
     $sha.Dispose()
   }

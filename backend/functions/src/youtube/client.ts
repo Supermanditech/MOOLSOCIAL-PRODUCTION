@@ -1536,6 +1536,73 @@ export class YouTubeDataClient {
     };
   }
 
+  async sharedCatalogueSearch(
+    requestId: string,
+    query: ExplicitSearchQuery,
+  ): Promise<YouTubePage<YouTubeVideoSummary>> {
+    const text = query.query.trim();
+    if (text.length < 3 || text.length > 120) {
+      throw new YouTubeProviderError(
+        "bad_request",
+        "Search must contain between 3 and 120 characters.",
+        400,
+      );
+    }
+    const maxResults = pageSize(query.maxResults);
+    const regionCode = safeRegion(query.regionCode);
+    const pageToken = safeToken(query.pageToken);
+    await this.options.quota.reserve({
+      principal: "shared-shorts-catalogue",
+      bucket: "search",
+      amount: 1,
+      operation: "search.list.sharedShortsRefresh",
+      requestId,
+    });
+    const url = new URL(`${DATA_API}/search`);
+    url.searchParams.set("part", "snippet");
+    url.searchParams.set("type", "video");
+    url.searchParams.set("videoEmbeddable", "true");
+    url.searchParams.set("videoSyndicated", "true");
+    url.searchParams.set("safeSearch", "moderate");
+    url.searchParams.set("q", text);
+    url.searchParams.set("regionCode", regionCode);
+    url.searchParams.set("maxResults", String(maxResults));
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const response = await this.options.transport.send({
+      url: url.toString(),
+      headers: { "x-goog-api-key": this.options.serverApiKey },
+    });
+    assertProviderResponse(response.status, response.body);
+    const results = parseJson<
+      ListEnvelope<{ readonly id?: { readonly videoId?: string } }>
+    >(response.body);
+    const candidates = candidateVideoIds(
+      (results.items ?? []).map((item) => item.id?.videoId),
+    );
+    const details = candidates.ids.length
+      ? await this.videoDetailsWithAvailability(
+          "shared-shorts-catalogue",
+          requestId,
+          candidates.ids,
+          {
+            regionCode,
+            syndicationConfirmedBySearch: true,
+          },
+        )
+      : { items: [] };
+    const filtered = mergeFiltered(
+      candidates.filtered,
+      details.filtered,
+    );
+    return {
+      items: details.items,
+      ...(results.nextPageToken === undefined
+        ? {}
+        : { nextPageToken: results.nextPageToken }),
+      ...(filtered === undefined ? {} : { filtered }),
+    };
+  }
+
   async batchVideoStatistics(
     principal: string,
     requestId: string,

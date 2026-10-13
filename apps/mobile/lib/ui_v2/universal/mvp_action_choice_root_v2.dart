@@ -107,7 +107,7 @@ const personalWorkActionChoices = <MvpActionChoiceSpec>[
   MvpActionChoiceSpec(
     id: 'workspace',
     label: 'Workspace',
-    supportingLabel: 'Open your saved work and workspace',
+    supportingLabel: 'Choose and build the Workspace for your role',
     route: '/app/work/my-work',
     icon: Icons.work_outline_rounded,
   ),

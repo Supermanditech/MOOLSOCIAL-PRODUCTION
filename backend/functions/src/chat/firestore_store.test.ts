@@ -10,6 +10,10 @@ import {
   type ChatPhotoUploadGrant,
   type ChatProfile,
   type ChatValidatedPhoto,
+  type ChatAttachmentKind,
+  type ChatAttachmentStore,
+  type ChatAttachmentUploadGrant,
+  type ChatValidatedAttachment,
 } from "./contracts.js";
 import { FirestoreChatRepository } from "./firestore_store.js";
 
@@ -368,6 +372,261 @@ test("one uploaded photo cannot be consumed by a second message", async () => {
   );
 });
 
+test("privacy persistence hides disabled read receipts", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T01:00:00.000Z"),
+  );
+  await repository.updatePrivacySettings("user-member", {
+    whoCanMessage: "connections",
+    messageRequestsEnabled: true,
+    shareLastSeen: false,
+    readReceipts: false,
+  });
+  const sent = await repository.sendMessage(
+    actor,
+    "thread-1",
+    "Private read state",
+    "chat-privacy-receipt-0001",
+    "privacy-receipt-digest",
+  );
+  await repository.markThreadRead("user-member", "thread-1");
+  const loaded = (await repository.listMessages(actor.userId, "thread-1", 20))
+    .find((message) => message.id === sent.id);
+  assert.equal(loaded?.readCount, 0);
+  assert.equal(loaded?.readByOthers, false);
+  assert.equal((await repository.getPrivacySettings("user-member")).shareLastSeen, false);
+});
+
+test("blocking hides and denies the exact direct conversation", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(database as unknown as Firestore);
+  await repository.setBlockedAccount(
+    actor,
+    { userId: "user-member", name: "Member", handle: "@member" },
+    true,
+  );
+  assert.equal((await repository.listThreads(actor.userId, 10)).length, 1);
+  assert.equal(
+    (await repository.listThreads(actor.userId, 10))[0]?.id,
+    "thread-2",
+  );
+  await assert.rejects(
+    repository.listMessages(actor.userId, "thread-1", 10),
+    (error: unknown) =>
+      error instanceof ChatError && error.code === "permission_denied",
+  );
+  assert.equal((await repository.listBlockedAccounts(actor.userId))[0]?.userId,
+    "user-member");
+  await repository.setBlockedAccount(
+    actor,
+    { userId: "user-member", name: "Member", handle: "@member" },
+    false,
+  );
+  assert.equal((await repository.listBlockedAccounts(actor.userId)).length, 0);
+});
+
+test("pending message request is isolated until its recipient accepts", async () => {
+  const database = chatDatabase();
+  const pendingId = "thread-request";
+  database.create(new FakeDocumentReference(database, `chatThreads/${pendingId}`), {
+    schemaVersion: 1,
+    type: "people",
+    participantIds: [actor.userId, "user-requester"],
+    profiles: {
+      [actor.userId]: { name: actor.name, handle: actor.handle },
+      "user-requester": { name: "Requester", handle: "@requester" },
+    },
+    preview: "Hello",
+    updatedAt: "2026-08-29T02:00:00.000Z",
+    verified: false,
+    requestStatus: "pending",
+    requestedByUserId: "user-requester",
+    requestRecipientId: actor.userId,
+    requestedAt: "2026-08-29T02:00:00.000Z",
+  });
+  const repository = new FirestoreChatRepository(database as unknown as Firestore);
+  assert.equal((await repository.listThreads(actor.userId, 10)).some(
+    (thread) => thread.id === pendingId,
+  ), false);
+  assert.equal((await repository.listMessageRequests(actor.userId))[0]?.thread.id,
+    pendingId);
+  await repository.resolveMessageRequest(actor.userId, pendingId, true);
+  assert.equal((await repository.listMessageRequests(actor.userId)).length, 0);
+  assert.equal((await repository.listThreads(actor.userId, 10)).some(
+    (thread) => thread.id === pendingId,
+  ), true);
+});
+
+test("call availability exposes recipient off and completes call lifecycle", async () => {
+  const database = chatDatabase();
+  const now = () => new Date("2026-08-29T03:00:00.000Z");
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    now,
+  );
+  await repository.updateCallPreferences("user-member", {
+    voiceCallsEnabled: false,
+    videoCallsEnabled: true,
+  });
+  const disabled = await repository.getCallAvailability(
+    actor.userId,
+    "thread-1",
+    "voice",
+  );
+  assert.equal(disabled.canStart, false);
+  assert.equal(disabled.status, "calls_off");
+  assert.match(disabled.message, /turned off voice calls/u);
+
+  await repository.updateCallPreferences("user-member", {
+    voiceCallsEnabled: true,
+    videoCallsEnabled: true,
+  });
+  await repository.setPresence("user-member", "active");
+  const availability = await repository.getCallAvailability(
+    actor.userId,
+    "thread-1",
+    "voice",
+  );
+  assert.equal(availability.status, "available");
+  const started = await repository.startCall(
+    actor,
+    "thread-1",
+    "voice",
+    "chat-call-lifecycle-0001",
+  );
+  assert.equal(started.status, "ringing");
+  const accepted = await repository.respondToCall(
+    "user-member",
+    started.id,
+    true,
+  );
+  assert.equal(accepted.status, "accepted");
+  const ended = await repository.endCall(actor.userId, started.id);
+  assert.equal(ended.status, "ended");
+});
+
+test("attachment finalize is private idempotent and signed for reading", async () => {
+  const database = chatDatabase();
+  const media = new FakeAttachmentStore();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T04:00:00.000Z"),
+    undefined,
+    media,
+  );
+  const grant = await repository.prepareAttachmentUpload(
+    actor,
+    "thread-1",
+    "voice",
+    "Voice message.m4a",
+    "audio/mp4",
+    4096,
+    2400,
+  );
+  const args = [
+    actor,
+    "thread-1",
+    "voice" as const,
+    grant.uploadId,
+    "Voice message.m4a",
+    "audio/mp4",
+    4096,
+    2400,
+    "Listen when free",
+    "chat-attachment-idempotency-0001",
+    "attachment-request-digest",
+  ] as const;
+  const first = await repository.sendAttachmentMessage(...args);
+  const repeated = await repository.sendAttachmentMessage(...args);
+  assert.equal(first.id, repeated.id);
+  assert.equal(first.attachment?.kind, "voice");
+  assert.equal(first.attachment?.durationMilliseconds, 2400);
+  assert.equal(first.attachment?.readUrl, attachmentReadUrl);
+  assert.equal(JSON.stringify(first).includes("chat-media/v1"), false);
+  assert.equal(media.validateCalls, 2);
+});
+
+test("group invitation acceptance permissions and leave update one membership", async () => {
+  const database = chatDatabase();
+  database.create(new FakeDocumentReference(database, "chatThreads/group-1"), {
+    schemaVersion: 1,
+    group: true,
+    type: "people",
+    title: "Home Group",
+    groupDescription: "Coordinate together.",
+    participantIds: [actor.userId, "member-2", "member-3"],
+    adminIds: [actor.userId],
+    invitePermission: "admins",
+    profiles: {
+      [actor.userId]: { name: actor.name, handle: actor.handle },
+      "member-2": { name: "Member Two", handle: "@two" },
+      "member-3": { name: "Member Three", handle: "@three" },
+    },
+    preview: "Welcome",
+    updatedAt: "2026-08-29T05:00:00.000Z",
+    unreadCounts: {},
+    lastReadAtBy: {},
+  });
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T05:00:00.000Z"),
+  );
+  const before = await repository.getGroupInfo(actor.userId, "group-1");
+  assert.equal(before.members.length, 3);
+  assert.equal(before.canManage, true);
+  const invited = await repository.inviteGroupMember(
+    actor,
+    "group-1",
+    { userId: "member-4", name: "Member Four", handle: "@four" },
+  );
+  await repository.respondToGroupInvite("member-4", invited.id, true);
+  const joined = await repository.getGroupInfo("member-4", "group-1");
+  assert.equal(joined.members.length, 4);
+  assert.equal(joined.members.find((member) => member.userId === "member-4")?.name,
+    "Member Four");
+  const permissions = await repository.updateGroupPermissions(
+    actor.userId,
+    "group-1",
+    "members",
+  );
+  assert.equal(permissions.invitePermission, "members");
+  assert.equal(permissions.canInvite, true);
+  await repository.leaveGroup("member-4", "group-1");
+  assert.equal((await repository.getGroupInfo(actor.userId, "group-1")).members.length,
+    3);
+});
+
+test("notification preferences and device token lifecycle persist exactly", async () => {
+  const database = chatDatabase();
+  const repository = new FirestoreChatRepository(
+    database as unknown as Firestore,
+    () => new Date("2026-08-29T06:00:00.000Z"),
+  );
+  const saved = await repository.updateNotificationPreferences(actor.userId, {
+    messagesEnabled: false,
+    callsEnabled: true,
+    groupInvitesEnabled: false,
+    showPreview: false,
+    quietHoursEnabled: true,
+    quietStartMinutes: 1320,
+    quietEndMinutes: 420,
+    utcOffsetMinutes: 330,
+  });
+  assert.equal(saved.showPreview, false);
+  assert.deepEqual(await repository.getNotificationPreferences(actor.userId), saved);
+  const token = "token-" + "a".repeat(58);
+  assert.deepEqual(
+    await repository.registerNotificationDevice(actor.userId, token, "android"),
+    { registered: true },
+  );
+  assert.deepEqual(
+    await repository.unregisterNotificationDevice(actor.userId, token),
+    { registered: false },
+  );
+});
+
 function chatDatabase(): FakeFirestore {
   return new FakeFirestore({
     "chatThreads/thread-1": {
@@ -479,6 +738,17 @@ class FakeFirestore {
     }
     Object.assign(current, data);
   }
+
+  set(reference: FakeDocumentReference, data: DocumentData, merge = false): void {
+    const current = this.documents.get(reference.path);
+    this.documents.set(reference.path, merge && current
+      ? { ...current, ...data }
+      : { ...data });
+  }
+
+  delete(reference: FakeDocumentReference): void {
+    this.documents.delete(reference.path);
+  }
 }
 
 class FakeCollectionReference {
@@ -520,6 +790,14 @@ class FakeDocumentReference {
 
   async get(): Promise<FakeDocumentSnapshot> {
     return this.database.snapshot(this);
+  }
+
+  async set(data: DocumentData, options?: { merge?: boolean }): Promise<void> {
+    this.database.set(this, data, options?.merge === true);
+  }
+
+  async delete(): Promise<void> {
+    this.database.delete(this);
   }
 }
 
@@ -586,6 +864,11 @@ class FakeQuery {
         const selected = document.data()?.[field];
         return Array.isArray(selected) && selected.includes(value);
       });
+    }
+    if (this.whereField && this.whereOperator === "==") {
+      const field = this.whereField;
+      const value = this.whereValue;
+      documents = documents.filter((document) => document.data()?.[field] === value);
     }
     if (this.orderField) {
       const field = this.orderField;
@@ -688,6 +971,62 @@ class FakePhotoStore implements ChatPhotoAttachmentStore {
     return {
       readUrl: photoReadUrl,
       expiresAt: "2026-08-15T00:06:00.000Z",
+    };
+  }
+}
+
+const attachmentUploadId = "00000000-0000-4000-8000-000000000002";
+const attachmentReadUrl =
+  `https://storage.googleapis.test/chat-media%2Fv1%2Fvoice%2F${attachmentUploadId}?signed=1`;
+
+class FakeAttachmentStore implements ChatAttachmentStore {
+  validateCalls = 0;
+
+  async prepare(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatAttachmentUploadGrant> {
+    return {
+      uploadId: attachmentUploadId,
+      uploadUrl: "https://storage.googleapis.test/private-upload?signed=1",
+      expiresAt: "2026-08-29T04:05:00.000Z",
+      requiredHeaders: { "content-type": input.contentType },
+    };
+  }
+
+  async validate(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    uploadId: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatValidatedAttachment> {
+    this.validateCalls += 1;
+    return {
+      uploadId: input.uploadId,
+      objectPath: `chat-media/v1/${input.kind}/${input.uploadId}`,
+      generation: "generation-19",
+      kind: input.kind,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      ...(input.durationMilliseconds === undefined
+        ? {}
+        : { durationMilliseconds: input.durationMilliseconds }),
+    };
+  }
+
+  async readUrl() {
+    return {
+      readUrl: attachmentReadUrl,
+      expiresAt: "2026-08-29T04:05:00.000Z",
     };
   }
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
+import 'package:moolsocial/features/chat/screens/chat_inbox_screen.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/journey01/universal_intent_catalog.dart';
@@ -156,14 +159,6 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('section-buy')), findsOneWidget);
-    await tapVisible(tester, const Key('sub-action-buy-medicine'));
-    await tapVisible(tester, const Key('open-intent-medicine'));
-    expect(find.byKey(const Key('buy-medicine-screen')), findsOneWidget);
-
-    expect(find.byKey(const Key('buy-back')), findsNothing);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('section-buy')), findsOneWidget);
     final horizontalActions = find.byWidgetPredicate(
       (widget) =>
           widget is ListView && widget.scrollDirection == Axis.horizontal,
@@ -173,6 +168,31 @@ void main() {
     await tapVisible(tester, const Key('sub-action-buy-basket'));
     await tapVisible(tester, const Key('open-intent-basket'));
     expect(find.byKey(const Key('buy-basket-screen')), findsOneWidget);
+  });
+
+  testWidgets('legacy Medicine action opens and returns to Care, not Buy', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final session = await readySession();
+    addTearDown(session.dispose);
+    await openSection(tester, session, 'buy');
+    await tapVisible(tester, const Key('sub-action-buy-medicine'));
+    await tapVisible(tester, const Key('open-intent-medicine'));
+    final medicine = find.byKey(const Key('buy-medicine-screen'));
+    expect(medicine, findsOneWidget);
+    expect(
+      GoRouterState.of(tester.element(medicine)).uri.path,
+      '/app/book/medicine',
+    );
+    expect(find.byKey(const Key('buy-back')), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final care = find.byKey(const Key('mvp-action-root-book'));
+    expect(care, findsOneWidget);
+    expect(GoRouterState.of(tester.element(care)).uri.path, '/app/book');
+    expect(find.byKey(const Key('section-buy')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Eat production entries open only Order Food and Book Table', (
@@ -271,12 +291,12 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final session = await readySession();
     addTearDown(session.dispose);
-    await openProductionSection(tester, session, 'work');
+    await openProductionSection(tester, session, 'work/earn');
 
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
     expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);
     await tapVisible(tester, const Key('work-local-workspace'));
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
     await tapVisible(tester, const Key('work-local-earn'));
     expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
   });
@@ -295,11 +315,14 @@ void main() {
       await tapVisible(tester, const Key('search-result-chat-business-chat'));
 
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+      final businessFilter = find.byKey(const Key('chat-filter-business'));
+      expect(businessFilter, findsOneWidget);
+      expect(tester.widget<ChoiceChip>(businessFilter).selected, isTrue);
       expect(
         tester
-            .widget<ChoiceChip>(find.byKey(const Key('chat-filter-business')))
-            .selected,
-        isTrue,
+            .widget<ChatInboxScreen>(find.byType(ChatInboxScreen))
+            .initialFilter,
+        ChatThreadType.business,
       );
       expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
       expect(

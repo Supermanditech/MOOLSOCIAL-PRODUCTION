@@ -4,6 +4,8 @@ param(
   [string]$ComparePath,
   [string]$RepositoryRoot
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -184,7 +186,7 @@ $rows = @($relativePaths | ForEach-Object {
 })
 $text = ($rows -join [Environment]::NewLine) + [Environment]::NewLine
 $bytes = [Text.UTF8Encoding]::new($false).GetBytes($text)
-$hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))
+$hash = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($bytes))))
 
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
   $path = Resolve-C30UOutput -Path $OutputPath
@@ -199,7 +201,7 @@ if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
   $path = Resolve-C30UOutput -Path $ComparePath
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw 'C30U comparison source manifest is missing.' }
   $existing = [IO.File]::ReadAllBytes($path)
-  $existingHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($existing))
+  $existingHash = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($existing))))
   if ($existing.Length -ne $bytes.Length -or $existingHash -cne $hash) {
     throw 'C30U source changed between qualification cycles.'
   }

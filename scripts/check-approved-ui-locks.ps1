@@ -10,6 +10,433 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 
+function Test-CursorContinuationUnchanged {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $branch = (& git -C $root rev-parse --abbrev-ref HEAD 2>$null).Trim()
+  if (
+    $LASTEXITCODE -ne 0 -or
+    $branch -cne 'work/cursor-ui/shop-chat-ui-20260824'
+  ) {
+    return $false
+  }
+  $continuationBase = '44a843859b417b498de0ddb5bf2aa0735fd1b53f'
+  $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  $resolved = [IO.Path]::GetFullPath($Path)
+  if (-not $resolved.StartsWith(
+      $rootPrefix,
+      [StringComparison]::OrdinalIgnoreCase
+    )) {
+    return $false
+  }
+  $relative = $resolved.Substring($rootPrefix.Length).Replace('\', '/')
+  & git -C $root cat-file -e "${continuationBase}:$relative" 2>$null
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root diff --quiet $continuationBase -- $relative
+  return $LASTEXITCODE -eq 0
+}
+
+function Test-SealedParallelContinuationFacts {
+  param(
+    [bool]$BranchAllowed,
+    [bool]$CodexOwnerExists,
+    [bool]$CursorOwnerExists,
+    [bool]$TipBlobsEqual,
+    [bool]$CurrentOwnerEqual
+  )
+  return (
+    $BranchAllowed -and $CodexOwnerExists -and $CursorOwnerExists -and
+    $TipBlobsEqual -and $CurrentOwnerEqual
+  )
+}
+
+if (
+  -not (Test-SealedParallelContinuationFacts $true $true $true $true $true) -or
+  (Test-SealedParallelContinuationFacts $true $true $true $false $true) -or
+  (Test-SealedParallelContinuationFacts $true $true $true $true $false) -or
+  (Test-SealedParallelContinuationFacts $false $true $true $true $true)
+) {
+  throw 'Approved UI sealed-parallel continuation fixture failed.'
+}
+
+function Test-SealedParallelContinuationUnchanged {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $branch = (& git -C $root rev-parse --abbrev-ref HEAD 2>$null).Trim()
+  if (
+    $LASTEXITCODE -ne 0 -or
+    $branch -cnotin @(
+      'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+      'integration/moolsocial/social-runtime-chat-v2-20260825',
+      'integration/moolsocial/social-runtime-chat-v3-20260826',
+      'integration/moolsocial/social-runtime-chat-v4-20260826',
+      'work/codex-auth/social-share-runtime-20260826'
+    )
+  ) {
+    return $false
+  }
+  if ($branch -ceq 'work/codex-auth/social-share-runtime-20260826') {
+    & git -C $root merge-base --is-ancestor `
+      '0a40f68dc7697ae226aef469604761fa8b3d1301' HEAD
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+  $codexTip = '922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9'
+  $cursorTip = '00ce93552091ee51739266c0a8fbe6d207d9f695'
+  $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  $resolved = [IO.Path]::GetFullPath($Path)
+  if (-not $resolved.StartsWith(
+      $rootPrefix,
+      [StringComparison]::OrdinalIgnoreCase
+    )) {
+    return $false
+  }
+  $relative = $resolved.Substring($rootPrefix.Length).Replace('\', '/')
+  $codexSpec = '{0}:{1}' -f $codexTip,$relative
+  $cursorSpec = '{0}:{1}' -f $cursorTip,$relative
+  & git -C $root cat-file -e $codexSpec 2>$null
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root cat-file -e $cursorSpec 2>$null
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $codexBlob = (& git -C $root rev-parse $codexSpec 2>$null).Trim()
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $cursorBlob = (& git -C $root rev-parse $cursorSpec 2>$null).Trim()
+  if ($LASTEXITCODE -ne 0 -or $codexBlob -cne $cursorBlob) { return $false }
+  & git -C $root diff --quiet $codexTip -- $relative
+  $currentOwnerEqual = $LASTEXITCODE -eq 0
+  return Test-SealedParallelContinuationFacts `
+    $true $true $true $true $currentOwnerEqual
+}
+
+function Get-LockSha256 {
+  param([Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes)
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return [BitConverter]::ToString($sha.ComputeHash($Bytes)).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha.Dispose()
+  }
+}
+
+function Get-CursorAccessibilityNativeProjection {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Source
+  )
+  $expectedRoot = [IO.Path]::GetFullPath(
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905'
+  ).TrimEnd([char[]]@('\','/'))
+  $actualRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/'))
+  # REG4608: admit only the exact merged accessibility + PDF composition in
+  # this correction lane and its single fresh final-admission destination.
+  $combinedBranch = switch ($actualRoot.Replace('\','/')) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-ready-20260921' {
+      'work/cursor-ui/buy-ready-20260921'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
+      'work/codex-ui/store-procurement-bridge-20260912'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v31-20260916' {
+      'integration/moolsocial/store-buy-final-v31-20260916'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
+      'work/cursor-ui/redmi-v6-audit-20260913'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919' {
+      'work/codex-ui/counter-sale-20260919'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919' {
+      'integration/moolsocial/counter-sale-20260919'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v2' {
+      'integration/moolsocial/counter-sale-20260919-v2'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v3' {
+      'integration/moolsocial/counter-sale-20260919-v3'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v4' {
+      'integration/moolsocial/counter-sale-20260919-v4'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-counter-sale-20260919-v5' {
+      'integration/moolsocial/counter-sale-20260919-v5'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920' {
+      'work/codex-ui/add-product-screen1-20260920'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-add-product-20260921' {
+      'integration/moolsocial/store-add-product-20260921'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-combined-20261008' {
+      'work/integration-repair/store-buy-combined-20261008'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008' {
+      'work/integration-repair/store-buy-compatibility-20261008'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008' {
+      'integration/moolsocial/store-buy-combined-baseline-20261008'
+    }
+    default { $null }
+  }
+  $combined = $null -ne $combinedBranch
+  if ($combined) { $expectedRoot = $actualRoot }
+  $expectedPath = [IO.Path]::GetFullPath((Join-Path $expectedRoot (
+    'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+  )))
+  $exactOwner = $actualRoot.Equals($expectedRoot,[StringComparison]::OrdinalIgnoreCase) -and
+    [IO.Path]::GetFullPath($Path).Equals($expectedPath,[StringComparison]::OrdinalIgnoreCase)
+  if (-not $exactOwner) {
+    if ($Source.Contains('MOOLSOCIAL_ACCESSIBILITY_BRIDGE_')) {
+      throw 'Approved UI Accessibility projection requires its exact isolated native owner.'
+    }
+    return $Source
+  }
+  $branch = @(& git -C $root rev-parse --abbrev-ref HEAD)
+  $requiredBranch = if ($combined) { $combinedBranch } else {
+    'work/cursor-ui/buy-redmi-fixes-v1-20260905'
+  }
+  if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
+      [string]$branch[0] -cne $requiredBranch) {
+    throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  $octoberUIComposition = $requiredBranch -cin @(
+    'work/integration-repair/store-buy-combined-20261008',
+    'work/integration-repair/store-buy-compatibility-20261008',
+    'integration/moolsocial/store-buy-combined-baseline-20261008'
+  )
+  if ($octoberUIComposition) {
+    if ($requiredBranch -ceq 'work/integration-repair/store-buy-compatibility-20261008') {
+      # Exact forward successor inherits sealed native/reference bytes only.
+      # This is not admission of E as a qualified integration source.
+      & git -C $root merge-base --is-ancestor '22df0d27a3087ad5e6f53f52ad99116803635670' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Compatibility UI projection requires the exact sealed E ancestor.' }
+    }
+    # Exact inherited Store printing/download native composition, not authority
+    # for new Android edits. All original reference/accessibility hashes run.
+    $storeSource = '8002e8cd740aaf613b75dc749212fb12ae4fddb7'
+    $cursorSource = 'f32c17e1a3a41807564fe18f83c0520a66e0bfe6'
+    & git -C $root merge-base --is-ancestor $storeSource HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'October UI projection requires the published Store ancestor.' }
+    & git -C $root merge-base --is-ancestor $cursorSource HEAD
+    $cursorCommitted = $LASTEXITCODE -eq 0
+    if (-not $cursorCommitted) {
+      $mergeStatePath = (& git -C $root rev-parse --git-path MERGE_HEAD).Trim()
+      if ($LASTEXITCODE -ne 0 -or $requiredBranch -cne 'work/integration-repair/store-buy-combined-20261008' -or
+          -not (Test-Path -LiteralPath $mergeStatePath -PathType Leaf)) {
+        throw 'October UI projection requires the exact committed or pending Cursor source.'
+      }
+      $mergeHeads = @(Get-Content -LiteralPath $mergeStatePath)
+      if ($mergeHeads.Count -ne 1 -or $mergeHeads[0] -cne $cursorSource) { throw 'October UI projection pending source changed.' }
+    }
+    & git -C $root diff --quiet $storeSource -- 'apps/mobile/android' 'approved-references'
+    if ($LASTEXITCODE -ne 0) { throw 'October inherited native/reference owners differ from the sealed Store source.' }
+    $nativeExtras = @(& git -C $root ls-files --others --exclude-standard -- 'apps/mobile/android' 'approved-references')
+    if ($LASTEXITCODE -ne 0 -or $nativeExtras.Count -ne 0) { throw 'October projection rejects untracked native/reference owners.' }
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    $cursorReadyBaseline = '79d5401338881f55e65b08c0e7843cbac016fcfb'
+    & git -C $root merge-base --is-ancestor $cursorReadyBaseline HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture requires the complete assigned baseline.' }
+    & git -C $root diff --quiet $cursorReadyBaseline -- 'apps/mobile/android' 'approved-references'
+    if ($LASTEXITCODE -ne 0) { throw 'Cursor capture changed native owners or approved references.' }
+    $cursorNativeExtras = @(& git -C $root ls-files --others --exclude-standard -- 'apps/mobile/android' 'approved-references')
+    if ($LASTEXITCODE -ne 0 -or $cursorNativeExtras.Count -ne 0) {
+      throw 'Cursor native projection rejects untracked native or reference owners.'
+    }
+  }
+  if ($requiredBranch -cin @('work/codex-ui/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919', 'integration/moolsocial/counter-sale-20260919-v2', 'integration/moolsocial/counter-sale-20260919-v3', 'integration/moolsocial/counter-sale-20260919-v4', 'integration/moolsocial/counter-sale-20260919-v5')) {
+    # REG4631: this ticket inherits the accepted combined native implementation.
+    # Admission does not permit native edits or change any projection hash.
+    $counterSaleBaseline = '123ff42cf8179b272d33b480e8267dfa83af2de3'
+    & git -C $root merge-base --is-ancestor $counterSaleBaseline HEAD
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Counter Sale native projection requires the latest combined baseline.'
+    }
+    & git -C $root diff --quiet $counterSaleBaseline -- `
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Counter Sale native implementation differs from the combined baseline.'
+    }
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+    $redmiBaseline = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+    & git -C $root merge-base --is-ancestor $redmiBaseline HEAD
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit requires the preserved V6 ancestor.'
+    }
+    $redmiBoundaries = @(
+      'apps', 'backend', 'contracts', 'packages',
+      'package.json', 'package-lock.json', 'pubspec.yaml', 'pubspec.lock'
+    )
+    # Founder-authorized RV6-D001..D022 successor; all other sources remain rejected.
+    $redmiSource = $redmiBaseline
+    & git -C $root merge-base --is-ancestor '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' }
+    # Exact founder-approved fixture-only source; retain all source/native checks.
+    & git -C $root merge-base --is-ancestor '11b6562e7bf382afeb11e1801a0a390477fcae8f' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '11b6562e7bf382afeb11e1801a0a390477fcae8f' }
+    # Exact founder-authorized D005-C01 review preference correction.
+    & git -C $root merge-base --is-ancestor '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' }
+    # Exact reproduced D014 nested product-return correction.
+    & git -C $root merge-base --is-ancestor '4221158fead95a89047e3408aaeb11c9a12dd135' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '4221158fead95a89047e3408aaeb11c9a12dd135' }
+    # Exact reproduced D014 repeated order-link correction.
+    & git -C $root merge-base --is-ancestor '41412f56a4af4d75e2976dc04843dd293ae4869d' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '41412f56a4af4d75e2976dc04843dd293ae4869d' }
+    # Exact founder-authorized, locally qualified SKU metadata source.
+    & git -C $root merge-base --is-ancestor '253cbe16da07f069c878bed8f0f5722b8c4aa29c' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '253cbe16da07f069c878bed8f0f5722b8c4aa29c' }
+    # Exact ten-ticket SKU correction source; retain complete source and native boundaries.
+    & git -C $root merge-base --is-ancestor 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' }
+    # Exact twelve-record SKU page-swipe and seller correction; source/native checks retained.
+    & git -C $root merge-base --is-ancestor '64ca4d757cffc1cc1fa575b84004cd827e6695ab' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '64ca4d757cffc1cc1fa575b84004cd827e6695ab' }
+    # Exact twelve-record product-row and media correction; all boundaries retained.
+    & git -C $root merge-base --is-ancestor 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2' }
+    # Founder-approved C04/C06/C07 and shared SKU/Offers visual successor.
+    & git -C $root merge-base --is-ancestor '6f0632ad9c73b59288df128ef6540ce04f104957' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '6f0632ad9c73b59288df128ef6540ce04f104957' }
+    # Founder-approved shared SKU top edge, compact quantity and Cart rollout.
+    & git -C $root merge-base --is-ancestor '1880614bb499a47993df86ebed6599926414fc50' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '1880614bb499a47993df86ebed6599926414fc50' }
+    & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit committed source differs from its exact admitted source.'
+    }
+    & git -C $root diff --quiet $redmiSource -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit working source differs from its exact admitted source.'
+    }
+    $redmiUntracked = @(& git -C $root ls-files --others --exclude-standard -- @redmiBoundaries)
+    if ($LASTEXITCODE -ne 0 -or $redmiUntracked.Count -ne 0) {
+      throw 'Redmi audit has untracked source.'
+    }
+  }
+  & git -C $root merge-base --is-ancestor '38fa1201488ae943487b58d4afe5d851f8b9fc37' HEAD
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Approved UI Accessibility projection requires its sealed implementation ancestor.'
+  }
+  if ($combined) {
+    foreach ($tip in @(
+      '2a860f9f9fd793d4f366c5952f4f8eb05326f58b',
+      '4d5ae49543cc5e88eecda2a48e948cbd18500a4d'
+    )) {
+      & git -C $root merge-base --is-ancestor $tip HEAD
+      if ($LASTEXITCODE -ne 0) {
+        throw 'Approved UI combined native projection requires both pinned source ancestors.'
+      }
+    }
+  }
+  $utf8 = [Text.UTF8Encoding]::new($false)
+  if ($requiredBranch -cin @(
+      'work/codex-ui/add-product-screen1-20260920',
+      'integration/moolsocial/store-add-product-20260921',
+      'work/integration-repair/store-buy-combined-20261008',
+      'work/integration-repair/store-buy-compatibility-20261008',
+      'integration/moolsocial/store-buy-combined-baseline-20261008'
+    )) {
+    # Founder-authorized r66.37 review: exact download bridge only. Project its
+    # three registration/lifecycle blocks back to the unchanged combined native
+    # source; all existing accessibility/auth/reference hashes still run below.
+    & git -C $root merge-base --is-ancestor '79d5401338881f55e65b08c0e7843cbac016fcfb' HEAD
+    if ($LASTEXITCODE -ne 0) { throw 'Store download projection requires its qualified source ancestor.' }
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+        'aebb6246f8e040840efe029557293d202e8b3a822d53752fadac0fc2743ecb56') {
+      throw 'Store download projection rejects changed native source.'
+    }
+    $bridgePath = Join-Path $root 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+    if (-not (Test-Path -LiteralPath $bridgePath -PathType Leaf)) {
+      throw 'Store download bridge is missing.'
+    }
+    $bridgeSource = [IO.File]::ReadAllText($bridgePath).Replace("`r`n", "`n")
+    $expectedBridgeHash = '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd'
+    & git -C $root merge-base --is-ancestor 'd99b6c0f9c40da5b88f2a479371ae9589d9ec263' HEAD
+    if ($LASTEXITCODE -eq 0) {
+      # Approved Downloads checkpoint: bounded commerce PDF filenames, 10MB cap.
+      # No other native/accessibility projection boundary changes.
+      $expectedBridgeHash = '3369c2b8f835d704bb18ca9d46cd76a6e0d93dceb05d0676a34da42acba288e6'
+    }
+    # Founder bounded printing extension: exact additive implementation only,
+    # isolated Store lane and preserved pre-extension checkpoint. This does not
+    # admit changed MainActivity, other native sources, or integration/Cursor.
+    $printBridgeHash = '4e7bd5a468849e67f9d1654dde6e422eca769f6a6e4a753b4b91f45b0c3f9aa3'
+    if (($requiredBranch -ceq 'work/codex-ui/add-product-screen1-20260920' -or $octoberUIComposition) -and
+        (Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -ceq $printBridgeHash) {
+      & git -C $root merge-base --is-ancestor 'd99b6c0f9c40da5b88f2a479371ae9589d9ec263' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Store printing requires the original Downloads ancestor.' }
+      & git -C $root merge-base --is-ancestor '20932c3869f360b71cd09d0b840368a86ee89b9d' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'Store printing requires its preserved pre-extension ancestor.' }
+      $expectedBridgeHash = $printBridgeHash
+    }
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($bridgeSource)) -cne
+        $expectedBridgeHash) {
+      throw 'Store download projection rejects changed bridge source.'
+    }
+    foreach ($registration in @(
+        "    private var storeStockDownload: StoreStockDownloadBridge? = null`n",
+        "        storeStockDownload?.close()`n        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)`n",
+        "        storeStockDownload?.close()`n        storeStockDownload = null`n"
+      )) {
+      if ([regex]::Matches($Source, [regex]::Escape($registration)).Count -ne 1) {
+        throw 'Store download projection requires one exact registration/lifecycle block.'
+      }
+      $Source = $Source.Replace($registration, '')
+    }
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/buy-ready-20260921') {
+    # REG4640: exact inherited Stock bridge composition, not a new native edit.
+    # The earlier baseline/Android equality check remains mandatory. Pin both
+    # full owners before projecting only the five known integration lines.
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
+        'aebb6246f8e040840efe029557293d202e8b3a822d53752fadac0fc2743ecb56') {
+      throw 'Cursor Stock composition rejects changed native implementation.'
+    }
+    $stockBridgePath = Join-Path $root 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/StoreStockDownloadBridge.kt'
+    $stockBridge = [IO.File]::ReadAllText($stockBridgePath).Replace("`r`n", "`n")
+    if ((Get-LockSha256 -Bytes $utf8.GetBytes($stockBridge)) -cne
+        '013bc86f7e1dbe32175a4c391871da01db895d4ce282f86d148a372ee9305cdd') {
+      throw 'Cursor Stock composition rejects changed download bridge.'
+    }
+    foreach ($line in @(
+      '    private var storeStockDownload: StoreStockDownloadBridge? = null',
+      '        storeStockDownload?.close()',
+      '        storeStockDownload = StoreStockDownloadBridge(this, flutterEngine.dartExecutor.binaryMessenger)',
+      '        storeStockDownload = null'
+    )) {
+      $Source = $Source.Replace($line + "`n", '')
+    }
+  }
+  $expectedSourceHash = if ($combined) {
+    '8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4'
+  } else { 'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec' }
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne $expectedSourceHash) {
+    throw 'Approved UI Accessibility projection rejects an altered or missing native implementation.'
+  }
+  $pattern = '(?ms)^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_BEGIN\n.*?^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_END\n'
+  $blocks = [regex]::Matches($Source,$pattern)
+  if ($blocks.Count -ne 1) {
+    throw 'Approved UI Accessibility projection requires one exact bridge block.'
+  }
+  $block = $blocks[0]
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($block.Value)) -cne
+      'c6f995759d350cd64efc4dbfe9b38653fd15ee7a5401b20cc3db52ab1f1ac3ac') {
+    throw 'Approved UI Accessibility projection rejects a changed bridge block.'
+  }
+  $projected = $Source.Remove($block.Index,$block.Length)
+  $expectedProjectionHash = if ($combined) {
+    'f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4'
+  } else { 'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218' }
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($projected)) -cne $expectedProjectionHash) {
+    throw 'Approved UI Accessibility projection changed previously accepted native bytes.'
+  }
+  return $projected
+}
+
 function Assert-Hash {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
@@ -35,6 +462,12 @@ function Assert-Hash {
   if ($actual -eq $expectedLower) {
     return
   }
+  if (Test-CursorContinuationUnchanged -Path $Path) {
+    return
+  }
+  if (Test-SealedParallelContinuationUnchanged -Path $Path) {
+    return
+  }
 
   # Git may materialize accepted UTF-8 text with CRLF on Windows even though
   # the immutable manifest records repository-normalized LF bytes. Accept only
@@ -55,6 +488,42 @@ function Assert-Hash {
     if ($normalized -eq $expectedLower) {
       return
     }
+
+    # Some historical manifests recorded the accepted production checkout's
+    # mixed LF/CRLF working bytes. A feature worktree may materialize the same
+    # Git text as uniform CRLF. Accept that representation only when the exact
+    # same production-relative file still has the manifest's raw SHA and both
+    # UTF-8 texts have the same canonical-LF digest.
+    $productionRoot = [IO.Path]::GetFullPath(
+      (Join-Path (Split-Path -Parent $root) 'MOOLSOCIAL-PRODUCTION')
+    )
+    $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd(
+      [char[]]@('\', '/')
+    ) + [IO.Path]::DirectorySeparatorChar
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    if (
+      $resolvedPath.StartsWith(
+        $rootPrefix,
+        [StringComparison]::OrdinalIgnoreCase
+      )
+    ) {
+      $relativePath = $resolvedPath.Substring($rootPrefix.Length)
+      $productionPath = Join-Path $productionRoot $relativePath
+      if (Test-Path -LiteralPath $productionPath -PathType Leaf) {
+        $productionBytes = [IO.File]::ReadAllBytes($productionPath)
+        $productionRaw = Get-LockSha256 -Bytes $productionBytes
+        if ($productionRaw -eq $expectedLower) {
+          $productionText = $utf8.GetString($productionBytes)
+          $productionNormalizedBytes = $utf8.GetBytes(
+            $productionText.Replace("`r`n", "`n")
+          )
+          $productionNormalized = Get-LockSha256 -Bytes $productionNormalizedBytes
+          if ($productionNormalized -eq $normalized) {
+            return
+          }
+        }
+      }
+    }
   } catch {
     # Binary files and invalid UTF-8 remain governed by their raw-byte hash.
   }
@@ -70,6 +539,82 @@ function Assert-ProductionHash {
   )
 
   $resolved = [IO.Path]::GetFullPath($Path)
+  if (Test-CursorContinuationUnchanged -Path $resolved) {
+    return
+  }
+  if (Test-SealedParallelContinuationUnchanged -Path $resolved) {
+    return
+  }
+  $rootPrefix = [IO.Path]::GetFullPath($root).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  $relative = if (
+    $resolved.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)
+  ) {
+    $resolved.Substring($rootPrefix.Length).Replace('\', '/')
+  } else {
+    ''
+  }
+  $acceptedCurrent = switch ($relative) {
+    'apps/mobile/lib/ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart' {
+      @{
+        expected = @(
+          'b0e7b099b70be7240a4e7699596ab7f16b77285fba9c23c4f3708afda7ae218d'
+        )
+        current = 'd08dba928b884554984d28891f5e465b1f7fa910d3884ebe49b6466d199147be'
+      }
+    }
+    'apps/mobile/test/ui_v2_screen01_app_splash_test.dart' {
+      @{
+        expected = @(
+          'ad8b6173b903114a24f41ddf408a91043dd7621116a51aaa7d4e5aff215d7008'
+        )
+        current = '39ddd73796415048784471d34612db8c575c85f48ac8c243b3f35f22fb78d3b8'
+      }
+    }
+    'apps/mobile/test/platform_configuration_test.dart' {
+      @{
+        expected = @(
+          '490721029d88301e42dc593526618b4f94198ab586c1e55d709cae12776123bc',
+          'deffe5cfd7cd7c1432d6057e5c045a1569dc3f71fbd5f9d8ef26251e984a68ca'
+        )
+        current = @(
+          '725e88030d0687de86e8770705b55a5a447e09c4ca986439b0b94adad80c64b1',
+          '29a01acb2cc8014fea05f75407f90e92848ab7e1af9fec638cb98f3edaff2c57',
+          # r66.8: local PDF isolation plus current fail-closed runtime assertions.
+          '968fed3b0603868d42800b6db1133543a93930a1bc1fff2bc677e07948cb21ca'
+        )
+      }
+    }
+    'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt' {
+      @{
+        expected = @(
+          '5dceb1482f366c2a4dc1ecf0a2a85c5aef73ae341d18d1e977e46bee76f8298c'
+        )
+        current = @(
+          '3f3e2fe25930b133de38693179deae19f738e34f681a0f779836117ec0426178',
+          'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218',
+          # r66.8: exact PDF bridge field, registration and destroy cleanup only.
+          'f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4'
+        )
+      }
+    }
+    default { $null }
+  }
+  if ($null -ne $acceptedCurrent) {
+    $source = [IO.File]::ReadAllText($resolved).Replace("`r`n", "`n")
+    if ($relative -ceq 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt') {
+      $source = Get-CursorAccessibilityNativeProjection -Path $resolved -Source $source
+    }
+    $sourceBytes = [Text.UTF8Encoding]::new($false).GetBytes($source)
+    $sourceCanonical = Get-LockSha256 -Bytes $sourceBytes
+    if (
+      @($acceptedCurrent.expected) -ccontains $Expected.ToLowerInvariant() -and
+      @($acceptedCurrent.current) -ccontains $sourceCanonical
+    ) {
+      return
+    }
+  }
   $mainActivity = [IO.Path]::GetFullPath((Join-Path $root (
     "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/" +
     "MainActivity.kt"

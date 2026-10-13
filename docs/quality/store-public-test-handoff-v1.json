@@ -1,0 +1,1978 @@
+{
+  "schema": "store-public-test-handoff/v1",
+  "testOnly": true,
+  "publicationConfirmed": false,
+  "generatedFrom": "WorkspaceCatalogueItem.toBuyPublicProduct",
+  "money": {
+    "product": "whole INR rupees",
+    "comparisonTiers": "INR minor units"
+  },
+  "quantity": "One selling pack; structured base quantity uses thousandths",
+  "providerOwnedButNotPublic": [
+    "purchasePrice",
+    "lowStockThreshold",
+    "settlementBankAccount"
+  ],
+  "stores": [
+    {
+      "id": "fixture-store-a",
+      "name": "Same display name",
+      "providerDetails": {
+        "businessType": "retailer",
+        "street": "1 Test Lane",
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "pinCode": "302001",
+        "legalName": "Fixture Retailer",
+        "billingAddress": "",
+        "pan": "",
+        "cin": "",
+        "fssai": "",
+        "signatory": "",
+        "returnSummary": "Wrong or damaged item: request review with invoice.",
+        "returnWindowDays": null,
+        "returnConditions": "",
+        "returnRemedies": [],
+        "dispatchDays": 2,
+        "retailPaymentMethods": [
+          "Cash on Delivery",
+          "PhonePe"
+        ],
+        "wholesalePaymentMethods": [
+          "Bank transfer"
+        ],
+        "shoppingArea": {
+          "regionId": "fixture-region-jaipur",
+          "googlePlaceId": "fixture-place-not-a-real-google-place",
+          "label": "Jaipur",
+          "countryCode": "IN",
+          "postalCode": "302001"
+        }
+      },
+      "pickupRequested": true,
+      "publicationConfirmed": false
+    },
+    {
+      "id": "fixture-store-b",
+      "name": "Same display name",
+      "providerDetails": {
+        "businessType": "retailer",
+        "street": "1 Test Lane",
+        "city": "Jaipur",
+        "state": "Rajasthan",
+        "pinCode": "302001",
+        "legalName": "Fixture Retailer",
+        "billingAddress": "",
+        "pan": "",
+        "cin": "",
+        "fssai": "",
+        "signatory": "",
+        "returnSummary": "Wrong or damaged item: request review with invoice.",
+        "returnWindowDays": null,
+        "returnConditions": "",
+        "returnRemedies": [],
+        "dispatchDays": 2,
+        "retailPaymentMethods": [
+          "Cash on Delivery",
+          "PhonePe"
+        ],
+        "wholesalePaymentMethods": [
+          "Bank transfer"
+        ],
+        "shoppingArea": {
+          "regionId": "fixture-region-jaipur",
+          "googlePlaceId": "fixture-place-not-a-real-google-place",
+          "label": "Jaipur",
+          "countryCode": "IN",
+          "postalCode": "302001"
+        }
+      },
+      "pickupRequested": false,
+      "publicationConfirmed": false
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "retail-and-wholesale",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "different-pack",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-5",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 5 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "5 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-5",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-5",
+        "variant": "Refined",
+        "pack": "5 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 5000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 1250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 120000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-5",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "5 L pouch",
+          "price": 1320,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 5 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 1500,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "5 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-5",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 5 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-5.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-5",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-5",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "5 L pouch",
+          "price": 1250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 5 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 1500,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "5 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-5",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 5 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-5.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-5",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "same-name-other-store",
+      "publicContent": {
+        "storeId": "fixture-store-b",
+        "productId": "fixture-b-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-b",
+        "skuId": "fixture-b-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-b-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-b-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-b",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 260,
+          "unitPrice": "₹260.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-b",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-b-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-b-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-b",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-b",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-b-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "private-stock",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": false,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": false,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": false,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "out-of-stock",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 0,
+        "available": false,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": false,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "wholesale-only",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": false,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": false,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r1/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r1",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "photo-replaced",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r2/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r2",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": true,
+          "mediaAssets": [
+            {
+              "id": "fixture-oil-1",
+              "label": "Product photo",
+              "semanticLabel": "Fixture brand Sunflower oil, 1 L pouch",
+              "kind": "network",
+              "source": "https://example.invalid/fixture-r2/oil-1.png",
+              "posterSource": null,
+              "transcript": null,
+              "binding": {
+                "supplierWorkspaceId": "fixture-catalogue",
+                "storeId": "fixture-store-a",
+                "productId": "fixture-sunflower-oil",
+                "skuId": "fixture-a-oil-1",
+                "assetRevision": "fixture-r2",
+                "file": {
+                  "mimeType": "image/png",
+                  "byteLength": 8192,
+                  "width": 1024,
+                  "height": 1024,
+                  "normalized": true,
+                  "frameCount": 1,
+                  "duration": null,
+                  "frameRate": null,
+                  "videoCodec": null,
+                  "videoProfile": null,
+                  "audioCodec": null
+                },
+                "posterFile": null
+              }
+            }
+          ]
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    },
+    {
+      "caseId": "photo-missing",
+      "publicContent": {
+        "storeId": "fixture-store-a",
+        "productId": "fixture-a-oil-1",
+        "sourceId": "fixture-content-r1",
+        "state": "ready",
+        "description": "Fixture product description for exact pack 1 L pouch.",
+        "highlights": [
+          "Fixture highlight"
+        ],
+        "specifications": [
+          {
+            "label": "Pack",
+            "value": "1 L pouch"
+          },
+          {
+            "label": "Fixture variant",
+            "value": "Refined"
+          }
+        ]
+      },
+      "storeStock": {
+        "storeId": "fixture-store-a",
+        "skuId": "fixture-a-oil-1",
+        "canonicalId": "fixture-sunflower-oil",
+        "sku": "fixture-a-oil-1",
+        "variant": "Refined",
+        "pack": "1 L pouch",
+        "stock": 48,
+        "available": true,
+        "requestedPublicListing": true,
+        "retailEnabled": true,
+        "packMeasure": {
+          "unit": "litre",
+          "quantityMilli": 1000,
+          "unitsPerCase": 1,
+          "containedRetailUnitId": null
+        },
+        "wholesaleOffer": {
+          "priceRupees": 250,
+          "minimumPacks": 6,
+          "incrementPacks": 6,
+          "enabled": true,
+          "saleType": "wholesale",
+          "tiers": [
+            {
+              "minimumPacks": 12,
+              "packPriceMinor": 24000
+            }
+          ]
+        }
+      },
+      "projections": [
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "shop",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 264,
+          "unitPrice": "₹264.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 1,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": false,
+          "mediaAssets": []
+        },
+        {
+          "id": "fixture-a-oil-1",
+          "canonicalId": "fixture-sunflower-oil",
+          "storeId": "fixture-store-a",
+          "destination": "wholesale",
+          "categoryId": "grocery",
+          "brand": "Fixture brand",
+          "title": "Sunflower oil",
+          "variant": "Refined",
+          "pack": "1 L pouch",
+          "price": 250,
+          "unitPrice": "₹250.00/L",
+          "seller": "Same display name",
+          "sellerType": "Store",
+          "deliveryPromise": "Delivery subject to location confirmation",
+          "origin": "India",
+          "visualLabel": "Fixture sunflower oil, 1 L pouch",
+          "visualKind": "catalogue-packshot",
+          "mrp": 300,
+          "requiresPrescription": false,
+          "composition": null,
+          "regulatoryNote": null,
+          "minimumOrder": 6,
+          "returnPolicy": "Wrong or damaged item: request review with invoice.",
+          "purchaseProtection": {
+            "summary": "Wrong or damaged item: request review with invoice.",
+            "remedies": [],
+            "windowLabel": null,
+            "conditionsLabel": null,
+            "verificationLabel": null,
+            "initiationLabel": null,
+            "approvalLabel": null,
+            "pickupLabel": null,
+            "refundMethodLabel": null,
+            "refundTimelineLabel": null,
+            "warrantyLabel": null,
+            "nonReturnableReason": null,
+            "policyVersion": null,
+            "effectiveFromLabel": null
+          },
+          "compliance": {
+            "genericName": "Sunflower oil",
+            "netQuantity": "1 L",
+            "manufacturerName": "Fixture maker",
+            "packerName": "Fixture packer",
+            "importerName": null,
+            "countryOfOrigin": "India",
+            "manufacturedOrPackedOn": null,
+            "bestBeforeOrUseBy": null,
+            "fssaiLicenseNumber": null,
+            "consumerCare": "care@example.invalid"
+          },
+          "merchandisingLabel": "",
+          "procurementSupplierGrant": null,
+          "badge": "Store price",
+          "confirmedOn": "Updated by store",
+          "freightIncluded": false,
+          "manufacturerVerified": false,
+          "catalogueListing": false,
+          "mediaAssets": []
+        }
+      ],
+      "counterOrderable": true,
+      "publicOrderable": false
+    }
+  ],
+  "pendingRuntimeContracts": [
+    "Resolved region/location-source wiring and public Store publication readback",
+    "Authoritative per-customer payment terms and public policy/content delivery",
+    "Supplier grant, publication acknowledgement, discovery index and ranking",
+    "Fleet serviceability, fees, expiry/freshness and final checkout quote",
+    "Atomic stock reservation, payment confirmation, invoice, dispatch and tracking",
+    "Authoritative restore and cross-device synchronization"
+  ]
+}

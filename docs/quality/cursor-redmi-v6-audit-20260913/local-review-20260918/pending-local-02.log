@@ -1,0 +1,111 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: C04 shop whole grid follows finger reduced=false
+00:03 +1: C04 shop whole grid follows finger reduced=true
+00:05 +2: C04 wholesale whole grid follows finger reduced=false
+00:07 +3: C04 wholesale whole grid follows finger reduced=true
+00:08 +4: C06 one progress line with independent requests productsFirst=true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TypeWidgetFinder:<Found 2 widgets with type "LinearProgressIndicator": [
+            LinearProgressIndicator-[<'buy-catalogue-loading'>](<indeterminate>, dependencies:
+[Directionality], state: _LinearProgressIndicatorState#d2cc7(ticker active)),
+            LinearProgressIndicator(54.0%, dependencies: [Directionality, InheritedCupertinoTheme,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#d9227]], state:
+_LinearProgressIndicatorState#ab8e7(ticker inactive)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart:209:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart line 209
+The test description was:
+  C06 one progress line with independent requests productsFirst=true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +4 -1: C06 one progress line with independent requests productsFirst=true [E]
+  Test failed. See exception logs above.
+  The test description was: C06 one progress line with independent requests productsFirst=true
+  
+00:10 +4 -1: C06 one progress line with independent requests productsFirst=false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TypeWidgetFinder:<Found 2 widgets with type "LinearProgressIndicator": [
+            LinearProgressIndicator-[<'buy-catalogue-loading'>](<indeterminate>, dependencies:
+[Directionality], state: _LinearProgressIndicatorState#6cb30(ticker active)),
+            LinearProgressIndicator(54.0%, dependencies: [Directionality, InheritedCupertinoTheme,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#5018a]], state:
+_LinearProgressIndicatorState#1987b(ticker inactive)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart:209:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart line 209
+The test description was:
+  C06 one progress line with independent requests productsFirst=false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +4 -2: C06 one progress line with independent requests productsFirst=false [E]
+  Test failed. See exception logs above.
+  The test description was: C06 one progress line with independent requests productsFirst=false
+  
+00:11 +4 -2: C07 rotation cancels an old launcher drag, fresh tap still works
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'mool-navigator-family-buy'>]: [
+            AnimatedContainer-[<'mool-navigator-family-buy'>](duration: 180ms, bg:
+BoxDecoration(color: Color(alpha: 0.1000, red: 0.4824, green: 0.2471, blue: 0.7098, colorSpace:
+ColorSpace.sRGB), borderRadius: BorderRadius.circular(12.0)), clipBehavior: Clip.none, state:
+_AnimatedContainerState#396e0(ticker inactive, bg: DecorationTween(BoxDecoration(color: Color(alpha:
+0.1000, red: 0.4824, green: 0.2471, blue: 0.7098, colorSpace: ColorSpace.sRGB), borderRadius:
+BorderRadius.circular(12.0)) → BoxDecoration(color: Color(alpha: 0.1000, red: 0.4824, green: 0.2471,
+blue: 0.7098, colorSpace: ColorSpace.sRGB), borderRadius: BorderRadius.circular(12.0))))),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart:258:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart line 258
+The test description was:
+  C07 rotation cancels an old launcher drag, fresh tap still works
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +4 -3: C07 rotation cancels an old launcher drag, fresh tap still works [E]
+  Test failed. See exception logs above.
+  The test description was: C07 rotation cancels an old launcher drag, fresh tap still works
+  
+00:11 +4 -3: (tearDownAll)
+00:11 +4 -3: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C06 one progress line with independent requests productsFirst=false
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C06 one progress line with independent requests productsFirst=true
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C07 rotation cancels an old launcher drag, fresh tap still works

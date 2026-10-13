@@ -1,0 +1,22 @@
+{
+  "candidateId": "UAW-CODEX-OPPO-R66.14-REVIEW-20260911",
+  "state": "installed_checksum_verified_device_review_pending",
+  "device": "OPPO CPH2375",
+  "serial": "2b3e0f71",
+  "packageId": "com.moolsocial.app.runtime",
+  "dataClearAuthorized": false,
+  "apkSha256": "CF9457EB29F01FE7CCB78A036BC6F49657FC39EC99B498CD637816AC32679BD1",
+  "installedApkSha256": "CF9457EB29F01FE7CCB78A036BC6F49657FC39EC99B498CD637816AC32679BD1",
+  "bytes": 210157569,
+  "versionName": "1.0.0-r66.14-runtime",
+  "versionCode": 2026091101,
+  "sourceHead": "73c0a2840da4e038fc90a650b069467060eb27de",
+  "installCommand": "adb -s 2b3e0f71 install -r <checksum-verified-r66.14-apk>",
+  "installExitCode": 0,
+  "installLog": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6614-install-attempt1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "installedPath": "/data/app/~~2nW4B9hOmsPOavKd9wW7hg==/com.moolsocial.app.runtime-_0UKDFqZ05GvzMsEW4pl7Q==/base.apk",
+  "installedReadback": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6614-installed-base.apk",
+  "redmiTouched": false,
+  "backendQualified": false
+}

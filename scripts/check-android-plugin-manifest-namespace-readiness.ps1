@@ -113,6 +113,7 @@ $reviewedObsoletePackagePlugins = @(
   'jni',
   'jni_flutter',
   'permission_handler_android',
+  'share_plus',
   'shared_preferences_android',
   'url_launcher_android',
   'video_player_android'
@@ -122,9 +123,9 @@ $expectedObsoletePackagePlugins = @(
   $reviewedObsoletePackagePlugins | Sort-Object
 )
 $baselineMatches = (
-  $androidPlugins.Count -eq 19 -and
+  $androidPlugins.Count -eq 20 -and
   ($resolvedAndroidPlugins.Count - $androidPlugins.Count) -eq 1 -and
-  $manifestCount -eq 17 -and
+  $manifestCount -eq 18 -and
   $actualObsoletePackagePlugins.Count -eq
     $expectedObsoletePackagePlugins.Count -and
   ($actualObsoletePackagePlugins -join '|') -ceq

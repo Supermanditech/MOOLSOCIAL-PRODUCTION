@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   ACCEPTED_PUBLIC_REVIEW_MODE,
+  ACCEPTED_SOCIAL_RUNTIME_MODE,
   PRIVATE_DEV_YOUTUBE_MAX_PROOF_MILLISECONDS,
   PRIVATE_DEV_YOUTUBE_PROJECT_ID,
   connectCapabilityForPurpose,
@@ -11,6 +12,7 @@ import {
   readCapabilities,
   requireCapability,
   requireConnectPurposeCapability,
+  requireOwnerConnectionStatusCapability,
   requireOAuthAttemptCapability,
 } from "./config.js";
 import { YouTubeProviderError } from "./errors.js";
@@ -38,6 +40,7 @@ function proofEnvironment(
   profile:
     | "publicData"
     | "ownerConnect"
+    | "socialAuthRuntime"
     | "ownerActions"
     | "creatorAssets"
     | "live"
@@ -48,6 +51,7 @@ function proofEnvironment(
   const flag = {
     publicData: "YOUTUBE_PUBLIC_DATA_ENABLED",
     ownerConnect: "YOUTUBE_OWNER_CONNECT_ENABLED",
+    socialAuthRuntime: "YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED",
     ownerActions: "YOUTUBE_OWNER_ACTIONS_ENABLED",
     creatorAssets: "YOUTUBE_CREATOR_ASSETS_ENABLED",
     live: "YOUTUBE_LIVE_ENABLED",
@@ -60,6 +64,18 @@ function proofEnvironment(
     YOUTUBE_PROOF_PROFILE: profile,
     YOUTUBE_PROOF_EXPIRES_AT: `utc:${expiry}`,
     [flag]: "true",
+  };
+}
+
+function acceptedSocialRuntimeEnvironment(
+  overrides: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  return {
+    MOOLSOCIAL_PROVIDER_ENV: "dev",
+    GCLOUD_PROJECT: PRIVATE_DEV_YOUTUBE_PROJECT_ID,
+    YOUTUBE_SOCIAL_RUNTIME_MODE: ACCEPTED_SOCIAL_RUNTIME_MODE,
+    YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED: "true",
+    ...overrides,
   };
 }
 
@@ -77,6 +93,34 @@ test("provider capabilities default to disabled", () => {
     reportingV1: false,
     publicOrUnlistedUpload: false,
   });
+});
+
+test("owner connection status requires one active owner capability", () => {
+  for (const profile of [
+    "ownerConnect",
+    "ownerActions",
+    "creatorAssets",
+    "live",
+    "privateUpload",
+    "ownerAnalytics",
+  ] as const) {
+    assert.doesNotThrow(() =>
+      requireOwnerConnectionStatusCapability(
+        readCapabilities(proofEnvironment(profile), now),
+      ),
+    );
+  }
+  for (const capabilities of [
+    readCapabilities({}, now),
+    readCapabilities(proofEnvironment("publicData"), now),
+  ]) {
+    assert.throws(
+      () => requireOwnerConnectionStatusCapability(capabilities),
+      (error: unknown) =>
+        error instanceof YouTubeProviderError &&
+        error.code === "capability_disabled",
+    );
+  }
 });
 
 test("individual flags cannot activate without the explicit Dev profile", () => {
@@ -133,6 +177,94 @@ test("one supervised profile activates only inside its server proof window", () 
       profile === "ownerAnalytics",
     );
     assert.equal(result.publicOrUnlistedUpload, false);
+  }
+});
+
+test("social auth runtime exposes only public data and channel connection", () => {
+  const result = readCapabilities(
+    proofEnvironment("socialAuthRuntime"),
+    now,
+  );
+  assert.deepEqual(result, {
+    environment: "dev",
+    publicData: true,
+    ownerConnect: true,
+    ownerActions: false,
+    creatorAssets: false,
+    live: false,
+    privateUpload: false,
+    ownerAnalytics: false,
+    analyticsV2: false,
+    reportingV1: false,
+    publicOrUnlistedUpload: false,
+  });
+  assert.deepEqual(
+    readCapabilities(
+      {
+        ...proofEnvironment("socialAuthRuntime"),
+        YOUTUBE_OWNER_CONNECT_ENABLED: "true",
+      },
+      now,
+    ),
+    {
+      environment: "dev",
+      publicData: false,
+      ownerConnect: false,
+      ownerActions: false,
+      creatorAssets: false,
+      live: false,
+      privateUpload: false,
+      ownerAnalytics: false,
+      analyticsV2: false,
+      reportingV1: false,
+      publicOrUnlistedUpload: false,
+    },
+  );
+});
+
+test("accepted social runtime stays live without a temporary proof expiry", () => {
+  const expected = {
+    environment: "dev",
+    publicData: true,
+    ownerConnect: true,
+    ownerActions: false,
+    creatorAssets: false,
+    live: false,
+    privateUpload: false,
+    ownerAnalytics: false,
+    analyticsV2: false,
+    reportingV1: false,
+    publicOrUnlistedUpload: false,
+  };
+  assert.deepEqual(
+    readCapabilities(acceptedSocialRuntimeEnvironment(), now),
+    expected,
+  );
+  assert.deepEqual(
+    readCapabilities(
+      acceptedSocialRuntimeEnvironment(),
+      new Date("2027-07-25T00:00:00Z"),
+    ),
+    expected,
+  );
+});
+
+test("accepted social runtime rejects every ambiguous or wrong boundary", () => {
+  for (const overrides of [
+    { GCLOUD_PROJECT: "moolsocial-staging-503018" },
+    { YOUTUBE_SOCIAL_RUNTIME_MODE: "pending" },
+    { YOUTUBE_PROOF_PROFILE: "socialAuthRuntime" },
+    { YOUTUBE_PROOF_EXPIRES_AT: "utc:2026-07-25T00:30:00Z" },
+    { YOUTUBE_PUBLIC_DATA_REVIEW_MODE: ACCEPTED_PUBLIC_REVIEW_MODE },
+    { YOUTUBE_PUBLIC_DATA_ENABLED: "true" },
+    { YOUTUBE_OWNER_ACTIONS_ENABLED: "true" },
+  ]) {
+    const result = readCapabilities(
+      acceptedSocialRuntimeEnvironment(overrides),
+      now,
+    );
+    assert.equal(result.publicData, false);
+    assert.equal(result.ownerConnect, false);
   }
 });
 

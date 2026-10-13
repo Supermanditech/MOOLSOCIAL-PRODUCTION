@@ -49,6 +49,7 @@ test("explicit user search and shared refresh keep distinct quota purpose", asyn
     query: "India news #Shorts",
     regionCode: "IN",
     maxResults: sharedShortsCatalogueContract.pageSize,
+    pageToken: "page-2",
   });
 
   assert.deepEqual(
@@ -81,4 +82,10 @@ test("explicit user search and shared refresh keep distinct quota purpose", asyn
     ),
     "25",
   );
+  const sharedUrl = new URL(
+    transport.requests[1]?.url ?? "https://invalid.example",
+  );
+  assert.equal(sharedUrl.searchParams.get("q"), "India news #Shorts");
+  assert.equal(sharedUrl.searchParams.get("regionCode"), "IN");
+  assert.equal(sharedUrl.searchParams.get("pageToken"), "page-2");
 });

@@ -18,6 +18,7 @@ class PersonalMoolRootV2 extends StatefulWidget {
     required this.onBack,
     required this.onOpenAction,
     required this.onOpenChat,
+    this.onSignOut,
     this.onOpenRoute,
     this.areaLabel,
     super.key,
@@ -26,6 +27,7 @@ class PersonalMoolRootV2 extends StatefulWidget {
   final VoidCallback onBack;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback onOpenChat;
+  final Future<void> Function()? onSignOut;
   final ValueChanged<String>? onOpenRoute;
   final String? areaLabel;
 
@@ -101,7 +103,10 @@ class _PersonalMoolRootV2State extends State<PersonalMoolRootV2>
                     ),
                     child: Column(
                       children: [
-                        _MoolRootHeader(onOpenChat: widget.onOpenChat),
+                        _MoolRootHeader(
+                          onOpenChat: widget.onOpenChat,
+                          onSignOut: widget.onSignOut,
+                        ),
                         Expanded(
                           child: _MoolHomeDashboard(
                             arrival: _arrival,
@@ -128,9 +133,10 @@ class _PersonalMoolRootV2State extends State<PersonalMoolRootV2>
 }
 
 class _MoolRootHeader extends StatelessWidget {
-  const _MoolRootHeader({required this.onOpenChat});
+  const _MoolRootHeader({required this.onOpenChat, this.onSignOut});
 
   final VoidCallback onOpenChat;
+  final Future<void> Function()? onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -145,35 +151,94 @@ class _MoolRootHeader extends StatelessWidget {
         ),
         child: Align(
           alignment: Alignment.centerRight,
-          child: Semantics(
-            button: true,
-            label: 'Open Chat',
-            onTap: onOpenChat,
-            excludeSemantics: true,
-            child: SizedBox(
-              width: MoolMetrics.minimumTapTarget,
-              height: MoolMetrics.minimumTapTarget,
-              child: Material(
-                color: Colors.white,
-                shape: const CircleBorder(),
-                elevation: 1,
-                shadowColor: const Color(0x18000000),
-                child: InkWell(
-                  key: const Key('mool-home-chat'),
-                  customBorder: const CircleBorder(),
-                  onTap: onOpenChat,
-                  child: const Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    color: MoolColors.navy,
-                    size: 20,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onSignOut != null) ...[
+                Semantics(
+                  button: true,
+                  label: 'Sign out of MoolSocial',
+                  onTap: () => _requestSignOut(context),
+                  excludeSemantics: true,
+                  child: SizedBox(
+                    width: MoolMetrics.minimumTapTarget,
+                    height: MoolMetrics.minimumTapTarget,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 1,
+                      shadowColor: const Color(0x18000000),
+                      child: InkWell(
+                        key: const Key('mool-home-sign-out'),
+                        customBorder: const CircleBorder(),
+                        onTap: () => _requestSignOut(context),
+                        child: const Icon(
+                          Icons.logout_rounded,
+                          color: MoolColors.navy,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: MoolSpacing.xs),
+              ],
+              Semantics(
+                button: true,
+                label: 'Open Chat',
+                onTap: onOpenChat,
+                excludeSemantics: true,
+                child: SizedBox(
+                  width: MoolMetrics.minimumTapTarget,
+                  height: MoolMetrics.minimumTapTarget,
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    elevation: 1,
+                    shadowColor: const Color(0x18000000),
+                    child: InkWell(
+                      key: const Key('mool-home-chat'),
+                      customBorder: const CircleBorder(),
+                      onTap: onOpenChat,
+                      child: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: MoolColors.navy,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _requestSignOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out of MoolSocial?'),
+        content: const Text(
+          'You can sign in again with any supported method. '
+          'Your language and serviceable area stay saved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Stay signed in'),
+          ),
+          FilledButton(
+            key: const Key('mool-confirm-sign-out'),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await onSignOut?.call();
   }
 }
 
@@ -185,6 +250,15 @@ class _MoolHomeDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = FadeTransition(
+      opacity: CurvedAnimation(parent: arrival, curve: MoolMotion.enter),
+      child: MoolMainDomainMenu(
+        keyPrefix: 'mool-home',
+        onOpenFamily: (family) => onOpenRoute?.call(family.route),
+      ),
+    );
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return Padding(
       key: const Key('mool-home-dashboard'),
       padding: const EdgeInsets.fromLTRB(
@@ -195,13 +269,13 @@ class _MoolHomeDashboard extends StatelessWidget {
       ),
       child: Align(
         alignment: Alignment.topCenter,
-        child: FadeTransition(
-          opacity: CurvedAnimation(parent: arrival, curve: MoolMotion.enter),
-          child: MoolMainDomainMenu(
-            keyPrefix: 'mool-home',
-            onOpenFamily: (family) => onOpenRoute?.call(family.route),
-          ),
-        ),
+        child: landscape
+            ? SingleChildScrollView(
+                key: const Key('mool-home-dashboard-scroll'),
+                primary: false,
+                child: content,
+              )
+            : content,
       ),
     );
   }

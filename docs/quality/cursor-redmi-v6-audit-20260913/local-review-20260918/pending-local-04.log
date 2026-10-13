@@ -1,0 +1,16 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: C04 shop whole grid follows finger reduced=false
+00:04 +1: C04 shop whole grid follows finger reduced=true
+00:06 +2: C04 wholesale whole grid follows finger reduced=false
+00:08 +3: C04 wholesale whole grid follows finger reduced=true
+00:10 +4: C04 store shared grid follows finger and changes page
+00:11 +5: C04 supplier shared grid follows finger and changes page
+00:13 +6: C04 offers shared grid follows finger and changes page
+00:15 +7: C06 one progress line with independent requests productsFirst=true
+00:16 +8: C06 one progress line with independent requests productsFirst=false
+00:17 +9: C07 actual Buy route retains search and stays closed across rotation
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:21 +10: C07 rotation cancels an old launcher drag, fresh tap still works
+00:22 +11: (tearDownAll)
+00:22 +11: All tests passed!

@@ -1,6 +1,14 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/journey01/review_journey_services.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 
 void main() {
   test('returning authenticated session restores directly to ready', () async {
@@ -23,6 +31,132 @@ void main() {
     expect(session.areaChoice, AreaChoice.manual);
     expect(session.manualArea, 'Jodhpur');
   });
+
+  testWidgets(
+    'rapid reauthentication waits for prior draft cleanup',
+    _proveRapidReauthenticationWaitsForDraftCleanup,
+  );
+
+  test(
+    'sign-out clears every auth gateway and a restart stays signed out',
+    () async {
+      final store = MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'hi',
+          areaMode: 'manual',
+          areaLabel: 'Jodhpur',
+          setupComplete: true,
+        ),
+      );
+      final otp = ReviewOtpGateway(signedIn: true);
+      final social = ReviewSocialAuthGateway(signedIn: true);
+      final emailLink = ReviewEmailLinkGateway()..signedIn = true;
+      final session = JourneySession(
+        store: store,
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+      expect(session.stage, JourneyStage.ready);
+
+      expect(await session.signOut(), isTrue);
+
+      expect(otp.signOutCount, 1);
+      expect(social.signOutCount, 1);
+      expect(emailLink.signOutCount, 1);
+      expect(otp.signedIn, isFalse);
+      expect(social.signedIn, isFalse);
+      expect(emailLink.signedIn, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.noticeMessage, contains('signed out'));
+      expect(session.languageCode, 'hi');
+      expect(session.manualArea, 'Jodhpur');
+
+      final restarted = JourneySession(
+        store: store,
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+      );
+      addTearDown(restarted.dispose);
+      await restarted.start();
+
+      expect(restarted.stage, JourneyStage.signIn);
+      expect(restarted.isReady, isFalse);
+      expect(restarted.languageCode, 'hi');
+      expect(restarted.manualArea, 'Jodhpur');
+    },
+  );
+
+  test(
+    'explicit sign-out opens account choice even when guest browsing is allowed',
+    () async {
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        allowGuestReady: true,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(session.isAuthenticated, isTrue);
+      expect(session.stage, JourneyStage.ready);
+
+      expect(await session.signOut(), isTrue);
+
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.noticeMessage, contains('signed out'));
+    },
+  );
+
+  test(
+    'sign-out attempts every cleanup and removes local auth after invalidation',
+    () async {
+      final pendingAddress = MemoryPendingEmailLinkAddressStore();
+      await pendingAddress.write('member@example.com');
+      final otp = ReviewOtpGateway(signedIn: true);
+      final social = ReviewSocialAuthGateway(
+        signedIn: true,
+        signOutFailure: StateError('private provider cleanup failure'),
+      );
+      final emailLink = ReviewEmailLinkGateway()..signedIn = true;
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: otp,
+        socialAuthGateway: social,
+        emailLinkGateway: emailLink,
+        pendingEmailLinkAddressStore: pendingAddress,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      expect(await session.signOut(), isFalse);
+
+      expect(otp.signOutCount, 1);
+      expect(social.signOutCount, 1);
+      expect(emailLink.signOutCount, 1);
+      expect(await pendingAddress.read(), isNull);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.errorMessage, contains('signed out on this device'));
+      expect(session.busy, isFalse);
+    },
+  );
 
   test('boot failure changes nothing and exact retry restores state', () async {
     final store = MemoryJourneyStore(readFailure: StateError('disk'));
@@ -59,6 +193,1183 @@ void main() {
     expect(session.busy, isFalse);
     expect(session.errorMessage, contains('Nothing was changed'));
   });
+
+  test('timeout principal change is invalid, never retryable', () async {
+    final protector = const ReviewPrincipalBindingProtector();
+    final before = await protector.protect('private-user-a');
+    final after = await protector.protect('private-user-b');
+    final bootstrap = _TimeoutPrincipalBootstrap([before, after]);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: before);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+      accountBootstrapTimeout: const Duration(milliseconds: 1),
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(
+      session.authenticatedBootstrapState,
+      AuthenticatedAccountBootstrapState.invalidSession,
+    );
+    expect(bootstrap.invalidationCount, 1);
+    expect(receiptStore.binding, isNull);
+  });
+
+  test(
+    'timeout is retryable only across exact pre-post-receipt match',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _TimeoutPrincipalBootstrap([binding, binding]);
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+        accountBootstrapTimeout: const Duration(milliseconds: 1),
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.ready);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.authenticatedRevalidationPending, isTrue);
+      expect(
+        session.authenticatedBootstrapState,
+        AuthenticatedAccountBootstrapState.retryableUnavailable,
+      );
+      expect(bootstrap.invalidationCount, 0);
+      expect(receiptStore.binding!.matches(binding), isTrue);
+    },
+  );
+
+  test('timeout with mismatched stored receipt invalidates session', () async {
+    final protector = const ReviewPrincipalBindingProtector();
+    final current = await protector.protect('private-user-a');
+    final stored = await protector.protect('private-user-b');
+    final bootstrap = _TimeoutPrincipalBootstrap([current, current]);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: stored);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+      accountBootstrapTimeout: const Duration(milliseconds: 1),
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(
+      session.authenticatedBootstrapState,
+      AuthenticatedAccountBootstrapState.invalidSession,
+    );
+    expect(bootstrap.invalidationCount, 1);
+    expect(receiptStore.binding, isNull);
+  });
+
+  test(
+    'legacy online relaunch writes its first verified principal receipt',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore();
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.ready);
+      expect(
+        session.authenticatedBootstrapState,
+        AuthenticatedAccountBootstrapState.verified,
+      );
+      expect(receiptStore.binding!.matches(binding), isTrue);
+      expect(receiptStore.writeCount, 1);
+    },
+  );
+
+  test(
+    'retryable relaunch restores only a matching verified receipt',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      );
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.retryableUnavailable(
+          binding,
+        ),
+        currentBinding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.ready);
+      expect(session.isAuthenticated, isTrue);
+      expect(session.authenticatedRevalidationPending, isTrue);
+      expect(session.noticeMessage, contains('offline'));
+      expect(
+        session.authenticatedBootstrapState,
+        AuthenticatedAccountBootstrapState.retryableUnavailable,
+      );
+      expect(receiptStore.binding!.matches(binding), isTrue);
+      expect(bootstrap.invalidationCount, 0);
+    },
+  );
+
+  test(
+    'retryable relaunch without prior receipt remains fail-closed',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: ReviewAccountBootstrapGateway(
+          result: AuthenticatedAccountBootstrapResult.retryableUnavailable(
+            binding,
+          ),
+          currentBinding: binding,
+        ),
+        verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(),
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.authenticatedRevalidationPending, isFalse);
+    },
+  );
+
+  test('offline revalidation is single-flight and clears on success', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedRevalidationPending, isTrue);
+
+    final first = session.retryAuthenticatedAccountRevalidation();
+    final second = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    expect(bootstrap.prepareCount, 2);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+
+    expect(await first, isTrue);
+    expect(await second, isTrue);
+    expect(bootstrap.prepareCount, 2);
+    expect(session.stage, JourneyStage.ready);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(session.noticeMessage, isNull);
+  });
+
+  test(
+    'fatal reconnect revalidation invalidates the degraded session',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _ControlledRevalidationBootstrap(binding);
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+          binding: binding,
+        ),
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      final retry = session.retryAuthenticatedAccountRevalidation();
+      bootstrap.complete(
+        const AuthenticatedAccountBootstrapResult.fatal(
+          code: 'auth-session-verification-fatal',
+        ),
+      );
+
+      expect(await retry, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.authenticatedRevalidationPending, isFalse);
+      expect(bootstrap.invalidationCount, 1);
+    },
+  );
+
+  test('late verified reconnect cannot cross explicit sign-out', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    final staleRetry = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    expect(bootstrap.prepareCount, 2);
+    expect(await session.signOut(), isTrue);
+    expect(receiptStore.binding, isNull);
+
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+
+    expect(await staleRetry, isFalse);
+    expect(receiptStore.binding, isNull);
+    expect(session.accountIdentity, isNull);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.authenticatedRevalidationPending, isFalse);
+  });
+
+  test('invalid reconnect leaves degraded session signed out', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    var boundaryNotifications = 0;
+    void onBoundary() => boundaryNotifications += 1;
+    session.addListener(onBoundary);
+    addTearDown(() => session.removeListener(onBoundary));
+
+    final retry = session.retryAuthenticatedAccountRevalidation();
+    bootstrap.complete(
+      const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-user-disabled',
+      ),
+    );
+
+    expect(await retry, isFalse);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(receiptStore.binding, isNull);
+    expect(bootstrap.invalidationCount, 1);
+    expect(boundaryNotifications, 1);
+  });
+
+  test(
+    'invalid reconnect cleanup failure still removes authenticated state',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final bootstrap = _ControlledRevalidationBootstrap(
+        binding,
+        invalidationFailure: StateError('private invalidation failure'),
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+      await session.start();
+
+      final retry = session.retryAuthenticatedAccountRevalidation();
+      bootstrap.complete(
+        const AuthenticatedAccountBootstrapResult.invalidSession(),
+      );
+
+      expect(await retry, isFalse);
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(session.authenticatedRevalidationPending, isFalse);
+      expect(receiptStore.binding, isNull);
+      expect(session.errorMessage, contains('could not be cleared safely'));
+    },
+  );
+
+  testWidgets('invalid reconnect notifies real app boundary once', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final shared = SharedSession()..setAuthorized(true);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    addTearDown(shared.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        sharedSession: shared,
+        legacyPresentationForTestsOnly: true,
+      ),
+    );
+    await tester.pump();
+
+    final retry = session.retryAuthenticatedAccountRevalidation();
+    bootstrap.complete(
+      const AuthenticatedAccountBootstrapResult.invalidSession(),
+    );
+    expect(await retry, isFalse);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 3100));
+    await tester.pump();
+
+    expect(shared.authorized, isFalse);
+    expect(find.byKey(const Key('screen03-login-v2')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app resume starts exactly one pending revalidation', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, legacyPresentationForTestsOnly: true),
+    );
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(bootstrap.prepareCount, 2);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+    await tester.pump();
+    await tester.pump();
+    expect(session.authenticatedRevalidationPending, isFalse);
+    expect(bootstrap.prepareCount, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('authenticated transition invokes runtime rebind callback once', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: ReviewSocialAuthGateway(
+        results: const {
+          SocialAuthProvider.google: SocialAuthResult.authenticated(
+            'private-user-a',
+          ),
+        },
+      ),
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(),
+      availableSocialAuthProviders: const {SocialAuthProvider.google},
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    var rebindCount = 0;
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        legacyPresentationForTestsOnly: true,
+        onAuthenticatedBoundary: () async {
+          rebindCount += 1;
+        },
+      ),
+    );
+    await tester.pump();
+
+    expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+    await tester.pump();
+    await tester.pump();
+
+    expect(rebindCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('app resume performs no revalidation for verified session', (
+    tester,
+  ) async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final bootstrap = ReviewAccountBootstrapGateway(
+      result: AuthenticatedAccountBootstrapResult.verified(binding),
+      currentBinding: binding,
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+      ),
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    session.stage = JourneyStage.booting;
+    await tester.pumpWidget(
+      MoolSocialApp(session: session, legacyPresentationForTestsOnly: true),
+    );
+    await tester.pump();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(bootstrap.prepareCount, 1);
+    expect(session.authenticatedRevalidationPending, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('RT-06 same-process resume preserves exact Work route', (
+    tester,
+  ) async {
+    final bootstrap = ReviewAccountBootstrapGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+          lastReadyRoute: '/app/work',
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: session,
+        initialLocation: '/app/work',
+        legacyPresentationForTestsOnly: true,
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('mvp-action-root-work')), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(find.byKey(const Key('mvp-action-root-work')), findsOneWidget);
+    expect(find.byKey(const Key('mvp-action-root-social')), findsNothing);
+    expect(bootstrap.prepareCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  test('RT-06 native launcher delegates ordinary re-entry to Flutter', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    final activity = File(
+      'android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+    ).readAsStringSync();
+
+    expect(manifest, contains('android:launchMode="singleTop"'));
+    expect(activity, contains('class MainActivity : FlutterActivity()'));
+    expect(activity, isNot(contains('onNewIntent(')));
+    expect(activity, isNot(contains("'/app/social'")));
+  });
+
+  test(
+    'verified principal mismatch clears receipt and invalidates session',
+    () async {
+      final protector = const ReviewPrincipalBindingProtector();
+      final stored = await protector.protect('private-user-a');
+      final current = await protector.protect('private-user-b');
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: stored);
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(current),
+        currentBinding: current,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(receiptStore.binding, isNull);
+      expect(bootstrap.invalidationCount, 1);
+    },
+  );
+
+  test('invalid session clears receipt and cannot restore ready', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final bootstrap = ReviewAccountBootstrapGateway(
+      result: const AuthenticatedAccountBootstrapResult.invalidSession(
+        code: 'auth-session-user-disabled',
+      ),
+      currentBinding: binding,
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(receiptStore.binding, isNull);
+    expect(bootstrap.invalidationCount, 1);
+  });
+
+  test('sign-out clears verified principal receipt', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+
+    expect(await session.signOut(), isTrue);
+
+    expect(receiptStore.binding, isNull);
+    expect(receiptStore.clearCount, greaterThanOrEqualTo(1));
+  });
+
+  test('unsafe receipt write and clear failure blocks ready', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      writeFailure: StateError('private write failure'),
+      clearFailure: StateError('private clear failure'),
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+
+    expect(session.stage, JourneyStage.bootFailure);
+    expect(session.errorMessage, isNot(contains('private')));
+  });
+
+  test(
+    'signed-out startup must clear stale receipt before authentication',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+        clearFailure: StateError('private clear failure'),
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.principalBindingCleanupRequired, isTrue);
+      expect(receiptStore.binding!.matches(binding), isTrue);
+
+      receiptStore.clearFailure = null;
+      await session.retryBoot();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.principalBindingCleanupRequired, isFalse);
+      expect(receiptStore.binding, isNull);
+    },
+  );
+
+  test(
+    'social rollback clear failure blocks every retry before provider UI',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore();
+      final social = ReviewSocialAuthGateway(
+        results: const {
+          SocialAuthProvider.google: SocialAuthResult.authenticated(
+            'private-user-a',
+          ),
+        },
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        socialAuthGateway: social,
+        accountBootstrapGateway: ReviewAccountBootstrapGateway(
+          result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+          currentBinding: binding,
+        ),
+        verifiedPrincipalBindingStore: receiptStore,
+        availableSocialAuthProviders: const {SocialAuthProvider.google},
+      );
+      addTearDown(session.dispose);
+      await session.start();
+      receiptStore.binding = binding;
+      receiptStore.clearFailure = StateError('private clear failure');
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.google),
+        isFalse,
+      );
+      expect(session.principalBindingCleanupRequired, isTrue);
+      expect(social.signInCount, 1);
+
+      expect(
+        await session.signInWithSocial(SocialAuthProvider.google),
+        isFalse,
+      );
+      expect(social.signInCount, 1);
+    },
+  );
+
+  test('OTP rollback clear failure blocks a later OTP request', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore();
+    final otp = ReviewOtpGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: otp,
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(await session.requestOtp('9876543210'), isTrue);
+    receiptStore.binding = binding;
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(await session.verifyOtp('123456'), isFalse);
+    expect(session.principalBindingCleanupRequired, isTrue);
+    final requestCount = otp.requestCount;
+
+    expect(await session.requestOtp('9876543210'), isFalse);
+    expect(otp.requestCount, requestCount);
+  });
+
+  test('email-link rollback clear failure blocks another request', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore();
+    final emailLink = ReviewEmailLinkGateway(userId: 'private-user-a');
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      emailLinkGateway: emailLink,
+      emailLinkAvailable: true,
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: const AuthenticatedAccountBootstrapResult.invalidSession(),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(await session.requestEmailLink('person@example.com'), isTrue);
+    receiptStore.binding = binding;
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(
+      await session.prepareEmailLinkReturn(emailLink.acceptedLink),
+      isTrue,
+    );
+    expect(session.principalBindingCleanupRequired, isTrue);
+    expect(emailLink.completionCount, 1);
+    expect(emailLink.signOutCount, 1);
+    final sendCount = emailLink.sendCount;
+
+    expect(await session.requestEmailLink('person@example.com'), isFalse);
+    expect(emailLink.sendCount, sendCount);
+  });
+
+  test('Social callback cannot bypass receipt-cleanup latch', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+      clearFailure: StateError('private clear failure'),
+    );
+    final callbackGateway = _CallbackSocialAuthGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: callbackGateway,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.principalBindingCleanupRequired, isTrue);
+
+    expect(
+      await session.prepareSocialAuthReturn(
+        'moolsocial://auth/x?code=fixture&state=fixture',
+      ),
+      isTrue,
+    );
+
+    expect(callbackGateway.callbackCompletionCount, 0);
+    expect(session.isAuthenticated, isFalse);
+  });
+
+  test('email callback cannot bypass receipt-cleanup latch', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+      clearFailure: StateError('private clear failure'),
+    );
+    final emailLink = ReviewEmailLinkGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      emailLinkGateway: emailLink,
+      emailLinkAvailable: true,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.principalBindingCleanupRequired, isTrue);
+
+    expect(
+      await session.prepareEmailLinkReturn(emailLink.acceptedLink),
+      isTrue,
+    );
+
+    expect(emailLink.completionCount, 0);
+    expect(session.isAuthenticated, isFalse);
+  });
+
+  test('explicit sign-out clear failure remains fail-closed', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(binding: binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+      accountBootstrapGateway: ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      ),
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    receiptStore.clearFailure = StateError('private clear failure');
+
+    expect(await session.signOut(), isFalse);
+
+    expect(session.principalBindingCleanupRequired, isTrue);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.errorMessage, isNot(contains('private')));
+  });
+
+  test(
+    'corrupt receipt resets secure binding and requires fresh sign-in',
+    () async {
+      final values = <String, String?>{};
+      final receiptStore = SecureVerifiedPrincipalBindingStore.forTesting(
+        readValue: ({required key}) async => values[key],
+        writeValue: ({required key, required value}) async {
+          values[key] = value;
+        },
+        deleteValue: ({required key}) async {
+          values.remove(key);
+        },
+        createSecret: () => List<int>.filled(32, 11),
+      );
+      final binding = await receiptStore.protect('private-user-a');
+      await receiptStore.write(binding);
+      final receiptKey = values.keys.singleWhere(
+        (key) => key.contains('verified_principal'),
+      );
+      values[receiptKey] = 'v2:corrupt';
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.isAuthenticated, isFalse);
+      expect(values, isEmpty);
+      expect(bootstrap.invalidationCount, 1);
+
+      final replacement = await receiptStore.protect('private-user-a');
+      await receiptStore.write(replacement);
+      expect((await receiptStore.read())!.matches(replacement), isTrue);
+    },
+  );
+
+  test('unsafe reset failure cannot bypass latch on signed-in Retry', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect(
+      'private-user-a',
+    );
+    final receiptStore = MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+      readFailure: StateError('private read failure'),
+    );
+    final social = ReviewSocialAuthGateway(
+      signedIn: true,
+      signOutFailure: StateError('private sign-out failure'),
+    );
+    final bootstrap = ReviewAccountBootstrapGateway(
+      result: AuthenticatedAccountBootstrapResult.verified(binding),
+      currentBinding: binding,
+      invalidationFailure: StateError('private invalidation failure'),
+    );
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: social,
+      accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: receiptStore,
+    );
+    addTearDown(session.dispose);
+
+    await session.start();
+    expect(session.stage, JourneyStage.bootFailure);
+    expect(session.principalBindingCleanupRequired, isTrue);
+    expect(bootstrap.prepareCount, 1);
+
+    await session.retryBoot();
+    expect(session.stage, JourneyStage.bootFailure);
+    expect(bootstrap.prepareCount, 1);
+
+    bootstrap.invalidationFailure = null;
+    social.signOutFailure = null;
+    receiptStore.readFailure = null;
+    await session.retryBoot();
+
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.principalBindingCleanupRequired, isFalse);
+    expect(bootstrap.prepareCount, 1);
+  });
+
+  test(
+    'unsafe receipt reset deletion failure blocks until Retry succeeds',
+    () async {
+      final binding = await const ReviewPrincipalBindingProtector().protect(
+        'private-user-a',
+      );
+      final receiptStore = MemoryVerifiedPrincipalBindingStore(
+        binding: binding,
+        readFailure: StateError('private read failure'),
+        resetFailure: StateError('private reset failure'),
+      );
+      final bootstrap = ReviewAccountBootstrapGateway(
+        result: AuthenticatedAccountBootstrapResult.verified(binding),
+        currentBinding: binding,
+      );
+      final session = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'skipped',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+        accountBootstrapGateway: bootstrap,
+        verifiedPrincipalBindingStore: receiptStore,
+      );
+      addTearDown(session.dispose);
+
+      await session.start();
+      expect(session.stage, JourneyStage.bootFailure);
+      expect(session.principalBindingCleanupRequired, isTrue);
+
+      receiptStore.resetFailure = null;
+      receiptStore.readFailure = null;
+      await session.retryBoot();
+
+      expect(session.stage, JourneyStage.signIn);
+      expect(session.principalBindingCleanupRequired, isFalse);
+      expect(receiptStore.binding, isNull);
+    },
+  );
 
   test('legacy completed setup must show approved Screen 02 once', () async {
     final store = MemoryJourneyStore(
@@ -333,10 +1644,170 @@ void main() {
   });
 }
 
+Future<void> _proveRapidReauthenticationWaitsForDraftCleanup(
+  WidgetTester tester,
+) async {
+  final binding = await const ReviewPrincipalBindingProtector().protect(
+    'private-user-a',
+  );
+  final session = JourneySession(
+    store: MemoryJourneyStore(
+      snapshot: const JourneySnapshot(
+        languageCode: 'en',
+        areaMode: 'skipped',
+        setupComplete: true,
+      ),
+    ),
+    otpGateway: ReviewOtpGateway(signedIn: true),
+    socialAuthGateway: ReviewSocialAuthGateway(
+      results: const {
+        SocialAuthProvider.google: SocialAuthResult.authenticated(
+          'private-user-a',
+        ),
+      },
+    ),
+    accountBootstrapGateway: ReviewAccountBootstrapGateway(
+      result: AuthenticatedAccountBootstrapResult.verified(binding),
+      currentBinding: binding,
+    ),
+    verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(
+      binding: binding,
+    ),
+    availableSocialAuthProviders: const {SocialAuthProvider.google},
+  );
+  addTearDown(session.dispose);
+  await session.start();
+  var rebindCount = 0;
+  await tester.pumpWidget(
+    MoolSocialApp(
+      session: session,
+      legacyPresentationForTestsOnly: true,
+      onAuthenticatedBoundary: () async {
+        rebindCount += 1;
+      },
+    ),
+  );
+  await tester.pump();
+  final draftRepository = _DelayedClearDraftRepository();
+  final draftBinding = socialCreateDraftState.beginPrincipalBindingAttempt();
+  await socialCreateDraftState.configureDurability(
+    draftRepository,
+    bindingAttempt: draftBinding,
+  );
+  addTearDown(() {
+    socialCreateDraftState.beginPrincipalBindingAttempt();
+  });
+
+  expect(await session.signOut(), isTrue);
+  await draftRepository.clearStarted.future;
+  expect(await session.signInWithSocial(SocialAuthProvider.google), isTrue);
+  await tester.pump();
+  expect(rebindCount, 0);
+
+  draftRepository.clearGate.complete();
+  await tester.pump();
+  await tester.pump();
+  expect(rebindCount, 1);
+  await tester.pumpWidget(const SizedBox.shrink());
+}
+
+final class _DelayedClearDraftRepository
+    implements SocialCreateDraftRepository {
+  final Completer<void> clearStarted = Completer<void>();
+  final Completer<void> clearGate = Completer<void>();
+
+  @override
+  Future<SocialCreateDraftRead> read() async => const SocialCreateDraftRead(
+    freshness: SocialCreateDraftFreshness.missing,
+  );
+
+  @override
+  Future<void> write(SocialCreateDraftSnapshot snapshot) async {}
+
+  @override
+  Future<void> clear() async {
+    if (!clearStarted.isCompleted) clearStarted.complete();
+    await clearGate.future;
+  }
+}
+
 class _NeverCompletesAccountBootstrap implements AccountBootstrapGateway {
   @override
-  Future<void> prepareAuthenticatedAccount({String? expectedUserId}) =>
-      Future<void>.delayed(const Duration(days: 1));
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) => Future<AuthenticatedAccountBootstrapResult>.delayed(
+    const Duration(days: 1),
+  );
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async => null;
+
+  @override
+  Future<void> invalidateLocalSession() async {}
+}
+
+class _TimeoutPrincipalBootstrap implements AccountBootstrapGateway {
+  _TimeoutPrincipalBootstrap(this.bindings);
+
+  final List<VerifiedPrincipalBinding?> bindings;
+  int bindingReadCount = 0;
+  int invalidationCount = 0;
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async {
+    final index = bindingReadCount < bindings.length
+        ? bindingReadCount
+        : bindings.length - 1;
+    bindingReadCount += 1;
+    return bindings[index];
+  }
+
+  @override
+  Future<void> invalidateLocalSession() async {
+    invalidationCount += 1;
+  }
+
+  @override
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) => Completer<AuthenticatedAccountBootstrapResult>().future;
+}
+
+class _ControlledRevalidationBootstrap implements AccountBootstrapGateway {
+  _ControlledRevalidationBootstrap(this.binding, {this.invalidationFailure});
+
+  final VerifiedPrincipalBinding binding;
+  final Completer<AuthenticatedAccountBootstrapResult> _retry =
+      Completer<AuthenticatedAccountBootstrapResult>();
+  int prepareCount = 0;
+  int invalidationCount = 0;
+  Object? invalidationFailure;
+
+  @override
+  Future<VerifiedPrincipalBinding?> currentPrincipalBinding() async => binding;
+
+  @override
+  Future<void> invalidateLocalSession() async {
+    invalidationCount += 1;
+    if (invalidationFailure case final failure?) throw failure;
+  }
+
+  @override
+  Future<AuthenticatedAccountBootstrapResult> prepareAuthenticatedAccount({
+    String? expectedUserId,
+  }) {
+    prepareCount += 1;
+    if (prepareCount == 1) {
+      return Future.value(
+        AuthenticatedAccountBootstrapResult.retryableUnavailable(binding),
+      );
+    }
+    return _retry.future;
+  }
+
+  void complete(AuthenticatedAccountBootstrapResult result) {
+    _retry.complete(result);
+  }
 }
 
 class _CallbackSocialAuthGateway

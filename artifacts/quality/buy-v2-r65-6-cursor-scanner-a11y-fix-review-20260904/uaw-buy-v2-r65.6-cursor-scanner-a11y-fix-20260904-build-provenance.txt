@@ -1,0 +1,15 @@
+CandidateId=UAW-BUY-V2-R65.6-CURSOR-SCANNER-A11Y-FIX-20260904
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-BUY-V2-R65.6-CURSOR-SCANNER-A11Y-FIX-20260904;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r65.6
+VersionCode=2026090322
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904\apk-regression-state.json
+Branch=work/cursor-ui/buy-mvp-ticket14-v1-20260902
+HEAD=7d0a1dec245802a1eba6bc4e0dfefd7edbf97284
+SourceFingerprint=8F9724CEF4EC26E308E165E6D19F3A5003392E2E358DED256A22FDD2E3013FC1
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-6-cursor-scanner-a11y-fix-review-20260904\uaw-buy-v2-r65.6-cursor-scanner-a11y-fix-20260904-device-review-debug.apk
+Bytes=208712697
+SHA256=FF4474E77231BC82691DD269C97E640885DB2C2E32595902A09F5EA294ED80D7
+BuiltAt=2026-09-04T07:34:21.5215846+05:30

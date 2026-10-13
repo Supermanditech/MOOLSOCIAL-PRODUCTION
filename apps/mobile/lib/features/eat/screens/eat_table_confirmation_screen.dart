@@ -195,7 +195,7 @@ class EatTableConfirmationScreen extends StatelessWidget {
                       child: OutlinedButton(
                         key: const Key('eat-table-confirm-chat'),
                         onPressed: () => context.go(
-                          '/app/chat/thread/mahadev-business?return=/app/eat/table/$bookingId',
+                          '/app/chat/thread/food-restaurant-${receipt.restaurant.id}?return=/app/eat/table/$bookingId',
                         ),
                         child: const Text('Chat'),
                       ),

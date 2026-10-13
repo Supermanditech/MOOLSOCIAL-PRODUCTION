@@ -48,6 +48,17 @@ foreach ($requiredLiteral in @(
   'moolsocialcontent',
   '--dry-run',
   '--no-invoker-iam-check',
+  '$expectedProviderEnvironment = "dev"',
+  '$expectedProviderRuntimeEnabled = "true"',
+  '$expectedProviderRuntimeMode = "accepted"',
+  '"youtubeOAuthCallback"',
+  'MOOLSOCIAL_PROVIDER_ENV=$expectedProviderEnvironment',
+  'YOUTUBE_OAUTH_REDIRECT_URI=$expectedProviderOAuthCallback',
+  'YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED=$expectedProviderRuntimeEnabled',
+  'YOUTUBE_SOCIAL_RUNTIME_MODE=$expectedProviderRuntimeMode',
+  '--update-env-vars=$permanentProviderRuntimeValues',
+  'Assert-C30MPermanentProviderRuntime',
+  'spec.template.spec.containers',
   'update-traffic',
   'functions:artifacts:setpolicy',
   'check-codex-development-regression-memory.ps1',
@@ -71,7 +82,9 @@ foreach ($forbiddenLiteral in @(
   'print-access-token',
   'secrets versions access',
   'functions:secrets:get',
-  'contain-youtube-private-dev.ps1'
+  'contain-youtube-private-dev.ps1',
+  'YOUTUBE_PROOF_EXPIRES_AT',
+  'YOUTUBE_PROOF_PROFILE'
 )) {
   if ($deployment.Contains($forbiddenLiteral)) {
     throw "C30M provider-only deployment contains forbidden scope: $forbiddenLiteral"
@@ -94,7 +107,8 @@ if (
   -not $package.Contains('AllowReviewedExistingRuntime') -or
   -not $contentGate.Contains('AllowReviewedExistingRuntime') -or
   -not $package.Contains('if (-not $ProviderOnlyC30M)') -or
-  -not $package.Contains('--test-reporter=dot')
+  -not $package.Contains('npm run verify') -or
+  -not $package.Contains('check-youtube-private-dev-exports.mjs')
 ) {
   throw "The reviewed runtime or provider-only package gate is incomplete."
 }
@@ -106,6 +120,26 @@ if (
     '(?s)firebaseExecutable\s+deploy.*?--only\s+\([^\)]*,[^\)]*\)'
 ) {
   throw "Firebase deployment is not pinned to one exact provider target."
+}
+
+if (
+  $deployment -notmatch (
+    '(?s)firebaseExecutable\s+deploy.*?' +
+    'gcloudExecutable\s+run services update.*?' +
+    '--update-env-vars=\$permanentProviderRuntimeValues.*?' +
+    'providerAfter\s*=\s*Read-C30MRunServiceState'
+  ) -or
+  $deployment -notmatch (
+    '(?s)Assert-C30MPermanentProviderRuntime\s+`?\s*' +
+    '-State\s+\$providerBefore.*?' +
+    'Assert-C30MPermanentProviderRuntime\s+`?\s*' +
+    '-State\s+\$providerAfter'
+  )
+) {
+  throw (
+    'The permanent YouTube provider runtime tuple is not restored and ' +
+    'verified around the isolated deployment.'
+  )
 }
 
 $wrongProjectRejected = $false

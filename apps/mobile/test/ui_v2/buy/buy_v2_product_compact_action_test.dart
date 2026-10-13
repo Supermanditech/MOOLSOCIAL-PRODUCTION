@@ -94,15 +94,28 @@ void main() {
           find.byKey(const ValueKey('buy-product-action-bar')),
           findsNothing,
         );
-        expect(tester.getSize(slot), const Size(148, 44));
-        expect(tester.getSize(shell), const Size(88, 44));
+        expect(
+          tester.getSize(slot),
+          Size(destination == BuyV2Destination.medicine ? 148 : 44, 44),
+        );
+        expect(
+          tester.getSize(shell),
+          Size(destination == BuyV2Destination.medicine ? 88 : 44, 44),
+        );
         expect(tester.getTopRight(shell), tester.getTopRight(slot));
         expect(tester.getSize(primary).height, greaterThanOrEqualTo(44));
         expect(find.descendant(of: panel, matching: shell), findsOneWidget);
+        final actionOwner = destination != BuyV2Destination.medicine
+            ? find.byKey(ValueKey('buy-product-purchase-hero-${product.id}'))
+            : find.byKey(ValueKey('buy-product-title-reveal-${product.id}'));
+        expect(
+          find.descendant(of: actionOwner, matching: panel),
+          findsOneWidget,
+        );
         expect(
           find.descendant(
-            of: find.byKey(ValueKey('buy-product-title-reveal-${product.id}')),
-            matching: panel,
+            of: actionOwner,
+            matching: find.text(buyV2Money(product.price)),
           ),
           findsOneWidget,
         );
@@ -111,7 +124,8 @@ void main() {
             of: panel,
             matching: find.text(buyV2Money(product.price)),
           ),
-          findsOneWidget,
+          findsNothing,
+          reason: 'The adjacent purchase hero owns the price once.',
         );
         expect(
           find.descendant(
@@ -122,7 +136,13 @@ void main() {
         );
         expect(
           find.descendant(of: primary, matching: find.text('Add')),
-          findsOneWidget,
+          destination == BuyV2Destination.medicine
+              ? findsOneWidget
+              : findsNothing,
+        );
+        expect(
+          tester.getSemantics(primary).label,
+          contains(product.customerTitle),
         );
         expect(
           find.descendant(of: primary, matching: find.text(product.title)),
@@ -132,7 +152,6 @@ void main() {
           find.byKey(ValueKey('buy-product-action-title-${product.id}')),
           findsNothing,
         );
-        expect(find.text(product.title), findsOneWidget);
         expect(
           tester
               .getSemantics(primary)
@@ -175,23 +194,17 @@ void main() {
     await tester.tap(find.byKey(ValueKey('buy-product-primary-${product.id}')));
     await tester.pump();
 
-    final enteringSlide = find.descendant(
-      of: slot,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is SlideTransition && widget.position.value.dx > 0.02,
-        description: 'incoming product-action transform-only acknowledgement',
-      ),
-    );
     expect(addShell, findsNothing);
     expect(
       find.byKey(ValueKey('buy-product-quantity-${product.id}')),
       findsOneWidget,
     );
-    expect(enteringSlide, findsOneWidget);
-    final incomingTransition = tester.widget<SlideTransition>(enteringSlide);
-    expect(incomingTransition.position.value.dx, closeTo(0.025, 0.001));
-    expect(incomingTransition.transformHitTests, isFalse);
+    expect(
+      find.byKey(ValueKey('buy-product-quantity-${product.id}')).hitTestable(),
+      findsOneWidget,
+      reason:
+          'Replacing the compact Add must expose usable quantity controls immediately.',
+    );
     expect(
       find.descendant(
         of: slot,
@@ -205,30 +218,36 @@ void main() {
     await tester.pumpAndSettle();
 
     final stepper = find.byKey(ValueKey('buy-product-quantity-${product.id}'));
-    final remove = find.descendant(
-      of: stepper,
-      matching: find.byTooltip('Remove one'),
-    );
+    final remove = find
+        .descendant(of: stepper, matching: find.byType(IconButton))
+        .first;
     final add = find.descendant(
       of: stepper,
       matching: find.byTooltip('Add one'),
     );
-    expect(slotSizeBefore, const Size(148, 44));
-    expect(tester.getSize(slot), slotSizeBefore);
-    expect(tester.getTopLeft(slot), slotOriginBefore);
-    expect(tester.getSize(stepper), const Size(148, 44));
-    expect(tester.getTopRight(stepper), tester.getTopRight(slot));
-    expect(incomingTransition.position.value, Offset.zero);
+    expect(slotSizeBefore.height, 44);
+    expect(slotSizeBefore.width, 44);
+    expect(tester.getSize(slot).width, inInclusiveRange(120, 170));
+    expect(tester.getSize(slot).height, slotSizeBefore.height);
+    expect(
+      tester.getTopRight(slot),
+      slotOriginBefore + Offset(slotSizeBefore.width, 0),
+    );
+    expect(tester.getSize(stepper), tester.getSize(slot));
+    expect(tester.getCenter(stepper), tester.getCenter(slot));
     expect(tester.getSize(remove), const Size(44, 44));
+    expect(tester.widget<IconButton>(remove).tooltip, 'Remove from Cart');
     expect(tester.getSize(add), const Size(44, 44));
     expect(session.quantityFor(product.id), 1);
     expect(find.descendant(of: panel, matching: stepper), findsOneWidget);
-    expect(find.text(product.title), findsOneWidget);
-
     await tester.tap(add);
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 2);
-    expect(find.text('2'), findsOneWidget);
+    expect(tester.widget<IconButton>(remove).tooltip, 'Remove one');
+    expect(
+      find.descendant(of: stepper, matching: find.text('2')),
+      findsOneWidget,
+    );
 
     await tester.tap(remove);
     await tester.pumpAndSettle();
@@ -236,7 +255,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('state-owned Add point cannot retarget to replacement plus', (
+  testWidgets('quantity opens its editor without retargeting to plus', (
     tester,
   ) async {
     await setSurface(tester, const Size(390, 844));
@@ -258,37 +277,33 @@ void main() {
     await tester.pumpAndSettle();
 
     final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-    final normalAddRect = tester.getRect(primary);
-    final stateOwnedAddPoint = Offset(
-      normalAddRect.left + normalAddRect.width / 4,
-      normalAddRect.center.dy,
-    );
-
-    await tester.tapAt(stateOwnedAddPoint);
+    await tester.tap(primary);
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 1);
 
     final stepper = find.byKey(ValueKey('buy-product-quantity-${product.id}'));
     final remove = find.descendant(
       of: stepper,
-      matching: find.byTooltip('Remove one'),
-    );
-    final addOne = find.descendant(
-      of: stepper,
-      matching: find.byTooltip('Add one'),
+      matching: find.byTooltip('Remove from Cart'),
     );
     final quantityLabel = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.label == '1 in cart',
-      description: 'non-clickable current quantity semantics owner',
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.label == 'Edit quantity, 1 pack in Cart',
+      description: 'editable current quantity semantics owner',
     );
     expect(quantityLabel, findsOneWidget);
 
-    final addOneRect = tester.getRect(addOne);
     final quantityRect = tester.getRect(quantityLabel);
-    expect(normalAddRect.center.dx, closeTo(addOneRect.left, 0.001));
-    expect(quantityRect.contains(stateOwnedAddPoint), isTrue);
+    final quantityPoint = quantityRect.center;
+    expect(find.text('Buy now'), findsNothing);
 
-    await tester.tapAt(stateOwnedAddPoint);
+    await tester.tapAt(quantityPoint);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), 1);
+
+    expect(find.byKey(const ValueKey('buy-quantity-input')), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 1);
 
@@ -326,25 +341,27 @@ void main() {
       await tester.pumpAndSettle();
       final shell = find.byKey(ValueKey('buy-product-add-shell-${product.id}'));
       final primary = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-      expect(tester.getSize(shell), const Size(88, 44));
+      final medicine = product.destination == BuyV2Destination.medicine;
+      expect(tester.getSize(shell), Size(medicine ? 88 : 44, 44));
       expect(tester.getSize(panel).width, greaterThan(0));
       expect(find.descendant(of: panel, matching: shell), findsOneWidget);
       expect(
         find.descendant(of: primary, matching: find.text('Add')),
-        findsOneWidget,
+        medicine ? findsOneWidget : findsNothing,
       );
       expect(
         find.descendant(of: primary, matching: find.text(product.title)),
         findsNothing,
       );
-      expect(find.text(product.title), findsOneWidget);
       expect(
         find.byKey(const ValueKey('buy-product-action-bar')),
         findsNothing,
       );
       expect(
         tester.getSemantics(primary).label,
-        'Add ${product.title} to cart',
+        product.destination == BuyV2Destination.wholesale
+            ? 'Add minimum order of ${product.minimumOrder} packs of ${product.title} to Cart for ${buyV2Money(product.price * product.minimumOrder)}. ${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · ${buyV2BuyerDeliveryPromise(session.productFactsFor(product))}'
+            : 'Add ${product.title} to cart',
       );
       final semantics = tester.getSemantics(primary);
       expect(
@@ -352,10 +369,10 @@ void main() {
         isTrue,
       );
       tester.semantics.tap(
-        find.semantics.byLabel('Add ${product.title} to cart'),
+        find.semantics.byLabel(tester.getSemantics(primary).label),
       );
       await tester.pumpAndSettle();
-      expect(session.quantityFor(product.id), 1);
+      expect(session.quantityFor(product.id), product.minimumOrder);
       expect(tester.binding.transientCallbackCount, 0);
       expect(tester.takeException(), isNull);
     },

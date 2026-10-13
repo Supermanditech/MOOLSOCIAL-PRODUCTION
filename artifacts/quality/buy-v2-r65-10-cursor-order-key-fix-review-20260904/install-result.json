@@ -1,0 +1,12 @@
+{
+  "state": "passed_checksum_matched",
+  "device": "Redmi TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r65.10-cursorreview",
+  "versionCode": "2026090326",
+  "builtBytes": 208715009,
+  "installedBytes": 208715009,
+  "builtSha256": "E2A84F2CA0F547FDB7B34AC93EFC7DD0B233A5E4830011FFA1B1C7D9B36D90EA",
+  "installedSha256": "E2A84F2CA0F547FDB7B34AC93EFC7DD0B233A5E4830011FFA1B1C7D9B36D90EA",
+  "exactMatch": true
+}

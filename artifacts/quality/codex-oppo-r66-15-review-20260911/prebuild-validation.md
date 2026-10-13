@@ -1,0 +1,25 @@
+# r66.15 prebuild validation
+
+## One-build activation
+
+Founder-authorised review build activated once against clean remote-equal evidence seal752c8830610e15d5836e9f16f26c1cba1cc28e16, verified zero status bytes/records/stderr and exit0 before activation. Exact candidate UAW-CODEX-OPPO-R66.15-REVIEW-20260911, RuntimeUiReview debug1.0.0-r66.15+2026091102, unchanged391-input manifest BB9B3049875A88745007EFCEFD2E4474F051595040FEF3795D3C93481630394E. Only this activation evidence and machine state are uncommitted; product/test source is sealed. This authority is consumed by the attempt and cannot be silently reused after failure. APK integrity, installation and OPPO review remain pending.
+
+Status: prebuild passed on clean remote-equal6e10f4e932ce3f00929dc123be5369a6c8e5195d. Build remains disabled until the evidence seal is committed/pushed/clean and the exact seal HEAD is activated for one attempt. No r66.15 APK, install or device pass is claimed.
+
+Required before activation: both complete 44-file cycles, review-only isolation, exact source hashes, full analysis, copy/UI locks, approved-commit coverage and fixtures, Flutter support-byte preservation, Android resources, unchanged build-foundation controls, incremental pre_build for 1.0.0-r66.15+2026091102, current MVP execution controls and clean remote-equal evidence seal. Then activate exactly one RuntimeUiReview debug build for the sealed HEAD. Preserve all earlier candidates and never reuse a consumed build authorisation.
+
+The initial reservation gate returned exit1 because the exact new evidence files were not yet present. It is retained in REG4557.r6615CandidateReservation. Only this candidate's ten exact evidence paths and the existing continuation allowlist were corrected;10 positive/20 negative identity/path checks and the implementation gate passed. No APK followed the failed gate, no product/test source changed, and no general owner/root/lane rule was relaxed.
+
+## Attempt2 passed
+
+Terminal exit0. Both1856-pass/83-skip full cycles,13 review-isolation checks, zero-issue analysis and unchanged source hashes are recorded in local-validation.md. Fresh controls passed clean handoff/regression memory, approved18/rejected2 commit coverage and fixtures, approved UI locks, customer copy, tracked-support restoration, Android resources, build-foundation fixtures, incremental pre_build1.0.0-r66.15+2026091102, and existing MVP execution controls. Final Git digest is zero bytes/records/stderr,exit0. All391 manifest input hashes match BB9B3049875A88745007EFCEFD2E4474F051595040FEF3795D3C93481630394E.
+
+The existing exact archive parameter default was supplied; no gate was changed and no archived file was copied or modified. Retained external r6615-prebuild-controls-attempt2.stdout.log SHA256 A717726B91F1DC8BD3A47D53C109E55550EF26AF0D7DBD64DEBD4475B2F669F6; stderr.log SHA256 51A8C17414958C033615ADBDE747713E9B83E30946F87DDDA9B109C659C02F73. Stderr contains PowerShell progress records, not a failing terminal result. Play qualification remains false. This is permission for the existing bounded review-build workflow only, not production promotion.
+
+## Attempt1 stopped before build
+
+Clean, remote-equal HEAD7a4c566d1e07b756f323f08273327c7283c1666e passed handoff/memory, approved commit coverage18/rejected2, coverage fixtures, UI locks, copy, Flutter support preservation and Android resources. Nested build-foundation memory then rejected historical REG3955 evidence because the caller omitted the supported archive parameter. Terminal exit1; no later control, APK or device action ran. Reuse existing REG4496: set PSDefaultParameterValues['check-codex-development-regression-memory.ps1:EvidenceArchiveRoot'] to C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904 in the invocation scope. Do not modify the checker or copy/delete/recreate evidence.
+
+The exact zero-byte preimage was read-only verified within the archive's MOOLSOCIAL-WORKTREE-CURSOR-buy-cart-safe-clear-v1-20260901/untracked/artifacts/quality/registry-disk-full-recovery-20260902 directory, with both archive-metadata.json and untracked-sha256.csv present. File hash E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855. This is historical failed evidence, not source or a successful registry.
+
+Complete OS-boundary logs at C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905: r6615-prebuild-controls-attempt1.stdout.log SHA256 BE66C20B0D0F1DC1F974723396572600A987CA5C5A21E1C3C37D2F468EB7E8A9; r6615-prebuild-controls-attempt1.stderr.log SHA256 488B49CFFE5C08DCD005E337E46F6C3D85FCE6AD765EF6AFEB7B15758BD580B4. A subsequent over-broad registry search was truncated; exact REG4496 and the archive file were recovered independently before retry. Original tool output is retained; omitted content is not qualification evidence. Registry remains4514, current binding AF2FB82B5EC1E68CDD49516CB4D6DD1AB10AB0605F94B96C7D1529E617E31808. App/test inputs and previous candidates remain unchanged.

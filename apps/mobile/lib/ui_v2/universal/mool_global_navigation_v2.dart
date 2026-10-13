@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show GestureBinding;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -82,17 +84,27 @@ MoolDirectActionSpec moolDefaultActionForFamily(String familyId) {
 /// Resolves the customer-facing domain from the canonical catalogue instead
 /// of assuming that a route's path prefix is its presentation owner.
 ///
-/// Care/Medicine deliberately reuses Buy commerce, and Travel/Bus deliberately
-/// reuses Book booking. Exact catalogue membership therefore wins over the
-/// legacy route namespace.
+/// Care/Medicine deliberately reuses the shared commerce implementation, and
+/// Travel/Bus deliberately reuses Book booking. Exact catalogue membership
+/// therefore wins over an implementation's source directory.
 String? moolActionFamilyIdForRoute(String route) {
+  final uri = Uri.tryParse(route);
+  final query = uri?.queryParameters;
+  const medicineValues = {'medicine', 'rx'};
+  if (uri?.path == '/app/buy/medicine' ||
+      (uri?.path == '/app/buy' &&
+          (medicineValues.contains(query?['sub'] ?? query?['view']) ||
+              medicineValues.contains(query?['context']) ||
+              medicineValues.contains(query?['scope'])))) {
+    return 'book';
+  }
   for (final family in moolActionFamilies) {
     if (family.route == route ||
         family.actions.any((action) => action.route == route)) {
       return family.id;
     }
   }
-  final path = Uri.tryParse(route)?.path;
+  final path = uri?.path;
   if (path == null) return null;
   for (final familyId in const [
     'social',
@@ -229,7 +241,7 @@ const moolActionFamilies = <MoolActionFamilySpec>[
         id: 'medicine',
         label: 'Medicine',
         icon: Icons.medication_outlined,
-        route: '/app/buy?sub=medicine',
+        route: '/app/book/medicine',
       ),
       MoolDirectActionSpec(
         id: 'salon',
@@ -335,6 +347,14 @@ double moolAndroidExportedSemanticsClearance({
       .toDouble();
 }
 
+double moolAndroidExportedHorizontalSemanticsClearance({
+  required EdgeInsets viewPadding,
+  required TargetPlatform platform,
+}) => MoolLocalNavigationTokens.androidExportedSideClearance(
+  viewPadding: viewPadding,
+  platform: platform,
+);
+
 /// Keeps destination-local choices visibly connected to the selected global
 /// action without placing a panel between the customer and destination content.
 class MoolGlobalChatShortcut extends StatelessWidget {
@@ -382,6 +402,30 @@ class MoolGlobalChatShortcut extends StatelessWidget {
   }
 }
 
+class MoolGlobalNavigationController {
+  bool get isOpen => _isOpen;
+
+  bool _isOpen = false;
+  Future<void> Function()? _close;
+
+  Future<void> close() async {
+    await _close?.call();
+  }
+
+  void _attach(Future<void> Function() close) {
+    _close = close;
+  }
+
+  void _detach() {
+    _close = null;
+    _isOpen = false;
+  }
+
+  void _setOpen(bool value) {
+    _isOpen = value;
+  }
+}
+
 class MoolDestinationNavigationV2 extends StatefulWidget {
   const MoolDestinationNavigationV2({
     required this.activeId,
@@ -389,9 +433,12 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
     required this.localNavigation,
     required this.selectedLocalIndex,
     required this.localActionCount,
+    this.familyRootSelected = false,
+    this.showFamilyRootAction = true,
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
+    this.moolNavigationController,
     this.onPreviousLocalAction,
     this.onNextLocalAction,
     super.key,
@@ -404,9 +451,12 @@ class MoolDestinationNavigationV2 extends StatefulWidget {
   final Widget localNavigation;
   final int selectedLocalIndex;
   final int localActionCount;
+  final bool familyRootSelected;
+  final bool showFamilyRootAction;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
+  final MoolGlobalNavigationController? moolNavigationController;
   final VoidCallback? onPreviousLocalAction;
   final VoidCallback? onNextLocalAction;
 
@@ -434,6 +484,14 @@ class _MoolDestinationNavigationV2State
       ),
       platform: defaultTargetPlatform,
     );
+    final horizontalSemanticsClearance =
+        moolAndroidExportedHorizontalSemanticsClearance(
+          viewPadding: EdgeInsets.fromViewPadding(
+            view.viewPadding,
+            view.devicePixelRatio,
+          ),
+          platform: defaultTargetPlatform,
+        );
     return RepaintBoundary(
       key: const Key('moolsocial-single-home-launcher-shell'),
       child: DecoratedBox(
@@ -450,7 +508,12 @@ class _MoolDestinationNavigationV2State
           color: Colors.transparent,
           child: Padding(
             key: const Key('moolsocial-android-exported-semantics-clearance'),
-            padding: EdgeInsets.only(bottom: exportedSemanticsClearance),
+            padding: EdgeInsets.fromLTRB(
+              horizontalSemanticsClearance,
+              0,
+              horizontalSemanticsClearance,
+              exportedSemanticsClearance,
+            ),
             child: SafeArea(
               top: false,
               maintainBottomViewPadding: true,
@@ -460,33 +523,44 @@ class _MoolDestinationNavigationV2State
                 height: MoolLocalNavigationTokens.destinationRailHeight,
                 child: Row(
                   children: [
-                    MoolGlobalNavigationV2(
-                      activeId: widget.activeId,
-                      onOpenMool: widget.onOpenMool,
-                      onOpenAction: widget.onOpenAction,
-                      onOpenChat: widget.onOpenChat,
-                      compact: true,
+                    Expanded(
+                      child: MoolGlobalNavigationV2(
+                        activeId: widget.activeId,
+                        onOpenMool: widget.onOpenMool,
+                        onOpenAction: widget.onOpenAction,
+                        onOpenChat: widget.onOpenChat,
+                        controller: widget.moolNavigationController,
+                        compact: true,
+                        compactExpanded: true,
+                      ),
                     ),
-                    const SizedBox(width: 2),
-                    if (family.id != 'social') ...[
-                      _MoolFamilyRootButton(
-                        family: family,
-                        onPressed: () => widget.onOpenAction(
-                          PersonalMoolActionSpec(
-                            id: family.id,
-                            label: family.label,
-                            route: family.route,
-                            icon: family.icon,
+                    if (family.id != 'social' &&
+                        widget.showFamilyRootAction) ...[
+                      Expanded(
+                        child: _MoolFamilyRootButton(
+                          family: family,
+                          selected: widget.familyRootSelected,
+                          onPressed: () => widget.onOpenAction(
+                            PersonalMoolActionSpec(
+                              id: family.id,
+                              label: family.label,
+                              route: family.route,
+                              icon: family.icon,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 2),
                     ],
-                    Expanded(child: widget.localNavigation),
-                    const SizedBox(width: 2),
-                    MoolGlobalChatNavigationV2(
-                      controlKey: const Key('mool-global-chat'),
-                      onOpenChat: widget.onOpenChat,
+                    Expanded(
+                      flex: widget.localActionCount,
+                      child: widget.localNavigation,
+                    ),
+                    Expanded(
+                      child: MoolGlobalChatNavigationV2(
+                        controlKey: const Key('mool-global-chat'),
+                        onOpenChat: widget.onOpenChat,
+                        expandedCell: true,
+                      ),
                     ),
                   ],
                 ),
@@ -500,9 +574,14 @@ class _MoolDestinationNavigationV2State
 }
 
 class _MoolFamilyRootButton extends StatelessWidget {
-  const _MoolFamilyRootButton({required this.family, required this.onPressed});
+  const _MoolFamilyRootButton({
+    required this.family,
+    required this.selected,
+    required this.onPressed,
+  });
 
   final MoolActionFamilySpec family;
+  final bool selected;
   final VoidCallback onPressed;
 
   @override
@@ -510,33 +589,84 @@ class _MoolFamilyRootButton extends StatelessWidget {
     final accent = MoolLocalNavigationTokens.navigationAccentForFamily(
       family.id,
     );
-    final fixedCellWidth =
-        MoolLocalNavigationTokens.destinationFixedCellWidthFor(
-          MediaQuery.sizeOf(context).width,
-        );
     return Semantics(
       container: true,
       button: true,
-      label: 'Open ${family.label} home',
+      selected: selected,
+      label: selected
+          ? '${family.label} home, current'
+          : 'Open ${family.label} home',
       onTap: onPressed,
       excludeSemantics: true,
       child: SizedBox(
         key: ValueKey('moolsocial-family-root-${family.id}'),
-        width: fixedCellWidth,
+        width: double.infinity,
         height: MoolLocalNavigationTokens.destinationRailHeight,
         child: Material(
-          color: Colors.transparent,
+          key: ValueKey('moolsocial-family-root-${family.id}-surface'),
+          color: selected
+              ? accent.withValues(
+                  alpha:
+                      MoolLocalNavigationTokens.destinationSelectedFillOpacity,
+                )
+              : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
+            side: BorderSide(
+              color: selected
+                  ? accent.withValues(
+                      alpha: MoolLocalNavigationTokens
+                          .destinationSelectedBorderOpacity,
+                    )
+                  : Colors.transparent,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: ValueKey('moolsocial-family-root-${family.id}-tap'),
             onTap: onPressed,
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
             splashColor: accent.withValues(alpha: .08),
             highlightColor: accent.withValues(alpha: .045),
-            child: MoolDestinationIconLabel(
-              key: ValueKey('moolsocial-family-root-${family.id}-icon-label'),
-              label: family.label,
-              icon: family.icon,
-              color: accent.withValues(alpha: .84),
-              emphasized: true,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                MoolDestinationIconLabel(
+                  key: ValueKey(
+                    'moolsocial-family-root-${family.id}-icon-label',
+                  ),
+                  label: family.label,
+                  icon: family.icon,
+                  color: selected ? accent : MoolColors.muted,
+                  emphasized: selected,
+                ),
+                Positioned(
+                  bottom: 0,
+                  child: AnimatedContainer(
+                    key: ValueKey(
+                      'moolsocial-family-root-${family.id}-selected-indicator',
+                    ),
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolLocalNavigationTokens.stateDuration,
+                    ),
+                    width: selected
+                        ? MoolLocalNavigationTokens
+                              .destinationSelectedIndicatorWidth
+                        : 0,
+                    height: MoolLocalNavigationTokens
+                        .destinationSelectedIndicatorHeight,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -1328,14 +1458,32 @@ class _MoolConnectedActionNavigatorState
                 ),
                 borderRadius: radius,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(
-                  MoolLocalNavigationTokens.switcherPadding,
-                ),
-                child: MoolMainDomainMenu(
-                  selectedFamilyId: widget.initialFamilyId,
-                  keyPrefix: 'mool-navigator',
-                  onOpenFamily: widget.onOpenFamily,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification) _dragDy = 0;
+                  if (notification is OverscrollNotification &&
+                      notification.dragDetails != null &&
+                      notification.overscroll < 0) {
+                    _dragDy -= notification.overscroll;
+                    if (_dragDy > 24) {
+                      _dragDy = 0;
+                      widget.onDismiss();
+                    }
+                  }
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  key: const Key('mool-connected-action-navigator-scroll'),
+                  primary: false,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.all(
+                    MoolLocalNavigationTokens.switcherPadding,
+                  ),
+                  child: MoolMainDomainMenu(
+                    selectedFamilyId: widget.initialFamilyId,
+                    keyPrefix: 'mool-navigator',
+                    onOpenFamily: widget.onOpenFamily,
+                  ),
                 ),
               ),
             ),
@@ -1352,10 +1500,12 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
     required this.onOpenMool,
     required this.onOpenAction,
     required this.onOpenChat,
+    this.controller,
     this.selectedMainActionAnchorKey,
     this.localNavigationExpanded,
     this.onToggleLocalNavigation,
     this.compact = false,
+    this.compactExpanded = false,
     this.compactOverlayAlignEnd = false,
     super.key,
   }) : assert(
@@ -1366,10 +1516,12 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec> onOpenAction;
   final VoidCallback? onOpenChat;
+  final MoolGlobalNavigationController? controller;
   final GlobalKey? selectedMainActionAnchorKey;
   final bool? localNavigationExpanded;
   final VoidCallback? onToggleLocalNavigation;
   final bool compact;
+  final bool compactExpanded;
   final bool compactOverlayAlignEnd;
 
   @override
@@ -1377,23 +1529,46 @@ class MoolGlobalNavigationV2 extends StatefulWidget {
 }
 
 class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final OverlayPortalController _overlayController = OverlayPortalController();
-  final LayerLink _launcherLink = LayerLink();
   late final AnimationController _switcherController;
   LocalHistoryEntry? _historyEntry;
   bool _isOpen = false;
   bool _reduceMotion = false;
   bool _removingHistoryEntry = false;
   double _launcherDragDy = 0;
+  final Set<int> _launcherPointers = {};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _switcherController = AnimationController(
       vsync: this,
       duration: MoolLocalNavigationTokens.selectionDuration,
     );
+    widget.controller?._attach(_closeConnectedNavigator);
+  }
+
+  @override
+  void didUpdateWidget(covariant MoolGlobalNavigationV2 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach();
+      widget.controller?._attach(_closeConnectedNavigator);
+      widget.controller?._setOpen(_isOpen);
+    }
+  }
+
+  @override
+  void didChangeMetrics() {
+    // Rotation changes launcher coordinates. A gesture begun in the old
+    // layout must not become a menu tap/swipe when the new layout arrives.
+    for (final pointer in _launcherPointers.toList()) {
+      GestureBinding.instance.cancelPointer(pointer);
+    }
+    _launcherPointers.clear();
+    _launcherDragDy = 0;
   }
 
   @override
@@ -1411,7 +1586,9 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _removeLocalHistoryEntry();
+    widget.controller?._detach();
     _switcherController.dispose();
     super.dispose();
   }
@@ -1449,6 +1626,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
   void _openConnectedNavigator() {
     if (_isOpen) return;
     setState(() => _isOpen = true);
+    widget.controller?._setOpen(true);
     _overlayController.show();
     _registerLocalHistoryEntry();
     if (_reduceMotion) {
@@ -1470,6 +1648,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     }
     if (!mounted || !_isOpen) return;
     _overlayController.hide();
+    widget.controller?._setOpen(false);
     setState(() => _isOpen = false);
   }
 
@@ -1485,6 +1664,7 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     _removeLocalHistoryEntry();
     _switcherController.value = 0;
     _overlayController.hide();
+    widget.controller?._setOpen(false);
     setState(() => _isOpen = false);
     widget.onOpenAction(
       PersonalMoolActionSpec(
@@ -1496,7 +1676,49 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
     );
   }
 
-  Widget _buildEmbeddedSwitcher(BuildContext context) {
+  Widget _buildEmbeddedSwitcher(
+    BuildContext context,
+    OverlayChildLayoutInfo info,
+  ) {
+    final media = MediaQuery.of(context);
+    final view = View.of(context);
+    final systemPadding = EdgeInsets.fromViewPadding(
+      view.viewPadding,
+      view.devicePixelRatio,
+    );
+    final safeTop = math.max(media.viewPadding.top, systemPadding.top);
+    final safeLeft = math.max(media.viewPadding.left, systemPadding.left);
+    final safeRight = math.max(media.viewPadding.right, systemPadding.right);
+    final safeBottom = math.max(media.viewPadding.bottom, systemPadding.bottom);
+    final keyboard = math.max(
+      media.viewInsets.bottom,
+      view.viewInsets.bottom / view.devicePixelRatio,
+    );
+    final launcher = MatrixUtils.transformRect(
+      info.childPaintTransform,
+      Offset.zero & info.childSize,
+    );
+    final width = math.min(
+      MoolLocalNavigationTokens.switcherWidth,
+      math.max(0.0, info.overlaySize.width - safeLeft - safeRight),
+    );
+    final desiredLeft = widget.compact && widget.compactOverlayAlignEnd
+        ? launcher.right - width
+        : launcher.left;
+    final left = desiredLeft
+        .clamp(
+          safeLeft,
+          math.max(safeLeft, info.overlaySize.width - safeRight - width),
+        )
+        .toDouble();
+    final menuBottom = math.max(
+      safeTop,
+      math.min(
+        launcher.top - 2,
+        info.overlaySize.height - math.max(safeBottom, keyboard),
+      ),
+    );
+    final availableHeight = math.max(0.0, menuBottom - safeTop);
     final initialFamilyId =
         moolActionFamilies.any((family) => family.id == widget.activeId)
         ? widget.activeId
@@ -1517,16 +1739,10 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
               child: const ColoredBox(color: Colors.transparent),
             ),
           ),
-          CompositedTransformFollower(
-            link: _launcherLink,
-            showWhenUnlinked: false,
-            targetAnchor: widget.compact && widget.compactOverlayAlignEnd
-                ? Alignment.topRight
-                : Alignment.topLeft,
-            followerAnchor: widget.compact && widget.compactOverlayAlignEnd
-                ? Alignment.bottomRight
-                : Alignment.bottomLeft,
-            offset: const Offset(0, -2),
+          Positioned(
+            left: left,
+            bottom: info.overlaySize.height - menuBottom,
+            width: width,
             child: FadeTransition(
               opacity: progress,
               child: SlideTransition(
@@ -1538,8 +1754,8 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
                   key: const Key('moolsocial-main-menu-arrival-motion'),
                   alignment: Alignment.bottomLeft,
                   scale: Tween<double>(begin: .96, end: 1).animate(progress),
-                  child: SizedBox(
-                    width: MoolLocalNavigationTokens.switcherWidth,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: availableHeight),
                     child: MoolConnectedActionNavigator(
                       initialFamilyId: initialFamilyId,
                       onOpenFamily: _openFamily,
@@ -1562,25 +1778,34 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
         key: Key('moolsocial-home-has-no-bottom-navigation'),
       );
     }
-    final launcher = GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragStart: (_) => _launcherDragDy = 0,
-      onVerticalDragUpdate: (details) {
-        _launcherDragDy += details.primaryDelta ?? 0;
-      },
-      onVerticalDragEnd: (details) {
-        if (_launcherDragDy < -24 ||
-            (details.primaryVelocity != null &&
-                details.primaryVelocity! < -80)) {
-          _openConnectedNavigator();
-        }
-      },
-      child: CompositedTransformTarget(
-        link: _launcherLink,
-        child: _MoolHomeLauncher(
-          compact: widget.compact,
-          expanded: _isOpen,
-          onPressed: _toggleConnectedNavigator,
+    final launcher = Listener(
+      onPointerDown: (event) => _launcherPointers.add(event.pointer),
+      onPointerUp: (event) => _launcherPointers.remove(event.pointer),
+      onPointerCancel: (event) => _launcherPointers.remove(event.pointer),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragStart: (_) => _launcherDragDy = 0,
+        onVerticalDragUpdate: (details) {
+          _launcherDragDy += details.primaryDelta ?? 0;
+        },
+        onVerticalDragCancel: () => _launcherDragDy = 0,
+        onVerticalDragEnd: (details) {
+          if (_launcherDragDy < -24 ||
+              (details.primaryVelocity != null &&
+                  details.primaryVelocity! < -80)) {
+            _openConnectedNavigator();
+          }
+          _launcherDragDy = 0;
+        },
+        child: OverlayPortal.overlayChildLayoutBuilder(
+          controller: _overlayController,
+          overlayChildBuilder: _buildEmbeddedSwitcher,
+          child: _MoolHomeLauncher(
+            compact: widget.compact,
+            expandedCell: widget.compactExpanded,
+            expanded: _isOpen,
+            onPressed: _toggleConnectedNavigator,
+          ),
         ),
       ),
     );
@@ -1606,6 +1831,29 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
             child: Hero(
               tag: moolGlobalNavigationHeroTag,
               transitionOnUserGestures: true,
+              // A Hero flight must not mount the route's live OverlayPortal a
+              // second time. Only the launcher appearance travels; its menu
+              // controller and input ownership remain with the mounted route.
+              flightShuttleBuilder: (_, _, _, _, _) => IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.only(bottom: MoolSpacing.xs),
+                      child: SizedBox(
+                        height: 64,
+                        child: Center(
+                          child: _MoolHomeLauncher(
+                            expanded: false,
+                            onPressed: () {},
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               child: Material(
                 color: Colors.transparent,
                 child: SafeArea(
@@ -1620,17 +1868,12 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
               ),
             ),
           );
-    final portal = OverlayPortal(
-      controller: _overlayController,
-      overlayChildBuilder: _buildEmbeddedSwitcher,
-      child: anchoredLauncher,
-    );
     if (Router.maybeOf<Object?>(context)?.backButtonDispatcher == null) {
-      return portal;
+      return anchoredLauncher;
     }
     return BackButtonListener(
       onBackButtonPressed: _handleBackButton,
-      child: portal,
+      child: anchoredLauncher,
     );
   }
 }
@@ -1642,11 +1885,13 @@ class MoolGlobalChatNavigationV2 extends StatefulWidget {
   const MoolGlobalChatNavigationV2({
     required this.onOpenChat,
     this.controlKey = const Key('mool-global-chat'),
+    this.expandedCell = false,
     super.key,
   });
 
   final VoidCallback? onOpenChat;
   final Key controlKey;
+  final bool expandedCell;
 
   @override
   State<MoolGlobalChatNavigationV2> createState() =>
@@ -1680,14 +1925,16 @@ class _MoolGlobalChatNavigationV2State
         ),
         curve: MoolMotion.change,
         child: SizedBox(
-          width: fixedCellWidth,
+          width: widget.expandedCell ? double.infinity : fixedCellWidth,
           height: MoolLocalNavigationTokens.destinationRailHeight,
           child: Material(
             key: const Key('mool-global-chat-white-surface'),
-            color: Colors.white,
-            elevation: 1,
-            shadowColor: const Color(0x26000050),
-            borderRadius: BorderRadius.circular(14),
+            color: Colors.transparent,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(
+              MoolLocalNavigationTokens.destinationSelectedCellRadius,
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: const Key('mool-global-chat-tap'),
@@ -1710,8 +1957,8 @@ class _MoolGlobalChatNavigationV2State
                 key: Key('mool-global-chat-icon-label'),
                 label: 'Chat',
                 icon: Icons.chat_bubble_outline_rounded,
-                color: MoolColors.navy,
-                emphasized: true,
+                color: MoolColors.muted,
+                emphasized: false,
               ),
             ),
           ),
@@ -1726,11 +1973,13 @@ class _MoolHomeLauncher extends StatefulWidget {
     required this.onPressed,
     required this.expanded,
     this.compact = false,
+    this.expandedCell = false,
   });
 
   final VoidCallback onPressed;
   final bool expanded;
   final bool compact;
+  final bool expandedCell;
 
   @override
   State<_MoolHomeLauncher> createState() => _MoolHomeLauncherState();
@@ -1747,6 +1996,7 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
             MediaQuery.sizeOf(context).width,
           );
       return Semantics(
+        key: const Key('mool-home-launcher'),
         container: true,
         button: true,
         expanded: widget.expanded,
@@ -1764,14 +2014,16 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
           ),
           curve: MoolMotion.change,
           child: SizedBox(
-            width: fixedCellWidth,
+            width: widget.expandedCell ? double.infinity : fixedCellWidth,
             height: MoolLocalNavigationTokens.destinationRailHeight,
             child: Material(
               key: const Key('mool-compact-launcher-white-surface'),
-              color: Colors.white,
-              elevation: 1,
-              shadowColor: const Color(0x26000050),
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.transparent,
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(
+                MoolLocalNavigationTokens.destinationSelectedCellRadius,
+              ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 key: const Key('mool-compact-launcher'),
@@ -1787,12 +2039,14 @@ class _MoolHomeLauncherState extends State<_MoolHomeLauncher> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const MoolDestinationIconLabel(
+                    MoolDestinationIconLabel(
                       key: Key('mool-compact-launcher-icon-label'),
                       label: 'Mool',
                       icon: Icons.grid_view_rounded,
-                      color: MoolColors.navy,
-                      emphasized: true,
+                      color: widget.expanded
+                          ? MoolColors.navy
+                          : MoolColors.muted,
+                      emphasized: widget.expanded,
                     ),
                     Positioned(
                       bottom: 0,

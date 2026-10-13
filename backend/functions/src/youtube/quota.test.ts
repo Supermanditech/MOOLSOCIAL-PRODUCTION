@@ -11,6 +11,8 @@ import {
   YouTubeQuotaGovernor,
   readDevYouTubeQuotaCaps,
   type QuotaClock,
+  type YouTubeQuotaMeasuredReserveRequest,
+  type YouTubeQuotaMeasurementStore,
   type YouTubeQuotaReserveRequest,
   type YouTubeQuotaReserveResult,
   type YouTubeQuotaStore,
@@ -289,6 +291,83 @@ test("invalid clock data fails closed before quota-store mutation", async () => 
     /Quota clock returned an invalid date/u,
   );
   assert.equal(calls, 0);
+});
+
+test("measured reservation rejects before an unmeasured store mutation", async () => {
+  let ordinaryReserveCalls = 0;
+  const store: YouTubeQuotaStore = {
+    async reserve(
+      request: YouTubeQuotaReserveRequest,
+    ): Promise<YouTubeQuotaReserveResult> {
+      ordinaryReserveCalls += 1;
+      return {
+        allowed: true,
+        bucket: request.bucket,
+        windowId: request.windowId,
+        resetAt: request.resetAt,
+        used: request.units,
+        remaining: request.limit - request.units,
+        limit: request.limit,
+      };
+    },
+  };
+  const governor = new YouTubeQuotaGovernor(store);
+
+  await assert.rejects(
+    governor.reserveMeasured("general", 1, {
+      principal: "public",
+      operation: "videos.list.chart",
+      requestId: "measured-store-required",
+      local: true,
+    }),
+    /quota measurement store is unavailable/u,
+  );
+  assert.equal(ordinaryReserveCalls, 0);
+});
+
+test("measured reservation uses one clock instant for usage and measurement", async () => {
+  const instant = new Date("2026-07-24T12:00:00.000Z");
+  let clockReads = 0;
+  const captured: YouTubeQuotaMeasuredReserveRequest[] = [];
+  const store: YouTubeQuotaMeasurementStore = {
+    async reserve(): Promise<YouTubeQuotaReserveResult> {
+      throw new Error("ordinary reserve is forbidden");
+    },
+    async reserveMeasured(
+      request: YouTubeQuotaMeasuredReserveRequest,
+    ): Promise<YouTubeQuotaReserveResult> {
+      captured.push(structuredClone(request));
+      return {
+        allowed: true,
+        bucket: request.bucket,
+        windowId: request.windowId,
+        resetAt: request.resetAt,
+        used: request.units,
+        remaining: request.limit - request.units,
+        limit: request.limit,
+      };
+    },
+  };
+  const governor = new YouTubeQuotaGovernor(store, {
+    clock: {
+      now: () => {
+        clockReads += 1;
+        return new Date(instant);
+      },
+    },
+  });
+
+  await governor.reserveMeasured("general", 1, {
+    principal: "public",
+    operation: "videos.list.chart",
+    requestId: "single-clock",
+    local: true,
+  });
+  assert.equal(clockReads, 1);
+  assert.equal(captured.length, 1);
+  assert.equal(captured[0]?.occurredAt, instant.toISOString());
+  assert.equal(captured[0]?.windowId, "2026-07-24");
+  assert.equal(captured[0]?.resetAt, "2026-07-25T07:00:00.000Z");
 });
 
 test("mismatched quota-store metadata fails closed", async () => {

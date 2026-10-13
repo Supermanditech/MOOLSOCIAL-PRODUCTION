@@ -1,0 +1,22 @@
+{
+  "schema": "moolsocial_shop_chat_r61_9_redmi_install_v1",
+  "candidateId": "UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829",
+  "device": "Redmi TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r61.9-cursorreview",
+  "versionCode": "2026082811",
+  "builtBytes": 206453947,
+  "installedBytes": 206453947,
+  "builtSha256": "5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB",
+  "installedSha256": "5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB",
+  "installMode": "in_place_no_uninstall_no_data_clear",
+  "coldLaunch": "passed",
+  "shopContext": "Fresh Basket Order",
+  "wholesaleContext": "Metro Wholesale Partner",
+  "offersContext": "Shop Offers Support",
+  "androidBack": "passed_exact_origin_recovery",
+  "oppoTouched": false,
+  "runtimePackageTouched": false,
+  "privateValuesEmitted": false,
+  "result": "passed_pending_founder_visual_approval"
+}

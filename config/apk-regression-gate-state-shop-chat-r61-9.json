@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "device_qualified_pending_founder",
+  "buildAuthorization": "consumed_passed",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/prebuild-validation.md",
+    "negativeSelfTest": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/build-attempt2-package-identity-failure.md"
+  },
+  "candidate": {
+    "id": "UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829",
+    "versionName": "1.0.0-r61.9",
+    "versionCode": "2026082811",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/integration-repair/shop-chat-shared-v1-20260829",
+    "head": "e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt",
+    "manifestSha256": "9A1D95F77A454287D7E069924FEC0235AD3ED252E7DB27EEF13D485559247A70",
+    "fileCount": 640
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-SHOP-CHAT-CONTEXT-R61.9-CURSOR-UI-REVIEW-20260829"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/source-identity.json"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/shop-chat-r61-9-source-manifest.txt",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/source-identity.json"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/positive-release-gates.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-pass.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-pass.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/plugin-integrity-attempt3.log"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/protected-boundary-disposition.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/rejected-candidate-preserved.md",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/backend-boundary-failure.log",
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/data-egress-failure.log"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/startup-config-regression-registered.md"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle1.json"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/full-buy-cycle2.json"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/clean-source-state.json"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/wrapper-self-test.log"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/package-isolation-attempt2.log"
+      ]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "state": "prewrite_audited_no_motion_change",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
+    "disposition": "docs/quality/UAW-INTEGRATION-REPAIR-SHOP-CHAT-SHARED-V1-20260829.md",
+    "applied": [],
+    "reused": [
+      "authoritative_shared_chat_motion",
+      "approved_buy_navigation_motion",
+      "shared_profile_reduced_motion"
+    ],
+    "dependencyHeld": [
+      "backend_chat_delivery",
+      "provider_call_runtime"
+    ],
+    "inapplicable": [
+      "new_decorative_loops"
+    ]
+  },
+  "predecessor": {
+    "id": "UAW-SHOP-CHAT-CONTEXT-R61.8-CURSOR-UI-REVIEW-20260829",
+    "state": "build_failed_disk_preserved_no_apk_no_install",
+    "commit": "e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c"
+  },
+  "founderDirective": {
+    "state": "authorized_ui_only_redmi_review",
+    "redmi": "TG8HCYTGGQT885OF",
+    "oppoForbidden": true,
+    "runtimePackageForbidden": true
+  },
+  "qualificationResult": {
+    "state": "device_qualified_pending_founder_approval"
+  },
+  "buildResult": {
+    "state": "passed",
+    "wrapper": "scripts/build-buy-device-review.ps1",
+    "attempt": 1,
+    "apkPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/uaw-shop-chat-context-r61.9-cursor-ui-review-20260829-device-review-debug.apk",
+    "apkBytes": 206453947,
+    "apkSha256": "5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB",
+    "head": "e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c",
+    "sourceFingerprint": "9A1D95F77A454287D7E069924FEC0235AD3ED252E7DB27EEF13D485559247A70",
+    "failedAttempts": []
+  },
+  "installResult": {
+    "state": "passed_checksum_matched",
+    "device": "Redmi TG8HCYTGGQT885OF",
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r61.9-cursorreview",
+    "versionCode": "2026082811",
+    "installedBytes": 206453947,
+    "installedSha256": "5262CE6011FB15F0D21EB3F8DCA8BDAFB2372914684C02AC2D3AF66F7A377CBB",
+    "coldLaunch": "passed",
+    "shopContext": "passed",
+    "wholesaleContext": "passed",
+    "offersContext": "passed",
+    "androidBack": "passed_exact_origin_recovery",
+    "evidence": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-9-20260829/install-result.json"
+  },
+  "founderApproval": {
+    "state": "pending"
+  },
+  "postBuildGates": [
+    {
+      "id": "post-build-source-identity",
+      "state": "passed"
+    },
+    {
+      "id": "apk-signature-badging-install-pull",
+      "state": "passed_checksum_matched"
+    },
+    {
+      "id": "cold-process-and-shop-chat-journey",
+      "state": "passed"
+    },
+    {
+      "id": "technical-qualification",
+      "state": "passed_pending_founder_review"
+    }
+  ]
+}

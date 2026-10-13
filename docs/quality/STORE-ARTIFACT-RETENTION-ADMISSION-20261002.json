@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Store-only admission of published historical retention repair; not Cart/T07 integration or ordinary application-gate acceptance.",
+  "founderQuestion": "May I admit Cursor's verified shared retention repair to the Codex Store branch - only the exact gate/helper/proof/tests and matching owner permission, with no Cart/T07 code, broad merge, APK or release changes?",
+  "founderAnswer": "Yes - Store-only retention admission",
+  "trustedReplySource": "call_LtgqJPy5SYxSGxYDv9BRijyO question reply; original Unicode wording retained in task founder source27.",
+  "publishedRepairCommit": "1a66f12c4153d98962cc639945af215d44b1d7c1",
+  "storeBaseline": "93dd9fb04f38d05cdb03320aab027e3709570d6d",
+  "root": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-add-product-screen1-20260920",
+  "branch": "work/codex-ui/add-product-screen1-20260920",
+  "lane": "codex_ui",
+  "task": "/root",
+  "role": "primary",
+  "workId": "add-product-screen1-20260920",
+  "ticketId": "UAW-ADD-PRODUCT-SCREEN1-20260920",
+  "proofPath": "docs/quality/CURSOR-BUY-ARTIFACT-RETENTION-20261002.json",
+  "proofSha256": "70F6FE4BAB84B29D9A0C323B6B48CC2CFC2515E25761431AEF2F69E186138370",
+  "ownerTransfer": {
+    "owner": "scripts/check-codex-development-regression-memory.ps1",
+    "from": "/root/repair_store_buy_conflict_v3_20260904",
+    "to": "/root",
+    "preserveOtherOwners": true
+  },
+  "bootstrap": "Normal memory validation fails because the cleanup deleted three rejected historical binaries. Founder explicitly authorizes this exact serialized governance maintenance; no Dart edits, runtime changes, APK, cleanup rerun or other-tree writes until normal gates pass again.",
+  "independentCompatibility": "Pinned raw proof verified; all three exact artifact paths and five original registry consumers match Store. All four normalized original provenance manifests and specified identity/rejection assertions match. Missing binaries were not restored or re-read.",
+  "architectReview": "Read-only conceptual review requires complete separate identity conjunction, serialized transfer, immutable proof and fail-closed negative controls. No independent architect test pass claimed.",
+  "limits": [
+    "Original reference arrays and rejection history stay intact; only exact three artifacts and five consumers can retire physical-evidence requirements.",
+    "No current release candidate, arbitrary missing evidence, fabricated binary or changed checksum is admitted.",
+    "No Cart/T07 code/contracts, broad merge/cherry-pick, full Cursor policy/registry/MVP-state copy or release changes.",
+    "Fresh coordination, memory, scoped MVP, incremental and founder gates still govern subsequent Store application/device work."
+  ]
+}

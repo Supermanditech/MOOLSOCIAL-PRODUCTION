@@ -111,80 +111,73 @@ void main() {
     }
   });
 
+  testWidgets('Social Feed Mool opens connected menu and Back restores Feed', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final journey = signedInSession();
+    addTearDown(journey.dispose);
+    await journey.start();
+    await pumpApp(tester, journey, '/app/social?sub=feed');
+
+    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsOneWidget,
+    );
+    for (final family in moolActionFamilies) {
+      expect(
+        find.byKey(ValueKey('mool-navigator-family-${family.id}')),
+        findsOneWidget,
+      );
+    }
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('mool-connected-action-navigator')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const Key('screen04-rail-feed')))
+          .flagsCollection
+          .isSelected,
+      Tristate.isTrue,
+    );
+    semantics.dispose();
+  });
+
   testWidgets(
-    'Social Feed Mool opens connected menu and Back restores Feed',
+    'Legacy direct Home opens Buy and compact menu dismisses exactly',
     (tester) async {
-      final semantics = tester.ensureSemantics();
       final journey = signedInSession();
       addTearDown(journey.dispose);
       await journey.start();
-      await pumpApp(tester, journey, '/app/social?sub=feed');
-
+      await pumpApp(tester, journey, '/app/mool');
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+      expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
       await tester.tap(find.byKey(const Key('mool-compact-launcher')));
       await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsOneWidget,
-      );
       for (final family in moolActionFamilies) {
         expect(
           find.byKey(ValueKey('mool-navigator-family-${family.id}')),
           findsOneWidget,
         );
       }
-      expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
-
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
       expect(
         find.byKey(const Key('mool-connected-action-navigator')),
         findsNothing,
       );
-      expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
-      expect(
-        tester
-            .getSemantics(find.byKey(const Key('screen04-rail-feed')))
-            .flagsCollection
-            .isSelected,
-        Tristate.isTrue,
-      );
-      semantics.dispose();
     },
   );
-
-  testWidgets('direct Mool is a durable home with no invented origin', (
-    tester,
-  ) async {
-    final journey = signedInSession();
-    addTearDown(journey.dispose);
-    await journey.start();
-    await pumpApp(tester, journey, '/app/mool');
-
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-    expect(find.byKey(const Key('mool-home-dashboard')), findsOneWidget);
-    for (final family in moolActionFamilies) {
-      expect(
-        find.byKey(ValueKey('mool-home-family-${family.id}')),
-        findsOneWidget,
-      );
-    }
-    expect(find.byKey(const Key('mool-home-continue')), findsNothing);
-    expect(find.text('Continue Social'), findsNothing);
-    expect(find.byKey(const Key('mool-root-back')), findsNothing);
-    expect(
-      find.byKey(const Key('moolsocial-global-navigation')),
-      findsNothing,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('mool-home-family-buy')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-    expect(find.byKey(const Key('mool-home-dashboard')), findsOneWidget);
-  });
 
   testWidgets('compact fixed Home keeps all six families reachable', (
     tester,

@@ -1,0 +1,411 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'buy_v2_qualified_provider_fixture.dart';
+
+final class _FreightCommerce extends Fake implements BuyV2CommerceAdapter {
+  _FreightCommerce(this.products);
+  final List<BuyV2Product> products;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: products,
+    orders: const [],
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  Widget app(
+    BuyV2Session session, {
+    Size size = const Size(390, 844),
+    double textScale = 1,
+    EdgeInsets safeArea = EdgeInsets.zero,
+  }) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: MoolTheme.light(),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        size: size,
+        textScaler: TextScaler.linear(textScale),
+        padding: safeArea,
+        viewPadding: safeArea,
+        disableAnimations: true,
+      ),
+      child: child!,
+    ),
+    home: BuyV2Screen(
+      session: session,
+      initialDestination: BuyV2Destination.wholesale,
+      initialView: BuyV2View.cart,
+      initialCartScope: BuyV2CartScope.wholesale,
+    ),
+  );
+
+  BuyV2Session wholesaleSession() {
+    final session = BuyV2Session(core: BuySession());
+    expect(session.addProduct('w-onion'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    return session;
+  }
+
+  for (final flags in [
+    [true],
+    [false],
+    [true, false],
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'Wholesale cart freight summary follows all selected lines $flags $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final base = BuyV2Catalogue.products.firstWhere(
+            (p) => p.id == 'w-onion',
+          );
+          final products = [
+            for (var i = 0; i < flags.length; i++)
+              BuyV2Product(
+                id: 'freight-$i',
+                storeId: 'freight-review-store',
+                offerClass: BuyV2OfferClass.wholesale,
+                price: 100 + i * 50,
+                minimumOrder: 1,
+                freightIncluded: flags[i],
+                destination: base.destination,
+                categoryId: base.categoryId,
+                brand: base.brand,
+                title: base.title,
+                variant: base.variant,
+                pack: base.pack,
+                unitPrice: base.unitPrice,
+                badge: base.badge,
+                seller: base.seller,
+                sellerType: base.sellerType,
+                deliveryPromise: base.deliveryPromise,
+                origin: base.origin,
+                confirmedOn: base.confirmedOn,
+                visualLabel: base.visualLabel,
+                visualKind: base.visualKind,
+              ),
+          ];
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: false,
+            commerceAdapter: _FreightCommerce(products),
+            productFactsAdapter: QualifiedTestProductFacts(
+              products.map((p) => p.id).toSet(),
+            ),
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          await session.restoreCommerce();
+          for (final product in products) {
+            expect(
+              session.addProduct(product.id),
+              isTrue,
+              reason: session.notice,
+            );
+          }
+          session.openCart(scope: BuyV2CartScope.wholesale);
+          final totalBefore = session.scopedPayableTotal;
+          await tester.pumpWidget(
+            app(session, size: const Size(360, 800), textScale: scale),
+          );
+          await tester.pumpAndSettle();
+          final included = flags.every((flag) => flag);
+          final action = find.byKey(const ValueKey('buy-cart-action-bar'));
+          expect(
+            find.descendant(
+              of: action,
+              matching: find.text(
+                included
+                    ? 'Freight included'
+                    : 'Freight confirmed before payment',
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: find.byKey(const ValueKey('buy-cart-action-bar')),
+              matching: find.text(
+                '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'pack' : 'packs'} selected · total',
+              ),
+            ),
+            findsOneWidget,
+          );
+          if (!included) {
+            expect(
+              find.text('Freight included'),
+              findsNothing,
+            );
+            expect(find.text('Landed cart total'), findsNothing);
+          }
+          expect(session.scopedPayableTotal, totalBefore);
+          expect(session.cartLines.length, flags.length);
+          expect(find.text('Checkout'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('Wholesale Cart distinguishes products, packs and landed total', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = wholesaleSession();
+    addTearDown(session.dispose);
+    final product = session.product('w-onion');
+    final expectedTotal = product.price * product.minimumOrder;
+    expect(session.scopedPayableTotal, expectedTotal);
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    expect(
+      buyV2WholesaleCartTradeSummaryContractVersion,
+      'buy-wholesale-cart-trade-summary-v1',
+    );
+    expect(
+      find.text('1 product · ${product.minimumOrder} packs'),
+      findsOneWidget,
+    );
+    expect(find.text('${product.minimumOrder} products'), findsNothing);
+    expect(
+      find.text(
+        'Minimum order ${product.minimumOrder} packs · '
+        '${buyV2Money(product.price)} per pack',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('${product.unitPrice} · Freight included'),
+      findsOneWidget,
+    );
+    expect(find.text('Item total'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-cart-action-bar')),
+        matching: find.text(
+          '${session.scopedItemCount} ${session.scopedItemCount == 1 ? 'pack' : 'packs'} selected · total',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Freight included'),
+      findsOneWidget,
+    );
+    expect(find.text('Checkout'), findsOneWidget);
+
+    final facts = find.byKey(
+      ValueKey('buy-wholesale-cart-line-facts-${product.id}'),
+    );
+    expect(facts, findsOneWidget);
+    expect(
+      tester.getSemantics(facts).label,
+      contains('Minimum order ${product.minimumOrder} packs'),
+    );
+    expect(
+      tester.getSemantics(facts).label,
+      contains('${buyV2Money(product.price)} per pack'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scoped Wholesale header never leaks mixed-cart totals', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('w-onion'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    session.chooseCartDisplayFilter('wholesale');
+    final wholesale = session.product('w-onion');
+    final shop = session.product('s-tomato');
+    final wholesaleTotal = wholesale.price * wholesale.minimumOrder;
+    final globalTotal = wholesaleTotal + shop.price;
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Wholesale · 1 product · ${wholesale.minimumOrder} packs'),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-cart-header-value-motion')),
+        matching: find.textContaining(buyV2Money(globalTotal)),
+      ),
+      findsNothing,
+    );
+    expect(session.scopedPayableTotal, globalTotal);
+    expect(find.byKey(const ValueKey('buy-cart-line-s-tomato')), findsNothing);
+    expect(find.byKey(const ValueKey('buy-cart-line-w-onion')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Wholesale quantity controls explain MOQ removal exactly', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = wholesaleSession();
+    addTearDown(session.dispose);
+    final product = session.product('w-onion');
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Add one trade pack'), findsOneWidget);
+    expect(find.byTooltip('Remove ${product.title} from Cart'), findsOneWidget);
+    await tester.tap(find.byTooltip('Add one trade pack'));
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), product.minimumOrder + 1);
+    expect(find.text('1 product · 3 packs'), findsOneWidget);
+    expect(find.byTooltip('Remove one trade pack'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove one trade pack'));
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), product.minimumOrder);
+    expect(find.byTooltip('Remove ${product.title} from Cart'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove ${product.title} from Cart'));
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), 0);
+    expect(session.view, BuyV2View.catalogue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('product review and checkout return preserve Wholesale Cart', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = wholesaleSession();
+    addTearDown(session.dispose);
+    final product = session.product('w-onion');
+
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey('buy-cart-product-details-${product.id}')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.product);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.wholesale);
+    expect(session.quantityFor(product.id), product.minimumOrder);
+
+    await tester.tap(find.text('Checkout'));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.checkout);
+    final receivingCard = find.byKey(
+      const ValueKey('buy-checkout-confirm-address'),
+    );
+    expect(receivingCard, findsOneWidget);
+    expect(
+      find.descendant(of: receivingCard, matching: find.text('Receive at')),
+      findsOneWidget,
+    );
+    final address = session.selectedAddressOrNull!;
+    expect(
+      find.descendant(
+        of: receivingCard,
+        matching: find.textContaining(address.line),
+      ),
+      findsOneWidget,
+    );
+    expect(session.quantityFor(product.id), product.minimumOrder);
+    expect(session.scopedPayableTotal, product.price * product.minimumOrder);
+    expect(session.checkoutPaymentAttempt, isNull);
+    expect(
+      find.byKey(const ValueKey('buy-scoped-purchase-owner')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-local-destination-tabs')),
+      findsOneWidget,
+    );
+    for (final key in const [
+      'buy-local-tab-wholesale',
+      'buy-local-tab-orders',
+      'buy-local-tab-offers',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact Android and iOS insets retain the Cart action', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final viewports = <({Size size, double scale, EdgeInsets safe})>[
+      (
+        size: const Size(320, 568),
+        scale: 1.4,
+        safe: const EdgeInsets.symmetric(vertical: 24),
+      ),
+      (
+        size: const Size(430, 932),
+        scale: 1.2,
+        safe: const EdgeInsets.only(top: 59, bottom: 34),
+      ),
+    ];
+
+    for (final viewport in viewports) {
+      tester.view.physicalSize = viewport.size;
+      final session = wholesaleSession();
+      await tester.pumpWidget(
+        app(
+          session,
+          size: viewport.size,
+          textScale: viewport.scale,
+          safeArea: viewport.safe,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final actionBar = find.byKey(const ValueKey('buy-cart-action-bar'));
+      expect(actionBar, findsOneWidget, reason: '${viewport.size} action');
+      expect(find.text('Checkout'), findsOneWidget);
+      expect(
+        tester.getBottomRight(actionBar).dy,
+        lessThanOrEqualTo(viewport.size.height - viewport.safe.bottom),
+        reason: '${viewport.size} bottom inset',
+      );
+      expect(tester.takeException(), isNull, reason: '${viewport.size}');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      session.dispose();
+    }
+  });
+}

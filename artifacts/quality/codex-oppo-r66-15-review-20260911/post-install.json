@@ -1,0 +1,23 @@
+{
+  "candidateId": "UAW-CODEX-OPPO-R66.15-REVIEW-20260911",
+  "deviceSerial": "2b3e0f71",
+  "deviceModel": "CPH2375",
+  "package": "com.moolsocial.app.runtime",
+  "versionName": "1.0.0-r66.15-runtime",
+  "versionCode": 2026091102,
+  "sourceHead": "752c8830610e15d5836e9f16f26c1cba1cc28e16",
+  "installCommand": "adb -s 2b3e0f71 install -r <exact r66.15 APK>",
+  "installExitCode": 0,
+  "installLog": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r6615-oppo-install-attempt1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "installedApkReadback": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r6615-oppo-installed-base.apk",
+  "apkBytes": 210174349,
+  "builtAndInstalledApkSha256": "D483815725B86A1CB337ED513912EC34041BBCF7719D1D454317EF4499D397DF",
+  "checksumEquality": true,
+  "retainedData": true,
+  "launchComponent": "com.moolsocial.app.runtime/com.moolsocial.app.MainActivity",
+  "nativeQualification": "in_progress_not_all_27_closed",
+  "backendAuthority": "not_qualified_by_review_fixtures",
+  "cursorIntegration": "not_performed",
+  "redmiAction": "none"
+}

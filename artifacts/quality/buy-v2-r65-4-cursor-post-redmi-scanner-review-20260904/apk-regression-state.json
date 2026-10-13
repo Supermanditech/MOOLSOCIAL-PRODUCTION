@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_passed",
+  "buildAuthorization": "approved_for_one_build",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/prebuild-validation.md"
+  },
+  "candidate": {
+    "id": "UAW-BUY-V2-R65.4-CURSOR-POST-REDMI-SCANNER-20260904",
+    "versionName": "1.0.0-r65.4",
+    "versionCode": "2026090320",
+    "buildMode": "debug",
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902",
+    "head": "8617c10b8e813e3fca392fcf53a71017ffb953d2"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/source-manifest.txt",
+    "manifestSha256": "4266A42A41B5B417DF9151F5B8F940D73874B5CC8B9FC2B87C5C91D9DB3D9739",
+    "fileCount": 34
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-BUY-V2-R65.4-CURSOR-POST-REDMI-SCANNER-20260904"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/prebuild-validation.md"]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/source-manifest.txt"]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/local-validation.md"]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/local-validation.md"]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/prebuild-validation.md"]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/candidate-contract.md"]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-3-cursor-75-defect-review-20260903/prebuild-validation.md"]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/prebuild-validation.md"]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/local-validation.md"]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/local-validation.md"]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/local-validation.md"]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/prebuild-validation.md"]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": ["artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/candidate-contract.md"]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "state": "audited_for_r65_4",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/candidate-contract.md",
+    "disposition": "artifacts/quality/buy-v2-r65-4-cursor-post-redmi-scanner-review-20260904/motion-disposition.md",
+    "applied": ["scanner_active_detection_motion", "quick_delivery_progress_rail", "cart_value_transition", "payment_and_order_status_transition"],
+    "reused": ["approved_buy_finite_event_driven_motion", "static_reduced_motion"],
+    "dependencyHeld": ["shared_chat_motion", "shared_shell_motion"],
+    "inapplicable": ["perpetual_decorative_loops"]
+  }
+}

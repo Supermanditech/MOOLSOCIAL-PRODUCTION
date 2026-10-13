@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-COUNTER-SALE-20260919",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-COUNTER-SALE-20260919",
+      "customerOutcome": "Retailer completes fast, accurate Store Counter Sale entry, review and invoice without false payment completion.",
+      "manifestPath": "docs/quality/COUNTER-SALE-20260919.md",
+      "manifestSha256": "543CBC3FE98925948F379BA59C479EEF3E9880BE0D9DE18FAAC2763946ACF3CA",
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "implementationDisposition": ["reuse", "configuration", "thin_policy_adapter", "test_only_acceptance", "new_necessary_work"],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart"
+      ],
+      "newScreens": ["Full Store Product view within existing dashboard owner"],
+      "newRoutes": ["Internal Navigator product route retaining Counter Sale context"],
+      "newBackendOwners": [],
+      "necessityProof": "Existing editor/preview cannot serve the requested read-only full product add flow. No Store UPI destination existed. Reuse cart, draft, invoice, money and existing QR encoder; add only scoped device-local UPI settings.",
+      "robustnessCoverage": ["IME/navigation/long-name and text scaling", "stale sale/live stock protection", "scope and storage recovery", "exact money and unpaid truth", "QR decode", "full local and OPPO journeys"],
+      "adjustments": ["Reconcile late machine-state binding transparently; preserve historical state", "Reuse installed QR dependency"],
+      "explicitExclusions": ["No backend or SQL Connect", "No real payment/message", "No release or fabricated acceptance"],
+      "dependenciesAndApprovals": ["Exact gated review candidate", "Connected OPPO", "Founder visual decision", "Git closure"],
+      "timelineImpactDays": 2,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/COUNTER-SALE-20260919.md"
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {
+    "branch": "work/codex-ui/counter-sale-20260919",
+    "head": "6e32df591dc8178aa1776c0f18c2eac0bb4efc37",
+    "successorRegistered": true,
+    "approvalState": "founder explicitly approved bounded r66.36 successor source/version/integration admission and gated review build/install/test; implementation 6e32df59; physical OPPO acceptance and final Git closure pending"
+  },
+  "ticket": {
+    "id": "UAW-COUNTER-SALE-20260919",
+    "customerOutcome": "Fast retailer-facing Counter Sale from customer entry through invoice, retaining accurate stock and payment state.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Founder-listed bounded usability and recovery corrections in the existing Store sale journey.",
+    "minimumCompleteScope": ["CS-201 through CS-216 and full connected journey evidence"],
+    "explicitExclusions": ["Unrelated app rewrites", "Live payment/message/deployment", "SQL Connect", "Production release"],
+    "dependenciesAndApprovals": ["Exact candidate gates", "OPPO verification", "Founder acceptance before closure"],
+    "testAndEvidencePlan": ["Focused behavior/layout and full affected regressions", "QR optical decode", "Checksum-matched full OPPO screenshots and interruptions", "Founder/Git closure evidence"]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/COUNTER-SALE-20260919.md"
+  },
+  "authorization": {
+    "state": "existing_ticket_authority_confirmed",
+    "evidence": "docs/quality/COUNTER-SALE-20260919.md",
+    "beyondMvpExplicitlyAuthorized": false
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "externalServiceWriteAuthorized": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "shop_clean_state_v1",
+  "attempt": 2,
+  "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+  "head": "9a05a49a5979671e4d7a21f4fb572b57dfb0b847",
+  "trackedStatusBytes": 0,
+  "trackedStatusSha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+  "trackedClean": true,
+  "untrackedEvidenceAllowed": [
+    "source-manifest-attempt2.txt",
+    "package-isolation-attempt2.log",
+    "head-attempt2.txt",
+    "source-identity-attempt2.json",
+    "clean-state-attempt2.json",
+    "prebuild-validation-attempt2.md"
+  ],
+  "recordedAt": "2026-08-28T22:56:54.3880461+05:30"
+}

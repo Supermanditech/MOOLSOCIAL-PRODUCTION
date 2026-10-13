@@ -5,6 +5,8 @@ param(
   [string]$ProjectId = "moolsocial-dev-503018",
   [string]$Confirmation = ""
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -89,11 +91,7 @@ Assert-C30T (
   )
 ) "accepted review runtime contains a forbidden secret variable name"
 $reviewRuntimeHash = (
-  [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData(
-      [Text.Encoding]::ASCII.GetBytes($reviewRuntime)
-    )
-  )
+  (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::ASCII.GetBytes($reviewRuntime)))))
 )
 Assert-C30T (
   $reviewRuntimeHash -ceq

@@ -1,0 +1,18 @@
+{
+  "state": "passed_checksum_and_version",
+  "serial": "2b3e0f71",
+  "package": "com.moolsocial.app.runtime",
+  "versionName": "1.0.0-r66.11-runtime",
+  "versionCode": 2026090901,
+  "apkSha256": "0A3A8F70FD8A42F81B4045F7DC92BCFC37AE4C32AFAC446A6D07C779A4DA4801",
+  "installedApkSha256": "0A3A8F70FD8A42F81B4045F7DC92BCFC37AE4C32AFAC446A6D07C779A4DA4801",
+  "apkBytes": 209790309,
+  "sourceHead": "3cb25a36b277fe1d49188d5d0fb152fb19581aec",
+  "retainedData": true,
+  "installMode": "adb install -r; no clear data or downgrade",
+  "installLog": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6611-install-and-checksum-attempt1.log",
+  "installLogSha256": "E34895D1BE527D154A543F9A0A815960A8E205784BD00D11129100795B6C88BC",
+  "nativeEvidenceManifest": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-11-native-20260909/native-evidence-manifest-v1.json",
+  "nativeEvidenceManifestSha256": "6B1EE5CCA392723F892B2C468AFBB7000986146234BB4C28A4959B8EDA9FCD20",
+  "scope": "Debug UI review only, not production promotion. Local contact drafts restored; review gateway application scenarios are process-local. No real OTP, support message, WhatsApp, payment or approval. Redmi untouched."
+}

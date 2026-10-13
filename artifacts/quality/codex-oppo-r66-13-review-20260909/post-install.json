@@ -1,0 +1,17 @@
+{
+  "state": "passed",
+  "candidate": "UAW-CODEX-OPPO-R66.13-REVIEW-20260909",
+  "deviceSerial": "2b3e0f71",
+  "installed": true,
+  "packageId": "com.moolsocial.app.runtime",
+  "versionName": "1.0.0-r66.13-runtime",
+  "versionCode": 2026090903,
+  "sourceHead": "9fd05843c8333b429d78024e4653f136684ae55b",
+  "apkSha256": "51CCCCEDA86C1DA803B4919467C3CF7BFAC9B5A1A6E40CD3A76B2E23143B3C10",
+  "installedApkSha256": "51CCCCEDA86C1DA803B4919467C3CF7BFAC9B5A1A6E40CD3A76B2E23143B3C10",
+  "apkBytes": 209790553,
+  "installMode": "adb install -r; no data clear",
+  "installLog": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6613-install-attempt1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "scope": "OPPO review package only; no Redmi, release, AAB or backend qualification."
+}

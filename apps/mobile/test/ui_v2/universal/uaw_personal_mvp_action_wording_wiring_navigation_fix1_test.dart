@@ -44,6 +44,13 @@ void main() {
               (subAction['id'], subAction['label']),
           ],
       };
+      // C29E/C32I supersede only the historical Social projection.
+      expectedSubActions['social'] = [
+        ('videos', 'Home'),
+        ('shorts', 'Shorts'),
+        ('create', 'Create'),
+        ('feed', 'Feed'),
+      ];
 
       expect(
         personalMoolRootActions.map((action) => (action.id, action.label)),
@@ -88,7 +95,11 @@ void main() {
         MoolSocialApp(session: journey, initialLocation: '/app/mool'),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(Key('mool-home-family-${destination.id}')));
+      await tester.tap(find.byKey(const Key('mool-compact-launcher')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(Key('mool-navigator-family-${destination.id}')),
+      );
       await tester.pumpAndSettle();
       expect(find.byKey(destination.ownerKey), findsOneWidget);
       expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
@@ -103,7 +114,11 @@ void main() {
       returnKey: Key('ride-booking-screen'),
     ),
     (id: 'book', route: '/app/book/doctor', returnKey: Key('book-doctor')),
-    (id: 'work', route: '/app/work/my-work', returnKey: Key('my-work-screen')),
+    (
+      id: 'work',
+      route: '/app/work/my-work',
+      returnKey: Key('work-choose-screen'),
+    ),
   ]) {
     testWidgets('${origin.id} connected chooser Back preserves its owner', (
       tester,
@@ -130,9 +145,7 @@ void main() {
     });
   }
 
-  testWidgets('Home header Chat returns to the exact Home owner', (
-    tester,
-  ) async {
+  testWidgets('Legacy Home Chat returns to Buy', (tester) async {
     final journey = signedInSession();
     addTearDown(journey.dispose);
     await journey.start();
@@ -141,14 +154,14 @@ void main() {
       MoolSocialApp(session: journey, initialLocation: '/app/mool'),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mool-home-chat')));
+    await tester.tap(find.byKey(const Key('mool-global-chat-tap')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
 
     expect(find.byKey(const Key('chat-back')), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('personal-mool-root-v2')), findsOneWidget);
-    expect(find.byKey(const Key('mool-home-dashboard')), findsOneWidget);
+    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+    expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
   });
 }

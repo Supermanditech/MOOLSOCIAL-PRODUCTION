@@ -71,6 +71,36 @@ class SocialComment {
   final DateTime publishedAt;
 }
 
+enum SocialEarningState { unavailable, building, eligible, active }
+
+class SocialEarningCriterion {
+  const SocialEarningCriterion({
+    required this.label,
+    required this.detail,
+    required this.met,
+  });
+
+  final String label;
+  final String detail;
+  final bool met;
+}
+
+class SocialPublicProfileStatus {
+  const SocialPublicProfileStatus({
+    required this.publicLabel,
+    required this.publicSummary,
+    required this.earningState,
+    required this.earningSummary,
+    this.criteria = const <SocialEarningCriterion>[],
+  });
+
+  final String publicLabel;
+  final String publicSummary;
+  final SocialEarningState earningState;
+  final String earningSummary;
+  final List<SocialEarningCriterion> criteria;
+}
+
 class SocialAuthorProfile {
   const SocialAuthorProfile({
     required this.authorId,
@@ -80,6 +110,9 @@ class SocialAuthorProfile {
     required this.followed,
     required this.isSelf,
     required this.posts,
+    this.paidFollowMonthlyPrice,
+    this.paidFollowBenefits = const <String>[],
+    this.publicStatus,
   });
 
   final String authorId;
@@ -89,6 +122,12 @@ class SocialAuthorProfile {
   final bool followed;
   final bool isSelf;
   final List<SocialPublishedItem> posts;
+  final int? paidFollowMonthlyPrice;
+  final List<String> paidFollowBenefits;
+  final SocialPublicProfileStatus? publicStatus;
+
+  bool get paidFollowAvailable =>
+      paidFollowMonthlyPrice != null && paidFollowMonthlyPrice! > 0;
 }
 
 class SocialPublishedItem {

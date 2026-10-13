@@ -42,6 +42,176 @@ void main() {
     },
   );
 
+  testWidgets(
+    'UI review Feed uses the real contract and keeps messaging on profiles',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        allowGuestReady: true,
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final shared = SharedSession(
+        socialContentGateway: UiReviewSocialContentGateway(
+          now: () => DateTime(2026, 8, 31, 12),
+        ),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      await journey.start();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            enableCreateReviewPreview: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(shared.socialPublishedItems, hasLength(3));
+      expect(
+        find.byKey(const Key('screen04-feed-review-preview-label')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-mode-forYou')),
+        findsOneWidget,
+      );
+      expect(find.text('Asha Verma'), findsOneWidget);
+      expect(find.text('Rohan Mehta'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-message-author-UI-REVIEW-FEED-001')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('social-author-relationship-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-network-discover')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-saved-posts')),
+        findsOneWidget,
+      );
+      expect(find.text('Like'), findsWidgets);
+      expect(find.text('Comment'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('screen04-feed-notifications')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-notifications-panel')),
+        findsOneWidget,
+      );
+      expect(find.text('Notification preview'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('social-notification-UI-REVIEW-NOTIFICATION-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-post-detail-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('screen04-feed-mode-following')));
+      await tester.pumpAndSettle();
+      expect(find.text('Your Following feed is ready to grow'), findsOneWidget);
+      expect(find.text('Asha Verma'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('screen04-feed-mode-forYou')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('social-open-post-UI-REVIEW-FEED-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-post-detail-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      expect(find.text('Conversation'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-comments-panel-UI-REVIEW-FEED-001')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('social-author-profile-UI-REVIEW-FEED-001')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Sign in to message'), findsOneWidget);
+      expect(
+        find.byKey(const Key('social-author-status-ui-review-asha')),
+        findsOneWidget,
+      );
+      expect(find.text('Earning program unavailable'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  test('UI review Feed adapter rejects every write', () async {
+    final gateway = UiReviewSocialContentGateway(
+      now: () => DateTime(2026, 8, 31, 12),
+    );
+    final page = await gateway.feed();
+    expect(page.items, hasLength(3));
+    expect(
+      () => gateway.interact(postId: page.items.first.id, interaction: 'like'),
+      throwsA(
+        isA<SocialContentGatewayException>().having(
+          (error) => error.code,
+          'code',
+          'ui_review_read_only',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'notification read status changes only after gateway acknowledgement',
+    () async {
+      final gateway = ReviewSocialContentGateway();
+      final session = SharedSession(socialContentGateway: gateway);
+      addTearDown(session.dispose);
+      await gateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'notification-read-owner',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'Open this notification destination.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+
+      expect(await session.loadSocialNotifications(refresh: true), isTrue);
+      expect(session.socialNotifications.single.read, isFalse);
+      expect(
+        await session.markSocialNotificationRead('TEST-NOTIFICATION-0001'),
+        isTrue,
+      );
+      expect(session.socialNotifications.single.read, isTrue);
+      expect(gateway.readNotifications, contains('TEST-NOTIFICATION-0001'));
+    },
+  );
+
   testWidgets('C30T Feed Create uses the authenticated creation gateway', (
     tester,
   ) async {
@@ -78,7 +248,21 @@ void main() {
 
     await tester.tap(find.text('Create a post'));
     await tester.pump();
-    expect(find.byKey(const Key('screen04-create-workbench')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-create-home')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('social-v2-create-workbench')),
+      findsOneWidget,
+    );
+    for (final key in const [
+      Key('screen04-create-tool-post'),
+      Key('screen04-create-tool-image'),
+      Key('screen04-create-tool-carousel'),
+      Key('screen04-create-tool-image-poll'),
+      Key('screen04-create-tool-quick-poll'),
+      Key('screen04-create-tool-quiz'),
+    ]) {
+      expect(find.byKey(key), findsOneWidget);
+    }
     expect(journey.stage, JourneyStage.ready);
     expect(journey.isAuthenticated, isTrue);
   });
@@ -124,6 +308,10 @@ void main() {
 
     expect(journey.stage, JourneyStage.signIn);
     expect(journey.returnTo, '/app/social?sub=create');
+    expect(
+      journey.authenticationPurpose,
+      JourneyAuthenticationPurpose.socialCreate,
+    );
     expect(find.byKey(const Key('social-v2-create-workbench')), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -251,7 +439,19 @@ void main() {
       await tester.ensureVisible(field);
       await tester.enterText(field, 'Keep this reply through sign-in');
       final submit = find.byKey(Key('social-reply-submit-${item.id}'));
-      await tester.ensureVisible(submit);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(Key('social-reply-context-${item.id}')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Replying to Riya Sharma'), findsOneWidget);
+      expect(find.text('No replies yet'), findsNothing);
+      expect(
+        tester.getBottomRight(submit).dy,
+        lessThanOrEqualTo(544),
+        reason: 'The reply action must stay above a 300dp keyboard.',
+      );
       await tester.tap(submit);
       await tester.pump();
 
@@ -397,6 +597,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(
+        find.byKey(Key('social-author-relationship-${item.id}')),
+      );
+      await tester.pump();
+      expect(journey.stage, JourneyStage.signIn);
+      expect(
+        journey.returnTo,
+        '/app/social?sub=feed&item=${item.id}&action=follow',
+      );
+      expect(shared.socialAuthorProfile(item.authorId!), isNull);
+      journey.cancelSignIn();
+      await tester.pumpAndSettle();
+
       await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
       await tester.pumpAndSettle();
       expect(journey.stage, JourneyStage.ready);
@@ -408,6 +621,14 @@ void main() {
       expect(find.text('@riyasharma'), findsWidgets);
       expect(find.text('A public author post.'), findsWidgets);
       expect(find.textContaining('followers'), findsOneWidget);
+      expect(
+        find.byKey(Key('social-author-paid-follow-${item.authorId}')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Paid following is not offered'),
+        findsOneWidget,
+      );
       expect(find.textContaining('email'), findsNothing);
       final follow = find.byKey(Key('social-author-follow-${item.authorId}'));
       await tester.ensureVisible(follow);
@@ -472,22 +693,399 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
-      await tester.pumpAndSettle();
-      final follow = find.byKey(Key('social-author-follow-${item.authorId}'));
-      await tester.ensureVisible(follow);
-      await tester.tap(follow);
+      final relationship = find.byKey(
+        Key('social-author-relationship-${item.id}'),
+      );
+      await tester.tap(relationship);
       await tester.pumpAndSettle();
 
       expect(shared.socialAuthorProfile(item.authorId!)?.followed, isTrue);
-      expect(find.text('Unfollow'), findsOneWidget);
-      await tester.tap(follow);
+      expect(
+        find.descendant(of: relationship, matching: find.text('Following')),
+        findsOneWidget,
+      );
+      await tester.tap(relationship);
       await tester.pumpAndSettle();
       expect(shared.socialAuthorProfile(item.authorId!)?.followed, isFalse);
-      expect(find.text('Follow'), findsOneWidget);
+      expect(find.text('Follow'), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'C30T restored Follow intent never unfollows an existing relationship',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final socialGateway = ReviewSocialContentGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      final item = await socialGateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'restored-follow-already-complete',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'Keep this existing follow relationship.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+      await socialGateway.follow(authorId: item.authorId!, followed: true);
+      await journey.start();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            initialItem: item.id,
+            initialAction: 'follow',
+            youtubePublicAccessOverride: false,
+            youtubeCreatorAccessOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(shared.socialAuthorProfile(item.authorId!)?.followed, isTrue);
+      expect(
+        find.descendant(
+          of: find.byKey(Key('social-author-relationship-${item.id}')),
+          matching: find.text('Following'),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'C30T public profile Block and Unblock wait for acknowledgement',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(snapshot: readySnapshot),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      final creator = CreatorSession();
+      final retailer = RetailerSession();
+      final socialGateway = ReviewSocialContentGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      addTearDown(journey.dispose);
+      addTearDown(creator.dispose);
+      addTearDown(retailer.dispose);
+      addTearDown(shared.dispose);
+      final item = await socialGateway.publish(
+        const SocialPublishDraft(
+          idempotencyKey: 'block-public-author',
+          type: SocialPublishedContentType.post,
+          authorName: 'Riya Sharma',
+          authorHandle: '@riyasharma',
+          body: 'A public post that can leave the Feed after blocking.',
+          audience: 'Public',
+          mediaPaths: <String>[],
+          mediaAreAssets: false,
+          choices: <SocialPublishedChoice>[],
+        ),
+      );
+      await journey.start();
+      await shared.loadSocialFeed(refresh: true);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SocialUniversalV2(
+            session: journey,
+            creatorSession: creator,
+            retailerSession: retailer,
+            sharedSession: shared,
+            initialSubAction: 'feed',
+            youtubePublicAccessOverride: false,
+            youtubeCreatorAccessOverride: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('social-author-profile-${item.id}')));
+      await tester.pumpAndSettle();
+      final block = find.byKey(Key('social-author-block-${item.authorId}'));
+      await tester.ensureVisible(block);
+      await tester.tap(block);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('social-author-block-save')));
+      await tester.pumpAndSettle();
+
+      expect(shared.socialAuthorBlocked(item.authorId!), isTrue);
+      expect(socialGateway.blockedAuthors[item.authorId], isTrue);
+      expect(find.text('Unblock profile'), findsOneWidget);
+      await tester.tap(block);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('social-author-block-save')));
+      await tester.pumpAndSettle();
+      expect(shared.socialAuthorBlocked(item.authorId!), isFalse);
+      expect(socialGateway.blockedAuthors[item.authorId], isFalse);
+      expect(find.text('Block profile'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('C30T guest Report preserves the exact post action', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      allowGuestReady: true,
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'guest-report-return',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'A public post with report controls.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-post-more-${item.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-report-post-${item.id}')));
+    await tester.pump();
+
+    expect(journey.stage, JourneyStage.signIn);
+    expect(
+      journey.returnTo,
+      '/app/social?sub=feed&item=${item.id}&action=report',
+    );
+    expect(socialGateway.reports, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T authenticated Report waits for durable confirmation', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'authenticated-report',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'Report this post only after confirmation.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-post-more-${item.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-report-post-${item.id}')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(Key('social-report-reason-dialog-${item.id}')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('social-report-reason-spam')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('social-report-confirm-${item.id}')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('social-report-send')));
+    await tester.pumpAndSettle();
+
+    expect(socialGateway.reports, hasLength(1));
+    expect(socialGateway.reports.single.$1, item.id);
+    expect(socialGateway.reports.single.$2, SocialReportReason.spam);
+    expect(shared.socialPostReported(item.id), isTrue);
+    expect(find.textContaining('Report sent'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T guest Saved posts preserves the exact return', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      allowGuestReady: true,
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final shared = SharedSession(
+      socialContentGateway: UiReviewSocialContentGateway(),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    await journey.start();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          enableCreateReviewPreview: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('screen04-feed-saved-posts')));
+    await tester.pump();
+
+    expect(journey.stage, JourneyStage.signIn);
+    expect(journey.returnTo, '/app/social?sub=feed&state=saved');
+    expect(journey.readyRoute(), '/app/social?sub=feed');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('C30T Saved posts opens the selected public post', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final journey = JourneySession(
+      store: MemoryJourneyStore(snapshot: readySnapshot),
+      otpGateway: ReviewOtpGateway(signedIn: true),
+    );
+    final creator = CreatorSession();
+    final retailer = RetailerSession();
+    final socialGateway = ReviewSocialContentGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    addTearDown(journey.dispose);
+    addTearDown(creator.dispose);
+    addTearDown(retailer.dispose);
+    addTearDown(shared.dispose);
+    final item = await socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'saved-post-library',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'A useful post saved for later.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await journey.start();
+    await shared.loadSocialFeed(refresh: true);
+    expect(await shared.toggleSocialSave(item.id), isTrue);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SocialUniversalV2(
+          session: journey,
+          creatorSession: creator,
+          retailerSession: retailer,
+          sharedSession: shared,
+          initialSubAction: 'feed',
+          youtubePublicAccessOverride: false,
+          youtubeCreatorAccessOverride: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('screen04-feed-saved-posts')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('social-saved-posts-panel')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(Key('social-saved-post-${item.id}')),
+        matching: find.text('A useful post saved for later.'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(Key('social-saved-open-${item.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(Key('social-post-detail-${item.id}')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'C30T post-sign-in author return reopens the exact public author',
@@ -694,6 +1292,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('social-share-send-chat')), findsOneWidget);
+      expect(find.byKey(const Key('social-share-other-apps')), findsOneWidget);
+      expect(find.byKey(const Key('social-copy-post-link')), findsOneWidget);
       expect(socialGateway.interactions, isEmpty);
       await tester.tap(find.byKey(const Key('social-share-add-thoughts')));
       await tester.pump();
@@ -755,15 +1355,23 @@ void main() {
         await tester.pump();
       }
 
-      await tester.tap(
-        find.byKey(const Key('social-message-author-public-action-truth')),
-      );
-      await tester.pump();
-      expect(journey.stage, JourneyStage.signIn);
       expect(
-        journey.returnTo,
-        '/app/chat?start=public-author-1&return=%2Fapp%2Fsocial%3Fsub%3Dfeed',
+        find.byKey(const Key('social-message-author-public-action-truth')),
+        findsNothing,
       );
+      await tester.tap(
+        find.byKey(const Key('social-author-profile-public-action-truth')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-author-panel-public-author-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('social-author-message-request-public-author-1')),
+        findsNothing,
+      );
+      expect(journey.stage, JourneyStage.ready);
       expect(socialGateway.interactions, isEmpty);
       expect(tester.takeException(), isNull);
     },

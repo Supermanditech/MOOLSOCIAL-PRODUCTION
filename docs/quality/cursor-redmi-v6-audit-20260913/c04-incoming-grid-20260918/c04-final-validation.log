@@ -1,0 +1,24 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: (setUpAll)
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 shop whole grid follows finger reduced=false
+00:07 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 1.0
+00:11 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 1.0
+00:17 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 1.0
+00:17 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 wholesale whole grid follows finger reduced=true
+00:21 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 2.0
+00:23 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 2.0
+00:25 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation shop 2.0
+00:28 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C04 offers shared grid follows finger and changes page
+00:28 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:29 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:30 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:32 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:34 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_founder_pending_review_test.dart: C07 actual Buy route retains search and stays closed across rotation
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:34 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:35 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 1.0
+00:37 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe pages and compact navigation wholesale 2.0
+00:44 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe final page shop
+00:45 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU swipe final page wholesale
+00:45 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: (tearDownAll)
+00:45 +18: All tests passed!

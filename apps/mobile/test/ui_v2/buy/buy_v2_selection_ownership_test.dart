@@ -38,9 +38,10 @@ void main() {
       expect(session.selectedAddressId, isNull);
       expect(session.selectedAddressOrNull, isNull);
       expect(() => session.selectedAddress, throwsStateError);
-      expect(session.openCheckout(), isFalse);
-      expect(session.view, BuyV2View.cart);
-      expect(session.notice, 'Choose a delivery address to continue.');
+      expect(session.openCheckout(), isTrue);
+      expect(session.view, BuyV2View.checkout);
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+      expect(session.notice, isNull);
       expect(session.confirmOrder(), isFalse);
       expect(session.itemCount, product.minimumOrder);
       expect(session.orders.length, orderCount);
