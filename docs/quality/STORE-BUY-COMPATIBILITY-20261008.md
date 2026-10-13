@@ -4,6 +4,13 @@
 
 ### Exact APK navigation replay correction — 13 October
 
+Qualified correction: `23a1d3a16363131603546cbf2d6af89c8da29297`.
+Apps tree: `bd45428ed324e9cea67f38868d4b253f061e51f8`; lib remains
+`be50d78dbe1dbd60dcab33a6c5423002403630d8`. The existing admission checker
+binds this source and its actual replay/analysis logs; only admission metadata
+may follow. The successor starts at af95d64f, keeps both previous baselines and
+must equal the automatic merge tree of af95d64f and the exact published repair.
+
 R67.2's wrapper stopped before compilation; no APK was created or installed.
 Its failed navigation replay and candidate state remain preserved. The existing
 approved test-only scope covers this correction, not a runtime redesign.
