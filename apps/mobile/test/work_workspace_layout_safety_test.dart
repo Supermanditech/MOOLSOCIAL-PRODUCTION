@@ -31731,10 +31731,15 @@ void main() {
     });
     testWidgets('STORE-PARITY single Sales action', (tester) async {
       for (final scale in [1.0, 2.0]) {
+        final work = storeViewFixture();
+        // This is the entry to an unfinished Counter bill, not permission to
+        // replace a separately selected customer order. Prepare through the
+        // normal controller operation before exercising its home entry.
+        expect(work.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop'), isTrue);
         await mount(
           tester,
           route: '/app/buy',
-          work: storeViewFixture(),
+          work: work,
           textScale: scale,
           uiReviewOnly: true,
         );
@@ -31752,7 +31757,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Counter sale'), findsOneWidget);
         expect(find.byKey(const Key('work-store-action-edge')), findsNothing);
-        final action = find.byKey(const Key('work-sales-new-counter-sale'));
+        final action = find.byKey(const Key('work-sales-primary-counter-sale'));
         await tester.ensureVisible(action);
         await tester.pumpAndSettle();
         expect(action.hitTestable(), findsOneWidget);
@@ -66760,9 +66765,20 @@ void main() {
         await tester.tap(find.byKey(const Key('work-back')));
         await tester.pumpAndSettle();
         if (storeReviewRuntime) {
-          // Runtime binds an account: a conflicted selected order cannot be
-          // persisted as this Counter draft. Leaving risks data loss and must
-          // offer recovery, not silently discard the bill to satisfy a fixture.
+          // Sales retains its full-screen composer: Review -> Items -> Home.
+          // Returning to Sales home is not leaving the Store or discarding it.
+          expect(find.byKey(const Key('work-sales-home')), findsOneWidget);
+          expect(work.currentWorkspaceOrder, same(incoming));
+          expect(work.workspaceOrderCustomer, '9829012345');
+          expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+          expect(work.workspaceInvoices, isEmpty);
+          // Now attempt the actual Store-leave boundary. A selected incoming
+          // order must not be overwritten by saving the unfinished Counter bill.
+          expect(await work.saveWorkspaceCounterDraft(), isFalse);
+          final leaveSales = find.byKey(const Key('work-store-home'));
+          expect(leaveSales.hitTestable(), findsOneWidget);
+          await tester.tap(leaveSales);
+          await tester.pumpAndSettle();
           expect(
             find.byKey(const Key('work-order-discard-dialog')),
             findsOneWidget,
@@ -66778,9 +66794,17 @@ void main() {
           expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
           expect(work.workspaceInvoices, isEmpty);
           expect(
-            find.byKey(const Key('work-order-review-summary')),
+            find.byKey(const Key('work-sales-home')),
             findsOneWidget,
           );
+          expect(jsonEncode(incoming.toLedgerJson()), incomingBefore);
+          await openSalesTask(tester, 'counter');
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-order-review')), findsOneWidget);
+          expect(work.workspaceOrderCustomer, '9829012345');
+          expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+          expect(work.currentWorkspaceOrder, same(incoming));
+          expect(work.workspaceInvoices, isEmpty);
           expect(tester.takeException(), isNull);
           return;
         }
