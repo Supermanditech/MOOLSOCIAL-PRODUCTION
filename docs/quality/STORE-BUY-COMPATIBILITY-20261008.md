@@ -2,6 +2,40 @@
 
 ## Direct baseline continuation — founder-approved 13 October 2026
 
+### Final publication admission (metadata only)
+
+Qualified source is `e0695334692dddb6e34e262c88b14612f2f33510`, published
+with clean exact remote equality. Its complete `apps` tree is
+`d5d6435cb0f3ae859a43b5f50a1cf6b607eb4635`. The final admission correction
+changes only this record and the existing checker/focused producer. No policy,
+registry, application, dependency or accepted screen changes are made here.
+
+The existing direct-continuation check now admits source authorization and
+final integration verify/close only under their exact root/branch/task identities.
+It retains ownership, registry generation, secret checks and linear repair
+history. Admission additionally requires the unchanged qualified apps tree,
+metadata-only successors, actual retained test-log hashes, all registered
+worktrees clean, the exact Store/Cursor/repair remote tips and the annotated
+governance tag's local/remote equality. The final branch must contain one
+automatic two-parent merge from that tag, with the exact approved repair tip
+as second parent and an entire tree identical to that tip. Close requires exact
+final local/remote equality. No APK or provider acceptance is granted.
+
+The focused identity test reproduced the missing source-admission permission
+before correction; all 48 positive/negative identity probes then passed on
+PowerShell 7 and Windows PowerShell 5.1. Actual live admission/integration checks
+remain required before reporting the final baseline. These probe counts alone
+do not qualify a merge.
+
+Actual host logs used for unchanged-source reuse (SHA-256):
+
+- Impacted final, 1219 pass / 11 existing skips:
+  `A5AE29710DC6755315FC39DF58CB6EBEEE0A69171833694A44AD3AE5390D4AFE`
+- Exact final focused replay, 77 pass:
+  `ABD6D8DD1FD065797D5DEF521C0813AC1BD1D018DFC04EB09BBA83EA2ADF5B00`
+- Final focused analysis, no issues:
+  `CE615622C3C82DAEAEEEA969EB621F66B048712EA9CE8E71652484AF771B4EAB`
+
 The operative goal supersedes this task's capture/phase prerequisite only.
 Use immutable checkpoint `50b0af4e0d02df0b5c615db773432a77b10214d0`, which
 already contains exact Store `8002e8cd740aaf613b75dc749212fb12ae4fddb7` and

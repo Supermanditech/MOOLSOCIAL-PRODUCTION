@@ -65,12 +65,23 @@ function Test-OctoberDirectBaselineIdentity([hashtable]$Facts) {
     WorkId='store-buy-compatibility-20261008'
     TicketId='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'
   }
+  $phases=@('task_start','implementation','pre_commit','handoff','integration_admission_authorize')
+  if ($Facts.ContainsKey('Lane') -and $Facts.Lane -ceq 'integration') {
+    $exact=@{
+      Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'
+      Branch='integration/moolsocial/store-buy-combined-baseline-20261008'
+      Role='primary'; Task='/root'; Lane='integration'
+      WorkId='store-buy-combined-baseline-20261008'
+      TicketId='UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008'
+    }
+    $phases=@('integration_verify','integration_close')
+  }
   foreach ($key in $exact.Keys) {
     if (-not $Facts.ContainsKey($key) -or $Facts[$key] -isnot [string] -or
         $Facts[$key] -cne $exact[$key]) { return $false }
   }
   return $Facts.ContainsKey('Phase') -and $Facts.Phase -is [string] -and
-    $Facts.Phase -cin @('task_start','implementation','pre_commit','handoff')
+    $Facts.Phase -cin $phases
 }
 
 # Exact forward successor; these predicates grant no admission until the live
@@ -9337,20 +9348,28 @@ foreach ($readOwner in $mandatoryReads) {
 $rawClaims = @($policy.activeClaims)
 $claims = @($rawClaims)
 $directRoot='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-compatibility-20261008'
-if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot) {
+$directFinalRoot='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'
+$directFinal=$root.Replace('\','/').TrimEnd('/') -ceq $directFinalRoot
+if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
   $directBranch=@(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($directBranch.Count -eq 1 -and (Test-OctoberDirectBaselineIdentity @{
-    Root=$directRoot; Branch=$directBranch[0]; Role=$AgentRole; Task=$AgentTask
+    Root=$root.Replace('\','/').TrimEnd('/'); Branch=$directBranch[0]; Role=$AgentRole; Task=$AgentTask
     Lane=$ProductionLane; WorkId=$ProductionWorkId; TicketId=$ProductionTicketId; Phase=$ProductionPhase
   })) 'Direct baseline continuation identity/phase is outside the founder-approved boundary.'
   $anchor='50b0af4e0d02df0b5c615db773432a77b10214d0'
   $directHead=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0]
+  $directSourceHead=$directHead
+  if ($directFinal) {
+    $parents=(@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P','HEAD'))[0] -split ' ')
+    Assert-Coordination ($parents.Count -eq 2) 'Combined baseline requires exactly two merge parents.'
+    $directSourceHead=$parents[1]
+  }
   Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"${anchor}^{tree}"))[0]) -ceq
     '3522fc0894e2753da85ed6653253dcb43af32351') 'Direct baseline anchor tree changed.'
   foreach ($tip in @($anchor,'8002e8cd740aaf613b75dc749212fb12ae4fddb7','f32c17e1a3a41807564fe18f83c0520a66e0bfe6')) {
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$tip,'HEAD') | Out-Null
   }
-  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$anchor..HEAD")).Count -eq 0) 'Direct repairs must remain linear.'
+  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$anchor..$directSourceHead")).Count -eq 0) 'Direct repairs must remain linear.'
   Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and
     (@(Get-OctoberCompatibilityGitLines @('rev-parse','--is-shallow-repository'))[0]) -ceq 'false') 'Direct baseline history overrides are forbidden.'
   foreach ($operation in @('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply','info/grafts')) {
@@ -9406,10 +9425,74 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot) {
       @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'Precommit requires staged work only.'
   }
-  if ($ProductionPhase -cin @('task_start','handoff')) {
+  if ($ProductionPhase -cin @('task_start','handoff','integration_admission_authorize','integration_verify','integration_close')) {
     Assert-Coordination (Test-ProductionWorktreeClean $root) 'Direct baseline boundary must be clean.'
   }
-  Write-Output 'Direct baseline ownership/Git/registry/secret checks passed; qualification, publication and APK acceptance are not granted.'
+  if ($directFinal -or $ProductionPhase -ceq 'integration_admission_authorize') {
+    # The approved direct route reuses actual tests of e069, not the retired
+    # recursive capture/phase workflow. Only metadata may follow that source.
+    $qualified='e0695334692dddb6e34e262c88b14612f2f33510'
+    Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$qualified,$directSourceHead) | Out-Null
+    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"${directSourceHead}:apps"))[0]) -ceq
+      'd5d6435cb0f3ae859a43b5f50a1cf6b607eb4635') 'Qualified application tree changed; fresh regression evidence required.'
+    foreach ($path in @(Get-OctoberCompatibilityGitLines @('diff','--name-only',$qualified,$directSourceHead))) {
+      Assert-Coordination ($path -cin @('scripts/check-codex-subagent-coordination-policy.ps1',
+        'scripts/test-codex-integration-repair-coordination-policy.ps1',
+        'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')) 'Post-qualification work is not admission metadata only.'
+    }
+    $logRoot='C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/work'
+    foreach ($log in @(
+      @('direct-baseline-impacted-final-20261013.log','A5AE29710DC6755315FC39DF58CB6EBEEE0A69171833694A44AD3AE5390D4AFE'),
+      @('direct-baseline-final-focused-20261013.log','ABD6D8DD1FD065797D5DEF521C0813AC1BD1D018DFC04EB09BBA83EA2ADF5B00'),
+      @('direct-baseline-analysis-clean-20261013.log','CE615622C3C82DAEAEEEA969EB621F66B048712EA9CE8E71652484AF771B4EAB'))) {
+      Assert-Coordination ((Get-FileHash -LiteralPath (Join-Path $logRoot $log[0]) -Algorithm SHA256).Hash -ceq $log[1]) 'Actual qualified test log is missing or changed.'
+    }
+    foreach ($source in @(
+      @('work/codex-ui/add-product-screen1-20260920','8002e8cd740aaf613b75dc749212fb12ae4fddb7'),
+      @('work/cursor-ui/buy-ready-20260921','f32c17e1a3a41807564fe18f83c0520a66e0bfe6'),
+      @('work/integration-repair/store-buy-compatibility-20261008',$directSourceHead))) {
+      Assert-Coordination ((Get-ProductionRemoteBranchHead $source[0]) -ceq $source[1]) 'Approved source remote changed.'
+    }
+    $tag='moolsocial-parallel-production-discipline-20260824-v86'
+    $start=@(Get-OctoberCompatibilityGitLines @('rev-parse',"${tag}^{commit}"))[0]
+    Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('cat-file','-t',$tag))[0]) -ceq 'tag' -and
+      $start -ceq 'c2a65ac51ed58174754b9b07f2223583c48500b3') 'Governance start tag changed.'
+    $remoteTag=@(Get-OctoberCompatibilityGitLines @('ls-remote','--exit-code','origin',"refs/tags/$tag^{}"))
+    Assert-Coordination ($remoteTag.Count -eq 1 -and ($remoteTag[0] -split '\s+')[0] -ceq $start) 'Governance tag remote differs.'
+    foreach ($line in @(Get-OctoberCompatibilityGitLines @('worktree','list','--porcelain'))) {
+      if ($line.StartsWith('worktree ',[StringComparison]::Ordinal)) {
+        Assert-Coordination (Test-ProductionWorktreeClean $line.Substring(9)) 'Registered worktree is not clean.'
+      }
+    }
+    if ($directFinal) {
+      Assert-Coordination ($ApprovedFeatureCommits.Count -eq 1 -and $ApprovedFeatureCommits[0] -ceq $directSourceHead -and
+        $ApprovedFeatureBranches.Count -eq 1 -and $ApprovedFeatureBranches[0] -ceq
+        'work/integration-repair/store-buy-compatibility-20261008') 'Exact qualified integration selection required.'
+      Assert-Coordination ($parents[0] -ceq $start -and
+        (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s','HEAD'))[0]) -ceq
+        'merge(store-buy-combined-baseline-20261008): integrate qualified Store and public Buy') 'Final merge identity changed.'
+      $automatic=@(Get-OctoberCompatibilityGitLines @('merge-tree','--write-tree',$start,$directSourceHead))
+      $actual=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD^{tree}'))[0]
+      Assert-Coordination ($automatic.Count -eq 1 -and $automatic[0] -ceq $actual -and
+        $actual -ceq (@(Get-OctoberCompatibilityGitLines @('rev-parse',"${directSourceHead}^{tree}"))[0])) 'Final tree is not the unchanged automatic integration.'
+      Assert-ProductionSecretSafe -BaseCommit $start -HeadCommit $directHead
+      if ($ProductionPhase -ceq 'integration_close') {
+        Assert-Coordination ((Get-ProductionRemoteBranchHead $directBranch[0]) -ceq $directHead) 'Final local/remote baseline differs.'
+      }
+    } else {
+      Assert-Coordination ($IntegrationTargetRoot.Replace('\','/').TrimEnd('/') -ceq $directFinalRoot -and
+        $IntegrationTargetWorkId -ceq 'store-buy-combined-baseline-20261008' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008') 'Source admission target differs.'
+      $targetHead=@(& git -C $IntegrationTargetRoot rev-parse HEAD)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and $targetHead[0] -ceq $start) 'Target must start at the governance tag.'
+      $targetBranch=@(& git -C $IntegrationTargetRoot branch --show-current)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and $targetBranch[0] -ceq
+        'integration/moolsocial/store-buy-combined-baseline-20261008') 'Target branch differs.'
+    }
+    Write-Output 'Direct baseline exact source, host evidence, ownership, secrets, Git and integration boundary passed; APK/provider acceptance excluded.'
+  } else {
+    Write-Output 'Direct baseline ownership/Git/registry/secret checks passed; qualification, publication and APK acceptance are not granted.'
+  }
   return
 }
 $octoberCompatibilityTestAdmissionVerified=$false

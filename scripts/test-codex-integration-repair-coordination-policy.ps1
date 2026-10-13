@@ -51,7 +51,7 @@ if ($RequireDirectBaselineScopeProbes) {
     Lane='integration_repair'; WorkId='store-buy-compatibility-20261008'
     TicketId='UAW-INTEGRATION-REPAIR-STORE-BUY-COMPATIBILITY-20261008'; Phase='implementation'}
   $cases=0
-  foreach ($phase in @('task_start','implementation','pre_commit','handoff')) {
+  foreach ($phase in @('task_start','implementation','pre_commit','handoff','integration_admission_authorize')) {
     $probe=$facts.Clone(); $probe.Phase=$phase
     Assert-RepairContract (Test-OctoberDirectBaselineIdentity $probe) 'exact repair identity rejected.'
     $cases++
@@ -63,15 +63,38 @@ if ($RequireDirectBaselineScopeProbes) {
     Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) "missing $key accepted."
     $cases+=2
   }
-  foreach ($phase in @('integration_admission_authorize','candidate_preflight','baseline','')) {
+  foreach ($phase in @('candidate_preflight','baseline','')) {
     $probe=$facts.Clone(); $probe.Phase=$phase
     Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) 'publication/build phase accepted by repair-only identity.'
     $cases++
   }
   Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $null)) 'null facts accepted.'
   $cases++
-  Assert-RepairContract ($cases -eq 25) 'direct scope probe count changed.'
-  Write-Output "Direct baseline repair identity: $cases probes passed; no qualification/publication/APK authority."
+  $facts=@{Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008'
+    Branch='integration/moolsocial/store-buy-combined-baseline-20261008'; Role='primary'; Task='/root'
+    Lane='integration'; WorkId='store-buy-combined-baseline-20261008'
+    TicketId='UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008'; Phase='integration_verify'}
+  foreach ($phase in @('integration_verify','integration_close')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-RepairContract (Test-OctoberDirectBaselineIdentity $probe) 'exact final integration identity rejected.'
+    $cases++
+  }
+  foreach ($key in @($facts.Keys)) {
+    $probe=$facts.Clone(); $probe[$key]='altered'
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) "altered final $key accepted."
+    $probe=$facts.Clone(); $probe.Remove($key)
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) "missing final $key accepted."
+    $cases+=2
+  }
+  foreach ($phase in @('implementation','integration_start','candidate_preflight','')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $probe)) 'unsupported final phase accepted.'
+    $cases++
+  }
+  Assert-RepairContract (-not (Test-OctoberDirectBaselineIdentity $null)) 'null final facts accepted.'
+  $cases++
+  Assert-RepairContract ($cases -eq 48) 'direct scope probe count changed.'
+  Write-Output "Direct baseline identities: $cases probes passed; live source/Git checks remain required; no APK authority."
   return
 }
 
