@@ -156,6 +156,15 @@ class JourneySession extends ChangeNotifier {
 
   bool get isReady => stage == JourneyStage.ready;
   bool get isAuthenticated => _isAuthenticated;
+
+  /// Read-only validity for retained navigation; never authenticates a caller.
+  int? get navigationAuthenticationGeneration =>
+      !_disposed &&
+          isReady &&
+          isAuthenticated &&
+          !authenticatedRevalidationPending
+      ? _authenticationGeneration
+      : null;
   bool get socialAuthCleanupRequired => _socialAuthCleanupRequired;
   bool get principalBindingCleanupRequired => _principalBindingCleanupRequired;
   bool isSocialAuthProviderAvailable(SocialAuthProvider provider) =>

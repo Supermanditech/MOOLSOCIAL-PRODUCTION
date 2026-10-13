@@ -32,8 +32,77 @@ checker/state and business data remain unchanged. Windows PowerShell's successfu
 Git stderr messages are captured and classified by native exit code, not mistaken
 for failure; error matching uses the cross-host ordinal IndexOf overload.
 The complete fixture and 25 direct-identity probes passed on PowerShell 7 and 5.1.
-Actual legacy-route correction and its regressions remain pending; no combined
-baseline or APK acceptance is claimed by these host results.
+At the d3a1d03c checkpoint, the legacy correction was still pending. Its later
+implementation/verification is recorded below; these fixture results alone
+grant neither combined-baseline nor APK acceptance.
+
+REG4649 diagnostic-boundary recurrence: a default Flutter test regenerated
+tracked plugin support. The scope guard rejected the resulting dirt, but the
+orchestration incorrectly applied two read-only getter patches after that
+nonzero result. Those changes remained explicitly unqualified. The generated
+support was audited (timestamp/path regeneration, no pubspec/lock changes),
+restored to Git-equivalent original content, and the scope audit passed again.
+Every subsequent orchestration branches on the actual command exit before
+editing; Flutter tests use `--no-pub`. Refresh founder/ownership checks before
+continuing. Registry bytes and the original lesson remain unchanged.
+
+### Concrete legacy correction and host verification — 13 October
+
+Normal routing contains unapproved retailer services (including review/active
+query states), customer-detail links only, and campaign links. The customer list
+and current Store journeys remain reachable. Constructor-only legacy fixtures
+remain explicit; URL flags do not grant that mode. Existing auth/setup/proof
+precedence and the six Personal containment families remain intact.
+
+Back requires the actual retained imperative page stack, matching page identity
+and full origin URI, current ready authentication generation and monotonic Store
+id/profile/verification revision. Valid Back retains customer scroll and draft
+fields; cold/stale contexts use current MyWork. Stale/disposed callbacks are
+inert, double Back is consumed once, and rejected covered-page taps do not lock
+subsequent Back. No backend operation or runtime commerce record is introduced.
+WorkSession's unrelated formatter churn was removed; its final change is eight
+lines of read-only navigation-scope observation.
+
+The first broad run failed one stale Activity Deck assertion (1218 pass, 11 skip,
+1 fail). That run is preserved, not relabelled. The already-owned vertical-slice
+assertion now names the approved Analytics home and rejects the retired Deck;
+its Stock opening and live-state checks remain. Focused replay passed, followed
+by the complete 15-file impacted run: **1219 pass, 11 pre-existing skips, zero
+failures**. Skips remain skips, not device/backend evidence.
+
+| Actual host check | Result |
+| --- | --- |
+| Existing containment suite including retained scroll/draft and stale-context cases | 25 passed |
+| Impacted auth/Work/Stock/atomic operations/publication/PDF/download/Chat/routing, 15 files | 1219 passed; 11 existing skips |
+| Store search, Purchases, Counter sale, ledgers/statements, Analytics, compact/enlarged/landscape recovery | 38 passed |
+| Shop, Wholesale, Offers, every 2-way mix and the 3-way mix, text scales 1 and 2 | 14 passed |
+| Final exact-source combined containment/Store/Cart replay | 77 passed; zero skips/failures |
+| Focused analysis of runtime corrections and both affected Dart tests | No issues |
+| Existing approved UI/reference locks | Passed |
+
+Runtime Git blobs verified at final replay:
+- journey_router.dart: `b67599a31ed3d20359479cd4e9d6371a6e3c289f`
+- journey_session.dart: `3d0f126a1b6ac7d6cc19c65ecbfcfb1afd378ab7`
+- work_session.dart: `6b79fc07bd60a36dd0202e28b0291431429821be`
+- legacy_route_containment_screen_v2.dart: `0163b4ba22585259e89def2de1221acdc273a6c1`
+
+Logs retained in the existing task's work directory:
+`direct-baseline-impacted-20261013.log` (failed original),
+`direct-baseline-live-store-20261013.log` (corrected assertion replay),
+`direct-baseline-containment-20261013.log`,
+`direct-baseline-impacted-final-20261013.log`,
+`direct-baseline-final-focused-20261013.log` and
+`direct-baseline-analysis-clean-20261013.log`.
+The 77-case replay includes the final brace-only analysis cleanup; that cleanup
+does not change the 15-file run's runtime behavior.
+Architect context review found no material blocker in the stated design; this
+is advice, not independent source/test or publication verification.
+
+These are isolated host fixtures, not real-user device, live-provider, backend
+or APK acceptance. Existing evaluation Store records were not operated on.
+Public preview/projection, authoritative operational refresh, authentication/
+payment-provider integration, OCR/native permissions and fresh OPPO/Redmi APK
+qualification remain deferred to their actual dependencies/subsequent scope.
 
 ## Current W-bound purchase recovery amendment (10 October 2026)
 

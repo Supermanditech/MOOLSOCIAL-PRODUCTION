@@ -1788,7 +1788,8 @@ void main() {
         workSession: work,
       );
 
-      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      expect(find.byKey(const Key('work-store-activity-deck')), findsNothing);
       await tapVisible(tester, const Key('work-store-stock'));
       expect(
         find.byKey(const Key('work-dashboard-catalogue-screen')),

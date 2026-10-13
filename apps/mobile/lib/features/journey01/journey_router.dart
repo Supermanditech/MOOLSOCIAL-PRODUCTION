@@ -343,6 +343,16 @@ GoRouter createJourneyRouter(
   }
 
   late final GoRouter router;
+  ({
+    List<RouteMatchBase> matches,
+    Uri location,
+    int? authentication,
+    int? workspaceRevision,
+    String? workspaceId,
+    bool verified,
+  })?
+  legacyReturnOrigin;
+  ValueKey<String>? legacyReturnPageKey;
   VoidCallback buyExit(BuildContext context, GoRouterState state) => () {
     if (context.canPop()) {
       context.pop();
@@ -435,6 +445,11 @@ GoRouter createJourneyRouter(
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
           if (!protected) return session.readyRoute();
+          final prior = router.routerDelegate.currentConfiguration;
+          final authentication = session.navigationAuthenticationGeneration;
+          final workspaceRevision = workSession.navigationScopeRevision;
+          final workspaceId = workSession.activeWorkspace?.id;
+          final verifiedWorkspace = workSession.hasVerifiedWorkspace;
           if (await workSession.recoverPendingProof(
             accountReady: session.isAuthenticated || uiReviewOnly,
           )) {
@@ -444,8 +459,32 @@ GoRouter createJourneyRouter(
               ? null
               : legacyRouteContainmentFor(state.uri);
           if (containment != null) {
+            legacyReturnOrigin = null;
+            legacyReturnPageKey = null;
+            if (containment.id.startsWith('retailer-') &&
+                prior.matches.isNotEmpty) {
+              final previous = prior.matches.last;
+              final previousUri = previous is ImperativeRouteMatch
+                  ? previous.matches.uri
+                  : prior.uri;
+              if (previousUri.path.startsWith('/app/') &&
+                  previousUri.path != '/app/action-unavailable' &&
+                  legacyRouteContainmentFor(previousUri) == null) {
+                legacyReturnOrigin = (
+                  matches: List<RouteMatchBase>.unmodifiable(prior.matches),
+                  location: previousUri,
+                  authentication: authentication,
+                  workspaceRevision: workspaceRevision,
+                  workspaceId: workspaceId,
+                  verified: verifiedWorkspace,
+                );
+              }
+            }
             return containment.recoveryLocation;
           }
+          if (location == '/app/action-unavailable') return null;
+          legacyReturnOrigin = null;
+          legacyReturnPageKey = null;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (session.isReady &&
                 router.routeInformationProvider.value.uri.path == location) {
@@ -492,11 +531,65 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/action-unavailable',
-        builder: (context, state) => LegacyRouteContainmentScreenV2(
-          spec: legacyRouteContainmentSpecForReason(
+        builder: (context, state) {
+          final spec = legacyRouteContainmentSpecForReason(
             state.uri.queryParameters['reason'],
-          ),
-        ),
+          );
+          if (!spec.id.startsWith('retailer-')) {
+            return LegacyRouteContainmentScreenV2(spec: spec);
+          }
+          legacyReturnPageKey ??= state.pageKey;
+          final origin = legacyReturnPageKey == state.pageKey
+              ? legacyReturnOrigin
+              : null;
+          bool back() {
+            if (!context.mounted) return false;
+            final current = router.routerDelegate.currentConfiguration;
+            if (current.matches.isEmpty) return false;
+            final top = current.matches.last;
+            final currentUri = top is ImperativeRouteMatch
+                ? top.matches.uri
+                : current.uri;
+            // A stale screen callback must never navigate a replaced route.
+            if (top.pageKey != state.pageKey || currentUri != state.uri) {
+              return false;
+            }
+            final retained =
+                origin != null &&
+                top is ImperativeRouteMatch &&
+                current.matches.length == origin.matches.length + 1 &&
+                List.generate(origin.matches.length, (i) => i).every(
+                  // GoRouter reparses match objects while retaining these pages.
+                  (i) => current.matches[i] == origin.matches[i],
+                ) &&
+                (current.matches[current.matches.length - 2]
+                            is ImperativeRouteMatch
+                        ? (current.matches[current.matches.length - 2]
+                                  as ImperativeRouteMatch)
+                              .matches
+                              .uri
+                        : current.uri) ==
+                    origin.location;
+            final sameScope =
+                origin != null &&
+                origin.authentication != null &&
+                origin.authentication ==
+                    session.navigationAuthenticationGeneration &&
+                origin.workspaceRevision != null &&
+                origin.workspaceRevision ==
+                    workSession.navigationScopeRevision &&
+                origin.workspaceId == workSession.activeWorkspace?.id &&
+                origin.verified == workSession.hasVerifiedWorkspace;
+            if (retained && sameScope && router.canPop()) {
+              router.pop();
+            } else {
+              router.go('/app/work/my-work');
+            }
+            return true;
+          }
+
+          return LegacyRouteContainmentScreenV2(spec: spec, onBack: back);
+        },
       ),
       GoRoute(
         path: '/app/buy',

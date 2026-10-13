@@ -9386,6 +9386,7 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot) {
   $permitted=@('config/codex-subagent-coordination-policy.json','scripts/check-codex-subagent-coordination-policy.ps1',
     'scripts/test-codex-integration-repair-coordination-policy.ps1','scripts/test-cross-agent-incremental-ticket-gate.ps1',
     'apps/mobile/lib/features/journey01/journey_router.dart','apps/mobile/lib/features/work/work_session.dart',
+    'apps/mobile/test/work_vertical_slice_test.dart',
     'docs/quality/STORE-BUY-COMPATIBILITY-20261008.md')+$addedOwners
   $directChanged=@(@(Get-OctoberCompatibilityGitLines @('diff','--name-only',$anchor,'HEAD'))+
     @(Get-OctoberCompatibilityGitLines @('diff','--name-only','HEAD'))+

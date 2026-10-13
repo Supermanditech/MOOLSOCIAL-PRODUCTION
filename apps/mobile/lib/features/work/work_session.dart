@@ -3658,8 +3658,16 @@ class WorkSession extends ChangeNotifier {
   String unsupportedOtherActivity = '';
 
   WorkWorkspace? _activeWorkspace;
+  int _navigationScopeRevision = 0;
+  /// Changes even across unnotified Store A -> B -> A navigation boundaries.
+  int? get navigationScopeRevision => _disposed ? null : _navigationScopeRevision;
   WorkWorkspace? get activeWorkspace => _activeWorkspace;
   set activeWorkspace(WorkWorkspace? value) {
+    if (_activeWorkspace?.id != value?.id ||
+        _activeWorkspace?.profileId != value?.profileId ||
+        _activeWorkspace?.verified != value?.verified) {
+      _navigationScopeRevision++;
+    }
     final previousId = _activeWorkspace?.id;
     if (previousId != value?.id) {
       _clearCollection();

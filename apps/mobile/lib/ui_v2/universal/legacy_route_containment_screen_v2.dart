@@ -27,6 +27,30 @@ class LegacyRouteContainmentSpec {
 }
 
 const legacyRouteContainmentSpecs = <String, LegacyRouteContainmentSpec>{
+  'retailer-services': LegacyRouteContainmentSpec(
+    id: 'retailer-services',
+    label: 'Business services',
+    currentRootLabel: 'Store',
+    currentRootRoute: '/app/work/my-work',
+    detail:
+        'Service activation is not available from this link. No service was activated or charged. Open Store to use available options.',
+  ),
+  'retailer-customer-detail': LegacyRouteContainmentSpec(
+    id: 'retailer-customer-detail',
+    label: 'Customer details',
+    currentRootLabel: 'Store',
+    currentRootRoute: '/app/work/my-work',
+    detail:
+        'Customer account changes are not available from this link. Open Store to view available customer and Sales records. No message or payment was sent.',
+  ),
+  'retailer-campaigns': LegacyRouteContainmentSpec(
+    id: 'retailer-campaigns',
+    label: 'Promotions',
+    currentRootLabel: 'Store',
+    currentRootRoute: '/app/work/my-work',
+    detail:
+        'Promotions are not available from this link. No campaign was created or message sent. Open Store to use available options.',
+  ),
   'tiffin': LegacyRouteContainmentSpec(
     id: 'tiffin',
     label: 'Tiffin',
@@ -85,6 +109,18 @@ LegacyRouteContainmentSpec legacyRouteContainmentSpecForReason(
 
 LegacyRouteContainmentSpec? legacyRouteContainmentFor(Uri uri) {
   final path = uri.path;
+
+  if (path == '/app/retailer/services' ||
+      path.startsWith('/app/retailer/services/')) {
+    return legacyRouteContainmentSpecs['retailer-services'];
+  }
+  if (path.startsWith('/app/retailer/customers/')) {
+    return legacyRouteContainmentSpecs['retailer-customer-detail'];
+  }
+  if (path == '/app/retailer/campaigns' ||
+      path.startsWith('/app/retailer/campaigns/')) {
+    return legacyRouteContainmentSpecs['retailer-campaigns'];
+  }
 
   if (path == '/app/eat/tiffin' || path.startsWith('/app/eat/tiffin/')) {
     return legacyRouteContainmentSpecs['tiffin'];
@@ -150,19 +186,54 @@ LegacyRouteContainmentSpec? legacyRouteContainmentFor(Uri uri) {
   return null;
 }
 
-class LegacyRouteContainmentScreenV2 extends StatelessWidget {
-  const LegacyRouteContainmentScreenV2({required this.spec, super.key});
+class LegacyRouteContainmentScreenV2 extends StatefulWidget {
+  const LegacyRouteContainmentScreenV2({
+    required this.spec,
+    this.onBack,
+    super.key,
+  });
 
   final LegacyRouteContainmentSpec spec;
 
+  /// Supplied by the router only; URLs cannot supply a trusted return target.
+  final bool Function()? onBack;
+
+  @override
+  State<LegacyRouteContainmentScreenV2> createState() =>
+      _LegacyRouteContainmentState();
+}
+
+class _LegacyRouteContainmentState
+    extends State<LegacyRouteContainmentScreenV2> {
+  bool _leaving = false;
+  LegacyRouteContainmentSpec get spec => widget.spec;
+
+  void _open(String location) {
+    if (!mounted || _leaving) return;
+    _leaving = true;
+    context.go(location);
+  }
+
+  void _back() {
+    if (!mounted || _leaving) return;
+    _leaving = true;
+    final back = widget.onBack;
+    if (back != null) {
+      // A covered/stale page did not leave; its Back remains usable later.
+      _leaving = back();
+    } else {
+      context.go(spec.currentRootRoute);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    void openCurrentRoot() => context.go(spec.currentRootRoute);
+    void openCurrentRoot() => _open(spec.currentRootRoute);
 
     return PopScope<Object?>(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) openCurrentRoot();
+        if (!didPop) _back();
       },
       child: Scaffold(
         key: Key('legacy-route-containment-${spec.id}'),
@@ -173,8 +244,8 @@ class LegacyRouteContainmentScreenV2 extends StatelessWidget {
           foregroundColor: Colors.white,
           leading: IconButton(
             key: const Key('legacy-route-containment-back'),
-            tooltip: 'Open current choices',
-            onPressed: openCurrentRoot,
+            tooltip: 'Back',
+            onPressed: _back,
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
           title: const Text(
@@ -237,7 +308,7 @@ class LegacyRouteContainmentScreenV2 extends StatelessWidget {
                         const SizedBox(height: MoolSpacing.sm),
                         OutlinedButton.icon(
                           key: const Key('legacy-route-containment-mool'),
-                          onPressed: () => context.go('/app/mool'),
+                          onPressed: () => _open('/app/mool'),
                           icon: const Icon(MoolBrand.moolLauncherIcon),
                           label: const Text('Open Mool'),
                         ),
