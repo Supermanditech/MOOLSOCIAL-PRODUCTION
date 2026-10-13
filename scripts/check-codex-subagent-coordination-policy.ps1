@@ -9429,12 +9429,17 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
     Assert-Coordination (Test-ProductionWorktreeClean $root) 'Direct baseline boundary must be clean.'
   }
   if ($directFinal -or $ProductionPhase -ceq 'integration_admission_authorize') {
-    # The approved direct route reuses actual tests of e069, not the retired
+    # The approved APK successor reuses unchanged runtime evidence plus the
+    # native Store/journal tests of c8adaa03, not the retired
     # recursive capture/phase workflow. Only metadata may follow that source.
-    $qualified='e0695334692dddb6e34e262c88b14612f2f33510'
+    $qualified='c8adaa03ccc987873def50f5afa0be7a82d2f1d1'
+    $publishedBaseline='b16b5782ce9687d1eab6821e0ae4dbd102927f5c'
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$qualified,$directSourceHead) | Out-Null
     Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse',"${directSourceHead}:apps"))[0]) -ceq
-      'd5d6435cb0f3ae859a43b5f50a1cf6b607eb4635') 'Qualified application tree changed; fresh regression evidence required.'
+      '09e5b7361c3eb369225ea76a9bca8721c2c86a2c') 'Qualified application tree changed; fresh regression evidence required.'
+    Get-OctoberCompatibilityGitLines @('diff','--exit-code',$publishedBaseline,$directSourceHead,'--',
+      'apps/mobile/lib','apps/mobile/assets','apps/mobile/android','apps/mobile/packages',
+      'apps/mobile/pubspec.yaml','apps/mobile/pubspec.lock') | Out-Null
     foreach ($path in @(Get-OctoberCompatibilityGitLines @('diff','--name-only',$qualified,$directSourceHead))) {
       Assert-Coordination ($path -cin @('scripts/check-codex-subagent-coordination-policy.ps1',
         'scripts/test-codex-integration-repair-coordination-policy.ps1',
@@ -9444,7 +9449,9 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
     foreach ($log in @(
       @('direct-baseline-impacted-final-20261013.log','A5AE29710DC6755315FC39DF58CB6EBEEE0A69171833694A44AD3AE5390D4AFE'),
       @('direct-baseline-final-focused-20261013.log','ABD6D8DD1FD065797D5DEF521C0813AC1BD1D018DFC04EB09BBA83EA2ADF5B00'),
-      @('direct-baseline-analysis-clean-20261013.log','CE615622C3C82DAEAEEEA969EB621F66B048712EA9CE8E71652484AF771B4EAB'))) {
+      @('direct-baseline-analysis-clean-20261013.log','CE615622C3C82DAEAEEEA969EB621F66B048712EA9CE8E71652484AF771B4EAB'),
+      @('apk-runtime-fixture-repair-20261013-v3.jsonl','E798FC63BD272D7A2885B9B754670BC34E8FEAFE13AE63B48BB0771EB5729B6F'),
+      @('apk-runtime-journal-recovery-20261013-v1.jsonl','834179CA0BA6EB24D9827C9159FC7710CBA5291D1391F0B3066D6A5E10A6F238'))) {
       Assert-Coordination ((Get-FileHash -LiteralPath (Join-Path $logRoot $log[0]) -Algorithm SHA256).Hash -ceq $log[1]) 'Actual qualified test log is missing or changed.'
     }
     foreach ($source in @(
@@ -9468,10 +9475,10 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
       Assert-Coordination ($ApprovedFeatureCommits.Count -eq 1 -and $ApprovedFeatureCommits[0] -ceq $directSourceHead -and
         $ApprovedFeatureBranches.Count -eq 1 -and $ApprovedFeatureBranches[0] -ceq
         'work/integration-repair/store-buy-compatibility-20261008') 'Exact qualified integration selection required.'
-      Assert-Coordination ($parents[0] -ceq $start -and
+      Assert-Coordination ($parents[0] -ceq $publishedBaseline -and
         (@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s','HEAD'))[0]) -ceq
         'merge(store-buy-combined-baseline-20261008): integrate qualified Store and public Buy') 'Final merge identity changed.'
-      $automatic=@(Get-OctoberCompatibilityGitLines @('merge-tree','--write-tree',$start,$directSourceHead))
+      $automatic=@(Get-OctoberCompatibilityGitLines @('merge-tree','--write-tree',$publishedBaseline,$directSourceHead))
       $actual=@(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD^{tree}'))[0]
       Assert-Coordination ($automatic.Count -eq 1 -and $automatic[0] -ceq $actual -and
         $actual -ceq (@(Get-OctoberCompatibilityGitLines @('rev-parse',"${directSourceHead}^{tree}"))[0])) 'Final tree is not the unchanged automatic integration.'
@@ -9484,7 +9491,7 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq $directRoot -or $directFinal) {
         $IntegrationTargetWorkId -ceq 'store-buy-combined-baseline-20261008' -and
         $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-COMBINED-BASELINE-20261008') 'Source admission target differs.'
       $targetHead=@(& git -C $IntegrationTargetRoot rev-parse HEAD)
-      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and $targetHead[0] -ceq $start) 'Target must start at the governance tag.'
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and $targetHead[0] -ceq $publishedBaseline) 'Successor target must be the preserved published baseline.'
       $targetBranch=@(& git -C $IntegrationTargetRoot branch --show-current)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and $targetBranch[0] -ceq
         'integration/moolsocial/store-buy-combined-baseline-20261008') 'Target branch differs.'

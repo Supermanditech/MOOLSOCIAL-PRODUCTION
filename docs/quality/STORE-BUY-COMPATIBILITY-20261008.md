@@ -4,6 +4,18 @@
 
 ### Subsequent combined-APK test correction — 13 October
 
+Test correction checkpoint: `c8adaa03ccc987873def50f5afa0be7a82d2f1d1`.
+Qualified apps tree: `09e5b7361c3eb369225ea76a9bca8721c2c86a2c`.
+Runtime lib tree: `be50d78dbe1dbd60dcab33a6c5423002403630d8`, unchanged
+from b16b5782. The necessary admission-only successor pins this checkpoint and
+its actual native logs, allows metadata only afterward, and compares every
+runtime/native/asset/package/lock input with b16b5782. Its automatic publication
+merge must have b16b5782 as first parent and the exact clean published repair tip
+as second; the full resulting tree must equal that tip. No history is rewritten.
+The prior original-baseline admission section below remains historical evidence,
+not the new APK successor's selection. Analysis has one pre-existing unrelated
+curly-braces info lint at the old line 52266; no new analyzer issue was found.
+
 Founder explicitly approved only the demonstrated Store test corrections and
 strictly necessary existing admission/compatibility updates. Published baseline
 `b16b5782ce9687d1eab6821e0ae4dbd102927f5c` remains preserved. There are no
