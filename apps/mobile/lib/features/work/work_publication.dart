@@ -236,9 +236,14 @@ abstract final class WorkspacePublicationContract {
     'purchaseProtection': protectionValues(
       storeDetails?.protectionFor(p.returnPolicy),
     ),
-    ...?p.compliance?.toJson().map(
-      (key, value) => MapEntry('compliance.$key', value),
-    ),
+    // Retained v1 export omits newer fields; the current audit below includes
+    // them. Actual typed public products carry all supported pack addresses.
+    if (p.compliance case final c?)
+      ...Map.fromEntries(c.toJson().entries.where((entry) => !const {
+        'manufacturerAddress', 'packerAddress', 'importerAddress',
+      }.contains(entry.key))).map(
+        (key, value) => MapEntry('compliance.$key', value),
+      ),
   };
 
   static Map<String, Object?> publicProductValues(BuyV2Product p) => {
@@ -300,6 +305,9 @@ abstract final class WorkspacePublicationContract {
     'packTerms': null,
     'offerClass': null,
     'reviewDeliveryOptions': const <BuyV2DeliveryOption>{},
+    'compliance.manufacturerAddress': p.compliance?.manufacturerAddress,
+    'compliance.packerAddress': p.compliance?.packerAddress,
+    'compliance.importerAddress': p.compliance?.importerAddress,
   };
 
   static Map<String, Object?> publicProductAuditValues(BuyV2Product p) => {
@@ -313,6 +321,9 @@ abstract final class WorkspacePublicationContract {
     'reviewDeliveryOptions': p.reviewDeliveryOptions.isEmpty
         ? const <BuyV2DeliveryOption>{}
         : p.reviewDeliveryOptions,
+    'compliance.manufacturerAddress': p.compliance?.manufacturerAddress,
+    'compliance.packerAddress': p.compliance?.packerAddress,
+    'compliance.importerAddress': p.compliance?.importerAddress,
   };
 
   static List<WorkspacePublicationIssue> productIssues(

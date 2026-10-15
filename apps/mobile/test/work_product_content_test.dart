@@ -8,6 +8,74 @@ import 'package:moolsocial/features/work/work_publication.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  const packAddresses = {
+    'manufacturerAddress': 'Host fixture maker, Plot 1, Jaipur',
+    'packerAddress': 'Host fixture packer, Plot 2, Delhi',
+    'importerAddress': 'Host fixture importer, Plot 3, Mumbai',
+  };
+  test('LF03 pack addresses round trip and project without Store defaults', () {
+    final original = handoffStock();
+    final saved = WorkspaceProductCompliance.fromJson({
+      ...original.compliance!.toJson(), ...packAddresses,
+    })!;
+    final item = original.copyWith(compliance: saved);
+    expect(WorkspaceProductCompliance.fromJson(jsonDecode(jsonEncode(saved.toJson())))!.toJson(), saved.toJson());
+    final public = item.toBuyPublicProduct(storeName: 'Selling Store', storeId: 'a');
+    for (final field in packAddresses.keys) {
+      expect(saved.toJson()[field], packAddresses[field]);
+      expect(WorkspaceProductImport.templateLabels, contains(field));
+    }
+    expect(public.compliance!.manufacturerAddress, packAddresses['manufacturerAddress']);
+    expect(public.compliance!.packerAddress, packAddresses['packerAddress']);
+    expect(public.compliance!.importerAddress, packAddresses['importerAddress']);
+    expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Selling Store'), isEmpty);
+    expect(public.id, original.id);
+    expect(public.mediaAssets.single.source, original.toBuyPublicProduct(storeName: '', storeId: 'a').mediaAssets.single.source);
+    final cleared = WorkspaceProductCompliance.fromJson({...saved.toJson(), 'manufacturerAddress': '  '})!;
+    expect(cleared.toJson(), isNot(contains('manufacturerAddress')));
+    final clearedReload = WorkspaceProductCompliance.fromJson(jsonDecode(jsonEncode(cleared.toJson())))!;
+    expect(original.copyWith(compliance: clearedReload).toBuyPublicProduct(storeName: 'Selling Store', storeId: 'a').compliance!.manufacturerAddress, isNull);
+    expect(cleared.toJson()['packerAddress'], packAddresses['packerAddress']);
+    // Historic v1 is intentionally not the transport for these newer fields.
+    for (final field in packAddresses.keys) {
+      expect(WorkspacePublicationContract.sourceProductValues(item, storeId: 'a', storeName: 'Selling Store'), isNot(contains('compliance.$field')));
+      expect(WorkspacePublicationContract.publicProductValues(public), isNot(contains('compliance.$field')));
+      expect(WorkspacePublicationContract.publicProductAuditValues(public)['compliance.$field'], packAddresses[field]);
+    }
+    for (final field in packAddresses.keys) {
+      expect(original.compliance!.toJson(), isNot(contains(field)));
+    }
+    expect(() => WorkspaceProductCompliance.fromJson({'manufacturerAddress': 42}), throwsFormatException);
+  });
+  test('LF03 CSV prefills pack addresses and accepts explicit matching overrides', () {
+    final base = workspaceMasterCatalogue.first;
+    final catalogue = base.copyWith(compliance: WorkspaceProductCompliance.fromJson({
+      ...?base.compliance?.toJson(), ...packAddresses,
+    }));
+    WorkspaceProductImport decode(Map<String, String> extras, {bool match = true}) {
+      final row = <String, String>{
+        'title': base.title, 'brand': base.brand, 'pack': base.pack,
+        'variant': base.variant, 'barcode': base.barcode,
+        'purchasePrice': '200', 'sellingPrice': '264', 'stock': '4',
+        ...extras,
+      };
+      String cell(String s) => '"${s.replaceAll('"', '""')}"';
+      return WorkspaceProductImport.parse('${row.keys.join(',')}\n${row.values.map(cell).join(',')}',
+        catalogue: match ? [catalogue] : const [], owned: const []);
+    }
+    final inherited = decode({}).rows.single;
+    expect(inherited.issue, isNull);
+    expect(inherited.product!.compliance!.toJson()['manufacturerAddress'], packAddresses['manufacturerAddress']);
+    final override = decode({'manufacturerAddress': 'Updated fixture maker, Plot 9'}).rows.single;
+    expect(override.issue, isNull);
+    expect(override.product!.compliance!.toJson()['manufacturerAddress'], 'Updated fixture maker, Plot 9');
+    expect(override.product!.compliance!.toJson()['packerAddress'], packAddresses['packerAddress']);
+    expect(override.product!.catalogueFactsRequireReview, isTrue);
+    final manual = decode(packAddresses, match: false).rows.single;
+    expect(manual.issue, isNull);
+    expect(manual.product!.compliance!.toJson()['importerAddress'], packAddresses['importerAddress']);
+    expect(() => decode({'manufacturerAddress': 'x' * 4001}), throwsFormatException);
+  });
   test(
     'CSV37 duplicate source and original row stay explicit after correction',
     () {

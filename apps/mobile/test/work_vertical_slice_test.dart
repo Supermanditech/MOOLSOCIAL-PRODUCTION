@@ -525,6 +525,38 @@ void main() {
   });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03 optional pack address editor saves exact product $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final work = _testWorkSession()..seedVerifiedWorkspace();
+      final product = workspaceMasterCatalogue.first.copyWith(stock: 2);
+      work.workspaceCatalogueItems..clear()..add(product);
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work, size: const Size(320, 568));
+      await tapVisible(tester, const Key('work-store-stock'));
+      await tapVisible(tester, Key('work-catalogue-edit-${product.id}'));
+      await tapVisible(tester, const Key('work-product-pack-information'));
+      for (final field in ['manufacturerAddress', 'packerAddress', 'importerAddress']) {
+        final input = find.byKey(Key('work-product-pack-$field'));
+        expect(input, findsOneWidget);
+        expect(tester.widget<EditableText>(find.descendant(of: input, matching: find.byType(EditableText))).controller.text, isEmpty);
+      }
+      final address = find.byKey(const Key('work-product-pack-manufacturerAddress'));
+      await tester.ensureVisible(address);
+      await tester.enterText(address, 'Host fixture maker, Plot 7, Jaipur');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('work-product-save'));
+      final saved = work.workspaceCatalogueItems.single;
+      expect(saved.id, product.id);
+      expect(saved.stock, 2);
+      expect(saved.compliance!.manufacturerAddress, 'Host fixture maker, Plot 7, Jaipur');
+      expect(saved.compliance!.packerAddress, isNull);
+      expect(saved.catalogueFactsRequireReview, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   Future<void> enter(WidgetTester tester, Key key, String value) async {
     final finder = find.byKey(key);
     if (finder.evaluate().isEmpty) {

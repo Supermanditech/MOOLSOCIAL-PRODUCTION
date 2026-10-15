@@ -5967,8 +5967,11 @@ class WorkspaceProductCompliance {
     this.genericName,
     this.netQuantity,
     this.manufacturerName,
+    this.manufacturerAddress,
     this.packerName,
+    this.packerAddress,
     this.importerName,
+    this.importerAddress,
     this.countryOfOrigin,
     this.manufacturedOrPackedOn,
     this.bestBeforeOrUseBy,
@@ -5979,8 +5982,11 @@ class WorkspaceProductCompliance {
   final String? genericName;
   final String? netQuantity;
   final String? manufacturerName;
+  final String? manufacturerAddress;
   final String? packerName;
+  final String? packerAddress;
   final String? importerName;
+  final String? importerAddress;
   final String? countryOfOrigin;
   final String? manufacturedOrPackedOn;
   final String? bestBeforeOrUseBy;
@@ -5991,8 +5997,11 @@ class WorkspaceProductCompliance {
     'genericName': genericName,
     'netQuantity': netQuantity,
     'manufacturerName': manufacturerName,
+    if (manufacturerAddress != null) 'manufacturerAddress': manufacturerAddress,
     'packerName': packerName,
+    if (packerAddress != null) 'packerAddress': packerAddress,
     'importerName': importerName,
+    if (importerAddress != null) 'importerAddress': importerAddress,
     'countryOfOrigin': countryOfOrigin,
     'manufacturedOrPackedOn': manufacturedOrPackedOn,
     'bestBeforeOrUseBy': bestBeforeOrUseBy,
@@ -6019,8 +6028,11 @@ class WorkspaceProductCompliance {
       genericName: field('genericName'),
       netQuantity: field('netQuantity'),
       manufacturerName: field('manufacturerName'),
+      manufacturerAddress: field('manufacturerAddress'),
       packerName: field('packerName'),
+      packerAddress: field('packerAddress'),
       importerName: field('importerName'),
+      importerAddress: field('importerAddress'),
       countryOfOrigin: field('countryOfOrigin'),
       manufacturedOrPackedOn: field('manufacturedOrPackedOn'),
       bestBeforeOrUseBy: field('bestBeforeOrUseBy'),
@@ -6033,8 +6045,11 @@ class WorkspaceProductCompliance {
     genericName: genericName,
     netQuantity: netQuantity,
     manufacturerName: manufacturerName,
+    manufacturerAddress: manufacturerAddress,
     packerName: packerName,
+    packerAddress: packerAddress,
     importerName: importerName,
+    importerAddress: importerAddress,
     countryOfOrigin: countryOfOrigin,
     manufacturedOrPackedOnLabel: manufacturedOrPackedOn,
     bestBeforeOrUseByLabel: bestBeforeOrUseBy,
@@ -8021,8 +8036,11 @@ class WorkspaceProductImport {
     'genericName': 'Generic product name',
     'netQuantity': 'Net quantity',
     'manufacturerName': 'Manufacturer',
+    'manufacturerAddress': 'Manufacturer address, if on pack',
     'packerName': 'Packer',
+    'packerAddress': 'Packer address, if on pack',
     'importerName': 'Importer, if applicable',
+    'importerAddress': 'Importer address, if applicable',
     'countryOfOrigin': 'Country of origin',
     'fssaiLicenseNumber': 'Manufacturer FSSAI number, if applicable',
     'consumerCare': 'Product consumer care',

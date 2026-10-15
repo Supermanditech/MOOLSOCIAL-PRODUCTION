@@ -25338,16 +25338,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               widget.product.packMeasure == null))
         entry.key: entry.value.text,
   };
-  static const _packFieldLabels = {
-    'genericName': 'Generic product name',
-    'netQuantity': 'Net quantity',
-    'manufacturerName': 'Manufacturer',
-    'packerName': 'Packer',
-    'importerName': 'Importer, if applicable',
-    'countryOfOrigin': 'Country of origin',
-    'fssaiLicenseNumber': 'Manufacturer FSSAI number, if applicable',
-    'consumerCare': 'Product consumer care',
-  };
+  static const _packFieldLabels = WorkspaceProductImport.packFieldLabels;
   late final _packFields = {
     for (final key in _packFieldLabels.keys)
       key: TextEditingController(
@@ -25364,8 +25355,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         {
           'genericName',
           'manufacturerName',
+          'manufacturerAddress',
           'packerName',
+          'packerAddress',
           'importerName',
+          'importerAddress',
           'consumerCare',
         }.contains(field)
         ? 0
@@ -25399,8 +25393,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           ],
           for (final field in [
             'manufacturerName',
+            'manufacturerAddress',
             'packerName',
+            'packerAddress',
             'importerName',
+            'importerAddress',
             'fssaiLicenseNumber',
             'consumerCare',
           ]) ...[const SizedBox(height: 8), _packField(field)],
