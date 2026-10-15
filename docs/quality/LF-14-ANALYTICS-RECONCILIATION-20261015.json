@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-14",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-14",
+      "customerOutcome": "Store analytics remains truthful about exact scope, current versus period values and missing public/order/offer/feedback coverage, without changing approved reports.",
+      "necessityProof": "Final mapped frontend slice requires checking existing data boundaries and unmet feed contracts, not inventing graphs or implementation where no defect is demonstrated.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/work_downloads.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Exact Store/account/SKU/period and snapshot coverage/freshness",
+        "Units/cohort and genuine zero versus unavailable",
+        "Existing local sales/collections/Stock/Money versus supplier/public data separation",
+        "Passive OPPO figures and explicit incomplete provider integrations"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder accepted47346545 and answered Approve; proceed to Batch14.",
+        "No provider service/tracking/aggregation or new reports. All previously parked provider and frontend contract gaps remain accountable."
+      ],
+      "manifestPath": "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+      "manifestSha256": "D409CCE74DB568F5C37B0C042BE752770A6219AE2ECB31900A31F4366FCFF485",
+      "evidencePath": "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-14",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Store analytics remains truthful about exact scope, current versus period values and missing public/order/offer/feedback coverage, without changing approved reports.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Verify already implemented analytics truthfulness and map genuine dependencies before claiming connected frontend completion.",
+    "minimumCompleteScope": [
+      "Reconcile existing data sources and read-only request/coverage/unit/freshness guards.",
+      "Run existing focused analytics regressions and passive OPPO checks; no source correction absent a demonstrated failure.",
+      "Record explicit public/event/order/offer/feedback and previous frontend dependencies; founder review."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder accepted47346545 and answered Approve; proceed to Batch14.",
+      "No provider service/tracking/aggregation or new reports. All previously parked provider and frontend contract gaps remain accountable."
+    ],
+    "testAndEvidencePlan": [
+      "Existing analytics model and relevant widget/recovery/export/large-value tests; no new synthetic runtime events.",
+      "Passive OPPO scope/value/coverage inspection; existing source remains if no defect."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.md",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.md",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.json",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_delivery_exception_scope_test.dart",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.md",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.json"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve; proceed to Batch14. Accepted47346545; no full connected/provider/MVP acceptance."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}
