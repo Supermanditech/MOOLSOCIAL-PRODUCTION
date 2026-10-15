@@ -45903,7 +45903,7 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('FREEHEADER alerts and profile stay unframed $scale', (
+    testWidgets('FREEHEADER alerts and home-only profile stay unframed $scale', (
       tester,
     ) async {
       final work = liveStore();
@@ -45915,9 +45915,7 @@ void main() {
         viewport: Size(scale == 1 ? 360 : 320, 806),
         textScale: scale,
       );
-      await tester.tap(find.byKey(const Key('work-store-orders')));
-      await tester.pumpAndSettle();
-      for (final key in ['work-dashboard-alerts', 'work-dashboard-profile']) {
+      void expectUnframed(String key) {
         final target = find.byKey(Key(key));
         expect(target.hitTestable(), findsOneWidget);
         final size = tester.getSize(target);
@@ -45935,6 +45933,18 @@ void main() {
           expect(paint.elevation, 0);
         }
       }
+      // Founder-approved Batch02 architecture: one profile entry on Store home,
+      // never reintroduce a duplicate profile on Orders to satisfy the old test.
+      expectUnframed('work-dashboard-profile');
+      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-dashboard-profile')), findsNothing);
+      expectUnframed('work-dashboard-alerts');
       final badge = tester.widget<Badge>(
         find
             .ancestor(
@@ -45945,11 +45955,6 @@ void main() {
       );
       expect(badge.isLabelVisible, isTrue);
       await captureStoreView(tester, 'free-header-$scale');
-      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
       await tester.pumpAndSettle();
       expect(
@@ -68308,6 +68313,55 @@ void main() {
         restorePhotos();
       },
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF17 attention separates refund state and retains full detail $scale', (tester) async {
+      // Isolated host fixture only; never inserted into evaluation runtime data.
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      const orderId = 'ORD-20261016-12345678901234567890';
+      final items = List.generate(21, (i) => 'Evaluation product ${i + 1} × 1').join(', ');
+      final now = DateTime.now();
+      work.workspaceOrders.add(WorkspaceOrderRecord(id: orderId, customer: '9000091941',
+        items: items, quantities: const {}, amount: 1000000000, source: 'App',
+        fulfilment: 'Pickup', payment: 'Paid online', address: '', stage: 'Completed',
+        needsDelivery: false, createdAt: now));
+      expect(work.applyWorkspaceFinance(WorkspaceFinanceSnapshot(
+        accountScope: 'review-draft-account', workspaceId: work.activeWorkspace!.id,
+        revision: 1, asOf: now, salesTodayMinor: 0, duesMinor: 0, availableMinor: 0,
+        heldMinor: 0, requestedMinor: 0, paidOutMinor: 0, feesMinor: 0,
+        deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+        payments: [WorkspacePaymentRecord(orderId: orderId, customerId: 'lf17-customer',
+          customerName: '9000091941', revision: 1, updatedAt: now,
+          amountMinor: 100000000000, paidMinor: 100000000000, dueMinor: 0,
+          refundedMinor: 0, state: WorkspacePaymentState.refundPending,
+          channel: WorkspacePaymentChannel.platform)], payouts: const [])), isTrue);
+      final stock = List.of(work.workspaceCatalogueItems);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 800), textScale: scale);
+      await openStoreAlerts(tester);
+      expect(find.byKey(const Key('work-alerts-heading')), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing);
+      expect(find.text('Customer: 9000091941'), findsOneWidget);
+      expect(find.text('Refund pending'), findsOneWidget);
+      expect(find.textContaining('Bill total'), findsOneWidget);
+      expect(find.text('Refund amount not supplied'), findsOneWidget);
+      final summary = find.byKey(Key('work-alert-summary-payment-$orderId'));
+      expect(tester.widget<Text>(summary).maxLines, 2);
+      final details = find.byKey(Key('work-alert-expand-payment-$orderId'));
+      await reveal(tester, details);
+      await tester.tap(details.hitTestable());
+      await tester.pumpAndSettle();
+      expect(find.text(orderId), findsOneWidget);
+      expect(find.descendant(of: details, matching: find.textContaining(items)), findsOneWidget);
+      final review = find.byKey(Key('work-alert-cta-payment-$orderId'));
+      await reveal(tester, review);
+      expect(tester.getSize(review).height, greaterThanOrEqualTo(48));
+      expect(find.text('Review refund'), findsOneWidget);
+      expect(work.workspaceCatalogueItems, orderedEquals(stock));
+      expect(work.workspaceFinance!.payments.single.refundedMinor, 0);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final scale in [1.0, 2.0]) {

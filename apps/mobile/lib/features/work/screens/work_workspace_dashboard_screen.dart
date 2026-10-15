@@ -1520,8 +1520,10 @@ class _WorkWorkspaceDashboardScreenState
           : storeRootSurface
           ? _WorkspaceDashboardHeader(
               showStatusLabel:
-                  _view == _WorkspaceControlView.dashboard || ordersContext,
-              compact: compactOperation || focusedOrderDetails,
+                  _view == _WorkspaceControlView.dashboard || ordersContext ||
+                  _view == _WorkspaceControlView.alerts,
+              compact: compactOperation || focusedOrderDetails ||
+                  _view == _WorkspaceControlView.alerts,
               singleLine: shortHomeHeader,
               session: session,
               workspace: workspace,
@@ -42542,7 +42544,12 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
     }
     return Material(
       color: Colors.white,
-      child: ListView.separated(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text('Needs attention · ${alerts.length}',
+            key: const Key('work-alerts-heading'),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+        Expanded(child: ListView.separated(
         key: const Key('work-dashboard-alerts-screen'),
         controller: scrollController,
         padding: const EdgeInsets.all(16),
@@ -42642,7 +42649,8 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
             ),
           );
         },
-      ),
+        )),
+      ]),
     );
   }
 }
@@ -42697,6 +42705,44 @@ class _WorkspaceAlertContent extends StatelessWidget {
         height: 1.4,
       ),
     );
+    final preview = alert.paymentPreview;
+    if (preview != null) {
+      // Payment amounts and refund state are independent facts. The full
+      // original reference/items remain available without dominating the list.
+      final reference = preview.reference.length > 18
+          ? '…${preview.reference.substring(preview.reference.length - 12)}'
+          : preview.reference;
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(preview.heading, key: Key('work-alert-title-${alert.id}'),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: MoolColors.ink)),
+        Text('${alert.financeFocus?.payoutId != null ? 'Settlement' : 'Order'} · $reference',
+          style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+        const SizedBox(height: 6),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(color: const Color(0xfffff4de), borderRadius: BorderRadius.circular(6)),
+          child: Text(preview.status, style: const TextStyle(fontSize: 12,
+            fontWeight: FontWeight.w700, color: Color(0xff875100)))),
+        const SizedBox(height: 4),
+        Text(preview.amount, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+        if (preview.note != null) Text(preview.note!,
+          style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+        if (preview.items.isNotEmpty) Text(preview.items,
+          key: Key('work-alert-summary-${alert.id}'), maxLines: 2, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, color: MoolColors.muted)),
+        if (preview.fulfilment != null) Text(preview.fulfilment!,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(preview.updated, style: const TextStyle(fontSize: 11, color: MoolColors.muted)),
+        ExpansionTile(key: Key('work-alert-expand-${alert.id}'),
+          tilePadding: EdgeInsets.zero, childrenPadding: const EdgeInsets.only(bottom: 6),
+          dense: true, title: const Text('Full details', style: TextStyle(fontSize: 12)),
+          children: [Align(alignment: AlignmentDirectional.centerStart,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SelectableText(preview.reference, style: const TextStyle(fontSize: 12)),
+              details,
+            ]))]),
+        Align(alignment: AlignmentDirectional.centerEnd, child: action),
+      ]);
+    }
     return LayoutBuilder(
       builder: (context, constraints) {
         final scaler = MediaQuery.textScalerOf(context);
@@ -42944,6 +42990,7 @@ typedef _WorkspaceAlertItem = ({
   _WorkspaceOperation? operation,
   WorkspacePurchaseRecord? purchase,
   _WorkspaceFinanceFocus? financeFocus,
+  ({String heading, String reference, String items, String amount, String status, String updated, String? note, String? fulfilment})? paymentPreview,
   IconData icon,
   bool requiredAction,
 });
@@ -42953,6 +43000,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.retailerSetupSaved) {
     alerts.add((
       id: 'store-setup',
+      paymentPreview: null,
       financeFocus: null,
       purchase: null,
       title: 'Finish setting up your store',
@@ -42968,6 +43016,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.workspaceContactsReady) {
     alerts.add((
       id: 'contact-details',
+      paymentPreview: null,
       financeFocus: null,
       purchase: null,
       title: 'Confirm contact details',
@@ -42985,6 +43034,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       !session.dismissedWorkspaceAlerts.contains('store-paused')) {
     alerts.add((
       id: 'store-paused',
+      paymentPreview: null,
       financeFocus: null,
       purchase: null,
       title: session.workspaceStoreState == WorkspaceStoreState.paused
@@ -43003,6 +43053,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (session.workspaceLowStockCount > 0) {
     alerts.add((
       id: 'low-stock',
+      paymentPreview: null,
       financeFocus: null,
       purchase: null,
       title: '${session.workspaceLowStockCount} products need stock attention',
@@ -43039,6 +43090,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         '${placed.minute.toString().padLeft(2, '0')}';
     alerts.add((
       id: 'order-${order.id}',
+      paymentPreview: null,
       financeFocus: null,
       purchase: null,
       title: '${order.id} · ${order.customer.split('·').first.trim()}',
@@ -43096,6 +43148,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         '${updated.minute.toString().padLeft(2, '0')}';
     alerts.add((
       id: 'purchase-${purchase.shipmentId}',
+      paymentPreview: null,
       financeFocus: null,
       purchase: purchase,
       title: '${purchase.orderId} · ${purchase.supplierName}',
@@ -43153,6 +43206,18 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       final order = orders[payment.orderId];
       alerts.add((
         id: 'payment-${payment.orderId}',
+        paymentPreview: (
+          heading: 'Customer: ${payment.customerName}', reference: payment.orderId,
+          items: order?.items ?? '', amount: 'Bill total ${_purchaseAmount(payment.amountMinor)}',
+          status: payment.label,
+          updated: '${session.workspaceFinanceStale ? 'Last confirmed · ' : ''}${updateLabel(payment.updatedAt)}',
+          fulfilment: order != null && !order.isClosed &&
+              !const {'Completed', 'Delivered', 'Collected', 'Rejected'}.contains(order.stage)
+              ? 'Order · ${order.stage == 'Confirmed' ? 'Awaiting acceptance' : session.workspaceOrderStageLabel(order)}'
+              : null,
+          note: payment.state == WorkspacePaymentState.refundPending
+              ? 'Refund amount not supplied' : null,
+        ),
         financeFocus: (
           accountScope: finance.accountScope,
           workspaceId: finance.workspaceId,
@@ -43165,13 +43230,15 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         title: '${payment.orderId} · ${payment.customerName}',
         detail: [
           if (order != null) order.items,
-          '${_purchaseAmount(payment.amountMinor)} · ${payment.label}',
+          'Bill total ${_purchaseAmount(payment.amountMinor)} · ${payment.label}',
+          if (payment.state == WorkspacePaymentState.refundPending) 'Refund amount not supplied',
           if (order != null)
             'Order · ${order.stage == 'Confirmed' ? 'Awaiting acceptance' : session.workspaceOrderStageLabel(order)}',
           if (session.workspaceFinanceStale) 'Last confirmed update',
           updateLabel(payment.updatedAt),
         ].join('\n'),
-        actionLabel: 'Review payment',
+        actionLabel: payment.state == WorkspacePaymentState.refundPending
+            ? 'Review refund' : 'Review payment',
         route: null,
         operation: null,
         icon: Icons.payments_outlined,
@@ -43192,6 +43259,12 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
     for (final payout in payouts) {
       alerts.add((
         id: 'payout-${payout.id}',
+        paymentPreview: (
+          heading: 'Settlement review', reference: payout.id,
+          items: payout.bankLabel ?? '', amount: 'Settlement amount ${_purchaseAmount(payout.amountMinor)}',
+          status: payout.state.label, note: null, fulfilment: null,
+          updated: '${session.workspaceFinanceStale ? 'Last confirmed · ' : ''}${updateLabel(payout.updatedAt)}',
+        ),
         financeFocus: (
           accountScope: finance.accountScope,
           workspaceId: finance.workspaceId,
