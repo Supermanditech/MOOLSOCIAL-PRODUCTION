@@ -156,3 +156,39 @@ evidence, subject to the successful final test results and these truthful limits
 Supported Batch 03 frontend corrections are checkpointed for review; source-held
 fields and named later work remain open. Do not count this as complete acceptance
 of all Store-to-public provider flows or proceed to Batch 04 without founder review.
+
+### Physical entry continuation — 15 October 2026
+
+The founder requested continuing the remaining checks. The earlier native-entry
+pending status above is superseded for these bounded paths only; source remains
+95c19d9b, with no application code change in this continuation.
+
+Actual OPPO UI saves in TEST Store · product entry:
+
+| Path | Saved SKU / product | Quantity | Purchase / selling price |
+| --- | --- | --- | --- |
+| Catalogue | EVAL-LENTILS-500G / Red lentils, 500 g pouch | 6 | ₹60 / ₹75 |
+| Manual | LF03-MAN-CUMIN100 / custom-1792061502317910, 100 g pouch | 4 | ₹70 / ₹90 |
+| CSV file picker → review → Save 1 | LF03-CSV-CORI200 / import-1792061788605945-0, 200 g pouch | 8 | ₹40 / ₹55 |
+
+All private/review-only. The existing catalogue evaluation image stayed attached
+to the exact lentil pack; manual/CSV correctly showed photo unavailable. Manual
+manufacturer address and CSV manufacturer/packer addresses were entered/imported
+as explicitly evaluation-only values, then observed unchanged after Flutter hot
+restart (3706 ms), navigation back to the same Store, and reopening each product.
+All three Stock SKUs, quantities and prices survived. No runtime-storage injection,
+invoices/orders/receipts/payments, live publication, backend or APK operations.
+No intentional edit/deletion of existing evaluation records or Cart was performed.
+
+Evidence and exact values: calling task outputs/lf03-native-entry-20261015.md,
+lf03-three-saved.png, lf03-manual-address-restored.png and
+lf03-csv-address-restored.png. CSV fixture was an actual input document selected
+through Android Downloads, not a storage seed. System picker Search could not
+load content; ordinary Downloads browsing successfully selected the exact CSV.
+
+Hot restart is NOT cold-process/fresh-APK upgrade or backend-sync acceptance.
+Nonempty importer-address native save, invoices and exported Sales statements
+were not exercised in this bounded product-entry continuation. Host evidence stays
+separate; no need to rerun unchanged 441 cases. No new app defect reproduced here.
+Founder screenwise approval still required before Batch 04. The source-held and
+explicit later-batch gaps above remain open, not silently declared implemented.
