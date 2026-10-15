@@ -50,7 +50,7 @@
         "Live pack/pricing/publication/benefit authority remains service-dependent."
       ],
       "manifestPath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
-      "manifestSha256": "7045D0A4E378F02F4C21249D998D43CE6A40A8AE56C91D8F0D673243CA1F38B3",
+      "manifestSha256": "12D4CC83E792199BC5FB3F2A46F5F1223D754D5B112E405D02562810446E0AAE",
       "evidencePath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -80,7 +80,7 @@
     "testAndEvidencePlan": [
       "Fail before corrections; MOQ+n*step and tier amounts, changed/expired/incorrect source terms, channel/Store isolation, no fake offer success, existing entry/import and public regressions.",
       "Use real app journeys only for runtime data; host contract fixtures are not live provider acceptance.",
-      "84 prior selected host cases passed; founder approved checkpoint11c8b53f on OPPO, excluding live provider results. Private-product selector successor:12 LF04 cases passed including2 new missing-reference cases; analysis same8 existing infos only. Native selector review/restore pending app availability."
+      "84 prior selected host cases passed; founder approved checkpoint11c8b53f on OPPO, excluding live provider results. Private-product selector ad66bb9d:12 LF04 cases passed including2 new missing-reference cases; analysis same8 existing infos only. Native selection of existing LF03 Cumin, explicit draft save and restoration after app restart/reattach/hot restart passed; founder review pending."
     ],
     "frontendAdmission": {
       "task": "/root",
@@ -142,7 +142,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder approved Batch04 first checkpoint 11c8b53f on OPPO: private draft recovery and selling-term guards. Live publication, benefits and provider readback excluded. Remaining private-product draft correction awaits tests/device review; whole Batch04 not accepted."
+    "founderAcceptance": "Founder approved Batch04 first checkpoint 11c8b53f on OPPO: private draft recovery and selling-term guards. Live publication, benefits and provider readback excluded. Saved-product selector ad66bb9d passed host/native draft checks; founder review and Batch05 advance remain pending, not assumed."
   },
   "execution": {
     "referenceWriteAuthorized": false,

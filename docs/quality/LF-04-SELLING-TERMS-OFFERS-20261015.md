@@ -141,7 +141,7 @@ provider or APK completion. Founder explicitly approved checkpoint 11c8b53f on
 OPPO; live publishing, benefits and provider readback were excluded. Keep the full
 active two-way MVP goal unchanged.
 
-### Private saved-product draft correction — host tested, device review pending
+### Private saved-product draft correction — OPPO verified, founder review pending
 
 The offer draft listed only published products, preventing private preparation
 against saved Stock while publishing is unavailable. The same selector now lists
@@ -164,7 +164,32 @@ valid; they were not needlessly rerun for this UI-only change.
 
 Hot reload reported one library loaded in4082ms, then the attach disconnected.
 OPPO moved outside MoolSocial before this new selector could be inspected. No tap
-was made in the other app; founder was asked to return. Native private-SKU selection,
-saved restoration and founder review of this correction remain pending. The earlier
-11c8b53f approval does not accept an unseen successor. Architect context review
-found no demonstrated stop issue; it grants no device/provider acceptance.
+was made in the other app; founder was asked to return. The earlier11c8b53f approval
+does not accept an unseen successor. Architect context review found no demonstrated
+stop issue; it grants no device/provider acceptance.
+
+After the founder returned/reconnected OPPO, current source at ad66bb9d was loaded
+and hot-restarted successfully (4040ms). USB interruptions required reconnection.
+An Android null-root capture could leave an old dump behind; the task-local UI
+helper now requires a fresh uniquely named capture and rejects failed captures,
+never reading a previous file as current state. This was an automation issue, not
+evidence that Store/account state or product data was lost. A noninteractive attach
+was replaced by an interactive terminal; no application/source fix was needed.
+
+Actual path: TEST Store · product entry → home profile → Operations → Promote
+store and post requirements → Create → Saved product for this draft. Selected the
+existing manual-entry `LF03 Evaluation Cumin · 100 g pouch` (saved SKU
+`LF03-MAN-CUMIN100`, product `custom-1792061502317910`, see Batch03 entry evidence),
+not a new or injected product. Retained headline `LF04 Evaluation Offer Draft`,
+detail `Private evaluation draft - not published`, order limit50; date stays unset.
+Tapped Save draft and observed “Offer draft saved on this device. Not published.”
+Private-product warning was visible and Publish offer was disabled.
+
+Then restarted only MoolSocial after the explicit draft save, reattached the same
+source, hot-restarted successfully (3757ms), reopened the same Store/form and
+observed the same selected Cumin/pack, headline, detail and limit50. No product,
+Stock, invoice, order, payment, public campaign or customer-message operation was
+performed. This is native draft persistence/recovery evidence, not a newly built
+APK, provider publication, quote, actual discount or public purchase acceptance.
+Screens: calling-task outputs/lf04-private-product-saved.png and
+outputs/lf04-private-product-restored.png. Founder review of ad66bb9d remains pending.
