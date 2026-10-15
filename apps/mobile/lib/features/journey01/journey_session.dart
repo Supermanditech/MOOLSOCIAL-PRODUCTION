@@ -1435,7 +1435,9 @@ class JourneySession extends ChangeNotifier {
   }
 
   void cancelSignIn() {
-    if (!canCancelSignIn) return;
+    // Keep the router's Back interception until the in-flight provider result
+    // settles; clearing the destination here can orphan a completed sign-in.
+    if (busy || !canCancelSignIn) return;
     final cancelLocation = _authenticationCancelTo;
     stage = JourneyStage.ready;
     returnTo = null;

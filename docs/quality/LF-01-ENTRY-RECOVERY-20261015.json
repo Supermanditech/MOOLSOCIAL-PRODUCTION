@@ -29,7 +29,7 @@
       "explicitExclusions": ["No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."],
       "dependenciesAndApprovals": ["Founder authorized Batch 01 and narrow admission correction on 15 October 2026; OPPO review must precede Batch 02.", "Authoritative Store approval and account access remain provider responsibilities."],
       "manifestPath": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
-      "manifestSha256": "66E03D2BB34301D979ED5FE2EA929A29D4D66E05ED698E24FB5BBB0AA027C0A8",
+      "manifestSha256": "13D6952E054CD05A2D114655B84F6832E776069272D6050C51293F888BE39490",
       "evidencePath": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,

@@ -11,6 +11,76 @@ import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 
 void main() {
+  test('Back during pending sign-in preserves the Buy destination', () async {
+    final social = _PendingSocialAuthGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: social,
+      allowGuestReady: true,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    session.beginSignIn(
+      returnLocation: '/app/buy?sub=cart',
+      cancelLocation: '/app/buy',
+    );
+
+    final attempt = session.signInWithSocial(SocialAuthProvider.google);
+    expect(session.busy, isTrue);
+    session.cancelSignIn();
+    final pendingStage = session.stage;
+    final pendingDestination = session.returnTo;
+    social.complete(const SocialAuthResult.authenticated('user-1'));
+    final succeeded = await attempt;
+
+    expect(pendingStage, JourneyStage.signIn);
+    expect(pendingDestination, '/app/buy?sub=cart');
+    expect(succeeded, isTrue);
+    expect(session.isAuthenticated, isTrue);
+    expect(session.readyRoute(), '/app/buy?sub=cart');
+    expect(session.busy, isFalse);
+  });
+
+  test('provider cancellation restores safe Back to Store context', () async {
+    final social = _PendingSocialAuthGateway();
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'skipped',
+          setupComplete: true,
+        ),
+      ),
+      socialAuthGateway: social,
+      allowGuestReady: true,
+    );
+    addTearDown(session.dispose);
+    await session.start();
+    const storeRoute = '/app/work/workspace/dashboard';
+    session.beginSignIn(
+      returnLocation: '/app/buy?sub=cart',
+      cancelLocation: storeRoute,
+    );
+    final attempt = session.signInWithSocial(SocialAuthProvider.google);
+    session.cancelSignIn();
+    final pendingStage = session.stage;
+    social.complete(const SocialAuthResult.cancelled());
+    expect(await attempt, isFalse);
+    expect(pendingStage, JourneyStage.signIn);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.canCancelSignIn, isTrue);
+    session.cancelSignIn();
+    expect(session.stage, JourneyStage.ready);
+    expect(session.readyRoute(), storeRoute);
+    expect(session.returnTo, isNull);
+  });
+
   test('returning authenticated session restores directly to ready', () async {
     final store = MemoryJourneyStore(
       snapshot: const JourneySnapshot(
@@ -1807,6 +1877,19 @@ class _ControlledRevalidationBootstrap implements AccountBootstrapGateway {
 
   void complete(AuthenticatedAccountBootstrapResult result) {
     _retry.complete(result);
+  }
+}
+
+class _PendingSocialAuthGateway extends ReviewSocialAuthGateway {
+  final _result = Completer<SocialAuthResult>();
+
+  void complete(SocialAuthResult result) => _result.complete(result);
+
+  @override
+  Future<SocialAuthResult> signIn(SocialAuthProvider provider) async {
+    final result = await _result.future;
+    if (result.outcome == SocialAuthOutcome.authenticated) signedIn = true;
+    return result;
   }
 }
 

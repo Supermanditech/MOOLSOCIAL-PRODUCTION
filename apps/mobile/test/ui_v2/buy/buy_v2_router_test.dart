@@ -82,7 +82,7 @@ void main() {
     expect(find.text('Find wholesale products'), findsOneWidget);
 
     await tapConnectedAction(tester, 'buy', 'orders');
-    expect(find.text('PURCHASES'), findsOneWidget);
+    expect(find.byKey(const PageStorageKey('buy-orders')), findsOneWidget);
     expect(find.text('Orders'), findsWidgets);
   });
 
@@ -171,7 +171,7 @@ void main() {
 
       expect(find.text('This order could not be found.'), findsOneWidget);
       expect(find.byKey(const Key('buy-order-tracking')), findsNothing);
-      expect(find.text('PURCHASES'), findsOneWidget);
+      expect(find.byKey(const PageStorageKey('buy-orders')), findsOneWidget);
     },
   );
 }

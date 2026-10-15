@@ -1,7 +1,8 @@
 # LF-01 — Buy/Store entry and recovery
 
-Status: founder-authorized implementation; application changes, local results,
-OPPO hot-reload review and founder acceptance are pending. Date: 15 October 2026 IST.
+Status: first bounded application correction implemented and hot-reloaded on
+OPPO; focused host checks passed. Founder acceptance remains pending. Date:
+15 October 2026 IST. Batch 02 has not started.
 
 Actor: a MoolSocial account holder entering Buy or its approved Retailer/Grocery
 Store. Capability: enter and return to the intended account/Store context without
@@ -67,3 +68,43 @@ admission path. Preserve the previous path for all historical tickets unchanged.
 Keep accepted-baseline ancestry, literal changed-owner checks, registry generation,
 Git operation/history protection, clean boundaries and existing secret checks.
 This is task admission, not a passing application test or UI acceptance.
+
+## Application correction and current verification
+
+- Reproduced: cancelling sign-in while a provider result is pending changed the
+  session to ready and cleared its Buy destination. A successful provider result
+  could then be reported without completing the local authenticated session.
+- Smallest correction: `cancelSignIn` now rejects cancellation while busy. The
+  existing router Back interception remains installed; normal cancellation is
+  available after a provider failure/cancellation. No approved screen changed.
+- Added two deterministic, host-only delayed-provider regressions in the existing
+  JourneySession test: authenticated completion retains the intended Buy Cart
+  route; provider cancellation restores normal Back to the Store origin. Both
+  failed before the correction and passed afterward.
+- Corrected two stale Buy router test assertions from the removed `PURCHASES`
+  heading to the existing Orders view key. No Orders UI or behavior changed.
+- Full JourneySession plus Buy router pass: 58 tests. Additional focused existing
+  Store draft/restart, account/session isolation, procurement and retained Back
+  checks pass: 40 tests. Analysis of the changed Dart files: no issues found.
+  These are host fixture results, not production/provider acceptance.
+- OPPO 2b3e0f71: attached to existing debug runtime r67.3, no APK build/install or
+  data reset. Reloaded one library; read-only VM inspection confirmed the actual
+  running `cancelSignIn` contains the busy guard. Initial zero-library reloads
+  were not treated as proof that the correction had loaded.
+- The existing consumer Cart remained one Herbal bathing soap pack, INR 164,
+  with its prior payment-review hold intact. Existing Store/Stock opened as
+  TEST Store · product entry; saved oil 7 and OPPO37E rice 97 remain visible.
+- Buy stock correctly refuses this unbound evaluation account: "Your Store
+  account is unavailable. Reopen the Store before buying stock." A connected,
+  approved Store procurement journey remains provider/account-dependent; it was
+  not fabricated or declared device-passed. The current notice uses a green
+  success treatment for an unavailable message; record as a presentation issue,
+  not evidence that procurement succeeded or authority to redesign this screen.
+- No orders, payments, stock changes or invoices were created. Origins of old
+  evaluation records were not newly established. Device restart persistence and
+  live delayed-provider authentication were not retested in this round.
+
+Review artifacts are in the calling task's existing outputs folder:
+`lf01-before-review-20261015.png`, `lf01-workspaces-20261015.png` and
+`lf01-restock-latest-20261015.png`. They are observations, not founder-approved
+references. Acceptance is pending; retain backend/provider limitations above.
