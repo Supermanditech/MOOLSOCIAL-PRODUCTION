@@ -2112,7 +2112,7 @@ class _WorkWorkspaceDashboardScreenState
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Change in your business profile.',
+                      'Selected preferences for this session. Public ordering and visibility are not confirmed.',
                       key: Key('work-store-status-guidance'),
                       style: TextStyle(color: MoolColors.muted, fontSize: 12),
                     ),
@@ -3786,11 +3786,11 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                   excludeSemantics: true,
                   onTap: onSettings,
                   label:
-                      '${session.workspaceStoreState == WorkspaceStoreState.open
+                      'Selected preferences: ${session.workspaceStoreState == WorkspaceStoreState.open
                           ? 'Open'
                           : session.workspaceStoreState == WorkspaceStoreState.paused
                           ? 'Paused'
-                          : 'Off'}, ${session.workspaceVisibleToCustomers ? 'public storefront' : 'private storefront'}. Store status',
+                          : 'Off'}, ${session.workspaceVisibleToCustomers ? 'Public' : 'Private'}. Public ordering and visibility are not confirmed. Store status',
                   child: Material(
                     key: const Key('work-dashboard-settings'),
                     color: compact || showStatusLabel
@@ -42944,11 +42944,11 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       financeFocus: null,
       purchase: null,
       title: session.workspaceStoreState == WorkspaceStoreState.paused
-          ? 'Your store is paused'
-          : 'Your store is off',
+          ? 'Store pause preference'
+          : 'Store off preference',
       detail: session.workspaceReopensAt.isEmpty
-          ? 'Customers cannot place new app orders until you reopen the store.'
-          : 'Customers can see that ordering resumes ${session.workspaceReopensAt}.',
+          ? 'Off is selected in this session. Public ordering status is not confirmed.'
+          : 'Requested reopening: ${session.workspaceReopensAt}. Public ordering status is not confirmed.',
       actionLabel: 'Review availability',
       route: '/app/work/workspace/dashboard',
       operation: null,

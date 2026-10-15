@@ -43632,7 +43632,7 @@ void main() {
                   isButton: true,
                   hasTapAction: true,
                   label:
-                      '$opening, ${visibility.toLowerCase()} storefront. Store status',
+                      'Selected preferences: $opening, $visibility. Public ordering and visibility are not confirmed. Store status',
                 ),
               );
               final capture = !isPublic && state == WorkspaceStoreState.off;
@@ -46405,6 +46405,64 @@ void main() {
       expect(work.workspaceInvoices, orderedEquals(invoices));
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    for (final reopening in ['', 'Tomorrow at 8:00 AM']) {
+      testWidgets('LF15 attention preference is not public confirmation '
+          'scale=$scale reopening=$reopening', (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final work = liveStore()
+            ..workspaceAcceptingOrders = false
+            ..workspaceStoreState = reopening.isEmpty
+                ? WorkspaceStoreState.off : WorkspaceStoreState.paused
+            ..workspaceReopensAt = reopening;
+          final storeId = work.activeWorkspace?.id;
+          final products = List.of(work.workspaceCatalogueItems);
+          final orders = List.of(work.workspaceOrders);
+          final invoices = List.of(work.workspaceInvoices);
+          final updatedAt = work.workspaceLastUpdatedAt;
+          await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+            viewport: const Size(320, 740), textScale: scale);
+          await openStoreAlerts(tester);
+          expect(tester.getSemantics(find.byKey(const Key('work-dashboard-settings'))),
+            matchesSemantics(isButton: true, hasTapAction: true,
+              label: 'Selected preferences: ${reopening.isEmpty ? 'Off' : 'Paused'}, '
+                'Public. Public ordering and visibility are not confirmed. Store status'));
+          await tester.tap(find.byKey(const Key('work-dashboard-settings')));
+          await tester.pumpAndSettle();
+          expect(find.text('Selected preferences for this session. '
+            'Public ordering and visibility are not confirmed.'), findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          final alert = find.byKey(const Key('work-alert-store-paused'));
+          await reveal(tester, alert);
+          expect(find.text(reopening.isEmpty
+            ? 'Store off preference' : 'Store pause preference'), findsOneWidget);
+          expect(find.text(reopening.isEmpty
+            ? 'Off is selected in this session. Public ordering status is not confirmed.'
+            : 'Requested reopening: $reopening. Public ordering status is not confirmed.'),
+            findsOneWidget);
+          expect(find.textContaining('Customers can see'), findsNothing);
+          expect(find.textContaining('Customers cannot place'), findsNothing);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(work.activeWorkspace?.id, storeId);
+          expect(work.workspaceReopensAt, reopening);
+          expect(work.workspaceAcceptingOrders, isFalse);
+          expect(work.workspaceStoreState, reopening.isEmpty
+            ? WorkspaceStoreState.off : WorkspaceStoreState.paused);
+          expect(work.workspaceLastUpdatedAt, updatedAt);
+          expect(work.workspaceCatalogueItems, orderedEquals(products));
+          expect(work.workspaceOrders, orderedEquals(orders));
+          expect(work.workspaceInvoices, orderedEquals(invoices));
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
   }
 
   for (final missingSetup in [true, false]) {
