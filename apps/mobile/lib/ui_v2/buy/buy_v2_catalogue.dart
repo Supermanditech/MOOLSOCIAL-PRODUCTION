@@ -6631,7 +6631,6 @@ Future<void> showBuyV2PartnerCatalogue(
     );
   }
   final previewProducts = products.take(6).toList(growable: false);
-  final storeTrust = session.marketplaceTrustFor(current);
   final storeFulfilment = publicPartner
       ? _publicStoreFulfilmentLabels(
           session,
@@ -7029,7 +7028,9 @@ Future<void> showBuyV2PartnerCatalogue(
                                               current,
                                             ),
                                             now: session.catalogueNow,
-                                            trust: storeTrust,
+                                            store: session.catalogueStore(
+                                              current.storeId ?? '',
+                                            ),
                                             fulfilmentLabels: storeFulfilment,
                                             onOrderForCollection: () {
                                               if (session.beginStoreCollection(
@@ -7269,27 +7270,6 @@ List<String> _publicStoreFulfilmentLabels(
   return List.unmodifiable(labels);
 }
 
-String _publicStoreLocality(String source) {
-  final parts = source
-      .split(RegExp(r'\s*(?:→|·)\s*'))
-      .map((part) => part.trim())
-      .where((part) => part.isNotEmpty)
-      .toList(growable: false);
-  if (parts.length >= 2) {
-    final origin = parts.first;
-    final destination = parts.last;
-    final originIsJodhpur = origin.toLowerCase().startsWith('jodhpur');
-    final destinationIsJodhpur = destination.toLowerCase().startsWith(
-      'jodhpur',
-    );
-    if (destinationIsJodhpur) {
-      return originIsJodhpur ? destination : origin;
-    }
-    return '$destination, $origin';
-  }
-  return source.trim();
-}
-
 String _publicProviderType(String source) {
   final value = source.trim().toLowerCase();
   if (value.contains('manufacturer')) return 'Manufacturer';
@@ -7309,7 +7289,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
     required this.storeName,
     required this.facts,
     required this.now,
-    required this.trust,
+    required this.store,
     required this.fulfilmentLabels,
     required this.onAskStore,
     required this.onOrderForCollection,
@@ -7322,7 +7302,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   final String storeName;
   final BuyV2ProductFactsSnapshot facts;
   final DateTime Function() now;
-  final BuyV2MarketplaceTrustSnapshot trust;
+  final BuyV2StoreListing? store;
   final List<String> fulfilmentLabels;
   final VoidCallback? onAskStore;
   final VoidCallback onOrderForCollection;
@@ -7396,13 +7376,18 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
   Widget build(BuildContext context) {
     final product = widget.product;
     final facts = widget.facts;
-    final trust = widget.trust;
     final fulfilmentLabels = widget.fulfilmentLabels;
     final onAskStore = widget.onAskStore;
-    final sourceLocation = trust.partnerLocation?.trim().isNotEmpty == true
-        ? trust.partnerLocation!.trim()
-        : product.origin.trim();
-    final locality = _publicStoreLocality(sourceLocation);
+    // Only the exact public Store record describes its location. Product
+    // origin, buyer destination and general trust readiness are not addresses
+    // or evidence of address verification.
+    final store = widget.store;
+    final location = store != null && store.id == product.storeId
+        ? (store.area.trim().isNotEmpty
+              ? store.area.trim()
+              : store.address.trim())
+        : '';
+    final locality = location.isEmpty ? 'Store location unavailable' : location;
     final providerType = _publicProviderType(product.sellerType);
     final fulfilmentIdentity = product.destination == BuyV2Destination.shop
         ? 'MoolSocial Fulfilment Store'
@@ -7412,8 +7397,6 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
         : providerType == 'Manufacturer'
         ? 'Ask manufacturer'
         : 'Ask supplier';
-    final addressConfirmed =
-        trust.state == BuyV2MarketplaceTrustState.ready && locality.isNotEmpty;
     final (
       statusLabel,
       statusColor,
@@ -7445,7 +7428,6 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
       container: true,
       label:
           '$fulfilmentIdentity. ${widget.storeName}. $providerType. '
-          '${addressConfirmed ? 'Address confirmed. ' : ''}'
           '$locality. $statusLabel. ${fulfilmentLabels.join(', ')}',
       child: Container(
         padding: widget.embedded ? EdgeInsets.zero : const EdgeInsets.all(8),
@@ -7541,12 +7523,8 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                   ],
                   Text(
                     widget.showLocality
-                        ? (addressConfirmed
-                              ? '$providerType · Address confirmed · $locality'
-                              : '$providerType · $locality')
-                        : (addressConfirmed
-                              ? '$providerType · Address confirmed'
-                              : providerType),
+                        ? '$providerType · $locality'
+                        : providerType,
                     key: const ValueKey('buy-public-store-location'),
                     overflow: TextOverflow.clip,
                     style: context.buyMeta.copyWith(
@@ -7743,6 +7721,14 @@ class BuyV2StoreCartBar extends StatelessWidget {
       destination,
     );
     final visibleMessage = '$itemCount $itemLabel';
+    final scopeLabel = aggregate
+        ? 'All Cart items'
+        : switch (destination) {
+            BuyV2Destination.shop ||
+            BuyV2Destination.orders => 'Shop · all Stores',
+            BuyV2Destination.wholesale => 'Wholesale · all suppliers',
+            BuyV2Destination.medicine => 'Care · all pharmacies',
+          };
     final message = itemCount == 0
         ? 'Cart is empty'
         : acknowledgement == null
@@ -7770,12 +7756,16 @@ class BuyV2StoreCartBar extends StatelessWidget {
       messageStyle,
     );
     final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
-    final valueWidth = messageSize.width > totalSize.width
-        ? messageSize.width
-        : totalSize.width;
-    final height = (messageSize.height + totalSize.height + 16)
-        .clamp(44.0, double.infinity)
-        .toDouble();
+    final scopeSize = buyV2ValueTextSize(context, scopeLabel, totalStyle);
+    final valueWidth = [
+      messageSize.width,
+      totalSize.width,
+      scopeSize.width,
+    ].reduce((a, b) => a > b ? a : b);
+    final height =
+        (scopeSize.height + messageSize.height + totalSize.height + 16)
+            .clamp(44.0, double.infinity)
+            .toDouble();
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = (valueWidth + 55)
@@ -7794,7 +7784,7 @@ class BuyV2StoreCartBar extends StatelessWidget {
               container: true,
               button: true,
               liveRegion: true,
-              label: '$message. $totalText. View Cart',
+              label: '$scopeLabel. $message. $totalText. View Cart',
               onTap: activate,
               child: SizedBox(
                 width: width,
@@ -7830,6 +7820,11 @@ class BuyV2StoreCartBar extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Text(
+                                    scopeLabel,
+                                    key: const ValueKey('buy-store-cart-scope'),
+                                    style: totalStyle,
+                                  ),
                                   BuyV2FiniteValueTransition(
                                     key: const ValueKey(
                                       'buy-store-cart-feedback',
@@ -8354,7 +8349,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         storeName: _publicStoreName(widget.session, widget.product),
         facts: widget.session.productFactsFor(widget.product),
         now: widget.session.catalogueNow,
-        trust: widget.session.marketplaceTrustFor(widget.product),
+        store: widget.session.catalogueStore(widget.product.storeId ?? ''),
         fulfilmentLabels: _publicStoreFulfilmentLabels(widget.session, [
           widget.product,
         ]),
@@ -8557,7 +8552,9 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     style: context.buyTitle.copyWith(fontSize: 16),
                   ),
                   Text(
-                    store?.address ?? product.origin,
+                    store?.address.trim().isNotEmpty == true
+                        ? store!.address.trim()
+                        : 'Store address unavailable',
                     style: context.buyMeta,
                   ),
                 ],
@@ -9619,8 +9616,10 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
                                     facts: session.productFactsFor(product),
                                     confirmAfterStoreAcceptance:
                                         confirmAfterStoreAcceptance &&
-                                        (product.destination == BuyV2Destination.shop ||
-                                            product.destination == BuyV2Destination.wholesale),
+                                        (product.destination ==
+                                                BuyV2Destination.shop ||
+                                            product.destination ==
+                                                BuyV2Destination.wholesale),
                                     onOpen: () => onOpenProduct(product.id),
                                     onAdd: () => unawaited(
                                       _addProduct(context, product),

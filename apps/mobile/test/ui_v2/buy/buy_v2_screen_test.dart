@@ -393,8 +393,154 @@ final class _T01CMutableDeliveryFactsAdapter
   }
 }
 
+// Isolated descriptive-location fixture, not live publication/verification.
+class _Lf07LocationSession extends BuyV2Session {
+  _Lf07LocationSession(this.location) : super(core: BuySession());
+  final BuyV2StoreListing? location;
+
+  @override
+  BuyV2StoreListing? catalogueStore(String storeId) => location;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scale in [1.0, 2.0]) {
+    for (final location in ['missing', 'matching', 'foreign']) {
+      testWidgets('LF07 Store location $location text $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        final product = BuyV2Catalogue.products
+            .firstWhere((item) => item.id == 's-eggs')
+            .copyWith(storeId: 'lf07-evaluation-store');
+        final session = _Lf07LocationSession(
+          location == 'missing'
+              ? null
+              : BuyV2StoreListing(
+                  id: location == 'matching' ? product.storeId! : 'other-store',
+                  name: product.seller,
+                  area: 'Evaluation Store locality',
+                  address: 'Evaluation Store address',
+                  regionId: 'evaluation-region',
+                ),
+        );
+        addTearDown(session.dispose);
+        expect(product.origin, isNotEmpty);
+        expect(
+          session.marketplaceTrustFor(product).state,
+          BuyV2MarketplaceTrustState.ready,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => unawaited(
+                    showBuyV2PartnerCatalogue(context, session, product),
+                  ),
+                  child: const Text('Open evaluation Store'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open evaluation Store'));
+        await tester.pumpAndSettle();
+        final label = tester
+            .widget<Text>(
+              find.byKey(const ValueKey('buy-public-store-location')),
+            )
+            .data!;
+        expect(label, isNot(contains('Address confirmed')));
+        expect(
+          label,
+          contains(
+            location == 'matching'
+                ? 'Evaluation Store locality'
+                : 'Store location unavailable',
+          ),
+        );
+        expect(label, isNot(contains(product.origin)));
+        final semantics = tester
+            .widget<Semantics>(
+              find.byKey(const ValueKey('buy-public-store-truth-s-eggs')),
+            )
+            .properties
+            .label!;
+        expect(semantics, isNot(contains('Address confirmed')));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    for (final (aggregate, destination, scope) in [
+      (false, BuyV2Destination.shop, 'Shop · all Stores'),
+      (false, BuyV2Destination.wholesale, 'Wholesale · all suppliers'),
+      (false, BuyV2Destination.medicine, 'Care · all pharmacies'),
+      (true, BuyV2Destination.shop, 'All Cart items'),
+    ]) {
+      testWidgets('LF07 Cart scope $scope text $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 844);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(core: BuySession());
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-tomato'), isTrue);
+        expect(session.addProduct('s-eggs'), isTrue);
+        expect(session.addProduct('w-rice'), isTrue);
+        final before = session.itemCount;
+        final expected = aggregate
+            ? session.cartTotal
+            : session.totalForDestination(destination);
+        var opened = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.bottomRight,
+                child: BuyV2StoreCartBar(
+                  session: session,
+                  destination: destination,
+                  aggregate: aggregate,
+                  onOpenCart: () => opened++,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(scope), findsOneWidget);
+        final total = find.byKey(const ValueKey('buy-store-cart-total'));
+        expect(tester.widget<Text>(total).data, buyV2Money(expected));
+        expect(
+          tester.renderObject<RenderParagraph>(total).didExceedMaxLines,
+          isFalse,
+        );
+        final bar = find.byKey(const ValueKey('buy-store-cart-bar'));
+        expect(tester.widget<Semantics>(bar).properties.label, contains(scope));
+        await tester.tap(bar);
+        await tester.pumpAndSettle();
+        expect(opened, 1);
+        expect(session.itemCount, before);
+        expect(session.quantityFor('w-rice'), greaterThan(0));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   Finder scrollableWithin(Key ownerKey) => find.descendant(
     of: find.byKey(ownerKey),
@@ -5973,7 +6119,7 @@ void main() {
     return false;
   }
 
-  for (final total in [1, 10000, 10000000]) {
+  for (final total in [1, 10000, 10000000, 1000000000]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
         'R66 cart display fixture INR$total fits complete text at $scale',
@@ -11118,7 +11264,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('MoolSocial Fulfilment Store'), findsNothing);
-      expect(find.textContaining('Address confirmed'), findsOneWidget);
+      expect(find.textContaining('Address confirmed'), findsNothing);
+      expect(find.textContaining('Store location unavailable'), findsOneWidget);
       final storeTruth = find.byKey(
         const ValueKey('buy-public-store-truth-s-eggs'),
       );
@@ -13610,7 +13757,8 @@ void main() {
       tester.widget<Semantics>(truth).properties.label,
       contains('MoolSocial Fulfilment Store. Safe Protein Store.'),
     );
-    expect(find.textContaining('Address confirmed'), findsOneWidget);
+    expect(find.textContaining('Address confirmed'), findsNothing);
+    expect(find.textContaining('Store location unavailable'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
