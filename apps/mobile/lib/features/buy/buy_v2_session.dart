@@ -5690,7 +5690,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2RatingKind kind = BuyV2RatingKind.product,
   }) {
     final product = findProduct(productId);
-    if (product == null || !procurementScopeCurrent) return const [];
+    if (!_prepareProductFeedbackScope() || product == null) return const [];
     return List.unmodifiable(
       _ratingTargets.values.where(
         (target) =>
@@ -5705,7 +5705,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2RatingTarget? purchaseRatingTarget(String purchaseId) {
-    if (!procurementScopeCurrent ||
+    if (!_prepareProductFeedbackScope() ||
         commerceLoadState != BuyV2CommerceLoadState.ready ||
         commerceAdapter is! BuyV2VerifiedRatingAdapter) {
       return null;
@@ -5738,6 +5738,7 @@ class BuyV2Session extends ChangeNotifier {
     required int rating,
     required String comment,
   }) async {
+    if (!_prepareProductFeedbackScope()) return false;
     final target = purchaseRatingTarget(purchaseId);
     if (target == null) {
       notice =
@@ -5756,11 +5757,11 @@ class BuyV2Session extends ChangeNotifier {
   bool canReviewProduct(
     String productId, {
     BuyV2RatingKind kind = BuyV2RatingKind.product,
-  }) => reviewDataEnabled
+  }) => _prepareProductFeedbackScope() && (reviewDataEnabled
       ? kind == BuyV2RatingKind.product &&
             _reviewableProductIds.contains(productId)
       : commerceAdapter is BuyV2VerifiedRatingAdapter &&
-            ratingTargetsFor(productId, kind: kind).isNotEmpty;
+            ratingTargetsFor(productId, kind: kind).isNotEmpty);
 
   String? productReviewUnavailableReason(
     String productId, {
@@ -5777,11 +5778,22 @@ class BuyV2Session extends ChangeNotifier {
           : 'You can review this item after delivery or collection.',
   };
 
-  bool canReportProduct(String productId) =>
-      findProduct(productId) != null && _productReportsAvailable;
+  String _productReportKey(BuyV2Product product) =>
+      jsonEncode([product.storeId, _buyV2SavedKey(product)]);
+
+  bool canReportProduct(String productId) {
+    if (!_prepareProductFeedbackScope() ||
+        commerceLoadState != BuyV2CommerceLoadState.ready) {
+      return false;
+    }
+    final product = findProduct(productId);
+    return product != null && _productReportsAvailable &&
+        !_unconfirmedProductReports.contains(_productReportKey(product));
+  }
 
   bool productFeedbackBusy(String productId) =>
-      _productFeedbackBusyIds.contains(productId);
+      _prepareProductFeedbackScope() &&
+      _productFeedbackOperations.containsKey(productId);
 
   bool get addressRequestsAvailable => reviewDataEnabled;
 
@@ -6090,7 +6102,11 @@ class BuyV2Session extends ChangeNotifier {
 
   String? get reviewDraftOwnerScope => customerStateStore?.ownerScope;
 
+  Object? get productFeedbackContext =>
+      _prepareProductFeedbackScope() ? _productFeedbackScope : null;
+
   void _ensureReviewDraftOwner() {
+    if (!_prepareProductFeedbackScope()) return;
     if (_reviewDraftOwnerScope == reviewDraftOwnerScope) return;
     _reviewDrafts.clear();
     _reviewDraftOwnerScope = reviewDraftOwnerScope;
@@ -6100,6 +6116,7 @@ class BuyV2Session extends ChangeNotifier {
     String productId, {
     String? targetId,
   }) {
+    if (!_prepareProductFeedbackScope()) return null;
     _ensureReviewDraftOwner();
     return findProduct(productId) == null &&
             !(targetId != null &&
@@ -6114,8 +6131,12 @@ class BuyV2Session extends ChangeNotifier {
     required String comment,
     required String? ownerScope,
     String? targetId,
+    Object? feedbackContext,
   }) {
-    if (ownerScope != reviewDraftOwnerScope || !procurementScopeCurrent) return;
+    if (!_prepareProductFeedbackScope() || ownerScope != reviewDraftOwnerScope ||
+        (feedbackContext != null && feedbackContext != _productFeedbackScope)) {
+      return;
+    }
     _ensureReviewDraftOwner();
     final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
     if ((findProduct(productId) == null &&
@@ -6151,7 +6172,45 @@ class BuyV2Session extends ChangeNotifier {
 
   final Map<String, String> _reportedProductReasons = {};
   final Set<String> _reviewableProductIds = {};
-  final Set<String> _productFeedbackBusyIds = {};
+  final Map<String, Object> _productFeedbackOperations = {};
+  final Set<String> _unconfirmedProductReports = {};
+  (String?, String?, String?, int, int)? _productFeedbackScope;
+
+  bool _prepareProductFeedbackScope() {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
+    final scope = _currentCustomerOrderScope;
+    if (_productFeedbackScope != null && _productFeedbackScope != scope) {
+      _productFeedbackOperations.clear();
+      _ratingTargets.clear();
+      // A new login must recheck eligibility, not erase the same owner's draft.
+      if (_productFeedbackScope!.$1 != scope.$1) {
+        _reviewDrafts.clear();
+      }
+      _customerReviews.clear();
+      _reportedProductReasons.clear();
+      _unconfirmedProductReports.clear();
+      _reviewableProductIds.clear();
+      _productReportsAvailable = false;
+    }
+    _productFeedbackScope = scope;
+    return true;
+  }
+
+  bool _productFeedbackCurrent(
+    String key, (String?, String?, String?, int, int)? scope, Object operation,
+  ) =>
+      !_collectionDisposed && procurementScopeCurrent &&
+      scope == _currentCustomerOrderScope &&
+      identical(_productFeedbackOperations[key], operation);
+
+  void _finishProductFeedback(
+    String key, (String?, String?, String?, int, int)? scope, Object operation,
+  ) {
+    if (_productFeedbackCurrent(key, scope, operation)) {
+      _productFeedbackOperations.remove(key);
+      notifyListeners();
+    }
+  }
   bool _productReportsAvailable = false;
   final Map<String, Object> _orderRefreshOperations = {};
   int _orderRefreshGeneration = 0;
@@ -7646,13 +7705,16 @@ class BuyV2Session extends ChangeNotifier {
         ? ++_procurementEpoch
         : _procurementEpoch;
     if (isStoreProcurement) _procurementBuyerGrant = null;
+    final feedbackScope = _currentCustomerOrderScope;
     commerceMessage = null;
     notifyListeners();
     try {
+      if (_collectionDisposed || feedbackScope != _currentCustomerOrderScope) return;
       final snapshot = await commerceAdapter.refresh();
       if (refreshSequence != _commerceRefreshSequence ||
           _collectionDisposed ||
           procurementEpoch != _procurementEpoch ||
+          feedbackScope != _currentCustomerOrderScope ||
           !procurementScopeCurrent) {
         return;
       }
@@ -7724,6 +7786,7 @@ class BuyV2Session extends ChangeNotifier {
           snapshot.businessVerificationState ==
               BuyV2BusinessVerificationState.verified ||
           snapshot.businessVerified;
+      _prepareProductFeedbackScope();
       _productReportsAvailable = snapshot.productReportsAvailable;
       _reviewableProductIds
         ..clear()
@@ -7772,6 +7835,7 @@ class BuyV2Session extends ChangeNotifier {
       if (refreshSequence != _commerceRefreshSequence ||
           _collectionDisposed ||
           procurementEpoch != _procurementEpoch ||
+          feedbackScope != _currentCustomerOrderScope ||
           !procurementScopeCurrent) {
         return;
       }
@@ -13912,6 +13976,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2CustomerReview? customerReviewFor(String productId) {
+    if (!_prepareProductFeedbackScope()) return null;
     final product = findProduct(productId);
     if (product == null) return null;
     if (!reviewDataEnabled) {
@@ -13935,6 +14000,7 @@ class BuyV2Session extends ChangeNotifier {
     required int rating,
     required String comment,
   }) {
+    if (!_prepareProductFeedbackScope()) return false;
     final product = findProduct(productId);
     final cleanComment = comment.trim();
     if (product == null ||
@@ -13963,12 +14029,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool hasReportedProduct(String productId) {
+    if (!_prepareProductFeedbackScope()) return false;
     final product = findProduct(productId);
     return product != null &&
-        _reportedProductReasons.containsKey(product.canonicalId);
+        _reportedProductReasons.containsKey(_productReportKey(product));
   }
 
   bool reportProduct({required String productId, required String reason}) {
+    if (!_prepareProductFeedbackScope()) return false;
     final product = findProduct(productId);
     final cleanReason = reason.trim();
     if (product == null || cleanReason.isEmpty) {
@@ -13976,7 +14044,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    _reportedProductReasons[product.canonicalId] = cleanReason;
+    _reportedProductReasons[_productReportKey(product)] = cleanReason;
     notice = 'Report received. We will review these product details.';
     notifyListeners();
     return true;
@@ -13989,6 +14057,7 @@ class BuyV2Session extends ChangeNotifier {
     String? targetId,
     BuyV2RatingKind kind = BuyV2RatingKind.product,
   }) async {
+    if (!_prepareProductFeedbackScope()) return false;
     final unavailable = productReviewUnavailableReason(productId, kind: kind);
     if (unavailable != null) {
       notice = unavailable;
@@ -14028,6 +14097,7 @@ class BuyV2Session extends ChangeNotifier {
     String comment,
     String productId,
   ) async {
+    if (!_prepareProductFeedbackScope()) return false;
     final adapter = commerceAdapter;
     final clean = comment.trim();
     if (adapter is! BuyV2VerifiedRatingAdapter ||
@@ -14036,11 +14106,17 @@ class BuyV2Session extends ChangeNotifier {
         clean.characters.length > 8000) {
       return false;
     }
-    if (!_productFeedbackBusyIds.add(productId)) return false;
+    if (_productFeedbackOperations.containsKey(productId)) return false;
+    final operation = Object();
+    final scope = _productFeedbackScope;
+    _productFeedbackOperations[productId] = operation;
     final owner = reviewDraftOwnerScope;
     notice = null;
-    notifyListeners();
+    bool current() => _productFeedbackCurrent(productId, scope, operation) &&
+        identical(_ratingTargets[target.id], target);
     try {
+      notifyListeners();
+      if (!current()) return false;
       final request = BuyV2RatingRequest(
         target: target,
         stars: rating,
@@ -14063,9 +14139,7 @@ class BuyV2Session extends ChangeNotifier {
         request,
       );
       final saved = result.saved;
-      if (owner != reviewDraftOwnerScope ||
-          !procurementScopeCurrent ||
-          !identical(_ratingTargets[target.id], target)) {
+      if (!current()) {
         return false;
       }
       final accepted =
@@ -14103,12 +14177,12 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'Thank you for your rating.';
       return true;
     } on Object {
+      if (!current()) return false;
       notice =
           'Your rating could not be sent. Check your connection and retry.';
       return false;
     } finally {
-      _productFeedbackBusyIds.remove(productId);
-      notifyListeners();
+      _finishProductFeedback(productId, scope, operation);
     }
   }
 
@@ -14116,6 +14190,7 @@ class BuyV2Session extends ChangeNotifier {
     required String productId,
     required String reason,
   }) async {
+    if (!_prepareProductFeedbackScope()) return false;
     if (reviewDataEnabled) {
       return reportProduct(productId: productId, reason: reason);
     }
@@ -14127,30 +14202,44 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!canReportProduct(productId)) {
-      notice = 'Product reporting is unavailable right now. Try again later.';
+      notice = _unconfirmedProductReports.contains(_productReportKey(product))
+          ? 'Your report is not confirmed. Check with support before submitting again.'
+          : 'Product reporting is unavailable right now. Try again later.';
       notifyListeners();
       return false;
     }
-    if (!_productFeedbackBusyIds.add(productId)) return false;
+    if (_productFeedbackOperations.containsKey(productId)) return false;
+    final operation = Object();
+    final scope = _productFeedbackScope;
+    _productFeedbackOperations[productId] = operation;
+    bool current() => _productFeedbackCurrent(productId, scope, operation) &&
+        identical(findProduct(productId), product);
     notice = null;
-    notifyListeners();
     try {
+      notifyListeners();
+      if (!current()) return false;
       final result = await commerceAdapter.reportProduct(
         product: product,
         reason: cleanReason,
       );
+      if (!current()) return false;
+      if (result.customerMessage.trim().isEmpty) {
+        _unconfirmedProductReports.add(_productReportKey(product));
+        notice = 'Your report is not confirmed. Check with support before submitting again.';
+        return false;
+      }
       if (result.accepted) {
-        _reportedProductReasons[product.canonicalId] = cleanReason;
+        _reportedProductReasons[_productReportKey(product)] = cleanReason;
       }
       notice = result.customerMessage;
       return result.accepted;
     } on Object {
-      notice =
-          'This report could not be sent. Check your connection and retry.';
+      if (!current()) return false;
+      _unconfirmedProductReports.add(_productReportKey(product));
+      notice = 'Your report is not confirmed. Check with support before submitting again.';
       return false;
     } finally {
-      _productFeedbackBusyIds.remove(productId);
-      notifyListeners();
+      _finishProductFeedback(productId, scope, operation);
     }
   }
 

@@ -8033,10 +8033,13 @@ Future<void> _showProductReportSheet(
             MediaQuery.viewInsetsOf(sheetContext).bottom +
             exportedBottomClearance,
       ),
-      child: _ProductReportSheet(
-        session: session,
-        product: product,
-        reasons: reasons,
+      child: AnimatedBuilder(
+        animation: session,
+        builder: (_, _) => _ProductReportSheet(
+          session: session,
+          product: product,
+          reasons: reasons,
+        ),
       ),
     ),
   );
@@ -8195,14 +8198,19 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   BuyV2RatingTarget? get _target =>
       _targets.where((t) => t.id == _targetId).firstOrNull;
   late final String? _draftOwnerScope;
+  late final Object? _feedbackContext;
+  bool get _feedbackContextCurrent => _feedbackContext != null &&
+      _feedbackContext == widget.session.productFeedbackContext;
   bool _submissionRejected = false;
   bool _submitting = false;
 
   bool get _canCompose =>
-      (widget.purchaseId == null && widget.session.reviewDataEnabled) ||
-      _target != null;
+      _feedbackContextCurrent &&
+      ((widget.purchaseId == null && widget.session.reviewDataEnabled) ||
+      _target != null);
 
   bool get _isValid =>
+      _feedbackContextCurrent &&
       _rating >= 1 &&
       _rating <= 5 &&
       _commentController.text.characters.length <= 8000 &&
@@ -8212,6 +8220,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   @override
   void initState() {
     super.initState();
+    _feedbackContext = widget.session.productFeedbackContext;
     _draftOwnerScope = widget.session.reviewDraftOwnerScope;
     _targetId = _targets.length == 1 ? _targets.single.id : null;
     final draft = _canCompose
@@ -8242,6 +8251,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
       comment: _commentController.text,
       ownerScope: _draftOwnerScope,
       targetId: _targetId,
+      feedbackContext: _feedbackContext,
     );
   }
 
@@ -8292,7 +8302,8 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
 
   @override
   Widget build(BuildContext context) {
-    if (_draftOwnerScope != widget.session.reviewDraftOwnerScope) {
+    if (!_feedbackContextCurrent ||
+        _draftOwnerScope != widget.session.reviewDraftOwnerScope) {
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -8666,13 +8677,23 @@ class _ProductReportSheet extends StatefulWidget {
 }
 
 class _ProductReportSheetState extends State<_ProductReportSheet> {
+  late final Object? _feedbackContext;
+  bool get _feedbackContextCurrent => _feedbackContext != null &&
+      _feedbackContext == widget.session.productFeedbackContext;
+
+  @override
+  void initState() {
+    super.initState();
+    _feedbackContext = widget.session.productFeedbackContext;
+  }
+
   String? _selectedReason;
   bool _submissionRejected = false;
   bool _submitting = false;
 
   Future<void> _submit() async {
     final reason = _selectedReason;
-    if (reason == null || _submitting) return;
+    if (reason == null || _submitting || !_feedbackContextCurrent) return;
     setState(() {
       _submitting = true;
       _submissionRejected = false;
@@ -8694,6 +8715,21 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_feedbackContextCurrent) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Your account changed. Reopen this product to report it.'),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
     final stateDuration =
         BuyV2ProductFeedbackSheetMotion.resolveFormStateDuration(context);
     const title = 'Report a product issue';
