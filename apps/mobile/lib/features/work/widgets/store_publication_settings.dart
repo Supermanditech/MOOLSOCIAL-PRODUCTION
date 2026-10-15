@@ -17,12 +17,40 @@ class StorePublicationSettings extends StatefulWidget {
 class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   late final String? _storeId;
   late final int? _scopeRevision;
+  late final WorkSession _ownerSession;
+  late final Object _ownerContext;
+  late Future<bool> _load;
+  bool _initialized = false;
   @override
   void initState() {
     super.initState();
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     _scopeRevision = widget.session.navigationScopeRevision;
+    _ownerSession = widget.session;
+    _ownerContext = widget.session.publicationPreferencesContext;
+    if (_storeId != null && !widget.session.publicationPreferencesPersistenceAvailable) {
+      _initializeInputs();
+      _load = Future.value(true);
+    } else {
+      _load = _loadInputs();
+    }
+  }
+  bool get _contextCurrent => identical(widget.session, _ownerSession) &&
+      _ownerContext == widget.session.publicationPreferencesContext;
+  Future<bool> _loadInputs() async {
+    final loaded = _storeId != null && await widget.session
+        .loadWorkspacePublicationPreferences(expectedStoreId: _storeId);
+    if (loaded && mounted && _contextCurrent && !_initialized) {
+      _initializeInputs();
+    }
+    return loaded;
+  }
+  void _initializeInputs() {
     _initial = widget.session.workspacePublicationDetails;
+    for (final key in _labels.keys) {
+      _fields[key] = TextEditingController(text: '${_initial.toJson()[key] ?? ''}');
+    }
+    _initialized = true;
   }
   late final WorkspaceStorePublicationDetails _initial;
   late String _businessType = _initial.businessType;
@@ -49,18 +77,25 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     'returnWindowDays': 'Return window',
     'dispatchDays': 'Dispatch within',
   };
-  late final _fields = {
-    for (final key in _labels.keys)
-      key: TextEditingController(text: '${_initial.toJson()[key] ?? ''}'),
-  };
+  final _fields = <String, TextEditingController>{};
   late List<WorkspacePaymentTerm> _wholesaleTerms = List.of(
     _initial.wholesalePaymentTerms,
   );
   late final _remedies = Set<String>.of(_initial.returnRemedies);
   String? _message;
   bool _failed = false;
+  static const _changedContextMessage =
+      'Your Store changed. Reopen these details in the correct Store or account. Your entries are kept.';
+  bool _canApply() {
+    if (!_contextCurrent) {
+      setState(() { _failed = true; _message = _changedContextMessage; });
+      return false;
+    }
+    return !widget.session.workspacePublicationPreferencesSaving;
+  }
 
   void _applyBusiness({String? type, bool? retail, bool? wholesale}) {
+    if (!_canApply()) return;
     final details = WorkspaceStorePublicationDetails.fromJson({
       ...widget.session.workspacePublicationDetails.toJson(),
       'businessType': type ?? _businessType,
@@ -94,6 +129,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   }
 
   void _apply({required bool address}) {
+    if (!_canApply()) return;
     final current = widget.session.workspacePublicationDetails;
     final patch = <String, Object?>{...current.toJson()};
     if (address) {
@@ -241,7 +277,35 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   );
 
   @override
-  Widget build(BuildContext context) => StoreSettingsStyle(
+  Widget build(BuildContext context) => FutureBuilder<bool>(future: _load,
+    initialData: _initialized ? true : null,
+    builder: (context, snapshot) {
+      if (!_contextCurrent) return const Text(_changedContextMessage);
+      if (!_initialized && snapshot.connectionState != ConnectionState.done) {
+        return const Center(child: CircularProgressIndicator(semanticsLabel: 'Opening saved Store defaults'));
+      }
+      if (snapshot.data != true || !_initialized) {
+        return Column(children: [
+        Text(widget.session.workspacePublicationPreferencesError ?? 'Saved Store defaults could not be opened.'),
+        OutlinedButton(onPressed: () => setState(() { _load = _loadInputs(); }), child: const Text('Try again')),
+        ]);
+      }
+      return AnimatedBuilder(animation: widget.session, builder: (context, _) {
+        if (!_contextCurrent) return const Text(_changedContextMessage);
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (widget.session.publicationPreferencesPersistenceAvailable) Padding(
+            padding: const EdgeInsets.only(bottom: 8), child: Text(
+              widget.session.workspacePublicationPreferencesError ??
+                (widget.session.workspacePublicationPreferencesSaving ? 'Saving Store defaults on this device…' :
+                 widget.session.workspacePublicationPreferencesSaved ? 'Saved on this device. Public synchronization is pending.' :
+                 'Save these inputs on this device. Public synchronization is pending.'),
+              key: const Key('work-publication-device-status'), style: const TextStyle(fontSize: 12))),
+          AbsorbPointer(absorbing: widget.session.workspacePublicationPreferencesSaving, child: _editor(context)),
+        ]);
+      });
+    });
+
+  Widget _editor(BuildContext context) => StoreSettingsStyle(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -333,6 +397,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                 ],
                 saveKey: 'work-publication-save-address',
                 saveLabel: 'Apply Store details',
+                saveEnabled: !widget.session.workspacePublicationPreferencesSaving,
                 onSave: () => _apply(address: true),
                 trailing: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,6 +513,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                 ),
                 saveKey: 'work-publication-save-terms',
                 saveLabel: 'Apply terms',
+                saveEnabled: !widget.session.workspacePublicationPreferencesSaving,
                 onSave: () => _apply(address: false),
               ),
             ],

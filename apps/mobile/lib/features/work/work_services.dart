@@ -802,16 +802,19 @@ abstract interface class WorkPendingProofStore {
 
 class SecureWorkPendingProofStore implements WorkPendingProofStore {
   SecureWorkPendingProofStore({this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = null, _pickupPreferences = false;
+    : _contactDraft = false, _offerStoreId = null, _pickupPreferences = false, _publicationPreferences = false;
   SecureWorkPendingProofStore.contactDraft({this.reviewOnly = false})
-    : _contactDraft = true, _offerStoreId = null, _pickupPreferences = false;
+    : _contactDraft = true, _offerStoreId = null, _pickupPreferences = false, _publicationPreferences = false;
   SecureWorkPendingProofStore.offerDraft(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false;
+    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false, _publicationPreferences = false;
   SecureWorkPendingProofStore.pickupPreferences(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = true;
+    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = true, _publicationPreferences = false;
+  SecureWorkPendingProofStore.publicationPreferences(String storeId, {this.reviewOnly = false})
+    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false, _publicationPreferences = true;
   final bool reviewOnly;
   final bool _contactDraft;
   final bool _pickupPreferences;
+  final bool _publicationPreferences;
   final String? _offerStoreId;
   static final Map<String, Future<void>> _offerWrites = {};
   static const _storage = FlutterSecureStorage();
@@ -825,7 +828,7 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       : 'moolsocial.workspace.pending-proof.v1';
 
   String _scopedKey(String scope) => _offerStoreId != null
-      ? 'moolsocial.workspace.${_pickupPreferences ? 'pickup-preferences' : 'offer-draft'}.${_review ? 'review.' : ''}v1.'
+      ? 'moolsocial.workspace.${_publicationPreferences ? 'publication-inputs' : _pickupPreferences ? 'pickup-preferences' : 'offer-draft'}.${_review ? 'review.' : ''}v1.'
           '${Uri.encodeComponent(scope)}/${Uri.encodeComponent(_offerStoreId)}'
       : _contactDraft
       ? 'moolsocial.workspace.contact-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}'
@@ -856,7 +859,9 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
         decoded['scope'] != scope ||
         decoded['draft'] is! Map) {
       if (_offerStoreId != null) {
-        throw WorkGatewayException(_pickupPreferences
+        throw WorkGatewayException(_publicationPreferences
+            ? 'Your saved Store defaults could not be opened.'
+            : _pickupPreferences
             ? 'Your saved pickup preferences could not be opened.'
             : 'Your saved offer draft could not be opened.');
       }

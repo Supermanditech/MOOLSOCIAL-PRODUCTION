@@ -474,8 +474,10 @@ class _StoreOperationalData {
       <String, DateTime>{};
 
   int pendingOperationalRequests = 0;
-  final Map<String, _PickupPreferencesRecovery> pickupPreferences = {};
+  final Map<String, _OwnerInputRecovery> pickupPreferences = {};
   String? pickupPreferencesOwner;
+  final Map<String, _OwnerInputRecovery> publicationPreferences = {};
+  String? publicationPreferencesOwner;
   bool inventoryLoaded = false;
   int? inventoryRevision;
   int? inventoryReceiptCheckpointRevision;
@@ -487,7 +489,7 @@ class _StoreOperationalData {
   bool inventoryReceiptRecoveryPending = false;
 }
 
-class _PickupPreferencesRecovery {
+class _OwnerInputRecovery {
   bool loaded = false, saved = false;
   Map<String, Object?>? sessionFields;
   int pendingWrites = 0;
@@ -589,6 +591,7 @@ class WorkSession extends ChangeNotifier {
     this.analyticsReader,
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
+    this.publicationPreferencesStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -636,6 +639,7 @@ class WorkSession extends ChangeNotifier {
     this.analyticsReader,
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
+    this.publicationPreferencesStoreFactory,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -653,6 +657,7 @@ class WorkSession extends ChangeNotifier {
   final WorkGateway gateway;
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
   final WorkPendingProofStore Function(String storeId)? pickupPreferencesStoreFactory;
+  final WorkPendingProofStore Function(String storeId)? publicationPreferencesStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
 
@@ -8152,10 +8157,24 @@ class WorkSession extends ChangeNotifier {
     }
     // Snapshot immutable selections; later edits to a caller's Set cannot change
     // another Store's accepted methods or saved return rules.
+    final changedInputs = !_ownerInputValuesEqual(
+      _publicationInputFields(), _publicationInputFields(details));
+    if (changedInputs && publicationPreferencesPersistenceAvailable &&
+        (!_publicationRecovery.loaded || workspacePublicationPreferencesSaving)) {
+      showError(workspacePublicationPreferencesSaving
+          ? 'Wait for the device save to finish. Your entries are kept.'
+          : 'Open your saved Store defaults before saving. Your entries are kept.');
+      return false;
+    }
     _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson(
       details.toJson(),
     );
     _persistOperationalState('publicationDetails');
+    if (publicationPreferencesPersistenceAvailable && _publicationRecovery.loaded &&
+        !workspacePublicationPreferencesSaving &&
+        (changedInputs || !_publicationRecovery.saved)) {
+      _savePublicationPreferences();
+    }
     notifyListeners();
     return true;
   }
@@ -9819,12 +9838,158 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  // Only fields entered in StorePublicationSettings; no resolved place,
+  // approval, customer-specific exception, trading screen or payment methods.
+  static const _publicationInputKeys = {
+    'businessType', 'retailChannelEnabled', 'wholesaleChannelEnabled',
+    'street', 'city', 'state', 'pinCode', 'publicContactPhone', 'legalName',
+    'billingAddress', 'pan', 'cin', 'fssai', 'signatory', 'wholesalePaymentTerms',
+    'returnSummary', 'returnWindowDays', 'returnConditions', 'returnRemedies', 'dispatchDays',
+  };
+  bool get publicationPreferencesPersistenceAvailable => _contactAccountScope != null &&
+      (publicationPreferencesStoreFactory != null || contactDraftStore is SecureWorkPendingProofStore);
+  _OwnerInputRecovery get _publicationRecovery => _storeData.publicationPreferences
+      .putIfAbsent(_contactAccountScope ?? '', _OwnerInputRecovery.new);
+  Object get publicationPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
+  bool get workspacePublicationPreferencesSaving => _publicationRecovery.pendingWrites > 0;
+  bool get workspacePublicationPreferencesSaved => _publicationRecovery.saved;
+  String? get workspacePublicationPreferencesError => _publicationRecovery.error;
+  Future<bool> get workspacePublicationPreferencesWrite => _publicationRecovery.writes;
+  WorkPendingProofStore? _publicationPreferencesStore(String id) {
+    if (publicationPreferencesStoreFactory != null) return publicationPreferencesStoreFactory!(id);
+    final contact = contactDraftStore;
+    return contact is SecureWorkPendingProofStore
+        ? SecureWorkPendingProofStore.publicationPreferences(id, reviewOnly: contact.reviewOnly) : null;
+  }
+  Map<String, Object?> _publicationInputFields([WorkspaceStorePublicationDetails? details]) {
+    final value = (details ?? workspacePublicationDetails).toJson();
+    return {for (final key in _publicationInputKeys) key: value[key]};
+  }
+  static bool _ownerInputValuesEqual(Object? a, Object? b) {
+    if (a is Map && b is Map) {
+      return a.length == b.length &&
+        a.keys.every((key) => b.containsKey(key) && _ownerInputValuesEqual(a[key], b[key]));
+    }
+    if (a is List && b is List) {
+      return a.length == b.length &&
+        List.generate(a.length, (i) => _ownerInputValuesEqual(a[i], b[i])).every((v) => v);
+    }
+    return a == b;
+  }
+  void _restorePublicationInputs(Map<String, Object?> fields) {
+    final current = workspacePublicationDetails.toJson();
+    final addressChanged = const ['street', 'city', 'state', 'pinCode']
+        .any((key) => current[key] != fields[key]);
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
+      ...current, ...fields, if (addressChanged) 'shoppingArea': null,
+    });
+  }
+  Future<bool> loadWorkspacePublicationPreferences({required String expectedStoreId}) {
+    if (_disposed || activeWorkspace?.id != expectedStoreId) return Future.value(false);
+    if (!publicationPreferencesPersistenceAvailable) return Future.value(true);
+    final recovery = _publicationRecovery;
+    final owner = _contactAccountScope!;
+    if (_storeData.publicationPreferencesOwner case final previous? when previous != owner) {
+      _storeData.publicationPreferences[previous]?.sessionFields = workspacePublicationDetails.toJson();
+      // Account-local in-memory drafts include excluded private fields; they are
+      // never included in the persisted defaults record or public projection.
+      _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson(recovery.sessionFields ?? {});
+    }
+    _storeData.publicationPreferencesOwner = owner;
+    if (recovery.loaded) return Future.value(true);
+    return recovery.loading ??= _readPublicationPreferences(expectedStoreId, recovery)
+        .whenComplete(() { recovery.loading = null; });
+  }
+  Future<bool> _readPublicationPreferences(String id, _OwnerInputRecovery recovery) async {
+    final data = _storeData, account = _contactAccountScope;
+    final revision = navigationScopeRevision;
+    final before = _publicationInputFields();
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && account != null &&
+        navigationScopeRevision == revision && _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    if (!current()) return false;
+    addListener(watch);
+    try {
+      await recovery.writes;
+      final store = _publicationPreferencesStore(id);
+      if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+      final saved = await store.read(account!).timeout(const Duration(seconds: 12));
+      if (!current()) return false;
+      if (saved != null) {
+        final fields = saved['fields'];
+        if (saved['schemaVersion'] != 1 || saved['storeId'] != id || saved.length != 3 ||
+            fields is! Map || fields.length != _publicationInputKeys.length ||
+            fields.keys.any((key) => !_publicationInputKeys.contains(key))) {
+          throw const FormatException('Invalid Store defaults');
+        }
+        final inputs = Map<String, Object?>.from(fields);
+        final typed = WorkspaceStorePublicationDetails.fromJson(inputs);
+        if (!_ownerInputValuesEqual(inputs, _publicationInputFields(typed))) {
+          throw const FormatException('Invalid Store default field values');
+        }
+        if (_ownerInputValuesEqual(before, _publicationInputFields())) {
+          _restorePublicationInputs(inputs);
+          recovery.saved = true;
+        }
+      }
+      recovery.loaded = true;
+      recovery.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (current()) {
+        recovery.error = 'Saved Store defaults could not be opened. Your entries are kept. Try again.';
+        notifyListeners();
+      }
+      return false;
+    } finally { removeListener(watch); }
+  }
+  void _savePublicationPreferences() {
+    final data = _storeData, account = _contactAccountScope!;
+    final id = activeWorkspace!.id, revision = navigationScopeRevision;
+    final recovery = _publicationRecovery, fields = _publicationInputFields();
+    recovery.sessionFields = workspacePublicationDetails.toJson();
+    recovery.pendingWrites++;
+    recovery.saved = false;
+    recovery.error = null;
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && navigationScopeRevision == revision &&
+        _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    addListener(watch);
+    recovery.writes = recovery.writes.then((_) async {
+      try {
+        if (!current()) return false;
+        final store = _publicationPreferencesStore(id);
+        if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+        await store.save(account, {'schemaVersion': 1, 'storeId': id, 'fields': fields})
+            .timeout(const Duration(seconds: 12));
+        if (!current()) return false;
+        if (_ownerInputValuesEqual(fields, _publicationInputFields())) {
+          recovery.saved = true;
+          recovery.error = null;
+        }
+        return true;
+      } catch (_) {
+        if (current() && _ownerInputValuesEqual(fields, _publicationInputFields())) {
+          recovery.error = 'Device save could not be confirmed. Your entries are kept. Try again.';
+        }
+        return false;
+      } finally {
+        removeListener(watch);
+        recovery.pendingWrites--;
+        if (current()) notifyListeners();
+      }
+    });
+  }
+
   bool get pickupPreferencesPersistenceAvailable =>
       _contactAccountScope != null &&
       (pickupPreferencesStoreFactory != null || contactDraftStore is SecureWorkPendingProofStore);
 
-  _PickupPreferencesRecovery get _pickupRecovery => _storeData.pickupPreferences
-      .putIfAbsent(_contactAccountScope ?? '', _PickupPreferencesRecovery.new);
+  _OwnerInputRecovery get _pickupRecovery => _storeData.pickupPreferences
+      .putIfAbsent(_contactAccountScope ?? '', _OwnerInputRecovery.new);
   bool get workspacePickupPreferencesSaving => _pickupRecovery.pendingWrites > 0;
   Object get pickupPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
   bool get workspacePickupPreferencesSaved => _pickupRecovery.saved;
@@ -9862,7 +10027,7 @@ class WorkSession extends ChangeNotifier {
         .whenComplete(() { recovery.loading = null; });
   }
 
-  Future<bool> _readPickupPreferences(String id, _PickupPreferencesRecovery recovery) async {
+  Future<bool> _readPickupPreferences(String id, _OwnerInputRecovery recovery) async {
     final data = _storeData;
     final account = _contactAccountScope;
     final revision = navigationScopeRevision;

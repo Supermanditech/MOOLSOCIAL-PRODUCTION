@@ -77,6 +77,306 @@ void main() {
     expect(restored.workspaceCatalogueItems, isEmpty);
   });
 
+  testWidgets('LF18 Store owner defaults survive a new session', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({}); // Isolated host plugin fixture.
+    WorkSession create() => WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _Lf16SecurePrefsStore('host-contact'),
+      publicationPreferencesStoreFactory: (id) => _Lf18SecureDefaultsStore(id))
+      ..activeWorkspace = _lf16Store('lf18-defaults');
+    Future<void> open(WorkSession work) async {
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+        child: StorePublicationSettings(session: work)))));
+      await tester.pumpAndSettle();
+    }
+    final first = create();
+    await open(first);
+    expect(first.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+      legalName: 'Host owner business', returnSummary: 'Return unopened goods',
+      returnWindowDays: 7, dispatchDays: 2), expectedStoreId: 'lf18-defaults'), isTrue);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+    first.dispose();
+    final second = create();
+    addTearDown(second.dispose);
+    await open(second);
+    expect(second.workspacePublicationDetails.legalName, 'Host owner business');
+    expect(second.workspacePublicationDetails.returnWindowDays, 7);
+    expect(second.workspacePublicationDetails.dispatchDays, 2);
+    expect(second.workspaceVisibleToCustomers, isFalse);
+    expect((second.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+    expect(second.workspaceOrders, isEmpty);
+    expect(second.workspaceInvoices, isEmpty);
+    expect(second.workspaceCatalogueItems, isEmpty);
+  });
+
+  for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin', 'nested', 'location', 'customer', 'fraction']) {
+    test('LF18 invalid saved $invalid stays intact and cannot overwrite inputs', () async {
+      final f = await _lf18Prepared();
+      final row = Map<String, Object?>.from(jsonDecode(f.rows[f.key('lf18-a')]!) as Map);
+      final fields = row['fields'] as Map;
+      if (invalid == 'version') row['schemaVersion'] = 2;
+      if (invalid == 'store') row['storeId'] = 'other-store';
+      if (invalid == 'missing') fields.remove('legalName');
+      if (invalid == 'extra') fields['orders'] = [];
+      if (invalid == 'type') fields['retailChannelEnabled'] = 'true';
+      if (invalid == 'pin') fields['pinCode'] = 'bad';
+      if (invalid == 'nested') (fields['wholesalePaymentTerms'] as List).first['authority'] = true;
+      if (invalid == 'location') fields['shoppingArea'] = {'regionId': 'invented'};
+      if (invalid == 'customer') fields['customerPaymentTerms'] = {'private-id': []};
+      if (invalid == 'fraction') fields['dispatchDays'] = 1.5;
+      final encoded = jsonEncode(row);
+      f.rows[f.key('lf18-a')] = encoded;
+      final work = f.work();
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isFalse);
+      expect(work.workspacePublicationDetails.legalName, isEmpty);
+      expect(work.workspacePublicationPreferencesError, isNotNull);
+      expect(work.saveWorkspacePublicationDetails(_lf18Details(), expectedStoreId: 'lf18-a'), isFalse);
+      expect(f.rows[f.key('lf18-a')], encoded);
+    });
+  }
+
+  test('LF18 saved defaults exclude authority and private customer exceptions', () async {
+    final f = _Lf18Storage();
+    final first = f.work();
+    await first.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+    final input = WorkspaceStorePublicationDetails.fromJson({..._lf18Details().toJson(),
+      'shoppingArea': {'regionId': 'host-region', 'googlePlaceId': 'host-place',
+        'label': 'Host area', 'countryCode': 'IN', 'postalCode': '411001'},
+      'openingTime': '08:00', 'closingTime': '22:00',
+      'retailPaymentMethods': ['PhonePe'],
+      'customerPaymentTerms': {'host-private-id': []}});
+    expect(first.saveWorkspacePublicationDetails(input), isTrue);
+    expect(await first.workspacePublicationPreferencesWrite, isTrue);
+    final fields = (jsonDecode(f.rows[f.key('lf18-a')]!) as Map)['fields'] as Map;
+    for (final key in ['shoppingArea', 'customerPaymentTerms', 'openingTime', 'closingTime', 'retailPaymentMethods']) {
+      expect(fields.containsKey(key), isFalse);
+    }
+    first.dispose();
+    final second = f.work();
+    addTearDown(second.dispose);
+    expect(await second.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(second.workspacePublicationDetails.legalName, 'Host default business');
+    expect(second.workspacePublicationDetails.wholesalePaymentTerms.single.advancePercent, 25);
+    expect(second.workspacePublicationDetails.customerPaymentTerms, isEmpty);
+    expect(second.workspacePublicationDetails.shoppingArea, isNull);
+    expect(second.workspacePublicStoreDetails!.regionId, isEmpty);
+    expect(second.workspacePublicationDetails.openingTime, isEmpty);
+    expect(second.workspacePublicationDetails.retailPaymentMethods, isEmpty);
+    expect(second.workspaceVisibleToCustomers, isFalse);
+    expect((second.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+  });
+
+  test('LF18 read failure retries without erasing the record', () async {
+    final f = (await _lf18Prepared())..failRead = true;
+    final saved = Map.of(f.rows);
+    final work = f.work();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isFalse);
+    expect(f.rows, saved);
+    f.failRead = false;
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+  });
+
+  test('LF18 failed write keeps current input and same-value retry can save', () async {
+    final f = _Lf18Storage()..failWrite = true;
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+    expect(work.saveWorkspacePublicationDetails(_lf18Details()), isTrue);
+    expect(await work.workspacePublicationPreferencesWrite, isFalse);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    expect(work.workspacePublicationPreferencesSaved, isFalse);
+    expect(work.workspacePublicationPreferencesError, isNotNull);
+    f.failWrite = false;
+    expect(work.saveWorkspacePublicationDetails(_lf18Details()), isTrue);
+    expect(await work.workspacePublicationPreferencesWrite, isTrue);
+    expect(work.workspacePublicationPreferencesSaved, isTrue);
+    expect(work.workspacePublicationPreferencesError, isNull);
+  });
+
+  test('LF18 busy writes reject duplicate edits without replacing current inputs', () async {
+    final f = _Lf18Storage()..writeGate = Completer<void>();
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+    expect(work.saveWorkspacePublicationDetails(_lf18Details()), isTrue);
+    expect(work.workspacePublicationPreferencesSaving, isTrue);
+    expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(legalName: 'Newer attempt')), isFalse);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    f.writeGate!.complete();
+    expect(await work.workspacePublicationPreferencesWrite, isTrue);
+    expect(work.workspacePublicationPreferencesSaving, isFalse);
+    expect(f.writes, 1);
+  });
+
+  for (final aba in [false, true]) {
+    test('LF18 delayed read rejects Store change ABA=$aba', () async {
+      final f = await _lf18Prepared();
+      f.readGate = Completer<void>();
+      final work = f.work();
+      addTearDown(work.dispose);
+      final read = work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+      await Future<void>.delayed(Duration.zero);
+      work.activeWorkspace = _lf16Store('lf18-b');
+      if (aba) work.activeWorkspace = _lf16Store('lf18-a');
+      f.readGate!.complete();
+      expect(await read, isFalse);
+      expect(work.workspacePublicationDetails.legalName, isEmpty);
+    });
+  }
+
+  test('LF18 observed account ABA and disposal cannot apply old defaults', () async {
+    final f = await _lf18Prepared();
+    f.readGate = Completer<void>();
+    final work = f.work();
+    final read = work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+    await Future<void>.delayed(Duration.zero);
+    f.account = 'host-b'; work.showNotice('Host account changed');
+    f.account = 'lf16-host'; work.showNotice('Host account returned');
+    f.readGate!.complete();
+    expect(await read, isFalse);
+    expect(work.workspacePublicationDetails.legalName, isEmpty);
+    work.dispose();
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isFalse);
+  });
+
+  test('LF18 account caches keep each owners inputs separate', () async {
+    final f = await _lf18Prepared();
+    final work = f.work();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    f.account = 'host-b';
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.legalName, isEmpty);
+    expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(legalName: 'Owner B')), isTrue);
+    expect(await work.workspacePublicationPreferencesWrite, isTrue);
+    f.account = 'lf16-host';
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'other-store'), isFalse);
+  });
+
+  test('LF18 customer exception before load cannot overwrite unread defaults', () async {
+    final f = await _lf18Prepared();
+    final encoded = f.rows[f.key('lf18-a')];
+    final writes = f.writes;
+    final work = f.work();
+    addTearDown(work.dispose);
+    // Separately labelled host customer/order, not native evaluation data.
+    work.workspaceOrders.add(WorkspaceOrderRecord(id: 'host-lf18-order',
+      customer: 'Host buyer · 9000091991', items: 'Host item × 1',
+      quantities: const {'host-item': 1}, amount: 1, source: 'App',
+      fulfilment: 'Pickup', payment: 'Paid online', address: '', stage: 'Completed',
+      needsDelivery: false, createdAt: DateTime.now()));
+    final customerId = work.workspaceCustomerBook.single.id;
+    expect(work.saveWorkspaceCustomerPaymentTerms(expectedStoreId: 'lf18-a',
+      customerId: customerId, terms: []), isTrue);
+    expect(work.workspacePublicationPreferencesSaved, isFalse);
+    expect(f.rows[f.key('lf18-a')], encoded);
+    expect(f.writes, writes);
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    expect(work.workspacePublicationDetails.customerPaymentTerms[customerId], isEmpty);
+    expect(f.rows[f.key('lf18-a')], encoded);
+  });
+
+  test('LF18 recovered inputs cannot inherit contact or location confirmation', () async {
+    final f = await _lf18Prepared();
+    final row = jsonDecode(f.rows[f.key('lf18-a')]!) as Map;
+    (row['fields'] as Map)['publicContactPhone'] = '9000091991';
+    f.rows[f.key('lf18-a')] = jsonEncode(row);
+    f.contactAvailable = false; // Existing session-only setup before a scoped reader exists.
+    final work = f.work();
+    addTearDown(work.dispose);
+    work.primaryMobile = '9000091000';
+    work.primaryMobileVerified = true;
+    final identity = work.activeWorkspace;
+    expect(work.saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails.fromJson({
+      ..._lf18Details().toJson(), 'street': 'Old input lane', 'publicContactPhone': '9000091000',
+      'shoppingArea': {'regionId': 'host-old-region', 'googlePlaceId': 'host-old-place',
+        'label': 'Host old area', 'countryCode': 'IN', 'postalCode': '411001'},
+      'customerPaymentTerms': {'private-current-customer': []},
+      'openingTime': '09:00', 'closingTime': '18:00'})), isTrue);
+    f.contactAvailable = true;
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.street, 'Host default lane');
+    expect(work.workspacePublicationDetails.publicContactPhone, '9000091991');
+    expect(work.primaryMobile, '9000091000');
+    expect(work.primaryMobileVerified, isTrue, reason: 'Verification stays bound to the unchanged account contact');
+    expect(work.activeWorkspace, same(identity));
+    expect(work.workspacePublicationDetails.shoppingArea, isNull);
+    expect(work.workspacePublicStoreDetails!.regionId, isEmpty);
+    expect(work.workspacePublicStoreDetails!.collection, isNull);
+    expect(work.workspacePublicationDetails.customerPaymentTerms.keys, ['private-current-customer']);
+    expect(work.workspacePublicationDetails.openingTime, '09:00');
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF18 editor retains failed-save inputs and disables pending save $scale', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final f = await _lf18Prepared();
+      final work = f.work();
+      addTearDown(work.dispose);
+      await tester.pumpWidget(MaterialApp(builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(session: work)))));
+      await tester.pumpAndSettle();
+      final section = find.byKey(const PageStorageKey('work-publication-address-section'));
+      await tester.ensureVisible(section);
+      await tester.tap(section);
+      await tester.pumpAndSettle();
+      final street = find.byKey(const Key('work-publication-street'));
+      expect(tester.widget<TextFormField>(street).controller!.text, 'Host default lane');
+      await tester.ensureVisible(street);
+      await tester.enterText(street, 'Edited host lane');
+      final save = find.byKey(const Key('work-publication-save-address'));
+      f.failWrite = true;
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(work.workspacePublicationPreferencesSaved, isFalse);
+      expect(work.workspacePublicationPreferencesError, isNotNull);
+      expect(tester.widget<TextFormField>(street).controller!.text, 'Edited host lane');
+      f.failWrite = false;
+      f.writeGate = Completer<void>();
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pump();
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+      f.writeGate!.complete();
+      await tester.pumpAndSettle();
+      expect(work.workspacePublicationPreferencesSaved, isTrue);
+      final status = find.byKey(const Key('work-publication-device-status'));
+      await tester.ensureVisible(status);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(status).data, contains('Saved on this device'));
+      expect(work.workspacePublicationDetails.street, 'Edited host lane');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('LF18 unreadable editor gates fields and retries without discarding saved data', (tester) async {
+    final f = (await _lf18Prepared())..failRead = true;
+    final work = f.work();
+    addTearDown(work.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: StorePublicationSettings(session: work)))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-publication-business-type')), findsNothing);
+    expect(find.text('Try again'), findsOneWidget);
+    f.failRead = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-publication-business-type')), findsOneWidget);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    expect(tester.takeException(), isNull);
+  });
+
   for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin']) {
     test('LF16 invalid saved $invalid preserves entries and original record', () async {
       final fixture = _Lf16Storage();
@@ -905,4 +1205,51 @@ class _Lf16MemoryStore implements WorkPendingProofStore {
   }
   @override
   Future<void> clear(String scope) async => throw StateError('Recovery must not delete');
+}
+
+class _Lf18SecureDefaultsStore extends SecureWorkPendingProofStore {
+  _Lf18SecureDefaultsStore(super.storeId) : super.publicationPreferences();
+  @override
+  String get accountScope => 'lf16-host';
+}
+
+class _Lf18Storage extends _Lf16Storage {
+  bool contactAvailable = true;
+  @override
+  WorkSession work() => WorkSession(gateway: ReviewWorkGateway(),
+    contactDraftStore: _Lf18ContactStore(this),
+    publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(this, id))
+      ..activeWorkspace = _lf16Store('lf18-a');
+}
+
+class _Lf18ContactStore implements WorkPendingProofStore {
+  _Lf18ContactStore(this.storage);
+  final _Lf18Storage storage;
+  @override
+  String? get accountScope => storage.contactAvailable ? storage.account : null;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> data) async {}
+  @override
+  Future<void> clear(String scope) async => throw StateError('Host contact must not clear');
+}
+
+WorkspaceStorePublicationDetails _lf18Details() => const WorkspaceStorePublicationDetails(
+  legalName: 'Host default business', street: 'Host default lane', city: 'Pune',
+  state: 'Maharashtra', pinCode: '411001', retailChannelEnabled: true,
+  wholesaleChannelEnabled: true, returnSummary: 'Return unopened goods',
+  returnWindowDays: 7, dispatchDays: 2, returnRemedies: {'Replacement'},
+  wholesalePaymentTerms: [WorkspacePaymentTerm(
+    BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery, advancePercent: 25)],
+);
+
+Future<_Lf18Storage> _lf18Prepared() async {
+  final f = _Lf18Storage();
+  final work = f.work();
+  await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+  expect(work.saveWorkspacePublicationDetails(_lf18Details()), isTrue);
+  expect(await work.workspacePublicationPreferencesWrite, isTrue);
+  work.dispose();
+  return f;
 }
