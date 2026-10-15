@@ -84,3 +84,35 @@ Full mapped/frontend provider requirements and morning acceptance remain open.
 Readiness synchronization, Quick/Scheduled/serviceability and order admission
 are not implemented by local preference recovery. No downgrade guarantee or
 founder approval is inferred from these host/source-attached checks.
+
+## Restart-entry follow-up assessment — LF01 cross-reference
+
+Reuse the admitted layout test and its approved-Store feed fixture to exercise
+one ordinary Workspace rail tap before the feed completes, at normal and200%
+text. Assert loading rather than onboarding, one feed call despite a repeated
+tap, automatic entry to the exact approved Store, and no late redirect after
+the user returns to Earn. Also assess an already-running feed. This is focused
+verification of the restart-entry observation above, not permission to change
+onboarding/router/session behaviour under a readiness-preference outcome. If a
+defect reproduces, record it under LF01 and select only the bounded correction;
+passing tests do not explain the original native observation or prove cold APK
+entry. No app edits, native actions or new acceptance are implied by this plan.
+
+First assessment run: four existing R669 neighbours passed; all six new cases
+stopped at the second tap because the test used an unfiltered rail-key finder
+while the pushed page and retained Earn page both contained that key. The first
+tap and loading assertions had succeeded. This is a test-target ambiguity, not
+an application navigation defect or successful new case. Retry must assert and
+tap the single hit-testable rail target, preserving all original outcome checks.
+Focused analysis had no errors/warnings and one existing brace-style info.
+
+Corrected focused run: all10 cases passed (six delayed-entry cases and four
+existing R669 approved/retry neighbours). Normal/200% early taps show loading,
+then automatically open approved-store/Approved Kirana after exactly one feed;
+already-running feed also succeeds. Back before completion leaves Earn visible,
+with no late redirect; a later deliberate tap opens the same recovered Store.
+The captured initial settlement balance is unchanged. No navigation/application
+fix is justified by these outcomes. The original OPPO observation is still not
+explained: these use an approved-feed host fixture, not the native saved-review-
+selection path, payment/data recovery, cold launch or a newly installed APK.
+This follow-up changes tests and their existing evidence only, not Store UI.

@@ -28520,6 +28520,73 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+    for (final entryMode in ['ordinary', 'running-feed', 'leave-before-ready']) {
+      testWidgets('LF23 restart entry $entryMode waits for exact Store $scale', (
+        tester,
+      ) async {
+        // Host-only delayed approved-feed fixture, not runtime Store data.
+        final ready = Completer<void>();
+        final gateway = _WorkspaceEntryFixtureGateway()..feedReady = ready;
+        final work = WorkSession(gateway: gateway);
+        final originalBalance = work.workspaceSettlementBalance;
+        final refresh = entryMode == 'running-feed' ? work.refreshFeed() : null;
+        addTearDown(() {
+          if (!ready.isCompleted) ready.complete();
+        });
+        await mount(
+          tester,
+          route: '/app/work/earn',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+          settle: false,
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+        final workspace = find.byKey(const Key('work-local-workspace'));
+        expect(workspace.hitTestable(), findsOneWidget);
+        await tester.tap(workspace);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+        expect(find.text('Opening your Workspaces…'), findsOneWidget);
+        expect(find.byKey(const Key('work-choose-screen')), findsNothing);
+        expect(work.activeWorkspace, isNull);
+        expect(gateway.feedCalls, 1);
+        // The selected Workspace rail cannot enqueue another recovery request.
+        expect(workspace.hitTestable(), findsOneWidget);
+        await tester.tap(workspace.hitTestable());
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(gateway.feedCalls, 1);
+        if (entryMode == 'leave-before-ready') {
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 350));
+          expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+        }
+        ready.complete();
+        if (refresh != null) await refresh;
+        await tester.pumpAndSettle();
+        expect(work.activeWorkspace?.id, 'approved-store');
+        expect(work.activeWorkspace?.name, 'Approved Kirana');
+        expect(gateway.feedCalls, 1);
+        expect(work.workspaceSettlementBalance, originalBalance);
+        expect(find.byKey(const Key('work-choose-screen')), findsNothing);
+        if (entryMode == 'leave-before-ready') {
+          expect(find.byKey(const Key('work-earn-screen')), findsOneWidget);
+          expect(find.byKey(const Key('work-workspace-dashboard')), findsNothing);
+          // A later deliberate entry uses the recovered Store, not another feed.
+          expect(workspace.hitTestable(), findsOneWidget);
+          await tester.tap(workspace.hitTestable());
+          await tester.pumpAndSettle();
+        }
+        expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+        expect(work.activeWorkspace?.id, 'approved-store');
+        expect(gateway.feedCalls, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('R669 ordinary workspace entry resumes approved Store $scale', (
       tester,
     ) async {
@@ -77268,8 +77335,13 @@ void main() {
 
 class _WorkspaceEntryFixtureGateway extends ReviewWorkGateway {
   bool failOnce = false;
+  Completer<void>? feedReady;
+  int feedCalls = 0;
   @override
   Future<List<WorkReviewResult>> loadFeed() async {
+    feedCalls++;
+    final ready = feedReady;
+    if (ready != null) await ready.future;
     if (failOnce) {
       failOnce = false;
       throw const WorkGatewayException('Workspaces could not be loaded.');

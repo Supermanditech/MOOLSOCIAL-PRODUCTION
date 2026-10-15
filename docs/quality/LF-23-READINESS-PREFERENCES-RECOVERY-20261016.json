@@ -46,7 +46,7 @@
         "Local input recovery is not publication/sync authority; unrelated history and drafts remain accessible."
       ],
       "manifestPath": "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.md",
-      "manifestSha256": "E4D82D794D0E4A40FF16560D900ECB637E9C86FD688F67E8D1048ACCF3993504",
+      "manifestSha256": "24D83074FC9C73947A7240725935E2EEC593C53839CC1D68A2D999FC12413739",
       "evidencePath": "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -75,7 +75,8 @@
     ],
     "testAndEvidencePlan": [
       "Demonstrate fresh-session loss. Test legacy/new schema/strict types, failures/retry, all groups, owners/context/ABA/newer inputs and editor interleaving.",
-      "Host global Save preserves other status on failure; native evaluation preference Save/restart, no commerce/provider/APK operations."
+      "Host global Save preserves other status on failure; native evaluation preference Save/restart, no commerce/provider/APK operations.",
+      "Follow up the native restart-entry observation with delayed approved-feed ordinary rail-tap/leave and already-running-feed tests in the existing layout owner. Test assessment only; any demonstrated navigation correction needs its LF01 scope, not readiness scope."
     ],
     "frontendAdmission": {
       "task": "/root",
