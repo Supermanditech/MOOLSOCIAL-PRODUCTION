@@ -1156,8 +1156,8 @@ class _WorkWorkspaceDashboardScreenState
     final bottomAction = switch (_view) {
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
-        label: _settingsSaving ? 'Saving…' : 'Apply settings',
-        busy: _settingsSaving,
+        label: _settingsSaving || session.workspaceTradingPreferencesSaving ? 'Saving…' : 'Apply settings',
+        busy: _settingsSaving || session.workspaceTradingPreferencesSaving,
         icon: Icons.check_circle_outline_rounded,
         onPressed: _saveAvailability,
       ),
@@ -14658,6 +14658,14 @@ class _StoreRecordPurchaseState extends State<_StoreRecordPurchaseSurface> {
   }
   Future<void> _addGoodsProduct(_PurchaseGoodsInput line) async {
     if (_busy || !_current || _scope == null || line.name.text.trim().isEmpty) return;
+    final inputContext = widget.session.tradingPreferencesContext;
+    final storeId = widget.session.activeWorkspace?.id;
+    final loaded = storeId != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: storeId);
+    if (!mounted || !_current || _busy || inputContext != widget.session.tradingPreferencesContext) return;
+    if (!loaded) {
+      setState(() => _error = widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened. Try again.');
+      return;
+    }
     FocusScope.of(context).unfocus();
     final id = 'custom-${DateTime.now().microsecondsSinceEpoch}';
     final defaults = widget.session.workspaceProductDefaults;
@@ -21760,6 +21768,17 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   late final Widget _entryPage = _addProductEntry();
+  late final WorkSession _entryOwner = widget.session;
+  late final Object _entryInputContext = widget.session.tradingPreferencesContext;
+  late final String? _entryStoreId = widget.session.activeWorkspace?.id;
+  late Future<bool> _entryDefaultsLoad = _loadEntryDefaults();
+  bool get _entryCurrent => identical(widget.session, _entryOwner) &&
+      _entryInputContext == widget.session.tradingPreferencesContext;
+  Future<bool> _loadEntryDefaults() async {
+    final id = _entryStoreId;
+    final loaded = id != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: id);
+    return mounted && _entryCurrent && loaded;
+  }
 
   void _restoreStockAction(String productId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -21771,8 +21790,9 @@ class _WorkspaceCatalogueSurfaceState
     });
   }
 
-  WorkspaceCatalogueItem _blankProduct({String barcode = ''}) {
+  WorkspaceCatalogueItem _blankProduct({String barcode = '', WorkspaceProductDefaults? defaults}) {
     final stamp = DateTime.now().microsecondsSinceEpoch;
+    final appliedDefaults = defaults ?? widget.session.workspaceProductDefaults;
     return WorkspaceCatalogueItem(
       id: 'custom-$stamp',
       canonicalId: 'custom-$stamp',
@@ -21793,24 +21813,27 @@ class _WorkspaceCatalogueSurfaceState
       visualKind: 'catalogue-packshot',
       available: false,
       publicListing:
-          widget.session.workspaceProductDefaults.customerListingRequested,
-      stockMode: widget.session.workspaceProductDefaults.stockMode,
+          appliedDefaults.customerListingRequested,
+      stockMode: appliedDefaults.stockMode,
       lowStockThreshold:
-          widget.session.workspaceProductDefaults.lowStockThreshold,
+          appliedDefaults.lowStockThreshold,
     );
   }
 
   Widget _addProductEntry() {
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    final inputContext = widget.session.tradingPreferencesContext;
+    final defaults = widget.session.workspaceProductDefaults;
     var tab = 0;
-    var manualProduct = _blankProduct();
+    var manualProduct = _blankProduct(defaults: defaults);
     WorkspaceCatalogueItem? catalogueProduct;
     var manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
     var catalogueEditorKey = GlobalKey<_CatalogueProductEditorState>();
     bool storeUnchanged() {
       if (!mounted) return false;
-      if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+      if (inputContext != widget.session.tradingPreferencesContext ||
+          (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
           storeId) {
         widget.session.showError('Your store changed. Open Add product again.');
         return false;
@@ -21832,7 +21855,7 @@ class _WorkspaceCatalogueSurfaceState
             if (!pageContext.mounted || !storeUnchanged()) return;
             setPageState(() {
               if (tab == 1) {
-                manualProduct = _blankProduct();
+                manualProduct = _blankProduct(defaults: defaults);
                 manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
               } else if (tab == 0) {
                 catalogueProduct = null;
@@ -21862,7 +21885,7 @@ class _WorkspaceCatalogueSurfaceState
                 }
               },
               ownedProducts: List.of(widget.session.workspaceCatalogueItems),
-              createProduct: (barcode) => _blankProduct(barcode: barcode),
+              createProduct: (barcode) => _blankProduct(barcode: barcode, defaults: defaults),
               scanBarcode: () => showStoreProductScanner(pageContext),
               onAdd: (product) {
                 if (!storeUnchanged()) return;
@@ -21888,20 +21911,14 @@ class _WorkspaceCatalogueSurfaceState
                 setPageState(() {
                   catalogueProduct = product.copyWith(
                     stockMode:
-                        widget.session.workspaceProductDefaults.stockMode,
-                    lowStockThreshold: widget
-                        .session
-                        .workspaceProductDefaults
-                        .lowStockThreshold,
+                        defaults.stockMode,
+                    lowStockThreshold: defaults.lowStockThreshold,
                     purchasePrice: 0,
                     sellingPrice: 0,
                     unitPrice: '',
                     stock: 0,
                     available: false,
-                    publicListing: widget
-                        .session
-                        .workspaceProductDefaults
-                        .customerListingRequested,
+                    publicListing: defaults.customerListingRequested,
                     compliance: product.compliance == null
                         ? null
                         : WorkspaceProductCompliance.fromJson({
@@ -21942,7 +21959,7 @@ class _WorkspaceCatalogueSurfaceState
           guardRouteExit: false,
           onSaved: () => Navigator.of(pageContext).pop(true),
           onDone: () => setPageState(() {
-            manualProduct = _blankProduct();
+            manualProduct = _blankProduct(defaults: defaults);
             manualEditorKey = GlobalKey<_CatalogueProductEditorState>();
             tab = 0;
           }),
@@ -21953,6 +21970,7 @@ class _WorkspaceCatalogueSurfaceState
           }
           final result = await _importCatalogue(
             csvOnly: true,
+            defaults: defaults,
             onSaved: () {
               if (pageContext.mounted && storeUnchanged()) {
                 Navigator.of(pageContext).pop(true);
@@ -21991,8 +22009,10 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   Future<bool> _scan() async {
+    final inputContext = widget.session.tradingPreferencesContext;
     final code = await showStoreProductScanner(context);
-    if (!mounted || code == null || code.trim().isEmpty) return false;
+    if (!mounted || inputContext != widget.session.tradingPreferencesContext ||
+        code == null || code.trim().isEmpty) { return false; }
     final normalized = code.trim().toLowerCase();
     final products = [
       ...widget.session.workspaceCatalogueItems,
@@ -22006,7 +22026,19 @@ class _WorkspaceCatalogueSurfaceState
               item.canonicalId.toLowerCase() == normalized,
         )
         .firstOrNull;
-    await _edit(product ?? _blankProduct(barcode: code.trim()));
+    final savedProduct = product != null && widget.session.workspaceCatalogueItems.any((item) => item.id == product.id);
+    if (!savedProduct) {
+      final id = widget.session.activeWorkspace?.id;
+      final loaded = id != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: id);
+      if (!mounted || inputContext != widget.session.tradingPreferencesContext) return false;
+      if (!loaded) {
+        widget.session.showError(widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened. Try again.');
+        return false;
+      }
+    }
+    final draft = product == null ? _blankProduct(barcode: code.trim()) : savedProduct
+        ? product : widget.session.workspaceProductDefaults.applyToNew(product);
+    await _edit(draft);
     return true;
   }
 
@@ -22099,16 +22131,19 @@ class _WorkspaceCatalogueSurfaceState
 
   Future<String?> _importCatalogue({
     bool csvOnly = false,
+    WorkspaceProductDefaults? defaults,
     VoidCallback? onSaved,
   }) async {
     final identity = widget.session.counterDraftIdentity;
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    final inputContext = widget.session.tradingPreferencesContext;
     var invalidated = false;
     bool current() =>
         !invalidated &&
         mounted &&
         identity == widget.session.counterDraftIdentity &&
+        inputContext == widget.session.tradingPreferencesContext &&
         storeId ==
             (widget.session.activeWorkspace?.id ?? widget.session.workspaceId);
     void trackScope() {
@@ -22117,6 +22152,10 @@ class _WorkspaceCatalogueSurfaceState
 
     widget.session.addListener(trackScope);
     try {
+      final loaded = storeId != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: storeId);
+      if (!current()) return 'Your store changed. Import the file again.';
+      if (!loaded) return widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened. Try again.';
+      final importDefaults = defaults ?? widget.session.workspaceProductDefaults;
       final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
@@ -22136,7 +22175,7 @@ class _WorkspaceCatalogueSurfaceState
         json: picked.name.toLowerCase().endsWith('.json'),
         catalogue: widget.session.referenceCatalogue,
         owned: List.of(widget.session.workspaceCatalogueItems),
-        defaults: widget.session.workspaceProductDefaults,
+        defaults: importDefaults,
       );
       if (!current()) return 'Your store changed. Import the file again.';
       if (!mounted) return null;
@@ -22174,7 +22213,7 @@ class _WorkspaceCatalogueSurfaceState
                   .toList();
               final seed = matches.length == 1
                   ? matches.single
-                  : _blankProduct();
+                  : _blankProduct(defaults: importDefaults);
               final corrected = await Navigator.of(reviewContext)
                   .push<WorkspaceProductImportRow>(
                     MaterialPageRoute(
@@ -22212,8 +22251,7 @@ class _WorkspaceCatalogueSurfaceState
                                   ...widget.session.workspaceCatalogueItems,
                                 ],
                                 readyRows: readyProducts,
-                                defaults:
-                                    widget.session.workspaceProductDefaults,
+                                defaults: importDefaults,
                               );
                             },
                             onImportReviewed: (result) =>
@@ -22366,7 +22404,22 @@ class _WorkspaceCatalogueSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    if (widget.entryOnly) return _entryPage;
+    if (widget.entryOnly) {
+      if (!widget.session.tradingPreferencesPersistenceAvailable) return _entryPage;
+      return FutureBuilder<bool>(future: _entryDefaultsLoad, builder: (context, snapshot) {
+        if (_entryCurrent && snapshot.connectionState == ConnectionState.done && snapshot.data == true) return _entryPage;
+        return Scaffold(key: const Key('work-product-defaults-hold'),
+          appBar: AppBar(title: const Text('Add products')),
+          body: Center(child: Padding(padding: const EdgeInsets.all(16), child:
+            !_entryCurrent ? const Text('Your Store or account changed. Reopen Add products.') :
+            snapshot.connectionState != ConnectionState.done
+              ? const CircularProgressIndicator(semanticsLabel: 'Opening saved product defaults')
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened.'),
+                  OutlinedButton(onPressed: () => setState(() { _entryDefaultsLoad = _loadEntryDefaults(); }), child: const Text('Try again')),
+                ]))));
+      });
+    }
     return SizedBox.expand(
       key: const Key('work-dashboard-catalogue-screen'),
       child: _StockQuickActionsFrame(
@@ -36329,28 +36382,52 @@ class StoreProductDefaultsSection extends StatefulWidget {
 
 class _StoreProductDefaultsSectionState
     extends State<StoreProductDefaultsSection> {
-  late final _scope =
-      widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
-  late bool _count =
-      widget.session.workspaceProductDefaults.stockMode ==
-      WorkspaceStockMode.exactQuantity;
-  late bool _listing =
-      widget.session.workspaceProductDefaults.customerListingRequested;
-  late final _low = TextEditingController(
-    text: '${widget.session.workspaceProductDefaults.lowStockThreshold}',
-  );
+  late final String? _scope;
+  late final Object _inputContext;
+  late final WorkSession _owner;
+  late Future<bool> _load;
+  bool _initialized = false, _saving = false;
+  bool _count = true, _listing = false;
+  final _low = TextEditingController();
   String? _error;
   bool _saved = false;
+  @override
+  void initState() {
+    super.initState();
+    _scope = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    _inputContext = widget.session.tradingPreferencesContext;
+    _owner = widget.session;
+    if (!widget.session.tradingPreferencesPersistenceAvailable) {
+      _initializeInputs();
+      _load = Future.value(true);
+    } else { _load = _loadInputs(); }
+  }
+  bool get _current => identical(widget.session, _owner) &&
+      _inputContext == widget.session.tradingPreferencesContext;
+  void _initializeInputs() {
+    final defaults = widget.session.workspaceProductDefaults;
+    _count = defaults.stockMode == WorkspaceStockMode.exactQuantity;
+    _listing = defaults.customerListingRequested;
+    _low.text = '${defaults.lowStockThreshold}';
+    _saved = widget.session.workspaceProductDefaultsSaved;
+    _initialized = true;
+  }
+  Future<bool> _loadInputs() async {
+    final id = _scope;
+    final loaded = id != null && await widget.session.loadWorkspaceProductDefaults(expectedStoreId: id);
+    if (loaded && mounted && _current && !_initialized) _initializeInputs();
+    return loaded;
+  }
   @override
   void dispose() {
     _low.dispose();
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving || widget.session.workspaceTradingPreferencesSaving) return;
     final low = int.tryParse(_low.text.trim());
-    if (_scope !=
-        (widget.session.activeWorkspace?.id ?? widget.session.workspaceId)) {
+    if (!_current) {
       setState(() => _error = 'Your Store changed. Reopen Product controls.');
       return;
     }
@@ -36366,16 +36443,49 @@ class _StoreProductDefaultsSectionState
         lowStockThreshold: low,
         customerListingRequested: _listing,
       ),
+      expectedStoreId: _scope,
+      expectedNavigationRevision: widget.session.navigationScopeRevision,
     );
+    if (!saved) {
+      setState(() { _error = widget.session.errorMessage ?? 'Defaults could not be updated.'; _saved = false; });
+      return;
+    }
+    setState(() { _saving = true; _saved = false; _error = null; });
+    final confirmed = !widget.session.tradingPreferencesPersistenceAvailable ||
+        await widget.session.workspaceTradingPreferencesWrite;
+    if (!mounted) return;
+    if (!_current) {
+      setState(() { _saving = false; _error = 'Your Store or account changed. Reopen Product controls. Your entries are kept.'; });
+      return;
+    }
     setState(() {
-      _error = saved ? null : 'Defaults could not be updated.';
-      _saved = saved;
+      _saving = false;
+      _error = confirmed ? null : widget.session.workspaceTradingPreferencesError ?? 'Device save could not be confirmed. Your entries are kept. Try again.';
+      _saved = confirmed;
     });
-    if (saved) FocusScope.of(context).unfocus();
+    if (confirmed) FocusScope.of(context).unfocus();
   }
 
   @override
-  Widget build(BuildContext context) => ExpansionTile(
+  Widget build(BuildContext context) => FutureBuilder<bool>(future: _load,
+    initialData: _initialized ? true : null, builder: (context, snapshot) {
+      if (!_current) return const Text('Your Store or account changed. Reopen Product controls. Your entries are kept.');
+      if (snapshot.data != true || !_initialized) {
+        return ExpansionTile(title: const Text('Product controls'), children: [
+          if (snapshot.connectionState != ConnectionState.done)
+            const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(semanticsLabel: 'Opening saved product defaults'))
+          else ...[
+            Text(widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened.'),
+            OutlinedButton(onPressed: () => setState(() { _load = _loadInputs(); }), child: const Text('Try again')),
+          ],
+        ]);
+      }
+      return AnimatedBuilder(animation: widget.session, builder: (context, _) =>
+        AbsorbPointer(absorbing: _saving || widget.session.workspaceTradingPreferencesSaving,
+          child: _editor(context)));
+    });
+
+  Widget _editor(BuildContext context) => ExpansionTile(
     leading: const Icon(Icons.inventory_2_outlined),
     title: const Text('Product controls'),
     childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -36481,17 +36591,19 @@ class _StoreProductDefaultsSectionState
           ),
         ),
       if (_saved)
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(top: 8),
-          child: Text('Defaults applied', style: TextStyle(fontSize: 12)),
+          child: Text(widget.session.tradingPreferencesPersistenceAvailable
+              ? 'Defaults saved on this device. New products only.' : 'Defaults applied',
+            style: const TextStyle(fontSize: 12)),
         ),
       const SizedBox(height: 10),
       Align(
         alignment: Alignment.centerRight,
         child: FilledButton(
           key: const Key('work-defaults-save'),
-          onPressed: _save,
-          child: const Text('Save defaults'),
+          onPressed: _saving || widget.session.workspaceTradingPreferencesSaving ? null : _save,
+          child: Text(_saving ? 'Saving…' : 'Save defaults'),
         ),
       ),
     ],

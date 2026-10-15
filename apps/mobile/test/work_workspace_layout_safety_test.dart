@@ -42,6 +42,7 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
+import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/work/widgets/store_product_thumbnail.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/features/work/screens/store_add_product_sheet.dart';
@@ -46413,6 +46414,197 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('LF21 inline defaults confirm device save and retain failed entries $scale', (tester) async {
+      final storage = _Lf20TradingFixtureStore();
+      final work = WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: _ContactDraftFixtureStore(), tradingPreferencesStoreFactory: (_) => storage)
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+      addTearDown(work.dispose);
+      final id = work.activeWorkspace!.id;
+      storage.value = {'schemaVersion': 1, 'storeId': id, 'fields': {
+        'openingTime': '21:30', 'closingTime': '05:15', 'maximumActiveOrders': 0,
+        'alertSound': false, 'alertVibration': false,
+      }};
+      await work.loadWorkspaceProductDefaults(expectedStoreId: id);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 800);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: StoreSettingsStyle(
+          child: StoreProductDefaultsSection(session: work))))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Product controls'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Defaults saved on this device.'), findsNothing,
+        reason: 'Legacy trading-only record does not contain product defaults.');
+      final low = find.byKey(const Key('work-default-low-stock'));
+      await tester.ensureVisible(low);
+      await tester.enterText(low, '17');
+      final save = find.byKey(const Key('work-defaults-save'));
+      await tester.ensureVisible(save);
+      storage.saveGate = Completer<void>(); storage.failSave = true;
+      await tester.tap(save);
+      await tester.pump();
+      expect(work.workspaceProductDefaultsSaved, isFalse);
+      expect(tester.widget<FilledButton>(save).onPressed, isNull);
+      storage.saveGate!.complete();
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(low).controller!.text, '17');
+      expect(work.workspaceProductDefaultsSaved, isFalse);
+      expect(storage.value!['schemaVersion'], 1);
+      storage.failSave = false; storage.saveGate = null;
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(work.workspaceProductDefaultsSaved, isTrue);
+      expect((storage.value!['productDefaults'] as Map)['lowStockThreshold'], 17);
+      expect((storage.value!['fields'] as Map)['openingTime'], '21:30');
+      expect(find.textContaining('Defaults saved on this device.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final manual in [false, true]) {
+    testWidgets('LF21 new entry waits for recovery and freezes defaults manual=$manual', (tester) async {
+      final storage = _Lf20TradingFixtureStore()..readGate = Completer<void>();
+      final work = WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: _ContactDraftFixtureStore(), tradingPreferencesStoreFactory: (_) => storage)
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+      work.workspaceCatalogueItems.clear(); // Isolated host fixture only.
+      storage.value = _lf21UiPreferences(work.activeWorkspace!.id);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final add = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, add);
+      await tester.tap(add.hitTestable());
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(const Key('work-product-defaults-hold')), findsOneWidget);
+      expect(find.byKey(const Key('work-product-title')), findsNothing);
+      storage.readGate!.complete();
+      await tester.pumpAndSettle();
+      if (manual) {
+        await chooseAddProductMode(tester, 'enter');
+      } else {
+        await tester.tap(find.byKey(Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}')));
+        await tester.pumpAndSettle();
+      }
+      final low = find.byKey(const Key('work-product-low-stock-threshold'));
+      await tester.ensureVisible(low);
+      final editable = find.descendant(of: low, matching: find.byType(EditableText));
+      expect(tester.widget<EditableText>(editable).controller.text, '17');
+      expect(find.byKey(const Key('work-product-stock')), findsNothing);
+      expect(work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(lowStockThreshold: 29)), isTrue);
+      await work.workspaceTradingPreferencesWrite;
+      await tester.pumpAndSettle();
+      expect(tester.widget<EditableText>(editable).controller.text, '17');
+      await tester.enterText(low, '3');
+      expect(work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(lowStockThreshold: 30)), isTrue);
+      await work.workspaceTradingPreferencesWrite;
+      await tester.pumpAndSettle();
+      expect(tester.widget<EditableText>(editable).controller.text, '3');
+      expect(work.workspaceCatalogueItems, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('LF21 CSV uses frozen defaults and preserves explicit overrides through correction', (tester) async {
+    final storage = _Lf20TradingFixtureStore();
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _ContactDraftFixtureStore(), tradingPreferencesStoreFactory: (_) => storage)
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    work.workspaceCatalogueItems.clear(); // Isolated host import, no native save.
+    storage.value = _lf21UiPreferences(work.activeWorkspace!.id);
+    await work.loadWorkspaceProductDefaults(expectedStoreId: work.activeWorkspace!.id);
+    final previous = FilePickerPlatform.instance;
+    final picker = _EntryFilePicker()..pending = Completer<PlatformFile?>();
+    FilePickerPlatform.instance = picker;
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    final add = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, add); await tester.tap(add.hitTestable());
+    await tester.pumpAndSettle();
+    await chooseAddProductMode(tester, 'import');
+    await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(picker.calls, 1);
+    expect(work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(lowStockThreshold: 29)), isTrue);
+    await work.workspaceTradingPreferencesWrite;
+    picker.pending!.complete(_EntryCsvFile(
+      'title,brand,pack,purchasePrice,sellingPrice,stock,sku,stockMode,lowStockThreshold\n'
+      ',Host,1 kg,40,50,5,LF21-CORRECT,,\n'
+      'Explicit product,Host,1 kg,40,50,5,LF21-EXPLICIT,exactQuantity,2'));
+    await tester.pumpAndSettle();
+    var review = tester.widget<StoreProductImportReviewScreen>(find.byType(StoreProductImportReviewScreen));
+    expect(review.review.rows.last.product!.lowStockThreshold, 2);
+    expect(review.review.rows.last.product!.stockMode, WorkspaceStockMode.exactQuantity);
+    await chooseImportIssues(tester);
+    await tester.tap(find.byKey(const Key('work-import-correct-2')));
+    await tester.pumpAndSettle();
+    final title = find.byKey(const Key('work-product-title'));
+    await reveal(tester, title); await tester.enterText(title, 'Corrected product');
+    tester.testTextInput.hide(); await tester.pumpAndSettle();
+    final apply = find.byKey(const Key('work-product-save'));
+    await reveal(tester, apply); await tester.tap(apply.hitTestable());
+    await tester.pumpAndSettle();
+    await openImportFilters(tester);
+    await tester.tap(find.byKey(const Key('work-import-ready')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-import-edit-2')));
+    await tester.pumpAndSettle();
+    final correctedLow = find.byKey(const Key('work-product-low-stock-threshold'));
+    await tester.ensureVisible(correctedLow);
+    expect(tester.widget<EditableText>(find.descendant(of: correctedLow,
+      matching: find.byType(EditableText))).controller.text, '17');
+    expect(find.byKey(const Key('work-product-stock')), findsNothing);
+    expect(work.workspaceProductDefaults.lowStockThreshold, 29);
+    expect(work.workspaceCatalogueItems, isEmpty);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-import-save')).hitTestable());
+    await tester.pumpAndSettle();
+    final savedCorrection = work.workspaceCatalogueItems.singleWhere((p) => p.sku == 'LF21-CORRECT');
+    final savedOverride = work.workspaceCatalogueItems.singleWhere((p) => p.sku == 'LF21-EXPLICIT');
+    expect(savedCorrection.lowStockThreshold, 17);
+    expect(savedCorrection.stockMode, WorkspaceStockMode.availabilityOnly);
+    expect(savedCorrection.publicListing, isFalse);
+    expect(savedCorrection.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+    expect(savedOverride.lowStockThreshold, 2);
+    expect(savedOverride.stockMode, WorkspaceStockMode.exactQuantity);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('LF21 unreadable defaults hold new entry but preserve existing Stock access', (tester) async {
+    final storage = _Lf20TradingFixtureStore()..failRead = true;
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _ContactDraftFixtureStore(), tradingPreferencesStoreFactory: (_) => storage)
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    storage.value = _lf21UiPreferences(work.activeWorkspace!.id);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+    final before = List.of(work.workspaceCatalogueItems);
+    expect(before, isNotEmpty);
+    final add = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, add); await tester.tap(add.hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-product-defaults-hold')), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    expect(find.byKey(const Key('work-product-title')), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-dashboard-catalogue-screen')), findsOneWidget);
+    expect(work.workspaceCatalogueItems, orderedEquals(before));
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets('LF20 trading editor retains failed save and waits for confirmation $scale', (tester) async {
       final storage = _Lf20TradingFixtureStore();
       final work = WorkSession(gateway: ReviewWorkGateway(),
@@ -77372,12 +77564,25 @@ class _Lf16PickupFixtureStore extends _ContactDraftFixtureStore {
 
 class _Lf20TradingFixtureStore extends _Lf16PickupFixtureStore {
   Completer<void>? saveGate;
+  Completer<void>? readGate;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    final value = await super.read(scope);
+    await readGate?.future;
+    return value;
+  }
   @override
   Future<void> save(String scope, Map<String, Object?> draft) async {
     await saveGate?.future;
     await super.save(scope, draft);
   }
 }
+
+Map<String, Object?> _lf21UiPreferences(String id) => {'schemaVersion': 2,
+  'storeId': id, 'fields': {'openingTime': '21:30', 'closingTime': '05:15',
+    'maximumActiveOrders': 0, 'alertSound': false, 'alertVibration': false},
+  'productDefaults': {'stockMode': 'availabilityOnly', 'lowStockThreshold': 17,
+    'customerListingRequested': true}};
 
 class _ContactDraftFixtureStore implements WorkPendingProofStore {
   @override

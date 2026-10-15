@@ -493,6 +493,7 @@ class _StoreOperationalData {
 
 class _OwnerInputRecovery {
   bool loaded = false, saved = false;
+  int? recordVersion;
   Map<String, Object?>? sessionFields;
   int pendingWrites = 0;
   String? error;
@@ -8236,20 +8237,36 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  bool saveWorkspaceProductDefaults(WorkspaceProductDefaults value) {
-    if ((activeWorkspace?.id ?? workspaceId)?.trim().isNotEmpty != true ||
+  bool saveWorkspaceProductDefaults(WorkspaceProductDefaults value, {
+    String? expectedStoreId, int? expectedNavigationRevision,
+  }) {
+    if (!_settingsScopeCurrent(expectedStoreId, expectedNavigationRevision) ||
+        (activeWorkspace?.id ?? workspaceId)?.trim().isNotEmpty != true ||
         !value.valid) {
       showError(
         'Choose your Store and enter a low-stock count from 0 to 999999999.',
       );
       return false;
     }
+    if (tradingPreferencesPersistenceAvailable &&
+        (!_tradingRecovery.loaded || workspaceTradingPreferencesSaving)) {
+      showError(workspaceTradingPreferencesSaving
+          ? 'Wait for the device save to finish. Your entries are kept.'
+          : 'Open your saved Store preferences before saving. Your entries are kept.');
+      return false;
+    }
     _storeData.productDefaults = value;
     // The inline editor owns its compact confirmation; avoid a duplicate banner.
     clearMessages();
     _persistOperationalState('productDefaults');
+    if (tradingPreferencesPersistenceAvailable) _saveTradingPreferences();
     return true;
   }
+
+  bool get workspaceProductDefaultsSaved =>
+      workspaceTradingPreferencesSaved && _tradingRecovery.recordVersion == 2;
+  Future<bool> loadWorkspaceProductDefaults({required String expectedStoreId}) =>
+      loadWorkspaceTradingPreferences(expectedStoreId: expectedStoreId);
 
   /// Customer preference only; the backend must authorise and quote these terms
   /// for the authenticated buyer. Never match by display name or auto-grant credit.
@@ -9869,11 +9886,17 @@ class WorkSession extends ChangeNotifier {
     if (!tradingPreferencesPersistenceAvailable) return Future.value(true);
     final recovery = _tradingRecovery, owner = _contactAccountScope!;
     if (_storeData.tradingPreferencesOwner case final previous? when previous != owner) {
-      _storeData.tradingPreferences[previous]?.sessionFields = _tradingFields();
-      _restoreTradingInputs(recovery.sessionFields ?? {
+      _storeData.tradingPreferences[previous]?.sessionFields = {
+        ..._tradingFields(), 'productDefaults': workspaceProductDefaults.toJson(),
+      };
+      final local = recovery.sessionFields;
+      _restoreTradingInputs(local ?? {
         'openingTime': '8:00 AM', 'closingTime': '10:00 PM',
         'maximumActiveOrders': 8, 'alertSound': true, 'alertVibration': true,
       });
+      final localDefaults = local?['productDefaults'];
+      _storeData.productDefaults = localDefaults == null ? const WorkspaceProductDefaults()
+          : _decodeProductDefaults(localDefaults);
     }
     _storeData.tradingPreferencesOwner = owner;
     if (recovery.loaded) return Future.value(true);
@@ -9883,6 +9906,7 @@ class WorkSession extends ChangeNotifier {
   Future<bool> _readTradingPreferences(String id, _OwnerInputRecovery recovery) async {
     final data = _storeData, account = _contactAccountScope;
     final revision = navigationScopeRevision, before = _tradingFields();
+    final beforeDefaults = workspaceProductDefaults.toJson();
     var scopeChanged = false;
     bool current() => !_disposed && !scopeChanged && account != null &&
         navigationScopeRevision == revision && _isStoreScopeCurrent(data, id, account);
@@ -9898,7 +9922,10 @@ class WorkSession extends ChangeNotifier {
       if (saved != null) {
         final fields = saved['fields'];
         const keys = {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound', 'alertVibration'};
-        if (saved['schemaVersion'] != 1 || saved['storeId'] != id || saved.length != 3 ||
+        final version = saved['schemaVersion'];
+        if (version is! int || (version != 1 && version != 2) || saved['storeId'] != id ||
+            saved.length != (version == 1 ? 3 : 4) ||
+            saved.keys.any((key) => !const {'schemaVersion', 'storeId', 'fields', 'productDefaults'}.contains(key)) ||
             fields is! Map || fields.length != keys.length || fields.keys.any((k) => !keys.contains(k)) ||
             fields['openingTime'] is! String || fields['closingTime'] is! String ||
             !WorkspaceStorePublicationDetails.validTradingTime(fields['openingTime'] as String) ||
@@ -9907,8 +9934,12 @@ class WorkSession extends ChangeNotifier {
             fields['alertSound'] is! bool || fields['alertVibration'] is! bool) {
           throw const FormatException('Invalid Store hours and alerts');
         }
-        if (mapEquals(before, _tradingFields())) {
+        final defaults = version == 2 ? _decodeProductDefaults(saved['productDefaults']) : null;
+        if (mapEquals(before, _tradingFields()) &&
+            mapEquals(beforeDefaults, workspaceProductDefaults.toJson())) {
           _restoreTradingInputs(Map<String, Object?>.from(fields));
+          if (defaults != null) _storeData.productDefaults = defaults;
+          recovery.recordVersion = version;
           recovery.saved = true;
         }
       }
@@ -9918,7 +9949,7 @@ class WorkSession extends ChangeNotifier {
       return true;
     } catch (_) {
       if (current()) {
-        recovery.error = 'Saved Store hours and alerts could not be opened. Your current entries are kept. Try again.';
+        recovery.error = 'Saved Store preferences could not be opened. Your current entries are kept. Try again.';
         notifyListeners();
       }
       return false;
@@ -9929,6 +9960,9 @@ class WorkSession extends ChangeNotifier {
     if (id == null || account == null || !_tradingRecovery.loaded) return;
     final data = _storeData, revision = navigationScopeRevision;
     final recovery = _tradingRecovery, fields = _tradingFields();
+    final defaults = workspaceProductDefaults.toJson();
+    bool inputsUnchanged() => mapEquals(fields, _tradingFields()) &&
+        mapEquals(defaults, workspaceProductDefaults.toJson());
     recovery.saved = false;
     recovery.pendingWrites++;
     recovery.error = null;
@@ -9942,13 +9976,16 @@ class WorkSession extends ChangeNotifier {
         if (!current()) return false;
         final store = _tradingPreferencesStore(id);
         if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
-        await store.save(account, {'schemaVersion': 1, 'storeId': id, 'fields': fields})
+        await store.save(account, {'schemaVersion': 2, 'storeId': id,
+          'fields': fields, 'productDefaults': defaults})
             .timeout(const Duration(seconds: 12));
         if (!current()) return false;
-        if (mapEquals(fields, _tradingFields())) { recovery.saved = true; recovery.error = null; }
+        if (inputsUnchanged()) {
+          recovery.saved = true; recovery.error = null; recovery.recordVersion = 2;
+        }
         return true;
       } catch (_) {
-        if (current() && mapEquals(fields, _tradingFields())) {
+        if (current() && inputsUnchanged()) {
           recovery.error = 'Device save could not be confirmed. Your entries are kept. Try again.';
         }
         return false;
@@ -9958,6 +9995,22 @@ class WorkSession extends ChangeNotifier {
         if (current()) notifyListeners();
       }
     });
+  }
+
+  static WorkspaceProductDefaults _decodeProductDefaults(Object? raw) {
+    const keys = {'stockMode', 'lowStockThreshold', 'customerListingRequested'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key)) ||
+        raw['stockMode'] is! String || raw['lowStockThreshold'] is! int ||
+        raw['customerListingRequested'] is! bool) {
+      throw const FormatException('Invalid product defaults');
+    }
+    final mode = WorkspaceStockMode.values.where((mode) => mode.name == raw['stockMode']).firstOrNull;
+    if (mode == null) throw const FormatException('Invalid product stock mode');
+    final value = WorkspaceProductDefaults(stockMode: mode,
+      lowStockThreshold: raw['lowStockThreshold'] as int,
+      customerListingRequested: raw['customerListingRequested'] as bool);
+    if (!value.valid) throw const FormatException('Invalid low-stock count');
+    return value;
   }
 
   void dismissWorkspaceAlert(String alertId) {

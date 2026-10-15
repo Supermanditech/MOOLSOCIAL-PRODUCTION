@@ -98,7 +98,7 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
 # The accepted combined source is LF-01's start, not the retired August ticket.
 # Delegate to the current exact owner/scope/Git checks; historical paths below
 # remain unchanged. This grants no build, install or handoff acceptance.
-if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10','LF-11','LF-12','LF-13','LF-14','LF-15','LF-16','LF-17','LF-18','LF-19','LF-20') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details','last-frontend-product-media','last-frontend-selling-terms-offers','last-frontend-payment-return-policy','last-frontend-fulfilment-readiness','last-frontend-public-store-consistency','last-frontend-cart-checkout-consistency','last-frontend-payment-recovery','last-frontend-store-customer-orders','last-frontend-handover-tracking','last-frontend-after-sales-documents','last-frontend-customer-feedback','last-frontend-analytics-reconciliation','last-frontend-store-settings-truthfulness','last-frontend-pickup-preferences-recovery','last-frontend-store-attention-visual','last-frontend-store-defaults-recovery','last-frontend-store-input-consumers','last-frontend-trading-preferences-recovery')) {
+if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10','LF-11','LF-12','LF-13','LF-14','LF-15','LF-16','LF-17','LF-18','LF-19','LF-20','LF-21') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details','last-frontend-product-media','last-frontend-selling-terms-offers','last-frontend-payment-return-policy','last-frontend-fulfilment-readiness','last-frontend-public-store-consistency','last-frontend-cart-checkout-consistency','last-frontend-payment-recovery','last-frontend-store-customer-orders','last-frontend-handover-tracking','last-frontend-after-sales-documents','last-frontend-customer-feedback','last-frontend-analytics-reconciliation','last-frontend-store-settings-truthfulness','last-frontend-pickup-preferences-recovery','last-frontend-store-attention-visual','last-frontend-store-defaults-recovery','last-frontend-store-input-consumers','last-frontend-trading-preferences-recovery','last-frontend-product-defaults-recovery')) {
   Assert-IncrementalTicket (($TicketId -ceq 'LF-01' -and $UiScope -ceq 'last-frontend-entry-recovery' -or
     $TicketId -ceq 'LF-02-1' -and $UiScope -ceq 'last-frontend-store-details' -or
     $TicketId -ceq 'LF-03' -and $UiScope -ceq 'last-frontend-product-media' -or
@@ -118,7 +118,8 @@ if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','
     $TicketId -ceq 'LF-17' -and $UiScope -ceq 'last-frontend-store-attention-visual' -or
     $TicketId -ceq 'LF-18' -and $UiScope -ceq 'last-frontend-store-defaults-recovery' -or
     $TicketId -ceq 'LF-19' -and $UiScope -ceq 'last-frontend-store-input-consumers' -or
-    $TicketId -ceq 'LF-20' -and $UiScope -ceq 'last-frontend-trading-preferences-recovery') -and $Lane -ceq 'codex_ui' -and
+    $TicketId -ceq 'LF-20' -and $UiScope -ceq 'last-frontend-trading-preferences-recovery' -or
+    $TicketId -ceq 'LF-21' -and $UiScope -ceq 'last-frontend-product-defaults-recovery') -and $Lane -ceq 'codex_ui' -and
     $PackageId -ceq 'com.moolsocial.app.runtime' -and
     $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
     $Phase -cin @('ticket_start','implementation')) 'LF-01 permits only its current hot-reload source identity; no build/handoff.'

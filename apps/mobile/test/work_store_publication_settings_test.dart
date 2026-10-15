@@ -15,6 +15,151 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test('LF21 product defaults restore without editing saved Stock', () async {
+    final f = _Lf20Storage(); // Shared private Store-preference host fixture.
+    final first = f.work();
+    await first.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    final original = handoffStock();
+    first.workspaceCatalogueItems.add(original);
+    expect(first.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(
+      stockMode: WorkspaceStockMode.availabilityOnly, lowStockThreshold: 17,
+      customerListingRequested: true)), isTrue);
+    await first.workspaceTradingPreferencesWrite;
+    expect(first.workspaceCatalogueItems.single, same(original));
+    first.dispose();
+    final restored = f.work();
+    addTearDown(restored.dispose);
+    await restored.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(restored.workspaceProductDefaults.stockMode, WorkspaceStockMode.availabilityOnly);
+    expect(restored.workspaceProductDefaults.lowStockThreshold, 17);
+    expect(restored.workspaceProductDefaults.customerListingRequested, isTrue);
+    expect(restored.workspaceVisibleToCustomers, isFalse);
+    expect(restored.workspaceCatalogueItems, isEmpty);
+    expect((restored.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+  });
+
+  test('LF21 v1 read preserves bytes and cannot claim absent defaults were saved', () async {
+    final f = _Lf20Storage();
+    final bytes = jsonEncode(f.valid());
+    f.rows[f.key('lf20-a')] = bytes;
+    final work = f.work();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspaceTradingPreferencesSaved, isTrue);
+    expect(work.workspaceProductDefaultsSaved, isFalse);
+    expect(work.workspaceProductDefaults.lowStockThreshold, 5);
+    expect(f.rows[f.key('lf20-a')], bytes);
+    expect(f.writes, 0);
+  });
+
+  for (final productEditor in [false, true]) {
+    test('LF21 explicit editor save upgrades v1 preserving other inputs product=$productEditor', () async {
+      final f = _Lf20Storage();
+      f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+      final work = f.work();
+      addTearDown(work.dispose);
+      await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+      expect(productEditor ? work.saveWorkspaceProductDefaults(_lf21Defaults())
+          : _lf20Save(work, opening: '10:00'), isTrue);
+      expect(await work.workspaceTradingPreferencesWrite, isTrue);
+      final row = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
+      expect(row['schemaVersion'], 2);
+      expect((row['fields'] as Map)['openingTime'], productEditor ? '21:30' : '10:00');
+      expect((row['fields'] as Map)['maximumActiveOrders'], 0);
+      expect(row['productDefaults'], productEditor ? _lf21Defaults().toJson()
+          : const WorkspaceProductDefaults().toJson());
+      expect(work.workspaceProductDefaultsSaved, isTrue);
+    });
+  }
+
+  for (final invalid in ['mode', 'type', 'negative', 'large', 'fraction', 'boolean', 'missing', 'extra', 'versionFraction']) {
+    test('LF21 malformed v2 $invalid stays unreadable and cannot alter either group', () async {
+      final f = _Lf20Storage();
+      final row = _lf21Record(f);
+      final defaults = row['productDefaults'] as Map;
+      if (invalid == 'mode') defaults['stockMode'] = 'unknown';
+      if (invalid == 'type') defaults['lowStockThreshold'] = '17';
+      if (invalid == 'negative') defaults['lowStockThreshold'] = -1;
+      if (invalid == 'large') defaults['lowStockThreshold'] = 1000000000;
+      if (invalid == 'fraction') defaults['lowStockThreshold'] = 1.5;
+      if (invalid == 'boolean') defaults['customerListingRequested'] = 'true';
+      if (invalid == 'missing') defaults.remove('stockMode');
+      if (invalid == 'extra') defaults['published'] = true;
+      if (invalid == 'versionFraction') row['schemaVersion'] = 2.0;
+      final bytes = jsonEncode(row);
+      f.rows[f.key('lf20-a')] = bytes;
+      final work = f.work();
+      addTearDown(work.dispose);
+      final original = handoffStock();
+      work.workspaceCatalogueItems.add(original);
+      expect(await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a'), isFalse);
+      expect(work.workspaceProductDefaults.lowStockThreshold, 5);
+      expect(work.workspaceOpeningTime, '8:00 AM');
+      expect(work.saveWorkspaceProductDefaults(_lf21Defaults()), isFalse);
+      expect(_lf20Save(work), isFalse);
+      expect(f.rows[f.key('lf20-a')], bytes);
+      expect(f.writes, 0);
+      expect(work.workspaceCatalogueItems.single, same(original));
+    });
+  }
+
+  for (final productFirst in [false, true]) {
+    test('LF21 editor interleaving cannot overwrite the other group productFirst=$productFirst', () async {
+      final f = _Lf20Storage()..writeGate = Completer<void>();
+      final work = f.work();
+      addTearDown(work.dispose);
+      await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+      expect(productFirst ? work.saveWorkspaceProductDefaults(_lf21Defaults())
+          : _lf20Save(work, opening: '10:00'), isTrue);
+      expect(productFirst ? _lf20Save(work, opening: '10:00')
+          : work.saveWorkspaceProductDefaults(_lf21Defaults()), isFalse);
+      expect(work.workspaceProductDefaults.lowStockThreshold, productFirst ? 17 : 5);
+      f.writeGate!.complete();
+      expect(await work.workspaceTradingPreferencesWrite, isTrue);
+      expect(productFirst ? _lf20Save(work, opening: '10:00')
+          : work.saveWorkspaceProductDefaults(_lf21Defaults()), isTrue);
+      expect(await work.workspaceTradingPreferencesWrite, isTrue);
+      final row = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
+      expect((row['fields'] as Map)['openingTime'], '10:00');
+      expect(row['productDefaults'], _lf21Defaults().toJson());
+    });
+  }
+
+  test('LF21 failed defaults save retains input and preserves v1 until confirmed retry', () async {
+    final f = _Lf20Storage()..failWrite = true;
+    final bytes = jsonEncode(f.valid());
+    f.rows[f.key('lf20-a')] = bytes;
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+    expect(work.saveWorkspaceProductDefaults(_lf21Defaults()), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isFalse);
+    expect(work.workspaceProductDefaultsSaved, isFalse);
+    expect(work.workspaceProductDefaults.lowStockThreshold, 17);
+    expect(f.rows[f.key('lf20-a')], bytes);
+    f.failWrite = false;
+    expect(work.saveWorkspaceProductDefaults(_lf21Defaults()), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(work.workspaceProductDefaultsSaved, isTrue);
+  });
+
+  test('LF21 v2 defaults remain account-private across cached owner changes', () async {
+    final f = _Lf20Storage();
+    f.rows[f.key('lf20-a')] = jsonEncode(_lf21Record(f));
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+    expect(work.workspaceProductDefaults.lowStockThreshold, 17);
+    f.account = 'host-b';
+    await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+    expect(work.workspaceProductDefaults.lowStockThreshold, 5);
+    expect(work.workspaceProductDefaults.customerListingRequested, isFalse);
+    f.account = 'lf16-host';
+    await work.loadWorkspaceProductDefaults(expectedStoreId: 'lf20-a');
+    expect(work.workspaceProductDefaults.lowStockThreshold, 17);
+    expect(work.workspaceProductDefaultsSaved, isTrue);
+  });
+
   test('LF20 saved trading inputs restore without operational replay', () async {
     final f = _Lf16Storage(); // Isolated host preference storage.
     WorkSession create() => WorkSession(gateway: ReviewWorkGateway(),
@@ -1659,6 +1804,13 @@ class _Lf20SecureTradingStore extends SecureWorkPendingProofStore {
 bool _lf20Save(WorkSession work, {String opening = '21:30'}) =>
     work.saveWorkspaceTradingControls(openingTime: opening, closingTime: '05:15',
       maximumActiveOrders: 0, alertSound: false, alertVibration: false);
+
+WorkspaceProductDefaults _lf21Defaults() => const WorkspaceProductDefaults(
+  stockMode: WorkspaceStockMode.availabilityOnly, lowStockThreshold: 17,
+  customerListingRequested: true);
+Map<String, Object?> _lf21Record(_Lf20Storage f) => {
+  ...f.valid(), 'schemaVersion': 2, 'productDefaults': _lf21Defaults().toJson(),
+};
 
 WorkspaceStorePublicationDetails _lf18Details() => const WorkspaceStorePublicationDetails(
   legalName: 'Host default business', street: 'Host default lane', city: 'Pune',
