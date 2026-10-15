@@ -458,9 +458,9 @@ class _StoreOperationalData {
   int workspaceDeliveryRadiusKm = 5;
   int workspaceDeliveryFee = 30;
   int workspaceFreeDeliveryAbove = 499;
-  String workspaceDeliveryCity = 'Jodhpur';
-  String workspaceDeliveryArea = 'Sardarpura';
-  String workspaceDeliveryPincode = '342003';
+  String workspaceDeliveryCity = '';
+  String workspaceDeliveryArea = '';
+  String workspaceDeliveryPincode = '';
   bool workspacePickupEnabled = true;
   bool workspaceStaffAccessEnabled = false;
   int workspaceCounterCount = 1;
@@ -8119,10 +8119,13 @@ class WorkSession extends ChangeNotifier {
   bool saveWorkspacePublicationDetails(
     WorkspaceStorePublicationDetails details, {
     String? expectedStoreId,
+    int? expectedNavigationRevision,
   }) {
     final current = activeWorkspace?.id ?? workspaceId;
     if (current?.trim().isNotEmpty != true ||
         expectedStoreId != null && current != expectedStoreId ||
+        expectedNavigationRevision != null &&
+            navigationScopeRevision != expectedNavigationRevision ||
         details.inputErrors.isNotEmpty) {
       return false;
     }
@@ -9633,12 +9636,31 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  void saveWorkspaceAvailability({
+  bool _settingsScopeCurrent(String? storeId, int? revision) {
+    if (_disposed) return false;
+    final current = activeWorkspace?.id ?? workspaceId;
+    if (current?.trim().isNotEmpty != true ||
+        storeId != null && storeId != current ||
+        revision != null && revision != navigationScopeRevision) {
+      showError('Your Store changed. Reopen these settings in the correct Store. Your entries are kept.');
+      return false;
+    }
+    return true;
+  }
+
+  bool saveWorkspaceAvailability({
     required bool acceptingOrders,
     required String fulfilmentMode,
     required int busyMinutes,
     required String reopensAt,
+    String? expectedStoreId,
+    int? expectedNavigationRevision,
   }) {
+    if (!_settingsScopeCurrent(expectedStoreId, expectedNavigationRevision)) return false;
+    if (busyMinutes < 0 || fulfilmentMode.trim().isEmpty) {
+      showError('Check the preparation time and fulfilment preference.');
+      return false;
+    }
     workspaceAcceptingOrders = acceptingOrders;
     workspaceFulfilmentMode = fulfilmentMode;
     workspaceBusyMinutes = busyMinutes;
@@ -9652,35 +9674,39 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity(
       acceptingOrders
           ? busyMinutes > 0
-                ? 'Store marked busy with $busyMinutes minutes extra preparation.'
-                : 'Store opened for customer orders.'
-          : 'New customer orders paused${reopensAt.isEmpty ? '.' : ' until $reopensAt.'}',
+                ? 'Store preparation preference set to $busyMinutes extra minutes.'
+                : 'Store open preference saved.'
+          : 'Store pause preference saved${reopensAt.isEmpty ? '.' : ' until $reopensAt.'}',
     );
     showNotice(
       acceptingOrders
-          ? 'Store availability updated for customers.'
-          : 'Store paused. Customers can see when ordering resumes.',
+          ? 'Store readiness applied in this session. Public sync is pending.'
+          : 'Store pause applied in this session. Public sync is pending.',
     );
     _persistOperationalState('availability');
+    return true;
   }
 
-  void saveWorkspaceTradingControls({
+  bool saveWorkspaceTradingControls({
     required String openingTime,
     required String closingTime,
     required int maximumActiveOrders,
     required bool alertSound,
     required bool alertVibration,
+    String? expectedStoreId,
+    int? expectedNavigationRevision,
   }) {
+    if (!_settingsScopeCurrent(expectedStoreId, expectedNavigationRevision)) return false;
     // 0 means explicitly unlimited; positive values are retailer-entered limits.
     // This is a planning preference, not admission control for incoming orders.
     if (maximumActiveOrders < 0) {
       showError('Enter an active-order limit or choose Unlimited.');
-      return;
+      return false;
     }
     if (!WorkspaceStorePublicationDetails.validTradingTime(openingTime) ||
         !WorkspaceStorePublicationDetails.validTradingTime(closingTime)) {
       showError('Choose valid opening and closing times.');
-      return;
+      return false;
     }
     _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
       ...workspacePublicationDetails.toJson(),
@@ -9695,6 +9721,7 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity('Store hours and order alerts updated.');
     _persistOperationalState('trading-controls');
     notifyListeners();
+    return true;
   }
 
   void dismissWorkspaceAlert(String alertId) {
@@ -9771,12 +9798,15 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
-  void saveWorkspaceDeliverySettings({
+  bool saveWorkspaceDeliverySettings({
     String? city,
     String? area,
     String? pincode,
     bool? pickupEnabled,
+    String? expectedStoreId,
+    int? expectedNavigationRevision,
   }) {
+    if (!_settingsScopeCurrent(expectedStoreId, expectedNavigationRevision)) return false;
     // Retailers own pickup location/preferences, not MoolSocial coverage/pricing.
     final nextCity = (city ?? workspaceDeliveryCity).trim();
     final nextArea = (area ?? workspaceDeliveryArea).trim();
@@ -9785,15 +9815,16 @@ class WorkSession extends ChangeNotifier {
         nextArea.isEmpty ||
         !RegExp(r'^[1-9][0-9]{5}$').hasMatch(nextPincode)) {
       showError('Check the Store city, area and PIN code before saving.');
-      return;
+      return false;
     }
     workspaceDeliveryCity = city?.trim() ?? workspaceDeliveryCity;
     workspaceDeliveryArea = area?.trim() ?? workspaceDeliveryArea;
     workspaceDeliveryPincode = pincode?.trim() ?? workspaceDeliveryPincode;
     workspacePickupEnabled = pickupEnabled ?? workspacePickupEnabled;
     _recordWorkspaceActivity('Store pickup location and preferences updated.');
-    showNotice('Store pickup details updated.');
+    showNotice('Pickup preferences applied in this session. Durable sync and collection confirmation are pending.');
     _persistOperationalState('delivery-settings');
+    return true;
   }
 
   void saveWorkspaceStaffSettings({

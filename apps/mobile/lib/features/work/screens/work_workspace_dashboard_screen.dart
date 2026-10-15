@@ -729,6 +729,8 @@ class _WorkWorkspaceDashboardScreenState
   int _draftMaximumActiveOrders = 8;
   bool _draftOrderAlertSound = true;
   bool _draftOrderAlertVibration = true;
+  String? _settingsStoreId;
+  int? _settingsScopeRevision;
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceFinanceFocus? _focusedFinance;
@@ -1153,7 +1155,7 @@ class _WorkWorkspaceDashboardScreenState
     final bottomAction = switch (_view) {
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
-        label: 'Save settings',
+        label: 'Apply settings',
         icon: Icons.check_circle_outline_rounded,
         onPressed: _saveAvailability,
       ),
@@ -2321,6 +2323,8 @@ class _WorkWorkspaceDashboardScreenState
   void _showStatus() {
     _searchFocus.unfocus();
     setState(() {
+      _settingsStoreId = session.activeWorkspace?.id ?? session.workspaceId;
+      _settingsScopeRevision = session.navigationScopeRevision;
       _draftAcceptingOrders = session.workspaceAcceptingOrders;
       _draftVisibleToCustomers = session.workspaceVisibleToCustomers;
       _draftFulfilmentMode = session.workspaceFulfilmentMode;
@@ -3198,6 +3202,15 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   void _saveAvailability() {
+    if (_settingsStoreId != (session.activeWorkspace?.id ?? session.workspaceId) ||
+        _settingsScopeRevision != session.navigationScopeRevision) {
+      session.showError('Your Store changed. Reopen these settings in the correct Store. Your entries are kept.');
+      return;
+    }
+    if (_draftBusyMinutes < 0 || _draftFulfilmentMode.trim().isEmpty) {
+      session.showError('Check the preparation time and fulfilment preference.');
+      return;
+    }
     if (_draftMaximumActiveOrders < 0 ||
         !(_settingsForm.currentState?.validate() ?? true)) {
       _settingsForm.currentState?.validate();
@@ -3212,21 +3225,27 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     if (availabilityChanged) {
-      session.saveWorkspaceAvailability(
+      final saved = session.saveWorkspaceAvailability(
         acceptingOrders: _draftAcceptingOrders,
         fulfilmentMode: _draftFulfilmentMode,
         busyMinutes: _draftBusyMinutes,
         reopensAt: _draftReopensAt,
+        expectedStoreId: _settingsStoreId,
+        expectedNavigationRevision: _settingsScopeRevision,
       );
+      if (!saved) return;
     }
     if (tradingControlsChanged) {
-      session.saveWorkspaceTradingControls(
+      final saved = session.saveWorkspaceTradingControls(
         openingTime: _draftOpeningTime,
         closingTime: _draftClosingTime,
         maximumActiveOrders: _draftMaximumActiveOrders,
         alertSound: _draftOrderAlertSound,
         alertVibration: _draftOrderAlertVibration,
+        expectedStoreId: _settingsStoreId,
+        expectedNavigationRevision: _settingsScopeRevision,
       );
+      if (!saved) return;
     }
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
@@ -36019,16 +36038,20 @@ class _WorkspaceDeliverySettingsSurface extends StatefulWidget {
 
 class _WorkspaceDeliverySettingsSurfaceState
     extends State<_WorkspaceDeliverySettingsSurface> {
-  late final TextEditingController _city = TextEditingController(
-    text: widget.session.workspaceDeliveryCity,
-  );
-  late final TextEditingController _area = TextEditingController(
-    text: widget.session.workspaceDeliveryArea,
-  );
-  late final TextEditingController _pincode = TextEditingController(
-    text: widget.session.workspaceDeliveryPincode,
-  );
-  late bool _pickupEnabled = widget.session.workspacePickupEnabled;
+  late final String? _storeId;
+  late final int? _scopeRevision;
+  @override
+  void initState() {
+    super.initState();
+    _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    _scopeRevision = widget.session.navigationScopeRevision;
+    _city = TextEditingController(text: widget.session.workspaceDeliveryCity);
+    _area = TextEditingController(text: widget.session.workspaceDeliveryArea);
+    _pincode = TextEditingController(text: widget.session.workspaceDeliveryPincode);
+    _pickupEnabled = widget.session.workspacePickupEnabled;
+  }
+  late final TextEditingController _city, _area, _pincode;
+  late bool _pickupEnabled;
 
   @override
   void dispose() {
@@ -36043,7 +36066,26 @@ class _WorkspaceDeliverySettingsSurfaceState
     return StoreSettingsForm(
       key: const Key('work-delivery-settings-screen'),
       title: 'Delivery & pickup',
-      detail: '',
+      detail: 'Preferences apply in this session. Durable sync and MoolSocial delivery/collection confirmation are pending.',
+      leading: widget.session.workspacePublicationDetails.city.trim().isNotEmpty &&
+              widget.session.workspacePublicationDetails.street.trim().isNotEmpty &&
+              RegExp(r'^[1-9][0-9]{5}$').hasMatch(widget.session.workspacePublicationDetails.pinCode)
+          ? TextButton.icon(
+              key: const Key('work-delivery-use-store-address'),
+              icon: const Icon(Icons.storefront_outlined),
+              label: const Text('Use saved Store address'),
+              onPressed: () {
+                if (_storeId != (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) ||
+                    _scopeRevision != widget.session.navigationScopeRevision) {
+                  widget.session.showError('Your Store changed. Reopen these settings in the correct Store.');
+                  return;
+                }
+                final details = widget.session.workspacePublicationDetails;
+                _city.text = details.city;
+                _area.text = details.street;
+                _pincode.text = details.pinCode;
+              },
+            ) : null,
       fields: [
         StoreSettingsInput(
           id: 'work-delivery-city',
@@ -36052,17 +36094,19 @@ class _WorkspaceDeliverySettingsSurfaceState
           validate: StoreSettingsInput.requiredText,
         ),
         StoreSettingsInput(
-          id: 'work-delivery-area',
-          label: 'Store area',
-          controller: _area,
-          validate: StoreSettingsInput.requiredText,
-        ),
-        StoreSettingsInput(
           id: 'work-delivery-pincode',
           label: 'PIN code',
           controller: _pincode,
           numeric: true,
           validate: StoreSettingsInput.pin,
+        ),
+        StoreSettingsInput(
+          id: 'work-delivery-area',
+          label: 'Pickup address / area',
+          controller: _area,
+          fullWidth: true,
+          maxLines: 3,
+          validate: StoreSettingsInput.requiredText,
         ),
       ],
       trailing: Column(
@@ -36087,13 +36131,15 @@ class _WorkspaceDeliverySettingsSurfaceState
         ],
       ),
       saveKey: 'work-delivery-settings-save',
-      saveLabel: 'Save pickup details',
+      saveLabel: 'Apply pickup preferences',
       onSave: () {
         widget.session.saveWorkspaceDeliverySettings(
           city: _city.text,
           area: _area.text,
           pincode: _pincode.text,
           pickupEnabled: _pickupEnabled,
+          expectedStoreId: _storeId,
+          expectedNavigationRevision: _scopeRevision,
         );
       },
     );

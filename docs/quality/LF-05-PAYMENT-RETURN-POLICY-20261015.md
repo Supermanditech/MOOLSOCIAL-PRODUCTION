@@ -115,3 +115,9 @@ the required checks then passed before any application edit. No gate was bypasse
 
 This is a frontend checkpoint awaiting founder approval before Batch06, not live
 policy publication/readback, credit approval, return service or payment acceptance.
+
+Subsequent founder answer: "Approve; proceed to Batch 06" accepts20fdc89b frontend
+checkpoint only. Provider limitations above remain. Batch06 inspection additionally
+confirmed missing durable settings readback: this ticket did not prove preference
+persistence across app restart. That enter-once requirement remains outstanding
+under the shared settings integration dependency, not silently satisfied by Save.

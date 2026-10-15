@@ -15,9 +15,16 @@ class StorePublicationSettings extends StatefulWidget {
 }
 
 class _StorePublicationSettingsState extends State<StorePublicationSettings> {
-  late final _storeId =
-      widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
-  late final _initial = widget.session.workspacePublicationDetails;
+  late final String? _storeId;
+  late final int? _scopeRevision;
+  @override
+  void initState() {
+    super.initState();
+    _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    _scopeRevision = widget.session.navigationScopeRevision;
+    _initial = widget.session.workspacePublicationDetails;
+  }
+  late final WorkspaceStorePublicationDetails _initial;
   late String _businessType = _initial.businessType;
   late bool _retail = _initial.retailChannelEnabled ?? true;
   late bool _wholesale =
@@ -63,6 +70,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     final saved = widget.session.saveWorkspacePublicationDetails(
       details,
       expectedStoreId: _storeId,
+      expectedNavigationRevision: _scopeRevision,
     );
     setState(() {
       if (saved) {
@@ -133,6 +141,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
       final saved = widget.session.saveWorkspacePublicationDetails(
         details,
         expectedStoreId: _storeId,
+        expectedNavigationRevision: _scopeRevision,
       );
       setState(() {
         _failed = !saved;

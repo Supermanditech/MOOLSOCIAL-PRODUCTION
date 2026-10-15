@@ -678,6 +678,58 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('LF06 old pickup form cannot write another Store at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final work = _testWorkSession()..seedVerifiedWorkspace();
+      work.saveWorkspaceDeliverySettings(city: 'Jaipur', area: 'Host A',
+        pincode: '302001', pickupEnabled: false);
+      work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+        city: 'Chennai', street: 'Host saved Store lane', pinCode: '600001'));
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+        'work-business-settings']) {
+        await tapVisible(tester, Key(key));
+      }
+      final delivery = find.text('Delivery & pickup');
+      await tester.scrollUntilVisible(delivery, 160, scrollable: find.byWidgetPredicate(
+        (w) => w is Scrollable && w.axisDirection == AxisDirection.down).first);
+      await Scrollable.ensureVisible(tester.element(delivery), alignment: .3);
+      await tester.pumpAndSettle();
+      await tester.tap(delivery);
+      await tester.pumpAndSettle();
+      final city = find.byKey(const Key('work-delivery-city'));
+      expect(tester.widget<EditableText>(find.descendant(of: city,
+        matching: find.byType(EditableText))).controller.text, 'Jaipur');
+      await tapVisible(tester, const Key('work-delivery-use-store-address'));
+      expect(tester.widget<EditableText>(find.descendant(of: city,
+        matching: find.byType(EditableText))).controller.text, 'Chennai');
+      expect(work.workspaceDeliveryCity, 'Jaipur'); // Copy edits a draft, not saved location.
+      await tester.enterText(city, 'Unsaved Store A');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      work.activeWorkspace = const WorkWorkspace(id: 'lf06-host-b', name: 'Host Store B',
+        profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Delhi', verified: true);
+      final before = (work.workspaceDeliveryCity, work.workspaceDeliveryArea,
+        work.workspaceDeliveryPincode, work.workspacePickupEnabled);
+      final save = find.byKey(const Key('work-delivery-settings-save'));
+      await tester.scrollUntilVisible(save, 120, scrollable: find.descendant(
+        of: find.byKey(const Key('work-delivery-settings-screen')),
+        matching: find.byType(Scrollable)).first);
+      await Scrollable.ensureVisible(tester.element(save), alignment: .3);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect((work.workspaceDeliveryCity, work.workspaceDeliveryArea,
+        work.workspaceDeliveryPincode, work.workspacePickupEnabled), before);
+      await tester.scrollUntilVisible(city, -120, scrollable: find.descendant(
+        of: find.byKey(const Key('work-delivery-settings-screen')),
+        matching: find.byType(Scrollable)).first);
+      expect(tester.widget<EditableText>(find.descendant(of: city,
+        matching: find.byType(EditableText))).controller.text, 'Unsaved Store A');
+      expect(tester.takeException(), isNull);
+    });
     testWidgets('LF04 offer form saves and restores a private draft at $scale', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);

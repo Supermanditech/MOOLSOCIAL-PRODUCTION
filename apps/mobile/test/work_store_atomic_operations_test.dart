@@ -19904,8 +19904,8 @@ void main() {
         reopensAt: '',
       );
       session.saveWorkspaceTradingControls(
-        openingTime: '9 AM',
-        closingTime: '8 PM',
+        openingTime: '09:00',
+        closingTime: '20:00',
         maximumActiveOrders: 8,
         alertSound: true,
         alertVibration: true,

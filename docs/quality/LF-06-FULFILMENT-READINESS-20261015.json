@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-06",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-06",
+      "customerOutcome": "Seller readiness and pickup inputs save only to their original Store; reuse explicitly saved location without inventing eligibility or repeating product data.",
+      "necessityProof": "Pickup/readiness saves lack originating Store guard, and new operational records contain hard-coded pickup location. Reuse existing settings and saved address.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Stale Store and ABA reject before mutation",
+        "Invalid prep/location retains saved settings",
+        "Saved address reuse is explicit and scoped",
+        "No local platform delivery/coverage grants"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder approved20fdc89b and explicitly proceeding to Batch06.",
+        "Location/serviceability/publication/readiness readback remain authoritative provider dependencies."
+      ],
+      "manifestPath": "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+      "manifestSha256": "947F2C7C08052AC13AF50EE941CF74A2FA9815453397D1485F1AD7313377E5EF",
+      "evidencePath": "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-06",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Seller readiness and pickup inputs save only to their original Store; reuse explicitly saved location without inventing eligibility or repeating product data.",
+    "classification": "mvp_required",
+    "classificationReason": "Seller settings for one Store must not overwrite another or imply unverified pickup/delivery availability.",
+    "minimumCompleteScope": [
+      "Guard original Store and navigation revision before pickup/readiness/trading saves.",
+      "Remove fabricated location defaults only for new records; preserve existing values.",
+      "Explicit same-Store address copy and truthful readiness/service labels.",
+      "Test affected saves/layout/recovery and hot reload OPPO; founder approval beforeBatch07."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder approved20fdc89b and explicitly proceeding to Batch06.",
+      "Location/serviceability/publication/readiness readback remain authoritative provider dependencies."
+    ],
+    "testAndEvidencePlan": [
+      "Fail before stale-scope/default corrections; StoreA/B/ABA and invalid settings preserve state.",
+      "Same-Store save and scoped address reuse, normal/200% widgets, no invented provider capability.",
+      "52 selected host cases passed, same8 existing style infos only. OPPO R7317ms, empty pickup rejection, genuine evaluation inputs applied/reopened within session; final readable full-width area r3045ms. Founder acceptance pending; durable settings readback/enter-once across restart remains explicitly unmet/provider-bound. No Stock/commerce/provider or injected runtime records."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve; proceed to Batch06. Batch06 implementation/device acceptance pending, live policy/eligibility/quote/payment excluded."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

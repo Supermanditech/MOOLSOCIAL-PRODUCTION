@@ -10,6 +10,79 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test('LF06 new Store location is unknown rather than fabricated', () {
+    final work = WorkSession(gateway: ReviewWorkGateway());
+    addTearDown(work.dispose);
+    expect(work.workspaceDeliveryCity, isEmpty);
+    expect(work.workspaceDeliveryArea, isEmpty);
+    expect(work.workspaceDeliveryPincode, isEmpty);
+    expect(work.workspacePublicStoreDetails, isNull);
+  });
+  test('LF06 stale and ABA readiness saves cannot mutate another settings scope', () {
+    final gateway = ReviewWorkGateway();
+    final work = WorkSession(gateway: gateway);
+    addTearDown(work.dispose);
+    const a = WorkWorkspace(id: 'host-lf06-a', name: 'Host A', profileId: 'retailer-grocery',
+      profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+    const b = WorkWorkspace(id: 'host-lf06-b', name: 'Host B', profileId: 'retailer-grocery',
+      profileLabel: 'Grocery', area: 'Delhi', verified: true);
+    work.activeWorkspace = a;
+    final revision = work.navigationScopeRevision;
+    work.activeWorkspace = b;
+    for (final target in [b, a]) {
+      work.activeWorkspace = target;
+      final before = (work.workspaceAcceptingOrders, work.workspaceBusyMinutes,
+        work.workspaceOpeningTime, work.workspaceDeliveryCity, gateway.operationalSaveCalls);
+      expect(work.saveWorkspaceAvailability(acceptingOrders: false,
+        fulfilmentMode: 'Pickup', busyMinutes: 10, reopensAt: '',
+        expectedStoreId: a.id, expectedNavigationRevision: revision), isFalse);
+      expect(work.saveWorkspaceTradingControls(openingTime: '09:00', closingTime: '20:00',
+        maximumActiveOrders: 12, alertSound: false, alertVibration: false,
+        expectedStoreId: a.id, expectedNavigationRevision: revision), isFalse);
+      expect(work.saveWorkspaceDeliverySettings(city: 'Jaipur', area: 'Host lane',
+        pincode: '302001', expectedStoreId: a.id,
+        expectedNavigationRevision: revision), isFalse);
+      expect((work.workspaceAcceptingOrders, work.workspaceBusyMinutes,
+        work.workspaceOpeningTime, work.workspaceDeliveryCity, gateway.operationalSaveCalls), before);
+    }
+    expect(work.saveWorkspaceAvailability(acceptingOrders: false,
+      fulfilmentMode: 'Pickup', busyMinutes: -1, reopensAt: ''), isFalse);
+    expect(work.workspaceAcceptingOrders, isFalse);
+    expect(work.saveWorkspaceAvailability(acceptingOrders: true,
+      fulfilmentMode: 'Pickup', busyMinutes: 10, reopensAt: '', expectedStoreId: a.id,
+      expectedNavigationRevision: work.navigationScopeRevision), isTrue);
+    expect(work.workspaceBusyMinutes, 10);
+    expect(handoffStock().toBuyPublicFacts(storeName: 'Host A', sourceId: 'host-local',
+      storeVisible: true, acceptingOrders: true, observedAt: DateTime.utc(2026,10,15)).fulfilmentMode, isNull);
+    expect(handoffStock().toBuyPublicFacts(storeName: 'Host A', sourceId: 'host-local',
+      storeVisible: true, acceptingOrders: true, observedAt: DateTime.utc(2026,10,15)).eligibility, isNull);
+  });
+  for (final aba in [false, true]) {
+    testWidgets('LF06 publication form captures original scope eagerly ABA$aba', (tester) async {
+      final work = WorkSession(gateway: ReviewWorkGateway());
+      addTearDown(work.dispose);
+      const a = WorkWorkspace(id: 'lf06-form-a', name: 'Host A', profileId: 'retailer-grocery',
+        profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+      work.activeWorkspace = a;
+      work.saveWorkspacePublicationDetails(handoffStoreDetails());
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+        child: StorePublicationSettings(session: work)))));
+      await tester.tap(find.byKey(const PageStorageKey('work-publication-address-section')));
+      await tester.pumpAndSettle();
+      work.activeWorkspace = const WorkWorkspace(id: 'lf06-form-b', name: 'Host B',
+        profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Delhi', verified: true);
+      if (aba) work.activeWorkspace = a;
+      final before = work.workspacePublicationDetails.toJson();
+      final save = find.byKey(const Key('work-publication-save-address'));
+      await Scrollable.ensureVisible(tester.element(save), alignment: .3);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(work.workspacePublicationDetails.toJson(), before);
+      expect(find.textContaining('Your Store changed.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   test(
     'LF02 public contact and explicit hours round trip without private fields',
     () {

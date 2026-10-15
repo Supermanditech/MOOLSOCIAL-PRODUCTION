@@ -48,7 +48,7 @@
         "Policy publication/readback, quotes, credit and payment authority remain service-dependent."
       ],
       "manifestPath": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
-      "manifestSha256": "CBDEEB9BB5F9B61CBFA320D873CDD744FC2ECAD7A9168C2F0A98388ABAB8F974",
+      "manifestSha256": "2FABF7C0B55DEE31BAF9163D115EB03F1F676E7EABD99244F610039A97836964",
       "evidencePath": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -143,7 +143,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder: Approve; proceed to Batch05. Batch05 implementation/device acceptance remains pending; no live provider acceptance."
+    "founderAcceptance": "Founder approved20fdc89b frontend checkpoint and explicitly proceeding to Batch06. No live policy/eligibility/quote/payment acceptance. Shared durable settings readback remains unimplemented; enter-once across app restart was not proved by this checkpoint."
   },
   "execution": {
     "referenceWriteAuthorized": false,
