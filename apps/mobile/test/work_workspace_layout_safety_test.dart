@@ -46440,14 +46440,27 @@ void main() {
       await tester.enterText(area, 'Updated pickup lane');
       final save = find.byKey(const Key('work-delivery-settings-save'));
       storage.failSave = true;
-      await reveal(tester, save);
+      final pickupScroll = find.descendant(
+        of: find.byKey(const Key('work-delivery-settings-screen')),
+        matching: find.byType(Scrollable)).first;
+      Future<void> revealSave() async {
+        await tester.pumpAndSettle();
+        for (var attempt = 0; attempt < 3; attempt++) {
+          final position = tester.state<ScrollableState>(pickupScroll).position;
+          position.jumpTo(position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          if (save.hitTestable().evaluate().isNotEmpty) break;
+        }
+        expect(save.hitTestable(), findsOneWidget);
+      }
+      await revealSave();
       await tester.tap(save.hitTestable());
       await tester.pumpAndSettle();
       expect(work.workspacePickupPreferencesSaved, isFalse);
       expect(work.workspacePickupPreferencesError, isNotNull);
       expect(tester.widget<TextFormField>(area).controller!.text, 'Updated pickup lane');
       storage.failSave = false;
-      await reveal(tester, save); // Error text can move the button at large text.
+      await revealSave();
       await tester.tap(save.hitTestable());
       await tester.pumpAndSettle();
       expect(work.workspacePickupPreferencesSaved, isTrue);
@@ -46466,6 +46479,71 @@ void main() {
       expect(work.activeWorkspace!.id, storeId);
       expect(work.workspaceCatalogueItems, orderedEquals(products));
       expect(work.workspaceInvoices, orderedEquals(invoices));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF19 pickup consumer distinguishes unsaved copies edits and toggle $scale', (tester) async {
+      final storage = _Lf16PickupFixtureStore();
+      final work = WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: _ContactDraftFixtureStore(),
+        pickupPreferencesStoreFactory: (_) => storage)
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+      final storeId = work.activeWorkspace!.id;
+      storage.value = {'schemaVersion': 1, 'storeId': storeId, 'fields': {
+        'city': 'Pune', 'area': 'Saved pickup lane', 'pincode': '411001', 'pickupEnabled': false,
+      }}; // Isolated host preferences, never device/runtime seed data.
+      final original = jsonEncode(storage.value);
+      await work.loadWorkspacePickupPreferences(expectedStoreId: storeId);
+      work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+        street: 'Saved Store lane', city: 'Pune', pinCode: '411001'));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 800), textScale: scale);
+      await openStoreSettings(tester);
+      Future<void> openPickup() async {
+        await reveal(tester, find.text('Delivery & pickup'));
+        await tester.tap(find.text('Delivery & pickup').hitTestable());
+        await tester.pumpAndSettle();
+      }
+      Future<void> header() async {
+        final scroll = tester.state<ScrollableState>(find.descendant(
+          of: find.byKey(const Key('work-delivery-settings-screen')),
+          matching: find.byType(Scrollable)).first);
+        scroll.position.jumpTo(0);
+        await tester.pumpAndSettle();
+      }
+      await openPickup();
+      expect(find.textContaining('Saved on this device.'), findsOneWidget);
+      final copy = find.byKey(const Key('work-delivery-use-store-address'));
+      await reveal(tester, copy);
+      await tester.tap(copy.hitTestable());
+      await header();
+      expect(find.textContaining('Unsaved changes'), findsOneWidget);
+      expect(find.textContaining('Saved on this device.'), findsNothing);
+      expect(jsonEncode(storage.value), original);
+      final area = find.byKey(const Key('work-delivery-area'));
+      await reveal(tester, area);
+      expect(tester.widget<TextFormField>(area).controller!.text, 'Saved Store lane');
+      await tester.enterText(area, 'Saved pickup lane');
+      await header();
+      expect(find.textContaining('Saved on this device.'), findsOneWidget);
+      final toggle = find.byKey(const Key('work-delivery-pickup'));
+      await reveal(tester, toggle);
+      await tester.tap(toggle.hitTestable());
+      await header();
+      expect(find.textContaining('Unsaved changes'), findsOneWidget);
+      expect(jsonEncode(storage.value), original);
+      // Back without Save must not persist the copied address or toggle.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await openPickup();
+      await reveal(tester, area);
+      expect(tester.widget<TextFormField>(area).controller!.text, 'Saved pickup lane');
+      await reveal(tester, toggle);
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(jsonEncode(storage.value), original);
+      expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
     });
   }

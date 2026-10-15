@@ -45,7 +45,7 @@
         "Local input recovery is not publication/sync authority; unrelated history and drafts remain accessible."
       ],
       "manifestPath": "docs/quality/LF-19-STORE-INPUT-CONSUMERS-20261016.md",
-      "manifestSha256": "FE14054BF2978E917E2B2161B212ADA8793B3D13F527688234D63F2326A521F0",
+      "manifestSha256": "A28B9CB4CA0E3D73228F2AD06239CE09DA780E185DC8B3B8EBF3A4A2974DDAE3",
       "evidencePath": "docs/quality/LF-19-STORE-INPUT-CONSUMERS-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,

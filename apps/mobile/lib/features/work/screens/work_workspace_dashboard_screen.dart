@@ -36059,6 +36059,12 @@ class _WorkspaceDeliverySettingsSurfaceState
   late final TextEditingController _city, _area, _pincode;
   late bool _pickupEnabled;
 
+  bool get _pickupInputsChanged =>
+      _city.text.trim() != widget.session.workspaceDeliveryCity ||
+      _area.text.trim() != widget.session.workspaceDeliveryArea ||
+      _pincode.text.trim() != widget.session.workspaceDeliveryPincode ||
+      _pickupEnabled != widget.session.workspacePickupEnabled;
+
   Future<bool> _loadPickupPreferences() async {
     final loaded = await widget.session.loadWorkspacePickupPreferences(expectedStoreId: _storeId ?? '');
     if (!mounted || _pickupContext != widget.session.pickupPreferencesContext) return false;
@@ -36097,12 +36103,15 @@ class _WorkspaceDeliverySettingsSurfaceState
           ],
         )));
       }
-      return AnimatedBuilder(animation: widget.session, builder: (context, _) => StoreSettingsForm(
+      return AnimatedBuilder(animation: Listenable.merge([
+        widget.session, _city, _area, _pincode,
+      ]), builder: (context, _) => StoreSettingsForm(
       key: const Key('work-delivery-settings-screen'),
       title: 'Delivery & pickup',
       detail: widget.session.pickupPreferencesPersistenceAvailable
           ? widget.session.workspacePickupPreferencesError ??
               (widget.session.workspacePickupPreferencesSaving ? 'Saving pickup preferences on this device…' :
+               _pickupInputsChanged ? 'Unsaved changes. Save on this device to keep them. Public sync and collection confirmation are pending.' :
                widget.session.workspacePickupPreferencesSaved ? 'Saved on this device. Public sync and collection confirmation are pending.' :
                'Save your pickup preferences on this device. Public sync and collection confirmation are pending.')
           : 'Preferences apply in this session. Durable sync and MoolSocial delivery/collection confirmation are pending.',

@@ -60,3 +60,28 @@ Architect context review found no further bounded LF19 blocker. Public projectio
 readiness is a hook/test seam, not a newly connected public provider consumer.
 Other defaults/hours/private exceptions, sync, provider contracts and full mapped
 frontend completion remain open. Founder morning acceptance is still pending.
+
+## Dependent pickup form follow-up
+
+The observed unsaved-copy caption is corrected in the same existing consumer.
+Its current text/toggle values qualify the existing confirmed saved-state flag;
+controller equality never creates a new device-saved claim. Error and in-flight
+save states retain precedence. Copy, text edits and toggle remain unsaved until
+explicit Save; no storage write or new route/state owner was introduced.
+
+Two new full-editor cases reproduced the missing Unsaved changes caption before
+the correction. Normal and200% small-viewport cases now pass: copy/edit/toggle,
+revert and Back/reopen preserve original saved values and stored bytes. Three
+LF16 full-editor recovery/failure/retry cases also pass:5 total,0fail/skip. Their
+generic reveal helper lost the lazy Save row after large-text error layout;
+the test now settles and exposes the actual form bottom with a bounded extent
+recheck and explicit hit-test requirement. Failed-save and stored-data assertions
+were retained. Removed a redundant test teardown already owned by mount.
+Focused analysis has0errors/warnings,9 unrelated pre-existing style infos.
+
+OPPO hot reload3276ms; copy saved Store address displayed Unsaved changes and
+Evaluation Store lane. Screenshot lf19-unsaved-pickup-20261016.png inspected.
+Back/reopen without Save returned Saved on this device and Evaluation pickup
+lane/Pune/411001. No commerce/provider/Stock action or APK. Architect review
+confirmed that the existing persisted-state flag, not equality alone, must be
+retained; current implementation does so. Morning acceptance remains pending.
