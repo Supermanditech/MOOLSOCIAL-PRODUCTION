@@ -15,6 +15,244 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test('LF20 saved trading inputs restore without operational replay', () async {
+    final f = _Lf16Storage(); // Isolated host preference storage.
+    WorkSession create() => WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _Lf16MemoryStore(f, 'contact'),
+      tradingPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, id))
+        ..activeWorkspace = _lf16Store('lf20-trading');
+    final first = create();
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(first.saveWorkspaceTradingControls(openingTime: '21:30', closingTime: '05:15',
+      maximumActiveOrders: 0, alertSound: false, alertVibration: false), isTrue);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    first.dispose();
+    final restored = create();
+    addTearDown(restored.dispose);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(restored.workspaceOpeningTime, '21:30');
+    expect(restored.workspaceClosingTime, '05:15');
+    expect(restored.workspaceMaximumActiveOrders, 0);
+    expect(restored.workspaceOrderAlertSound, isFalse);
+    expect(restored.workspaceOrderAlertVibration, isFalse);
+    expect(restored.workspacePublicationDetails.openingTime, '21:30');
+    expect(restored.workspacePublicationDetails.closingTime, '05:15');
+    expect(restored.workspaceVisibleToCustomers, isFalse);
+    expect(restored.workspaceOrders, isEmpty);
+    expect(restored.workspaceInvoices, isEmpty);
+    expect((restored.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+  });
+
+  test('LF20 missing trading record keeps legacy defaults and absent public hours', () async {
+    final f = _Lf20Storage();
+    final work = f.work();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspaceOpeningTime, '8:00 AM');
+    expect(work.workspaceMaximumActiveOrders, 8);
+    expect(work.workspacePublicationDetails.openingTime, isEmpty);
+    expect(work.workspaceTradingPreferencesSaved, isFalse);
+    expect(f.rows, isEmpty);
+  });
+
+  for (final invalid in ['version', 'store', 'missing', 'extra', 'time', 'limit', 'fraction', 'boolean']) {
+    test('LF20 unreadable $invalid record is kept and cannot be overwritten', () async {
+      final f = _Lf20Storage();
+      final row = f.valid();
+      final fields = row['fields'] as Map;
+      if (invalid == 'version') row['schemaVersion'] = 2;
+      if (invalid == 'store') row['storeId'] = 'other';
+      if (invalid == 'missing') fields.remove('alertSound');
+      if (invalid == 'extra') fields['open'] = true;
+      if (invalid == 'time') fields['openingTime'] = '25:30';
+      if (invalid == 'limit') fields['maximumActiveOrders'] = -1;
+      if (invalid == 'fraction') fields['maximumActiveOrders'] = 1.5;
+      if (invalid == 'boolean') fields['alertSound'] = 'false';
+      final encoded = jsonEncode(row);
+      f.rows[f.key('lf20-a')] = encoded;
+      final work = f.work();
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isFalse);
+      expect(work.workspaceOpeningTime, '8:00 AM');
+      expect(work.workspaceTradingPreferencesSaved, isFalse);
+      expect(work.workspaceTradingPreferencesError, isNotNull);
+      expect(_lf20Save(work), isFalse);
+      expect(f.rows[f.key('lf20-a')], encoded);
+      expect(f.writes, 0);
+    });
+  }
+
+  test('LF20 failed read coalesces and retries without erasing inputs', () async {
+    final f = _Lf20Storage()..failRead = true..readGate = Completer<void>();
+    f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+    final work = f.work();
+    addTearDown(work.dispose);
+    final first = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    final second = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(identical(first, second), isTrue);
+    expect(_lf20Save(work), isFalse);
+    f.readGate!.complete();
+    expect(await first, isFalse);
+    f.failRead = false;
+    expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspaceOpeningTime, '21:30');
+    expect(work.workspaceTradingPreferencesSaved, isTrue);
+  });
+
+  test('LF20 failed save retains applied input and same-value retry confirms durability', () async {
+    final f = _Lf20Storage()..failWrite = true;
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(_lf20Save(work), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isFalse);
+    expect(work.workspaceOpeningTime, '21:30');
+    expect(work.workspaceTradingPreferencesSaved, isFalse);
+    expect(work.workspaceTradingPreferencesError, isNotNull);
+    f.failWrite = false;
+    expect(_lf20Save(work), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(work.workspaceTradingPreferencesSaved, isTrue);
+    expect(work.workspaceTradingPreferencesError, isNull);
+    final saved = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
+    expect(saved['fields'], f.valid()['fields']);
+  });
+
+  test('LF20 pending write refuses duplicate edits and does not claim saved', () async {
+    final f = _Lf20Storage()..writeGate = Completer<void>();
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(_lf20Save(work), isTrue);
+    expect(work.workspaceTradingPreferencesSaving, isTrue);
+    expect(work.workspaceTradingPreferencesSaved, isFalse);
+    expect(_lf20Save(work, opening: '10:00'), isFalse);
+    expect(work.workspaceOpeningTime, '21:30');
+    f.writeGate!.complete();
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(f.writes, 1);
+  });
+
+  for (final aba in [false, true]) {
+    test('LF20 deferred read rejects Store changes ABA=$aba', () async {
+      final f = _Lf20Storage()..readGate = Completer<void>();
+      f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+      final work = f.work();
+      addTearDown(work.dispose);
+      final read = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+      await Future<void>.delayed(Duration.zero);
+      work.activeWorkspace = _lf16Store('lf20-b');
+      if (aba) work.activeWorkspace = _lf16Store('lf20-a');
+      f.readGate!.complete();
+      expect(await read, isFalse);
+      expect(work.workspaceOpeningTime, '8:00 AM');
+      expect(work.workspaceTradingPreferencesSaved, isFalse);
+    });
+  }
+
+  test('LF20 late read cannot overwrite newer current inputs', () async {
+    final f = _Lf20Storage()..readGate = Completer<void>();
+    f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+    final work = f.work();
+    addTearDown(work.dispose);
+    final read = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    await Future<void>.delayed(Duration.zero);
+    work.workspaceOpeningTime = '10:45';
+    f.readGate!.complete();
+    expect(await read, isTrue);
+    expect(work.workspaceOpeningTime, '10:45');
+    expect(work.workspaceTradingPreferencesSaved, isFalse);
+  });
+
+  test('LF20 observed account ABA and disposed sessions cannot apply read', () async {
+    final f = _Lf20Storage()..readGate = Completer<void>();
+    f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+    final work = f.work();
+    final read = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    await Future<void>.delayed(Duration.zero);
+    f.account = 'host-b'; work.showNotice('Host account changed');
+    f.account = 'lf16-host'; work.showNotice('Host account returned');
+    f.readGate!.complete();
+    expect(await read, isFalse);
+    expect(work.workspaceOpeningTime, '8:00 AM');
+    work.dispose();
+    final other = f.work();
+    f.readGate = Completer<void>();
+    final disposedRead = other.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    other.dispose();
+    f.readGate!.complete();
+    expect(await disposedRead, isFalse);
+  });
+
+  test('LF20 owner caches keep private alert and planning preferences isolated', () async {
+    final f = _Lf20Storage();
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(_lf20Save(work), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    f.account = 'host-b';
+    expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspaceOrderAlertSound, isTrue);
+    expect(work.workspaceMaximumActiveOrders, 8);
+    expect(_lf20Save(work, opening: '10:00'), isTrue);
+    await work.workspaceTradingPreferencesWrite;
+    f.account = 'lf16-host';
+    expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspaceOpeningTime, '21:30');
+    expect(f.rows, hasLength(2));
+  });
+
+  for (final tradingFirst in [false, true]) {
+  test('LF20 hours and publication remain coherent tradingFirst=$tradingFirst', () async {
+    final f = _Lf20Storage();
+    if (!tradingFirst) f.readGate = Completer<void>();
+    f.rows[f.key('lf20-a')] = jsonEncode(f.valid());
+    final defaults = await _lf18Prepared();
+    final publication = Map<String, Object?>.from(
+      jsonDecode(defaults.rows[defaults.key('lf18-a')]!) as Map)..['storeId'] = 'lf20-a';
+    defaults.rows[defaults.key('lf20-a')] = jsonEncode(publication);
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _Lf16MemoryStore(f, 'contact'),
+      tradingPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, id),
+      publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(defaults, id))
+        ..activeWorkspace = _lf16Store('lf20-a');
+    addTearDown(work.dispose);
+    if (tradingFirst) {
+      expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    }
+    // Equivalent owner-entered default update must not replace recovered hours.
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspacePublicationDetails.legalName, 'Host default business');
+    f.readGate?.complete();
+    expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(work.workspacePublicationDetails.openingTime, '21:30');
+    expect(work.workspacePublicationDetails.closingTime, '05:15');
+    expect(work.workspaceVisibleToCustomers, isFalse);
+  });
+  }
+
+  for (final aba in [false, true]) {
+    test('LF20 pending write cannot confirm a changed Store scope ABA=$aba', () async {
+      final f = _Lf20Storage()..writeGate = Completer<void>();
+      final work = f.work();
+      addTearDown(work.dispose);
+      await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+      expect(_lf20Save(work), isTrue);
+      final pending = work.workspaceTradingPreferencesWrite;
+      await Future<void>.delayed(Duration.zero);
+      expect(f.writes, 1);
+      work.activeWorkspace = _lf16Store('lf20-b');
+      if (aba) work.activeWorkspace = _lf16Store('lf20-a');
+      f.writeGate!.complete();
+      expect(await pending, isFalse);
+      expect(work.workspaceTradingPreferencesSaved, isFalse);
+      if (!aba) expect(work.workspaceOpeningTime, '8:00 AM');
+      expect(f.rows.containsKey(f.key('lf20-b')), isFalse);
+      expect(work.workspaceInvoices, isEmpty);
+    });
+  }
+
   testWidgets('LF16 secure writes remain ordered after a caller timeout', (tester) async {
     const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
     final gate = Completer<void>();
@@ -47,6 +285,31 @@ void main() {
     await second;
     expect(await read, {'value': 'new'});
     expect(writes, 2);
+  });
+
+  test('LF20 actual encrypted preference key restores and leaves other purposes intact', () async {
+    FlutterSecureStorage.setMockInitialValues({}); // Host platform plugin only.
+    final pickup = _Lf16SecurePrefsStore('lf20-encrypted');
+    final defaults = _Lf18SecureDefaultsStore('lf20-encrypted');
+    await pickup.save('lf16-host', {'hostMarker': 'pickup'});
+    await defaults.save('lf16-host', {'hostMarker': 'defaults'});
+    WorkSession create() => WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _Lf16SecurePrefsStore('host-contact'),
+      tradingPreferencesStoreFactory: (id) => _Lf20SecureTradingStore(id))
+        ..activeWorkspace = _lf16Store('lf20-encrypted');
+    final first = create();
+    expect(await first.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-encrypted'), isTrue);
+    expect(_lf20Save(first), isTrue);
+    expect(await first.workspaceTradingPreferencesWrite, isTrue);
+    first.dispose();
+    final restored = create();
+    addTearDown(restored.dispose);
+    expect(await restored.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-encrypted'), isTrue);
+    expect(restored.workspaceOpeningTime, '21:30');
+    expect(restored.workspaceMaximumActiveOrders, 0);
+    expect(restored.workspaceOrderAlertSound, isFalse);
+    expect(await pickup.read('lf16-host'), {'hostMarker': 'pickup'});
+    expect(await defaults.read('lf16-host'), {'hostMarker': 'defaults'});
   });
 
   test('LF16 actual pickup save recovers in a new session', () async {
@@ -1374,6 +1637,28 @@ class _Lf18ContactStore implements WorkPendingProofStore {
   @override
   Future<void> clear(String scope) async => throw StateError('Host contact must not clear');
 }
+
+class _Lf20Storage extends _Lf16Storage {
+  @override
+  Map<String, Object?> valid() => {'schemaVersion': 1, 'storeId': 'lf20-a',
+    'fields': <String, Object?>{'openingTime': '21:30', 'closingTime': '05:15',
+      'maximumActiveOrders': 0, 'alertSound': false, 'alertVibration': false}};
+  @override
+  WorkSession work() => WorkSession(gateway: ReviewWorkGateway(),
+    contactDraftStore: _Lf16MemoryStore(this, 'contact'),
+    tradingPreferencesStoreFactory: (id) => _Lf16MemoryStore(this, id))
+      ..activeWorkspace = _lf16Store('lf20-a');
+}
+
+class _Lf20SecureTradingStore extends SecureWorkPendingProofStore {
+  _Lf20SecureTradingStore(super.storeId) : super.tradingPreferences();
+  @override
+  String get accountScope => 'lf16-host';
+}
+
+bool _lf20Save(WorkSession work, {String opening = '21:30'}) =>
+    work.saveWorkspaceTradingControls(openingTime: opening, closingTime: '05:15',
+      maximumActiveOrders: 0, alertSound: false, alertVibration: false);
 
 WorkspaceStorePublicationDetails _lf18Details() => const WorkspaceStorePublicationDetails(
   legalName: 'Host default business', street: 'Host default lane', city: 'Pune',

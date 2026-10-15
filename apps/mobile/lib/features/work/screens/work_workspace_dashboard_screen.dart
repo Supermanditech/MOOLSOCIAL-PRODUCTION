@@ -731,6 +731,7 @@ class _WorkWorkspaceDashboardScreenState
   bool _draftOrderAlertVibration = true;
   String? _settingsStoreId;
   int? _settingsScopeRevision;
+  bool _settingsOpening = false, _settingsSaving = false;
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
   _WorkspaceFinanceFocus? _focusedFinance;
@@ -1155,7 +1156,8 @@ class _WorkWorkspaceDashboardScreenState
     final bottomAction = switch (_view) {
       _WorkspaceControlView.status => WorkPrimaryButton(
         keyName: 'work-status-save',
-        label: 'Apply settings',
+        label: _settingsSaving ? 'Saving…' : 'Apply settings',
+        busy: _settingsSaving,
         icon: Icons.check_circle_outline_rounded,
         onPressed: _saveAvailability,
       ),
@@ -1816,7 +1818,9 @@ class _WorkWorkspaceDashboardScreenState
                   _openSearchRecord(record, workspace.id, openScopedRoute),
             ),
           ),
-          _WorkspaceControlView.status => Form(
+          _WorkspaceControlView.status => AbsorbPointer(
+            absorbing: _settingsSaving,
+            child: Form(
             key: _settingsForm,
             child: _WorkspaceStatusSurface(
               scrollController: _settingsScroll,
@@ -1869,6 +1873,7 @@ class _WorkWorkspaceDashboardScreenState
               onPaymentControls: () =>
                   _showOperation(_WorkspaceOperation.payments),
             ),
+          ),
           ),
           _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
             session: session,
@@ -2322,7 +2327,27 @@ class _WorkWorkspaceDashboardScreenState
     }
   }
 
-  void _showStatus() {
+  Future<void> _showStatus() async {
+    if (_settingsOpening || _settingsSaving) return;
+    final owner = session, scope = session.tradingPreferencesContext;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final originView = _view, originOperation = _operation;
+    if (session.tradingPreferencesPersistenceAvailable) {
+      _settingsOpening = true;
+      const opening = 'Opening saved Store hours and alerts…';
+      session.showNotice(opening);
+      bool loaded;
+      try {
+        loaded = storeId != null && await session.loadWorkspaceTradingPreferences(expectedStoreId: storeId);
+      } finally { _settingsOpening = false; }
+      if (!mounted || !identical(owner, session) || scope != session.tradingPreferencesContext ||
+          _view != originView || _operation != originOperation) { return; }
+      if (!loaded) {
+        session.showError(session.workspaceTradingPreferencesError ?? 'Saved Store hours and alerts could not be opened. Try again.');
+        return;
+      }
+      if (session.noticeMessage == opening) { session.clearMessages(); }
+    }
     _searchFocus.unfocus();
     setState(() {
       _settingsStoreId = session.activeWorkspace?.id ?? session.workspaceId;
@@ -3203,7 +3228,9 @@ class _WorkWorkspaceDashboardScreenState
     }
   }
 
-  void _saveAvailability() {
+  Future<void> _saveAvailability() async {
+    if (_settingsSaving || session.workspaceTradingPreferencesSaving) return;
+    final owner = session, scope = session.tradingPreferencesContext;
     if (_settingsStoreId != (session.activeWorkspace?.id ?? session.workspaceId) ||
         _settingsScopeRevision != session.navigationScopeRevision) {
       session.showError('Your Store changed. Reopen these settings in the correct Store. Your entries are kept.');
@@ -3222,12 +3249,18 @@ class _WorkWorkspaceDashboardScreenState
     }
     final availabilityChanged = _availabilityDirty;
     final tradingControlsChanged = _tradingControlsDirty;
-    if (_draftVisibleToCustomers != session.workspaceVisibleToCustomers &&
-        !session.setWorkspaceVisibility(_draftVisibleToCustomers)) {
+    final durableTrading = session.tradingPreferencesPersistenceAvailable;
+    // Refuse invalid publication before any preference is applied. For the
+    // durable path, leave other settings untouched if the device write fails.
+    if (durableTrading && _draftVisibleToCustomers &&
+        !session.workspaceVisibleToCustomers && !session.workspacePublicationReport.ready) {
+      session.setWorkspaceVisibility(true); // Existing truthful refusal copy.
       return;
     }
-    if (availabilityChanged) {
-      final saved = session.saveWorkspaceAvailability(
+    bool applyOtherPreferences() {
+      if (_draftVisibleToCustomers != session.workspaceVisibleToCustomers &&
+          !session.setWorkspaceVisibility(_draftVisibleToCustomers)) { return false; }
+      return !availabilityChanged || session.saveWorkspaceAvailability(
         acceptingOrders: _draftAcceptingOrders,
         fulfilmentMode: _draftFulfilmentMode,
         busyMinutes: _draftBusyMinutes,
@@ -3235,9 +3268,10 @@ class _WorkWorkspaceDashboardScreenState
         expectedStoreId: _settingsStoreId,
         expectedNavigationRevision: _settingsScopeRevision,
       );
-      if (!saved) return;
     }
-    if (tradingControlsChanged) {
+    if (!durableTrading && !applyOtherPreferences()) return;
+    if (tradingControlsChanged || session.tradingPreferencesPersistenceAvailable &&
+        (!session.workspaceTradingPreferencesSaved || session.workspaceTradingPreferencesError != null)) {
       final saved = session.saveWorkspaceTradingControls(
         openingTime: _draftOpeningTime,
         closingTime: _draftClosingTime,
@@ -3248,7 +3282,21 @@ class _WorkWorkspaceDashboardScreenState
         expectedNavigationRevision: _settingsScopeRevision,
       );
       if (!saved) return;
+      if (session.tradingPreferencesPersistenceAvailable) {
+        setState(() => _settingsSaving = true);
+        final confirmed = await session.workspaceTradingPreferencesWrite;
+        if (!mounted) return;
+        setState(() => _settingsSaving = false);
+        if (!identical(owner, session) || scope != session.tradingPreferencesContext ||
+            _view != _WorkspaceControlView.status) { return; }
+        if (!confirmed || !session.workspaceTradingPreferencesSaved) {
+          session.showError(session.workspaceTradingPreferencesError ?? 'Device save could not be confirmed. Your entries are kept. Try again.');
+          return;
+        }
+        session.showNotice('Store hours and alerts saved on this device. Public sync is pending.');
+      }
     }
+    if (durableTrading && !applyOtherPreferences()) return;
     setState(() => _view = _WorkspaceControlView.dashboard);
   }
 
@@ -42054,6 +42102,11 @@ class _WorkspaceStatusSurface extends StatelessWidget {
         ? WorkspaceStoreState.off
         : WorkspaceStoreState.paused;
     final publicationReport = session.workspacePublicationReport;
+    final tradingChanged = openingTime != session.workspaceOpeningTime ||
+        closingTime != session.workspaceClosingTime ||
+        maximumActiveOrders != session.workspaceMaximumActiveOrders ||
+        alertSound != session.workspaceOrderAlertSound ||
+        alertVibration != session.workspaceOrderAlertVibration;
     return StoreSettingsStyle(
       child: ListView(
         key: const Key('work-dashboard-status-screen'),
@@ -42132,6 +42185,15 @@ class _WorkspaceStatusSurface extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 12),
+          if (session.tradingPreferencesPersistenceAvailable)
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(
+              session.workspaceTradingPreferencesError ??
+              (session.workspaceTradingPreferencesSaving ? 'Saving hours and alerts on this device…' :
+               tradingChanged ? 'Unsaved hours or alert changes.' :
+               session.workspaceTradingPreferencesSaved ? 'Hours and alerts saved on this device. Public sync is pending.' :
+               'Apply settings to keep hours and alerts on this device. Public sync is pending.'),
+              key: const Key('work-status-trading-device-status'),
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12))),
           Material(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),

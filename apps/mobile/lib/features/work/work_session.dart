@@ -478,6 +478,8 @@ class _StoreOperationalData {
   String? pickupPreferencesOwner;
   final Map<String, _OwnerInputRecovery> publicationPreferences = {};
   String? publicationPreferencesOwner;
+  final Map<String, _OwnerInputRecovery> tradingPreferences = {};
+  String? tradingPreferencesOwner;
   bool inventoryLoaded = false;
   int? inventoryRevision;
   int? inventoryReceiptCheckpointRevision;
@@ -592,6 +594,7 @@ class WorkSession extends ChangeNotifier {
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
+    this.tradingPreferencesStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -640,6 +643,7 @@ class WorkSession extends ChangeNotifier {
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
+    this.tradingPreferencesStoreFactory,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -658,6 +662,7 @@ class WorkSession extends ChangeNotifier {
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
   final WorkPendingProofStore Function(String storeId)? pickupPreferencesStoreFactory;
   final WorkPendingProofStore Function(String storeId)? publicationPreferencesStoreFactory;
+  final WorkPendingProofStore Function(String storeId)? tradingPreferencesStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
 
@@ -3733,6 +3738,14 @@ class WorkSession extends ChangeNotifier {
       }
     }
     _activeWorkspace = value;
+    if (value != null && previousId != value.id &&
+        value.profileId?.startsWith('retailer-') == true && tradingPreferencesPersistenceAvailable) {
+      scheduleMicrotask(() {
+        if (!_disposed && activeWorkspace?.id == value.id) {
+          unawaited(loadWorkspaceTradingPreferences(expectedStoreId: value.id));
+        }
+      });
+    }
     if (value != null && previousId != value.id &&
         value.profileId?.startsWith('retailer-') == true && publicationPreferencesPersistenceAvailable) {
       scheduleMicrotask(() {
@@ -8157,8 +8170,19 @@ class WorkSession extends ChangeNotifier {
 
   WorkspaceProductDefaults get workspaceProductDefaults =>
       _storeData.productDefaults;
-  WorkspaceStorePublicationDetails get workspacePublicationDetails =>
-      _storeData.publicationDetails;
+  WorkspaceStorePublicationDetails get workspacePublicationDetails {
+    final details = _storeData.publicationDetails;
+    // The separate private trading record owns these two existing inputs.
+    // Late publication-default recovery must not replace their current values.
+    if (tradingPreferencesPersistenceAvailable && _tradingRecovery.saved &&
+        _storeData.tradingPreferencesOwner == _contactAccountScope) {
+      return WorkspaceStorePublicationDetails.fromJson({
+        ...details.toJson(), 'openingTime': workspaceOpeningTime,
+        'closingTime': workspaceClosingTime,
+      });
+    }
+    return details;
+  }
 
   /// Store-owned projection for publication adapters. This getter is not a live
   /// catalogue registration or an acknowledgement that the Store is public.
@@ -9774,6 +9798,13 @@ class WorkSession extends ChangeNotifier {
     int? expectedNavigationRevision,
   }) {
     if (!_settingsScopeCurrent(expectedStoreId, expectedNavigationRevision)) return false;
+    if (tradingPreferencesPersistenceAvailable &&
+        (!_tradingRecovery.loaded || workspaceTradingPreferencesSaving)) {
+      showError(workspaceTradingPreferencesSaving
+          ? 'Wait for the device save to finish. Your entries are kept.'
+          : 'Open your saved Store hours and alerts before saving. Your entries are kept.');
+      return false;
+    }
     // 0 means explicitly unlimited; positive values are retailer-entered limits.
     // This is a planning preference, not admission control for incoming orders.
     if (maximumActiveOrders < 0) {
@@ -9797,8 +9828,136 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderAlertVibration = alertVibration;
     _recordWorkspaceActivity('Store hours and order alerts updated.');
     _persistOperationalState('trading-controls');
+    if (tradingPreferencesPersistenceAvailable) _saveTradingPreferences();
     notifyListeners();
     return true;
+  }
+
+  bool get tradingPreferencesPersistenceAvailable => _contactAccountScope != null &&
+      (tradingPreferencesStoreFactory != null || contactDraftStore is SecureWorkPendingProofStore);
+  _OwnerInputRecovery get _tradingRecovery => _storeData.tradingPreferences
+      .putIfAbsent(_contactAccountScope ?? '', _OwnerInputRecovery.new);
+  Object get tradingPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
+  bool get workspaceTradingPreferencesSaving => _tradingRecovery.pendingWrites > 0;
+  bool get workspaceTradingPreferencesSaved => _tradingRecovery.saved;
+  String? get workspaceTradingPreferencesError => _tradingRecovery.error;
+  Future<bool> get workspaceTradingPreferencesWrite => _tradingRecovery.writes;
+  WorkPendingProofStore? _tradingPreferencesStore(String id) {
+    if (tradingPreferencesStoreFactory != null) return tradingPreferencesStoreFactory!(id);
+    final contact = contactDraftStore;
+    return contact is SecureWorkPendingProofStore
+        ? SecureWorkPendingProofStore.tradingPreferences(id, reviewOnly: contact.reviewOnly) : null;
+  }
+  Map<String, Object?> _tradingFields() => {
+    'openingTime': workspaceOpeningTime, 'closingTime': workspaceClosingTime,
+    'maximumActiveOrders': workspaceMaximumActiveOrders,
+    'alertSound': workspaceOrderAlertSound, 'alertVibration': workspaceOrderAlertVibration,
+  };
+  void _restoreTradingInputs(Map<String, Object?> fields) {
+    workspaceOpeningTime = fields['openingTime'] as String;
+    workspaceClosingTime = fields['closingTime'] as String;
+    workspaceMaximumActiveOrders = fields['maximumActiveOrders'] as int;
+    workspaceOrderAlertSound = fields['alertSound'] as bool;
+    workspaceOrderAlertVibration = fields['alertVibration'] as bool;
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
+      ...workspacePublicationDetails.toJson(),
+      'openingTime': workspaceOpeningTime, 'closingTime': workspaceClosingTime,
+    });
+  }
+  Future<bool> loadWorkspaceTradingPreferences({required String expectedStoreId}) {
+    if (_disposed || activeWorkspace?.id != expectedStoreId) return Future.value(false);
+    if (!tradingPreferencesPersistenceAvailable) return Future.value(true);
+    final recovery = _tradingRecovery, owner = _contactAccountScope!;
+    if (_storeData.tradingPreferencesOwner case final previous? when previous != owner) {
+      _storeData.tradingPreferences[previous]?.sessionFields = _tradingFields();
+      _restoreTradingInputs(recovery.sessionFields ?? {
+        'openingTime': '8:00 AM', 'closingTime': '10:00 PM',
+        'maximumActiveOrders': 8, 'alertSound': true, 'alertVibration': true,
+      });
+    }
+    _storeData.tradingPreferencesOwner = owner;
+    if (recovery.loaded) return Future.value(true);
+    return recovery.loading ??= _readTradingPreferences(expectedStoreId, recovery)
+        .whenComplete(() { recovery.loading = null; });
+  }
+  Future<bool> _readTradingPreferences(String id, _OwnerInputRecovery recovery) async {
+    final data = _storeData, account = _contactAccountScope;
+    final revision = navigationScopeRevision, before = _tradingFields();
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && account != null &&
+        navigationScopeRevision == revision && _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    if (!current()) return false;
+    addListener(watch);
+    try {
+      await recovery.writes;
+      final store = _tradingPreferencesStore(id);
+      if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+      final saved = await store.read(account!).timeout(const Duration(seconds: 12));
+      if (!current()) return false;
+      if (saved != null) {
+        final fields = saved['fields'];
+        const keys = {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound', 'alertVibration'};
+        if (saved['schemaVersion'] != 1 || saved['storeId'] != id || saved.length != 3 ||
+            fields is! Map || fields.length != keys.length || fields.keys.any((k) => !keys.contains(k)) ||
+            fields['openingTime'] is! String || fields['closingTime'] is! String ||
+            !WorkspaceStorePublicationDetails.validTradingTime(fields['openingTime'] as String) ||
+            !WorkspaceStorePublicationDetails.validTradingTime(fields['closingTime'] as String) ||
+            fields['maximumActiveOrders'] is! int || (fields['maximumActiveOrders'] as int) < 0 ||
+            fields['alertSound'] is! bool || fields['alertVibration'] is! bool) {
+          throw const FormatException('Invalid Store hours and alerts');
+        }
+        if (mapEquals(before, _tradingFields())) {
+          _restoreTradingInputs(Map<String, Object?>.from(fields));
+          recovery.saved = true;
+        }
+      }
+      recovery.loaded = true;
+      recovery.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (current()) {
+        recovery.error = 'Saved Store hours and alerts could not be opened. Your current entries are kept. Try again.';
+        notifyListeners();
+      }
+      return false;
+    } finally { removeListener(watch); }
+  }
+  void _saveTradingPreferences() {
+    final id = activeWorkspace?.id, account = _contactAccountScope;
+    if (id == null || account == null || !_tradingRecovery.loaded) return;
+    final data = _storeData, revision = navigationScopeRevision;
+    final recovery = _tradingRecovery, fields = _tradingFields();
+    recovery.saved = false;
+    recovery.pendingWrites++;
+    recovery.error = null;
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && navigationScopeRevision == revision &&
+        _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    addListener(watch);
+    recovery.writes = recovery.writes.then((_) async {
+      try {
+        if (!current()) return false;
+        final store = _tradingPreferencesStore(id);
+        if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+        await store.save(account, {'schemaVersion': 1, 'storeId': id, 'fields': fields})
+            .timeout(const Duration(seconds: 12));
+        if (!current()) return false;
+        if (mapEquals(fields, _tradingFields())) { recovery.saved = true; recovery.error = null; }
+        return true;
+      } catch (_) {
+        if (current() && mapEquals(fields, _tradingFields())) {
+          recovery.error = 'Device save could not be confirmed. Your entries are kept. Try again.';
+        }
+        return false;
+      } finally {
+        removeListener(watch);
+        recovery.pendingWrites--;
+        if (current()) notifyListeners();
+      }
+    });
   }
 
   void dismissWorkspaceAlert(String alertId) {

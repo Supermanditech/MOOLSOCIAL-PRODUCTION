@@ -46344,11 +46344,11 @@ void main() {
         expect(
           work.workspaceActivity.first.message,
           change == 'visibility'
-              ? 'Store removed from customer discovery.'
+              ? 'Private Store visibility preference requested.'
               : 'Store hours and order alerts updated.',
         );
         if (change == 'both') {
-          expect(work.workspaceActivity[1].message, contains('paused'));
+          expect(work.workspaceActivity[1].message, 'Store pause preference saved until In 1 hour.');
           expect(work.workspaceStoreState, WorkspaceStoreState.paused);
         } else {
           expect(work.workspaceStoreState, WorkspaceStoreState.open);
@@ -46408,6 +46408,79 @@ void main() {
       expect(work.workspaceCatalogueItems, orderedEquals(products));
       expect(work.workspaceOrders, orderedEquals(orders));
       expect(work.workspaceInvoices, orderedEquals(invoices));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF20 trading editor retains failed save and waits for confirmation $scale', (tester) async {
+      final storage = _Lf20TradingFixtureStore();
+      final work = WorkSession(gateway: ReviewWorkGateway(),
+        contactDraftStore: _ContactDraftFixtureStore(),
+        tradingPreferencesStoreFactory: (_) => storage)
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live
+        ..workspaceStoreState = WorkspaceStoreState.open
+        ..workspaceAcceptingOrders = true..workspaceVisibleToCustomers = true;
+      final storeId = work.activeWorkspace!.id;
+      storage.value = {'schemaVersion': 1, 'storeId': storeId, 'fields': {
+        'openingTime': '21:30', 'closingTime': '05:15',
+        'maximumActiveOrders': 0, 'alertSound': false, 'alertVibration': false,
+      }}; // Isolated host owner input, not runtime commerce.
+      await work.loadWorkspaceTradingPreferences(expectedStoreId: storeId);
+      final products = List.of(work.workspaceCatalogueItems);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 800), textScale: scale);
+      await openStoreSettings(tester);
+      expect(find.byKey(const Key('work-dashboard-status-screen')), findsOneWidget);
+      await tester.tap(find.descendant(of: find.byKey(const Key('work-status-store-state')),
+        matching: find.text('Paused')));
+      await tester.pumpAndSettle();
+      final visibility = find.byKey(const Key('work-status-visibility'));
+      await reveal(tester, visibility);
+      await tester.tap(visibility.hitTestable());
+      final unlimited = find.byKey(const Key('work-status-orders-unlimited'));
+      await reveal(tester, unlimited);
+      expect(tester.widget<FilterChip>(unlimited).selected, isTrue);
+      final sound = find.byKey(const Key('work-status-alert-sound'));
+      await reveal(tester, sound);
+      expect(tester.widget<SwitchListTile>(sound).value, isFalse);
+      await tester.tap(sound.hitTestable());
+      await tester.pumpAndSettle();
+      final save = find.byKey(const Key('work-status-save'));
+      storage.saveGate = Completer<void>();
+      storage.failSave = true;
+      await tester.tap(save.hitTestable());
+      await tester.pump();
+      expect(work.workspaceTradingPreferencesSaving, isTrue);
+      expect(work.workspaceTradingPreferencesSaved, isFalse);
+      expect(find.byKey(const Key('work-dashboard-status-screen')), findsOneWidget);
+      expect(find.text('Saving…'), findsOneWidget);
+      storage.saveGate!.complete();
+      await tester.pumpAndSettle();
+      expect(work.workspaceTradingPreferencesError, isNotNull);
+      expect(find.byKey(const Key('work-dashboard-status-screen')), findsOneWidget);
+      expect(work.workspaceAcceptingOrders, isTrue,
+        reason: 'Failed private save must not silently apply the requested pause.');
+      expect(work.workspaceVisibleToCustomers, isTrue);
+      await reveal(tester, sound);
+      expect(tester.widget<SwitchListTile>(sound).value, isTrue);
+      expect((storage.value!['fields'] as Map)['alertSound'], isFalse);
+      storage.failSave = false;
+      storage.saveGate = null;
+      await tester.tap(save.hitTestable());
+      await tester.pumpAndSettle();
+      expect(work.workspaceTradingPreferencesSaved, isTrue);
+      expect(work.workspaceAcceptingOrders, isFalse);
+      expect(work.workspaceVisibleToCustomers, isFalse);
+      expect((storage.value!['fields'] as Map)['alertSound'], isTrue);
+      expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+      await openStoreSettings(tester);
+      await reveal(tester, sound);
+      expect(tester.widget<SwitchListTile>(sound).value, isTrue);
+      expect(work.workspaceOpeningTime, '21:30');
+      expect(work.workspaceClosingTime, '05:15');
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
+      expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
     });
   }
@@ -77293,6 +77366,15 @@ class _Lf16PickupFixtureStore extends _ContactDraftFixtureStore {
   @override
   Future<void> save(String scope, Map<String, Object?> draft) async {
     if (failSave) throw StateError('Host save error');
+    await super.save(scope, draft);
+  }
+}
+
+class _Lf20TradingFixtureStore extends _Lf16PickupFixtureStore {
+  Completer<void>? saveGate;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {
+    await saveGate?.future;
     await super.save(scope, draft);
   }
 }
