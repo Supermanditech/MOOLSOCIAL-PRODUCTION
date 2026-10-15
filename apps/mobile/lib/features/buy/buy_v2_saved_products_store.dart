@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,6 +130,84 @@ class BuyV2ProductReviewDraft {
       rating >= 0 && rating <= 5 && comment.characters.length <= 8000;
 }
 
+/// Private duplicate-prevention metadata, never proof of payment or authority
+/// to replay a request. Restored records always require provider reconciliation.
+@immutable
+class BuyV2BalancePaymentHold {
+  const BuyV2BalancePaymentHold({
+    required this.ownerScope,
+    required this.accountId,
+    required this.orderId,
+    required this.orderIdentity,
+    required this.idempotencyKey,
+    required this.amountDue,
+    this.paymentReference,
+  });
+
+  final String ownerScope, orderId, orderIdentity, idempotencyKey;
+  final String? accountId, paymentReference;
+  final int amountDue;
+  String get storageKey => jsonEncode([ownerScope, accountId, orderId]);
+  bool get valid =>
+      [ownerScope, orderId, idempotencyKey].every(
+        (v) => v.trim().isNotEmpty && v == v.trim() && v.length <= 1024,
+      ) &&
+      (accountId == null || (accountId!.trim().isNotEmpty &&
+          accountId == accountId!.trim() && accountId!.length <= 1024)) &&
+      RegExp(r'^[a-f0-9]{64}$').hasMatch(orderIdentity) &&
+      amountDue > 0 && amountDue <= 9007199254740991 &&
+      (paymentReference == null || (paymentReference!.trim().isNotEmpty &&
+          paymentReference == paymentReference!.trim() &&
+          paymentReference!.length <= 1024));
+
+  static String identityOf(BuyV2Order order) => sha256.convert(utf8.encode(
+    jsonEncode([
+      order.id, order.purchaseId, order.destination.name, order.total,
+      order.totalMinor, order.partner, order.productIds,
+      for (final line in order.lines)
+        [line.product.id, line.product.storeId, line.product.canonicalId,
+          line.product.variant, line.product.pack, line.quantity],
+    ]),
+  )).toString();
+
+  BuyV2BalancePaymentHold withReference(String reference) =>
+      BuyV2BalancePaymentHold(ownerScope: ownerScope, accountId: accountId,
+        orderId: orderId, orderIdentity: orderIdentity,
+        idempotencyKey: idempotencyKey, amountDue: amountDue,
+        paymentReference: reference);
+
+  Map<String, Object?> toJson() => {
+    'ownerScope': ownerScope, 'accountId': accountId, 'orderId': orderId,
+    'orderIdentity': orderIdentity, 'idempotencyKey': idempotencyKey,
+    'amountDue': amountDue, 'currency': 'INR',
+    'paymentReference': paymentReference,
+  };
+
+  static BuyV2BalancePaymentHold fromJson(Object? raw) {
+    const keys = {'ownerScope', 'accountId', 'orderId', 'orderIdentity',
+      'idempotencyKey', 'amountDue', 'currency', 'paymentReference'};
+    if (raw is! Map || raw.length != keys.length ||
+        raw.keys.any((k) => !keys.contains(k)) || raw['currency'] != 'INR' ||
+        raw['ownerScope'] is! String || raw['orderId'] is! String ||
+        raw['orderIdentity'] is! String || raw['idempotencyKey'] is! String ||
+        raw['amountDue'] is! int ||
+        (raw['accountId'] != null && raw['accountId'] is! String) ||
+        (raw['paymentReference'] != null && raw['paymentReference'] is! String)) {
+      throw const FormatException('Balance payment recovery needs checking.');
+    }
+    final hold = BuyV2BalancePaymentHold(ownerScope: raw['ownerScope'] as String,
+      accountId: raw['accountId'] as String?, orderId: raw['orderId'] as String,
+      orderIdentity: raw['orderIdentity'] as String,
+      idempotencyKey: raw['idempotencyKey'] as String,
+      amountDue: raw['amountDue'] as int,
+      paymentReference: raw['paymentReference'] as String?);
+    if (!hold.valid) {
+      throw const FormatException('Balance payment recovery needs checking.');
+    }
+    return hold;
+  }
+}
+
 @immutable
 class BuyV2CustomerStateSnapshot {
   const BuyV2CustomerStateSnapshot({
@@ -159,6 +238,7 @@ class BuyV2CustomerStateSnapshot {
     this.retainedLegacyCheckoutAttempts = const [],
     this.retainedCheckoutPaymentAttempts = const [],
     this.paymentRecoveryIncomplete = false,
+    this.balancePaymentHolds = const [],
     this.paymentReference,
     this.paymentActionUri,
     this.bankTransferInstructions,
@@ -208,6 +288,7 @@ class BuyV2CustomerStateSnapshot {
   final List<BuyV2LegacyCheckoutAttempt> retainedLegacyCheckoutAttempts;
   final List<BuyV2CheckoutPaymentAttempt> retainedCheckoutPaymentAttempts;
   final bool paymentRecoveryIncomplete;
+  final List<BuyV2BalancePaymentHold> balancePaymentHolds;
   final String? paymentReference;
   final Uri? paymentActionUri;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
@@ -258,24 +339,37 @@ final class BuyV2SharedPreferencesCustomerStateStore
   Future<BuyV2CustomerStateSnapshot?> read() async {
     try {
       final source = await _preferences.getString(_key);
-      if (source == null || source.trim().isEmpty) return null;
+      if (source == null) return null;
+      if (source.trim().isEmpty) {
+        throw const FormatException('Saved customer state is unreadable.');
+      }
       final decoded = jsonDecode(source);
-      if (decoded is! Map<String, Object?>) return null;
+      if (decoded is! Map<String, Object?>) {
+        throw const FormatException('Saved customer state is unreadable.');
+      }
       if (decoded.containsKey('procurementDraft') &&
           _decodeProcurementDraft(decoded['procurementDraft']) == null &&
           decoded['checkoutIdempotencyKey'] == null &&
           !decoded.containsKey('legacyCheckoutAttempt') &&
-          !decoded.containsKey('checkoutPaymentAttempt')) {
+          !decoded.containsKey('checkoutPaymentAttempt') &&
+          !decoded.containsKey('balancePaymentHolds')) {
         return null;
       }
       return _decodeSnapshot(decoded);
     } on Object {
-      return null;
+      // An unreadable retained payment hold is not proof of no earlier attempt.
+      rethrow;
     }
   }
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    if (snapshot.balancePaymentHolds.any(
+      (h) => !h.valid || h.ownerScope != ownerScope,
+    ) || snapshot.balancePaymentHolds.map((h) => h.storageKey).toSet().length !=
+        snapshot.balancePaymentHolds.length) {
+      return false;
+    }
     if (snapshot.legacyCheckoutAttempt?.ownerScope != null &&
             snapshot.legacyCheckoutAttempt!.ownerScope != ownerScope ||
         snapshot.retainedLegacyCheckoutAttempts.any(
@@ -354,6 +448,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
         _encodePaymentAttempt(attempt),
     ],
     'paymentRecoveryIncomplete': snapshot.paymentRecoveryIncomplete,
+    'balancePaymentHolds': {
+      'version': 1,
+      'records': [for (final hold in snapshot.balancePaymentHolds) hold.toJson()],
+    },
     'paymentReference': snapshot.paymentReference,
     'paymentActionUri': snapshot.paymentActionUri?.toString(),
     if (snapshot.bankTransferInstructions case final bank?)
@@ -388,6 +486,22 @@ final class BuyV2SharedPreferencesCustomerStateStore
       if (draft.valid) drafts[key] = draft;
     }
     return Map.unmodifiable(drafts);
+  }
+
+  List<BuyV2BalancePaymentHold> _decodeBalanceHolds(Map<String, Object?> source) {
+    if (!source.containsKey('balancePaymentHolds')) return const [];
+    final raw = source['balancePaymentHolds'];
+    if (raw is! Map || raw.length != 2 || raw['version'] is! int ||
+        raw['version'] != 1 || raw['records'] is! List) {
+      throw const FormatException('Balance payment recovery needs checking.');
+    }
+    final result = (raw['records'] as List)
+        .map(BuyV2BalancePaymentHold.fromJson).toList(growable: false);
+    if (result.any((h) => h.ownerScope != ownerScope) ||
+        result.map((h) => h.storageKey).toSet().length != result.length) {
+      throw const FormatException('Balance payment recovery needs checking.');
+    }
+    return List.unmodifiable(result);
   }
 
   BuyV2CustomerStateSnapshot _decodeSnapshot(
@@ -450,6 +564,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
             .whereType<BuyV2CheckoutPaymentAttempt>()
             .toList(growable: false),
     paymentRecoveryIncomplete: _paymentRecoveryIncomplete(source),
+    balancePaymentHolds: _decodeBalanceHolds(source),
     paymentReference: _string(source['paymentReference']),
     paymentActionUri: _uri(source['paymentActionUri']),
     bankTransferInstructions: _decodeTransfer(

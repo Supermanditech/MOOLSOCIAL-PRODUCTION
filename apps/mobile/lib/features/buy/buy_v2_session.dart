@@ -6231,7 +6231,10 @@ class BuyV2Session extends ChangeNotifier {
   bool shoppingAlertsBusy = false;
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Map<String, Object> _balancePaymentOperations = {};
-  final Map<String, ({String key, int amount})> _balancePaymentRequests = {};
+  final Map<String, ({String key, int amount, bool dispatched})>
+      _balancePaymentRequests = {};
+  final Map<String, BuyV2BalancePaymentHold> _balancePaymentHolds = {};
+  String? _balanceHoldsLoadedOwner;
   (String?, String?, String?, int, int)? _balancePaymentScope;
   int _balancePaymentAttemptSequence = 0;
   final Map<String, BuyV2DeliveryExceptionSnapshot>
@@ -6879,6 +6882,39 @@ class BuyV2Session extends ChangeNotifier {
     _balancePaymentRequests.clear();
   }
 
+  BuyV2BalancePaymentHold? _balanceHoldFor(String orderId) =>
+      _balancePaymentHolds[jsonEncode([
+        customerStateStore?.ownerScope,
+        collectionIdentity?.value?.accountId,
+        orderId,
+      ])];
+
+  bool _balanceHoldMatches(BuyV2Order order) {
+    final hold = _balanceHoldFor(order.id);
+    return hold == null ||
+        hold.orderIdentity == BuyV2BalancePaymentHold.identityOf(order);
+  }
+
+  bool _balanceKnownUnsent(String orderId) {
+    final request = _balancePaymentRequests[orderId];
+    final hold = _balanceHoldFor(orderId);
+    return request?.dispatched == false && hold != null &&
+        hold.paymentReference == null && request!.key == hold.idempotencyKey;
+  }
+
+  Future<bool> _balanceRecoveryReady() async {
+    final scope = _currentCustomerOrderScope;
+    final owner = customerStateStore?.ownerScope;
+    if (_collectionDisposed || !procurementScopeCurrent || owner == null) {
+      return false;
+    }
+    await restoreCustomerState(restoreBrowsing: false);
+    return !_collectionDisposed && procurementScopeCurrent &&
+        scope == _currentCustomerOrderScope &&
+        _customerStateOwnerScope == owner &&
+        _balanceHoldsLoadedOwner == owner && !customerStateRecoveryPending;
+  }
+
   bool balancePaymentBusy(String orderId) {
     if (_collectionDisposed || !procurementScopeCurrent) return false;
     _syncBalancePaymentScope();
@@ -6888,6 +6924,27 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2BalancePaymentResult? balancePaymentFor(String orderId) {
     if (_collectionDisposed || !procurementScopeCurrent) return null;
     _syncBalancePaymentScope();
+    final hold = _balanceHoldFor(orderId);
+    if (hold != null) {
+      final order = _orders.where((o) => o.id == orderId).firstOrNull;
+      if (order == null || !_balanceHoldMatches(order)) return null;
+      final knownUnsent = _balanceKnownUnsent(orderId);
+      _balancePaymentRequests.putIfAbsent(orderId, () =>
+          (key: hold.idempotencyKey, amount: hold.amountDue, dispatched: true));
+      if (!knownUnsent) {
+        _balancePaymentResults.putIfAbsent(
+          orderId,
+          () => BuyV2BalancePaymentResult(
+            state: BuyV2BalancePaymentState.unknown,
+            amountDue: hold.amountDue,
+            dueLabel: order.balanceDueLabel ?? 'Needs checking',
+            customerMessage:
+                'The original balance payment needs checking. Do not pay again. Get order help.',
+            paymentReference: hold.paymentReference,
+          ),
+        );
+      }
+    }
     return _balancePaymentResults[orderId];
   }
 
@@ -6967,6 +7024,7 @@ class BuyV2Session extends ChangeNotifier {
   void _holdUnknownBalanceStart(
     String orderId,
     BuyV2BalancePaymentResult previous,
+    {String? reference}
   ) {
     _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
       state: BuyV2BalancePaymentState.unknown,
@@ -6974,23 +7032,26 @@ class BuyV2Session extends ChangeNotifier {
       dueLabel: previous.dueLabel,
       customerMessage:
           'The original balance payment needs checking. Do not pay again. Get order help.',
+      paymentReference: reference ?? previous.paymentReference ??
+          _balanceHoldFor(orderId)?.paymentReference,
     );
   }
 
   Future<bool> restoreBalancePayment(String orderId) async {
+    if (!await _balanceRecoveryReady()) return false;
     final adapter = balancePaymentAdapter;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     if (_collectionDisposed ||
         !procurementScopeCurrent ||
         adapter == null ||
         order == null ||
-        order.balanceDue <= 0) {
+        order.balanceDue <= 0 || !_balanceHoldMatches(order)) {
       return false;
     }
     final previous = balancePaymentFor(orderId);
     if (previous?.state == BuyV2BalancePaymentState.paid) return true;
     if (_balancePaymentRequests.containsKey(orderId) &&
-        previous?.paymentReference == null) {
+        previous?.paymentReference == null && !_balanceKnownUnsent(orderId)) {
       notice =
           'The original balance payment needs checking. Do not pay again. Get order help.';
       notifyListeners();
@@ -7030,13 +7091,19 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> startBalancePayment(String orderId) async {
+    if (!await _balanceRecoveryReady()) return false;
     final adapter = balancePaymentAdapter;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     final previous = balancePaymentFor(orderId);
+    final priorHold = _balanceHoldFor(orderId);
+    final knownUnsent = _balanceKnownUnsent(orderId);
     if (adapter == null ||
         order == null ||
         previous == null ||
-        _balancePaymentRequests.containsKey(orderId) ||
+        !_balanceHoldMatches(order) ||
+        (priorHold != null && !knownUnsent) ||
+        (_balancePaymentRequests.containsKey(orderId) && !knownUnsent) ||
+        (knownUnsent && priorHold!.amountDue != previous.amountDue) ||
         !const {
           BuyV2BalancePaymentState.due,
           BuyV2BalancePaymentState.overdue,
@@ -7046,15 +7113,38 @@ class BuyV2Session extends ChangeNotifier {
     final operation = _beginBalancePaymentOperation(order);
     if (operation == null) return false;
     final current = operation.current;
-    final request = (
+    final request = knownUnsent ? _balancePaymentRequests[orderId]! : (
       key:
           'balance-${orderId.toLowerCase()}-${_balancePaymentAttemptSequence++}',
       amount: previous.amountDue,
+      dispatched: false,
     );
-    // Preserve the initiation identity before the external call. This is not
-    // durable recovery; the existing adapter has no recover-by-key operation.
+    // This hold is not permission to retry after restart. A crash after this
+    // save cannot prove whether the external dispatch below happened.
+    final hold = priorHold ?? BuyV2BalancePaymentHold(
+      ownerScope: customerStateStore!.ownerScope!,
+      accountId: collectionIdentity?.value?.accountId,
+      orderId: order.id,
+      orderIdentity: BuyV2BalancePaymentHold.identityOf(order),
+      idempotencyKey: request.key,
+      amountDue: request.amount,
+    );
     _balancePaymentRequests[orderId] = request;
+    _balancePaymentHolds[hold.storageKey] = hold;
+    var dispatched = false;
     try {
+      final saved = await (_persistCustomerState() ?? Future.value(false));
+      if (!current()) return false;
+      if (!saved) {
+        // No external call occurred. A failed/partial disk write may still
+        // restore a conservative hold, but cannot authorize a payment.
+        // Retain this known-unsent original key for a serialized storage retry.
+        notice = 'Payment could not be safely started. Try saving again.';
+        return false;
+      }
+      dispatched = true;
+      _balancePaymentRequests[orderId] =
+          (key: request.key, amount: request.amount, dispatched: true);
       final result = await adapter.startPayment(
         orderId: orderId,
         amountDue: request.amount,
@@ -7078,10 +7168,24 @@ class BuyV2Session extends ChangeNotifier {
         _holdUnknownBalanceStart(orderId, previous);
         return false;
       }
+      _balancePaymentHolds[hold.storageKey] =
+          hold.withReference(result.paymentReference!);
+      final referenceSaved =
+          await (_persistCustomerState() ?? Future.value(false));
+      if (!current()) return false;
+      if (!referenceSaved) {
+        _holdUnknownBalanceStart(orderId, previous,
+          reference: result.paymentReference);
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return result.state == BuyV2BalancePaymentState.paymentActionRequired;
     } on Object {
       if (!current()) return false;
+      if (!dispatched) {
+        notice = 'Payment could not be safely started. Try saving again.';
+        return false;
+      }
       _holdUnknownBalanceStart(orderId, previous);
       return false;
     } finally {
@@ -7093,10 +7197,11 @@ class BuyV2Session extends ChangeNotifier {
     String orderId,
     BuyV2PaymentHandoff handoff,
   ) async {
+    if (!await _balanceRecoveryReady()) return false;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     final previous = balancePaymentFor(orderId);
     final uri = previous?.paymentActionUri;
-    if (order == null ||
+    if (order == null || !_balanceHoldMatches(order) ||
         previous == null ||
         previous.state != BuyV2BalancePaymentState.paymentActionRequired ||
         uri == null) {
@@ -7132,12 +7237,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> reconcileBalancePayment(String orderId) async {
+    if (!await _balanceRecoveryReady()) return false;
     final adapter = balancePaymentAdapter;
     final order = _orders.where((o) => o.id == orderId).firstOrNull;
     final previous = balancePaymentFor(orderId);
     final reference = previous?.paymentReference;
     if (adapter == null ||
         order == null ||
+        !_balanceHoldMatches(order) ||
         previous == null ||
         reference == null ||
         !const {
@@ -8449,6 +8556,7 @@ class BuyV2Session extends ChangeNotifier {
       return;
     }
     _customerStateOwnerScope = ownerScope;
+    _balanceHoldsLoadedOwner = null;
     _invalidateOrderRefreshes();
     final mutationRevision = _customerStateMutationRevision;
     final browseRevision = _procurementBrowseRevision;
@@ -8485,6 +8593,7 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       if (snapshot == null) {
+        _balanceHoldsLoadedOwner = ownerScope;
         _retainedProductIdentityKeys.clear();
         if (customerStateRecoveryPending) {
           _unresolvedCustomerCart.clear();
@@ -8616,6 +8725,17 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CustomerStateSnapshot snapshot, {
     bool retainUnknownProducts = false,
   }) {
+    final owner = customerStateStore?.ownerScope;
+    if (owner == null || snapshot.balancePaymentHolds.any(
+      (hold) => !hold.valid || hold.ownerScope != owner,
+    ) || snapshot.balancePaymentHolds.map((h) => h.storageKey).toSet().length !=
+        snapshot.balancePaymentHolds.length) {
+      throw const FormatException('Balance payment recovery needs checking.');
+    }
+    for (final hold in snapshot.balancePaymentHolds) {
+      _balancePaymentHolds[hold.storageKey] = hold;
+    }
+    _balanceHoldsLoadedOwner = owner;
     _ensureSupplierPolicyOwner();
     _supplierPolicyAcceptances
       ..clear()
@@ -9095,6 +9215,9 @@ class BuyV2Session extends ChangeNotifier {
         _retainedCheckoutPaymentAttempts,
       ),
       paymentRecoveryIncomplete: _paymentRecoveryIncomplete,
+      balancePaymentHolds: List.unmodifiable(_balancePaymentHolds.values.where(
+        (hold) => hold.ownerScope == store.ownerScope,
+      )),
       paymentReference: _paymentReference,
       paymentActionUri: _paymentActionUri,
       bankTransferInstructions: _bankTransferInstructions,

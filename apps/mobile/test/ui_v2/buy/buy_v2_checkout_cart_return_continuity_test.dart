@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat, Tristate, SemanticsAction;
 
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
@@ -388,6 +390,41 @@ class _BalancePaymentAdapter implements BuyV2BalancePaymentAdapter {
 class _Lf09OwnerStore extends _R66OrderCustomerStore {
   @override
   String ownerScope = 'lf09-owner-a';
+  bool failWrites = false;
+  int? failWriteAt;
+  Object? readError;
+  Object? writeError;
+  Completer<bool>? nextWrite;
+  final attemptedSnapshots = <BuyV2CustomerStateSnapshot>[];
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async {
+    if (readError case final error?) throw error;
+    return snapshot;
+  }
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    writes++;
+    attemptedSnapshots.add(value);
+    if (writeError case final error?) throw error;
+    final failed = failWrites || failWriteAt == writes;
+    final gate = nextWrite;
+    nextWrite = null;
+    if ((gate != null && !await gate.future) || failed) return false;
+    snapshot = value;
+    return true;
+  }
+}
+
+// Isolated JSON round-trip fixture; never used by the application.
+class _Lf22Preferences implements SharedPreferencesAsync {
+  final values = <String, String>{};
+  @override
+  Future<String?> getString(String key) async => values[key];
+  @override
+  Future<void> setString(String key, String value) async { values[key] = value; }
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected host preference call');
 }
 
 class _Lf09BalanceAdapter extends _BalancePaymentAdapter {
@@ -395,6 +432,7 @@ class _Lf09BalanceAdapter extends _BalancePaymentAdapter {
       startResponse,
       reconcileResponse;
   int loadCalls = 0;
+  bool throwOnStart = false;
   final keys = <String>[];
   @override
   Future<BuyV2BalancePaymentResult> loadBalance({required String orderId}) {
@@ -409,6 +447,10 @@ class _Lf09BalanceAdapter extends _BalancePaymentAdapter {
     required String idempotencyKey,
   }) {
     keys.add(idempotencyKey);
+    if (throwOnStart) {
+      startCalls++;
+      return Future.error(StateError('Host uncertain balance start'));
+    }
     if (startResponse != null) {
       startCalls++;
       return startResponse!;
@@ -675,6 +717,287 @@ void main() {
         : null,
   );
 
+  Future<BuyV2Session> lf22Restore(_Lf09OwnerStore owner,
+      ValueNotifier<BuyV2CollectionIdentity?> identity,
+      _Lf09BalanceAdapter adapter) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core, customerStateStore: owner,
+      collectionIdentity: identity, balancePaymentAdapter: adapter);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await session.restoreCustomerState();
+    return session;
+  }
+
+  for (final succeeds in [false, true]) {
+    test('LF22 confirms storage before dispatch: $succeeds', () async {
+      final (session, adapter, owner, _, order) = await lf09Fixture();
+      final gate = Completer<bool>();
+      owner.nextWrite = gate;
+      final pending = session.startBalancePayment(order.id);
+      await Future<void>.delayed(Duration.zero);
+      expect(session.balancePaymentBusy(order.id), isTrue);
+      expect(adapter.startCalls, 0);
+      expect(await session.startBalancePayment(order.id), isFalse);
+      gate.complete(succeeds);
+      expect(await pending, succeeds);
+      expect(adapter.startCalls, succeeds ? 1 : 0);
+      if (succeeds) {
+        final hold = owner.snapshot!.balancePaymentHolds.single;
+        expect(hold.idempotencyKey, adapter.keys.single);
+        expect(hold.amountDue, order.balanceDue);
+        expect(hold.paymentReference, 'BALANCE-PAY-1');
+      } else {
+        final originalKey = owner.attemptedSnapshots.last
+            .balancePaymentHolds.single.idempotencyKey;
+        expect(session.balancePaymentFor(order.id)?.state,
+            BuyV2BalancePaymentState.due);
+        expect(session.balancePaymentBusy(order.id), isFalse);
+        expect(await session.startBalancePayment(order.id), isTrue);
+        expect(adapter.startCalls, 1);
+        expect(adapter.keys.single, originalKey);
+      }
+    });
+  }
+
+  test('LF22 thrown pre-dispatch write permits safe storage retry without charge', () async {
+    final (session, adapter, owner, _, order) = await lf09Fixture();
+    owner.writeError = StateError('Host disk write failed');
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.startCalls, 0);
+    final originalKey = owner.attemptedSnapshots.last
+        .balancePaymentHolds.single.idempotencyKey;
+    expect(session.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.due);
+    owner.writeError = null;
+    expect(await session.startBalancePayment(order.id), isTrue);
+    expect(adapter.startCalls, 1);
+    expect(adapter.keys.single, originalKey);
+  });
+
+  for (final drift in ['owner', 'dispose']) {
+    test('LF22 $drift during durable preflight never dispatches', () async {
+      final (session, adapter, owner, identity, order) =
+          await lf09Fixture(manualDispose: drift == 'dispose');
+      final originalOwner = owner.ownerScope;
+      final gate = Completer<bool>();
+      owner.nextWrite = gate;
+      final pending = session.startBalancePayment(order.id);
+      await Future<void>.delayed(Duration.zero);
+      expect(adapter.startCalls, 0);
+      if (drift == 'owner') {
+        owner.ownerScope = 'lf22-another-owner';
+        expect(session.balancePaymentBusy(order.id), isFalse);
+      } else {
+        session.dispose();
+      }
+      gate.complete(true);
+      expect(await pending, isFalse);
+      expect(adapter.startCalls, 0);
+      owner.ownerScope = originalOwner;
+      final next = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+      final restored = await lf22Restore(owner, identity, next);
+      expect(restored.balancePaymentFor(order.id)?.state,
+          BuyV2BalancePaymentState.unknown);
+      expect(await restored.startBalancePayment(order.id), isFalse);
+      expect(next.startCalls, 0);
+    });
+  }
+
+  test('LF22 reference-save failure preserves original durable unknown hold', () async {
+    final (session, adapter, owner, identity, order) = await lf09Fixture();
+    owner.failWriteAt = owner.writes + 2;
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.startCalls, 1);
+    expect(owner.snapshot!.balancePaymentHolds.single.paymentReference, isNull);
+    expect(session.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    owner.failWriteAt = null;
+    final nextAdapter = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, nextAdapter);
+    expect(restored.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    expect(await restored.restoreBalancePayment(order.id), isFalse);
+    expect(await restored.startBalancePayment(order.id), isFalse);
+    expect(nextAdapter.loadCalls, 0);
+    expect(nextAdapter.startCalls, 0);
+  });
+
+  test('LF22 retained reference permits only explicit matching reconciliation', () async {
+    final (session, _, owner, identity, order) = await lf09Fixture();
+    expect(await session.startBalancePayment(order.id), isTrue);
+    final adapter = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, adapter);
+    final result = restored.balancePaymentFor(order.id)!;
+    expect(result.state, BuyV2BalancePaymentState.unknown);
+    expect(result.paymentReference, 'BALANCE-PAY-1');
+    expect(result.paymentActionUri, isNull);
+    expect(adapter.loadCalls, 0);
+    expect(adapter.reconcileCalls, 0);
+    adapter.reconcileResponse = Future.value(lf09Reply(
+      BuyV2BalancePaymentState.paid, 0, reference: 'OTHER-ATTEMPT'));
+    expect(await restored.reconcileBalancePayment(order.id), isFalse);
+    expect(restored.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    adapter.reconcileResponse = null;
+    expect(await restored.reconcileBalancePayment(order.id), isTrue);
+    expect(adapter.startCalls, 0);
+    expect(restored.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.paid);
+  });
+
+  test('LF22 account scope reset and return cannot forget original hold', () async {
+    final (session, adapter, _, identity, order) = await lf09Fixture();
+    adapter.throwOnStart = true;
+    expect(await session.startBalancePayment(order.id), isFalse);
+    final originalIdentity = identity.value;
+    identity.value = const BuyV2CollectionIdentity(
+      accountId: 'lf22-other', sessionId: 'lf22-other-session');
+    expect(session.balancePaymentFor(order.id), isNull);
+    identity.value = originalIdentity;
+    expect(session.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.keys, hasLength(1));
+  });
+
+  test('LF22 failed recovery cannot query or charge and leaves stored state intact', () async {
+    final (session, adapter, owner, identity, order) = await lf09Fixture();
+    adapter.throwOnStart = true;
+    expect(await session.startBalancePayment(order.id), isFalse);
+    final retained = owner.snapshot;
+    owner.readError = StateError('Host disk unavailable');
+    final next = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, next);
+    expect(await restored.restoreBalancePayment(order.id), isFalse);
+    expect(await restored.startBalancePayment(order.id), isFalse);
+    expect(next.startCalls, 0);
+    expect(next.loadCalls, 0);
+    expect(identical(owner.snapshot, retained), isTrue);
+    owner.readError = null;
+    await restored.restoreCustomerState();
+    expect(restored.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+  });
+
+  test('LF22 Cart write during pending hold preserves both current Cart and reference', () async {
+    final (session, adapter, owner, identity, order) = await lf09Fixture();
+    final gate = Completer<bool>();
+    owner.nextWrite = gate;
+    final pending = session.startBalancePayment(order.id);
+    await Future<void>.delayed(Duration.zero);
+    expect(adapter.startCalls, 0);
+    final product = BuyV2Catalogue.products.firstWhere(
+      (p) => p.destination == BuyV2Destination.shop);
+    expect(session.addProduct(product.id), isTrue);
+    final quantity = session.quantityFor(product.id);
+    gate.complete(true);
+    expect(await pending, isTrue);
+    expect(owner.snapshot!.cartQuantities[product.id], quantity);
+    expect(owner.snapshot!.balancePaymentHolds.single.paymentReference,
+        'BALANCE-PAY-1');
+    final next = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, next);
+    expect(restored.quantityFor(product.id), quantity);
+    expect(restored.balancePaymentFor(order.id)?.paymentReference,
+        'BALANCE-PAY-1');
+    expect(next.startCalls, 0);
+  });
+
+  test('LF22 pre-dispatch crash restores unknown without automatic initiation', () async {
+    final (session, adapter, owner, identity, order) = await lf09Fixture();
+    final hold = BuyV2BalancePaymentHold(ownerScope: owner.ownerScope,
+      accountId: identity.value!.accountId, orderId: order.id,
+      orderIdentity: BuyV2BalancePaymentHold.identityOf(order),
+      idempotencyKey: 'lf22-before-dispatch', amountDue: order.balanceDue);
+    final cart = Map<String, int>.of(owner.snapshot!.cartQuantities);
+    owner.snapshot = BuyV2CustomerStateSnapshot(
+      orders: owner.snapshot!.orders, cartQuantities: cart,
+      balancePaymentHolds: [hold]);
+    final next = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, next);
+    expect(restored.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    expect(await restored.startBalancePayment(order.id), isFalse);
+    expect(next.startCalls, 0);
+    expect(adapter.startCalls, 0);
+    expect(session.orders.any((o) => o.id == order.id), isTrue);
+  });
+
+  test('LF22 reused order id with a different purchase cannot reconcile old reference', () async {
+    final (session, _, owner, identity, order) = await lf09Fixture();
+    expect(await session.startBalancePayment(order.id), isTrue);
+    final changed = BuyV2Order(id: order.id, destination: order.destination,
+      title: order.title, itemSummary: order.itemSummary, total: order.total,
+      partner: order.partner, partnerType: order.partnerType, promise: order.promise,
+      destinationLabel: order.destinationLabel, progress: order.progress,
+      status: order.status, balanceDue: order.balanceDue, purchaseId: 'different-purchase');
+    owner.snapshot = BuyV2CustomerStateSnapshot(orders: [changed],
+      balancePaymentHolds: owner.snapshot!.balancePaymentHolds);
+    final adapter = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final restored = await lf22Restore(owner, identity, adapter);
+    expect(restored.balancePaymentFor(order.id), isNull);
+    expect(await restored.restoreBalancePayment(order.id), isFalse);
+    expect(await restored.reconcileBalancePayment(order.id), isFalse);
+    expect(await restored.startBalancePayment(order.id), isFalse);
+    expect(adapter.loadCalls, 0);
+    expect(adapter.reconcileCalls, 0);
+    expect(adapter.startCalls, 0);
+    expect(owner.snapshot!.balancePaymentHolds.single.paymentReference,
+        'BALANCE-PAY-1');
+  });
+
+  test('LF22 journal JSON round trip keeps exact hold and unrelated Cart', () async {
+    final preferences = _Lf22Preferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences,
+      ownerScope: 'lf22-json-owner');
+    final hold = BuyV2BalancePaymentHold(ownerScope: store.ownerScope,
+      accountId: 'lf22-account', orderId: 'lf22-order',
+      orderIdentity: 'a' * 64, idempotencyKey: 'lf22-original-key',
+      amountDue: 4321, paymentReference: 'lf22-reference');
+    expect(await store.write(BuyV2CustomerStateSnapshot(
+      cartQuantities: const {'retained-sku': 3}, balancePaymentHolds: [hold])), isTrue);
+    final saved = await store.read();
+    expect(saved!.cartQuantities, {'retained-sku': 3});
+    expect(saved.balancePaymentHolds.single.toJson(), hold.toJson());
+    final raw = jsonDecode(preferences.values.values.single) as Map;
+    final record = (raw['balancePaymentHolds'] as Map)['records'] as List;
+    expect((record.single as Map).keys, isNot(contains('paymentActionUri')));
+    expect((record.single as Map).keys, isNot(contains('state')));
+    preferences.values[preferences.values.keys.single] = jsonEncode({
+      'cartQuantities': {'legacy-sku': 2}});
+    final legacy = await store.read();
+    expect(legacy!.balancePaymentHolds, isEmpty);
+    expect(legacy.cartQuantities, {'legacy-sku': 2});
+  });
+
+  for (final defect in ['version', 'double-version', 'amount', 'owner',
+      'duplicate', 'records', 'currency', 'root', 'empty']) {
+    test('LF22 unreadable journal $defect is never treated as absence', () async {
+      final preferences = _Lf22Preferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences,
+        ownerScope: 'lf22-json-owner');
+      final hold = BuyV2BalancePaymentHold(ownerScope: store.ownerScope,
+        accountId: 'lf22-account', orderId: 'lf22-order',
+        orderIdentity: 'a' * 64, idempotencyKey: 'lf22-original-key', amountDue: 4321);
+      final record = Map<String, Object?>.of(hold.toJson());
+      final journal = <String, Object?>{'version': 1, 'records': [record]};
+      if (defect == 'version') journal['version'] = 2;
+      if (defect == 'double-version') journal['version'] = 1.0;
+      if (defect == 'amount') record['amountDue'] = 4321.0;
+      if (defect == 'owner') record['ownerScope'] = 'other-owner';
+      if (defect == 'duplicate') journal['records'] = [record, record];
+      if (defect == 'records') journal['records'] = 'not-a-list';
+      if (defect == 'currency') record['currency'] = 'USD';
+      final raw = defect == 'root' ? '[' : defect == 'empty' ? '' :
+          jsonEncode({'balancePaymentHolds': journal,
+            'cartQuantities': {'must-retain': 2}});
+      preferences.values['moolsocial.buy.customer-state.${store.ownerScope}.v1'] = raw;
+      await expectLater(store.read(), throwsA(isA<FormatException>()));
+      expect(preferences.values.values.single, raw);
+    });
+  }
+
   for (final phase in ['load', 'start', 'handoff', 'reconcile']) {
     for (final drift in ['owner', 'auth', 'dispose']) {
       test('LF09 balance $phase $drift rejects late results', () async {
@@ -743,6 +1066,7 @@ void main() {
     adapter.startResponse = gate.future;
     final first = session.startBalancePayment(order.id);
     expect(await session.startBalancePayment(order.id), isFalse);
+    await Future<void>.delayed(Duration.zero);
     expect(adapter.keys, hasLength(1));
     gate.complete(
       lf09Reply(
@@ -799,15 +1123,14 @@ void main() {
 
   test('LF09 balance uncertain start cannot create another payment', () async {
     final (session, adapter, _, _, order) = await lf09Fixture();
-    adapter.startResponse = Future.error(
-      StateError('Isolated transport uncertainty'),
-    );
+    adapter.throwOnStart = true;
     expect(await session.startBalancePayment(order.id), isFalse);
     expect(
       session.balancePaymentFor(order.id)?.state,
       BuyV2BalancePaymentState.unknown,
     );
     final loads = adapter.loadCalls;
+    adapter.throwOnStart = false;
     adapter.startResponse = null;
     expect(await session.restoreBalancePayment(order.id), isFalse);
     expect(await session.reconcileBalancePayment(order.id), isFalse);
@@ -815,6 +1138,31 @@ void main() {
     expect(adapter.keys, hasLength(1));
     expect(adapter.loadCalls, loads);
     expect(session.balancePaymentFor(order.id)?.amountDue, order.balanceDue);
+  });
+
+  test('LF22 unknown balance initiation remains held in a new session', () async {
+    final (session, adapter, owner, identity, order) = await lf09Fixture();
+    adapter.throwOnStart = true;
+    expect(await session.startBalancePayment(order.id), isFalse);
+    final core = BuySession();
+    final recoveredAdapter = _Lf09BalanceAdapter()..amountDue = order.balanceDue;
+    final recovered = BuyV2Session(
+      core: core,
+      customerStateStore: owner,
+      collectionIdentity: identity,
+      balancePaymentAdapter: recoveredAdapter,
+    );
+    addTearDown(core.dispose);
+    addTearDown(recovered.dispose);
+    await recovered.restoreCustomerState();
+    expect(recovered.orders.any((o) => o.id == order.id), isTrue);
+    expect(recovered.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.unknown);
+    expect(await recovered.restoreBalancePayment(order.id), isFalse);
+    expect(await recovered.startBalancePayment(order.id), isFalse);
+    expect(recoveredAdapter.loadCalls, 0);
+    expect(recoveredAdapter.startCalls, 0);
+    expect(adapter.keys, hasLength(1));
   });
 
   test('LF09 balance due readback cannot erase pending attempt', () async {
@@ -839,9 +1187,11 @@ void main() {
     final nextGate = Completer<BuyV2BalancePaymentResult>();
     adapter.loadResponse = oldGate.future;
     final old = session.restoreBalancePayment(order.id);
+    await Future<void>.delayed(Duration.zero);
     owner.ownerScope = 'lf09-owner-b';
     adapter.loadResponse = nextGate.future;
     final next = session.restoreBalancePayment(order.id);
+    await Future<void>.delayed(Duration.zero);
     expect(session.balancePaymentBusy(order.id), isTrue);
     oldGate.complete(lf09Reply(BuyV2BalancePaymentState.due, order.balanceDue));
     expect(await old, isFalse);
