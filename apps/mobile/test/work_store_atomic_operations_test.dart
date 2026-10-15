@@ -423,6 +423,10 @@ WorkOrderReply _commandReply(
   DateTime? deadline,
   DateTime? fulfilmentDeadline,
   WorkspaceDeliveryAssignment? delivery,
+  int amount = 155,
+  int remainderPaise = 0,
+  WorkspaceBillDiscount discount = const WorkspaceBillDiscount.none(),
+  int discountMinor = 0,
 }) => WorkOrderReply(
   accountScope: 'account-A',
   workspaceId: 'store-A',
@@ -436,7 +440,10 @@ WorkOrderReply _commandReply(
     customer: 'Customer $id',
     items: 'Oil 1 litre',
     quantities: quantities,
-    amount: 155,
+    amount: amount,
+    remainderPaise: remainderPaise,
+    discount: discount,
+    discountMinor: discountMinor,
     source: 'App',
     fulfilment: collection ? 'Collect at store' : 'Delivery',
     payment: 'Paid online',
@@ -16424,6 +16431,145 @@ void main() {
       addTearDown(work.dispose);
       return work;
     }
+
+    // Isolated host replies only; never runtime orders or provider evidence.
+    final invalidMoney = [
+      ('negative paise', -1, const WorkspaceBillDiscount.none(), 0),
+      ('overflow paise', 100, const WorkspaceBillDiscount.none(), 0),
+      ('negative discount', 0, const WorkspaceBillDiscount.none(), -1),
+      ('unmatched discount', 0, const WorkspaceBillDiscount.none(), 15),
+      ('invalid rate', 0, const WorkspaceBillDiscount.percentage(10001), 15),
+    ];
+    for (final invalid in invalidMoney) {
+      for (final phase in ['observe', 'acknowledge', 'reconcile']) {
+        test('LF10 malformed ${invalid.$1} $phase preserves order', () async {
+          expect(operations.observe(_commandReply('A')), isTrue);
+          expect(operations.observe(_commandReply('B')), isTrue);
+          WorkOrderCommand? command;
+          Future<bool>? update;
+          if (phase != 'observe') {
+            update = operations.act('A', WorkOrderAction.accept);
+            command = gateway.submitted.single;
+            if (phase == 'reconcile') {
+              gateway.responses.single.completeError(
+                TimeoutException('reply lost'),
+              );
+              expect(await update, isFalse);
+              update = operations.retry('A');
+              expect(gateway.reconciled.single, same(command));
+            }
+          }
+          final malformed = _commandReply(
+            'A',
+            command: command,
+            revision: 2,
+            stage: 'Preparing',
+            remainderPaise: invalid.$2,
+            discount: invalid.$3,
+            discountMinor: invalid.$4,
+          );
+          expect(malformed.order!.validBillAmounts, isFalse);
+          if (phase == 'observe') {
+            expect(operations.observe(malformed), isFalse);
+          } else {
+            (phase == 'reconcile' ? gateway.replies : gateway.responses).last
+                .complete(malformed);
+            expect(await update!, isFalse);
+            expect(operations.pending('A'), same(command));
+            expect(operations.state('A'), WorkOrderOperationState.uncertain);
+          }
+          expect(operations.order('A')!.revision, 1);
+          expect(operations.order('A')!.order!.stage, 'Confirmed');
+          expect(operations.order('A')!.order!.payableMinor, 15500);
+          expect(operations.order('B')!.order!.payableMinor, 15500);
+          if (command != null) {
+            final recovery = operations.retry('A');
+            expect(gateway.reconciled.last, same(command));
+            gateway.replies.last.complete(
+              _commandReply(
+                'A',
+                command: command,
+                revision: 3,
+                stage: 'Preparing',
+              ),
+            );
+            expect(await recovery, isTrue);
+            expect(operations.pending('A'), isNull);
+            expect(gateway.submitted.length, 1);
+          }
+        });
+      }
+    }
+    for (final valid in [
+      ('fractional', 155, 95, const WorkspaceBillDiscount.none(), 0),
+      ('discounted', 155, 95, const WorkspaceBillDiscount.fixed(1505), 1505),
+      ('large', 1000000000, 95, const WorkspaceBillDiscount.none(), 0),
+    ]) {
+      test('LF10 valid ${valid.$1} total stays exact', () async {
+        final original = _commandReply(
+          'A',
+          amount: valid.$2,
+          remainderPaise: valid.$3,
+          discount: valid.$4,
+          discountMinor: valid.$5,
+        );
+        expect(original.order!.validBillAmounts, isTrue);
+        expect(operations.observe(original), isTrue);
+        final action = operations.act('A', WorkOrderAction.accept);
+        gateway.responses.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.single,
+            revision: 2,
+            stage: 'Preparing',
+            amount: valid.$2,
+            remainderPaise: valid.$3,
+            discount: valid.$4,
+            discountMinor: valid.$5,
+          ),
+        );
+        expect(await action, isTrue);
+        expect(
+          operations.order('A')!.order!.payableMinor,
+          valid.$2 * 100 + valid.$3,
+        );
+        expect(operations.order('A')!.order!.discountMinor, valid.$5);
+      });
+    }
+    test('LF10 malformed reply retains durable original journal', () async {
+      operations.dispose();
+      final journal = SecureWorkOrderPendingStore(
+        storage: _OrderJournalStorage(),
+        currentAccount: () => 'account-A',
+      );
+      operations = WorkOrderOperations(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        gateway: gateway,
+        pendingStore: journal,
+      );
+      expect(await operations.restore(), isTrue);
+      operations.observe(_commandReply('A'));
+      final action = operations.act('A', WorkOrderAction.accept);
+      await _drainOrderJournal();
+      final command = gateway.submitted.single;
+      gateway.responses.single.complete(
+        _commandReply(
+          'A',
+          command: command,
+          revision: 2,
+          stage: 'Preparing',
+          remainderPaise: 100,
+        ),
+      );
+      expect(await action, isFalse);
+      expect(
+        (await journal.readPending('account-A', 'store-A')).single.operationId,
+        command.operationId,
+      );
+      expect(operations.pending('A'), same(command));
+      expect(operations.order('A')!.revision, 1);
+    });
 
     test(
       'session scoped order cannot use legacy timing pickup or delivery effects',

@@ -7906,7 +7906,7 @@ function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
   }
-  return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09') -and
+  return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10') -and
     $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
     $Facts.ContainsKey('Phase') -and $Facts.Role -ceq 'primary' -and
     $Facts.Task -ceq '/root' -and $Facts.Phase -cin @(
@@ -7918,6 +7918,7 @@ function Invoke-Lf01Admission {
   # The closed integration path below and its 83 bindings remain unchanged.
   $base = '3c5a454bf8af173d9736c75213cafb88e641765c'
   $recordOwner = switch -CaseSensitive ($ProductionTicketId) {
+    'LF-10' { 'docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.json' }
     'LF-09' { 'docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json' }
     'LF-08' { 'docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json' }
     'LF-07' { 'docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json' }
@@ -7945,7 +7946,7 @@ function Invoke-Lf01Admission {
     'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
     'apps/mobile/test/work_vertical_slice_test.dart',
     'apps/mobile/test/work_store_atomic_operations_test.dart')
-  if ($ProductionTicketId -cin @('LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-01-ENTRY-RECOVERY-20261015.json',
       'docs/quality/LF-01-ENTRY-RECOVERY-20261015.md',
       'apps/mobile/lib/features/work/work_publication_data.dart',
@@ -7959,43 +7960,48 @@ function Invoke-Lf01Admission {
       'apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart',
       'apps/mobile/test/store_settings_widgets_test.dart')
   }
-  if ($ProductionTicketId -cin @('LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-02-STORE-DETAILS-20261015.json',
       'docs/quality/LF-02-STORE-DETAILS-20261015.md',
       'apps/mobile/lib/features/work/work_models.dart',
       'apps/mobile/test/work_product_content_test.dart')
   }
-  if ($ProductionTicketId -cin @('LF-04','LF-05','LF-06','LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-03-PRODUCT-MEDIA-20261015.json',
       'docs/quality/LF-03-PRODUCT-MEDIA-20261015.md',
       'apps/mobile/test/work_public_handoff_test.dart',
       'apps/mobile/test/store_selling_channels_test.dart',
       'apps/mobile/test/fixtures/store_public_handoff_v1.dart')
   }
-  if ($ProductionTicketId -cin @('LF-05','LF-06','LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-05','LF-06','LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json',
       'docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md',
       'apps/mobile/lib/features/work/widgets/store_payment_terms.dart')
   }
-  if ($ProductionTicketId -cin @('LF-06','LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-06','LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json',
       'docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md')
   }
-  if ($ProductionTicketId -cin @('LF-07','LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-07','LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-06-FULFILMENT-READINESS-20261015.json',
       'docs/quality/LF-06-FULFILMENT-READINESS-20261015.md',
       'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart')
   }
-  if ($ProductionTicketId -cin @('LF-08','LF-09')) {
+  if ($ProductionTicketId -cin @('LF-08','LF-09','LF-10')) {
     $owners += @('docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json',
       'docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md',
       'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart')
   }
-  if ($ProductionTicketId -ceq 'LF-09') {
+  if ($ProductionTicketId -cin @('LF-09','LF-10')) {
     $owners += @('docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json',
       'docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md',
       'apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart')
+  }
+  if ($ProductionTicketId -ceq 'LF-10') {
+    $owners += @('docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json',
+      'docs/quality/LF-09-PAYMENT-RECOVERY-20261015.md',
+      'apps/mobile/test/work_workspace_layout_safety_test.dart')
   }
   $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{

@@ -44162,6 +44162,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-empty-state')), findsOneWidget);
       expect(find.text('No active orders'), findsOneWidget);
+      expect(find.textContaining('Online order coverage is unverified.'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Accept'), findsNothing);
       expect(work.visibleWorkspaceOrders, isEmpty);
       expect(work.activeGroupBuy, isNull);
@@ -47847,6 +47848,7 @@ void main() {
       expect(status.color, Colors.transparent);
       final strip = find.byKey(const Key('work-orders-filter-strip'));
       final empty = find.byKey(const Key('work-orders-empty-state'));
+      expect(find.textContaining('Online order coverage is unverified.'), findsOneWidget);
       final viewport = find
           .ancestor(of: empty, matching: find.byType(Align))
           .first;

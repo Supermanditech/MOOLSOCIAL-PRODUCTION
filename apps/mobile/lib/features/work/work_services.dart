@@ -4041,7 +4041,7 @@ class WorkOrderOperations extends ChangeNotifier {
       reply.orderId.isNotEmpty &&
       reply.revision >= 0 &&
       reply.order?.id == reply.orderId &&
-      reply.order!.amount >= 0 &&
+      reply.order!.validBillAmounts &&
       reply.order!.quantities.entries.every(
         (entry) => entry.key.isNotEmpty && entry.value > 0,
       ) &&

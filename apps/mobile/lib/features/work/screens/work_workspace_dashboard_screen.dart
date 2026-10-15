@@ -28696,8 +28696,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                             widget.orderId != null
                                 ? 'Return to the order list and search again.'
                                 : _filter == 'Done'
-                                ? 'Completed and cancelled customer orders are saved here. Counter sales are in Sales.'
-                                : 'Customer orders appear here when they reach this stage. Counter sales are in Sales.',
+                                ? 'Saved completed and cancelled orders are shown here. Online order coverage is unverified. Counter sales are in Sales.'
+                                : 'Only saved orders are shown. Online order coverage is unverified. Counter sales are in Sales.',
                             style: const TextStyle(
                               color: Color(0xFF4C5268), fontSize: 12,
                             ),
