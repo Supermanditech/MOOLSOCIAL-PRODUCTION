@@ -46,7 +46,7 @@
         "Local input recovery is not publication/sync authority; unrelated history and drafts remain accessible."
       ],
       "manifestPath": "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.md",
-      "manifestSha256": "24D83074FC9C73947A7240725935E2EEC593C53839CC1D68A2D999FC12413739",
+      "manifestSha256": "BAC13F4AE08E7C79F3DBD8C97162C3EB443B308451E4C5FD18928CB352391F74",
       "evidencePath": "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -63,7 +63,8 @@
     "minimumCompleteScope": [
       "Add two private readiness inputs to the existing preference record through explicit version3; read legacy1/2 unchanged.",
       "Reuse Settings/global Apply and shared Product defaults writer; preserve other groups and apply readiness only after confirmed save.",
-      "Focused migration/owner/failure/interleaving and settings regressions; OPPO real preference Save/source restart/recovery only."
+      "Focused migration/owner/failure/interleaving and settings regressions; OPPO real preference Save/source restart/recovery only.",
+      "Explicit LF01 restart follow-up: fix demonstrated pending-empty-feed entry loss in the existing WorkSession only; join that actual feed without duplicate refresh or weakening review/account/operation restrictions."
     ],
     "explicitExclusions": [
       "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
@@ -76,7 +77,7 @@
     "testAndEvidencePlan": [
       "Demonstrate fresh-session loss. Test legacy/new schema/strict types, failures/retry, all groups, owners/context/ABA/newer inputs and editor interleaving.",
       "Host global Save preserves other status on failure; native evaluation preference Save/restart, no commerce/provider/APK operations.",
-      "Follow up the native restart-entry observation with delayed approved-feed ordinary rail-tap/leave and already-running-feed tests in the existing layout owner. Test assessment only; any demonstrated navigation correction needs its LF01 scope, not readiness scope."
+      "Approved-feed early-entry assessment passed10 cases. Pending-empty-feed saved-selection regression failed with zero reads; test and repair only that demonstrated LF01 race as an explicit restart follow-up. Cover account/disposal, repeated entry, failed/approved feed, unrelated busy locks and production exclusion; native source restart/readback only, not cold APK or live authority."
     ],
     "frontendAdmission": {
       "task": "/root",

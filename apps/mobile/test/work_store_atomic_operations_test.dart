@@ -198,6 +198,17 @@ class _ReviewSelectionFixtureStore implements WorkReviewStoreSelectionStore {
   }
 }
 
+// Host-only entry fixture; never writes or seeds a native Store.
+class _PendingWorkspaceFeedGateway extends ReviewWorkGateway {
+  var result = Completer<List<WorkReviewResult>>();
+  int calls = 0;
+  @override
+  Future<List<WorkReviewResult>> loadFeed() {
+    calls++;
+    return result.future;
+  }
+}
+
 class _CounterDraftBoundaryStore implements WorkCounterDraftStore {
   _CounterDraftBoundaryStore(this.delegate);
   final WorkCounterDraftStore delegate;
@@ -3375,6 +3386,193 @@ void main() {
           );
         },
       );
+
+      test(
+        'LF01 pending empty feed retains saved Store entry intent',
+        () async {
+          final gateway = _PendingWorkspaceFeedGateway();
+          final selection = _ReviewSelectionFixtureStore(
+            StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 0,
+              now: DateTime.utc(2026, 9, 19),
+            ),
+          );
+          final work = WorkSession(
+            gateway: gateway,
+            contactDraftStore: _CommandAccountStore(),
+            reviewStoreSelectionStore: selection,
+          );
+          addTearDown(work.dispose);
+          final refresh = work.refreshFeed();
+          expect(work.busy, isTrue);
+          final opening = work.loadInitialWorkspaceState();
+          gateway.result.complete(const []);
+          await refresh;
+          await opening;
+          expect(gateway.calls, 1);
+          expect(selection.reads, 1);
+          expect(work.activeWorkspace?.id, selection.seed!.storeId);
+          expect(work.workspaceCatalogueItems, isEmpty);
+          expect(work.workspaceInvoices, isEmpty);
+          expect(work.initialWorkspaceStateLoaded, isTrue);
+        },
+      );
+
+      for (final mode in [
+        'completed-empty',
+        'repeated-entry',
+        'account-change',
+        'disposed',
+        'approved-feed',
+        'failed-feed',
+        'production',
+        'unrelated-busy',
+        'blocked-during-selection',
+      ]) {
+        test('LF01 saved entry boundary $mode', () async {
+          final gateway = _PendingWorkspaceFeedGateway();
+          final account = _CommandAccountStore();
+          final selection = _ReviewSelectionFixtureStore(
+            StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 0,
+              now: DateTime.utc(2026, 9, 19),
+            ),
+          );
+          final work = mode == 'production'
+              ? WorkSession.production(
+                  gateway: gateway,
+                  contactDraftStore: account,
+                  proofPicker: ReviewWorkProofPicker(),
+                  reviewStoreSelectionStore: selection,
+                )
+              : WorkSession(
+                  gateway: gateway,
+                  contactDraftStore: account,
+                  reviewStoreSelectionStore: selection,
+                );
+          var disposed = false;
+          addTearDown(() {
+            if (!disposed) work.dispose();
+          });
+          if (mode == 'unrelated-busy') {
+            work.busy = true;
+            await work.loadInitialWorkspaceState();
+            expect(work.busy, isTrue);
+            expect(gateway.calls, 0);
+            expect(selection.reads, 0);
+            expect(work.activeWorkspace, isNull);
+            work.busy = false;
+            return;
+          }
+          final refresh = work.refreshFeed();
+          if (mode == 'completed-empty') {
+            gateway.result.complete(const []);
+            await refresh;
+            expect(work.initialWorkspaceStateLoaded, isTrue);
+          }
+          if (mode == 'blocked-during-selection') {
+            selection.holdRead = Completer<void>();
+          }
+          final opening = work.loadInitialWorkspaceState();
+          final repeated = mode == 'repeated-entry'
+              ? work.loadInitialWorkspaceState()
+              : null;
+          if (mode == 'account-change') account.accountScope = 'account-B';
+          if (mode == 'disposed') {
+            work.dispose();
+            disposed = true;
+          }
+          if (!gateway.result.isCompleted) {
+            if (mode == 'failed-feed') {
+              gateway.result.completeError(
+                const WorkGatewayException('Workspace feed unavailable.'),
+              );
+            } else {
+              gateway.result.complete(mode == 'approved-feed'
+                  ? const [
+                      WorkReviewResult(
+                        caseId: 'approved-feed-case',
+                        status: WorkRemoteReviewStatus.approved,
+                        plan: 'free',
+                        workspaceId: 'approved-feed-store',
+                        profileId: 'retailer-grocery',
+                        name: 'Approved feed Store',
+                        area: '302001',
+                      ),
+                    ]
+                  : const []);
+            }
+          }
+          if (mode == 'blocked-during-selection') {
+            await _drainOrderJournal();
+            expect(selection.reads, 1);
+            work.busy = true;
+            selection.holdRead!.complete();
+          }
+          await refresh;
+          await opening;
+          if (repeated != null) await repeated;
+          expect(gateway.calls, 1);
+          if (mode == 'account-change' || mode == 'disposed') {
+            expect(selection.reads, 0);
+            expect(work.activeWorkspace, isNull);
+            expect(work.initialWorkspaceStateLoaded, isFalse);
+            if (mode == 'account-change') {
+              // Old cleanup cannot prevent a new explicit entry for account B.
+              selection.seed = StoreReviewSeed(
+                accountScope: 'account-B',
+                orderCount: 0,
+                now: DateTime.utc(2026, 9, 19),
+              );
+              gateway.result = Completer<List<WorkReviewResult>>()
+                ..complete(const []);
+              await work.loadInitialWorkspaceState();
+              expect(gateway.calls, 2);
+              expect(selection.reads, 1);
+              expect(work.activeWorkspace?.id, selection.seed!.storeId);
+              expect(work.initialWorkspaceStateLoaded, isTrue);
+            }
+          } else if (mode == 'approved-feed') {
+            expect(selection.reads, 0);
+            expect(work.activeWorkspace?.id, 'approved-feed-store');
+          } else if (mode == 'production') {
+            expect(selection.reads, 0);
+            expect(work.activeWorkspace, isNull);
+            expect(work.canLoadStoreReviewSeed, isFalse);
+          } else if (mode == 'failed-feed') {
+            expect(selection.reads, 0);
+            expect(work.activeWorkspace, isNull);
+            expect(work.initialWorkspaceStateLoaded, isFalse);
+            expect(work.errorMessage, 'Workspace feed unavailable.');
+            // Only deliberate retry issues a second read; no automatic retry.
+            gateway.result = Completer<List<WorkReviewResult>>()
+              ..complete(const []);
+            await work.loadInitialWorkspaceState();
+            expect(gateway.calls, 2);
+            expect(selection.reads, 1);
+            expect(work.activeWorkspace?.id, selection.seed!.storeId);
+          } else if (mode == 'blocked-during-selection') {
+            expect(work.busy, isTrue);
+            expect(work.activeWorkspace, isNull);
+            expect(work.initialWorkspaceStateLoaded, isFalse);
+            expect(work.errorMessage, contains('Finish the current Store operation'));
+            work.busy = false;
+            await work.loadInitialWorkspaceState();
+            expect(gateway.calls, 2);
+            expect(selection.reads, 2);
+            expect(work.activeWorkspace?.id, selection.seed!.storeId);
+            expect(work.initialWorkspaceStateLoaded, isTrue);
+          } else {
+            expect(selection.reads, 1);
+            expect(work.activeWorkspace?.id, selection.seed!.storeId);
+            expect(work.workspaceCatalogueItems, isEmpty);
+            expect(work.workspaceInvoices, isEmpty);
+            expect(work.initialWorkspaceStateLoaded, isTrue);
+          }
+        });
+      }
 
       test(
         'selection read failure is retryable without creating a Store',

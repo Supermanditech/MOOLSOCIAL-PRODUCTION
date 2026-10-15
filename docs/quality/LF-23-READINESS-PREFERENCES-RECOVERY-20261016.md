@@ -116,3 +116,68 @@ fix is justified by these outcomes. The original OPPO observation is still not
 explained: these use an approved-feed host fixture, not the native saved-review-
 selection path, payment/data recovery, cold launch or a newly installed APK.
 This follow-up changes tests and their existing evidence only, not Store UI.
+
+Next assessment targets the actual empty-feed/saved-review-selection boundary:
+start a delayed Earn feed refresh, request ordinary Workspace recovery while it
+is pending, then complete the empty feed. The existing account-scoped selection
+must be considered without a second entry request; production/disabled review
+must still never read it. Use only isolated test storage and an empty evaluation
+identity, never native seed data. Any app correction remains an LF01 decision
+after a demonstrated failure, not implicit readiness scope expansion.
+
+### Demonstrated LF01 defect and narrow restart-follow-up amendment
+
+The isolated review-enabled pending-empty-feed test failed: one feed request,
+zero saved-selection reads where one was required, and no recovered Store.
+Root cause: entry returns immediately while busy; the existing refresh then
+marks the feed loaded, so another entry call also skips selection recovery.
+This is a confirmed host control-flow defect, not proof of the original native
+observation's cause. No native data or provider operation was involved.
+
+Under the founder's standing overnight verified-defect authority, carry this
+LF01 correction in this existing restart checkpoint and its already-admitted
+WorkSession/atomic/layout owners rather than create another ticket or admission
+framework. This explicit amendment supersedes the assessment-only restriction
+above for this demonstrated race only; no other navigation redesign is allowed.
+Join only the actual pending feed's completion before the existing scoped entry
+recovery. Do not wait on unrelated busy operations, start a duplicate refresh,
+clear another operation's lock, self-wait, invent Store identity or bypass
+production/review/account/disposal/sync/collection checks. A failed feed remains
+an error with explicit retry, not an automatic second request. Verify normal
+entry, concurrent entry, account/disposal, approved feed and production exclusion
+before loading the source correction on OPPO. Morning approval remains pending.
+
+### Implemented restart-entry correction — review pending
+
+WorkSession now exposes only the completion/success of its actual current feed
+to the existing entry loader. A pending entry joins that read once; it neither
+starts another feed nor waits on unrelated busy work. A just-completed empty
+feed also retains the need to consider the saved evaluation selection, distinct
+from feed-loaded status. Account/disposal and production/review guards remain;
+operation locks are rechecked before and after selection storage. Unknown/error
+feed completion does not become success or auto-retry. Mid-selection refusal
+leaves an error and allows deliberate retry using the existing fresh-feed path.
+No router, onboarding, UI layout, provider, schema or saved identity changed.
+
+Final host results:23 review-enabled recovery cases passed, one mutually
+exclusive disabled-review case skipped; the default-mode selection of3 cases
+passed, including that disabled path. Ten normal/200% approved-feed entry/Back/
+retry layout cases passed after the source change. The original failed test now
+recovers the exact saved empty Store with one feed/read. Additional cases cover
+just-completed feed, repeated entry, error/manual retry, approved feed, production,
+account switch then explicit account-B entry, disposal, unrelated busy and a
+lock acquired while selection storage is pending followed by safe explicit retry.
+Focused WorkSession/atomic analysis is clean; scoped diff check passed. These
+are host fixtures, not newly created native Stock/invoices or live commerce.
+
+Actual OPPO source restart5265ms: Buy still showed one soap pack at164. Opened
+Work, tapped Workspace once; first fresh XML contained no readable app nodes.
+Did not tap again. A subsequent fresh read showed the same TEST Store overview:
+Stock29550/18low/24available/6unavailable. Viewed task screenshot
+lf23-entry-recovered-20261016.png. Profile -> Operations -> Store settings
+readback retained15 min/Pickup only,21:30/05:15/Unlimited and device-saved/public-
+sync-pending copy. No Save, product/order/invoice/payment operation, injected
+record, auth action, APK/install or push. Phone left on these unchanged Settings.
+This supports that one observed restart/entry sequence; the in-flight race was
+controlled only in host tests, and the original native observation's cause is
+not established. Fresh-APK/production-account acceptance is not claimed.

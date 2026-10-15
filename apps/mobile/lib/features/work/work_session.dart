@@ -3779,6 +3779,7 @@ class WorkSession extends ChangeNotifier {
 
   bool initialWorkspaceStateLoaded = false;
   bool _loadingWorkspaceEntry = false;
+  Future<bool>? _workspaceFeedRefresh;
   bool _lastWorkspaceFeedEmpty = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
@@ -11886,16 +11887,20 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get _workspaceEntryOperationBlocked =>
+      busy ||
+      workspaceOperationsSyncing ||
+      workspaceHandoverBusy ||
+      _collection?.busy == true ||
+      _collection?.needsReconciliation == true;
+
   Future<void> refreshFeed() async {
-    if (busy ||
-        workspaceOperationsSyncing ||
-        workspaceHandoverBusy ||
-        _collection?.busy == true ||
-        _collection?.needsReconciliation == true) {
-      return;
-    }
+    if (_workspaceEntryOperationBlocked) return;
     final requestedScope = _contactAccountScope;
     bool current() => !_disposed && requestedScope == _contactAccountScope;
+    final completion = Completer<bool>();
+    _workspaceFeedRefresh = completion.future;
+    var succeeded = false;
     busy = true;
     clearMessages();
     notifyListeners();
@@ -11905,21 +11910,40 @@ class WorkSession extends ChangeNotifier {
       _lastWorkspaceFeedEmpty = records.isEmpty;
       _restoreWorkspaceState(records);
       initialWorkspaceStateLoaded = true;
+      succeeded = true;
       noticeMessage = 'Work opportunities refreshed.';
     } on WorkGatewayException catch (error) {
       if (current()) errorMessage = error.message;
     } finally {
       busy = false;
+      if (identical(_workspaceFeedRefresh, completion.future)) {
+        _workspaceFeedRefresh = null;
+      }
+      completion.complete(succeeded);
       if (!_disposed) notifyListeners();
     }
   }
 
   Future<void> loadInitialWorkspaceState() async {
-    if (initialWorkspaceStateLoaded || busy || _loadingWorkspaceEntry) return;
+    if (_disposed || _loadingWorkspaceEntry) return;
+    final pendingFeed = _workspaceFeedRefresh;
+    final savedReviewEntryPending =
+        initialWorkspaceStateLoaded &&
+        _lastWorkspaceFeedEmpty &&
+        activeWorkspace == null &&
+        _reviewStoreRecoveryEnabled;
+    if (pendingFeed == null &&
+        ((initialWorkspaceStateLoaded && !savedReviewEntryPending) || busy)) {
+      return;
+    }
     final account = _contactAccountScope;
     _loadingWorkspaceEntry = true;
     try {
-      await refreshFeed();
+      if (pendingFeed != null) {
+        if (!await pendingFeed) return;
+      } else if (!initialWorkspaceStateLoaded) {
+        await refreshFeed();
+      }
       if (_disposed || account != _contactAccountScope) return;
       if (initialWorkspaceStateLoaded &&
           _lastWorkspaceFeedEmpty &&
@@ -11928,6 +11952,11 @@ class WorkSession extends ChangeNotifier {
         // The feed read is finished. Bind the saved review Store using the
         // normal controller gates, without bypassing the busy-operation guard.
         initialWorkspaceStateLoaded = false;
+        if (_workspaceEntryOperationBlocked) {
+          throw const WorkGatewayException(
+            'Finish the current Store operation, then retry opening your Workspaces.',
+          );
+        }
         _lastWorkspaceFeedEmpty = false;
         await _restoreSelectedReviewStore();
         if (_disposed || account != _contactAccountScope) return;
@@ -14187,6 +14216,11 @@ class WorkSession extends ChangeNotifier {
     if (seed.accountScope != account) {
       throw const WorkGatewayException(
         'Return to the same review account to reopen this test Store.',
+      );
+    }
+    if (_workspaceEntryOperationBlocked) {
+      throw const WorkGatewayException(
+        'Finish the current Store operation, then retry opening your Workspaces.',
       );
     }
     // Legacy workload selection is archived before opening an empty evaluation
