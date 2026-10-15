@@ -13,6 +13,60 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'));
     await font.load();
   });
+
+  for (final sample in [
+    (title: '', pack: '', label: 'Product photo unavailable'),
+    (title: '  ', pack: ' \n ', label: 'Product photo unavailable'),
+    (title: ' Cumin ', pack: '', label: 'Product photo unavailable for Cumin'),
+    (title: '', pack: ' 100 g ', label: 'Product photo unavailable for 100 g'),
+    (
+      title: ' Cumin ',
+      pack: ' 100 g ',
+      label: 'Product photo unavailable for Cumin, 100 g',
+    ),
+  ]) {
+    testWidgets(
+      'LF21 image announcement omits absent identity: ${sample.label} '
+      '(${sample.title.length}/${sample.pack.length})',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final product = workspaceMasterCatalogue.first.copyWith(
+            canonicalId: 'lf21-unmapped-photo',
+            title: sample.title,
+            pack: sample.pack,
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Scaffold(
+                body: StoreProductThumbnail(
+                  key: const Key('missing-photo'),
+                  product: product,
+                  extent: 48,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.bySemanticsLabel(sample.label), findsOneWidget);
+          expect(find.byTooltip('Product photo unavailable'), findsOneWidget);
+          expect(
+            tester.getSize(find.byKey(const Key('missing-photo'))),
+            const Size.square(48),
+          );
+          expect(
+            find.byIcon(Icons.image_not_supported_outlined),
+            findsOneWidget,
+          );
+          expect(find.byType(Image), findsNothing);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
   testWidgets('Store preserves actual Buy illustration mapping and disclosure', (
     tester,
   ) async {

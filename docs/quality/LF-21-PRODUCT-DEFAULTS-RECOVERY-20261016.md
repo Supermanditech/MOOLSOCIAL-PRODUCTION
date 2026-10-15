@@ -91,3 +91,34 @@ All original mapped dependencies remain explicit. No founder acceptance, push,
 backend connection, public publication, eligibility or full frontend/MVP closure
 is claimed. A separate observed empty-title photo accessibility label belongs to
 the existing product/image follow-up; no unowned thumbnail widget was edited here.
+
+## Bounded observed-image follow-up — implemented, morning review pending
+
+Admit only the existing StoreProductThumbnail and store_product_thumbnail_test
+owners for the blank manual-entry accessibility defect observed above. Use
+trimmed nonempty title/pack components; preserve full identity where supplied,
+and say Product photo unavailable when neither exists. Remove the duplicate
+Tooltip announcement from that unavailable branch only. Preserve successful
+private/evaluation image labels without changing media admission, source,
+layout, containment, loading/error behavior or SKU records. Add a failing
+semantic regression first, retain illustration/fit coverage, analyze and reload
+OPPO for unsaved entry inspection. No new ticket, route, backend or transaction.
+Morning review remains pending; host semantics are not native spoken-TalkBack
+acceptance. Customer-term durable replay remains held for stable identity, not
+silently implemented from display names or phone strings.
+
+All five new semantic cases first reproduced the missing/duplicated announcement;
+after correction all16 thumbnail and23 neighbouring product-content cases pass
+(39 total, no skips). Explicit SemanticsHandle cleanup uses try/finally inside
+the test; the initial teardown failure is not acceptance evidence. Focused Dart
+analysis has no issues. The source change is11 lines in the existing thumbnail;
+media source, containment and persisted values are unchanged.
+
+OPPO source reload3351ms, Stock -> Add products -> Add manually: fresh Android
+semantics now reads Product photo unavailable followed by the existing Product,
+price & stock heading, without dangling separators or duplicated tooltip text.
+The inspected screenshot lf21-thumbnail-fixed-20261016.png retains the approved
+form, low-stock13 and private visibility. Generated draftSKU1792103751393173 was
+not saved. This verifies Android semantic output, not spoken TalkBack operation.
+Back returns through Catalogue to saved Stock; no product or commerce write.
+Morning acceptance and the full mapped frontend/provider requirements stay open.

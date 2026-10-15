@@ -45,7 +45,7 @@
         "Local input recovery is not publication/sync authority; unrelated history and drafts remain accessible."
       ],
       "manifestPath": "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.md",
-      "manifestSha256": "28E3DF3EB852DC6ADD181AE78769002FC2CA5421F92F0DA17A29B38DA63DA277",
+      "manifestSha256": "61B30AAA23EB0463D667586650576AE004EB8E2368475E3F5AC6A1D1936E8084",
       "evidencePath": "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -168,7 +168,9 @@
         "docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.md",
         "docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.json",
         "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.md",
-        "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.json"
+        "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.json",
+        "apps/mobile/lib/features/work/widgets/store_product_thumbnail.dart",
+        "apps/mobile/test/store_product_thumbnail_test.dart"
       ]
     }
   },

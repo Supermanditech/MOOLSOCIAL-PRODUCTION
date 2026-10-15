@@ -33,12 +33,19 @@ class _StoreProductThumbnailState extends State<StoreProductThumbnail> {
   String? _mediaKey;
   Future<Uint8List>? _bytes;
 
+  String get _photoIdentity => [
+    widget.product.title.trim(),
+    widget.product.pack.trim(),
+  ].where((part) => part.isNotEmpty).join(', ');
+
   Widget _missing() => Semantics(
     image: true,
-    label:
-        'Product photo unavailable for ${widget.product.title}, ${widget.product.pack}',
+    label: _photoIdentity.isEmpty
+        ? 'Product photo unavailable'
+        : 'Product photo unavailable for $_photoIdentity',
     child: Tooltip(
       message: 'Product photo unavailable',
+      excludeFromSemantics: true,
       child: Icon(
         Icons.image_not_supported_outlined,
         size: (widget.extent * .45).clamp(16.0, 24.0),

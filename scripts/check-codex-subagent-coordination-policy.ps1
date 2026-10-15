@@ -8060,7 +8060,9 @@ function Invoke-Lf01Admission {
   }
   if ($ProductionTicketId -ceq 'LF-21') {
     $owners += @('docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.json',
-      'docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.md')
+      'docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.md',
+      'apps/mobile/lib/features/work/widgets/store_product_thumbnail.dart',
+      'apps/mobile/test/store_product_thumbnail_test.dart')
   }
   $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{
