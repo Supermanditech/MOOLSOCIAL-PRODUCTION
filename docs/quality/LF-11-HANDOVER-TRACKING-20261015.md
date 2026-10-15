@@ -87,3 +87,30 @@ the actual loaded guard before passive review; preserve Cart164/pending payment
 and current evaluation Store. That Store's0 saved orders limits native coverage
 to static/empty surfaces; do not seed orders to manufacture acceptance. Founder
 review remains pending before Batch12. No service dependency is closed here.
+
+## OPPO reconnection follow-up — 15 October 2026
+
+Founder answered Reconnected. Fresh adb shows device/transport11, MoolSocial in
+foreground and a new app process. Attach7508 waited for the service address;
+the app showed the saved Store Orders surface, no open edit. One app relaunch
+advertised the service, followed by a4004ms debug hot restart. No data was cleared
+and no APK was installed. Read-only VM Script retrieval now proves exact text
+equality of running buy_v2_session.dart and the tested working file, including
+_prepareLiveDeliveryOrder and _liveDeliveryOperations. Source checkpoint332848e1
+is loaded; the earlier offline limitation above is historical, not current.
+
+Native Cart inspection retained one Herbal bathing soap, pack4, quantity1, total164
+and its original payment-review hold. Review payment was not tapped. Returned
+through Work/Workspace to the same TEST Store product-entry evaluation Store,
+then Orders→Delivery:0 saved delivery orders, with unverified online coverage
+explicit. No order, tracking, handover, collection or financial action. Captures
+in task outputs: lf11-cart-restored-20261015.png and
+lf11-store-delivery-review-20261015.png; both visually inspected. One UI dump
+failed during the Workspace transition; fresh capture succeeded, no stale file
+or repeated navigation tap used. USB/app remained connected.
+
+Native evidence proves source loading and retained/static navigation only, not
+live tracking/provider actions on absent orders. Existing268 host checks remain
+the relevant tested-code evidence; no application source changed in this follow-up.
+Founder checkpoint acceptance is still pending before Batch12. Live providers,
+missing revision/stream contracts and all earlier dependencies remain unfinished.

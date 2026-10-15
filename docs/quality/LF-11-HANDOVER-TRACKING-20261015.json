@@ -46,7 +46,7 @@
         "No native tracking query/order/handover/payment. Authoritative stream/revision/proof/customer-update adapters remain unfinished where absent."
       ],
       "manifestPath": "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
-      "manifestSha256": "54D70A9E1D7877315CFDA402B9546CD90D6FE80A2465EEB6F7809DBE0FFFF8BA",
+      "manifestSha256": "C5986E3219059B7A54E11020CE8D8E5039E1F14DE5E05F7283F4674109005D4E",
       "evidencePath": "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
