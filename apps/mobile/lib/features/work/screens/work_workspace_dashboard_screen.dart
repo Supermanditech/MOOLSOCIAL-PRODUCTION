@@ -36633,9 +36633,10 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
     final eligibleCustomers = widget.session.workspaceCustomerBook
         .where((customer) => customer.messagesAllowed)
         .length;
-    final products = widget.session.workspaceCatalogueItems
-        .where((product) => product.published)
-        .toList(growable: false);
+    // Draft preparation may reference private saved Stock. This does not grant
+    // public visibility, campaign eligibility or publication authority.
+    final products = widget.session.workspaceCatalogueItems.toList(growable: false);
+    final hasPublicProducts = products.any((product) => product.published);
     final selectedProduct = products
         .where((product) => product.id == _productId)
         .firstOrNull;
@@ -36644,7 +36645,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
       key: const Key('work-store-offers-screen'),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
       children: [
-        if (products.isEmpty || eligibleCustomers == 0)
+        if (!hasPublicProducts || eligibleCustomers == 0)
           const Text(
             'Create offer',
             style: TextStyle(
@@ -36671,7 +36672,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
           Text(error, key: const Key('work-offer-draft-error')),
         ],
         if (!_draftLoaded) TextButton(onPressed: _restoreDraft, child: const Text('Retry opening draft')),
-        if (products.isEmpty || eligibleCustomers == 0) ...[
+        if (!hasPublicProducts || eligibleCustomers == 0) ...[
           const SizedBox(height: 8),
           Container(
             key: const Key('work-offer-prerequisites'),
@@ -36679,7 +36680,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (products.isEmpty) ...[
+                if (!hasPublicProducts) ...[
                   const Text(
                     'No public products yet.',
                     style: TextStyle(fontSize: 13),
@@ -36735,7 +36736,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
           key: const Key('work-offer-product'),
           isExpanded: true,
           initialValue: selectedProduct?.id,
-          decoration: const InputDecoration(labelText: 'Product'),
+          decoration: const InputDecoration(labelText: 'Saved product for this draft'),
           items: products
               .map(
                 (product) => DropdownMenuItem(
@@ -36753,6 +36754,18 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             _retainDraft();
           },
         ),
+        if (selectedProduct != null && !selectedProduct.published)
+          const Text(
+            'Private product selected for draft only. Not public or eligible to publish.',
+            key: Key('work-offer-private-product'),
+            style: TextStyle(fontSize: 12, color: MoolColors.muted),
+          ),
+        if (_productId != null && selectedProduct == null)
+          const Text(
+            'The saved product is not available in this Store. Its reference is kept; choose another saved product to replace it.',
+            key: Key('work-offer-missing-product'),
+            style: TextStyle(fontSize: 12, color: MoolColors.muted),
+          ),
         const SizedBox(height: 8),
         _AccessibleWorkTextField(
           keyName: 'work-offer-title',
@@ -36900,6 +36913,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
                     _validUntil == null ||
                     _validUntil!.isBefore(DateUtils.dateOnly(DateTime.now())) ||
                     selectedProduct == null ||
+                    !selectedProduct.published ||
                     eligibleCustomers == 0 ||
                     cap <= 0
                 ? null

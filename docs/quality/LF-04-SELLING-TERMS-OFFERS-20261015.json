@@ -50,7 +50,7 @@
         "Live pack/pricing/publication/benefit authority remains service-dependent."
       ],
       "manifestPath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
-      "manifestSha256": "523ED2BC7C74C78C305393FBA7A3E88C47344E06BF603FAB5CF7E0737B8CA8CB",
+      "manifestSha256": "7045D0A4E378F02F4C21249D998D43CE6A40A8AE56C91D8F0D673243CA1F38B3",
       "evidencePath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -80,7 +80,7 @@
     "testAndEvidencePlan": [
       "Fail before corrections; MOQ+n*step and tier amounts, changed/expired/incorrect source terms, channel/Store isolation, no fake offer success, existing entry/import and public regressions.",
       "Use real app journeys only for runtime data; host contract fixtures are not live provider acceptance.",
-      "84 selected host cases passed (69 product/channel/settings,14 LF navigation/editor/draft,1 production-offer guard); changed source/tests analysis clean,8 pre-existing dashboard infos. OPPO actual partial offer draft saved and restored after hot restart; live provider acceptance and founder review remain pending."
+      "84 prior selected host cases passed; founder approved checkpoint11c8b53f on OPPO, excluding live provider results. Private-product selector successor:12 LF04 cases passed including2 new missing-reference cases; analysis same8 existing infos only. Native selector review/restore pending app availability."
     ],
     "frontendAdmission": {
       "task": "/root",
@@ -142,7 +142,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder: Approve Batch03; proceed to Batch04. Batch04 application/device acceptance remains pending."
+    "founderAcceptance": "Founder approved Batch04 first checkpoint 11c8b53f on OPPO: private draft recovery and selling-term guards. Live publication, benefits and provider readback excluded. Remaining private-product draft correction awaits tests/device review; whole Batch04 not accepted."
   },
   "execution": {
     "referenceWriteAuthorized": false,

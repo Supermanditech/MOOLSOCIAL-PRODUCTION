@@ -51,7 +51,7 @@ attributes, redesign or edits in Cursor/other worktrees. Required source revisio
 service eligibility, publishing/benefit application remain unimplemented provider
 dependencies until supplied and actually integrated. No runtime success fixtures.
 
-## Implemented frontend checkpoint — founder review pending
+## Implemented frontend checkpoint — founder approved
 
 - Existing BuyV2PackTerms may be supplied to the Store projection. Validate exact
   SKU/pack, quantity step, case/content quantity when supplied, every tier threshold
@@ -137,5 +137,34 @@ live supplier/MoolSocial benefit acceptance. Commercial Cart proofs are host-onl
 | Native public quantity/tier acceptance | Genuine Store-origin provider data must reach Buy before this can be a real device journey; host fixtures are not a substitute. |
 
 This is a tested supported-frontend checkpoint, NOT whole-Batch04, connected MVP,
-provider or APK completion. Founder review remains pending; do not advance Batch05
-on an assumed acceptance. Keep the full active two-way MVP goal unchanged.
+provider or APK completion. Founder explicitly approved checkpoint 11c8b53f on
+OPPO; live publishing, benefits and provider readback were excluded. Keep the full
+active two-way MVP goal unchanged.
+
+### Private saved-product draft correction — host tested, device review pending
+
+The offer draft listed only published products, preventing private preparation
+against saved Stock while publishing is unavailable. The same selector now lists
+the current Store's saved products. Private selections are explicitly draft-only;
+missing/foreign references stay unresolved and retained, not silently replaced.
+The publication guard still requires a public product and the session refuses
+publication without a publisher. No Stock duplication, provider acknowledgement,
+live benefit or campaign engine.
+
+Failing-before: both 320px normal/200% widget cases could not find the saved private
+product. After correction, all 12 LF04 cases pass, including two additional missing
+reference cases. Save/reopen preserves the exact private product ID, Stock12 and
+private status; missing references save without exposing another Store's details.
+Changed source/test analysis has no errors/warnings, only the same8 pre-existing
+dashboard style infos. One new test initially used a generic helper that attempted
+to scroll an inner text field; selecting the known offer ListView fixed that test
+warning and the full12-case rerun is clean. This is a test-scrolling correction,
+not another product defect. Previously verified unchanged-source69+1 cases remain
+valid; they were not needlessly rerun for this UI-only change.
+
+Hot reload reported one library loaded in4082ms, then the attach disconnected.
+OPPO moved outside MoolSocial before this new selector could be inspected. No tap
+was made in the other app; founder was asked to return. Native private-SKU selection,
+saved restoration and founder review of this correction remain pending. The earlier
+11c8b53f approval does not accept an unseen successor. Architect context review
+found no demonstrated stop issue; it grants no device/provider acceptance.

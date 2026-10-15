@@ -681,8 +681,14 @@ void main() {
     testWidgets('LF04 offer form saves and restores a private draft at $scale', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      WorkSession open() => _testWorkSession(offerDraftStoreFactory: (id) =>
-        _Lf04SecureOfferDraft(id, () => 'review-case-widget'))..seedVerifiedWorkspace();
+      final product = workspaceMasterCatalogue.first.copyWith(
+        publicListing: false, stock: 12);
+      WorkSession open() {
+        final session = _testWorkSession(offerDraftStoreFactory: (id) =>
+          _Lf04SecureOfferDraft(id, () => 'review-case-widget'))..seedVerifiedWorkspace();
+        session.workspaceCatalogueItems..clear()..add(product);
+        return session;
+      }
       Future<void> offers() async {
         for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
           'work-business-grow', 'work-growth-offers']) {
@@ -700,6 +706,14 @@ void main() {
       await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
         size: const Size(320, 568));
       await offers();
+      await revealOffer(find.byKey(const Key('work-offer-product')));
+      await tester.tap(find.byKey(const Key('work-offer-product')));
+      await tester.pumpAndSettle();
+      final choice = find.text('${product.title} · ${product.pack}');
+      expect(choice, findsOneWidget);
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-offer-private-product')), findsOneWidget);
       for (final field in {'title': 'Host offer draft', 'detail': 'Host terms, not published'}.entries) {
         final input = find.byKey(Key('work-offer-${field.key}'));
         await revealOffer(input);
@@ -711,11 +725,18 @@ void main() {
       await tapVisible(tester, const Key('work-offer-save-draft'));
       expect(work.noticeMessage, contains('Not published'));
       expect(work.workspaceOffers, isEmpty);
+      expect(work.workspaceOfferDraft['productId'], product.id);
+      expect(work.workspaceCatalogueItems.single.stock, 12);
+      expect(work.workspaceCatalogueItems.single.published, isFalse);
       expect(tester.takeException(), isNull);
       final restored = open();
       await mount(tester, route: '/app/work/workspace/dashboard', workSession: restored,
         size: const Size(320, 568));
       await offers();
+      await revealOffer(find.byKey(const Key('work-offer-product')));
+      expect(restored.workspaceOfferDraft['productId'], product.id);
+      expect(find.text('${product.title} · ${product.pack}'), findsOneWidget);
+      expect(find.byKey(const Key('work-offer-private-product')), findsOneWidget);
       for (final field in {'title': 'Host offer draft', 'detail': 'Host terms, not published'}.entries) {
         final input = find.byKey(Key('work-offer-${field.key}'));
         await revealOffer(input);
@@ -723,6 +744,37 @@ void main() {
           matching: find.byType(EditableText))).controller.text, field.value);
       }
       expect(restored.workspaceOffers, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('LF04 missing draft product stays unresolved at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final work = _testWorkSession(offerDraftStoreFactory: (id) =>
+        _Lf04SecureOfferDraft(id, () => 'review-case-widget'))..seedVerifiedWorkspace();
+      final id = work.activeWorkspace!.id;
+      await work.loadWorkspaceOfferDraft(expectedStoreId: id);
+      work.workspaceOfferDraft.addAll({'title': 'Missing product draft',
+        'productId': 'host-product-in-another-store'});
+      work.workspaceCatalogueItems.clear();
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+        'work-business-grow', 'work-growth-offers']) {
+        await tapVisible(tester, Key(key));
+      }
+      final unresolved = find.byKey(const Key('work-offer-missing-product'));
+      await tester.scrollUntilVisible(unresolved, 100, scrollable: find.descendant(
+        of: find.byKey(const Key('work-store-offers-screen')),
+        matching: find.byType(Scrollable)).first);
+      expect(unresolved, findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(const Key('work-offer-save-draft')),
+        100, scrollable: find.descendant(
+          of: find.byKey(const Key('work-store-offers-screen')),
+          matching: find.byType(Scrollable)).first);
+      await tapVisible(tester, const Key('work-offer-save-draft'));
+      expect(work.workspaceOfferDraft['productId'], 'host-product-in-another-store');
+      expect(work.workspaceOffers, isEmpty);
+      expect(work.workspaceCatalogueItems, isEmpty);
       expect(tester.takeException(), isNull);
     });
     testWidgets('LF04 existing selling editor retains shared Stock terms at $scale', (tester) async {
