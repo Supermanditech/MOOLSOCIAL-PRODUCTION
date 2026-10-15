@@ -6161,7 +6161,10 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2OrderResolutionSnapshot> _orderResolutionSnapshots =
       {};
   final Map<String, BuyV2OrderResolutionResult> _orderResolutionResults = {};
-  final Set<String> _orderResolutionBusyIds = {};
+  final Map<String, Object> _orderResolutionOperations = {};
+  final Map<String, BuyV2Order> _orderResolutionOrders = {};
+  (String?, String?, String?, int, int)? _orderResolutionScope;
+  final Set<String> _orderResolutionUnconfirmed = {};
   List<BuyV2ShoppingAlert> _shoppingAlerts = [];
   BuyV2ShoppingAlertsState shoppingAlertsState =
       BuyV2ShoppingAlertsState.loading;
@@ -6174,7 +6177,10 @@ class BuyV2Session extends ChangeNotifier {
   int _balancePaymentAttemptSequence = 0;
   final Map<String, BuyV2DeliveryExceptionSnapshot>
   _deliveryExceptionSnapshots = {};
-  final Set<String> _deliveryExceptionBusyOrderIds = {};
+  final Map<String, Object> _deliveryExceptionOperations = {};
+  final Map<String, BuyV2Order> _deliveryExceptionOrders = {};
+  (String?, String?, String?, int, int)? _deliveryExceptionScope;
+  final Set<String> _deliveryExceptionUnconfirmed = {};
   final Map<String, String> _selectedDeliveryRescheduleSlots = {};
   final Map<String, BuyV2LiveDeliverySnapshot> _liveDeliverySnapshots = {};
   final Map<String, Object> _liveDeliveryOperations = {};
@@ -7141,13 +7147,99 @@ class BuyV2Session extends ChangeNotifier {
     };
   }
 
+  bool _sameDeliveryExceptionOrder(BuyV2Order original, BuyV2Order? latest) {
+    if (!_sameLiveDeliveryOrder(original, latest) ||
+        original.lines.length != latest!.lines.length) {
+      return false;
+    }
+    for (var i = 0; i < original.lines.length; i++) {
+      final a = original.lines[i];
+      final b = latest.lines[i];
+      if (a.quantity != b.quantity ||
+          a.product.id != b.product.id ||
+          a.product.variant != b.product.variant ||
+          a.product.pack != b.product.pack) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  BuyV2Order? _prepareDeliveryExceptionOrder(String orderId) {
+    if (_collectionDisposed || !procurementScopeCurrent) return null;
+    final scope = _currentCustomerOrderScope;
+    if (_deliveryExceptionScope != scope) {
+      _deliveryExceptionScope = scope;
+      _deliveryExceptionOperations.clear();
+      _deliveryExceptionOrders.clear();
+      _deliveryExceptionSnapshots.clear();
+      _selectedDeliveryRescheduleSlots.clear();
+      _deliveryExceptionUnconfirmed.clear();
+    }
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final original = _deliveryExceptionOrders[orderId];
+    if (order == null ||
+        (original != null && !_sameDeliveryExceptionOrder(original, order))) {
+      _deliveryExceptionOperations.remove(orderId);
+      _deliveryExceptionOrders.remove(orderId);
+      _deliveryExceptionSnapshots.remove(orderId);
+      _selectedDeliveryRescheduleSlots.remove(orderId);
+      _deliveryExceptionUnconfirmed.remove(orderId);
+    }
+    return order;
+  }
+
+  bool _deliveryExceptionCurrent(
+    String orderId,
+    BuyV2Order order,
+    (String?, String?, String?, int, int)? scope,
+    Object operation,
+  ) =>
+      !_collectionDisposed &&
+      procurementScopeCurrent &&
+      scope == _currentCustomerOrderScope &&
+      identical(_deliveryExceptionOperations[orderId], operation) &&
+      _sameDeliveryExceptionOrder(
+        order, _orders.where((o) => o.id == orderId).firstOrNull,
+      );
+
+  void _finishDeliveryException(
+    String orderId,
+    (String?, String?, String?, int, int)? scope,
+    Object operation,
+  ) {
+    if (!_collectionDisposed &&
+        scope == _currentCustomerOrderScope &&
+        identical(_deliveryExceptionOperations[orderId], operation)) {
+      _deliveryExceptionOperations.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  static const _deliveryExceptionUnconfirmedMessage =
+      'Delivery change is not confirmed. Check with support before submitting again.';
+
+  void _holdUnconfirmedDeliveryException(String orderId) {
+    _deliveryExceptionUnconfirmed.add(orderId);
+    _selectedDeliveryRescheduleSlots.remove(orderId);
+    notice = _deliveryExceptionUnconfirmedMessage;
+  }
+
   bool deliveryExceptionBusy(String orderId) =>
-      _deliveryExceptionBusyOrderIds.contains(orderId);
+      _prepareDeliveryExceptionOrder(orderId) != null &&
+      _deliveryExceptionOperations.containsKey(orderId);
 
   BuyV2DeliveryExceptionSnapshot? deliveryExceptionFor(String orderId) {
+    if (_prepareDeliveryExceptionOrder(orderId) == null) return null;
+    // A general status read is not key-correlated command reconciliation.
+    // Keep uncertain mutations non-actionable for this scoped session.
+    if (_deliveryExceptionUnconfirmed.contains(orderId)) {
+      return const BuyV2DeliveryExceptionSnapshot(
+        state: BuyV2CommerceLoadState.unavailable,
+        customerMessage: _deliveryExceptionUnconfirmedMessage,
+      );
+    }
     final snapshot = _deliveryExceptionSnapshots[orderId];
-    // An order refresh can replace its purchased lines after a receipt loaded.
-    // Never render or dispute receipt lines against a different purchase.
     if (snapshot?.itemisedReceipt != null &&
         !_validDeliveryExceptionSnapshot(snapshot!, orderId)) {
       return const BuyV2DeliveryExceptionSnapshot(
@@ -7159,51 +7251,68 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String? selectedDeliveryRescheduleSlot(String orderId) =>
-      _selectedDeliveryRescheduleSlots[orderId];
+      _prepareDeliveryExceptionOrder(orderId) == null
+      ? null : _selectedDeliveryRescheduleSlots[orderId];
 
   Future<bool> restoreDeliveryException(String orderId) async {
+    final order = _prepareDeliveryExceptionOrder(orderId);
     final adapter = deliveryExceptionAdapter;
-    final orderExists = _orders.any((order) => order.id == orderId);
-    if (adapter == null ||
-        !orderExists ||
-        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+    if (adapter == null || order == null ||
+        _deliveryExceptionOperations.containsKey(orderId)) {
       return false;
     }
-    notifyListeners();
+    final operation = Object();
+    final scope = _deliveryExceptionScope;
+    _deliveryExceptionOperations[orderId] = operation;
+    _deliveryExceptionOrders[orderId] = order;
+    bool current() => _deliveryExceptionCurrent(orderId, order, scope, operation);
     try {
+      notifyListeners();
+      if (!current()) return false;
       final snapshot = await adapter.loadException(orderId: orderId);
+      if (!current()) return false;
       if (!_validDeliveryExceptionSnapshot(snapshot, orderId)) {
         _deliveryExceptionSnapshots[orderId] =
             const BuyV2DeliveryExceptionSnapshot(
               state: BuyV2CommerceLoadState.unavailable,
-              customerMessage:
-                  'Delivery receipt could not be verified. Try again.',
+              customerMessage: 'Delivery receipt could not be verified. Try again.',
             );
+        _selectedDeliveryRescheduleSlots.remove(orderId);
         return false;
       }
-      _deliveryExceptionSnapshots[orderId] = snapshot;
+      final previous = _deliveryExceptionSnapshots[orderId];
       final selected = _selectedDeliveryRescheduleSlots[orderId];
-      if (selected != null && !snapshot.rescheduleSlots.contains(selected)) {
+      if (snapshot.state != BuyV2CommerceLoadState.ready ||
+          snapshot.kind != BuyV2DeliveryExceptionKind.rescheduleAvailable ||
+          previous?.exceptionId != snapshot.exceptionId ||
+          !snapshot.rescheduleSlots.contains(selected)) {
         _selectedDeliveryRescheduleSlots.remove(orderId);
       }
+      _deliveryExceptionSnapshots[orderId] = snapshot;
       return true;
     } on Object {
+      if (!current()) return false;
       _deliveryExceptionSnapshots[orderId] =
           const BuyV2DeliveryExceptionSnapshot(
             state: BuyV2CommerceLoadState.offline,
-            customerMessage:
-                'Delivery updates could not be checked. Try again.',
+            customerMessage: 'Delivery updates could not be checked. Try again.',
           );
+      _selectedDeliveryRescheduleSlots.remove(orderId);
       return false;
     } finally {
-      _deliveryExceptionBusyOrderIds.remove(orderId);
-      notifyListeners();
+      _finishDeliveryException(orderId, scope, operation);
     }
   }
 
   bool chooseDeliveryRescheduleSlot(String orderId, String slot) {
-    final snapshot = _deliveryExceptionSnapshots[orderId];
-    if (snapshot == null || !snapshot.rescheduleSlots.contains(slot)) {
+    if (_prepareDeliveryExceptionOrder(orderId) == null ||
+        _deliveryExceptionOperations.containsKey(orderId)) {
+      return false;
+    }
+    final snapshot = deliveryExceptionFor(orderId);
+    if (snapshot?.state != BuyV2CommerceLoadState.ready ||
+        snapshot?.kind != BuyV2DeliveryExceptionKind.rescheduleAvailable ||
+        !snapshot!.rescheduleSlots.contains(slot)) {
       notice = 'This delivery time is no longer available.';
       notifyListeners();
       return false;
@@ -7215,27 +7324,36 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> confirmDeliveryReschedule(String orderId) async {
+    final order = _prepareDeliveryExceptionOrder(orderId);
     final adapter = deliveryExceptionAdapter;
-    final snapshot = _deliveryExceptionSnapshots[orderId];
+    final snapshot = deliveryExceptionFor(orderId);
     final exceptionId = snapshot?.exceptionId;
     final slot = _selectedDeliveryRescheduleSlots[orderId];
-    if (adapter == null ||
-        snapshot == null ||
-        exceptionId == null ||
-        slot == null ||
-        !snapshot.rescheduleSlots.contains(slot) ||
-        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+    if (adapter == null || order == null ||
+        snapshot?.state != BuyV2CommerceLoadState.ready ||
+        snapshot?.kind != BuyV2DeliveryExceptionKind.rescheduleAvailable ||
+        exceptionId == null || slot == null ||
+        !snapshot!.rescheduleSlots.contains(slot) ||
+        _deliveryExceptionOperations.containsKey(orderId)) {
       return false;
     }
-    notifyListeners();
+    final operation = Object();
+    final scope = _deliveryExceptionScope;
+    _deliveryExceptionOperations[orderId] = operation;
+    _deliveryExceptionOrders[orderId] = order;
+    bool current() => _deliveryExceptionCurrent(orderId, order, scope, operation);
     try {
+      notifyListeners();
+      if (!current()) return false;
       final updated = await adapter.rescheduleDelivery(
-        orderId: orderId,
-        exceptionId: exceptionId,
-        slot: slot,
+        orderId: orderId, exceptionId: exceptionId, slot: slot,
       );
-      if (!_validDeliveryExceptionSnapshot(updated, orderId)) {
-        notice = 'Delivery update could not be verified. Try again.';
+      if (!current()) return false;
+      if (!_validDeliveryExceptionSnapshot(updated, orderId) ||
+          updated.state != BuyV2CommerceLoadState.ready ||
+          updated.exceptionId != exceptionId ||
+          updated.kind == null) {
+        _holdUnconfirmedDeliveryException(orderId);
         return false;
       }
       _deliveryExceptionSnapshots[orderId] = updated;
@@ -7243,46 +7361,56 @@ class BuyV2Session extends ChangeNotifier {
       notice = updated.customerMessage;
       return true;
     } on Object {
-      notice = 'Delivery could not be rescheduled. Try again.';
+      if (!current()) return false;
+      _holdUnconfirmedDeliveryException(orderId);
       return false;
     } finally {
-      _deliveryExceptionBusyOrderIds.remove(orderId);
-      notifyListeners();
+      _finishDeliveryException(orderId, scope, operation);
     }
   }
 
   Future<bool> disputeProofOfDelivery(String orderId) async {
+    final order = _prepareDeliveryExceptionOrder(orderId);
     final adapter = deliveryExceptionAdapter;
     final snapshot = deliveryExceptionFor(orderId);
     final exceptionId = snapshot?.exceptionId;
     final proofReference = snapshot?.proofReference;
-    if (adapter == null ||
+    if (adapter == null || order == null ||
+        snapshot?.state != BuyV2CommerceLoadState.ready ||
         snapshot?.kind != BuyV2DeliveryExceptionKind.proofOfDeliveryAvailable ||
-        exceptionId == null ||
-        proofReference == null ||
-        !_deliveryExceptionBusyOrderIds.add(orderId)) {
+        exceptionId == null || proofReference == null ||
+        _deliveryExceptionOperations.containsKey(orderId)) {
       return false;
     }
-    notifyListeners();
+    final operation = Object();
+    final scope = _deliveryExceptionScope;
+    _deliveryExceptionOperations[orderId] = operation;
+    _deliveryExceptionOrders[orderId] = order;
+    bool current() => _deliveryExceptionCurrent(orderId, order, scope, operation);
     try {
+      notifyListeners();
+      if (!current()) return false;
       final updated = await adapter.disputeProofOfDelivery(
-        orderId: orderId,
-        exceptionId: exceptionId,
-        proofReference: proofReference,
+        orderId: orderId, exceptionId: exceptionId, proofReference: proofReference,
       );
-      if (!_validDeliveryExceptionSnapshot(updated, orderId)) {
-        notice = 'Delivery update could not be verified. Try again.';
+      if (!current()) return false;
+      if (!_validDeliveryExceptionSnapshot(updated, orderId) ||
+          updated.state != BuyV2CommerceLoadState.ready ||
+          updated.exceptionId != exceptionId ||
+          updated.kind != BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed ||
+          updated.proofReference != proofReference) {
+        _holdUnconfirmedDeliveryException(orderId);
         return false;
       }
       _deliveryExceptionSnapshots[orderId] = updated;
       notice = updated.customerMessage;
-      return updated.kind == BuyV2DeliveryExceptionKind.proofOfDeliveryDisputed;
+      return true;
     } on Object {
-      notice = 'Proof of delivery could not be reported. Try again.';
+      if (!current()) return false;
+      _holdUnconfirmedDeliveryException(orderId);
       return false;
     } finally {
-      _deliveryExceptionBusyOrderIds.remove(orderId);
-      notifyListeners();
+      _finishDeliveryException(orderId, scope, operation);
     }
   }
 
@@ -12965,14 +13093,75 @@ class BuyV2Session extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  BuyV2OrderResolutionSnapshot? orderResolutionFor(String orderId) =>
-      _orderResolutionSnapshots[orderId];
+  BuyV2Order? _prepareOrderResolution(String orderId) {
+    if (_collectionDisposed || !procurementScopeCurrent) return null;
+    final scope = _currentCustomerOrderScope;
+    if (_orderResolutionScope != scope) {
+      _orderResolutionScope = scope;
+      _orderResolutionOperations.clear();
+      _orderResolutionOrders.clear();
+      _orderResolutionSnapshots.clear();
+      _orderResolutionResults.clear();
+      _orderResolutionUnconfirmed.clear();
+    }
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final original = _orderResolutionOrders[orderId];
+    if (order == null ||
+        (original != null && !_sameDeliveryExceptionOrder(original, order))) {
+      _orderResolutionOperations.remove(orderId);
+      _orderResolutionOrders.remove(orderId);
+      _orderResolutionSnapshots.remove(orderId);
+      _orderResolutionResults.remove(orderId);
+      _orderResolutionUnconfirmed.remove(orderId);
+    }
+    return order;
+  }
+
+  bool _orderResolutionCurrent(
+    String orderId, BuyV2Order order,
+    (String?, String?, String?, int, int)? scope, Object operation,
+  ) =>
+      !_collectionDisposed && procurementScopeCurrent &&
+      scope == _currentCustomerOrderScope &&
+      identical(_orderResolutionOperations[orderId], operation) &&
+      _sameDeliveryExceptionOrder(
+        order, _orders.where((o) => o.id == orderId).firstOrNull,
+      );
+
+  void _finishOrderResolution(
+    String orderId, (String?, String?, String?, int, int)? scope, Object operation,
+  ) {
+    if (!_collectionDisposed && scope == _currentCustomerOrderScope &&
+        identical(_orderResolutionOperations[orderId], operation)) {
+      _orderResolutionOperations.remove(orderId);
+      notifyListeners();
+    }
+  }
+
+  void _holdUnconfirmedOrderResolution(String orderId) {
+    _orderResolutionUnconfirmed.add(orderId);
+    notice = 'This request is not confirmed. Check with support before submitting again.';
+  }
+
+  BuyV2OrderResolutionSnapshot? orderResolutionFor(String orderId) {
+    if (_prepareOrderResolution(orderId) == null) return null;
+    if (_orderResolutionUnconfirmed.contains(orderId)) {
+      return BuyV2OrderResolutionSnapshot(
+        orderId: orderId, state: BuyV2OrderResolutionState.unavailable,
+        sourceId: 'unconfirmed-request',
+        customerMessage: 'This request is not confirmed. Check with support before submitting again.',
+      );
+    }
+    return _orderResolutionSnapshots[orderId];
+  }
 
   BuyV2OrderResolutionResult? orderResolutionResultFor(String orderId) =>
-      _orderResolutionResults[orderId];
+      _prepareOrderResolution(orderId) == null
+      ? null : _orderResolutionResults[orderId];
 
   bool orderResolutionBusy(String orderId) =>
-      _orderResolutionBusyIds.contains(orderId);
+      _prepareOrderResolution(orderId) != null &&
+      _orderResolutionOperations.containsKey(orderId);
 
   BuyV2OrderResolutionItemEligibility? orderResolutionEligibilityFor(
     String orderId,
@@ -12980,7 +13169,7 @@ class BuyV2Session extends ChangeNotifier {
     String productId,
   ) {
     final order = _orders.where((value) => value.id == orderId).firstOrNull;
-    final snapshot = _orderResolutionSnapshots[orderId];
+    final snapshot = orderResolutionFor(orderId);
     if (order?.status != BuyV2OrderStatus.delivered ||
         snapshot?.state != BuyV2OrderResolutionState.ready ||
         !snapshot!.options.any((option) => option.kind == kind)) {
@@ -13025,13 +13214,15 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> refreshOrderResolution(String orderId) async {
-    final order = _orders
-        .where((candidate) => candidate.id == orderId)
-        .firstOrNull;
-    if (order == null || _orderResolutionBusyIds.contains(orderId)) {
+    final order = _prepareOrderResolution(orderId);
+    if (order == null || _orderResolutionOperations.containsKey(orderId)) {
       return false;
     }
-    _orderResolutionBusyIds.add(orderId);
+    final operation = Object();
+    final scope = _orderResolutionScope;
+    _orderResolutionOperations[orderId] = operation;
+    _orderResolutionOrders[orderId] = order;
+    bool current() => _orderResolutionCurrent(orderId, order, scope, operation);
     // Eligibility refresh does not revoke a confirmed request receipt.
     if (_orderResolutionResults[orderId]?.accepted != true) {
       _orderResolutionResults.remove(orderId);
@@ -13041,9 +13232,11 @@ class BuyV2Session extends ChangeNotifier {
       state: BuyV2OrderResolutionState.loading,
       sourceId: 'loading',
     );
-    notifyListeners();
     try {
+      notifyListeners();
+      if (!current()) return false;
       final snapshot = await orderResolutionAdapter.load(order);
+      if (!current()) return false;
       _orderResolutionSnapshots[orderId] = _validOrderResolutionSnapshot(
         order,
         snapshot,
@@ -13051,6 +13244,7 @@ class BuyV2Session extends ChangeNotifier {
       return _orderResolutionSnapshots[orderId]!.state ==
           BuyV2OrderResolutionState.ready;
     } on Object {
+      if (!current()) return false;
       _orderResolutionSnapshots[orderId] = BuyV2OrderResolutionSnapshot(
         orderId: orderId,
         state: BuyV2OrderResolutionState.unavailable,
@@ -13060,8 +13254,7 @@ class BuyV2Session extends ChangeNotifier {
       );
       return false;
     } finally {
-      _orderResolutionBusyIds.remove(orderId);
-      notifyListeners();
+      _finishOrderResolution(orderId, scope, operation);
     }
   }
 
@@ -13126,14 +13319,16 @@ class BuyV2Session extends ChangeNotifier {
     Map<String, int> itemQuantities = const {},
   }) async {
     final cleanReason = reason.trim();
-    final snapshot = _orderResolutionSnapshots[orderId];
+    final order = _prepareOrderResolution(orderId);
+    if (order == null) return false;
+    final snapshot = orderResolutionFor(orderId);
     final option = snapshot?.options
         .where((candidate) => candidate.kind == kind)
         .firstOrNull;
     if (snapshot?.state != BuyV2OrderResolutionState.ready ||
         option == null ||
         !option.reasons.contains(cleanReason) ||
-        _orderResolutionBusyIds.contains(orderId)) {
+        _orderResolutionOperations.containsKey(orderId)) {
       notice = 'Choose an available request and reason to continue.';
       notifyListeners();
       return false;
@@ -13148,9 +13343,14 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    _orderResolutionBusyIds.add(orderId);
-    notifyListeners();
+    final operation = Object();
+    final scope = _orderResolutionScope;
+    _orderResolutionOperations[orderId] = operation;
+    _orderResolutionOrders[orderId] = order;
+    bool current() => _orderResolutionCurrent(orderId, order, scope, operation);
     try {
+      notifyListeners();
+      if (!current()) return false;
       final result = await orderResolutionAdapter.submit(
         BuyV2OrderResolutionRequest(
           orderId: orderId,
@@ -13160,22 +13360,23 @@ class BuyV2Session extends ChangeNotifier {
           eligibilitySourceId: snapshot!.sourceId,
         ),
       );
+      if (!current()) return false;
       final valid =
           result.customerMessage.trim().isNotEmpty &&
           (!result.accepted || (result.reference?.trim().isNotEmpty ?? false));
       if (!valid) {
-        notice = 'This request could not be confirmed. Try again.';
+        _holdUnconfirmedOrderResolution(orderId);
         return false;
       }
       _orderResolutionResults[orderId] = result;
       notice = result.accepted ? result.customerMessage : null;
       return result.accepted;
     } on Object {
-      notice = 'This request could not be sent. Try again or contact support.';
+      if (!current()) return false;
+      _holdUnconfirmedOrderResolution(orderId);
       return false;
     } finally {
-      _orderResolutionBusyIds.remove(orderId);
-      notifyListeners();
+      _finishOrderResolution(orderId, scope, operation);
     }
   }
 

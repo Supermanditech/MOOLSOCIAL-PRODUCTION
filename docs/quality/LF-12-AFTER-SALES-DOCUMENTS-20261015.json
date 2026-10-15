@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-12",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-12",
+      "customerOutcome": "After-sales recovery and documents remain with the original owner/order; stale delivery-exception callbacks cannot leak or overwrite another context.",
+      "necessityProof": "Existing exception load/reschedule/dispute methods use order-ID-only cache/busy state without owner/auth/disposal or request-token guards. Reuse existing contracts, support and document owners.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/buy/buy_v2_session.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Owner/auth/order/disposal containment for exception reads and actions",
+        "Late-finally and listener reentrancy; stale slot/response rejection",
+        "Original receipt and money/status invariants",
+        "Existing cancellation/refund/support/document regression and explicit provider limits"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder accepted eec5310c and answered Approve; proceed to Batch12.",
+        "No native operational query/action or messages. Authoritative refunds, issued documents and durable key-correlated command recovery remain unimplemented where absent."
+      ],
+      "manifestPath": "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+      "manifestSha256": "C5FA9CD3D660CCE4D8C10CFD827A7D646758D7FAA8677B8D3E25AE21BE8CC20C",
+      "evidencePath": "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-12",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "After-sales recovery and documents remain with the original owner/order; stale delivery-exception callbacks cannot leak or overwrite another context.",
+    "classification": "mvp_required",
+    "classificationReason": "After-sales delivery exception/proof data must not leak across accounts or write after disposal; preserve original-order recovery.",
+    "minimumCompleteScope": [
+      "Audit existing cancellation/refund/support/document frontend and fix demonstrated delivery-exception owner/lifetime races.",
+      "Retain original receipt/order/payment facts and truthful unresolved-provider boundaries.",
+      "Focused fail-before/after host tests; passive OPPO hot reload/source verification and review before13."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder accepted eec5310c and answered Approve; proceed to Batch12.",
+      "No native operational query/action or messages. Authoritative refunds, issued documents and durable key-correlated command recovery remain unimplemented where absent."
+    ],
+    "testAndEvidencePlan": [
+      "Owner/auth/disposal/reentrant/late-finally and stale slots/response races; successful existing flows and immutable order/payment assertions.",
+      "Existing cancellation/refund/support/doc tests; no runtime injected records or actual operational query/action."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.md",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.md",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.json",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_delivery_exception_scope_test.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve; proceed to Batch12. Accepted eec5310c; native live tracking/handover remains unverified."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}
