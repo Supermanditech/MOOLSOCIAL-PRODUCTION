@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [switch]$RequireCompatibilityProbes
+  [switch]$RequireCompatibilityProbes,
+  [switch]$RequireLf01Probes
 )
 
 Set-StrictMode -Version Latest
@@ -49,6 +50,53 @@ function Assert-GateFails([scriptblock]$Invocation, [string]$Expected) {
     ) -ge 0
   }
   Assert-Fixture $failed "negative fixture did not fail with: $Expected"
+}
+
+if ($RequireLf01Probes) {
+  $checker = Join-Path $sourceRoot 'scripts/check-codex-subagent-coordination-policy.ps1'
+  $tokens=$null; $errors=$null
+  $ast=[Management.Automation.Language.Parser]::ParseFile($checker,[ref]$tokens,[ref]$errors)
+  Assert-Fixture ($errors.Count -eq 0) 'coordination checker has parse errors.'
+  $predicate=@($ast.FindAll({param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -ceq 'Test-Lf01AdmissionIdentity'
+  },$true))
+  Assert-Fixture ($predicate.Count -eq 1) 'LF-01 predicate absent/duplicated.'
+  . ([scriptblock]::Create($predicate[0].Extent.Text))
+  $facts=@{Root=$sourceRoot.Replace('\','/'); Branch='work/codex-ui/last-frontend-lf01-20261015'
+    Role='primary'; Task='/root'; Lane='codex_ui'; WorkId='last-frontend-lf01-20261015'
+    Ticket='LF-01'; Phase='coordination_bootstrap'}
+  $cases=0
+  foreach ($phase in @('coordination_bootstrap','task_start','implementation','pre_commit')) {
+    $probe=$facts.Clone(); $probe.Phase=$phase
+    Assert-Fixture (Test-Lf01AdmissionIdentity $probe) 'LF-01 exact identity rejected.'
+    $cases++
+  }
+  foreach ($key in @($facts.Keys)) {
+    $probe=$facts.Clone(); $probe[$key]='unrelated'
+    Assert-Fixture (-not (Test-Lf01AdmissionIdentity $probe)) "LF-01 changed $key admitted."
+    $probe=$facts.Clone(); $probe.Remove($key)
+    Assert-Fixture (-not (Test-Lf01AdmissionIdentity $probe)) "LF-01 missing $key admitted."
+    $cases+=2
+  }
+  $parameters=@{RepositoryRoot=$sourceRoot;AgentRole='primary';AgentTask='/root';UseRecordedClaim=$true
+    ExpectedRegistryEntryCount=4623;ExpectedRegistrySha256='8092CF57C67E40EB09CC4244E70B84A03BA280DA89B03F133F3DED00F7D6D9B3'
+    ProductionLane='codex_ui';ProductionPhase='coordination_bootstrap'
+    ProductionWorkId='last-frontend-lf01-20261015';ProductionTicketId='LF-01'}
+  $actual=@(& $checker @parameters)
+  Assert-Fixture (@($actual | Where-Object { $_ -clike 'LF-01 admission passed:*' }).Count -eq 1) 'LF-01 actual bootstrap did not pass.'
+  $cases++
+  $probe=$parameters.Clone(); $probe.ProductionPhase='candidate_preflight'
+  Assert-GateFails { & $checker @probe } 'exact authorized feature identity'
+  $probe=$parameters.Clone(); $probe.ExpectedRegistryEntryCount=4624
+  Assert-GateFails { & $checker @probe } 'registry generation changed'
+  $probe=$parameters.Clone(); $probe.Remove('UseRecordedClaim'); $probe.ClaimedOwners=@('backend/functions/src/index.ts')
+  Assert-GateFails { & $checker @probe } 'requested an unclaimed owner'
+  $cases+=3
+  Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase pre_build -Lane codex_ui -TicketId LF-01 -UiScope last-frontend-entry-recovery -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime } 'no build/handoff'
+  $cases++
+  Write-Output "LF-01 admission: $cases checks passed, including actual bootstrap and negative ownership/registry/build cases; no app/device qualification."
+  return
 }
 
 if($RequireCompatibilityProbes) {

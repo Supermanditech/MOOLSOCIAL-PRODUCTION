@@ -7896,6 +7896,136 @@ function Assert-ProductionSecretSafe(
   }
 }
 
+function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
+  if ($null -eq $Facts) { return $false }
+  $expected = @{
+    Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015'
+    Branch='work/codex-ui/last-frontend-lf01-20261015'
+    Lane='codex_ui'; WorkId='last-frontend-lf01-20261015'; Ticket='LF-01'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
+    $Facts.ContainsKey('Phase') -and $Facts.Role -ceq 'primary' -and
+    $Facts.Task -ceq '/root' -and $Facts.Phase -cin @(
+      'coordination_bootstrap','task_start','implementation','pre_commit')
+}
+
+function Invoke-Lf01Admission {
+  # Current founder-authorized task admission, not another historical successor.
+  # The closed integration path below and its 83 bindings remain unchanged.
+  $base = '3c5a454bf8af173d9736c75213cafb88e641765c'
+  $recordOwner = 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.json'
+  $manifestOwner = 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.md'
+  $metadata = @($recordOwner,$manifestOwner,
+    'scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/check-cross-agent-incremental-ticket-gate.ps1',
+    'scripts/test-cross-agent-incremental-ticket-gate.ps1')
+  $owners = $metadata + @(
+    'apps/mobile/lib/features/journey01/journey_router.dart',
+    'apps/mobile/lib/features/journey01/journey_session.dart',
+    'apps/mobile/lib/features/work/work_session.dart',
+    'apps/mobile/lib/features/work/work_services.dart',
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/test/journey_session_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+    'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
+    'apps/mobile/test/work_vertical_slice_test.dart',
+    'apps/mobile/test/work_store_atomic_operations_test.dart')
+  $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
+  Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{
+    Root=$root.Replace('\','/'); Branch=$branch[0]; Role=$AgentRole; Task=$AgentTask
+    Lane=$ProductionLane; WorkId=$ProductionWorkId; Ticket=$ProductionTicketId
+    Phase=$ProductionPhase
+  })) 'LF-01 requires its exact authorized feature identity; build, device and closure phases are not admitted.'
+  $record = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
+  $admission = $record.ticket.frontendAdmission
+  Assert-Coordination ($record.ticket.id -ceq 'LF-01' -and
+    $admission.baselineHead -ceq $base -and $admission.branch -ceq $branch[0] -and
+    $admission.worktreePath -ceq $root.Replace('\','/') -and
+    $admission.task -ceq $AgentTask -and $admission.role -ceq $AgentRole -and
+    $admission.lane -ceq $ProductionLane -and $admission.workId -ceq $ProductionWorkId -and
+    $admission.packageId -ceq 'com.moolsocial.app.runtime' -and
+    $admission.reviewVersionName -ceq '1.0.0-r67.3' -and
+    $admission.reviewVersionCode -eq 2026101303 -and
+    (@($admission.owners | Sort-Object) -join '|') -ceq
+    (@($owners | Sort-Object) -join '|')) 'LF-01 baseline, package or literal owner claim changed.'
+  Assert-Coordination (-not $record.execution.backendWriteAuthorized -and
+    -not $record.execution.buildAuthorized -and -not $record.execution.deviceInstallAuthorized -and
+    -not $record.execution.externalServiceWriteAuthorized) 'LF-01 cannot grant backend/build/install/external authority.'
+  $policyOwner = 'config/codex-subagent-coordination-policy.json'
+  $basePolicy = ((@(Get-OctoberCompatibilityGitLines @('show',"${base}:$policyOwner"))) -join "`n") | ConvertFrom-Json
+  $livePolicy = Get-Content -Raw -LiteralPath (Join-Path $root $policyOwner) | ConvertFrom-Json
+  Assert-Coordination (($basePolicy | ConvertTo-Json -Depth 100 -Compress) -ceq
+    ($livePolicy | ConvertTo-Json -Depth 100 -Compress)) 'LF-01 cannot rewrite historical policy, ownership or bindings.'
+  $registryOwner = Join-Path $root 'config/codex-development-regression-registry.json'
+  $currentRegistry = Get-Content -Raw -LiteralPath $registryOwner | ConvertFrom-Json
+  Assert-Coordination (@($currentRegistry.entries).Count -eq $ExpectedRegistryEntryCount -and
+    (Get-Sha256 $registryOwner) -ceq $ExpectedRegistrySha256 -and
+    $livePolicy.registryBinding.entryCount -eq $ExpectedRegistryEntryCount -and
+    $livePolicy.registryBinding.sha256 -ceq $ExpectedRegistrySha256) 'LF-01 registry generation changed.'
+  $head = @(Get-OctoberCompatibilityGitLines @('rev-parse','HEAD'))[0]
+  Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$base,$head) | Out-Null
+  Assert-Coordination ((@(Get-OctoberCompatibilityGitLines @('rev-parse','--is-shallow-repository')))[0] -ceq 'false' -and
+    @(Get-OctoberCompatibilityGitLines @('for-each-ref','--format=%(refname)','refs/replace')).Count -eq 0 -and
+    @(Get-OctoberCompatibilityGitLines @('rev-list','--merges',"$base..$head")).Count -eq 0) 'LF-01 history is shallow, overridden or contains a new merge.'
+  foreach ($operation in @('MERGE_HEAD','CHERRY_PICK_HEAD','REVERT_HEAD','rebase-merge','rebase-apply','info/grafts')) {
+    $operationPath = @(Get-OctoberCompatibilityGitLines @('rev-parse','--git-path',$operation))[0]
+    if (-not [IO.Path]::IsPathRooted($operationPath)) { $operationPath = Join-Path $root $operationPath }
+    Assert-Coordination (-not (Test-Path -LiteralPath $operationPath)) 'LF-01 has an unresolved Git operation/history override.'
+  }
+  Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('ls-files','-v') |
+    Where-Object { $_ -cmatch '^[a-zS] ' }).Count -eq 0) 'LF-01 has hidden index flags.'
+  $changed = @(@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$base)) +
+    @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard'))) | Sort-Object -Unique
+  foreach ($path in $changed) {
+    Assert-Coordination ($path -cin $owners) "LF-01 changed an unclaimed owner: $path"
+  }
+  if (-not $UseRecordedClaim) {
+    Assert-Coordination ($ClaimedOwners.Count -gt 0) 'LF-01 needs its recorded claim or a nonempty literal subset.'
+    foreach ($path in $ClaimedOwners) { Assert-Coordination ($path -cin $owners) 'LF-01 requested an unclaimed owner.' }
+  }
+  if ($ProductionPhase -ceq 'coordination_bootstrap') {
+    Assert-Coordination ($head -ceq $base) 'LF-01 bootstrap must start at the accepted baseline.'
+    foreach ($path in $changed) { Assert-Coordination ($path -cin $metadata) 'LF-01 bootstrap cannot edit application source/tests.' }
+  }
+  if ($ProductionPhase -ceq 'implementation') {
+    Assert-Coordination ($head -cne $base) 'LF-01 activation must be checkpointed before application implementation.'
+  }
+  if ($head -ceq $base -and $ProductionPhase -ceq 'pre_commit') {
+    foreach ($path in $changed) { Assert-Coordination ($path -cin $metadata) 'LF-01 first checkpoint must contain admission metadata only.' }
+  }
+  if ($ProductionPhase -ceq 'task_start') {
+    Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('status','--porcelain')).Count -eq 0) 'LF-01 task start requires a clean source checkpoint.'
+  }
+  foreach ($commit in @(Get-OctoberCompatibilityGitLines @('rev-list',"$base..$head"))) {
+    $subject = @(Get-OctoberCompatibilityGitLines @('show','-s','--format=%s',$commit))[0]
+    Assert-Coordination ($subject -cmatch '^ui\(last-frontend-lf01-20261015\): .+') 'LF-01 contains an unrelated commit subject.'
+    foreach ($path in @(Get-OctoberCompatibilityGitLines @('diff-tree','--no-renames','--no-commit-id','--name-only','-r',$commit))) {
+      Assert-Coordination ($path -cin $owners) 'LF-01 committed an unclaimed owner.'
+    }
+  }
+  & (Join-Path $root 'scripts/check-mvp-scope-gate-state.ps1') -RepositoryRoot $root `
+    -StatePath $recordOwner -CandidateId LF-01 -RequireExecutionAuthorized
+  Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
+  Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
+  if ($ProductionPhase -ceq 'pre_commit') {
+    Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -gt 0 -and
+      @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
+      @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'LF-01 precommit requires fully staged owned changes.'
+  }
+  Write-Output "LF-01 admission passed: phase=$ProductionPhase; owners=$($owners.Count); baseline=$base; no APK/provider/acceptance authority."
+}
+
+# A new authorized frontend task must not replay the completed integration graph.
+if ($ProductionTicketId -ceq 'LF-01' -or $ProductionWorkId -ceq 'last-frontend-lf01-20261015' -or
+    $root.Replace('\','/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015') {
+  Invoke-Lf01Admission
+  return
+}
+
 $policyPath = Join-Path $root 'config/codex-subagent-coordination-policy.json'
 $registryPath = Join-Path $root 'config/codex-development-regression-registry.json'
 $agentsPath = Join-Path $root 'AGENTS.md'

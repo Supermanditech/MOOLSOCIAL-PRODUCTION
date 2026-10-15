@@ -95,6 +95,25 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
   }catch{return $false}
 }
 
+# The accepted combined source is LF-01's start, not the retired August ticket.
+# Delegate to the current exact owner/scope/Git checks; historical paths below
+# remain unchanged. This grants no build, install or handoff acceptance.
+if ($TicketId -ceq 'LF-01' -or $UiScope -ceq 'last-frontend-entry-recovery') {
+  Assert-IncrementalTicket ($TicketId -ceq 'LF-01' -and $Lane -ceq 'codex_ui' -and
+    $UiScope -ceq 'last-frontend-entry-recovery' -and
+    $PackageId -ceq 'com.moolsocial.app.runtime' -and
+    $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
+    $Phase -cin @('ticket_start','implementation')) 'LF-01 permits only its current hot-reload source identity; no build/handoff.'
+  $binding = (Get-Content -Raw -LiteralPath (Join-Path $root 'config/codex-subagent-coordination-policy.json') | ConvertFrom-Json).registryBinding
+  $coordinationPhase = if ($Phase -ceq 'ticket_start') { 'task_start' } else { 'implementation' }
+  & (Join-Path $root 'scripts/check-codex-subagent-coordination-policy.ps1') `
+    -RepositoryRoot $root -AgentRole primary -AgentTask /root -UseRecordedClaim `
+    -ExpectedRegistryEntryCount $binding.entryCount -ExpectedRegistrySha256 $binding.sha256 `
+    -ProductionLane codex_ui -ProductionPhase $coordinationPhase `
+    -ProductionWorkId last-frontend-lf01-20261015 -ProductionTicketId LF-01
+  return
+}
+
 Assert-IncrementalTicket (
   $resolvedState.StartsWith(
     $root + [IO.Path]::DirectorySeparatorChar,

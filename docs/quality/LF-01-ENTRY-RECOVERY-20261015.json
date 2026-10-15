@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-01",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-01",
+      "customerOutcome": "Return safely to the intended Buy or approved Grocery Store context with the owning Cart and draft preserved.",
+      "necessityProof": "Existing commerce entry must not expose foreign account data or lose work; reuse router, sessions and existing recovery owners instead of another screen or state owner.",
+      "implementationDisposition": ["reuse", "configuration"],
+      "sharedImplementationOwners": ["apps/mobile/lib/features/journey01/journey_router.dart", "apps/mobile/lib/features/journey01/journey_session.dart", "apps/mobile/lib/features/work/work_session.dart", "apps/mobile/lib/features/work/work_services.dart", "apps/mobile/lib/features/buy/buy_v2_session.dart"],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": ["Sign-in and Android Back returns", "Account switch/logout during asynchronous recovery", "Separate consumer and Store supply purpose", "Saved Cart and draft continuity"],
+      "adjustments": ["One Codex writer from the accepted combined baseline; preserve closed integration admission unchanged for historical tasks."],
+      "explicitExclusions": ["No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."],
+      "dependenciesAndApprovals": ["Founder authorized Batch 01 and narrow admission correction on 15 October 2026; OPPO review must precede Batch 02.", "Authoritative Store approval and account access remain provider responsibilities."],
+      "manifestPath": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+      "manifestSha256": "66E03D2BB34301D979ED5FE2EA929A29D4D66E05ED698E24FB5BBB0AA027C0A8",
+      "evidencePath": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-01",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "A MoolSocial account holder returns to the correct Buy or approved Grocery Store without losing the owning Cart or Store draft.",
+    "classification": "mvp_required",
+    "classificationReason": "Safe access and recovery are required for existing commerce, not optional feature depth.",
+    "minimumCompleteScope": ["Inspect existing entry/recovery call paths and focused tests; fix only demonstrated frontend gaps.", "Protect context, sign-in/Back returns and account-safe asynchronous recovery; preserve saved data."],
+    "explicitExclusions": ["No backend, KYC approval, new auth provider, payment, dispatch, redesign, operator workspace, build/install or later LF batch."],
+    "dependenciesAndApprovals": ["The founder authorized sole Codex ownership until a later split and minimal existing-admission correction.", "OPPO founder approval is pending and required before the next batch."],
+    "testAndEvidencePlan": ["Focused router/session tests including late account results, cancel/Back and retained work.", "Impacted existing regressions and OPPO hot-reload inspection; no runtime storage injection."],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Implementation and narrow activation authorized; application behavior and OPPO founder acceptance remain pending."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}
