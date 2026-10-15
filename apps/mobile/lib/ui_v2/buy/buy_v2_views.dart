@@ -20244,6 +20244,33 @@ Future<void> showBuyV2AddressSheet(
   final view = session.view;
   final selectedAddressId = session.selectedAddressId;
   final addresses = session.addresses;
+  final owner = session.customerStateStore?.ownerScope;
+  final buyer = session.collectionIdentity?.value;
+  final navigation = session.navigationMotionSequence;
+  bool scopeCurrent() =>
+      session.customerStateStore?.ownerScope == owner &&
+      session.collectionIdentity?.value?.accountId == buyer?.accountId &&
+      session.collectionIdentity?.value?.sessionId == buyer?.sessionId &&
+      session.procurementScopeCurrent &&
+      session.navigationMotionSequence == navigation &&
+      session.destination == destination &&
+      session.view == view;
+  bool canUseAddressContext(BuildContext actionContext) {
+    if (scopeCurrent() && !session.cartChangesBlocked) return true;
+    if (actionContext.mounted) {
+      ScaffoldMessenger.of(actionContext).showSnackBar(
+        SnackBar(
+          content: Text(
+            session.cartChangesBlocked
+                ? 'Review the existing payment before changing your address.'
+                : 'Your account or page changed. Reopen delivery addresses.',
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+
   final bottomViewPadding = BuyV2AddressSheetMotion.resolveBottomSafeInset(
     context,
   );
@@ -20252,12 +20279,13 @@ Future<void> showBuyV2AddressSheet(
     BuildContext sheetContext,
     String addressId,
   ) async {
+    if (!canUseAddressContext(sheetContext)) return;
     HapticFeedback.selectionClick();
     final routeCompleted = ModalRoute.of(sheetContext)?.completed;
     Navigator.of(sheetContext).pop();
     if (routeCompleted != null) await routeCompleted;
-    if (session.destination != destination ||
-        session.view != view ||
+    if (!context.mounted) return;
+    if (!canUseAddressContext(context) ||
         session.selectedAddressId != selectedAddressId ||
         !session.addresses.any((address) => address.id == addressId)) {
       return;
@@ -20268,9 +20296,11 @@ Future<void> showBuyV2AddressSheet(
   }
 
   Future<void> addAndContinue(BuildContext sheetContext) async {
+    if (!canUseAddressContext(sheetContext)) return;
     final previousAddressId = session.selectedAddressId;
     await _showAddAddressSheet(sheetContext, session);
     if (!continueToCheckoutAfterSelection ||
+        !scopeCurrent() ||
         session.selectedAddressId == previousAddressId ||
         !sheetContext.mounted) {
       return;
@@ -20278,7 +20308,8 @@ Future<void> showBuyV2AddressSheet(
     final routeCompleted = ModalRoute.of(sheetContext)?.completed;
     Navigator.of(sheetContext).pop();
     if (routeCompleted != null) await routeCompleted;
-    if (session.destination == destination && session.view == view) {
+    if (!context.mounted) return;
+    if (canUseAddressContext(context)) {
       session.openCheckout();
     }
   }
@@ -20387,12 +20418,17 @@ Future<void> showBuyV2AddressSheet(
                       address: address,
                       selected: selectedAddressId == address.id,
                       onTap: () => chooseAfterReverse(sheetContext, address.id),
-                      onEdit: () => _showAddAddressSheet(
-                        sheetContext,
-                        session,
-                        existingAddress: address,
-                      ),
+                      onEdit: () {
+                        if (canUseAddressContext(sheetContext)) {
+                          _showAddAddressSheet(
+                            sheetContext,
+                            session,
+                            existingAddress: address,
+                          );
+                        }
+                      },
                       onDelete: () async {
+                        if (!canUseAddressContext(sheetContext)) return;
                         final remove = await showDialog<bool>(
                           context: sheetContext,
                           builder: (dialogContext) => AlertDialog(
@@ -20426,6 +20462,7 @@ Future<void> showBuyV2AddressSheet(
                           ),
                         );
                         if (remove != true || !sheetContext.mounted) return;
+                        if (!canUseAddressContext(sheetContext)) return;
                         if (session.removeAddress(address.id)) {
                           Navigator.of(sheetContext).pop();
                         }
@@ -20459,8 +20496,15 @@ Future<void> showBuyV2AddressSheet(
                   final request = OutlinedButton.icon(
                     style: style,
                     key: const ValueKey('buy-address-request'),
-                    onPressed: () =>
-                        _showAddressRequestSheet(sheetContext, session),
+                    onPressed: () {
+                      if (canUseAddressContext(sheetContext)) {
+                        _showAddressRequestSheet(
+                          sheetContext,
+                          session,
+                          scopeCurrent: scopeCurrent,
+                        );
+                      }
+                    },
                     icon: const Icon(Icons.ios_share_outlined, size: 16),
                     label: const Text('Request address'),
                   );
@@ -20719,8 +20763,9 @@ class _BuyV2AddressChoice extends StatelessWidget {
 
 Future<void> _showAddressRequestSheet(
   BuildContext context,
-  BuyV2Session session,
-) {
+  BuyV2Session session, {
+  required bool Function() scopeCurrent,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -20736,7 +20781,8 @@ Future<void> _showAddressRequestSheet(
     clipBehavior: Clip.antiAlias,
     sheetAnimationStyle: BuyV2AddressFormSheetMotion.resolve(context),
     routeSettings: const RouteSettings(name: 'buy-address-request-form'),
-    builder: (sheetContext) => _BuyV2AddressRequestForm(session: session),
+    builder: (sheetContext) =>
+        _BuyV2AddressRequestForm(session: session, scopeCurrent: scopeCurrent),
   );
 }
 
@@ -20752,9 +20798,13 @@ Future<void> _showAddAddressSheet(
 
   final navigation = session.navigationMotionSequence;
   final owner = session.customerStateStore?.ownerScope;
+  final buyer = session.collectionIdentity?.value;
   bool saveToExistingOwner(BuyV2Address address) {
     if (session.cartChangesBlocked ||
         session.customerStateStore?.ownerScope != owner ||
+        session.collectionIdentity?.value?.accountId != buyer?.accountId ||
+        session.collectionIdentity?.value?.sessionId != buyer?.sessionId ||
+        !session.procurementScopeCurrent ||
         session.navigationMotionSequence != navigation ||
         session.destination != destination ||
         session.view != view ||
@@ -20795,9 +20845,13 @@ Future<void> _showAddAddressSheet(
 }
 
 class _BuyV2AddressRequestForm extends StatefulWidget {
-  const _BuyV2AddressRequestForm({required this.session});
+  const _BuyV2AddressRequestForm({
+    required this.session,
+    required this.scopeCurrent,
+  });
 
   final BuyV2Session session;
+  final bool Function() scopeCurrent;
 
   @override
   State<_BuyV2AddressRequestForm> createState() =>
@@ -20808,6 +20862,23 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
   final recipientController = TextEditingController();
   bool requestBusy = false;
 
+  bool _canUseRequest() {
+    if (widget.scopeCurrent() && !widget.session.cartChangesBlocked) {
+      return true;
+    }
+    if (mounted) {
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your account or page changed. Reopen delivery addresses.',
+          ),
+        ),
+      );
+    }
+    return false;
+  }
+
   @override
   void dispose() {
     recipientController.dispose();
@@ -20815,13 +20886,26 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
   }
 
   Future<void> requestAddress({required bool copyOnly}) async {
-    if (requestBusy) return;
+    if (requestBusy || !_canUseRequest()) return;
     FocusScope.of(context).unfocus();
     setState(() => requestBusy = true);
-    final result = await widget.session.createAddressRequest(
-      recipient: recipientController.text,
-    );
+    BuyV2AddressRequestResult result;
+    try {
+      result = await widget.session.createAddressRequest(
+        recipient: recipientController.text,
+      );
+    } on Object {
+      if (!mounted || !_canUseRequest()) return;
+      setState(() => requestBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not prepare the address request. Try again.'),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
+    if (!_canUseRequest()) return;
     final shareUri = result.shareUri;
     if (shareUri == null) {
       setState(() => requestBusy = false);
@@ -20946,11 +21030,15 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                   child: OutlinedButton(
                     style: BuyV2ActionStyle.button(),
                     key: const ValueKey('buy-address-request-enter-manually'),
-                    onPressed: () => _showAddAddressSheet(
-                      context,
-                      widget.session,
-                      initialRecipient: recipientController.text,
-                    ),
+                    onPressed: () {
+                      if (_canUseRequest()) {
+                        _showAddAddressSheet(
+                          context,
+                          widget.session,
+                          initialRecipient: recipientController.text,
+                        );
+                      }
+                    },
                     child: const Text('Add it myself'),
                   ),
                 ),
@@ -26351,12 +26439,12 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                                   MediaQuery.textScalerOf(context).scale(13) >=
                                       19.5 ||
                                   buyV2ValueTextSize(
-                                        context,
-                                        amount,
-                                        amountStyle,
-                                      ).width +
-                                      195 >
-                                  constraints.maxWidth;
+                                            context,
+                                            amount,
+                                            amountStyle,
+                                          ).width +
+                                          195 >
+                                      constraints.maxWidth;
                               final identity = Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [

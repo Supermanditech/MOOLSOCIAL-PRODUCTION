@@ -98,14 +98,15 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
 # The accepted combined source is LF-01's start, not the retired August ticket.
 # Delegate to the current exact owner/scope/Git checks; historical paths below
 # remain unchanged. This grants no build, install or handoff acceptance.
-if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details','last-frontend-product-media','last-frontend-selling-terms-offers','last-frontend-payment-return-policy','last-frontend-fulfilment-readiness','last-frontend-public-store-consistency')) {
+if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details','last-frontend-product-media','last-frontend-selling-terms-offers','last-frontend-payment-return-policy','last-frontend-fulfilment-readiness','last-frontend-public-store-consistency','last-frontend-cart-checkout-consistency')) {
   Assert-IncrementalTicket (($TicketId -ceq 'LF-01' -and $UiScope -ceq 'last-frontend-entry-recovery' -or
     $TicketId -ceq 'LF-02-1' -and $UiScope -ceq 'last-frontend-store-details' -or
     $TicketId -ceq 'LF-03' -and $UiScope -ceq 'last-frontend-product-media' -or
     $TicketId -ceq 'LF-04' -and $UiScope -ceq 'last-frontend-selling-terms-offers' -or
     $TicketId -ceq 'LF-05' -and $UiScope -ceq 'last-frontend-payment-return-policy' -or
     $TicketId -ceq 'LF-06' -and $UiScope -ceq 'last-frontend-fulfilment-readiness' -or
-    $TicketId -ceq 'LF-07' -and $UiScope -ceq 'last-frontend-public-store-consistency') -and $Lane -ceq 'codex_ui' -and
+    $TicketId -ceq 'LF-07' -and $UiScope -ceq 'last-frontend-public-store-consistency' -or
+    $TicketId -ceq 'LF-08' -and $UiScope -ceq 'last-frontend-cart-checkout-consistency') -and $Lane -ceq 'codex_ui' -and
     $PackageId -ceq 'com.moolsocial.app.runtime' -and
     $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
     $Phase -cin @('ticket_start','implementation')) 'LF-01 permits only its current hot-reload source identity; no build/handoff.'

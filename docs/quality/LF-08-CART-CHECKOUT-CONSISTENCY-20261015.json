@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-08",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-08",
+      "customerOutcome": "Cart/Checkout address actions and async returns preserve the original account/page and Cart, not a newly selected identity.",
+      "necessityProof": "Address picker return/delete/entry lack existing editor origin guard; same IDs after account/navigation change can trigger unintended actions.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Current-owner choose/edit/delete remains",
+        "Stale owner/page returns cannot change selected address or remove another account address",
+        "Delayed request cannot copy/share after scope change",
+        "Saved Cart and payment-review lock preserved"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder accepted f8b9c1eb and explicitly approved Batch08.",
+        "Live quotes/credit/payment/business invoices/publication and durable Store sync remain held."
+      ],
+      "manifestPath": "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+      "manifestSha256": "309FB551E1A4F9832EEB2E3AC44817A6A789AE7B2F457620251CFB1D6883A47C",
+      "evidencePath": "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-08",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Cart/Checkout address actions and async returns preserve the original account/page and Cart, not a newly selected identity.",
+    "classification": "mvp_required",
+    "classificationReason": "Address/recipient actions must not cross an account or stale checkout context.",
+    "minimumCompleteScope": [
+      "Demonstrate stale picker choice/removal and guard original owner/navigation before actions and after async returns.",
+      "Preserve valid same-context address flow and entered drafts on failure.",
+      "Test affected address/quote/recipient/Cart continuity, hot reload OPPO read-only; founder approval before09."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder accepted f8b9c1eb and explicitly approved Batch08.",
+      "Live quotes/credit/payment/business invoices/publication and durable Store sync remain held."
+    ],
+    "testAndEvidencePlan": [
+      "Fail before stale actions; host account/navigation/failure/recovery and normal/200% layout.",
+      "67 distinct selected host cases passed, including18 new LF08; changed app/test analysis clean. OPPO r8828ms and7062ms; saved one-soap164 Cart and original payment-review lock preserved. Native only read-only current Cart, no auth-switch/editable-checkout/provider proof. No transactions or runtime injection. Founder checkpoint acceptance pending before09."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve; proceed to Batch08. Batch07 accepted f8b9c1eb. Batch08 device acceptance pending; live provider/durable sync excluded."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

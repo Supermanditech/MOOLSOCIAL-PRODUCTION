@@ -402,8 +402,269 @@ class _Lf07LocationSession extends BuyV2Session {
   BuyV2StoreListing? catalogueStore(String storeId) => location;
 }
 
+// Isolated address-request fixture; no real links, accounts or provider calls.
+class _Lf08AddressSession extends BuyV2Session {
+  _Lf08AddressSession(_CartReturnOwnerStore owner, this.buyerIdentity)
+    : super(
+        core: BuySession(),
+        customerStateStore: owner,
+        collectionIdentity: buyerIdentity,
+      );
+  final ValueNotifier<BuyV2CollectionIdentity?> buyerIdentity;
+  final response = Completer<BuyV2AddressRequestResult>();
+  int requests = 0;
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) {
+    requests++;
+    return response.future;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<_Lf08AddressSession> openLf08Picker(
+    WidgetTester tester,
+    _CartReturnOwnerStore owner,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(
+        accountId: 'lf08-a',
+        sessionId: 'lf08-session-a',
+      ),
+    );
+    addTearDown(identity.dispose);
+    final session = _Lf08AddressSession(owner, identity);
+    addTearDown(session.dispose);
+    addTearDown(session.core.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () =>
+                  unawaited(showBuyV2AddressSheet(context, session)),
+              child: const Text('Open evaluation addresses'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open evaluation addresses'));
+    await tester.pumpAndSettle();
+    return session;
+  }
+
+  for (final drift in ['none', 'owner', 'navigation', 'auth', 'auth-aba']) {
+    testWidgets('LF08 address selection after reverse $drift', (tester) async {
+      final owner = _CartReturnOwnerStore();
+      final session = await openLf08Picker(tester, owner);
+      final original = session.selectedAddressId;
+      final total = session.cartTotal;
+      await tester.tap(find.byKey(const ValueKey('buy-address-work')));
+      if (drift == 'owner') owner.ownerScope = 'lf08-owner-b';
+      if (drift.startsWith('auth')) {
+        session.buyerIdentity.value = const BuyV2CollectionIdentity(
+          accountId: 'lf08-b',
+          sessionId: 'lf08-session-b',
+        );
+        if (drift == 'auth-aba') {
+          session.buyerIdentity.value = const BuyV2CollectionIdentity(
+            accountId: 'lf08-a',
+            sessionId: 'lf08-session-a-new',
+          );
+        }
+      }
+      if (drift == 'navigation') {
+        session.openDestination(BuyV2Destination.wholesale);
+        session.openDestination(BuyV2Destination.shop);
+      }
+      await tester.pumpAndSettle();
+      expect(session.selectedAddressId, drift == 'none' ? 'work' : original);
+      expect(session.cartTotal, total);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final drift in [false, true]) {
+    testWidgets('LF08 address removal confirmation owner drift $drift', (
+      tester,
+    ) async {
+      final owner = _CartReturnOwnerStore();
+      final session = await openLf08Picker(tester, owner);
+      final before = session.addresses.length;
+      await tester.tap(find.byKey(const ValueKey('buy-address-actions-work')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-address-delete-work')));
+      await tester.pumpAndSettle();
+      if (drift) owner.ownerScope = 'lf08-owner-b';
+      await tester.tap(
+        find.byKey(const ValueKey('buy-address-delete-confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.addresses.length, before - (drift ? 0 : 1));
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final action in ['add', 'direct-edit-work', 'request']) {
+    testWidgets('LF08 stale picker prevents $action entry', (tester) async {
+      final owner = _CartReturnOwnerStore();
+      final session = await openLf08Picker(tester, owner);
+      owner.ownerScope = 'lf08-owner-b';
+      await tester.tap(find.byKey(ValueKey('buy-address-$action')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-address-add-form-route')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('buy-address-request-form-route')),
+        findsNothing,
+      );
+      expect(session.addresses.length, 2);
+      expect(session.requests, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final changedIdentity in [false, true]) {
+    testWidgets(
+      'LF08 address edit retains original identity $changedIdentity',
+      (tester) async {
+        final owner = _CartReturnOwnerStore();
+        final session = await openLf08Picker(tester, owner);
+        final original = session.addresses.singleWhere((a) => a.id == 'work');
+        await tester.tap(
+          find.byKey(const ValueKey('buy-address-direct-edit-work')),
+        );
+        await tester.pumpAndSettle();
+        final name = find.byKey(const ValueKey('buy-address-add-recipient'));
+        await tester.enterText(name, 'Evaluation edited recipient');
+        if (changedIdentity) {
+          session.buyerIdentity.value = const BuyV2CollectionIdentity(
+            accountId: 'lf08-b',
+            sessionId: 'lf08-session-b',
+          );
+        }
+        final submit = find.byKey(const ValueKey('buy-address-add-submit'));
+        await tester.scrollUntilVisible(
+          submit,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-address-add-form-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(
+          session.addresses.singleWhere((a) => a.id == 'work').recipient,
+          changedIdentity ? original.recipient : 'Evaluation edited recipient',
+        );
+        expect(
+          find.byKey(const ValueKey('buy-address-add-form-route')),
+          changedIdentity ? findsOneWidget : findsNothing,
+        );
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final outcome in [
+    'ready',
+    'late-owner',
+    'late-auth',
+    'failure',
+    'stale-copy',
+    'stale-manual',
+  ]) {
+    testWidgets('LF08 address request $outcome preserves owner and input', (
+      tester,
+    ) async {
+      final owner = _CartReturnOwnerStore();
+      final session = await openLf08Picker(tester, owner);
+      var copies = 0;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') copies++;
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await tester.tap(find.byKey(const ValueKey('buy-address-request')));
+      await tester.pumpAndSettle();
+      final name = find.byKey(const ValueKey('buy-address-request-recipient'));
+      await tester.enterText(name, 'Evaluation recipient');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      if (outcome.startsWith('stale')) owner.ownerScope = 'lf08-owner-b';
+      await tester.tap(
+        find.byKey(
+          ValueKey(
+            outcome == 'stale-manual'
+                ? 'buy-address-request-enter-manually'
+                : 'buy-address-request-copy',
+          ),
+        ),
+      );
+      await tester.pump();
+      if (outcome == 'late-owner') owner.ownerScope = 'lf08-owner-b';
+      if (outcome == 'late-auth') {
+        session.buyerIdentity.value = const BuyV2CollectionIdentity(
+          accountId: 'lf08-b',
+          sessionId: 'lf08-session-b',
+        );
+      }
+      if (!outcome.startsWith('stale')) {
+        if (outcome == 'failure') {
+          session.response.completeError(
+            StateError('isolated request failure'),
+          );
+        } else {
+          session.response.complete(
+            BuyV2AddressRequestResult(
+              shareUri: Uri.parse('https://example.invalid/lf08-address'),
+              customerMessage: 'Isolated host fixture',
+            ),
+          );
+        }
+      }
+      await tester.pumpAndSettle();
+      expect(copies, outcome == 'ready' ? 1 : 0);
+      expect(session.requests, outcome.startsWith('stale') ? 0 : 1);
+      expect(
+        find.byKey(const ValueKey('buy-address-add-form-route')),
+        findsNothing,
+      );
+      expect(
+        tester.widget<TextField>(name).controller!.text,
+        'Evaluation recipient',
+      );
+      expect(session.addresses.length, 2);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final scale in [1.0, 2.0]) {
     for (final location in ['missing', 'matching', 'foreign']) {
