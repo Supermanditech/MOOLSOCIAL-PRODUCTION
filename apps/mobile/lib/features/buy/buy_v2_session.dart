@@ -6168,7 +6168,9 @@ class BuyV2Session extends ChangeNotifier {
   String? shoppingAlertsMessage;
   bool shoppingAlertsBusy = false;
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
-  final Set<String> _balancePaymentBusyOrderIds = {};
+  final Map<String, Object> _balancePaymentOperations = {};
+  final Map<String, ({String key, int amount})> _balancePaymentRequests = {};
+  (String?, String?, String?, int, int)? _balancePaymentScope;
   int _balancePaymentAttemptSequence = 0;
   final Map<String, BuyV2DeliveryExceptionSnapshot>
   _deliveryExceptionSnapshots = {};
@@ -6793,76 +6795,230 @@ class BuyV2Session extends ChangeNotifier {
     return details.totalTax == order.tax;
   }
 
-  bool balancePaymentBusy(String orderId) =>
-      _balancePaymentBusyOrderIds.contains(orderId);
+  (String?, String?, String?, int, int) get _currentBalancePaymentScope => (
+    customerStateStore?.ownerScope,
+    collectionIdentity?.value?.accountId,
+    collectionIdentity?.value?.sessionId,
+    _collectionEpoch,
+    _procurementEpoch,
+  );
 
-  BuyV2BalancePaymentResult? balancePaymentFor(String orderId) =>
-      _balancePaymentResults[orderId];
+  void _syncBalancePaymentScope() {
+    final scope = _currentBalancePaymentScope;
+    if (_balancePaymentScope == scope) return;
+    _balancePaymentScope = scope;
+    _balancePaymentResults.clear();
+    _balancePaymentOperations.clear();
+    _balancePaymentRequests.clear();
+  }
+
+  bool balancePaymentBusy(String orderId) {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
+    _syncBalancePaymentScope();
+    return _balancePaymentOperations.containsKey(orderId);
+  }
+
+  BuyV2BalancePaymentResult? balancePaymentFor(String orderId) {
+    if (_collectionDisposed || !procurementScopeCurrent) return null;
+    _syncBalancePaymentScope();
+    return _balancePaymentResults[orderId];
+  }
+
+  ({bool Function() current, void Function() finish})?
+  _beginBalancePaymentOperation(BuyV2Order order) {
+    if (_collectionDisposed || !procurementScopeCurrent) return null;
+    _syncBalancePaymentScope();
+    if (_balancePaymentOperations.containsKey(order.id)) return null;
+    final scope = _balancePaymentScope;
+    final operation = Object();
+    _balancePaymentOperations[order.id] = operation;
+    bool current() {
+      if (_collectionDisposed ||
+          !procurementScopeCurrent ||
+          scope != _currentBalancePaymentScope ||
+          !identical(_balancePaymentOperations[order.id], operation)) {
+        return false;
+      }
+      final latest = _orders.where((o) => o.id == order.id).firstOrNull;
+      // Bind immutable purchase identity, not a mutable outstanding balance.
+      return latest != null &&
+          latest.purchaseId == order.purchaseId &&
+          latest.destination == order.destination &&
+          latest.total == order.total &&
+          latest.partner == order.partner;
+    }
+
+    void finish() {
+      // Cleanup owns only its token, even if this order's facts changed.
+      if (!_collectionDisposed &&
+          scope == _currentBalancePaymentScope &&
+          identical(_balancePaymentOperations[order.id], operation)) {
+        _balancePaymentOperations.remove(order.id);
+        notifyListeners();
+      }
+    }
+
+    notifyListeners();
+    if (!current()) {
+      finish();
+      return null;
+    }
+    return (current: current, finish: finish);
+  }
+
+  bool _balanceReplyPreservesAttempt(
+    BuyV2Order order,
+    BuyV2BalancePaymentResult? previous,
+    BuyV2BalancePaymentResult next,
+  ) {
+    final latest = _orders.where((o) => o.id == order.id).firstOrNull;
+    if (latest == null || !_validBalancePaymentResult(latest, next)) {
+      return false;
+    }
+    if (previous == null ||
+        !const {
+          BuyV2BalancePaymentState.paymentActionRequired,
+          BuyV2BalancePaymentState.paymentPending,
+          BuyV2BalancePaymentState.unknown,
+        }.contains(previous.state)) {
+      return true;
+    }
+    // A balance-only "due" reply does not close an issued payment attempt.
+    final reference = previous.paymentReference;
+    return reference != null &&
+        next.paymentReference == reference &&
+        const {
+          BuyV2BalancePaymentState.paymentActionRequired,
+          BuyV2BalancePaymentState.paymentPending,
+          BuyV2BalancePaymentState.unknown,
+          BuyV2BalancePaymentState.paid,
+        }.contains(next.state) &&
+        (next.state == BuyV2BalancePaymentState.paid ||
+            next.amountDue == previous.amountDue);
+  }
+
+  void _holdUnknownBalanceStart(
+    String orderId,
+    BuyV2BalancePaymentResult previous,
+  ) {
+    _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+      state: BuyV2BalancePaymentState.unknown,
+      amountDue: previous.amountDue,
+      dueLabel: previous.dueLabel,
+      customerMessage:
+          'The original balance payment needs checking. Do not pay again. Get order help.',
+    );
+  }
 
   Future<bool> restoreBalancePayment(String orderId) async {
     final adapter = balancePaymentAdapter;
-    final order = _orders
-        .where((candidate) => candidate.id == orderId)
-        .firstOrNull;
-    if (adapter == null || order == null || order.balanceDue <= 0) return false;
-    if (!_balancePaymentBusyOrderIds.add(orderId)) return false;
-    notifyListeners();
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    if (_collectionDisposed ||
+        !procurementScopeCurrent ||
+        adapter == null ||
+        order == null ||
+        order.balanceDue <= 0) {
+      return false;
+    }
+    final previous = balancePaymentFor(orderId);
+    if (previous?.state == BuyV2BalancePaymentState.paid) return true;
+    if (_balancePaymentRequests.containsKey(orderId) &&
+        previous?.paymentReference == null) {
+      notice =
+          'The original balance payment needs checking. Do not pay again. Get order help.';
+      notifyListeners();
+      return false;
+    }
+    final operation = _beginBalancePaymentOperation(order);
+    if (operation == null) return false;
+    final current = operation.current;
     try {
       final result = await adapter.loadBalance(orderId: orderId);
-      if (!_validBalancePaymentResult(order, result)) return false;
+      if (!current() ||
+          !_balanceReplyPreservesAttempt(order, previous, result)) {
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return true;
     } on Object {
-      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
-        state: BuyV2BalancePaymentState.offline,
-        amountDue: order.balanceDue,
-        dueLabel: order.balanceDueLabel ?? 'Due later',
-        customerMessage: 'Balance status could not be checked. Try again.',
-      );
+      if (!current()) return false;
+      // A failed status read never erases an issued payment/reference.
+      if (previous == null ||
+          !const {
+            BuyV2BalancePaymentState.paymentActionRequired,
+            BuyV2BalancePaymentState.paymentPending,
+            BuyV2BalancePaymentState.unknown,
+          }.contains(previous.state)) {
+        _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+          state: BuyV2BalancePaymentState.offline,
+          amountDue: order.balanceDue,
+          dueLabel: order.balanceDueLabel ?? 'Due later',
+          customerMessage: 'Balance status could not be checked. Try again.',
+        );
+      }
       return false;
     } finally {
-      _balancePaymentBusyOrderIds.remove(orderId);
-      notifyListeners();
+      operation.finish();
     }
   }
 
   Future<bool> startBalancePayment(String orderId) async {
     final adapter = balancePaymentAdapter;
-    final order = _orders
-        .where((candidate) => candidate.id == orderId)
-        .firstOrNull;
-    final current = _balancePaymentResults[orderId];
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final previous = balancePaymentFor(orderId);
     if (adapter == null ||
         order == null ||
-        current == null ||
-        (current.state != BuyV2BalancePaymentState.due &&
-            current.state != BuyV2BalancePaymentState.overdue) ||
-        !_balancePaymentBusyOrderIds.add(orderId)) {
+        previous == null ||
+        _balancePaymentRequests.containsKey(orderId) ||
+        !const {
+          BuyV2BalancePaymentState.due,
+          BuyV2BalancePaymentState.overdue,
+        }.contains(previous.state)) {
       return false;
     }
-    notifyListeners();
+    final operation = _beginBalancePaymentOperation(order);
+    if (operation == null) return false;
+    final current = operation.current;
+    final request = (
+      key:
+          'balance-${orderId.toLowerCase()}-${_balancePaymentAttemptSequence++}',
+      amount: previous.amountDue,
+    );
+    // Preserve the initiation identity before the external call. This is not
+    // durable recovery; the existing adapter has no recover-by-key operation.
+    _balancePaymentRequests[orderId] = request;
     try {
       final result = await adapter.startPayment(
         orderId: orderId,
-        amountDue: current.amountDue,
-        idempotencyKey:
-            'balance-${orderId.toLowerCase()}-'
-            '${_balancePaymentAttemptSequence++}',
+        amountDue: request.amount,
+        idempotencyKey: request.key,
       );
-      if (!_validBalancePaymentResult(order, result)) return false;
+      if (!current()) return false;
+      final latest = _orders.where((o) => o.id == orderId).firstOrNull;
+      final accepted =
+          latest != null &&
+          _validBalancePaymentResult(latest, result) &&
+          const {
+            BuyV2BalancePaymentState.paymentActionRequired,
+            BuyV2BalancePaymentState.paymentPending,
+            BuyV2BalancePaymentState.unknown,
+            BuyV2BalancePaymentState.paid,
+          }.contains(result.state) &&
+          result.paymentReference?.trim().isNotEmpty == true &&
+          (result.state == BuyV2BalancePaymentState.paid ||
+              result.amountDue == request.amount);
+      if (!accepted) {
+        _holdUnknownBalanceStart(orderId, previous);
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return result.state == BuyV2BalancePaymentState.paymentActionRequired;
     } on Object {
-      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
-        state: BuyV2BalancePaymentState.offline,
-        amountDue: current.amountDue,
-        dueLabel: current.dueLabel,
-        customerMessage: 'Balance payment could not start. Try again.',
-      );
+      if (!current()) return false;
+      _holdUnknownBalanceStart(orderId, previous);
       return false;
     } finally {
-      _balancePaymentBusyOrderIds.remove(orderId);
-      notifyListeners();
+      operation.finish();
     }
   }
 
@@ -6870,80 +7026,86 @@ class BuyV2Session extends ChangeNotifier {
     String orderId,
     BuyV2PaymentHandoff handoff,
   ) async {
-    final order = _orders
-        .where((candidate) => candidate.id == orderId)
-        .firstOrNull;
-    final current = _balancePaymentResults[orderId];
-    final uri = current?.paymentActionUri;
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final previous = balancePaymentFor(orderId);
+    final uri = previous?.paymentActionUri;
     if (order == null ||
-        current == null ||
-        current.state != BuyV2BalancePaymentState.paymentActionRequired ||
-        uri == null ||
-        !_balancePaymentBusyOrderIds.add(orderId)) {
+        previous == null ||
+        previous.state != BuyV2BalancePaymentState.paymentActionRequired ||
+        uri == null) {
       return false;
     }
-    notifyListeners();
-    var opened = false;
+    final operation = _beginBalancePaymentOperation(order);
+    if (operation == null) return false;
+    final current = operation.current;
     try {
-      opened = await handoff(uri);
-    } on Object {
-      opened = false;
+      var opened = false;
+      try {
+        opened = await handoff(uri);
+      } on Object {
+        opened = false;
+      }
+      if (!current()) return false;
+      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+        state: opened
+            ? BuyV2BalancePaymentState.paymentPending
+            : BuyV2BalancePaymentState.unknown,
+        amountDue: previous.amountDue,
+        dueLabel: previous.dueLabel,
+        customerMessage: opened
+            ? 'Return here after payment to check the balance.'
+            : 'The original balance payment needs checking. Do not pay again.',
+        paymentReference: previous.paymentReference,
+        paymentActionUri: previous.paymentActionUri,
+      );
+      return opened;
+    } finally {
+      operation.finish();
     }
-    _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
-      state: opened
-          ? BuyV2BalancePaymentState.paymentPending
-          : BuyV2BalancePaymentState.unknown,
-      amountDue: current.amountDue,
-      dueLabel: current.dueLabel,
-      customerMessage: opened
-          ? 'Return here after payment to check the balance.'
-          : 'The payment app did not open. No payment is confirmed.',
-      paymentReference: current.paymentReference,
-      paymentActionUri: current.paymentActionUri,
-    );
-    _balancePaymentBusyOrderIds.remove(orderId);
-    notifyListeners();
-    return opened;
   }
 
   Future<bool> reconcileBalancePayment(String orderId) async {
     final adapter = balancePaymentAdapter;
-    final order = _orders
-        .where((candidate) => candidate.id == orderId)
-        .firstOrNull;
-    final current = _balancePaymentResults[orderId];
-    final reference = current?.paymentReference;
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final previous = balancePaymentFor(orderId);
+    final reference = previous?.paymentReference;
     if (adapter == null ||
         order == null ||
-        current == null ||
+        previous == null ||
         reference == null ||
-        (current.state != BuyV2BalancePaymentState.paymentPending &&
-            current.state != BuyV2BalancePaymentState.unknown) ||
-        !_balancePaymentBusyOrderIds.add(orderId)) {
+        !const {
+          BuyV2BalancePaymentState.paymentPending,
+          BuyV2BalancePaymentState.unknown,
+        }.contains(previous.state)) {
       return false;
     }
-    notifyListeners();
+    final operation = _beginBalancePaymentOperation(order);
+    if (operation == null) return false;
+    final current = operation.current;
     try {
       final result = await adapter.reconcilePayment(
         orderId: orderId,
         paymentReference: reference,
       );
-      if (!_validBalancePaymentResult(order, result)) return false;
+      if (!current() ||
+          !_balanceReplyPreservesAttempt(order, previous, result)) {
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return result.state == BuyV2BalancePaymentState.paid;
     } on Object {
+      if (!current()) return false;
       _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
         state: BuyV2BalancePaymentState.unknown,
-        amountDue: current.amountDue,
-        dueLabel: current.dueLabel,
+        amountDue: previous.amountDue,
+        dueLabel: previous.dueLabel,
         customerMessage:
             'Balance payment is still being checked. Do not pay again.',
         paymentReference: reference,
       );
       return false;
     } finally {
-      _balancePaymentBusyOrderIds.remove(orderId);
-      notifyListeners();
+      operation.finish();
     }
   }
 

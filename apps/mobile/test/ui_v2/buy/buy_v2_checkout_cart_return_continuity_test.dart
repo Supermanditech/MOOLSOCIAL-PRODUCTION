@@ -384,6 +384,58 @@ class _BalancePaymentAdapter implements BuyV2BalancePaymentAdapter {
   }
 }
 
+// Isolated host-only payment controls. Never wired into the application.
+class _Lf09OwnerStore extends _R66OrderCustomerStore {
+  @override
+  String ownerScope = 'lf09-owner-a';
+}
+
+class _Lf09BalanceAdapter extends _BalancePaymentAdapter {
+  Future<BuyV2BalancePaymentResult>? loadResponse,
+      startResponse,
+      reconcileResponse;
+  int loadCalls = 0;
+  final keys = <String>[];
+  @override
+  Future<BuyV2BalancePaymentResult> loadBalance({required String orderId}) {
+    loadCalls++;
+    return loadResponse ?? super.loadBalance(orderId: orderId);
+  }
+
+  @override
+  Future<BuyV2BalancePaymentResult> startPayment({
+    required String orderId,
+    required int amountDue,
+    required String idempotencyKey,
+  }) {
+    keys.add(idempotencyKey);
+    if (startResponse != null) {
+      startCalls++;
+      return startResponse!;
+    }
+    return super.startPayment(
+      orderId: orderId,
+      amountDue: amountDue,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  @override
+  Future<BuyV2BalancePaymentResult> reconcilePayment({
+    required String orderId,
+    required String paymentReference,
+  }) {
+    if (reconcileResponse != null) {
+      reconcileCalls++;
+      return reconcileResponse!;
+    }
+    return super.reconcilePayment(
+      orderId: orderId,
+      paymentReference: paymentReference,
+    );
+  }
+}
+
 class _DeliveryExceptionAdapter implements BuyV2DeliveryExceptionAdapter {
   BuyV2DeliveryExceptionSnapshot snapshot =
       const BuyV2DeliveryExceptionSnapshot(
@@ -553,6 +605,271 @@ class _T08OrderSummarySession extends BuyV2Session {
 }
 
 void main() {
+  Future<
+    (
+      BuyV2Session,
+      _Lf09BalanceAdapter,
+      _Lf09OwnerStore,
+      ValueNotifier<BuyV2CollectionIdentity?>,
+      BuyV2Order,
+    )
+  >
+  lf09Fixture({bool manualDispose = false}) async {
+    final adapter = _Lf09BalanceAdapter();
+    final owner = _Lf09OwnerStore();
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(
+        accountId: 'lf09-a',
+        sessionId: 'lf09-session-a',
+      ),
+    );
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: owner,
+      collectionIdentity: identity,
+      commerceAdapter: prepaidCommerceFixture(),
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      balancePaymentAdapter: adapter,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(core.dispose);
+    addTearDown(identity.dispose);
+    if (!manualDispose) addTearDown(session.dispose);
+    expect(session.addProduct('w-rice'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    expect(
+      session.chooseCommercialPaymentTerm(
+        session
+            .commercialPaymentTermsFor(group.key)
+            .firstWhere(
+              (t) =>
+                  t.kind ==
+                  BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+            ),
+      ),
+      isTrue,
+    );
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    final order = session.confirmedOrders.single;
+    adapter.amountDue = order.balanceDue;
+    expect(await session.restoreBalancePayment(order.id), isTrue);
+    return (session, adapter, owner, identity, order);
+  }
+
+  BuyV2BalancePaymentResult lf09Reply(
+    BuyV2BalancePaymentState state,
+    int amount, {
+    String? reference = 'BALANCE-PAY-1',
+  }) => BuyV2BalancePaymentResult(
+    state: state,
+    amountDue: amount,
+    dueLabel: 'Isolated host due',
+    customerMessage: 'Isolated host result',
+    paymentReference: reference,
+    paymentActionUri: state == BuyV2BalancePaymentState.paymentActionRequired
+        ? Uri.parse('upi://pay?pa=host@example.invalid')
+        : null,
+  );
+
+  for (final phase in ['load', 'start', 'handoff', 'reconcile']) {
+    for (final drift in ['owner', 'auth', 'dispose']) {
+      test('LF09 balance $phase $drift rejects late results', () async {
+        final (session, adapter, owner, identity, order) = await lf09Fixture(
+          manualDispose: drift == 'dispose',
+        );
+        final response = Completer<BuyV2BalancePaymentResult>();
+        final opened = Completer<bool>();
+        late Future<bool> pending;
+        if (phase == 'load') {
+          adapter.loadResponse = response.future;
+          pending = session.restoreBalancePayment(order.id);
+        } else if (phase == 'start') {
+          adapter.startResponse = response.future;
+          pending = session.startBalancePayment(order.id);
+        } else {
+          expect(await session.startBalancePayment(order.id), isTrue);
+          if (phase == 'handoff') {
+            pending = session.continueBalancePayment(
+              order.id,
+              (_) => opened.future,
+            );
+          } else {
+            expect(
+              await session.continueBalancePayment(order.id, (_) async => true),
+              isTrue,
+            );
+            adapter.reconcileResponse = response.future;
+            pending = session.reconcileBalancePayment(order.id);
+          }
+        }
+        if (drift == 'owner') owner.ownerScope = 'lf09-owner-b';
+        if (drift == 'auth') {
+          identity.value = const BuyV2CollectionIdentity(
+            accountId: 'lf09-b',
+            sessionId: 'lf09-session-b',
+          );
+        }
+        if (drift == 'dispose') session.dispose();
+        if (phase == 'handoff') {
+          opened.complete(true);
+        } else {
+          response.complete(
+            lf09Reply(
+              phase == 'reconcile'
+                  ? BuyV2BalancePaymentState.paid
+                  : phase == 'start'
+                  ? BuyV2BalancePaymentState.paymentActionRequired
+                  : BuyV2BalancePaymentState.due,
+              phase == 'reconcile' ? 0 : order.balanceDue,
+            ),
+          );
+        }
+        expect(await pending, isFalse);
+        if (drift != 'dispose') {
+          expect(session.balancePaymentFor(order.id), isNull);
+          expect(session.balancePaymentBusy(order.id), isFalse);
+        }
+      });
+    }
+  }
+
+  test('LF09 balance duplicate initiation keeps one key', () async {
+    final (session, adapter, _, _, order) = await lf09Fixture();
+    final gate = Completer<BuyV2BalancePaymentResult>();
+    adapter.startResponse = gate.future;
+    final first = session.startBalancePayment(order.id);
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.keys, hasLength(1));
+    gate.complete(
+      lf09Reply(
+        BuyV2BalancePaymentState.paymentActionRequired,
+        order.balanceDue,
+      ),
+    );
+    expect(await first, isTrue);
+    expect(
+      session.balancePaymentFor(order.id)?.paymentReference,
+      'BALANCE-PAY-1',
+    );
+  });
+
+  test('LF09 balance scope recheck precedes external read', () async {
+    final (session, adapter, owner, _, order) = await lf09Fixture();
+    final before = adapter.loadCalls;
+    var changeOwner = true;
+    void changeDuringNotification() {
+      if (changeOwner && session.balancePaymentBusy(order.id)) {
+        changeOwner = false;
+        owner.ownerScope = 'lf09-owner-b';
+      }
+    }
+
+    session.addListener(changeDuringNotification);
+    expect(await session.restoreBalancePayment(order.id), isFalse);
+    session.removeListener(changeDuringNotification);
+    expect(adapter.loadCalls, before);
+  });
+
+  for (final reference in ['OTHER-PAYMENT', null]) {
+    test('LF09 balance original reference rejects $reference', () async {
+      final (session, adapter, _, _, order) = await lf09Fixture();
+      expect(await session.startBalancePayment(order.id), isTrue);
+      expect(
+        await session.continueBalancePayment(order.id, (_) async => true),
+        isTrue,
+      );
+      adapter.reconcileResponse = Future.value(
+        lf09Reply(BuyV2BalancePaymentState.paid, 0, reference: reference),
+      );
+      expect(await session.reconcileBalancePayment(order.id), isFalse);
+      expect(
+        session.balancePaymentFor(order.id)?.state,
+        BuyV2BalancePaymentState.paymentPending,
+      );
+      expect(
+        session.balancePaymentFor(order.id)?.paymentReference,
+        'BALANCE-PAY-1',
+      );
+    });
+  }
+
+  test('LF09 balance uncertain start cannot create another payment', () async {
+    final (session, adapter, _, _, order) = await lf09Fixture();
+    adapter.startResponse = Future.error(
+      StateError('Isolated transport uncertainty'),
+    );
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(
+      session.balancePaymentFor(order.id)?.state,
+      BuyV2BalancePaymentState.unknown,
+    );
+    final loads = adapter.loadCalls;
+    adapter.startResponse = null;
+    expect(await session.restoreBalancePayment(order.id), isFalse);
+    expect(await session.reconcileBalancePayment(order.id), isFalse);
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.keys, hasLength(1));
+    expect(adapter.loadCalls, loads);
+    expect(session.balancePaymentFor(order.id)?.amountDue, order.balanceDue);
+  });
+
+  test('LF09 balance due readback cannot erase pending attempt', () async {
+    final (session, adapter, _, _, order) = await lf09Fixture();
+    expect(await session.startBalancePayment(order.id), isTrue);
+    expect(
+      await session.continueBalancePayment(order.id, (_) async => true),
+      isTrue,
+    );
+    expect(await session.restoreBalancePayment(order.id), isFalse);
+    expect(
+      session.balancePaymentFor(order.id)?.state,
+      BuyV2BalancePaymentState.paymentPending,
+    );
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(adapter.keys, hasLength(1));
+  });
+
+  test('LF09 balance old finally cannot clear newer owner operation', () async {
+    final (session, adapter, owner, _, order) = await lf09Fixture();
+    final oldGate = Completer<BuyV2BalancePaymentResult>();
+    final nextGate = Completer<BuyV2BalancePaymentResult>();
+    adapter.loadResponse = oldGate.future;
+    final old = session.restoreBalancePayment(order.id);
+    owner.ownerScope = 'lf09-owner-b';
+    adapter.loadResponse = nextGate.future;
+    final next = session.restoreBalancePayment(order.id);
+    expect(session.balancePaymentBusy(order.id), isTrue);
+    oldGate.complete(lf09Reply(BuyV2BalancePaymentState.due, order.balanceDue));
+    expect(await old, isFalse);
+    expect(session.balancePaymentBusy(order.id), isTrue);
+    nextGate.complete(
+      lf09Reply(BuyV2BalancePaymentState.due, order.balanceDue),
+    );
+    expect(await next, isTrue);
+    expect(session.balancePaymentBusy(order.id), isFalse);
+  });
+
+  test('LF09 balance start cannot silently change requested amount', () async {
+    final (session, adapter, _, _, order) = await lf09Fixture();
+    adapter.startResponse = Future.value(
+      lf09Reply(
+        BuyV2BalancePaymentState.paymentActionRequired,
+        order.balanceDue - 1,
+      ),
+    );
+    expect(await session.startBalancePayment(order.id), isFalse);
+    expect(
+      session.balancePaymentFor(order.id)?.state,
+      BuyV2BalancePaymentState.unknown,
+    );
+    expect(session.balancePaymentFor(order.id)?.amountDue, order.balanceDue);
+    expect(await session.startBalancePayment(order.id), isFalse);
+  });
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('T08 mixed order payment summaries at $scale text', (
       tester,
