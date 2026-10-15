@@ -377,6 +377,146 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('LF19 fresh Store invoice uses saved seller without opening settings', () async {
+    final f = await _lf18Prepared();
+    final work = f.work();
+    addTearDown(work.dispose);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    // Isolated host Counter journey; no native evaluation transaction.
+    final product = handoffStock();
+    work.workspaceCatalogueItems.add(product);
+    work.workspaceOrderCustomer = 'Host buyer · 9000091991';
+    work.workspaceOrderSource = 'Counter';
+    work.workspaceOrderFulfilment = 'At the shop';
+    work.workspaceOrderQuantities[product.id] = 1;
+    final invoice = work.completeWorkspaceCounterSale();
+    expect(invoice, isNotNull);
+    expect(invoice!.seller!.legalName, 'Host default business');
+    expect(invoice.seller!.storeAddress, 'Host default lane, Pune, Maharashtra, 411001');
+    expect(invoice.seller!.storeId, 'lf18-a');
+  });
+
+  test('LF19 pending input read holds only dependent outputs and preserves the bill', () async {
+    final f = await _lf18Prepared();
+    f.readGate = Completer<void>();
+    final work = f.work();
+    addTearDown(work.dispose);
+    final product = _lf19BillInputs(work);
+    final stock = product.stock;
+    expect(work.workspacePublicationInputsReady, isFalse);
+    expect(work.workspacePublicStoreDetails, isNull);
+    expect(work.workspacePublicationReport.issues.any((e) => e.field == 'storeInputs'), isTrue);
+    expect(work.completeWorkspaceCounterSale(), isNull);
+    expect(work.workspaceOrders, isEmpty);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(work.workspaceCatalogueItems.singleWhere((e) => e.id == product.id).stock, stock);
+    expect(work.workspaceOrderQuantities[product.id], 1);
+    f.readGate!.complete();
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicStoreDetails!.address, 'Host default lane, Pune, Maharashtra, 411001');
+    expect(work.completeWorkspaceCounterSale()!.seller!.legalName, 'Host default business');
+  });
+
+  test('LF19 checked absence keeps legacy defaults usable without new prerequisites', () async {
+    final f = _Lf18Storage();
+    final work = f.work();
+    addTearDown(work.dispose);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(work.workspacePublicationInputsReady, isTrue);
+    expect(work.workspacePublicationPreferencesSaved, isFalse);
+    expect(work.workspacePublicStoreDetails!.id, 'lf18-a');
+    _lf19BillInputs(work);
+    expect(work.completeWorkspaceCounterSale(), isNotNull);
+  });
+
+  test('LF19 unreadable defaults retain draft and history rather than becoming absence', () async {
+    final f = await _lf18Prepared();
+    final first = f.work();
+    await first.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a');
+    _lf19BillInputs(first);
+    final oldInvoice = first.completeWorkspaceCounterSale()!;
+    final oldOrder = first.workspaceOrders.single;
+    first.dispose();
+    final encoded = f.rows[f.key('lf18-a')];
+    f.failRead = true;
+    final work = f.work();
+    addTearDown(work.dispose);
+    work.workspaceOrders.add(oldOrder);
+    work.workspaceInvoices.add(oldInvoice);
+    work.currentWorkspaceOrderId = oldOrder.id;
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isFalse);
+    expect(work.workspacePublicStoreDetails, isNull);
+    expect(work.completeWorkspaceCounterSale(), same(oldInvoice));
+    expect(oldInvoice.seller!.legalName, 'Host default business');
+    work.currentWorkspaceOrderId = null;
+    final product = _lf19BillInputs(work);
+    final stock = product.stock;
+    expect(work.completeWorkspaceCounterSale(), isNull);
+    expect(work.workspaceInvoices, [oldInvoice]);
+    expect(work.workspaceOrders, [oldOrder]);
+    expect(work.workspaceCatalogueItems.singleWhere((e) => e.id == product.id).stock, stock);
+    expect(f.rows[f.key('lf18-a')], encoded);
+    f.failRead = false;
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationInputsReady, isTrue);
+  });
+
+  test('LF19 simultaneous submissions coalesce input load and issue only one invoice', () async {
+    FlutterSecureStorage.setMockInitialValues({}); // Isolated host journal/plugin.
+    final f = await _lf18Prepared();
+    f.readGate = Completer<void>();
+    final work = _lf19JournalWork(f);
+    addTearDown(work.dispose);
+    await work.loadWorkspaceCounterDraft();
+    final product = _lf19BillInputs(work);
+    final stock = product.stock;
+    expect(await work.saveWorkspaceCounterDraft(), isTrue);
+    final first = work.submitWorkspaceCounterBill();
+    final second = work.submitWorkspaceCounterBill();
+    await Future<void>.delayed(Duration.zero);
+    expect(work.workspaceOrders, isEmpty);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(work.workspaceCatalogueItems.singleWhere((e) => e.id == product.id).stock, stock);
+    f.readGate!.complete();
+    final results = await Future.wait([first, second]);
+    expect(results.where((e) => e != null), hasLength(1));
+    expect(work.workspaceInvoices, hasLength(1));
+    expect(work.workspaceInvoices.single.seller!.legalName, 'Host default business');
+    expect(work.workspaceOrders, hasLength(1));
+    expect(work.workspaceCatalogueItems.singleWhere((e) => e.id == product.id).stock, stock - 1);
+  });
+
+  for (final aba in [false, true]) {
+    test('LF19 submission cannot cross a pending input read Store change ABA=$aba', () async {
+      final f = await _lf18Prepared();
+      f.readGate = Completer<void>();
+      final work = f.work();
+      addTearDown(work.dispose);
+      final product = _lf19BillInputs(work);
+      final stock = product.stock;
+      final submit = work.submitWorkspaceCounterBill();
+      await Future<void>.delayed(Duration.zero);
+      work.activeWorkspace = _lf16Store('lf19-other');
+      if (aba) work.activeWorkspace = _lf16Store('lf18-a');
+      f.readGate!.complete();
+      expect(await submit, isNull);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceOrders, isEmpty);
+      if (!aba) work.activeWorkspace = _lf16Store('lf18-a');
+      expect(work.workspaceCatalogueItems.singleWhere((e) => e.id == product.id).stock, stock);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceOrders, isEmpty);
+    });
+  }
+
+  test('LF19 visibility update is an unconfirmed session preference', () {
+    final work = WorkSession(gateway: ReviewWorkGateway())..activeWorkspace = _lf16Store('lf19-visibility');
+    addTearDown(work.dispose);
+    expect(work.setWorkspaceVisibility(false), isTrue);
+    expect(work.noticeMessage, contains('preference applied in this session'));
+    expect(work.noticeMessage, contains('Public status is not confirmed'));
+  });
+
   for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin']) {
     test('LF16 invalid saved $invalid preserves entries and original record', () async {
       final fixture = _Lf16Storage();
@@ -1253,3 +1393,19 @@ Future<_Lf18Storage> _lf18Prepared() async {
   work.dispose();
   return f;
 }
+
+WorkspaceCatalogueItem _lf19BillInputs(WorkSession work) {
+  final product = handoffStock();
+  work.workspaceCatalogueItems.add(product);
+  work.workspaceOrderCustomer = 'Host buyer · 9000091991';
+  work.workspaceOrderSource = 'Counter';
+  work.workspaceOrderFulfilment = 'At the shop';
+  work.workspaceOrderQuantities[product.id] = 1;
+  return product;
+}
+
+WorkSession _lf19JournalWork(_Lf18Storage f) => WorkSession(gateway: ReviewWorkGateway(),
+  contactDraftStore: _Lf18ContactStore(f),
+  publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, id),
+  counterDraftStore: SecureWorkCounterDraftStore(accountScope: () => f.account))
+    ..activeWorkspace = _lf16Store('lf18-a');

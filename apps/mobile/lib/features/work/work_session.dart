@@ -3149,6 +3149,22 @@ class WorkSession extends ChangeNotifier {
   Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
   submitWorkspaceCounterBill({String? expectedReview}) async {
     if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
+    final inputContext = publicationPreferencesContext;
+    if (publicationPreferencesPersistenceAvailable &&
+        !workspaceInvoices.any((invoice) => invoice.orderId == currentWorkspaceOrderId)) {
+      final storeId = activeWorkspace?.id;
+      if (storeId == null ||
+          !await loadWorkspacePublicationPreferences(expectedStoreId: storeId)) {
+        if (!_disposed && inputContext == publicationPreferencesContext) {
+          showError('Saved Store details could not be opened. Your bill is kept. Retry from Store settings.');
+        }
+        return null;
+      }
+      if (_disposed || inputContext != publicationPreferencesContext ||
+          counterDraftEditingBlocked || !_canEditCounterOrder()) {
+        return null;
+      }
+    }
     final inventoryData = _storeData;
     if (localInventoryEnabled) {
       final saved = await inventoryData.inventoryWrites;
@@ -3211,6 +3227,12 @@ class WorkSession extends ChangeNotifier {
         (workspaceOrderFulfilment != 'At the shop' &&
             workspaceOrderAddress.trim().isEmpty)) {
       showError('Check the customer, products and delivery details.');
+      return null;
+    }
+    // Inventory/ledger recovery above also awaits. Do not claim the bill under
+    // a different Store/account or a second submission after any of those waits.
+    if (_disposed || inputContext != publicationPreferencesContext ||
+        counterDraftEditingBlocked || !_canEditCounterOrder()) {
       return null;
     }
     final scope = _counterDraftScope;
@@ -3711,6 +3733,14 @@ class WorkSession extends ChangeNotifier {
       }
     }
     _activeWorkspace = value;
+    if (value != null && previousId != value.id &&
+        value.profileId?.startsWith('retailer-') == true && publicationPreferencesPersistenceAvailable) {
+      scheduleMicrotask(() {
+        if (!_disposed && activeWorkspace?.id == value.id) {
+          unawaited(loadWorkspacePublicationPreferences(expectedStoreId: value.id));
+        }
+      });
+    }
     if (value != null && previousId != value.id && pickupPreferencesPersistenceAvailable) {
       scheduleMicrotask(() {
         if (!_disposed && activeWorkspace?.id == value.id) {
@@ -8134,7 +8164,10 @@ class WorkSession extends ChangeNotifier {
   /// catalogue registration or an acknowledgement that the Store is public.
   BuyV2StoreListing? get workspacePublicStoreDetails {
     final workspace = activeWorkspace;
-    if (workspace == null || workspace.id.trim().isEmpty) return null;
+    if (workspace == null || workspace.id.trim().isEmpty ||
+        !workspacePublicationInputsReady) {
+      return null;
+    }
     return workspacePublicationDetails.toPublicStore(
       id: workspace.id,
       name: workspace.name,
@@ -8678,11 +8711,15 @@ class WorkSession extends ChangeNotifier {
       workspaceCatalogueItems.where((product) => product.published).length;
 
   WorkspacePublicationReport get workspacePublicationReport =>
-      WorkspacePublicationContract.inspect(
+      WorkspacePublicationReport([
+        if (!workspacePublicationInputsReady) WorkspacePublicationIssue(
+          'storeInputs', 'Store settings', workspacePublicationInputHold!),
+        ...WorkspacePublicationContract.inspect(
         store: activeWorkspace,
         products: workspaceCatalogueItems,
         details: workspacePublicationDetails,
-      );
+        ).issues,
+      ]);
 
   int reservedWorkspaceUnitsFor(String productId) => workspaceOrders
       .where(
@@ -9853,6 +9890,10 @@ class WorkSession extends ChangeNotifier {
   Object get publicationPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
   bool get workspacePublicationPreferencesSaving => _publicationRecovery.pendingWrites > 0;
   bool get workspacePublicationPreferencesSaved => _publicationRecovery.saved;
+  bool get workspacePublicationInputsReady =>
+      !publicationPreferencesPersistenceAvailable || _publicationRecovery.loaded;
+  String? get workspacePublicationInputHold => workspacePublicationInputsReady
+      ? null : workspacePublicationPreferencesError ?? 'Opening saved Store details. Please try again.';
   String? get workspacePublicationPreferencesError => _publicationRecovery.error;
   Future<bool> get workspacePublicationPreferencesWrite => _publicationRecovery.writes;
   WorkPendingProofStore? _publicationPreferencesStore(String id) {
@@ -10221,6 +10262,12 @@ class WorkSession extends ChangeNotifier {
         .where((invoice) => invoice.orderId == currentWorkspaceOrderId)
         .firstOrNull;
     if (completedInvoice != null) return completedInvoice;
+    if (!workspacePublicationInputsReady) {
+      final storeId = activeWorkspace?.id;
+      if (storeId != null) unawaited(loadWorkspacePublicationPreferences(expectedStoreId: storeId));
+      showError('${workspacePublicationInputHold!} Your bill is kept.');
+      return null;
+    }
     if (workspaceOrderQuantities.isEmpty ||
         workspaceOrderCustomer.trim().isEmpty ||
         workspaceCounterPayableMinor <= 0 ||
@@ -10276,13 +10323,13 @@ class WorkSession extends ChangeNotifier {
     workspaceLastUpdatedAt = DateTime.now();
     _recordWorkspaceActivity(
       visible
-          ? 'Store published for customer discovery.'
-          : 'Store removed from customer discovery.',
+          ? 'Public Store visibility preference requested.'
+          : 'Private Store visibility preference requested.',
     );
     showNotice(
       visible
-          ? 'Your store is now visible to customers.'
-          : 'Your store is hidden from customer discovery.',
+          ? 'Public visibility preference applied in this session. Public status is not confirmed.'
+          : 'Private visibility preference applied in this session. Public status is not confirmed.',
     );
     _persistOperationalState('visibility');
     return true;
