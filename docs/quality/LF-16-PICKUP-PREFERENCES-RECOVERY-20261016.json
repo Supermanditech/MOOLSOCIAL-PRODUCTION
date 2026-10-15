@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-16",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-16",
+      "customerOutcome": "Owner pickup inputs restore on the correct device/account/Store after restart without claiming public synchronization.",
+      "necessityProof": "Current Delivery and pickup applies fields only to the session, so entered settings disappear on restart.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/work/widgets/store_settings_widgets.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Private four-field typed recovery only, distinct encrypted key and absent versus corrupt",
+        "Exact owner/Store/ABA scope, pending-write serialization, retained input and failed save",
+        "Same existing form/validation, native evaluation preference save/restart and public sync pending"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder accepted3157e109 and approved continuing remaining settings frontend under the active mapped goal.",
+        "Other settings, authoritative source/revision/readback and synchronization remain pending; no made-up public result."
+      ],
+      "manifestPath": "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md",
+      "manifestSha256": "D791DB668168B84B69BA46E3FD40615653DD03F67C5A2DBCF6D9E1AFBCA092F6",
+      "evidencePath": "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-16",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Owner pickup inputs restore on the correct device/account/Store after restart without claiming public synchronization.",
+    "classification": "mvp_required",
+    "classificationReason": "Enter once/update later requires correct device recovery of the owner's existing pickup inputs, distinct from live service authority.",
+    "minimumCompleteScope": [
+      "Persist/restore only city, address/area, PIN and pickup preference using existing encrypted storage.",
+      "Scope/load/save/recovery checks and current-form error/busy feedback; preserve newer input and business records.",
+      "Targeted tests and actual evaluation preference save/restart on OPPO; founder review."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder accepted3157e109 and approved continuing remaining settings frontend under the active mapped goal.",
+      "Other settings, authoritative source/revision/readback and synchronization remain pending; no made-up public result."
+    ],
+    "testAndEvidencePlan": [
+      "New-session loss demonstration; serialized persisted-store roundtrip, strict fields, errors and stale scope.",
+      "Existing input validation and large-text widgets; actual UI save/restart, no runtime storage injection."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.md",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.md",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.json",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_delivery_exception_scope_test.dart",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.md",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.json",
+        "docs/quality/LF-15-STORE-SETTINGS-TRUTHFULNESS-20261016.md",
+        "docs/quality/LF-15-STORE-SETTINGS-TRUTHFULNESS-20261016.json",
+        "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md",
+        "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.json",
+        "apps/mobile/lib/features/work/widgets/store_settings_widgets.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder approved3157e109 and continuing remaining settings work; LF16 checkpoint review pending."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

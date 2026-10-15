@@ -802,13 +802,16 @@ abstract interface class WorkPendingProofStore {
 
 class SecureWorkPendingProofStore implements WorkPendingProofStore {
   SecureWorkPendingProofStore({this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = null;
+    : _contactDraft = false, _offerStoreId = null, _pickupPreferences = false;
   SecureWorkPendingProofStore.contactDraft({this.reviewOnly = false})
-    : _contactDraft = true, _offerStoreId = null;
+    : _contactDraft = true, _offerStoreId = null, _pickupPreferences = false;
   SecureWorkPendingProofStore.offerDraft(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId;
+    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false;
+  SecureWorkPendingProofStore.pickupPreferences(String storeId, {this.reviewOnly = false})
+    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = true;
   final bool reviewOnly;
   final bool _contactDraft;
+  final bool _pickupPreferences;
   final String? _offerStoreId;
   static final Map<String, Future<void>> _offerWrites = {};
   static const _storage = FlutterSecureStorage();
@@ -822,7 +825,7 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       : 'moolsocial.workspace.pending-proof.v1';
 
   String _scopedKey(String scope) => _offerStoreId != null
-      ? 'moolsocial.workspace.offer-draft.${_review ? 'review.' : ''}v1.'
+      ? 'moolsocial.workspace.${_pickupPreferences ? 'pickup-preferences' : 'offer-draft'}.${_review ? 'review.' : ''}v1.'
           '${Uri.encodeComponent(scope)}/${Uri.encodeComponent(_offerStoreId)}'
       : _contactDraft
       ? 'moolsocial.workspace.contact-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}'
@@ -841,7 +844,9 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   @override
   Future<Map<String, Object?>?> read(String scope) async {
     if (scope != accountScope) return null;
-    if (_offerStoreId != null) await _offerWrites[_scopedKey(scope)];
+    if (_offerStoreId != null) {
+      await _offerWrites[_scopedKey(scope)]?.timeout(const Duration(seconds: 10));
+    }
     final value = await _storage
         .read(key: _scopedKey(scope))
         .timeout(const Duration(seconds: 10));
@@ -851,7 +856,9 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
         decoded['scope'] != scope ||
         decoded['draft'] is! Map) {
       if (_offerStoreId != null) {
-        throw const WorkGatewayException('Your saved offer draft could not be opened.');
+        throw WorkGatewayException(_pickupPreferences
+            ? 'Your saved pickup preferences could not be opened.'
+            : 'Your saved offer draft could not be opened.');
       }
       return null;
     }
@@ -875,12 +882,15 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
         if (scope != accountScope) {
           throw const WorkGatewayException('Sign in again before saving this draft.');
         }
-        await _storage.write(key: key, value: encoded).timeout(const Duration(seconds: 10));
+        // A caller deadline cannot cancel the platform write. Keep the queue
+        // bound to its real completion so a late old write cannot replace a
+        // newer offer or pickup preference after timeout.
+        await _storage.write(key: key, value: encoded);
       });
       final tail = write.then<void>((_) {}, onError: (Object _, StackTrace _) {});
       _offerWrites[key] = tail;
       unawaited(tail.then((_) { if (identical(_offerWrites[key], tail)) _offerWrites.remove(key); }));
-      await write;
+      await write.timeout(const Duration(seconds: 10));
       return;
     }
     await _storage

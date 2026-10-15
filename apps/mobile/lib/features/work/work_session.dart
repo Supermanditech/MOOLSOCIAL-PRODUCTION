@@ -474,6 +474,8 @@ class _StoreOperationalData {
       <String, DateTime>{};
 
   int pendingOperationalRequests = 0;
+  final Map<String, _PickupPreferencesRecovery> pickupPreferences = {};
+  String? pickupPreferencesOwner;
   bool inventoryLoaded = false;
   int? inventoryRevision;
   int? inventoryReceiptCheckpointRevision;
@@ -483,6 +485,15 @@ class _StoreOperationalData {
   Future<bool> inventoryWrites = Future<bool>.value(true);
   bool inventoryReceiptBusy = false;
   bool inventoryReceiptRecoveryPending = false;
+}
+
+class _PickupPreferencesRecovery {
+  bool loaded = false, saved = false;
+  Map<String, Object?>? sessionFields;
+  int pendingWrites = 0;
+  String? error;
+  Future<bool>? loading;
+  Future<bool> writes = Future<bool>.value(true);
 }
 
 /// Editable application data is separate from an approved Store's operations.
@@ -577,6 +588,7 @@ class WorkSession extends ChangeNotifier {
     this.productPhotoSupportDirectory,
     this.analyticsReader,
     this.offerDraftStoreFactory,
+    this.pickupPreferencesStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -623,6 +635,7 @@ class WorkSession extends ChangeNotifier {
     this.productPhotoSupportDirectory,
     this.analyticsReader,
     this.offerDraftStoreFactory,
+    this.pickupPreferencesStoreFactory,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -639,6 +652,7 @@ class WorkSession extends ChangeNotifier {
 
   final WorkGateway gateway;
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
+  final WorkPendingProofStore Function(String storeId)? pickupPreferencesStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
 
@@ -3692,6 +3706,13 @@ class WorkSession extends ChangeNotifier {
       }
     }
     _activeWorkspace = value;
+    if (value != null && previousId != value.id && pickupPreferencesPersistenceAvailable) {
+      scheduleMicrotask(() {
+        if (!_disposed && activeWorkspace?.id == value.id) {
+          unawaited(loadWorkspacePickupPreferences(expectedStoreId: value.id));
+        }
+      });
+    }
     if (value != null && previousId != value.id && localInventoryEnabled) {
       scheduleMicrotask(() {
         if (!_disposed && activeWorkspace?.id == value.id) {
@@ -9798,6 +9819,150 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  bool get pickupPreferencesPersistenceAvailable =>
+      _contactAccountScope != null &&
+      (pickupPreferencesStoreFactory != null || contactDraftStore is SecureWorkPendingProofStore);
+
+  _PickupPreferencesRecovery get _pickupRecovery => _storeData.pickupPreferences
+      .putIfAbsent(_contactAccountScope ?? '', _PickupPreferencesRecovery.new);
+  bool get workspacePickupPreferencesSaving => _pickupRecovery.pendingWrites > 0;
+  Object get pickupPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
+  bool get workspacePickupPreferencesSaved => _pickupRecovery.saved;
+  String? get workspacePickupPreferencesError => _pickupRecovery.error;
+
+  WorkPendingProofStore? _pickupPreferencesStore(String storeId) {
+    if (pickupPreferencesStoreFactory != null) return pickupPreferencesStoreFactory!(storeId);
+    final owner = contactDraftStore;
+    return owner is SecureWorkPendingProofStore
+        ? SecureWorkPendingProofStore.pickupPreferences(storeId, reviewOnly: owner.reviewOnly)
+        : null;
+  }
+
+  Map<String, Object?> _pickupFields() => {
+    'city': workspaceDeliveryCity, 'area': workspaceDeliveryArea,
+    'pincode': workspaceDeliveryPincode, 'pickupEnabled': workspacePickupEnabled,
+  };
+
+  Future<bool> loadWorkspacePickupPreferences({required String expectedStoreId}) {
+    if (_disposed || activeWorkspace?.id != expectedStoreId) return Future.value(false);
+    if (!pickupPreferencesPersistenceAvailable) return Future.value(true);
+    final recovery = _pickupRecovery;
+    final owner = _contactAccountScope!;
+    if (_storeData.pickupPreferencesOwner case final previous? when previous != owner) {
+      _storeData.pickupPreferences[previous]?.sessionFields = _pickupFields();
+      final local = recovery.sessionFields;
+      _storeData.workspaceDeliveryCity = local?['city'] as String? ?? '';
+      _storeData.workspaceDeliveryArea = local?['area'] as String? ?? '';
+      _storeData.workspaceDeliveryPincode = local?['pincode'] as String? ?? '';
+      _storeData.workspacePickupEnabled = local?['pickupEnabled'] as bool? ?? true;
+    }
+    _storeData.pickupPreferencesOwner = owner;
+    if (recovery.loaded) return Future.value(true);
+    return recovery.loading ??= _readPickupPreferences(expectedStoreId, recovery)
+        .whenComplete(() { recovery.loading = null; });
+  }
+
+  Future<bool> _readPickupPreferences(String id, _PickupPreferencesRecovery recovery) async {
+    final data = _storeData;
+    final account = _contactAccountScope;
+    final revision = navigationScopeRevision;
+    final before = _pickupFields();
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && account != null &&
+        activeWorkspace?.id == id && navigationScopeRevision == revision &&
+        _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    if (!current()) return false;
+    addListener(watch);
+    try {
+      await recovery.writes;
+      final store = _pickupPreferencesStore(id);
+      if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+      final saved = await store.read(account!).timeout(const Duration(seconds: 12));
+      if (!current()) return false;
+      if (saved != null) {
+        final fields = saved['fields'];
+        const keys = {'city', 'area', 'pincode', 'pickupEnabled'};
+        if (saved['schemaVersion'] != 1 || saved['storeId'] != id ||
+            saved.keys.any((k) => !const {'schemaVersion', 'storeId', 'fields'}.contains(k)) ||
+            fields is! Map || fields.length != keys.length ||
+            fields.keys.any((k) => !keys.contains(k)) ||
+            fields['city'] is! String || (fields['city'] as String).trim().isEmpty ||
+            fields['area'] is! String || (fields['area'] as String).trim().isEmpty ||
+            fields['pincode'] is! String || !RegExp(r'^[1-9][0-9]{5}$').hasMatch(fields['pincode'] as String) ||
+            fields['pickupEnabled'] is! bool) {
+          throw const FormatException('Invalid pickup preferences');
+        }
+        // Direct recovery only: no operational command, approval or activity.
+        if (mapEquals(before, _pickupFields())) {
+          data.workspaceDeliveryCity = fields['city'] as String;
+          data.workspaceDeliveryArea = fields['area'] as String;
+          data.workspaceDeliveryPincode = fields['pincode'] as String;
+          data.workspacePickupEnabled = fields['pickupEnabled'] as bool;
+          recovery.saved = true;
+        }
+      }
+      recovery.loaded = true;
+      recovery.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (current()) {
+        recovery.error = 'Saved pickup preferences could not be opened. Your current entries are kept. Try again.';
+        notifyListeners();
+      }
+      return false;
+    } finally {
+      removeListener(watch);
+    }
+  }
+
+  void _savePickupPreferences() {
+    if (!pickupPreferencesPersistenceAvailable) return;
+    final data = _storeData;
+    final account = _contactAccountScope!;
+    final id = activeWorkspace!.id;
+    final revision = navigationScopeRevision;
+    final recovery = _pickupRecovery;
+    final fields = _pickupFields();
+    recovery.sessionFields = fields;
+    recovery.pendingWrites++;
+    recovery.error = null;
+    recovery.saved = false;
+    var scopeChanged = false;
+    bool current() => !_disposed && !scopeChanged && navigationScopeRevision == revision &&
+        _isStoreScopeCurrent(data, id, account);
+    void watch() { if (!current()) scopeChanged = true; }
+    addListener(watch);
+    recovery.writes = recovery.writes.then((_) async {
+      try {
+        if (!current()) return false;
+        final store = _pickupPreferencesStore(id);
+        if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
+        await store.save(account, {'schemaVersion': 1, 'storeId': id, 'fields': fields})
+            .timeout(const Duration(seconds: 12));
+        if (!current()) return false;
+        if (mapEquals(fields, _pickupFields())) {
+          recovery.saved = true;
+          recovery.error = null;
+          showNotice('Pickup preferences saved on this device. Public sync and collection confirmation are pending.');
+        }
+        return true;
+      } catch (_) {
+        if (current() && mapEquals(fields, _pickupFields())) {
+          recovery.error = 'Device save could not be confirmed. Your entries are kept. Try again.';
+          showError(recovery.error!);
+        }
+        return false;
+      } finally {
+        removeListener(watch);
+        recovery.pendingWrites--;
+        if (current()) notifyListeners();
+      }
+    });
+    notifyListeners();
+  }
+
   bool saveWorkspaceDeliverySettings({
     String? city,
     String? area,
@@ -9817,6 +9982,10 @@ class WorkSession extends ChangeNotifier {
       showError('Check the Store city, area and PIN code before saving.');
       return false;
     }
+    if (pickupPreferencesPersistenceAvailable && !_pickupRecovery.loaded) {
+      showError('Open your saved pickup preferences before saving. Your entries are kept.');
+      return false;
+    }
     workspaceDeliveryCity = city?.trim() ?? workspaceDeliveryCity;
     workspaceDeliveryArea = area?.trim() ?? workspaceDeliveryArea;
     workspaceDeliveryPincode = pincode?.trim() ?? workspaceDeliveryPincode;
@@ -9824,6 +9993,7 @@ class WorkSession extends ChangeNotifier {
     _recordWorkspaceActivity('Store pickup location and preferences updated.');
     showNotice('Pickup preferences applied in this session. Durable sync and collection confirmation are pending.');
     _persistOperationalState('delivery-settings');
+    _savePickupPreferences();
     return true;
   }
 

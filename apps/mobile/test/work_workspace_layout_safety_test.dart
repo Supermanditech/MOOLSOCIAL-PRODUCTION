@@ -46408,6 +46408,85 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('LF16 pickup editor recovers and retains failed-save inputs $scale', (tester) async {
+      final storage = _Lf16PickupFixtureStore();
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway,
+        contactDraftStore: _ContactDraftFixtureStore(),
+        pickupPreferencesStoreFactory: (_) => storage)
+        ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+      final storeId = work.activeWorkspace!.id;
+      storage.value = {'schemaVersion': 1, 'storeId': storeId, 'fields': {
+        'city': 'Pune', 'area': 'Saved pickup lane', 'pincode': '411001', 'pickupEnabled': false,
+      }}; // Host fixture, never evaluation runtime storage.
+      await work.loadWorkspacePickupPreferences(expectedStoreId: storeId);
+      final products = List.of(work.workspaceCatalogueItems);
+      final invoices = List.of(work.workspaceInvoices);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 800), textScale: scale);
+      await openStoreSettings(tester);
+      await reveal(tester, find.text('Delivery & pickup'));
+      await tester.tap(find.text('Delivery & pickup').hitTestable());
+      await tester.pumpAndSettle();
+      final area = find.byKey(const Key('work-delivery-area'));
+      expect(tester.widget<TextFormField>(area).controller!.text, 'Saved pickup lane');
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('work-delivery-pickup'))).value, isFalse);
+      await reveal(tester, area);
+      await tester.enterText(area, 'Updated pickup lane');
+      final save = find.byKey(const Key('work-delivery-settings-save'));
+      storage.failSave = true;
+      await reveal(tester, save);
+      await tester.tap(save.hitTestable());
+      await tester.pumpAndSettle();
+      expect(work.workspacePickupPreferencesSaved, isFalse);
+      expect(work.workspacePickupPreferencesError, isNotNull);
+      expect(tester.widget<TextFormField>(area).controller!.text, 'Updated pickup lane');
+      storage.failSave = false;
+      await reveal(tester, save); // Error text can move the button at large text.
+      await tester.tap(save.hitTestable());
+      await tester.pumpAndSettle();
+      expect(work.workspacePickupPreferencesSaved, isTrue);
+      expect((storage.value!['fields'] as Map)['area'], 'Updated pickup lane');
+      // The form header is lazily disposed while the large-text Save row is
+      // visible. Inspect the saved caption after returning to its actual view.
+      final formScroll = tester.state<ScrollableState>(
+        find.descendant(
+          of: find.byKey(const Key('work-delivery-settings-screen')),
+          matching: find.byType(Scrollable),
+        ).first,
+      );
+      formScroll.position.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Saved on this device.'), findsWidgets);
+      expect(work.activeWorkspace!.id, storeId);
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
+      expect(work.workspaceInvoices, orderedEquals(invoices));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('LF16 pickup editor gates unreadable storage and retries safely', (tester) async {
+    final storage = _Lf16PickupFixtureStore()..failRead = true;
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _ContactDraftFixtureStore(),
+      pickupPreferencesStoreFactory: (_) => storage)
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await openStoreSettings(tester);
+    await reveal(tester, find.text('Delivery & pickup'));
+    await tester.tap(find.text('Delivery & pickup').hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-delivery-area')), findsNothing);
+    expect(find.text('Try again'), findsOneWidget);
+    storage.failRead = false;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-delivery-area')), findsOneWidget);
+    expect(storage.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
     for (final reopening in ['', 'Tomorrow at 8:00 AM']) {
       testWidgets('LF15 attention preference is not public confirmation '
           'scale=$scale reopening=$reopening', (tester) async {
@@ -77069,6 +77148,20 @@ class _PurchaseEntryFixtureStore implements WorkPurchaseEntryStore {
       throw StateError('Fixture write failure');
     }
     value = WorkspacePurchaseEntryBook.fromJson(directory.toJson());
+  }
+}
+
+class _Lf16PickupFixtureStore extends _ContactDraftFixtureStore {
+  bool failRead = false, failSave = false;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    if (failRead) throw StateError('Host read error');
+    return super.read(scope);
+  }
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {
+    if (failSave) throw StateError('Host save error');
+    await super.save(scope, draft);
   }
 }
 

@@ -173,12 +173,14 @@ class StoreSettingsForm extends StatefulWidget {
     this.trailing,
     this.embedded = false,
     this.pairAtWidth = 290,
+    this.saveEnabled = true,
     super.key,
   });
   final String title, detail, saveKey, saveLabel;
   final List<StoreSettingsInput> fields;
   final Widget? leading, trailing;
   final bool embedded;
+  final bool saveEnabled;
   final double pairAtWidth;
   final VoidCallback onSave;
 
@@ -206,6 +208,7 @@ class _StoreSettingsFormState extends State<StoreSettingsForm> {
   }
 
   void _save() {
+    if (!widget.saveEnabled) return;
     setState(() => _attempted = true);
     if (!_form.currentState!.validate()) {
       final first = widget.fields.firstWhere(
@@ -318,7 +321,7 @@ class _StoreSettingsFormState extends State<StoreSettingsForm> {
               const SizedBox(height: 8),
               FilledButton.icon(
                 key: Key(widget.saveKey),
-                onPressed: _save,
+                onPressed: widget.saveEnabled ? _save : null,
                 icon: const Icon(Icons.check_rounded, size: 18),
                 label: Text(widget.saveLabel),
               ),

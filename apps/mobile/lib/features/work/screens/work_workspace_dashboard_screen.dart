@@ -36040,6 +36040,8 @@ class _WorkspaceDeliverySettingsSurfaceState
     extends State<_WorkspaceDeliverySettingsSurface> {
   late final String? _storeId;
   late final int? _scopeRevision;
+  late final Object _pickupContext;
+  late Future<bool> _pickupLoad;
   @override
   void initState() {
     super.initState();
@@ -36049,9 +36051,23 @@ class _WorkspaceDeliverySettingsSurfaceState
     _area = TextEditingController(text: widget.session.workspaceDeliveryArea);
     _pincode = TextEditingController(text: widget.session.workspaceDeliveryPincode);
     _pickupEnabled = widget.session.workspacePickupEnabled;
+    _pickupContext = widget.session.pickupPreferencesContext;
+    _pickupLoad = _loadPickupPreferences();
   }
   late final TextEditingController _city, _area, _pincode;
   late bool _pickupEnabled;
+
+  Future<bool> _loadPickupPreferences() async {
+    final loaded = await widget.session.loadWorkspacePickupPreferences(expectedStoreId: _storeId ?? '');
+    if (!mounted || _pickupContext != widget.session.pickupPreferencesContext) return false;
+    if (loaded) {
+      _city.text = widget.session.workspaceDeliveryCity;
+      _area.text = widget.session.workspaceDeliveryArea;
+      _pincode.text = widget.session.workspaceDeliveryPincode;
+      _pickupEnabled = widget.session.workspacePickupEnabled;
+    }
+    return loaded;
+  }
 
   @override
   void dispose() {
@@ -36063,10 +36079,31 @@ class _WorkspaceDeliverySettingsSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    return StoreSettingsForm(
+    return FutureBuilder<bool>(future: _pickupLoad, builder: (context, snapshot) {
+      if (_pickupContext != widget.session.pickupPreferencesContext) {
+        return const Center(child: Text('Your Store or account changed. Reopen pickup settings. Your entries are kept.'));
+      }
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(child: CircularProgressIndicator(semanticsLabel: 'Opening saved pickup preferences'));
+      }
+      if (snapshot.data != true) {
+        return Center(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+          mainAxisSize: MainAxisSize.min, children: [
+            Text(widget.session.workspacePickupPreferencesError ?? 'Saved pickup preferences could not be opened.'),
+            OutlinedButton(onPressed: () => setState(() { _pickupLoad = _loadPickupPreferences(); }),
+              child: const Text('Try again')),
+          ],
+        )));
+      }
+      return AnimatedBuilder(animation: widget.session, builder: (context, _) => StoreSettingsForm(
       key: const Key('work-delivery-settings-screen'),
       title: 'Delivery & pickup',
-      detail: 'Preferences apply in this session. Durable sync and MoolSocial delivery/collection confirmation are pending.',
+      detail: widget.session.pickupPreferencesPersistenceAvailable
+          ? widget.session.workspacePickupPreferencesError ??
+              (widget.session.workspacePickupPreferencesSaving ? 'Saving pickup preferences on this device…' :
+               widget.session.workspacePickupPreferencesSaved ? 'Saved on this device. Public sync and collection confirmation are pending.' :
+               'Save your pickup preferences on this device. Public sync and collection confirmation are pending.')
+          : 'Preferences apply in this session. Durable sync and MoolSocial delivery/collection confirmation are pending.',
       leading: widget.session.workspacePublicationDetails.city.trim().isNotEmpty &&
               widget.session.workspacePublicationDetails.street.trim().isNotEmpty &&
               RegExp(r'^[1-9][0-9]{5}$').hasMatch(widget.session.workspacePublicationDetails.pinCode)
@@ -36131,8 +36168,14 @@ class _WorkspaceDeliverySettingsSurfaceState
         ],
       ),
       saveKey: 'work-delivery-settings-save',
-      saveLabel: 'Apply pickup preferences',
+      saveLabel: widget.session.workspacePickupPreferencesSaving ? 'Saving…' :
+          widget.session.pickupPreferencesPersistenceAvailable ? 'Save on this device' : 'Apply pickup preferences',
+      saveEnabled: !widget.session.workspacePickupPreferencesSaving,
       onSave: () {
+        if (_pickupContext != widget.session.pickupPreferencesContext) {
+          widget.session.showError('Your Store or account changed. Your entries are kept.');
+          return;
+        }
         widget.session.saveWorkspaceDeliverySettings(
           city: _city.text,
           area: _area.text,
@@ -36142,7 +36185,8 @@ class _WorkspaceDeliverySettingsSurfaceState
           expectedNavigationRevision: _scopeRevision,
         );
       },
-    );
+    ));
+    });
   }
 }
 

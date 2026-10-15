@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
+import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -10,6 +15,234 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  testWidgets('LF16 secure writes remain ordered after a caller timeout', (tester) async {
+    const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+    final gate = Completer<void>();
+    final values = <String, String>{};
+    var writes = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+      final args = Map<String, Object?>.from(call.arguments as Map);
+      if (call.method == 'write') {
+        writes++;
+        if (writes == 1) await gate.future;
+        values[args['key'] as String] = args['value'] as String;
+        return null;
+      }
+      if (call.method == 'read') return values[args['key']];
+      throw StateError('Unexpected secure operation ${call.method}');
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+    final storage = _Lf16SecurePrefsStore('timeout');
+    var timedOut = false;
+    unawaited(storage.save('lf16-host', {'value': 'old'}).catchError((Object _) { timedOut = true; }));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 11));
+    expect(timedOut, isTrue);
+    final second = storage.save('lf16-host', {'value': 'new'});
+    final read = _Lf16SecurePrefsStore('timeout').read('lf16-host');
+    await tester.pump();
+    expect(writes, 1, reason: 'Caller timeout must not release a live platform write');
+    gate.complete();
+    await tester.pump();
+    await second;
+    expect(await read, {'value': 'new'});
+    expect(writes, 2);
+  });
+
+  test('LF16 actual pickup save recovers in a new session', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    FlutterSecureStorage.setMockInitialValues({}); // Host plugin fixture only.
+    const store = WorkWorkspace(id: 'lf16-private-pickup', name: 'Host Store',
+      profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Pune', verified: true);
+    WorkSession create(ReviewWorkGateway gateway) => WorkSession(gateway: gateway,
+      contactDraftStore: _Lf16SecurePrefsStore('host-contact'),
+      pickupPreferencesStoreFactory: (id) => _Lf16SecurePrefsStore(id))..activeWorkspace = store;
+    final first = create(ReviewWorkGateway());
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(first.saveWorkspaceDeliverySettings(city: 'Pune', area: 'Host pickup lane',
+      pincode: '411001', pickupEnabled: false), isTrue);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    first.dispose();
+    final gateway = ReviewWorkGateway();
+    final restored = create(gateway);
+    addTearDown(restored.dispose);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(restored.workspaceDeliveryCity, 'Pune');
+    expect(restored.workspaceDeliveryArea, 'Host pickup lane');
+    expect(restored.workspaceDeliveryPincode, '411001');
+    expect(restored.workspacePickupEnabled, isFalse);
+    expect(gateway.operationalSaveCalls, 0, reason: 'Recovery must not resend operations');
+    expect(restored.workspaceOrders, isEmpty);
+    expect(restored.workspaceInvoices, isEmpty);
+    expect(restored.workspaceCatalogueItems, isEmpty);
+  });
+
+  for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin']) {
+    test('LF16 invalid saved $invalid preserves entries and original record', () async {
+      final fixture = _Lf16Storage();
+      final row = fixture.valid();
+      if (invalid == 'version') row['schemaVersion'] = 2;
+      if (invalid == 'store') row['storeId'] = 'another-store';
+      final fields = row['fields'] as Map<String, Object?>;
+      if (invalid == 'missing') fields.remove('pickupEnabled');
+      if (invalid == 'extra') fields['orders'] = [];
+      if (invalid == 'type') fields['pickupEnabled'] = 'true';
+      if (invalid == 'pin') fields['pincode'] = 'bad';
+      final encoded = jsonEncode(row);
+      fixture.rows[fixture.key('lf16-a')] = encoded;
+      final work = fixture.work();
+      addTearDown(work.dispose);
+      work.workspaceDeliveryCity = 'Newer input';
+      expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isFalse);
+      expect(work.workspaceDeliveryCity, 'Newer input');
+      expect(work.workspacePickupPreferencesError, isNotNull);
+      expect(fixture.rows[fixture.key('lf16-a')], encoded);
+      expect(fixture.writes, 0);
+      expect(work.saveWorkspaceDeliverySettings(city: 'Pune', area: 'lane', pincode: '411001'), isFalse);
+    });
+  }
+
+  test('LF16 read failure is retryable without discarding entries', () async {
+    final fixture = _Lf16Storage()..failRead = true;
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    work.workspaceDeliveryArea = 'Unsaved address';
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isFalse);
+    fixture.failRead = false;
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isTrue);
+    expect(work.workspaceDeliveryArea, 'Unsaved address');
+    expect(work.workspacePickupPreferencesSaved, isFalse);
+  });
+
+  for (final aba in [false, true]) {
+    test('LF16 delayed Store read rejects changed scope ABA=$aba', () async {
+      final fixture = _Lf16Storage()..readGate = Completer<void>();
+      fixture.rows[fixture.key('lf16-a')] = jsonEncode(fixture.valid());
+      final work = fixture.work();
+      addTearDown(work.dispose);
+      final read = work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+      await Future<void>.delayed(Duration.zero);
+      work.activeWorkspace = _lf16Store('lf16-b');
+      if (aba) work.activeWorkspace = _lf16Store('lf16-a');
+      fixture.readGate!.complete();
+      expect(await read, isFalse);
+      expect(work.workspaceDeliveryCity, isEmpty);
+    });
+  }
+
+  test('LF16 account change and observed ABA cannot publish a delayed read', () async {
+    final fixture = _Lf16Storage()..readGate = Completer<void>();
+    fixture.rows[fixture.key('lf16-a')] = jsonEncode(fixture.valid());
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    final read = work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+    await Future<void>.delayed(Duration.zero);
+    fixture.account = 'other-owner';
+    work.showNotice('Host account changed');
+    fixture.account = 'lf16-host';
+    work.showNotice('Host account returned');
+    fixture.readGate!.complete();
+    expect(await read, isFalse);
+    expect(work.workspaceDeliveryCity, isEmpty);
+  });
+
+  test('LF16 late read preserves newer input and disposed session', () async {
+    final fixture = _Lf16Storage()..readGate = Completer<void>();
+    fixture.rows[fixture.key('lf16-a')] = jsonEncode(fixture.valid());
+    final work = fixture.work();
+    final read = work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+    await Future<void>.delayed(Duration.zero);
+    work.workspaceDeliveryCity = 'Newer city';
+    fixture.readGate!.complete();
+    expect(await read, isTrue);
+    expect(work.workspaceDeliveryCity, 'Newer city');
+    expect(work.workspacePickupPreferencesSaved, isFalse);
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'wrong-store'), isFalse);
+    work.dispose();
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isFalse);
+  });
+
+  test('LF16 owner caches do not expose another owner pickup inputs', () async {
+    final fixture = _Lf16Storage();
+    fixture.rows[fixture.key('lf16-a')] = jsonEncode(fixture.valid());
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isTrue);
+    expect(work.workspaceDeliveryCity, 'Pune');
+    fixture.account = 'owner-b';
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isTrue);
+    expect(work.workspaceDeliveryCity, isEmpty);
+    fixture.account = 'lf16-host';
+    expect(await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a'), isTrue);
+    expect(work.workspaceDeliveryCity, 'Pune');
+  });
+
+  test('LF16 write failure preserves input and recovery can retry', () async {
+    final fixture = _Lf16Storage();
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+    fixture.failWrite = true;
+    expect(work.saveWorkspaceDeliverySettings(city: 'Pune', area: 'Kept lane', pincode: '411001'), isTrue);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(work.workspacePickupPreferencesSaving, isFalse);
+    expect(work.workspacePickupPreferencesSaved, isFalse);
+    expect(work.workspacePickupPreferencesError, contains('could not be confirmed'));
+    expect(work.workspaceDeliveryArea, 'Kept lane');
+    fixture.failWrite = false;
+    expect(work.saveWorkspaceDeliverySettings(), isTrue);
+    for (var i = 0; i < 5; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(work.workspacePickupPreferencesSaved, isTrue);
+    expect(work.workspacePickupPreferencesError, isNull);
+    expect(jsonDecode(fixture.rows[fixture.key('lf16-a')]!)['fields']['area'], 'Kept lane');
+  });
+
+  test('LF16 consecutive saves finish in order and keep latest fields', () async {
+    final fixture = _Lf16Storage();
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+    fixture.writeGate = Completer<void>();
+    work.saveWorkspaceDeliverySettings(city: 'First', area: 'Lane', pincode: '411001');
+    await Future<void>.delayed(Duration.zero);
+    work.saveWorkspaceDeliverySettings(city: 'Latest', area: 'Lane', pincode: '411001');
+    await Future<void>.delayed(Duration.zero);
+    expect(fixture.writes, 1);
+    expect(work.workspacePickupPreferencesSaving, isTrue);
+    fixture.writeGate!.complete();
+    for (var i = 0; i < 8; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(fixture.writes, 2);
+    expect(work.workspacePickupPreferencesSaving, isFalse);
+    expect(work.workspacePickupPreferencesSaved, isTrue);
+    expect(jsonDecode(fixture.rows[fixture.key('lf16-a')]!)['fields']['city'], 'Latest');
+  });
+
+  testWidgets('LF16 busy settings save is visibly disabled', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StoreSettingsForm(
+      title: 'Host settings', detail: 'Host fixture', fields: const [],
+      saveKey: 'lf16-save', saveLabel: 'Saving…', saveEnabled: false,
+      onSave: () { calls++; },
+    ))));
+    final button = tester.widget<FilledButton>(find.byKey(const Key('lf16-save')));
+    expect(button.onPressed, isNull);
+    expect(calls, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('LF16 newer successful save clears an older queued failure', () async {
+    final fixture = _Lf16Storage();
+    final work = fixture.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspacePickupPreferences(expectedStoreId: 'lf16-a');
+    fixture.failWritesRemaining = 1;
+    work.saveWorkspaceDeliverySettings(city: 'Old', area: 'Lane', pincode: '411001');
+    work.saveWorkspaceDeliverySettings(city: 'Latest', area: 'Lane', pincode: '411001');
+    for (var i = 0; i < 8; i++) { await Future<void>.delayed(Duration.zero); }
+    expect(work.workspacePickupPreferencesSaved, isTrue);
+    expect(work.workspacePickupPreferencesError, isNull);
+  });
+
   test('LF06 new Store location is unknown rather than fabricated', () {
     final work = WorkSession(gateway: ReviewWorkGateway());
     addTearDown(work.dispose);
@@ -618,4 +851,58 @@ void main() {
       );
     },
   );
+}
+
+// Isolated host storage/identity fixtures, never runtime evaluation records.
+class _Lf16SecurePrefsStore extends SecureWorkPendingProofStore {
+  _Lf16SecurePrefsStore(super.storeId) : super.pickupPreferences();
+  @override
+  String get accountScope => 'lf16-host';
+}
+
+WorkWorkspace _lf16Store(String id) => WorkWorkspace(id: id, name: 'Host Store',
+  profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Pune', verified: true);
+
+class _Lf16Storage {
+  String account = 'lf16-host';
+  final rows = <String, String>{};
+  bool failRead = false, failWrite = false;
+  int writes = 0;
+  int failWritesRemaining = 0;
+  Completer<void>? readGate, writeGate;
+  String key(String id, [String? owner]) => jsonEncode([owner ?? account, id]);
+  Map<String, Object?> valid() => {'schemaVersion': 1, 'storeId': 'lf16-a',
+    'fields': <String, Object?>{'city': 'Pune', 'area': 'Saved lane', 'pincode': '411001', 'pickupEnabled': false}};
+  WorkSession work() => WorkSession(gateway: ReviewWorkGateway(),
+    contactDraftStore: _Lf16MemoryStore(this, 'contact'),
+    pickupPreferencesStoreFactory: (id) => _Lf16MemoryStore(this, id))
+      ..activeWorkspace = _lf16Store('lf16-a');
+}
+
+class _Lf16MemoryStore implements WorkPendingProofStore {
+  _Lf16MemoryStore(this.storage, this.id);
+  final _Lf16Storage storage;
+  final String id;
+  @override
+  String get accountScope => storage.account;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    final row = storage.rows[storage.key(id, scope)];
+    await storage.readGate?.future;
+    if (storage.failRead) throw StateError('Host read failure');
+    return row == null ? null : Map<String, Object?>.from(jsonDecode(row) as Map);
+  }
+  @override
+  Future<void> save(String scope, Map<String, Object?> data) async {
+    storage.writes++;
+    final frozen = jsonEncode(data);
+    await storage.writeGate?.future;
+    if (storage.failWrite || storage.failWritesRemaining > 0) {
+      if (storage.failWritesRemaining > 0) storage.failWritesRemaining--;
+      throw StateError('Host write failure');
+    }
+    storage.rows[storage.key(id, scope)] = frozen;
+  }
+  @override
+  Future<void> clear(String scope) async => throw StateError('Recovery must not delete');
 }
