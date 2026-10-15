@@ -266,7 +266,7 @@ void main() {
         expect(values.keys, containsAll(['variantAttributes', 'packTerms']));
         expect(values['variantAttributes'], isEmpty);
         expect(values['packTerms'], isNull);
-        expect(values['offerClass'], isNull);
+        expect(values['offerClass'], BuyV2OfferClass.retail);
         expect(values['reviewDeliveryOptions'], isEmpty);
       }
       expect(source, projected);
@@ -337,7 +337,7 @@ void main() {
   });
 
   test(
-    'PUB compatibility rejects unowned classification and review options',
+    'PUB compatibility accepts exact classification and rejects mismatches and review options',
     () {
       final item = fixture();
       final public = item.toBuyPublicProduct(
@@ -345,6 +345,10 @@ void main() {
         storeName: store.name,
       );
       for (final value in BuyV2OfferClass.values) {
+        if (value == BuyV2OfferClass.retail) {
+          expect(audit(item, target: public.copyWith(offerClass: value)), isEmpty);
+          continue;
+        }
         expect(
           audit(
             item,

@@ -8,6 +8,55 @@ import 'package:moolsocial/features/work/work_publication.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test('LF03 explicit retail wholesale and bulk class reaches public product', () {
+    final base = handoffStock();
+    for (final sale in [BuyV2WholesaleSaleType.wholesale, BuyV2WholesaleSaleType.bulk]) {
+      final item = base.copyWith(wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
+        ...base.wholesaleOffer!.toJson(), 'saleType': sale.name,
+      }));
+      for (final channel in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+        final expected = channel == BuyV2Destination.shop ? BuyV2OfferClass.retail
+            : sale == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale;
+        final public = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: channel);
+        expect(public.offerClass, expected);
+        expect(public.id, item.id);
+        expect(public.pack, item.pack);
+        expect(public.price, channel == BuyV2Destination.shop ? item.sellingPrice : item.wholesaleOffer!.priceRupees);
+        expect(public.reviewDeliveryOptions, isEmpty);
+        expect(public.packTerms, isNull); // No invented pack revision/pricing time.
+        expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Host Store', channel: channel), isEmpty);
+      }
+    }
+    final legacy = base.copyWith(wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
+      ...base.wholesaleOffer!.toJson(), 'saleType': null,
+    }));
+    final publicLegacy = legacy.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: BuyV2Destination.wholesale);
+    expect(publicLegacy.offerClass, isNull);
+    expect(publicLegacy.catalogueListing, isFalse);
+    expect(legacy.stock, base.stock);
+  });
+  test('LF03 complete inventory round trip preserves pack content photo and prices', () {
+    final initial = handoffStock();
+    final item = initial.copyWith(compliance: WorkspaceProductCompliance.fromJson({
+      ...initial.compliance!.toJson(), 'manufacturerAddress': 'Host maker address',
+      'packerAddress': 'Host packer address', 'importerAddress': 'Host importer address',
+    }));
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(jsonDecode(jsonEncode(item.toInventoryJson())));
+    expect(restored.toInventoryJson(), item.toInventoryJson());
+    expect(restored.cataloguePhoto!.revision, item.cataloguePhoto!.revision);
+    expect(restored.content.toJson(), item.content.toJson());
+    expect(restored.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store').compliance!.manufacturerAddress, 'Host maker address');
+    final oldProduct = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final newer = handoffStock(revision: 'new-approved-image');
+    final current = WorkspacePublicContentAdapter(storeId: 'a', item: newer, sourceId: 'host-current-content').snapshotFor(oldProduct);
+    expect(current.state, BuyV2ProductContentState.ready);
+    expect(current.media.single.binding!.assetRevision, 'new-approved-image');
+    expect(current.media.single.binding!.storeId, 'a');
+    expect(current.media.single.binding!.skuId, item.id);
+    final sibling = WorkspacePublicContentAdapter(storeId: 'a', item: handoffStock(litres: 5), sourceId: 'host-other-pack').snapshotFor(oldProduct);
+    expect(sibling.state, BuyV2ProductContentState.unavailable);
+    expect(sibling.media, isEmpty);
+  });
   const packAddresses = {
     'manufacturerAddress': 'Host fixture maker, Plot 1, Jaipur',
     'packerAddress': 'Host fixture packer, Plot 2, Delhi',

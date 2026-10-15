@@ -123,7 +123,7 @@ abstract final class WorkspacePublicationContract {
     'regulatoryNote': 'Applicable product note; not an approval',
     'minimumOrder': 'Product/channel minimum packs',
     'offerClass':
-        'Explicit provider offer classification pending; not inferred from quantity',
+        'Selected retail channel or explicit saved wholesale/bulk sale type; not eligibility or fleet permission',
     'reviewDeliveryOptions':
         'Device-review choices only; never public provider eligibility',
     'returnPolicy':
@@ -303,7 +303,13 @@ abstract final class WorkspacePublicationContract {
     ),
     'variantAttributes': const <BuyV2VariantAttribute>[],
     'packTerms': null,
-    'offerClass': null,
+    'offerClass': channel == BuyV2Destination.shop
+        ? BuyV2OfferClass.retail
+        : switch (p.wholesaleOffer?.saleType) {
+            BuyV2WholesaleSaleType.wholesale => BuyV2OfferClass.wholesale,
+            BuyV2WholesaleSaleType.bulk => BuyV2OfferClass.bulk,
+            null => null,
+          },
     'reviewDeliveryOptions': const <BuyV2DeliveryOption>{},
     'compliance.manufacturerAddress': p.compliance?.manufacturerAddress,
     'compliance.packerAddress': p.compliance?.packerAddress,

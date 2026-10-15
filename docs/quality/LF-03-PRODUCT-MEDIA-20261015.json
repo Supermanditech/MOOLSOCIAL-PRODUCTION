@@ -17,8 +17,8 @@
     "currentTicketId": "LF-03",
     "selectedTicketAssessment": {
       "ticketId": "LF-03",
-      "customerOutcome": "Optional exact-product manufacturer/packer/importer addresses survive catalogue/manual/CSV capture, saved Stock and typed public projection without repeated Store entry.",
-      "necessityProof": "Buy already models these pack addresses; Store producer and shared input schema omit them. Reuse existing records/editor/import instead of a new screen or provider service.",
+      "customerOutcome": "Supported product/pack/content/media values survive all entry paths and exact public projection; existing explicit selling classification is not dropped. Source-held data remains truthful and non-repetitive.",
+      "necessityProof": "Buy pack addresses were absent from Store input; current explicit retail/wholesale/bulk class was lost in typed projection. Reuse the existing saved record, editor/import and public adapter. Other mapped gaps retain their actual owner/dependency rather than new duplicate forms.",
       "implementationDisposition": [
         "reuse",
         "configuration"
@@ -49,7 +49,7 @@
         "Live publication remains provider-dependent; founder OPPO review before advancing."
       ],
       "manifestPath": "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
-      "manifestSha256": "AEFBE91ECCE5BE2AC67B23EE328EA22CA4483B5DFC3EC6B5BE7FE61B06046A30",
+      "manifestSha256": "3C1FD91F6331FA38978F8774E3D02813B23034CADF15A7086A00417DF68BE7CA",
       "evidencePath": "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -60,12 +60,13 @@
   "ticket": {
     "id": "LF-03",
     "parentTicketId": "LAST-FRONTEND",
-    "customerOutcome": "Optional exact-product manufacturer/packer/importer addresses survive catalogue/manual/CSV capture, saved Stock and typed public projection without repeated Store entry.",
+    "customerOutcome": "Supported product/pack/content/media values survive all entry paths and exact public projection; existing explicit selling classification is not dropped. Source-held data remains truthful and non-repetitive.",
     "classification": "mvp_required",
     "classificationReason": "Applicable basic product information for the existing Retailer/Grocery Store and its public consumers.",
     "minimumCompleteScope": [
       "Optional exact-product manufacturer/packer/importer addresses in shared model/editor/CSV/public projection.",
-      "Preserve legacy records and media identities; test and show the bounded slice on OPPO."
+      "Preserve legacy records and media identities; test and show the bounded slice on OPPO.",
+      "Map existing retail/wholesale/bulk class; verify whole supported product/media and saved-record boundary. Explicitly categorize remaining gaps by owner/cadence and later batch/provider dependency."
     ],
     "explicitExclusions": [
       "No backend, KYC approval, new auth provider, payment, dispatch, redesign, operator workspace, build/install or later LF batch."
@@ -76,7 +77,9 @@
     ],
     "testAndEvidencePlan": [
       "Failing regression before implementation; existing product/publication/handoff tests and affected editor checks.",
-      "No fake runtime Stock, public approval or backend result; actual device save/restart only if exercised."
+      "No fake runtime Stock, public approval or backend result; actual device save/restart only if exercised.",
+      "Current classification failing-before regression, full inventory round trip, exact media replacement/clearing/negative identity, existing CSV/manual/editor and relevant public-consumer tests. No repeated governance replay.",
+      "441 selected host cases passed (42 product/publication/handoff,42 ADD product/media/entry,4 LF02/LF03,7 CSV34,346 public contract/Store/variant); changed-source analysis clean. OPPO reload22 libraries/4830ms and actual field screenshot inspected; runtime save/relaunch and founder/provider acceptance remain pending."
     ],
     "frontendAdmission": {
       "task": "/root",

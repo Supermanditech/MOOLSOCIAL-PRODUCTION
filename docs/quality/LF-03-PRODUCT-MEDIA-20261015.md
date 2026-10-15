@@ -1,5 +1,14 @@
 # LF-03 — Product/media producer completeness (Batch 03)
 
+Current direction: founder requested FULL Batch 03, not closure on 03-A. Extend
+this same ticket to the existing explicit retail/wholesale/bulk classification
+projection and whole supported product/content/media/persistence verification.
+No new classification input: reuse selected channel and saved wholesale saleType.
+Missing source-held variant IDs, pack/pricing revisions, typed category schemas,
+history and optional galleries remain explicit, not invented. Mapping spans all
+public modes and Visit Store, while offers/terms/fulfilment execution remains in
+the existing later batches. The historical 03-A results below are not full closure.
+
 Founder accepted d5832aae and requested continuation after the complete Store ->
 public field map, including Visit Store and non-repetitive owner inputs.
 
@@ -57,3 +66,93 @@ readback was used before further navigation. No other app or Settings was operat
 Architect review checked clearing, CSV stability, identity and explicit v1 lossiness.
 Only the existing exact LF-03 ticket/owners were admitted; historical policy, registry,
 backend, dependency versions and other worktrees are unchanged. No Batch 04 started.
+
+## Full Batch 03 reconciliation — current, not just 03-A
+
+### Supported producer fields and source ownership
+
+| Public field group | Existing Store owner / maintenance | Current disposition |
+| --- | --- | --- |
+| Store ID/name/type/address/contact/hours | Store settings once, editable later; same branch across public views | Reuse Batch 02; no duplicate entries in each product or Visit Store |
+| Product ID/canonical/SKU/barcode/category/brand/title/variant/pack | Shared catalogue/manual/CSV record; once per exact SKU/pack | Supported; preserve identity through save and public consumers; no name joins |
+| Pack quantity/unit/case count; retail price/MRP/MOQ/unit-price display | Existing product selling inputs; edit only changes; derive comparable unit price | Supported local facts; no re-entry for Quick/Scheduled/public Store |
+| Retail/wholesale/bulk classification | Selected public channel and explicit saved wholesale saleType | Fixed loss in public projection; null legacy saleType remains unknown, not inferred from price/MOQ |
+| Manufacturer/packer/importer identities/addresses, origin, consumer care, applicable pack/legal facts | Product source or actual pack; prefill exact catalogue match and edit exceptions | Addresses fixed in 03-A; source names/addresses are not selling Store/billing details or verification |
+| Description/highlights/specifications/composition/safety/photo description | Existing product editor and shared CSV parser | Supported; private cost/KYC data excluded, optional text never fabricated |
+| Approved exact image, metadata, replacement and missing/failure state | Catalogue/media publisher and exact SKU/pack binding | Existing supported behavior verified; current approved image may refresh same identity, never sibling pack |
+| Private image and its storage | Existing private Stock image workflow | Not a public approval; no conversion to public image merely by saving |
+| Availability/Stock quantity/threshold | Real receiving/sale/return/adjustment activity | Local source retained; do not manually repeat per public tab or claim server reservation |
+| Common return/preferences with product exceptions | Existing Store defaults, explicit product override | Reuse existing ownership; versioned policy/consent execution belongs to Batch 05 |
+
+### Every remaining gap has a named destination
+
+| Gap | Why not silently filled in Batch 03 | Owner / completion condition |
+| --- | --- | --- |
+| Structured variantAttributes and variant-family revisions/options | No genuine structured option IDs in current Store input; free-text variant is not an ID schema | Catalogue source + minimal category-specific mapping when supplied; existing text variant remains supported |
+| Full public packTerms and pricing revision/freshness | Local measure does not supply accepted pack revision, measured-pricing semantics, pricing validity or tax/freight inclusion | Existing Batch 04 commercial/pack mapping with accepted source contract; no fake revision/time |
+| Wholesale increment/tier public consumption | Local wholesale increment/tier input exists; public product quantityStep currently defaults to 1 without packTerms | Explicit Batch 04 frontend/contract gap, NOT declared solved or purely a backend issue; preserve MOQ/step/tier in accepted public source before launch |
+| Simultaneous independent Wholesale and Bulk terms | Current producer has one wholesale offer with one explicit saleType | Batch 04 model/contract decision; never duplicate Stock or overwrite one channel silently |
+| Typed categoryFacts/highlightFields; category-specific size charts | Current text fields are not typed attribute IDs; grocery does not require a universal attribute/chart builder | Applicable trusted catalogue schema; irrelevant optional categories stay excluded |
+| Real price history / market signals | Today's edit/MRP cannot establish historical effective prices or regional trends | Authoritative history/market source; remain unavailable, not owner-entry fields |
+| Public gallery/video/upload approval | Main catalogue photo and private Stock photo exist, not a live gallery publisher | Optional gallery deferred; native media upload/normalization/review source required if launch scope needs it |
+| Supplier and MoolSocial offer publication/benefits/lifecycle | Current Store text offer is not a complete public campaign/discount producer; issuer/funding are separate | Batch 04: supplier scope and inputs, platform-only funding/eligibility; no fake publish or applied saving |
+| Versioned agreements, customer-specific credit and final money | Store defaults are preferences, not verified consent/credit/quote/payment | Batch 05 and existing checkout/payment batches; private exceptions stay private |
+| Quick/Scheduled/courier/freight/collection readiness, slots, ETA, charges | Classification and hours do not grant serviceability or an available fleet | Batch 06 + platform/logistics/Maps providers; operator Store remains separate; preserve platform-assigned delivery direction |
+| Public source revision, Stock freshness, pause/withdraw propagation | Local save is not publication acknowledgement | Batch 07/publication provider, with exact Store/SKU/channel/destination/revision |
+| Visit Store address-confirmation provenance | Source audit found product-origin fallback/generic trust-ready badge risk | Batch 07 focused reproduction/correction; no false claim of verified Store location |
+| Visit Store Cart-bar scope | Existing bar shows destination/global totals, not necessarily one Store | Batch 07 verify intended label/scope before correction; do not erase other Stores' legitimate Cart lines |
+| Customer orders/documents/feedback/analytics | Need buyer events and authoritative operational results, not more repeated product forms | Existing later LF batches; immutable purchased facts and exact review/Store targets |
+
+Visit Store scope includes discovery entry, public Store details/contact/hours/maps,
+Store-only catalogue/search/filter/pagination/Saved, exact product/media details,
+applicable mode/offers, Ask, Add/Cart/checkout, order/invoice and feedback context.
+Explicit Other stores and Compare may cross Stores; isolated catalogue must not.
+The detailed historical field-by-field map remains at the calling task's
+outputs/store-to-buy-provider-field-map-20261015.md; this disposition updates its
+address/classification statuses, not a claim all public providers now exist.
+
+Owner workflow: Store settings once -> catalogue-prefilled or manual/CSV product
+once -> explicit product/channel exceptions -> update only changed values at their
+source. Stock/order events update their own records. Platform promotions, verified
+ratings, payment/settlement and eligibility are never owner-entered 'success'.
+
+### Supported correction and acceptance boundary
+
+New projection uses only the selected shop channel or saved wholesale/bulk saleType.
+It grants no delivery choices, verified supplier role or publication acknowledgement.
+Retained v1 export stays unchanged; current audit checks expected class and rejects
+wrong classes/review-only delivery options. New regression failed with null class,
+then passed. Full inventory JSON round trip preserves content, new addresses,
+money, pack, exact image metadata and SKU; current-image refresh returns its actual
+new revision, while a sibling pack's content remains unavailable.
+
+No phone Stock/invoice/order/payment was injected or created in this continuation.
+Host Catalogue/manual/CSV paths and persistence are labelled host evidence. Fresh
+physical Catalogue/manual/CSV saves/relaunch and founder review remain distinct
+acceptance work, not silently inferred from test fixtures. Public provider readback
+and the named later-batch gaps remain pending. Therefore the full connected
+Store-to-public MVP is NOT declared complete by this Batch 03 source checkpoint.
+
+### Current verification result
+
+441 distinct selected host tests passed on the changed source: 42 product/content/
+publication/handoff; 42 existing ADD product/media/entry/layout cases; 4 LF02/LF03
+navigation/editor cases; 7 connected CSV34 cases; 346 public content-contract,
+partner/Visit Store catalogue and variant-selection cases. Successful terminal
+results read for all five groups. No failures/skips in these selected runs.
+Changed model/publication/test analysis: no issues. No rerun of the historical
+integration qualification machinery. Two initial Windows .bat regex selectors
+were interpreted as shell pipes before tests started; used plain prefixes instead.
+Those launcher errors are not test results and no checks were bypassed.
+
+OPPO successfully hot-reloaded 22 libraries in 4830ms. Current screenshot inspected:
+calling task outputs/lf03-full-review-20261015.png. Saved Sunflower oil editor's
+optional pack addresses remain visible, no new overlap; no data entry or Save tap.
+Runtime phone save/relaunch across all three entry methods and founder acceptance
+are still pending, not replaced by the 441 host results. No APK or live publication.
+Architect closing review found no additional concrete blocker in the supplied
+evidence, subject to the successful final test results and these truthful limits.
+
+Supported Batch 03 frontend corrections are checkpointed for review; source-held
+fields and named later work remain open. Do not count this as complete acceptance
+of all Store-to-public provider flows or proceed to Batch 04 without founder review.

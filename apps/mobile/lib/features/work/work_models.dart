@@ -10240,6 +10240,15 @@ class WorkspaceCatalogueItem {
       regulatoryNote: regulatoryNote,
       compliance: compliance?.toBuyPublicCompliance(),
       minimumOrder: channelMinimum,
+      // Classification describes the selected selling channel, not publication
+      // approval, customer eligibility or a delivery/fleet capability.
+      offerClass: wholesale
+          ? switch (offer!.saleType) {
+              BuyV2WholesaleSaleType.wholesale => BuyV2OfferClass.wholesale,
+              BuyV2WholesaleSaleType.bulk => BuyV2OfferClass.bulk,
+              null => null,
+            }
+          : BuyV2OfferClass.retail,
       returnPolicy: returnPolicy?.trim().isNotEmpty == true
           ? returnPolicy
           : storeDetails?.returnSummary.trim().isNotEmpty == true
