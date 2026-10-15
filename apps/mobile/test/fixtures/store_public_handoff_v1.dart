@@ -7,6 +7,56 @@ import 'package:moolsocial/features/work/work_publication.dart';
 
 final handoffTime = DateTime.utc(2026, 9, 22, 9);
 
+/// Host-only accepted contract input, never a runtime source or acknowledgement.
+BuyV2PackTerms handoffSellingTerms(WorkspaceCatalogueItem item, String storeId, {
+  DateTime? now,
+}) {
+  final clock = now ?? DateTime.now();
+  final offer = item.wholesaleOffer!;
+  final prices = <int, int>{offer.minimumPacks: offer.priceRupees};
+  for (final tier in offer.tiers) {
+    prices[tier.minimumPacks] = tier.packPriceMinor ~/ 100;
+  }
+  return BuyV2PackTerms(
+    skuId: item.id, revision: 'host-accepted-contract-only', sellUnit: item.pack,
+    quantityStep: offer.incrementPacks,
+    unitPriceLabel: offer.tiers.isEmpty ? item.packMeasure?.pricePerUnit(offer.priceRupees) : null,
+    priceTiers: offer.tiers.isEmpty ? const [] : [
+      for (final entry in prices.entries)
+        BuyV2PackPriceTier(minimumPacks: entry.key, price: entry.value),
+    ],
+    pricingStoreId: offer.tiers.isEmpty ? null : storeId,
+    priceObservedAt: offer.tiers.isEmpty ? null : clock.subtract(const Duration(hours: 1)),
+    priceValidUntil: offer.tiers.isEmpty ? null : clock.add(const Duration(hours: 1)),
+  );
+}
+
+/// Retained v1 deliberately had no quantity/tier contract. Keep that lossy
+/// historical export reproducible, never use it to qualify current purchasing.
+/// Serialize the original inputs; do not normalize away their step/tier values
+/// to bypass the current projection guard. No production imports or consumers.
+Map<String, Object?> _historicalV1Projection(
+  WorkspaceCatalogueItem item, BuyV2Destination channel, String storeId,
+) {
+  final details = handoffStoreDetails();
+  final retail = item.toBuyPublicProduct(storeName: 'Same display name',
+    storeId: storeId, storeDetails: details);
+  final fields = handoffPublicProduct(retail);
+  if (channel == BuyV2Destination.shop) return fields;
+  final offer = item.wholesaleOffer;
+  if (offer == null || !offer.valid || !offer.enabled) {
+    throw StateError('Invalid historical v1 fixture offer');
+  }
+  return {...fields,
+    'destination': channel.name, 'price': offer.priceRupees,
+    'minimumOrder': offer.minimumPacks,
+    'unitPrice': item.packMeasure?.pricePerUnit(offer.priceRupees) ?? item.unitPrice,
+    'catalogueListing': retail.mediaAssets.isNotEmpty && item.publicListing &&
+      details.channelEnabled(channel) && offer.saleType != null &&
+      item.customerFieldsCompleteFor(channel) && !item.catalogueFactsRequireReview,
+  };
+}
+
 WorkspaceStorePublicationDetails handoffStoreDetails() =>
     const WorkspaceStorePublicationDetails(
       street: '1 Test Lane',
@@ -263,14 +313,7 @@ Map<String, Object?> storePublicHandoffV1() => {
             BuyV2Destination.shop,
             BuyV2Destination.wholesale,
           ])
-            handoffPublicProduct(
-              c.$2.toBuyPublicProduct(
-                storeName: 'Same display name',
-                storeId: c.$3,
-                channel: channel,
-                storeDetails: handoffStoreDetails(),
-              ),
-            ),
+            _historicalV1Projection(c.$2, channel, c.$3),
         ],
         'counterOrderable': c.$2.canSellAtCounter,
         'publicOrderable':

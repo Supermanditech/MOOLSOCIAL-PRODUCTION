@@ -383,11 +383,14 @@ void main() {
         BuyV2Destination.shop,
         BuyV2Destination.wholesale,
       ]) {
+        final terms = channel == BuyV2Destination.wholesale
+            ? handoffSellingTerms(p, 'store-a') : null;
         final public = p.toBuyPublicProduct(
           storeId: 'store-a',
           storeName: 'Test Store',
           channel: channel,
           storeDetails: d,
+          publicPackTerms: terms,
         );
         expect(public.returnPolicy, d.returnSummary);
         expect(public.purchaseProtection!.windowLabel, '7 days from delivery');
@@ -398,6 +401,7 @@ void main() {
             storeName: 'Test Store',
             channel: channel,
             storeDetails: d,
+            publicPackTerms: terms,
           ),
           isEmpty,
         );
@@ -408,6 +412,7 @@ void main() {
             storeName: 'Test Store',
             channel: channel,
             storeDetails: d,
+            publicPackTerms: terms,
             projected: public.copyWith(
               purchaseProtection: const BuyV2PurchaseProtection(
                 summary: 'Wrong terms',

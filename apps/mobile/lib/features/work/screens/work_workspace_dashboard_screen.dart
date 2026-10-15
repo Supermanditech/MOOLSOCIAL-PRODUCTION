@@ -26452,6 +26452,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               const Text(
                                 'Packs: price per pack · Retail and wholesale use the same stock.',
                               ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Orders start at the minimum, then increase by the quantity step. Saved terms need confirmation before public listing.',
+                                key: Key('work-product-wholesale-public-terms'),
+                              ),
                             ],
                           ],
                         ),
@@ -36519,11 +36524,14 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
   String? _productId;
   DateTime? _validUntil;
   late final Map<String, String> _draft;
+  late final String? _storeId;
+  bool _loadingDraft = true, _draftLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _draft = widget.session.workspaceOfferDraft;
+    _storeId = widget.session.activeWorkspace?.id;
     _title.text = _draft['title'] ?? '';
     _detail.text = _draft['detail'] ?? '';
     _orderCap.text = _draft['orderCap'] ?? '50';
@@ -36532,9 +36540,28 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
     for (final controller in [_title, _detail, _orderCap]) {
       controller.addListener(_retainDraft);
     }
+    unawaited(_restoreDraft());
+  }
+
+  Future<void> _restoreDraft() async {
+    if (_storeId == null) { if (mounted) setState(() => _loadingDraft = false); return; }
+    if (mounted) setState(() => _loadingDraft = true);
+    final loaded = await widget.session.loadWorkspaceOfferDraft(expectedStoreId: _storeId!);
+    if (!mounted || widget.session.activeWorkspace?.id != _storeId ||
+        !identical(_draft, widget.session.workspaceOfferDraft)) {
+      return;
+    }
+    // Listeners ignore restoration; never replace saved values with constructor defaults.
+    _title.text = _draft['title'] ?? '';
+    _detail.text = _draft['detail'] ?? '';
+    _orderCap.text = _draft['orderCap'] ?? '50';
+    _productId = _draft['productId'];
+    _validUntil = DateTime.tryParse(_draft['validUntil'] ?? '');
+    setState(() { _loadingDraft = false; _draftLoaded = loaded; });
   }
 
   void _retainDraft() {
+    if (_loadingDraft) return;
     // Capture the original Store's map, never the newly selected Store on exit.
     _draft['title'] = _title.text;
     _draft['detail'] = _detail.text;
@@ -36602,6 +36629,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingDraft) return const Center(child: CircularProgressIndicator());
     final eligibleCustomers = widget.session.workspaceCustomerBook
         .where((customer) => customer.messagesAllowed)
         .length;
@@ -36632,6 +36660,17 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             detail:
                 'Choose a useful offer for customers who allow Store messages',
           ),
+        const SizedBox(height: 8),
+        const Text(
+          'Your Store funds these offers. MoolSocial offers are separate. Publishing is not available yet.',
+          key: Key('work-offer-publication-unavailable'),
+          style: TextStyle(fontSize: 12, color: MoolColors.muted),
+        ),
+        if (widget.session.workspaceOfferDraftError case final error?) ...[
+          const SizedBox(height: 8),
+          Text(error, key: const Key('work-offer-draft-error')),
+        ],
+        if (!_draftLoaded) TextButton(onPressed: _restoreDraft, child: const Text('Retry opening draft')),
         if (products.isEmpty || eligibleCustomers == 0) ...[
           const SizedBox(height: 8),
           Container(
@@ -36806,7 +36845,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
         if (widget.session.workspaceOffers.isNotEmpty) ...[
           const SizedBox(height: 18),
           const Text(
-            'Active offers',
+            'Recorded offers · publication unconfirmed',
             style: TextStyle(
               color: MoolColors.navy,
               fontSize: 18,
@@ -36836,7 +36875,24 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             color: Colors.white,
             border: Border(top: BorderSide(color: Color(0xFFE2E7F4))),
           ),
-          child: FilledButton.icon(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          OutlinedButton.icon(
+            key: const Key('work-offer-save-draft'),
+            onPressed: !_draftLoaded || widget.session.workspaceOfferDraftSaving ? null : () async {
+              if (widget.session.activeWorkspace?.id != _storeId ||
+                  !identical(_draft, widget.session.workspaceOfferDraft)) {
+                return;
+              }
+              _retainDraft();
+              final saving = widget.session.saveWorkspaceOfferDraft(expectedStoreId: _storeId!);
+              setState(() {});
+              await saving;
+              if (mounted) setState(() {});
+            },
+            icon: const Icon(Icons.save_outlined),
+            label: Text(widget.session.workspaceOfferDraftSaving ? 'Saving draft…' : 'Save draft'),
+          ),
+          FilledButton.icon(
             key: const Key('work-offer-publish'),
             onPressed:
                 _title.text.trim().isEmpty ||
@@ -36860,6 +36916,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
             icon: const Icon(Icons.local_offer_outlined),
             label: const Text('Publish offer'),
           ),
+          ]),
         ),
       ],
     );
@@ -37546,11 +37603,8 @@ class _GrowDestinationSurfaceV2 extends StatelessWidget {
     final repeatCustomers = session.workspaceCustomerBook
         .where((customer) => customer.repeatCustomer)
         .length;
-    final activeOffers = session.workspaceOffers
-        .where(
-          (offer) => offer.active && offer.validUntil.isAfter(DateTime.now()),
-        )
-        .length;
+    // Retained local records are not a publisher acknowledgement.
+    final recordedOffers = session.workspaceOffers.length;
     final paidWorkOpen = session.workspacePaidRequirementReference == null
         ? 0
         : 1;
@@ -37580,7 +37634,7 @@ class _GrowDestinationSurfaceV2 extends StatelessWidget {
           Row(
             children: [
               _GrowthMetric(value: '$repeatCustomers', label: 'Repeat'),
-              _GrowthMetric(value: '$activeOffers', label: 'Offers live'),
+              _GrowthMetric(value: '$recordedOffers', label: 'Offers recorded'),
               _GrowthMetric(value: '$paidWorkOpen', label: 'Requirements'),
               _GrowthMetric(
                 value: session.workspaceVisibleToCustomers
@@ -37614,7 +37668,7 @@ class _GrowDestinationSurfaceV2 extends StatelessWidget {
                   eyebrow: 'CUSTOMER OFFERS',
                   title: 'Create a Store offer',
                   detail:
-                      '$activeOffers active · choose products and customers who allow offers',
+                      '$recordedOffers recorded · public publication is not confirmed',
                   actionLabel: 'Create',
                   onPressed: onOffers,
                 ),

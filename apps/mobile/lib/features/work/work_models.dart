@@ -10187,6 +10187,79 @@ class WorkspaceCatalogueItem {
       available &&
       (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
 
+  /// Publication must supply its accepted pack contract when quantities/prices
+  /// cannot be represented by the legacy base-price projection. This method
+  /// validates consistency, not provider authorization or a customer quote.
+  String? publicSellingTermsIssue({
+    required BuyV2Destination channel,
+    required String? storeId,
+    BuyV2PackTerms? terms,
+    DateTime? now,
+  }) {
+    final wholesale = channel == BuyV2Destination.wholesale;
+    final offer = wholesale ? wholesaleOffer : null;
+    if (terms == null) {
+      return offer != null &&
+              (offer.incrementPacks != 1 || offer.tiers.isNotEmpty)
+          ? 'Wholesale quantities and prices need confirmation before publication.'
+          : null;
+    }
+    if (storeId?.trim().isNotEmpty != true ||
+        storeId != storeId!.trim() ||
+        !terms.isValidFor(id) ||
+        terms.label != pack ||
+        terms.quantityStep != (offer?.incrementPacks ?? 1) ||
+        terms.requiresMeasurement ||
+        !terms.validPricingFor(storeId, offer?.minimumPacks ?? minimumOrder) ||
+        !terms.pricingCurrentAt(now ?? DateTime.now())) {
+      return 'Pack quantities or prices do not match this Store product.';
+    }
+    final measure = packMeasure;
+    if (measure != null && terms.containedUnits != measure.unitsPerCase) {
+      return 'The confirmed case quantity does not match this selling pack.';
+    }
+    if (measure != null && terms.netContentMilli != null) {
+      final (unit, multiplier) = switch (terms.contentUnit) {
+        'kg' => (BuyV2ComparisonUnit.kilogram, 1000),
+        'g' => (BuyV2ComparisonUnit.kilogram, 1),
+        'L' => (BuyV2ComparisonUnit.litre, 1000),
+        'mL' => (BuyV2ComparisonUnit.litre, 1),
+        'piece' => (BuyV2ComparisonUnit.count, 1000),
+        _ => (null, 0),
+      };
+      if (unit != measure.unit ||
+          BigInt.from(terms.netContentMilli!) *
+                  BigInt.from(terms.containedUnits) * BigInt.from(multiplier) !=
+              BigInt.from(measure.quantityMilli) * BigInt.from(1000)) {
+        return 'The confirmed content quantity does not match this selling pack.';
+      }
+    }
+    final expected = <int, int>{};
+    if (offer != null && offer.tiers.isNotEmpty) {
+      expected[offer.minimumPacks] = offer.priceRupees;
+      for (final tier in offer.tiers) {
+        expected[tier.minimumPacks] = tier.packPriceMinor ~/ 100;
+      }
+    }
+    if (terms.priceTiers.length != expected.length) {
+      return 'Confirm every quantity price before publication.';
+    }
+    final entries = expected.entries.toList();
+    for (var i = 0; i < entries.length; i++) {
+      if (terms.priceTiers[i].minimumPacks != entries[i].key ||
+          terms.priceTiers[i].price != entries[i].value) {
+        return 'The confirmed quantity prices do not match the saved prices.';
+      }
+    }
+    final price = offer?.priceAt(offer.minimumPacks) ?? sellingPrice;
+    final expectedUnit = measure?.valid == true
+        ? measure!.pricePerUnit(price) : unitPrice;
+    if (terms.unitPriceLabel != null && terms.unitPriceLabel != expectedUnit) {
+      return 'The confirmed unit price does not match this selling pack.';
+    }
+    return null;
+  }
+
   BuyV2Product toBuyPublicProduct({
     required String storeName,
     String? storeId,
@@ -10194,6 +10267,8 @@ class WorkspaceCatalogueItem {
     String confirmedOn = 'Updated by store',
     BuyV2Destination channel = BuyV2Destination.shop,
     WorkspaceStorePublicationDetails? storeDetails,
+    BuyV2PackTerms? publicPackTerms,
+    DateTime? now,
   }) {
     final wholesale = channel == BuyV2Destination.wholesale;
     if (channel != BuyV2Destination.shop && !wholesale) {
@@ -10207,7 +10282,12 @@ class WorkspaceCatalogueItem {
     if (wholesale && (offer == null || !offer.valid || !offer.enabled)) {
       throw StateError('Wholesale is not enabled with valid selling terms.');
     }
-    final channelPrice = wholesale ? offer!.priceRupees : sellingPrice;
+    final termsIssue = publicSellingTermsIssue(
+      channel: channel, storeId: storeId, terms: publicPackTerms, now: now,
+    );
+    if (termsIssue != null) throw StateError(termsIssue);
+    final channelPrice = wholesale
+        ? offer!.priceAt(offer.minimumPacks) : sellingPrice;
     final channelMinimum = wholesale ? offer!.minimumPacks : minimumOrder;
     final product = BuyV2Product(
       id: id,
@@ -10221,7 +10301,9 @@ class WorkspaceCatalogueItem {
       pack: pack,
       price: channelPrice,
       unitPrice:
-          packMeasure?.valid == true &&
+          publicPackTerms != null
+          ? publicPackTerms.unitPriceLabel ?? ''
+          : packMeasure?.valid == true &&
               channelPrice >= 0 &&
               channelPrice <= 999999999
           ? packMeasure!.pricePerUnit(channelPrice)
@@ -10240,6 +10322,7 @@ class WorkspaceCatalogueItem {
       regulatoryNote: regulatoryNote,
       compliance: compliance?.toBuyPublicCompliance(),
       minimumOrder: channelMinimum,
+      packTerms: publicPackTerms,
       // Classification describes the selected selling channel, not publication
       // approval, customer eligibility or a delivery/fleet capability.
       offerClass: wholesale

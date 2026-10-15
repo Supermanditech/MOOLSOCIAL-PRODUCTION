@@ -3,11 +3,128 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
+// Host-only accepted-source fixture. No production provider or runtime seed.
+class _Lf04Catalogue implements BuyV2CataloguePageSource {
+  _Lf04Catalogue(this.product);
+  final BuyV2Product product;
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async =>
+      ids.contains(product.id) ? [product] : [];
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected LF04 host catalogue call');
+}
+
 void main() {
+  test('LF04 missing public wholesale terms cannot silently drop steps and tiers', () {
+    final item = handoffStock();
+    expect(item.wholesaleOffer!.incrementPacks, 6);
+    expect(item.wholesaleOffer!.tiers, isNotEmpty);
+    expect(() => item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale), throwsStateError);
+    expect(item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store').price, 264);
+    expect(item.stock, 48);
+    expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale).any((issue) => issue.field.endsWith(':packTerms')), isTrue);
+  });
+  test('LF04 supplied exact terms retain quantity and every tier; invalid source rejects', () {
+    final item = handoffStock();
+    final now = DateTime.utc(2026, 10, 15, 10);
+    BuyV2PackTerms terms({String? sku, String? store, String? pack, int step = 6,
+      int tierPrice = 240, int tierMinimum = 12, DateTime? end, DateTime? start}) => BuyV2PackTerms(
+      skuId: sku ?? item.id, revision: 'host-contract-only', sellUnit: pack ?? item.pack,
+      quantityStep: step, pricingStoreId: store ?? 'a',
+      priceObservedAt: start ?? now.subtract(const Duration(hours: 1)),
+      priceValidUntil: end ?? now.add(const Duration(hours: 1)),
+      priceTiers: [const BuyV2PackPriceTier(minimumPacks: 6, price: 250),
+        BuyV2PackPriceTier(minimumPacks: tierMinimum, price: tierPrice)],
+    );
+    final supplied = terms();
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale, publicPackTerms: supplied, now: now);
+    expect(product.hasValidPackTerms, isTrue);
+    expect(product.id, item.id);
+    expect(product.quantityStep, 6);
+    expect(product.minimumOrder, 6);
+    expect(product.price, 250);
+    expect(product.packTerms!.priceForQuantity(12, product.price), 240);
+    expect(product.unitPrice, isEmpty); // No single misleading per-L price for tiers.
+    expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale, publicPackTerms: supplied, now: now), isEmpty);
+    for (final invalid in [terms(sku: 'other'), terms(store: 'other'), terms(pack: '5 L pouch'),
+      terms(step: 1), terms(tierPrice: 239), terms(tierMinimum: 13),
+      terms(end: now), terms(start: now.add(const Duration(minutes: 1)))]) {
+      expect(() => item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store',
+        channel: BuyV2Destination.wholesale, publicPackTerms: invalid, now: now), throwsStateError);
+    }
+    expect(item.toInventoryJson(), handoffStock().toInventoryJson());
+  });
+  test('LF04 Store terms drive actual Buy Cart MOQ increments and tier totals', () async {
+    final item = handoffStock();
+    final now = DateTime.utc(2026, 10, 15, 10);
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale, now: now, publicPackTerms: BuyV2PackTerms(
+        skuId: item.id, revision: 'host-contract-only', sellUnit: item.pack, quantityStep: 6,
+        pricingStoreId: 'a', priceObservedAt: now.subtract(const Duration(hours: 1)),
+        priceValidUntil: now.add(const Duration(hours: 1)), priceTiers: const [
+          BuyV2PackPriceTier(minimumPacks: 6, price: 250),
+          BuyV2PackPriceTier(minimumPacks: 12, price: 240),
+        ],
+      ));
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      catalogueNow: () => now)..businessVerified = true;
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(await session.openLinkedProduct(product.id), isTrue);
+    expect(session.addProduct(product.id), isTrue);
+    expect(session.quantityFor(product.id), 6);
+    expect(session.cartLines.single.total, 1500);
+    expect(session.setCartQuantity(product.id, '7'), isFalse);
+    expect(session.quantityFor(product.id), 6);
+    session.increase(product.id);
+    expect(session.quantityFor(product.id), 12);
+    expect(session.cartLines.single.product.price, 240);
+    expect(session.cartLines.single.total, 2880);
+    session.decrease(product.id);
+    expect(session.quantityFor(product.id), 6);
+    expect(session.cartLines.single.total, 1500);
+    expect(item.stock, 48);
+  });
+  test('LF04 MOQ offset and expiry preserve an existing Cart without rewriting Stock', () async {
+    final item = handoffStock().copyWith(wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
+      'enabled': true, 'saleType': 'bulk', 'priceRupees': 250,
+      'minimumPacks': 3, 'incrementPacks': 2,
+      'tiers': [{'minimumPacks': 7, 'packPriceMinor': 24000}],
+    }));
+    var now = DateTime.utc(2026, 10, 15, 10);
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store',
+      channel: BuyV2Destination.wholesale, now: now,
+      publicPackTerms: handoffSellingTerms(item, 'a', now: now));
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      catalogueNow: () => now)..businessVerified = true;
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(await session.openLinkedProduct(product.id), isTrue);
+    expect(session.addProduct(product.id), isTrue);
+    expect(session.quantityFor(product.id), 3);
+    session.increase(product.id);
+    expect(session.quantityFor(product.id), 5);
+    expect(session.setCartQuantity(product.id, '6'), isFalse);
+    expect(session.setCartQuantity(product.id, '7'), isTrue);
+    expect(session.cartLines.single.total, 1680);
+    now = now.add(const Duration(hours: 2));
+    expect(session.setCartQuantity(product.id, '9'), isFalse);
+    expect(session.addProduct(product.id), isFalse);
+    expect(session.quantityFor(product.id), 7);
+    expect(item.stock, 48);
+    expect(session.productFactsFor(product).stale, isTrue);
+  });
   test('LF03 explicit retail wholesale and bulk class reaches public product', () {
     final base = handoffStock();
     for (final sale in [BuyV2WholesaleSaleType.wholesale, BuyV2WholesaleSaleType.bulk]) {
@@ -17,20 +134,22 @@ void main() {
       for (final channel in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
         final expected = channel == BuyV2Destination.shop ? BuyV2OfferClass.retail
             : sale == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale;
-        final public = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: channel);
+        final terms = channel == BuyV2Destination.wholesale ? handoffSellingTerms(item, 'a') : null;
+        final public = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: channel, publicPackTerms: terms);
         expect(public.offerClass, expected);
         expect(public.id, item.id);
         expect(public.pack, item.pack);
         expect(public.price, channel == BuyV2Destination.shop ? item.sellingPrice : item.wholesaleOffer!.priceRupees);
         expect(public.reviewDeliveryOptions, isEmpty);
-        expect(public.packTerms, isNull); // No invented pack revision/pricing time.
-        expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Host Store', channel: channel), isEmpty);
+        expect(public.packTerms, terms); // Explicit host contract, never runtime data.
+        expect(WorkspacePublicationContract.productIssues(item, storeId: 'a', storeName: 'Host Store', channel: channel, publicPackTerms: terms), isEmpty);
       }
     }
     final legacy = base.copyWith(wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
       ...base.wholesaleOffer!.toJson(), 'saleType': null,
     }));
-    final publicLegacy = legacy.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: BuyV2Destination.wholesale);
+    final publicLegacy = legacy.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store', channel: BuyV2Destination.wholesale,
+      publicPackTerms: handoffSellingTerms(legacy, 'a'));
     expect(publicLegacy.offerClass, isNull);
     expect(publicLegacy.catalogueListing, isFalse);
     expect(legacy.stock, base.stock);
@@ -468,6 +587,7 @@ void main() {
           storeName: 'Store',
           storeId: 'a',
           channel: channel,
+          publicPackTerms: channel == BuyV2Destination.wholesale ? handoffSellingTerms(item, 'a') : null,
         );
         final public = adapter.snapshotFor(product);
         expect(public.state, BuyV2ProductContentState.ready);
@@ -513,6 +633,7 @@ void main() {
           storeName: 'Store',
           storeId: 'a',
           channel: channel,
+          publicPackTerms: channel == BuyV2Destination.wholesale ? handoffSellingTerms(item, 'a') : null,
         );
         final ready = adapter.snapshotFor(product);
         final unavailable = adapter.snapshotFor(product.copyWith(storeId: 'b'));

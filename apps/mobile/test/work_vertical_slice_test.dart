@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +49,37 @@ class _ReviewCaseDraftStore implements WorkPendingProofStore {
   }
 }
 
+class _Lf04SecureOfferDraft extends SecureWorkPendingProofStore {
+  _Lf04SecureOfferDraft(super.storeId, this.owner) : super.offerDraft();
+  final String? Function() owner;
+  @override
+  String? get accountScope => owner();
+}
+
+class _Lf04DelayedOfferDraft implements WorkPendingProofStore {
+  String scope = 'review-case-widget';
+  @override
+  String get accountScope => scope;
+  Map<String, Object?>? saved;
+  Completer<Map<String, Object?>?>? readGate;
+  Completer<void>? saveGate;
+  bool failRead = false, failSave = false;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async {
+    if (failRead) throw StateError('Host unavailable storage');
+    return readGate != null ? await readGate!.future : saved;
+  }
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async {
+    final captured = Map<String, Object?>.from(jsonDecode(jsonEncode(value)) as Map);
+    if (saveGate != null) await saveGate!.future;
+    if (failSave) throw StateError('Host failed write');
+    saved = captured;
+  }
+  @override
+  Future<void> clear(String scope) async => saved = null;
+}
+
 // Host tests supply deterministic account, picker and review adapters in both
 // configurations. Native adapters are qualified separately.
 WorkSession _testWorkSession({
@@ -55,6 +87,7 @@ WorkSession _testWorkSession({
   WorkProofPicker? proofPicker,
   WorkPendingProofStore? contactDraftStore,
   WorkPendingProofStore? pendingProofStore,
+  WorkPendingProofStore Function(String)? offerDraftStoreFactory,
 }) {
   // Direct-route tests prepare confirmed contacts in memory before mounting.
   // Do not replay a locally saved draft (which correctly cannot assert identity).
@@ -68,6 +101,7 @@ WorkSession _testWorkSession({
     proofPicker: proofPicker ?? ReviewWorkProofPicker(),
     contactDraftStore: account,
     pendingProofStore: pendingProofStore ?? _ReviewCaseDraftStore(),
+    offerDraftStoreFactory: offerDraftStoreFactory,
   );
 }
 
@@ -147,6 +181,124 @@ void main() {
       () => StoreReviewSeed(accountScope: 'qa', orderCount: 13, now: now),
       throwsArgumentError,
     );
+  });
+  test('LF04 review transport cannot publish supplier offers or clear their input', () {
+    final work = _testWorkSession();
+    addTearDown(work.dispose);
+    final draft = work.workspaceOfferDraft;
+    draft.addAll({'title': 'Host supplier offer', 'detail': 'Retain these terms', 'productId': 'host-sku'});
+    work.addWorkspaceOffer(title: draft['title']!, detail: draft['detail']!,
+      validUntil: DateTime.now().add(const Duration(days: 1)), productId: 'host-sku', orderCap: 20);
+    expect(work.workspaceOffers, isEmpty);
+    expect(work.noticeMessage, isNull);
+    expect(work.errorMessage, contains('not available yet'));
+    expect(draft['title'], 'Host supplier offer');
+    expect(draft['productId'], 'host-sku');
+    expect(work.workspaceActivity.any((entry) => entry.message.contains('offer published')), isFalse);
+  });
+  test('LF04 encrypted offer drafts isolate Store and account and read pending writes', () async {
+    String owner = 'host-account-a';
+    final a = _Lf04SecureOfferDraft('a', () => owner);
+    final payload = <String, Object?>{'schemaVersion': 1, 'storeId': 'a',
+      'fields': {'title': 'Host saved offer', 'validUntil': '2026-10-20T00:00:00.000'}};
+    final write = a.save(owner, payload);
+    final same = _Lf04SecureOfferDraft('a', () => owner);
+    expect(await same.read(owner), payload); // New instance waits for pending write.
+    await write;
+    expect(await _Lf04SecureOfferDraft('b', () => owner).read(owner), isNull);
+    owner = 'host-account-b';
+    expect(await same.read(owner), isNull);
+    expect(() => same.save('host-account-a', payload), throwsA(isA<WorkGatewayException>()));
+    owner = 'host-account-a';
+    expect(await same.read(owner), payload);
+    final first = a.save(owner, {...payload, 'fields': {'title': 'First'}});
+    final last = same.save(owner, {...payload, 'fields': {'title': 'Latest'}});
+    await Future.wait([first, last]);
+    expect((await a.read(owner))!['fields'], {'title': 'Latest'});
+  });
+  test('LF04 offer draft restores in a fresh session without publication', () async {
+    WorkSession open() => _testWorkSession(offerDraftStoreFactory: (id) =>
+      _Lf04SecureOfferDraft(id, () => 'review-case-widget'))..seedVerifiedWorkspace();
+    final work = open(); addTearDown(work.dispose);
+    final id = work.activeWorkspace!.id;
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    work.workspaceOfferDraft.addAll({'title': 'Host supplier draft', 'detail': 'Retained input',
+      'productId': 'exact-host-sku', 'validUntil': '2026-10-20T00:00:00.000', 'orderCap': '20'});
+    expect(await work.saveWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    final restored = open(); addTearDown(restored.dispose);
+    expect(await restored.loadWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    expect(restored.workspaceOfferDraft, work.workspaceOfferDraft);
+    expect(restored.workspaceOffers, isEmpty);
+    expect(restored.workspaceOrders, isEmpty);
+    expect(work.noticeMessage, contains('Not published'));
+    restored.activeWorkspace = const WorkWorkspace(id: 'host-b', name: 'Host B',
+      profileLabel: 'Grocery', area: 'Host area', verified: true);
+    expect(await restored.loadWorkspaceOfferDraft(expectedStoreId: 'host-b'), isTrue);
+    expect(restored.workspaceOfferDraft, isEmpty);
+  });
+  test('LF04 failed unreadable or cross-Store drafts cannot overwrite saved bytes', () async {
+    final storage = _Lf04DelayedOfferDraft()..saved = {'schemaVersion': 1, 'storeId': 'another', 'fields': {'title': 'Keep'}};
+    final work = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(work.dispose);
+    final id = work.activeWorkspace!.id;
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: id), isFalse);
+    work.workspaceOfferDraft['title'] = 'New unsaved input';
+    expect(await work.saveWorkspaceOfferDraft(expectedStoreId: id), isFalse);
+    expect((storage.saved!['fields'] as Map)['title'], 'Keep');
+    storage.saved = null;
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    storage.failSave = true;
+    expect(await work.saveWorkspaceOfferDraft(expectedStoreId: id), isFalse);
+    expect(work.workspaceOfferDraft['title'], 'New unsaved input');
+    expect(work.workspaceOfferDraftError, contains('could not be saved'));
+    expect(work.workspaceOffers, isEmpty);
+  });
+  test('LF04 late load and save preserve scope and newer unsaved typing', () async {
+    final storage = _Lf04DelayedOfferDraft()..readGate = Completer();
+    final work = _testWorkSession(offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(work.dispose);
+    final original = work.activeWorkspace!;
+    final loading = work.loadWorkspaceOfferDraft(expectedStoreId: original.id);
+    work.activeWorkspace = null;
+    work.activeWorkspace = original;
+    storage.readGate!.complete({'schemaVersion': 1, 'storeId': original.id, 'fields': {'title': 'Late saved'}});
+    expect(await loading, isFalse);
+    expect(work.workspaceOfferDraft, isEmpty);
+    storage.readGate = null;
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: original.id), isTrue);
+    work.workspaceOfferDraft['title'] = 'Earlier';
+    storage.saveGate = Completer();
+    final saving = work.saveWorkspaceOfferDraft(expectedStoreId: original.id);
+    work.workspaceOfferDraft['title'] = 'Newer';
+    storage.saveGate!.complete();
+    expect(await saving, isTrue);
+    expect((storage.saved!['fields'] as Map)['title'], 'Earlier');
+    expect(work.workspaceOfferDraft['title'], 'Newer');
+    expect(work.noticeMessage, contains('Save again'));
+  });
+  test('LF04 an account change isolates input and suppresses a late save result', () async {
+    final storage = _Lf04DelayedOfferDraft();
+    final work = _testWorkSession(contactDraftStore: storage,
+      offerDraftStoreFactory: (_) => storage)..seedVerifiedWorkspace();
+    addTearDown(work.dispose);
+    final id = work.activeWorkspace!.id;
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    work.workspaceOfferDraft['title'] = 'Account A private input';
+    final original = work.workspaceOfferDraft;
+    storage.scope = 'host-account-b';
+    expect(work.workspaceOfferDraft, isEmpty);
+    expect(await work.loadWorkspaceOfferDraft(expectedStoreId: id), isTrue);
+    work.workspaceOfferDraft['title'] = 'Account B private input';
+    storage.scope = 'review-case-widget';
+    expect(work.workspaceOfferDraft, same(original));
+    storage.saveGate = Completer();
+    final saving = work.saveWorkspaceOfferDraft(expectedStoreId: id);
+    storage.scope = 'host-account-b';
+    storage.saveGate!.complete();
+    expect(await saving, isFalse);
+    expect(work.workspaceOfferDraft['title'], 'Account B private input');
+    expect(work.noticeMessage, isNull);
+    expect(work.workspaceOffers, isEmpty);
   });
 
   test(
@@ -526,6 +678,83 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 offer form saves and restores a private draft at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      WorkSession open() => _testWorkSession(offerDraftStoreFactory: (id) =>
+        _Lf04SecureOfferDraft(id, () => 'review-case-widget'))..seedVerifiedWorkspace();
+      Future<void> offers() async {
+        for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+          'work-business-grow', 'work-growth-offers']) {
+          await tapVisible(tester, Key(key));
+        }
+        expect(find.byKey(const Key('work-offer-publication-unavailable')), findsOneWidget);
+      }
+      Future<void> revealOffer(Finder input) async {
+        await tester.scrollUntilVisible(input, 120, scrollable: find.descendant(
+          of: find.byKey(const Key('work-store-offers-screen')),
+          matching: find.byType(Scrollable)).first, maxScrolls: 40);
+        await tester.pumpAndSettle();
+      }
+      final work = open();
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      await offers();
+      for (final field in {'title': 'Host offer draft', 'detail': 'Host terms, not published'}.entries) {
+        final input = find.byKey(Key('work-offer-${field.key}'));
+        await revealOffer(input);
+        await tester.enterText(input, field.value);
+        await tester.pumpAndSettle();
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('work-offer-save-draft'));
+      expect(work.noticeMessage, contains('Not published'));
+      expect(work.workspaceOffers, isEmpty);
+      expect(tester.takeException(), isNull);
+      final restored = open();
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: restored,
+        size: const Size(320, 568));
+      await offers();
+      for (final field in {'title': 'Host offer draft', 'detail': 'Host terms, not published'}.entries) {
+        final input = find.byKey(Key('work-offer-${field.key}'));
+        await revealOffer(input);
+        expect(tester.widget<EditableText>(find.descendant(of: input,
+          matching: find.byType(EditableText))).controller.text, field.value);
+      }
+      expect(restored.workspaceOffers, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('LF04 existing selling editor retains shared Stock terms at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final work = _testWorkSession()..seedVerifiedWorkspace();
+      final product = workspaceMasterCatalogue.first.copyWith(stock: 12,
+        wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
+          'enabled': true, 'saleType': 'bulk', 'priceRupees': 90,
+          'minimumPacks': 5, 'incrementPacks': 2,
+          'tiers': [{'minimumPacks': 9, 'packPriceMinor': 8000}],
+        }));
+      work.workspaceCatalogueItems..clear()..add(product);
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      await tapVisible(tester, const Key('work-store-stock'));
+      await tapVisible(tester, Key('work-catalogue-edit-${product.id}'));
+      await tapVisible(tester, const Key('work-product-selling-terms'));
+      final guide = find.byKey(const Key('work-product-wholesale-public-terms'));
+      await tester.ensureVisible(guide);
+      await tester.pumpAndSettle();
+      expect(guide, findsOneWidget);
+      for (final field in {'minimum': '5', 'increment': '2', 'tiers': '9:80'}.entries) {
+        final input = find.byKey(Key('work-product-wholesale-${field.key}'));
+        expect(tester.widget<EditableText>(find.descendant(of: input,
+          matching: find.byType(EditableText))).controller.text, field.value);
+      }
+      expect(work.workspaceCatalogueItems.single.id, product.id);
+      expect(work.workspaceCatalogueItems.single.stock, 12);
+      expect(work.workspaceOrders, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
     testWidgets('LF03 optional pack address editor saves exact product $scale', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);

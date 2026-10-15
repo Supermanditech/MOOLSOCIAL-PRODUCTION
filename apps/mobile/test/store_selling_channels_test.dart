@@ -206,11 +206,14 @@ void main() {
         ]) {
           for (final enabled in [true, false]) {
             final d = details(type, enabled, enabled);
+            final terms = channel == BuyV2Destination.wholesale
+                ? handoffSellingTerms(item, 'a') : null;
             final p = item.toBuyPublicProduct(
               storeId: 'a',
               storeName: 'Store A',
               channel: channel,
               storeDetails: d,
+              publicPackTerms: terms,
             );
             expect(p.sellerType, d.publicSellerType);
             expect(p.id, item.id);
@@ -236,6 +239,7 @@ void main() {
               storeName: 'Store A',
               channel: channel,
               storeDetails: d,
+              publicPackTerms: terms,
             );
             expect(
               issues.any((e) => e.message.contains('channel is off')),

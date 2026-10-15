@@ -104,7 +104,7 @@ abstract final class WorkspacePublicationContract {
         'Structured variant dimensions require a verified source; legacy variant text is not converted',
     'pack': 'Exact selling pack',
     'packTerms':
-        'Provider SKU pack and pricing terms pending; saved packMeasure remains the local quantity source',
+        'Supplied publication pack/pricing contract must match saved quantities/tiers; missing required terms block projection',
     'price':
         'Channel selling price in whole rupees; comparison uses minor units',
     'unitPrice':
@@ -293,6 +293,7 @@ abstract final class WorkspacePublicationContract {
     required String storeName,
     BuyV2Destination channel = BuyV2Destination.shop,
     WorkspaceStorePublicationDetails? storeDetails,
+    BuyV2PackTerms? publicPackTerms,
   }) => {
     ...sourceProductValues(
       p,
@@ -302,7 +303,10 @@ abstract final class WorkspacePublicationContract {
       storeDetails: storeDetails,
     ),
     'variantAttributes': const <BuyV2VariantAttribute>[],
-    'packTerms': null,
+    'packTerms': publicPackTerms,
+    if (publicPackTerms != null) 'unitPrice': publicPackTerms.unitPriceLabel ?? '',
+    if (channel == BuyV2Destination.wholesale && p.wholesaleOffer?.valid == true)
+      'price': p.wholesaleOffer!.priceAt(p.wholesaleOffer!.minimumPacks),
     'offerClass': channel == BuyV2Destination.shop
         ? BuyV2OfferClass.retail
         : switch (p.wholesaleOffer?.saleType) {
@@ -339,6 +343,8 @@ abstract final class WorkspacePublicationContract {
     BuyV2Destination channel = BuyV2Destination.shop,
     BuyV2Product? projected,
     WorkspaceStorePublicationDetails? storeDetails,
+    BuyV2PackTerms? publicPackTerms,
+    DateTime? now,
   }) {
     final issues = <WorkspacePublicationIssue>[];
     void missing(String field, String message) => issues.add(
@@ -405,6 +411,13 @@ abstract final class WorkspacePublicationContract {
       missing('channel', 'Complete and enable wholesale selling terms.');
       return issues;
     }
+    final termsIssue = item.publicSellingTermsIssue(
+      channel: channel, storeId: storeId, terms: publicPackTerms, now: now,
+    );
+    if (termsIssue != null) {
+      missing('packTerms', termsIssue);
+      return issues;
+    }
     final target =
         projected ??
         item.toBuyPublicProduct(
@@ -412,6 +425,8 @@ abstract final class WorkspacePublicationContract {
           storeName: storeName,
           channel: channel,
           storeDetails: storeDetails,
+          publicPackTerms: publicPackTerms,
+          now: now,
         );
     if (item.cataloguePhoto?.status != WorkspaceCataloguePhotoStatus.approved ||
         target.mediaAssets.isEmpty ||
@@ -446,6 +461,7 @@ abstract final class WorkspacePublicationContract {
       storeName: storeName,
       channel: channel,
       storeDetails: storeDetails,
+      publicPackTerms: publicPackTerms,
     );
     final to = publicProductAuditValues(target);
     for (final key in {...from.keys, ...to.keys}) {

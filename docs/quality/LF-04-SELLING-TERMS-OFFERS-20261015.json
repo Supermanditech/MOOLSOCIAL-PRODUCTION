@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-04",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-04",
+      "customerOutcome": "Retailer/Grocery Store selling quantities, tier prices and supplier offer preparation must not be lost or misrepresented to public customers; separate missing provider acceptance and platform-funded offers.",
+      "necessityProof": "Existing wholesale increment/tiers are dropped in public projection; review offer path can claim publication without a real publisher. Reuse existing inputs, accepted pack contracts and scoped offer draft, not a new engine.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "MOQ plus increment and all tier thresholds/amounts",
+        "Missing/mismatched/stale source terms fail closed",
+        "Saved SKU and Retail isolation",
+        "No fake offer publication; retained scoped input"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder accepted Batch03 at26e0f23a and explicitly approved Batch04.",
+        "Live pack/pricing/publication/benefit authority remains service-dependent."
+      ],
+      "manifestPath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+      "manifestSha256": "523ED2BC7C74C78C305393FBA7A3E88C47344E06BF603FAB5CF7E0737B8CA8CB",
+      "evidencePath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-04",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Retailer/Grocery Store selling quantities, tier prices and supplier offer preparation must not be lost or misrepresented to public customers; separate missing provider acceptance and platform-funded offers.",
+    "classification": "mvp_required",
+    "classificationReason": "An existing Retailer/Grocery Store customer must not buy under quantities/prices that silently drop saved selling terms.",
+    "minimumCompleteScope": [
+      "Preserve saved commercial inputs and validate supplied exact Store/SKU/pack terms; fail closed when required provenance is absent.",
+      "Separate supplier preparation from platform funding and actual publication; preserve scoped drafts.",
+      "Explicit encrypted local offer-draft save/recovery uses existing storage, isolated per account/Store/review mode; no published state or backend write.",
+      "Run targeted regressions, existing consumers and OPPO hot reload; founder approval before Batch05."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder accepted Batch03 at26e0f23a and explicitly approved Batch04.",
+      "Live pack/pricing/publication/benefit authority remains service-dependent."
+    ],
+    "testAndEvidencePlan": [
+      "Fail before corrections; MOQ+n*step and tier amounts, changed/expired/incorrect source terms, channel/Store isolation, no fake offer success, existing entry/import and public regressions.",
+      "Use real app journeys only for runtime data; host contract fixtures are not live provider acceptance.",
+      "84 selected host cases passed (69 product/channel/settings,14 LF navigation/editor/draft,1 production-offer guard); changed source/tests analysis clean,8 pre-existing dashboard infos. OPPO actual partial offer draft saved and restored after hot restart; live provider acceptance and founder review remain pending."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve Batch03; proceed to Batch04. Batch04 application/device acceptance remains pending."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

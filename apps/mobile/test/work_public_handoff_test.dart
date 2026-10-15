@@ -28,10 +28,13 @@ void main() {
         BuyV2Destination.wholesale,
       ]) {
         final p = handoffStock();
+        final terms = channel == BuyV2Destination.wholesale
+            ? handoffSellingTerms(p, 'fixture-store-a') : null;
         final projected = p.toBuyPublicProduct(
           storeId: 'fixture-store-a',
           storeName: 'Same display name',
           channel: channel,
+          publicPackTerms: terms,
         );
         final exported = handoffPublicProduct(projected);
         expect(exported.keys.toSet(), v1Fields);
@@ -58,6 +61,7 @@ void main() {
             storeId: 'fixture-store-a',
             storeName: 'Same display name',
             channel: channel,
+            publicPackTerms: terms,
           ),
           isEmpty,
         );

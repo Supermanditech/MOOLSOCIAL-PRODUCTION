@@ -802,11 +802,15 @@ abstract interface class WorkPendingProofStore {
 
 class SecureWorkPendingProofStore implements WorkPendingProofStore {
   SecureWorkPendingProofStore({this.reviewOnly = false})
-    : _contactDraft = false;
+    : _contactDraft = false, _offerStoreId = null;
   SecureWorkPendingProofStore.contactDraft({this.reviewOnly = false})
-    : _contactDraft = true;
+    : _contactDraft = true, _offerStoreId = null;
+  SecureWorkPendingProofStore.offerDraft(String storeId, {this.reviewOnly = false})
+    : _contactDraft = false, _offerStoreId = storeId;
   final bool reviewOnly;
   final bool _contactDraft;
+  final String? _offerStoreId;
+  static final Map<String, Future<void>> _offerWrites = {};
   static const _storage = FlutterSecureStorage();
   bool get _review =>
       reviewOnly &&
@@ -817,7 +821,10 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       ? 'moolsocial.workspace.pending-proof.review.v1'
       : 'moolsocial.workspace.pending-proof.v1';
 
-  String _scopedKey(String scope) => _contactDraft
+  String _scopedKey(String scope) => _offerStoreId != null
+      ? 'moolsocial.workspace.offer-draft.${_review ? 'review.' : ''}v1.'
+          '${Uri.encodeComponent(scope)}/${Uri.encodeComponent(_offerStoreId)}'
+      : _contactDraft
       ? 'moolsocial.workspace.contact-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}'
       : _key;
 
@@ -834,6 +841,7 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   @override
   Future<Map<String, Object?>?> read(String scope) async {
     if (scope != accountScope) return null;
+    if (_offerStoreId != null) await _offerWrites[_scopedKey(scope)];
     final value = await _storage
         .read(key: _scopedKey(scope))
         .timeout(const Duration(seconds: 10));
@@ -842,6 +850,9 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
     if (decoded is! Map ||
         decoded['scope'] != scope ||
         decoded['draft'] is! Map) {
+      if (_offerStoreId != null) {
+        throw const WorkGatewayException('Your saved offer draft could not be opened.');
+      }
       return null;
     }
     return Map<String, Object?>.from(decoded['draft'] as Map);
@@ -853,6 +864,24 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       throw const WorkGatewayException(
         'Sign in again before adding a document.',
       );
+    }
+    if (_offerStoreId != null) {
+      if (_offerStoreId.trim().isEmpty || _offerStoreId != _offerStoreId.trim()) {
+        throw const WorkGatewayException('Choose a Store before saving this draft.');
+      }
+      final key = _scopedKey(scope);
+      final encoded = jsonEncode({'scope': scope, 'draft': draft});
+      final write = (_offerWrites[key] ?? Future<void>.value()).then((_) async {
+        if (scope != accountScope) {
+          throw const WorkGatewayException('Sign in again before saving this draft.');
+        }
+        await _storage.write(key: key, value: encoded).timeout(const Duration(seconds: 10));
+      });
+      final tail = write.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+      _offerWrites[key] = tail;
+      unawaited(tail.then((_) { if (identical(_offerWrites[key], tail)) _offerWrites.remove(key); }));
+      await write;
+      return;
     }
     await _storage
         .write(

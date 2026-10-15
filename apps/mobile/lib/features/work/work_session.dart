@@ -441,8 +441,8 @@ class _StoreOperationalData {
   final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
   final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
   final List<WorkspaceStoreOffer> workspaceOffers = [];
-  // Unsent offer input belongs to this Store's in-session operational state.
-  final Map<String, String> workspaceOfferDraft = {};
+  // Store identity alone must not expose one account's unsent offer to another.
+  final Map<String, _OfferDraftRecovery> offerDraftsByAccount = {};
   String? currentWorkspaceOrderId;
   WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
   bool workspaceOperationsSyncing = false;
@@ -523,6 +523,12 @@ class _StockHistoryState {
   bool busy = false, loaded = false, needsRefresh = false;
 }
 
+class _OfferDraftRecovery {
+  final Map<String, String> values = {};
+  bool loaded = false, saving = false;
+  String? error;
+}
+
 class _CounterDraftRecovery {
   WorkspaceCounterDraft? record;
   Future<void> writes = Future<void>.value();
@@ -570,6 +576,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueReference,
     this.productPhotoSupportDirectory,
     this.analyticsReader,
+    this.offerDraftStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -615,6 +622,7 @@ class WorkSession extends ChangeNotifier {
     this.catalogueReference,
     this.productPhotoSupportDirectory,
     this.analyticsReader,
+    this.offerDraftStoreFactory,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -630,6 +638,7 @@ class WorkSession extends ChangeNotifier {
        proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
+  final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
 
@@ -8345,7 +8354,11 @@ class WorkSession extends ChangeNotifier {
   List<WorkspaceCustomerInvoice> get workspaceInvoices =>
       _storeData.workspaceInvoices;
   List<WorkspaceStoreOffer> get workspaceOffers => _storeData.workspaceOffers;
-  Map<String, String> get workspaceOfferDraft => _storeData.workspaceOfferDraft;
+  _OfferDraftRecovery get _offerDraftRecovery => _storeData.offerDraftsByAccount
+      .putIfAbsent(_contactAccountScope ?? '', () => _OfferDraftRecovery());
+  Map<String, String> get workspaceOfferDraft => _offerDraftRecovery.values;
+  String? get workspaceOfferDraftError => _offerDraftRecovery.error;
+  bool get workspaceOfferDraftSaving => _offerDraftRecovery.saving;
   String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
   set currentWorkspaceOrderId(String? value) =>
       _storeData.currentWorkspaceOrderId = value;
@@ -10576,6 +10589,93 @@ class WorkSession extends ChangeNotifier {
     }
   }
 
+  WorkPendingProofStore? _offerDraftStore(String storeId) {
+    if (offerDraftStoreFactory != null) return offerDraftStoreFactory!(storeId);
+    final owner = contactDraftStore;
+    return owner is SecureWorkPendingProofStore
+        ? SecureWorkPendingProofStore.offerDraft(storeId, reviewOnly: owner.reviewOnly)
+        : null;
+  }
+
+  static const _offerDraftFields = {'title', 'detail', 'productId', 'validUntil', 'orderCap'};
+
+  Future<bool> loadWorkspaceOfferDraft({required String expectedStoreId}) async {
+    final data = _storeData;
+    final draft = _offerDraftRecovery;
+    final scope = _contactAccountScope;
+    final revision = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) &&
+        activeWorkspace?.id == expectedStoreId && _contactAccountScope == scope &&
+        navigationScopeRevision == revision;
+    if (!current() || expectedStoreId.trim().isEmpty || scope == null) return false;
+    if (draft.loaded) return true;
+    try {
+      final store = _offerDraftStore(expectedStoreId);
+      if (store == null || store.accountScope != scope) throw StateError('Draft storage unavailable');
+      final saved = await store.read(scope);
+      if (!current()) return false;
+      final fields = saved?['fields'];
+      if (saved != null && (saved['schemaVersion'] != 1 || saved['storeId'] != expectedStoreId ||
+          fields is! Map || fields.entries.any((e) => !_offerDraftFields.contains(e.key) ||
+            e.value is! String || (e.value as String).length > 4000))) {
+        throw const FormatException('Invalid offer draft');
+      }
+      // Navigation may retain newer unsaved input; never replace it on reopening.
+      if (draft.values.isEmpty && fields is Map) {
+        draft.values.addAll(Map<String, String>.from(fields));
+      }
+      draft.loaded = true;
+      draft.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (current()) {
+        draft.error = 'Your saved offer draft could not be opened. Your current entries are kept.';
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  Future<bool> saveWorkspaceOfferDraft({required String expectedStoreId}) async {
+    final data = _storeData;
+    final draft = _offerDraftRecovery;
+    final scope = _contactAccountScope;
+    final revision = navigationScopeRevision;
+    bool current() => !_disposed && identical(data, _storeData) &&
+        activeWorkspace?.id == expectedStoreId && _contactAccountScope == scope &&
+        navigationScopeRevision == revision;
+    if (!current() || scope == null || !draft.loaded || draft.saving) return false;
+    final fields = Map<String, String>.of(draft.values);
+    if (fields.entries.any((e) => !_offerDraftFields.contains(e.key) || e.value.length > 4000)) {
+      draft.error = 'Keep each offer field within 4,000 characters.';
+      notifyListeners();
+      return false;
+    }
+    draft.saving = true;
+    draft.error = null;
+    notifyListeners();
+    try {
+      final store = _offerDraftStore(expectedStoreId);
+      if (store == null || store.accountScope != scope) throw StateError('Draft storage unavailable');
+      await store.save(scope, {'schemaVersion': 1, 'storeId': expectedStoreId, 'fields': fields});
+      if (!current()) return false;
+      showNotice(mapEquals(fields, draft.values)
+          ? 'Offer draft saved on this device. Not published.'
+          : 'Earlier draft saved. Save again to keep your latest edits.');
+      return true;
+    } catch (_) {
+      if (current()) {
+        draft.error = 'Your offer draft could not be saved. Your entries are kept; try again.';
+        notifyListeners();
+      }
+      return false;
+    } finally {
+      draft.saving = false;
+      if (current()) notifyListeners();
+    }
+  }
+
   void addWorkspaceOffer({
     required String title,
     required String detail,
@@ -10584,28 +10684,12 @@ class WorkSession extends ChangeNotifier {
     String audience = 'Customers who allow Store offers',
     int orderCap = 0,
   }) {
-    if (gateway is! ReviewWorkGateway) {
-      showError(
-        'Offer publishing is not available yet. Your details are still here.',
-      );
-      return;
-    }
-    workspaceOffers.insert(
-      0,
-      WorkspaceStoreOffer(
-        id: 'OFFER-${DateTime.now().millisecondsSinceEpoch}',
-        title: title.trim(),
-        detail: detail.trim(),
-        validUntil: validUntil,
-        active: true,
-        productId: productId,
-        audience: audience,
-        orderCap: orderCap,
-      ),
+    // No accepted publisher transport exists yet. A review gateway cannot turn
+    // entered copy into a live supplier offer, discount or customer consent.
+    // Leave the Store-scoped form input intact; do not add a published record.
+    showError(
+      'Offer publishing is not available yet. Your details are still here.',
     );
-    _recordWorkspaceActivity('Store offer published: ${title.trim()}.');
-    showNotice('Offer published for your Store customers.');
-    _persistOperationalState('offer-published');
   }
 
   Future<bool> createWorkspacePaidRequirement({

@@ -7906,7 +7906,7 @@ function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
   }
-  return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-01','LF-02-1','LF-03') -and
+  return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-01','LF-02-1','LF-03','LF-04') -and
     $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
     $Facts.ContainsKey('Phase') -and $Facts.Role -ceq 'primary' -and
     $Facts.Task -ceq '/root' -and $Facts.Phase -cin @(
@@ -7918,6 +7918,7 @@ function Invoke-Lf01Admission {
   # The closed integration path below and its 83 bindings remain unchanged.
   $base = '3c5a454bf8af173d9736c75213cafb88e641765c'
   $recordOwner = switch -CaseSensitive ($ProductionTicketId) {
+    'LF-04' { 'docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json' }
     'LF-03' { 'docs/quality/LF-03-PRODUCT-MEDIA-20261015.json' }
     'LF-02-1' { 'docs/quality/LF-02-STORE-DETAILS-20261015.json' }
     default { 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.json' }
@@ -7939,7 +7940,7 @@ function Invoke-Lf01Admission {
     'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
     'apps/mobile/test/work_vertical_slice_test.dart',
     'apps/mobile/test/work_store_atomic_operations_test.dart')
-  if ($ProductionTicketId -cin @('LF-02-1','LF-03')) {
+  if ($ProductionTicketId -cin @('LF-02-1','LF-03','LF-04')) {
     $owners += @('docs/quality/LF-01-ENTRY-RECOVERY-20261015.json',
       'docs/quality/LF-01-ENTRY-RECOVERY-20261015.md',
       'apps/mobile/lib/features/work/work_publication_data.dart',
@@ -7953,11 +7954,18 @@ function Invoke-Lf01Admission {
       'apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart',
       'apps/mobile/test/store_settings_widgets_test.dart')
   }
-  if ($ProductionTicketId -ceq 'LF-03') {
+  if ($ProductionTicketId -cin @('LF-03','LF-04')) {
     $owners += @('docs/quality/LF-02-STORE-DETAILS-20261015.json',
       'docs/quality/LF-02-STORE-DETAILS-20261015.md',
       'apps/mobile/lib/features/work/work_models.dart',
       'apps/mobile/test/work_product_content_test.dart')
+  }
+  if ($ProductionTicketId -ceq 'LF-04') {
+    $owners += @('docs/quality/LF-03-PRODUCT-MEDIA-20261015.json',
+      'docs/quality/LF-03-PRODUCT-MEDIA-20261015.md',
+      'apps/mobile/test/work_public_handoff_test.dart',
+      'apps/mobile/test/store_selling_channels_test.dart',
+      'apps/mobile/test/fixtures/store_public_handoff_v1.dart')
   }
   $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{
