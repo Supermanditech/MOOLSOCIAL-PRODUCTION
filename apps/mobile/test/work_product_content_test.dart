@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'fixtures/store_public_handoff_v1.dart';
@@ -21,7 +23,154 @@ class _Lf04Catalogue implements BuyV2CataloguePageSource {
       throw StateError('Unexpected LF04 host catalogue call');
 }
 
+// Isolated host readback/consent storage, never runtime policy or customer data.
+class _Lf05PolicySource implements BuyV2ProductContentAdapter {
+  _Lf05PolicySource(this.value);
+  BuyV2ProductContentSnapshot value;
+  bool fail = false;
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    if (fail) throw StateError('Host policy source offline');
+    return value;
+  }
+}
+class _Lf05ConsentStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'host-lf05-buyer';
+  BuyV2CustomerStateSnapshot? saved;
+  Completer<void>? pending;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => saved;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    if (pending != null) await pending!.future;
+    saved = value;
+    return true;
+  }
+}
+
 void main() {
+  final policyNow = DateTime.utc(2026, 10, 15, 10);
+  BuyV2ProductContentSnapshot policyReadback(WorkspaceCatalogueItem item, {
+    String store = 'a', String? productId, String source = 'host-policy-source',
+    String revision = 'host-policy-v1', String body = 'Host supplier purchase terms',
+    bool required = true, bool? decision, DateTime? expiry,
+    BuyV2ProductContentState state = BuyV2ProductContentState.ready,
+    bool omitPolicy = false,
+  }) => BuyV2ProductContentSnapshot(
+    productId: productId ?? item.id, sourceId: source, state: state,
+    supplierPolicyAcceptanceRequired: decision ?? required,
+    supplierPolicy: omitPolicy ? null : BuyV2SupplierPolicy(
+      id: 'host-supplier-policy', storeId: store, revision: revision,
+      title: 'Host supplier policy', body: body,
+      productIds: {item.id}, requiresAcceptance: required,
+      validUntil: expiry ?? policyNow.add(const Duration(hours: 1))),
+  );
+  test('LF05 scoped policy readback preserves Store content and rejects unsafe source', () {
+    final item = handoffStock().copyWith(content: WorkspaceProductContent.parse(
+      {'description': 'Host saved description'}));
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final source = _Lf05PolicySource(policyReadback(item));
+    final adapter = WorkspacePublicContentAdapter(storeId: 'a', item: item,
+      sourceId: 'host-store-content', policyReadback: source, now: () => policyNow);
+    final ready = adapter.snapshotFor(product);
+    expect(ready.supplierPolicy!.revision, 'host-policy-v1');
+    expect(ready.supplierPolicyAcceptanceRequired, isTrue);
+    expect(ready.description, 'Host saved description');
+    expect(ready.sourceId, 'host-store-content');
+    expect(ready.observedAt, isNull);
+    for (final bad in [policyReadback(item, store: 'b'),
+      policyReadback(item, productId: 'other'), policyReadback(item, source: ''),
+      policyReadback(item, revision: ''), policyReadback(item, body: ''),
+      policyReadback(item, expiry: policyNow), policyReadback(item, decision: false),
+      policyReadback(item, omitPolicy: true),
+      BuyV2ProductContentSnapshot(productId: item.id,
+        state: BuyV2ProductContentState.ready, sourceId: 'host-future-policy',
+        supplierPolicy: policyReadback(item).supplierPolicy,
+        observedAt: policyNow.add(const Duration(minutes: 1))),
+      policyReadback(item, state: BuyV2ProductContentState.offline)]) {
+      source.value = bad;
+      final held = adapter.snapshotFor(product);
+      expect(held.state, BuyV2ProductContentState.unavailable);
+      expect(held.supplierPolicy, isNull);
+      expect(held.supplierPolicyAcceptanceRequired, isTrue);
+    }
+    source.fail = true;
+    expect(adapter.snapshotFor(product).supplierPolicyAcceptanceRequired, isTrue);
+    source.fail = false;
+    source.value = policyReadback(item, required: false, omitPolicy: true);
+    expect(adapter.snapshotFor(product).supplierPolicyAcceptanceRequired, isFalse);
+    expect(adapter.snapshotFor(product).state, BuyV2ProductContentState.ready);
+    expect(item.stock, 48);
+  });
+  test('LF05 required policy without a source blocks actual Add without consent bypass', () async {
+    final item = handoffStock();
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      productContentAdapter: WorkspacePublicContentAdapter(storeId: 'a', item: item,
+        sourceId: 'host-store-content', policyReadbackRequired: true));
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(await session.openLinkedProduct(product.id), isTrue);
+    expect(session.addProduct(product.id), isFalse);
+    expect(session.pendingSupplierPolicyAdd, isNull);
+    expect(session.quantityFor(product.id), 0);
+    expect(session.notice, contains('policy'));
+    expect(item.stock, 48);
+  });
+  test('LF05 supplied policy reaches actual Buy consent and expiry preserves Cart', () async {
+    final item = handoffStock();
+    var now = policyNow;
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final source = _Lf05PolicySource(policyReadback(item));
+    final store = _Lf05ConsentStore();
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      productContentAdapter: WorkspacePublicContentAdapter(storeId: 'a', item: item,
+        sourceId: 'host-store-content', policyReadback: source, now: () => now),
+      customerStateStore: store, catalogueNow: () => now);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    expect(await session.openLinkedProduct(product.id), isTrue);
+    expect(session.addProduct(product.id), isFalse);
+    final intent = session.pendingSupplierPolicyAdd!;
+    expect(intent.policy.body, 'Host supplier purchase terms');
+    expect(session.quantityFor(product.id), 0);
+    source.value = policyReadback(item, body: 'Changed host terms');
+    expect(await session.acceptSupplierPolicyAndAdd(intent), isFalse);
+    expect(session.quantityFor(product.id), 0);
+    expect(session.addProduct(product.id), isFalse);
+    expect(await session.acceptSupplierPolicyAndAdd(session.pendingSupplierPolicyAdd), isTrue);
+    expect(session.quantityFor(product.id), 1);
+    expect(store.saved!.supplierPolicyAcceptances, hasLength(1));
+    now = now.add(const Duration(hours: 2));
+    expect(session.addProduct(product.id), isFalse);
+    expect(session.quantityFor(product.id), 1);
+    expect(item.stock, 48);
+  });
+  test('LF05 changed policy during consent save cannot add or reuse old acceptance', () async {
+    final item = handoffStock();
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final source = _Lf05PolicySource(policyReadback(item));
+    final store = _Lf05ConsentStore();
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      productContentAdapter: WorkspacePublicContentAdapter(storeId: 'a', item: item,
+        sourceId: 'host-store-content', policyReadback: source, now: () => policyNow),
+      customerStateStore: store, catalogueNow: () => policyNow);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    expect(await session.openLinkedProduct(product.id), isTrue);
+    expect(session.addProduct(product.id), isFalse);
+    store.pending = Completer<void>();
+    final saving = session.acceptSupplierPolicyAndAdd(session.pendingSupplierPolicyAdd);
+    source.value = policyReadback(item, body: 'New terms while saving');
+    store.pending!.complete();
+    expect(await saving, isFalse);
+    expect(session.quantityFor(product.id), 0);
+    expect(session.addProduct(product.id), isFalse);
+    expect(session.pendingSupplierPolicyAdd!.policy.body, 'New terms while saving');
+  });
   test('LF04 missing public wholesale terms cannot silently drop steps and tiers', () {
     final item = handoffStock();
     expect(item.wholesaleOffer!.incrementPacks, 6);

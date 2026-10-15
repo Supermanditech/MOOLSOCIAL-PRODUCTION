@@ -50,7 +50,7 @@
         "Live pack/pricing/publication/benefit authority remains service-dependent."
       ],
       "manifestPath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
-      "manifestSha256": "12D4CC83E792199BC5FB3F2A46F5F1223D754D5B112E405D02562810446E0AAE",
+      "manifestSha256": "5767EEA9D52BC10889C4B8CC3E95A821F92227311AAD434C36975E278D7EDD69",
       "evidencePath": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -142,7 +142,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder approved Batch04 first checkpoint 11c8b53f on OPPO: private draft recovery and selling-term guards. Live publication, benefits and provider readback excluded. Saved-product selector ad66bb9d passed host/native draft checks; founder review and Batch05 advance remain pending, not assumed."
+    "founderAcceptance": "Founder approved checkpoint11c8b53f and then explicitly approved ad66bb9d private-product correction (device record5f60fcc7): Approve; proceed to Batch05. Live publication, benefits and provider readback excluded; documented remaining dependencies are not marked finished."
   },
   "execution": {
     "referenceWriteAuthorized": false,

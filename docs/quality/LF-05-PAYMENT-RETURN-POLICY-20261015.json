@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-05",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-05",
+      "customerOutcome": "Store defaults and private customer exceptions remain reusable; valid supplied supplier policy reaches public consent without invented revisions, credit eligibility or payment results.",
+      "necessityProof": "Existing Store content adapter discards supplied-policy opportunities; selected advance/credit fields have no field-level format feedback. Reuse current editors/content contracts and preserve tested inheritance.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Exact Store/product policy scope and consistent required flag",
+        "Missing/invalid/expired required policy blocks applicable action",
+        "Existing customer/default/return precedence and privacy",
+        "Input feedback and preserved failed-save preferences"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder approved Batch04 correction and explicitly proceeding to Batch05; resume after power confirmed.",
+        "Policy publication/readback, quotes, credit and payment authority remain service-dependent."
+      ],
+      "manifestPath": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+      "manifestSha256": "CBDEEB9BB5F9B61CBFA320D873CDD744FC2ECAD7A9168C2F0A98388ABAB8F974",
+      "evidencePath": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-05",
+    "parentTicketId": "LAST-FRONTEND",
+    "customerOutcome": "Store defaults and private customer exceptions remain reusable; valid supplied supplier policy reaches public consent without invented revisions, credit eligibility or payment results.",
+    "classification": "mvp_required",
+    "classificationReason": "Customer policy requirements and saved Store terms must not silently disappear or be mistaken for verified credit/payment.",
+    "minimumCompleteScope": [
+      "Reuse inherited Store and private customer terms; preserve product return exceptions.",
+      "Validate optional supplied policy readback using accepted existing contracts; do not manufacture revision, approval or consent.",
+      "Show selected advance/credit format errors and preserve saved values on failed Apply.",
+      "Run targeted actual consumer/editor regressions and OPPO review before Batch06."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder approved Batch04 correction and explicitly proceeding to Batch05; resume after power confirmed.",
+      "Policy publication/readback, quotes, credit and payment authority remain service-dependent."
+    ],
+    "testAndEvidencePlan": [
+      "Demonstrate new gaps before correction; exact scope/expiry/required policy and actual Buy consent behavior.",
+      "Existing inheritance/customer privacy and return precedence, failed input/save,320px normal/200% widgets.",
+      "94 selected host cases passed; changed source/tests analysis clean. OPPO hot reload completed3383ms, advance100 error then25 recovery observed, original selections restored without Apply/Save. Founder review and live policy/provider acceptance remain pending."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Founder: Approve; proceed to Batch05. Batch05 implementation/device acceptance remains pending; no live provider acceptance."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

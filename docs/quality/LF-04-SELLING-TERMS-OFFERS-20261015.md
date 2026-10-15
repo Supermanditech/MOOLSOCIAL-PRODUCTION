@@ -193,3 +193,7 @@ performed. This is native draft persistence/recovery evidence, not a newly built
 APK, provider publication, quote, actual discount or public purchase acceptance.
 Screens: calling-task outputs/lf04-private-product-saved.png and
 outputs/lf04-private-product-restored.png. Founder review of ad66bb9d remains pending.
+
+Subsequent founder decision: "Approve; proceed to Batch 05" accepts the ad66bb9d
+private-product correction, documented at5f60fcc7. This supersedes the pending
+review status above, not the explicit service/concurrent-terms limitations.

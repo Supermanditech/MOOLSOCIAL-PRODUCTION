@@ -295,6 +295,28 @@ void main() {
       );
     },
   );
+  test('LF05 invalid preferences preserve defaults and reject stale Store saves', () {
+    final work = WorkSession(gateway: ReviewWorkGateway());
+    addTearDown(work.dispose);
+    const storeA = WorkWorkspace(id: 'host-lf05-a', name: 'Host A',
+      profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Jaipur', verified: true);
+    const storeB = WorkWorkspace(id: 'host-lf05-b', name: 'Host B',
+      profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Delhi', verified: true);
+    work.activeWorkspace = storeA;
+    const defaults = WorkspaceStorePublicationDetails(returnSummary: 'Host return defaults',
+      wholesalePaymentTerms: [WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.wholesaleAdvance)]);
+    expect(work.saveWorkspacePublicationDetails(defaults, expectedStoreId: storeA.id), isTrue);
+    expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+      returnSummary: 'Must not replace saved terms', wholesalePaymentTerms: [
+        WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch,
+          advancePercent: 100)]), expectedStoreId: storeA.id), isFalse);
+    expect(work.workspacePublicationDetails.toJson(), defaults.toJson());
+    work.activeWorkspace = storeB;
+    expect(work.saveWorkspacePublicationDetails(defaults, expectedStoreId: storeA.id), isFalse);
+    expect(work.workspacePublicationDetails.returnSummary, isEmpty);
+    work.activeWorkspace = storeA;
+    expect(work.workspacePublicationDetails.toJson(), defaults.toJson());
+  });
   WorkspaceStorePublicationDetails details() =>
       WorkspaceStorePublicationDetails.fromJson({
         ...handoffStoreDetails().toJson(),

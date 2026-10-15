@@ -410,7 +410,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                     const Padding(
                       padding: EdgeInsets.only(bottom: 10),
                       child: Text(
-                        'Choose one or more defaults. Set individual arrangements in Customers → customer details.',
+                        'Choose defaults once. Individual arrangements stay in Customers → customer details. These are preferences; customer eligibility and payable amounts need confirmation at checkout.',
                         style: TextStyle(fontSize: 12),
                       ),
                     ),

@@ -71,13 +71,21 @@ class _StorePaymentTermsEditorState extends State<StorePaymentTermsEditor> {
       keyboardType: TextInputType.number,
       decoration: InputDecoration(
         labelText: days ? 'Credit days' : 'Advance %',
+        errorMaxLines: 3,
+        errorText: !days &&
+                kind == BuyV2CommercialPaymentTermKind.supplierCredit &&
+                controller.text.trim().isEmpty
+            ? null
+            : StoreSettingsInput.whole(controller.text,
+                days || kind != BuyV2CommercialPaymentTermKind.supplierCredit ? 1 : 0,
+                days ? 365 : 99),
         hintText: days
             ? '1–365'
             : kind == BuyV2CommercialPaymentTermKind.supplierCredit
             ? '0–99'
             : '1–99',
       ),
-      onChanged: (_) => _emit(),
+      onChanged: (_) => setState(_emit),
     );
   }
 

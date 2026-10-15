@@ -10,9 +10,19 @@ class WorkspacePublicContentAdapter implements BuyV2ProductContentAdapter {
     required this.storeId,
     required this.item,
     required this.sourceId,
+    this.policyReadback,
+    this.policyReadbackRequired = false,
+    this.now,
   });
   final String storeId, sourceId;
   final WorkspaceCatalogueItem item;
+  /// Optional authoritative policy readback, not a local policy publisher.
+  /// Without it, policy/acceptance remain unknown as for legacy callers.
+  final BuyV2ProductContentAdapter? policyReadback;
+  /// Set by the publication consumer when policy resolution is required.
+  /// This requests a source hold; it never asserts that a buyer has consented.
+  final bool policyReadbackRequired;
+  final DateTime Function()? now;
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
     if (storeId.trim().isEmpty ||
@@ -32,7 +42,48 @@ class WorkspacePublicContentAdapter implements BuyV2ProductContentAdapter {
       );
     }
     try {
-      return item.toBuyPublicContent(storeId: storeId, sourceId: sourceId);
+      final local = item.toBuyPublicContent(storeId: storeId, sourceId: sourceId);
+      final readback = policyReadback;
+      BuyV2ProductContentSnapshot held() => BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.unavailable,
+        sourceId: sourceId,
+        supplierPolicyAcceptanceRequired: true,
+        customerMessage: 'Store policy could not be confirmed. Refresh this product.',
+      );
+      if (readback == null) return policyReadbackRequired ? held() : local;
+      try {
+        final supplied = readback.snapshotFor(product);
+        final current = (now ?? DateTime.now)();
+        final policy = supplied.supplierPolicy;
+        final decision = supplied.supplierPolicyAcceptanceRequired;
+        if (supplied.productId != product.id ||
+            supplied.sourceId.trim().isEmpty ||
+            supplied.state != BuyV2ProductContentState.ready ||
+            supplied.observedAt?.isAfter(current) == true ||
+            (policy == null && decision != false) ||
+            (policy != null && (!policy.appliesTo(product, current) ||
+                decision != null && decision != policy.requiresAcceptance))) {
+          return held();
+        }
+        return BuyV2ProductContentSnapshot(
+          productId: local.productId,
+          state: local.state,
+          // Policy carries its own ID/revision/validity. Do not relabel local
+          // product copy/media as provider-observed content.
+          sourceId: local.sourceId,
+          observedAt: local.observedAt,
+          media: local.media,
+          description: local.description,
+          highlights: local.highlights,
+          specifications: local.specifications,
+          supplierPolicy: policy,
+          supplierPolicyAcceptanceRequired: policy?.requiresAcceptance ?? decision,
+        );
+      } catch (_) {
+        // A failed supplied source is a hold, never a permissive local fallback.
+        return held();
+      }
     } on FormatException {
       return BuyV2ProductContentSnapshot(
         productId: product.id,
@@ -171,7 +222,7 @@ abstract final class WorkspacePublicationContract {
     'sizeChart': 'Verified source-specific size chart pending',
     'priceHistory':
         'Authoritative price history pending; local edits are not history',
-    'supplierPolicy': 'Verified supplier policy and revision pending',
+    'supplierPolicy': 'Optional exact-Store/product policy readback; live source pending',
     'supplierPolicyAcceptanceRequired':
         'Unknown until supplied by the authoritative policy owner; null is not consent',
     'retryable':
