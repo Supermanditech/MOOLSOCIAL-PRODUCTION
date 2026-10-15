@@ -12,6 +12,37 @@ BuyV2StoreListing store(String address) => BuyV2StoreListing(
 );
 
 void main() {
+  testWidgets('LF02 public contact and hours fit compact large text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: BuyV2StoreAddress(
+              store: const BuyV2StoreListing(
+                id: 'host-a',
+                name: 'Host fixture Store',
+                area: 'Jaipur',
+                regionId: 'host-region',
+                address: '12/A, Long Market Road, Jaipur, Rajasthan 302001',
+                publicContactPhone: '+91 98765 43210',
+                openingHoursLabel: '22:00 – 06:00',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Contact: +91 98765 43210'), findsOneWidget);
+    expect(find.text('Hours: 22:00 – 06:00'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('Maps keeps exact Store address and encodes reserved characters', () {
     final uri = buyV2StoreMapUri(store('12/A, Road #2 & Market'))!;
     expect(uri.scheme, 'https');

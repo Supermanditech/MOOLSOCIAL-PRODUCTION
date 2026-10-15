@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/work/work_models.dart';
@@ -8,6 +10,181 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test(
+    'LF02 public contact and explicit hours round trip without private fields',
+    () {
+      final details = WorkspaceStorePublicationDetails.fromJson({
+        'publicContactPhone': '+91 98765 43210',
+        'openingTime': '22:00',
+        'closingTime': '06:00',
+        'pan': 'PRIVATE-PAN',
+        'signatory': 'Private signatory',
+        'billingAddress': 'Private billing address',
+      });
+      final saved = details.toJson();
+      expect(saved['publicContactPhone'], '+91 98765 43210');
+      expect(saved['openingTime'], '22:00');
+      expect(saved['closingTime'], '06:00');
+      expect(WorkspaceStorePublicationDetails.fromJson(saved).toJson(), saved);
+      final public = details.toPublicStore(
+        id: 'host-a',
+        name: 'Host Store',
+        area: 'Jaipur',
+      );
+      expect(public.publicContactPhone, '+91 98765 43210');
+      expect(public.openingHoursLabel, '22:00 – 06:00');
+      expect(
+        const WorkspaceStorePublicationDetails(publicContactPhone: 'invalid')
+            .toPublicStore(id: 'host-a', name: 'Host Store', area: 'Jaipur')
+            .publicContactPhone,
+        isNull,
+      );
+      for (final patch in <Map<String, Object?>>[
+        {'publicContactPhone': 'call my login'},
+        {'publicContactPhone': '+123'},
+        {'publicContactPhone': 9876543210},
+        {'openingTime': '25:00', 'closingTime': '18:00'},
+        {'openingTime': '08:00', 'closingTime': ''},
+      ]) {
+        expect(
+          () => WorkspaceStorePublicationDetails.fromJson(patch),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test('LF02 public hours stay absent until explicitly saved', () {
+    final work = WorkSession(gateway: ReviewWorkGateway())
+      ..activeWorkspace = const WorkWorkspace(
+        id: 'lf02-host-store',
+        name: 'Host fixture Store',
+        profileId: 'retailer-grocery',
+        profileLabel: 'Grocery',
+        area: 'Jaipur',
+        verified: true,
+      );
+    addTearDown(work.dispose);
+    expect(
+      work.workspacePublicationDetails.toJson().containsKey('openingTime'),
+      isFalse,
+    );
+    expect(work.workspacePublicStoreDetails!.openingHoursLabel, isNull);
+    expect(work.workspacePublicStoreDetails!.publicContactPhone, isNull);
+    work.saveWorkspaceTradingControls(
+      openingTime: '22:00',
+      closingTime: '06:00',
+      maximumActiveOrders: 0,
+      alertSound: true,
+      alertVibration: false,
+    );
+    expect(work.workspacePublicationDetails.toJson()['openingTime'], '22:00');
+    expect(work.workspacePublicationDetails.toJson()['closingTime'], '06:00');
+    expect(
+      work.workspacePublicStoreDetails!.openingHoursLabel,
+      '22:00 – 06:00',
+    );
+    work.activeWorkspace = const WorkWorkspace(
+      id: 'lf02-host-store-b',
+      name: 'Other host Store',
+      profileId: 'retailer-grocery',
+      profileLabel: 'Grocery',
+      area: 'Delhi',
+      verified: true,
+    );
+    expect(work.workspacePublicStoreDetails!.openingHoursLabel, isNull);
+    expect(work.workspacePublicStoreDetails!.publicContactPhone, isNull);
+  });
+
+  testWidgets('LF02 existing Store form validates and saves public contact', (
+    tester,
+  ) async {
+    final work = WorkSession(gateway: ReviewWorkGateway())
+      ..activeWorkspace = const WorkWorkspace(
+        id: 'lf02-host-form',
+        name: 'Host fixture Store',
+        profileId: 'retailer-grocery',
+        profileLabel: 'Grocery',
+        area: 'Jaipur',
+        verified: true,
+      );
+    addTearDown(work.dispose);
+    work.saveWorkspacePublicationDetails(handoffStoreDetails());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: StorePublicationSettings(session: work),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(
+      find.byKey(const PageStorageKey('work-publication-address-section')),
+    );
+    await tester.pumpAndSettle();
+    final contact = find.byKey(
+      const Key('work-publication-publicContactPhone'),
+    );
+    await tester.ensureVisible(contact);
+    await tester.enterText(contact, 'not a number');
+    final save = find.byKey(const Key('work-publication-save-address'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a valid customer contact number.'), findsOneWidget);
+    expect(work.workspacePublicationDetails.publicContactPhone, isEmpty);
+    await tester.ensureVisible(contact);
+    await tester.enterText(contact, '+91 98765 43210');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(
+      work.workspacePublicStoreDetails!.publicContactPhone,
+      '+91 98765 43210',
+    );
+    work.saveWorkspaceTradingControls(
+      openingTime: '09:30',
+      closingTime: '18:45',
+      maximumActiveOrders: 0,
+      alertSound: true,
+      alertVibration: false,
+    );
+    final beforeInvalid = work.workspacePublicationDetails.toJson();
+    work.saveWorkspaceTradingControls(
+      openingTime: 'invalid',
+      closingTime: '06:00',
+      maximumActiveOrders: 10,
+      alertSound: false,
+      alertVibration: true,
+    );
+    expect(work.workspacePublicationDetails.toJson(), beforeInvalid);
+    expect(work.workspaceOpeningTime, '09:30');
+    expect(work.workspaceMaximumActiveOrders, 0);
+    await tester.ensureVisible(contact);
+    await tester.enterText(contact, '');
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(work.workspacePublicStoreDetails!.publicContactPhone, isNull);
+    expect(
+      work.workspacePublicStoreDetails!.openingHoursLabel,
+      '09:30 – 18:45',
+    );
+    final restored = WorkspaceStorePublicationDetails.fromJson(
+      work.workspacePublicationDetails.toJson(),
+    );
+    expect(restored.publicContactPhone, isEmpty);
+    expect(restored.openingTime, '09:30');
+    expect(restored.closingTime, '18:45');
+    expect(
+      work.workspacePublicationDetails.signatory,
+      handoffStoreDetails().signatory,
+    );
+    expect(work.workspaceVisibleToCustomers, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   test('PAYMENT-TERMS canonical kinds round trip and invalid terms reject', () {
     for (final kind in WorkspacePaymentTerm.wholesaleKinds) {

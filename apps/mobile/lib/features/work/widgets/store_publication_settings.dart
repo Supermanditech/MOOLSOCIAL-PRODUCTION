@@ -31,6 +31,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     'city': 'City',
     'state': 'State',
     'pinCode': 'PIN code',
+    'publicContactPhone': 'Customer contact number (public)',
     'billingAddress': 'Registered address, if different',
     'pan': 'Business PAN, if applicable',
     'cin': 'CIN, if applicable',
@@ -88,7 +89,19 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     final current = widget.session.workspacePublicationDetails;
     final patch = <String, Object?>{...current.toJson()};
     if (address) {
-      for (final key in _labels.keys.take(10)) {
+      for (final key in const [
+        'legalName',
+        'street',
+        'city',
+        'state',
+        'pinCode',
+        'publicContactPhone',
+        'billingAddress',
+        'pan',
+        'cin',
+        'fssai',
+        'signatory',
+      ]) {
         patch[key] = _fields[key]!.text.trim();
       }
       if ([
@@ -163,6 +176,10 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
       if (text.length > 2000) return 'Use at most 2,000 characters.';
       if (text.isEmpty) return null;
       if (key == 'pinCode') return StoreSettingsInput.pin(text);
+      if (key == 'publicContactPhone' &&
+          !WorkspaceStorePublicationDetails.validPublicPhone(text)) {
+        return 'Enter a valid customer contact number.';
+      }
       if (key == 'dispatchDays' || key == 'returnWindowDays') {
         return StoreSettingsInput.whole(text, 0, 365);
       }
@@ -301,6 +318,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                   _input('city', required: true),
                   _input('state', required: true),
                   _input('pinCode', required: true),
+                  _input('publicContactPhone', full: true),
                   _input('signatory'),
                   _input('billingAddress', full: true),
                 ],

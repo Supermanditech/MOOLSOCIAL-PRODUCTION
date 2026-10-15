@@ -253,6 +253,8 @@ class BuyV2StoreListing {
     this.distanceMeters,
     this.collection,
     this.previewProduct,
+    this.publicContactPhone,
+    this.openingHoursLabel,
   });
 
   final String id;
@@ -263,6 +265,10 @@ class BuyV2StoreListing {
   final int? distanceMeters;
   final BuyV2StoreCollectionCapability? collection;
   final BuyV2Product? previewProduct;
+
+  /// Descriptive Store-owned details, not live availability or KYC identity.
+  final String? publicContactPhone;
+  final String? openingHoursLabel;
 
   /// Pickup is offered by every Store. Legacy opt-in capability metadata is
   /// not an ordering gate; a real branch identity and collection address are.

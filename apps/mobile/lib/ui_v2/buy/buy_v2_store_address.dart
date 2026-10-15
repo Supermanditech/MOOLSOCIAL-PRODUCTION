@@ -51,26 +51,43 @@ class BuyV2StoreAddress extends StatelessWidget {
   Widget build(BuildContext context) {
     final uri = buyV2StoreMapUri(store);
     if (!showAddress && uri == null) return const SizedBox.shrink();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: Text(
-            !showAddress
-                ? 'Google Maps'
-                : store.address.trim().isEmpty
-                ? 'Store address unavailable'
-                : store.address.trim(),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                !showAddress
+                    ? 'Google Maps'
+                    : store.address.trim().isEmpty
+                    ? 'Store address unavailable'
+                    : store.address.trim(),
+                style: context.buyMeta.copyWith(fontSize: 12, height: 1.25),
+              ),
+            ),
+            if (uri != null)
+              IconButton(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                key: ValueKey('buy-store-map-${store.id}'),
+                tooltip: 'Open store in Google Maps',
+                onPressed: () => _open(context, uri),
+                icon: const Icon(Icons.location_on_outlined, size: 20),
+              ),
+          ],
+        ),
+        if (showAddress && store.publicContactPhone?.trim().isNotEmpty == true)
+          Text(
+            'Contact: ${store.publicContactPhone!.trim()}',
+            key: ValueKey('buy-store-contact-${store.id}'),
             style: context.buyMeta.copyWith(fontSize: 12, height: 1.25),
           ),
-        ),
-        if (uri != null)
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            key: ValueKey('buy-store-map-${store.id}'),
-            tooltip: 'Open store in Google Maps',
-            onPressed: () => _open(context, uri),
-            icon: const Icon(Icons.location_on_outlined, size: 20),
+        if (showAddress && store.openingHoursLabel?.trim().isNotEmpty == true)
+          Text(
+            'Hours: ${store.openingHoursLabel!.trim()}',
+            key: ValueKey('buy-store-hours-${store.id}'),
+            style: context.buyMeta.copyWith(fontSize: 12, height: 1.25),
           ),
       ],
     );

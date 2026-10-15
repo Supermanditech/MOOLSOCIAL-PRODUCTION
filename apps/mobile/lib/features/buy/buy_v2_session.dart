@@ -4624,6 +4624,8 @@ class BuyV2Session extends ChangeNotifier {
                       address: previous.address,
                       regionId: previous.regionId,
                       distanceMeters: previous.distanceMeters,
+                      publicContactPhone: previous.publicContactPhone,
+                      openingHoursLabel: previous.openingHoursLabel,
                       previewProduct: previous.previewProduct,
                     ),
                   );

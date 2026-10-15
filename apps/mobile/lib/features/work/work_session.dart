@@ -9664,6 +9664,16 @@ class WorkSession extends ChangeNotifier {
       showError('Enter an active-order limit or choose Unlimited.');
       return;
     }
+    if (!WorkspaceStorePublicationDetails.validTradingTime(openingTime) ||
+        !WorkspaceStorePublicationDetails.validTradingTime(closingTime)) {
+      showError('Choose valid opening and closing times.');
+      return;
+    }
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
+      ...workspacePublicationDetails.toJson(),
+      'openingTime': openingTime.trim(),
+      'closingTime': closingTime.trim(),
+    });
     workspaceOpeningTime = openingTime.trim();
     workspaceClosingTime = closingTime.trim();
     workspaceMaximumActiveOrders = maximumActiveOrders;

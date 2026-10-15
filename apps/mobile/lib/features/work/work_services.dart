@@ -391,6 +391,8 @@ class _StoreReviewProcurementCatalogue
         area: store.area,
         address: store.address,
         regionId: store.regionId,
+        publicContactPhone: store.publicContactPhone,
+        openingHoursLabel: store.openingHoursLabel,
         previewProduct: store.previewProduct == null
             ? null
             : _product(store.previewProduct!),

@@ -1343,7 +1343,7 @@ class _WorkWorkspaceDashboardScreenState
               ((shortHomeHeader
                           ? (MediaQuery.sizeOf(context).width - 40) / 2
                           : MediaQuery.sizeOf(context).width) -
-                      (procurementOpen ? 137 : 127) -
+                      (procurementOpen ? 137 : 127) - 48 -
                       (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0))
                   .clamp(64.0, double.infinity),
         );
@@ -1485,8 +1485,12 @@ class _WorkWorkspaceDashboardScreenState
           ? Text(salesOpen ? _salesTaskTitle : title, key: const Key('work-sales-task-heading'),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600))
           : analyticsSurface
-          ? Text(workspace.name, key: const Key('work-store-full-name'),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))
+          ? Row(children: [
+              Expanded(child: Text(workspace.name, key: const Key('work-store-full-name'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: MoolColors.navy))),
+              MoolGlobalProfileShortcutV2(keyName: 'work-dashboard-profile',
+                freeStanding: true, onPressed: () => _openProfile(context, workspace)),
+            ])
           : compactSettings
           ? Row(
               children: [
@@ -3828,6 +3832,11 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+                MoolGlobalProfileShortcutV2(
+                  keyName: 'work-dashboard-profile',
+                  freeStanding: true,
+                  onPressed: onProfile,
+                ),
               ],
             ),
           ),
@@ -3970,12 +3979,6 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                     _DashboardAlertButton(
                       count: _workspaceAlerts(session).length,
                       onPressed: onAlerts,
-                    ),
-                    const SizedBox(width: 4),
-                    MoolGlobalProfileShortcutV2(
-                      keyName: 'work-dashboard-profile',
-                      onPressed: onProfile,
-                      freeStanding: true,
                     ),
                   ],
                 ],

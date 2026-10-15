@@ -146,6 +146,10 @@ abstract final class WorkspacePublicationContract {
     'distanceMeters': 'Buyer location/service calculation, not Store input',
     'collection': 'Authoritative collection capability pending',
     'previewProduct': 'Same Store exact eligible SKU; no preview screen',
+    'publicContactPhone':
+        'Explicit customer-facing Store contact; never account/KYC contact',
+    'openingHoursLabel':
+        'Explicitly saved Store hours; not current open/orderability status',
   };
 
   static const contentBindings = <String, String>{

@@ -7901,12 +7901,13 @@ function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
   $expected = @{
     Root='C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015'
     Branch='work/codex-ui/last-frontend-lf01-20261015'
-    Lane='codex_ui'; WorkId='last-frontend-lf01-20261015'; Ticket='LF-01'
+    Lane='codex_ui'; WorkId='last-frontend-lf01-20261015'
   }
   foreach ($key in $expected.Keys) {
     if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
   }
-  return $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
+  return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-01','LF-02-1') -and
+    $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
     $Facts.ContainsKey('Phase') -and $Facts.Role -ceq 'primary' -and
     $Facts.Task -ceq '/root' -and $Facts.Phase -cin @(
       'coordination_bootstrap','task_start','implementation','pre_commit')
@@ -7916,8 +7917,8 @@ function Invoke-Lf01Admission {
   # Current founder-authorized task admission, not another historical successor.
   # The closed integration path below and its 83 bindings remain unchanged.
   $base = '3c5a454bf8af173d9736c75213cafb88e641765c'
-  $recordOwner = 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.json'
-  $manifestOwner = 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.md'
+  $recordOwner = if ($ProductionTicketId -ceq 'LF-02-1') { 'docs/quality/LF-02-STORE-DETAILS-20261015.json' } else { 'docs/quality/LF-01-ENTRY-RECOVERY-20261015.json' }
+  $manifestOwner = $recordOwner -replace '\.json$', '.md'
   $metadata = @($recordOwner,$manifestOwner,
     'scripts/check-codex-subagent-coordination-policy.ps1',
     'scripts/check-cross-agent-incremental-ticket-gate.ps1',
@@ -7934,6 +7935,20 @@ function Invoke-Lf01Admission {
     'apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart',
     'apps/mobile/test/work_vertical_slice_test.dart',
     'apps/mobile/test/work_store_atomic_operations_test.dart')
+  if ($ProductionTicketId -ceq 'LF-02-1') {
+    $owners += @('docs/quality/LF-01-ENTRY-RECOVERY-20261015.json',
+      'docs/quality/LF-01-ENTRY-RECOVERY-20261015.md',
+      'apps/mobile/lib/features/work/work_publication_data.dart',
+      'apps/mobile/lib/features/work/widgets/store_publication_settings.dart',
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart',
+      'apps/mobile/lib/features/work/work_publication.dart',
+      'apps/mobile/test/work_store_publication_settings_test.dart',
+      'apps/mobile/test/work_publication_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart',
+      'apps/mobile/test/store_settings_widgets_test.dart')
+  }
   $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{
     Root=$root.Replace('\','/'); Branch=$branch[0]; Role=$AgentRole; Task=$AgentTask
@@ -7942,7 +7957,7 @@ function Invoke-Lf01Admission {
   })) 'LF-01 requires its exact authorized feature identity; build, device and closure phases are not admitted.'
   $record = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
   $admission = $record.ticket.frontendAdmission
-  Assert-Coordination ($record.ticket.id -ceq 'LF-01' -and
+  Assert-Coordination ($record.ticket.id -ceq $ProductionTicketId -and
     $admission.baselineHead -ceq $base -and $admission.branch -ceq $branch[0] -and
     $admission.worktreePath -ceq $root.Replace('\','/') -and
     $admission.task -ceq $AgentTask -and $admission.role -ceq $AgentRole -and
@@ -8008,7 +8023,7 @@ function Invoke-Lf01Admission {
     }
   }
   & (Join-Path $root 'scripts/check-mvp-scope-gate-state.ps1') -RepositoryRoot $root `
-    -StatePath $recordOwner -CandidateId LF-01 -RequireExecutionAuthorized
+    -StatePath $recordOwner -CandidateId $ProductionTicketId -RequireExecutionAuthorized
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
   if ($ProductionPhase -ceq 'pre_commit') {

@@ -564,6 +564,9 @@ class WorkspaceStorePublicationDetails {
     this.city = '',
     this.state = '',
     this.pinCode = '',
+    this.publicContactPhone = '',
+    this.openingTime = '',
+    this.closingTime = '',
     this.legalName = '',
     this.billingAddress = '',
     this.pan = '',
@@ -613,6 +616,26 @@ class WorkspaceStorePublicationDetails {
       fssai,
       signatory;
   final Set<String> retailPaymentMethods, wholesalePaymentMethods;
+
+  /// Explicit customer contact, never copied from private account/KYC records.
+  final String publicContactPhone;
+
+  /// Empty for legacy records until the Store explicitly saves its hours.
+  final String openingTime, closingTime;
+  static bool validPublicPhone(String value) {
+    final text = value.trim();
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    return text.isEmpty ||
+        (RegExp(r'^\+?[0-9][0-9 ()-]*$').hasMatch(text) &&
+            digits.length >= 7 &&
+            digits.length <= 15 &&
+            text.length <= 30);
+  }
+
+  static bool validTradingTime(String value) => RegExp(
+    r'^(?:(?:[01]?\d|2[0-3]):[0-5]\d|(?:0?[1-9]|1[0-2]):[0-5]\d\s*[AP]M)$',
+    caseSensitive: false,
+  ).hasMatch(value.trim());
   final List<WorkspacePaymentTerm> wholesalePaymentTerms;
 
   /// Private Store/customer overrides: never attach this map to public products.
@@ -659,6 +682,11 @@ class WorkspaceStorePublicationDetails {
   /// Input errors only. Missing data may remain a private draft. Location and
   /// service verification are separate publication requirements, never inferred.
   Map<String, String> get inputErrors => {
+    if (!validPublicPhone(publicContactPhone))
+      'publicContactPhone': 'Enter a valid customer contact number.',
+    if ((openingTime.isNotEmpty || closingTime.isNotEmpty) &&
+        (!validTradingTime(openingTime) || !validTradingTime(closingTime)))
+      'openingTime': 'Choose valid opening and closing times.',
     if (!businessTypes.containsKey(businessType))
       'businessType': 'Choose a listed business type.',
     if ((retailChannelEnabled == null) != (wholesaleChannelEnabled == null))
@@ -778,6 +806,15 @@ class WorkspaceStorePublicationDetails {
     area: area,
     address: address,
     regionId: shoppingArea?.regionId ?? '',
+    publicContactPhone:
+        publicContactPhone.trim().isEmpty ||
+            !validPublicPhone(publicContactPhone)
+        ? null
+        : publicContactPhone.trim(),
+    openingHoursLabel:
+        validTradingTime(openingTime) && validTradingTime(closingTime)
+        ? '${openingTime.trim()} – ${closingTime.trim()}'
+        : null,
     collection: collection?.storeId == id ? collection : null,
   );
   Map<String, Object?> toJson() => {
@@ -790,6 +827,9 @@ class WorkspaceStorePublicationDetails {
     'city': city,
     'state': state,
     'pinCode': pinCode,
+    if (publicContactPhone.isNotEmpty) 'publicContactPhone': publicContactPhone,
+    if (openingTime.isNotEmpty) 'openingTime': openingTime,
+    if (closingTime.isNotEmpty) 'closingTime': closingTime,
     'legalName': legalName,
     'billingAddress': billingAddress,
     'pan': pan,
@@ -901,6 +941,9 @@ class WorkspaceStorePublicationDetails {
       city: text('city'),
       state: text('state'),
       pinCode: text('pinCode'),
+      publicContactPhone: text('publicContactPhone'),
+      openingTime: text('openingTime'),
+      closingTime: text('closingTime'),
       legalName: text('legalName'),
       billingAddress: text('billingAddress'),
       pan: text('pan'),

@@ -98,9 +98,9 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
 # The accepted combined source is LF-01's start, not the retired August ticket.
 # Delegate to the current exact owner/scope/Git checks; historical paths below
 # remain unchanged. This grants no build, install or handoff acceptance.
-if ($TicketId -ceq 'LF-01' -or $UiScope -ceq 'last-frontend-entry-recovery') {
-  Assert-IncrementalTicket ($TicketId -ceq 'LF-01' -and $Lane -ceq 'codex_ui' -and
-    $UiScope -ceq 'last-frontend-entry-recovery' -and
+if ($TicketId -cin @('LF-01','LF-02-1') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details')) {
+  Assert-IncrementalTicket (($TicketId -ceq 'LF-01' -and $UiScope -ceq 'last-frontend-entry-recovery' -or
+    $TicketId -ceq 'LF-02-1' -and $UiScope -ceq 'last-frontend-store-details') -and $Lane -ceq 'codex_ui' -and
     $PackageId -ceq 'com.moolsocial.app.runtime' -and
     $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
     $Phase -cin @('ticket_start','implementation')) 'LF-01 permits only its current hot-reload source identity; no build/handoff.'
@@ -110,7 +110,7 @@ if ($TicketId -ceq 'LF-01' -or $UiScope -ceq 'last-frontend-entry-recovery') {
     -RepositoryRoot $root -AgentRole primary -AgentTask /root -UseRecordedClaim `
     -ExpectedRegistryEntryCount $binding.entryCount -ExpectedRegistrySha256 $binding.sha256 `
     -ProductionLane codex_ui -ProductionPhase $coordinationPhase `
-    -ProductionWorkId last-frontend-lf01-20261015 -ProductionTicketId LF-01
+    -ProductionWorkId last-frontend-lf01-20261015 -ProductionTicketId $TicketId
   return
 }
 
