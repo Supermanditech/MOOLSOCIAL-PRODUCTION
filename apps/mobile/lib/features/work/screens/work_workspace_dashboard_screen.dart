@@ -1267,6 +1267,8 @@ class _WorkWorkspaceDashboardScreenState
                 _operation == _WorkspaceOperation.staff));
     final analyticsSurface = _view == _WorkspaceControlView.dashboard && _reviewedOrder == null &&
       (session.retailerSetupSaved || session.reviewStage == WorkReviewStage.live);
+    final showStoreProfile =
+        _view == _WorkspaceControlView.dashboard && _reviewedOrder == null;
     final storeRootSurface =
         _view == _WorkspaceControlView.dashboard ||
         _view == _WorkspaceControlView.search ||
@@ -1343,7 +1345,7 @@ class _WorkWorkspaceDashboardScreenState
               ((shortHomeHeader
                           ? (MediaQuery.sizeOf(context).width - 40) / 2
                           : MediaQuery.sizeOf(context).width) -
-                      (procurementOpen ? 137 : 127) - 48 -
+                      (procurementOpen ? 137 : 127) - (showStoreProfile ? 48 : 0) -
                       (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0))
                   .clamp(64.0, double.infinity),
         );
@@ -1653,7 +1655,9 @@ class _WorkWorkspaceDashboardScreenState
               },
               onSettings: () => _showStoreSignals(context),
               onAlerts: _showAlerts,
-              onProfile: () => _openProfile(context, workspace),
+              onProfile: showStoreProfile
+                  ? () => _openProfile(context, workspace)
+                  : null,
             )
           : null,
       fallbackBackRoute: '/app/work/earn',
@@ -3646,7 +3650,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     required this.onScan,
     required this.onSettings,
     required this.onAlerts,
-    required this.onProfile,
+    this.onProfile,
   });
 
   final WorkSession session;
@@ -3673,7 +3677,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final VoidCallback onScan;
   final VoidCallback onSettings;
   final VoidCallback onAlerts;
-  final VoidCallback onProfile;
+  final VoidCallback? onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -3832,10 +3836,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                MoolGlobalProfileShortcutV2(
+                if (onProfile != null) MoolGlobalProfileShortcutV2(
                   keyName: 'work-dashboard-profile',
                   freeStanding: true,
-                  onPressed: onProfile,
+                  onPressed: onProfile!,
                 ),
               ],
             ),

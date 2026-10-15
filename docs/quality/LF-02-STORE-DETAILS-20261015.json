@@ -68,7 +68,8 @@
     "classificationReason": "Basic public Store identity/contact/hours, not optional promotion or operator depth.",
     "minimumCompleteScope": [
       "Add dedicated public contact and explicitly saved hours through existing typed records/settings/public details.",
-      "Preserve old records, private fields, Store identity and current collection behavior; test and show OPPO."
+      "Preserve old records, private fields, Store identity and current collection behavior; test and show OPPO.",
+      "Founder placement correction: global profile on Store home only, not Stock, Purchases, Sales, Orders or working headers. This supersedes the broader main-header placement recorded in the preceding implementation; same global account and Store context remain."
     ],
     "explicitExclusions": [
       "No backend, KYC approval, new auth provider, payment, dispatch, redesign, operator workspace, build/install or later LF batch."
@@ -79,7 +80,10 @@
     ],
     "testAndEvidencePlan": [
       "Existing publication/settings baseline 25 passed.",
-      "Focused legacy/input/scope/privacy/display regressions, affected caller tests and OPPO hot reload."
+      "Focused legacy/input/scope/privacy/display regressions, affected caller tests and OPPO hot reload.",
+      "Home-only profile correction: both 412x915 and 320x568 widget regressions failed at the old Stock placement, then passed after correction. Cover Stock, Purchases, Sales, Orders absence and home -> global profile -> Operations. Dart analysis: no errors/warnings, eight unchanged dashboard style infos.",
+      "OPPO reloaded four libraries successfully. Actual Sales, Stock and Purchases semantic headers have no profile entry; home has one icon, tapped into existing Store-context global profile/Operations. Home and Sales captures: calling task outputs/lf02-home-only-home-20261015.png and lf02-home-only-sales-20261015.png. No saved-data mutation, APK install or provider acceptance. Founder review pending.",
+      "Bounded tooling correction: pre_commit was initially requested before staging and correctly rejected. Used implementation phase for edits/tests; no gate changed. Flutter refreshed generated plugin metadata during pub resolution; reverted only that generated refresh, preserving source and dependency versions."
     ],
     "frontendAdmission": {
       "task": "/root",

@@ -493,17 +493,26 @@ void main() {
   }
 
   for (final viewport in const [Size(412, 915), Size(320, 568)]) {
-  testWidgets('LF02 Store global profile reaches existing business settings ${viewport.width}', (tester) async {
+  testWidgets('LF02 Store profile is home-only and reaches business settings ${viewport.width}', (tester) async {
     final work = _testWorkSession()..seedVerifiedWorkspace();
     await mount(tester, route: '/app/work/workspace/dashboard', workSession: work, size: viewport);
     expect(find.byKey(const Key('work-dashboard-profile')), findsOneWidget);
     await tapVisible(tester, const Key('work-store-stock'));
+    expect(find.byKey(const Key('work-dashboard-profile')), findsNothing);
     await tester.tap(find.byKey(const Key('work-dashboard-settings')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-store-status-business-profile')), findsNothing);
     expect(find.text('Open business profile'), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('work-incoming-purchases'));
+    expect(find.byKey(const Key('work-dashboard-profile')), findsNothing);
+    for (final destination in ['work-store-sell', 'work-store-orders']) {
+      await tapVisible(tester, Key(destination));
+      expect(find.byKey(const Key('work-dashboard-profile')), findsNothing);
+    }
+    await tapVisible(tester, const Key('work-store-home'));
+    expect(find.byKey(const Key('work-dashboard-profile')), findsOneWidget);
     await tester.tap(find.byKey(const Key('work-dashboard-profile')));
     await tester.pumpAndSettle();
     final operations = find.text('Operations');
