@@ -15,6 +15,167 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
+  test('LF23 private preparation and fulfilment survive a fresh session', () async {
+    final f = _Lf20Storage();
+    final first = f.work();
+    await first.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    final originalState = first.workspaceStoreState;
+    expect(first.saveWorkspaceAvailability(acceptingOrders: true,
+      fulfilmentMode: 'Pickup only', busyMinutes: 15, reopensAt: ''), isTrue);
+    expect(_lf20Save(first), isTrue);
+    expect(await first.workspaceTradingPreferencesWrite, isTrue);
+    first.dispose();
+    final restored = f.work();
+    addTearDown(restored.dispose);
+    expect(await restored.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+    expect(restored.workspaceBusyMinutes, 15);
+    expect(restored.workspaceFulfilmentMode, 'Pickup only');
+    expect(restored.workspaceStoreState, originalState);
+    expect(restored.workspaceVisibleToCustomers, isFalse);
+    expect((restored.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+  });
+
+  for (final version in [1, 2]) {
+    test('LF23 legacy v$version read never claims absent readiness saved', () async {
+      final f = _Lf20Storage();
+      final bytes = jsonEncode(version == 1 ? f.valid() : _lf21Record(f));
+      f.rows[f.key('lf20-a')] = bytes;
+      final work = f.work();
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isTrue);
+      expect(work.workspaceReadinessPreferencesSaved, isFalse);
+      expect(work.workspaceBusyMinutes, 0);
+      expect(work.workspaceFulfilmentMode, 'Delivery and pickup');
+      expect(f.rows[f.key('lf20-a')], bytes);
+      expect(f.writes, 0);
+    });
+  }
+
+  test('LF23 failed and delayed readiness save applies only after confirmation', () async {
+    final f = _Lf20Storage();
+    f.rows[f.key('lf20-a')] = jsonEncode(_lf23Record(f));
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    final state = work.workspaceStoreState;
+    f.writeGate = Completer<void>();
+    f.failWrite = true;
+    expect(work.saveWorkspaceTradingControls(openingTime: '21:30', closingTime: '05:15',
+      maximumActiveOrders: 0, alertSound: false, alertVibration: false,
+      preparationMinutes: 30, fulfilmentPreference: 'Delivery only'), isTrue);
+    expect(work.workspaceBusyMinutes, 15);
+    expect(work.workspaceFulfilmentMode, 'Pickup only');
+    f.writeGate!.complete();
+    expect(await work.workspaceTradingPreferencesWrite, isFalse);
+    expect(work.workspaceReadinessPreferencesSaved, isFalse);
+    expect(work.workspaceBusyMinutes, 15);
+    expect(work.workspaceFulfilmentMode, 'Pickup only');
+    expect(work.workspaceStoreState, state);
+    f.failWrite = false;
+    f.writeGate = null;
+    expect(work.saveWorkspaceTradingControls(openingTime: '21:30', closingTime: '05:15',
+      maximumActiveOrders: 0, alertSound: false, alertVibration: false,
+      preparationMinutes: 30, fulfilmentPreference: 'Delivery only'), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(work.workspaceReadinessPreferencesSaved, isTrue);
+    expect(work.workspaceBusyMinutes, 30);
+    expect(work.workspaceFulfilmentMode, 'Delivery only');
+    expect(work.workspaceProductDefaults.toJson(), _lf21Defaults().toJson());
+    expect(work.workspaceStoreState, state);
+    final row = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
+    expect(row.keys, unorderedEquals(['schemaVersion', 'storeId', 'fields',
+      'productDefaults', 'readinessPreferences']));
+  });
+
+  for (final defect in ['negative', 'fraction', 'mode', 'blank', 'missing',
+      'extra', 'versionFraction', 'missingProductDefaults']) {
+    test('LF23 malformed v3 $defect cannot partially restore', () async {
+      final f = _Lf20Storage();
+      final row = _lf23Record(f), inputs = row['readinessPreferences'] as Map;
+      if (defect == 'negative') inputs['preparationMinutes'] = -1;
+      if (defect == 'fraction') inputs['preparationMinutes'] = 1.5;
+      if (defect == 'mode') inputs['fulfilmentMode'] = true;
+      if (defect == 'blank') inputs['fulfilmentMode'] = '  ';
+      if (defect == 'missing') inputs.remove('preparationMinutes');
+      if (defect == 'extra') inputs['acceptingOrders'] = true;
+      if (defect == 'versionFraction') row['schemaVersion'] = 3.0;
+      if (defect == 'missingProductDefaults') row.remove('productDefaults');
+      final bytes = jsonEncode(row);
+      f.rows[f.key('lf20-a')] = bytes;
+      final work = f.work();
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a'), isFalse);
+      expect(work.workspaceBusyMinutes, 0);
+      expect(work.workspaceFulfilmentMode, 'Delivery and pickup');
+      expect(work.workspaceProductDefaults.lowStockThreshold, 5);
+      expect(work.workspaceReadinessPreferencesSaved, isFalse);
+      expect(f.rows[f.key('lf20-a')], bytes);
+      expect(_lf20Save(work), isFalse);
+      expect(f.writes, 0);
+    });
+  }
+
+  test('LF23 account caches isolate both private readiness inputs', () async {
+    final f = _Lf20Storage();
+    f.rows[f.key('lf20-a')] = jsonEncode(_lf23Record(f));
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    f.account = 'lf23-other-account';
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(work.workspaceBusyMinutes, 0);
+    expect(work.workspaceFulfilmentMode, 'Delivery and pickup');
+    expect(work.saveWorkspaceTradingControls(openingTime: '09:00', closingTime: '18:00',
+      maximumActiveOrders: 0, alertSound: true, alertVibration: false,
+      preparationMinutes: 7, fulfilmentPreference: 'Delivery only'), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    f.account = 'lf16-host';
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(work.workspaceBusyMinutes, 15);
+    expect(work.workspaceFulfilmentMode, 'Pickup only');
+  });
+
+  test('LF23 product and hours saves retain accepted readiness without copying drafts', () async {
+    final f = _Lf20Storage();
+    f.rows[f.key('lf20-a')] = jsonEncode(_lf23Record(f));
+    final work = f.work();
+    addTearDown(work.dispose);
+    await work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(
+      stockMode: WorkspaceStockMode.exactQuantity, lowStockThreshold: 23)), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(_lf20Save(work, opening: '10:00'), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    final row = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
+    expect(row['readinessPreferences'],
+      {'preparationMinutes': 15, 'fulfilmentMode': 'Pickup only'});
+    expect((row['fields'] as Map)['openingTime'], '10:00');
+    expect((row['productDefaults'] as Map)['lowStockThreshold'], 23);
+  });
+
+  test('LF23 late read preserves newer preparation and custom fulfilment input', () async {
+    final f = _Lf20Storage()..readGate = Completer<void>();
+    f.rows[f.key('lf20-a')] = jsonEncode(_lf23Record(f));
+    final work = f.work();
+    addTearDown(work.dispose);
+    final pending = work.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(work.saveWorkspaceAvailability(acceptingOrders: false,
+      fulfilmentMode: 'Existing custom pickup label', busyMinutes: 45,
+      reopensAt: ''), isTrue);
+    f.readGate!.complete();
+    expect(await pending, isTrue);
+    expect(work.workspaceBusyMinutes, 45);
+    expect(work.workspaceFulfilmentMode, 'Existing custom pickup label');
+    expect(work.workspaceReadinessPreferencesSaved, isFalse);
+    expect(_lf20Save(work), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    final restored = f.work();
+    addTearDown(restored.dispose);
+    await restored.loadWorkspaceTradingPreferences(expectedStoreId: 'lf20-a');
+    expect(restored.workspaceBusyMinutes, 45);
+    expect(restored.workspaceFulfilmentMode, 'Existing custom pickup label');
+  });
+
   test('LF21 product defaults restore without editing saved Stock', () async {
     final f = _Lf20Storage(); // Shared private Store-preference host fixture.
     final first = f.work();
@@ -63,7 +224,7 @@ void main() {
           : _lf20Save(work, opening: '10:00'), isTrue);
       expect(await work.workspaceTradingPreferencesWrite, isTrue);
       final row = jsonDecode(f.rows[f.key('lf20-a')]!) as Map;
-      expect(row['schemaVersion'], 2);
+      expect(row['schemaVersion'], 3);
       expect((row['fields'] as Map)['openingTime'], productEditor ? '21:30' : '10:00');
       expect((row['fields'] as Map)['maximumActiveOrders'], 0);
       expect(row['productDefaults'], productEditor ? _lf21Defaults().toJson()
@@ -1810,6 +1971,11 @@ WorkspaceProductDefaults _lf21Defaults() => const WorkspaceProductDefaults(
   customerListingRequested: true);
 Map<String, Object?> _lf21Record(_Lf20Storage f) => {
   ...f.valid(), 'schemaVersion': 2, 'productDefaults': _lf21Defaults().toJson(),
+};
+Map<String, Object?> _lf23Record(_Lf20Storage f) => {
+  ..._lf21Record(f), 'schemaVersion': 3,
+  'readinessPreferences': <String, Object?>{
+    'preparationMinutes': 15, 'fulfilmentMode': 'Pickup only'},
 };
 
 WorkspaceStorePublicationDetails _lf18Details() => const WorkspaceStorePublicationDetails(

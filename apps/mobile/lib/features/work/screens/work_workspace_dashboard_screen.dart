@@ -3271,13 +3271,16 @@ class _WorkWorkspaceDashboardScreenState
     }
     if (!durableTrading && !applyOtherPreferences()) return;
     if (tradingControlsChanged || session.tradingPreferencesPersistenceAvailable &&
-        (!session.workspaceTradingPreferencesSaved || session.workspaceTradingPreferencesError != null)) {
+        (!session.workspaceTradingPreferencesSaved || !session.workspaceReadinessPreferencesSaved ||
+          session.workspaceTradingPreferencesError != null)) {
       final saved = session.saveWorkspaceTradingControls(
         openingTime: _draftOpeningTime,
         closingTime: _draftClosingTime,
         maximumActiveOrders: _draftMaximumActiveOrders,
         alertSound: _draftOrderAlertSound,
         alertVibration: _draftOrderAlertVibration,
+        preparationMinutes: _draftBusyMinutes,
+        fulfilmentPreference: _draftFulfilmentMode,
         expectedStoreId: _settingsStoreId,
         expectedNavigationRevision: _settingsScopeRevision,
       );
@@ -3293,7 +3296,7 @@ class _WorkWorkspaceDashboardScreenState
           session.showError(session.workspaceTradingPreferencesError ?? 'Device save could not be confirmed. Your entries are kept. Try again.');
           return;
         }
-        session.showNotice('Store hours and alerts saved on this device. Public sync is pending.');
+        session.showNotice('Store preferences saved on this device. Public sync is pending.');
       }
     }
     if (durableTrading && !applyOtherPreferences()) return;
@@ -3307,6 +3310,8 @@ class _WorkWorkspaceDashboardScreenState
       _draftReopensAt != session.workspaceReopensAt;
 
   bool get _tradingControlsDirty =>
+      _draftBusyMinutes != session.workspaceBusyMinutes ||
+      _draftFulfilmentMode != session.workspaceFulfilmentMode ||
       _draftOpeningTime != session.workspaceOpeningTime ||
       _draftClosingTime != session.workspaceClosingTime ||
       _draftMaximumActiveOrders != session.workspaceMaximumActiveOrders ||
@@ -42214,7 +42219,9 @@ class _WorkspaceStatusSurface extends StatelessWidget {
         ? WorkspaceStoreState.off
         : WorkspaceStoreState.paused;
     final publicationReport = session.workspacePublicationReport;
-    final tradingChanged = openingTime != session.workspaceOpeningTime ||
+    final tradingChanged = busyMinutes != session.workspaceBusyMinutes ||
+        fulfilmentMode != session.workspaceFulfilmentMode ||
+        openingTime != session.workspaceOpeningTime ||
         closingTime != session.workspaceClosingTime ||
         maximumActiveOrders != session.workspaceMaximumActiveOrders ||
         alertSound != session.workspaceOrderAlertSound ||
@@ -42300,10 +42307,13 @@ class _WorkspaceStatusSurface extends StatelessWidget {
           if (session.tradingPreferencesPersistenceAvailable)
             Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(
               session.workspaceTradingPreferencesError ??
-              (session.workspaceTradingPreferencesSaving ? 'Saving hours and alerts on this device…' :
-               tradingChanged ? 'Unsaved hours or alert changes.' :
-               session.workspaceTradingPreferencesSaved ? 'Hours and alerts saved on this device. Public sync is pending.' :
-               'Apply settings to keep hours and alerts on this device. Public sync is pending.'),
+              (session.workspaceTradingPreferencesSaving ? 'Saving Store preferences on this device…' :
+               tradingChanged ? 'Unsaved Store preferences.' :
+               session.workspaceTradingPreferencesSaved ?
+                 (session.workspaceReadinessPreferencesSaved
+                   ? 'Store preferences saved on this device. Public sync is pending.'
+                   : 'Hours and alerts saved on this device. Public sync is pending.') :
+               'Apply settings to keep Store preferences on this device. Public sync is pending.'),
               key: const Key('work-status-trading-device-status'),
               style: const TextStyle(color: MoolColors.muted, fontSize: 12))),
           Material(

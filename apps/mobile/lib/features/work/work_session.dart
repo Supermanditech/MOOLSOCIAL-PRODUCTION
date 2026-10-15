@@ -8264,7 +8264,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool get workspaceProductDefaultsSaved =>
-      workspaceTradingPreferencesSaved && _tradingRecovery.recordVersion == 2;
+      workspaceTradingPreferencesSaved && (_tradingRecovery.recordVersion ?? 0) >= 2;
   Future<bool> loadWorkspaceProductDefaults({required String expectedStoreId}) =>
       loadWorkspaceTradingPreferences(expectedStoreId: expectedStoreId);
 
@@ -9811,6 +9811,8 @@ class WorkSession extends ChangeNotifier {
     required int maximumActiveOrders,
     required bool alertSound,
     required bool alertVibration,
+    int? preparationMinutes,
+    String? fulfilmentPreference,
     String? expectedStoreId,
     int? expectedNavigationRevision,
   }) {
@@ -9820,6 +9822,16 @@ class WorkSession extends ChangeNotifier {
       showError(workspaceTradingPreferencesSaving
           ? 'Wait for the device save to finish. Your entries are kept.'
           : 'Open your saved Store hours and alerts before saving. Your entries are kept.');
+      return false;
+    }
+    final Map<String, Object?> readiness;
+    try {
+      readiness = _decodeReadinessPreferences({
+        'preparationMinutes': preparationMinutes ?? workspaceBusyMinutes,
+        'fulfilmentMode': fulfilmentPreference ?? workspaceFulfilmentMode,
+      });
+    } on FormatException {
+      showError('Check the preparation time and fulfilment preference.');
       return false;
     }
     // 0 means explicitly unlimited; positive values are retailer-entered limits.
@@ -9845,7 +9857,11 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderAlertVibration = alertVibration;
     _recordWorkspaceActivity('Store hours and order alerts updated.');
     _persistOperationalState('trading-controls');
-    if (tradingPreferencesPersistenceAvailable) _saveTradingPreferences();
+    if (tradingPreferencesPersistenceAvailable) {
+      _saveTradingPreferences(readinessInputs: readiness);
+    } else {
+      _restoreReadinessPreferences(readiness);
+    }
     notifyListeners();
     return true;
   }
@@ -9857,6 +9873,8 @@ class WorkSession extends ChangeNotifier {
   Object get tradingPreferencesContext => (_contactAccountScope, activeWorkspace?.id, navigationScopeRevision);
   bool get workspaceTradingPreferencesSaving => _tradingRecovery.pendingWrites > 0;
   bool get workspaceTradingPreferencesSaved => _tradingRecovery.saved;
+  bool get workspaceReadinessPreferencesSaved =>
+      workspaceTradingPreferencesSaved && _tradingRecovery.recordVersion == 3;
   String? get workspaceTradingPreferencesError => _tradingRecovery.error;
   Future<bool> get workspaceTradingPreferencesWrite => _tradingRecovery.writes;
   WorkPendingProofStore? _tradingPreferencesStore(String id) {
@@ -9870,6 +9888,26 @@ class WorkSession extends ChangeNotifier {
     'maximumActiveOrders': workspaceMaximumActiveOrders,
     'alertSound': workspaceOrderAlertSound, 'alertVibration': workspaceOrderAlertVibration,
   };
+  Map<String, Object?> _readinessFields() => {
+    'preparationMinutes': workspaceBusyMinutes,
+    'fulfilmentMode': workspaceFulfilmentMode,
+  };
+  static Map<String, Object?> _decodeReadinessPreferences(Object? raw) {
+    const keys = {'preparationMinutes', 'fulfilmentMode'};
+    if (raw is! Map || raw.length != keys.length ||
+        raw.keys.any((k) => !keys.contains(k)) ||
+        raw['preparationMinutes'] is! int ||
+        (raw['preparationMinutes'] as int) < 0 ||
+        raw['fulfilmentMode'] is! String ||
+        (raw['fulfilmentMode'] as String).trim().isEmpty) {
+      throw const FormatException('Invalid preparation and fulfilment preferences');
+    }
+    return Map<String, Object?>.from(raw);
+  }
+  void _restoreReadinessPreferences(Map<String, Object?> fields) {
+    workspaceBusyMinutes = fields['preparationMinutes'] as int;
+    workspaceFulfilmentMode = fields['fulfilmentMode'] as String;
+  }
   void _restoreTradingInputs(Map<String, Object?> fields) {
     workspaceOpeningTime = fields['openingTime'] as String;
     workspaceClosingTime = fields['closingTime'] as String;
@@ -9888,6 +9926,7 @@ class WorkSession extends ChangeNotifier {
     if (_storeData.tradingPreferencesOwner case final previous? when previous != owner) {
       _storeData.tradingPreferences[previous]?.sessionFields = {
         ..._tradingFields(), 'productDefaults': workspaceProductDefaults.toJson(),
+        'readinessPreferences': _readinessFields(),
       };
       final local = recovery.sessionFields;
       _restoreTradingInputs(local ?? {
@@ -9897,6 +9936,10 @@ class WorkSession extends ChangeNotifier {
       final localDefaults = local?['productDefaults'];
       _storeData.productDefaults = localDefaults == null ? const WorkspaceProductDefaults()
           : _decodeProductDefaults(localDefaults);
+      _restoreReadinessPreferences(_decodeReadinessPreferences(
+        local?['readinessPreferences'] ??
+            {'preparationMinutes': 0, 'fulfilmentMode': 'Delivery and pickup'},
+      ));
     }
     _storeData.tradingPreferencesOwner = owner;
     if (recovery.loaded) return Future.value(true);
@@ -9907,6 +9950,7 @@ class WorkSession extends ChangeNotifier {
     final data = _storeData, account = _contactAccountScope;
     final revision = navigationScopeRevision, before = _tradingFields();
     final beforeDefaults = workspaceProductDefaults.toJson();
+    final beforeReadiness = _readinessFields();
     var scopeChanged = false;
     bool current() => !_disposed && !scopeChanged && account != null &&
         navigationScopeRevision == revision && _isStoreScopeCurrent(data, id, account);
@@ -9923,9 +9967,9 @@ class WorkSession extends ChangeNotifier {
         final fields = saved['fields'];
         const keys = {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound', 'alertVibration'};
         final version = saved['schemaVersion'];
-        if (version is! int || (version != 1 && version != 2) || saved['storeId'] != id ||
-            saved.length != (version == 1 ? 3 : 4) ||
-            saved.keys.any((key) => !const {'schemaVersion', 'storeId', 'fields', 'productDefaults'}.contains(key)) ||
+        if (version is! int || (version != 1 && version != 2 && version != 3) || saved['storeId'] != id ||
+            saved.length != (version == 1 ? 3 : version == 2 ? 4 : 5) ||
+            saved.keys.any((key) => !const {'schemaVersion', 'storeId', 'fields', 'productDefaults', 'readinessPreferences'}.contains(key)) ||
             fields is! Map || fields.length != keys.length || fields.keys.any((k) => !keys.contains(k)) ||
             fields['openingTime'] is! String || fields['closingTime'] is! String ||
             !WorkspaceStorePublicationDetails.validTradingTime(fields['openingTime'] as String) ||
@@ -9934,11 +9978,15 @@ class WorkSession extends ChangeNotifier {
             fields['alertSound'] is! bool || fields['alertVibration'] is! bool) {
           throw const FormatException('Invalid Store hours and alerts');
         }
-        final defaults = version == 2 ? _decodeProductDefaults(saved['productDefaults']) : null;
+        final defaults = version >= 2 ? _decodeProductDefaults(saved['productDefaults']) : null;
+        final readiness = version == 3
+            ? _decodeReadinessPreferences(saved['readinessPreferences']) : null;
         if (mapEquals(before, _tradingFields()) &&
-            mapEquals(beforeDefaults, workspaceProductDefaults.toJson())) {
+            mapEquals(beforeDefaults, workspaceProductDefaults.toJson()) &&
+            mapEquals(beforeReadiness, _readinessFields())) {
           _restoreTradingInputs(Map<String, Object?>.from(fields));
           if (defaults != null) _storeData.productDefaults = defaults;
+          if (readiness != null) _restoreReadinessPreferences(readiness);
           recovery.recordVersion = version;
           recovery.saved = true;
         }
@@ -9955,14 +10003,17 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally { removeListener(watch); }
   }
-  void _saveTradingPreferences() {
+  void _saveTradingPreferences({Map<String, Object?>? readinessInputs}) {
     final id = activeWorkspace?.id, account = _contactAccountScope;
     if (id == null || account == null || !_tradingRecovery.loaded) return;
     final data = _storeData, revision = navigationScopeRevision;
     final recovery = _tradingRecovery, fields = _tradingFields();
     final defaults = workspaceProductDefaults.toJson();
+    final beforeReadiness = _readinessFields();
+    final readiness = Map<String, Object?>.of(readinessInputs ?? beforeReadiness);
     bool inputsUnchanged() => mapEquals(fields, _tradingFields()) &&
-        mapEquals(defaults, workspaceProductDefaults.toJson());
+        mapEquals(defaults, workspaceProductDefaults.toJson()) &&
+        mapEquals(beforeReadiness, _readinessFields());
     recovery.saved = false;
     recovery.pendingWrites++;
     recovery.error = null;
@@ -9976,12 +10027,15 @@ class WorkSession extends ChangeNotifier {
         if (!current()) return false;
         final store = _tradingPreferencesStore(id);
         if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
-        await store.save(account, {'schemaVersion': 2, 'storeId': id,
-          'fields': fields, 'productDefaults': defaults})
+        _decodeReadinessPreferences(readiness);
+        await store.save(account, {'schemaVersion': 3, 'storeId': id,
+          'fields': fields, 'productDefaults': defaults,
+          'readinessPreferences': readiness})
             .timeout(const Duration(seconds: 12));
         if (!current()) return false;
         if (inputsUnchanged()) {
-          recovery.saved = true; recovery.error = null; recovery.recordVersion = 2;
+          _restoreReadinessPreferences(readiness);
+          recovery.saved = true; recovery.error = null; recovery.recordVersion = 3;
         }
         return true;
       } catch (_) {

@@ -46638,6 +46638,18 @@ void main() {
       expect(tester.widget<SwitchListTile>(sound).value, isFalse);
       await tester.tap(sound.hitTestable());
       await tester.pumpAndSettle();
+      final preparation = find.byKey(const Key('work-status-preparation'));
+      final fulfilment = find.byKey(const Key('work-status-fulfilment'));
+      await reveal(tester, preparation);
+      await tester.tap(preparation);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('15 min').last);
+      await tester.pumpAndSettle();
+      await reveal(tester, fulfilment);
+      await tester.tap(fulfilment);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pickup only').last);
+      await tester.pumpAndSettle();
       final save = find.byKey(const Key('work-status-save'));
       storage.saveGate = Completer<void>();
       storage.failSave = true;
@@ -46654,6 +46666,14 @@ void main() {
       expect(work.workspaceAcceptingOrders, isTrue,
         reason: 'Failed private save must not silently apply the requested pause.');
       expect(work.workspaceVisibleToCustomers, isTrue);
+      expect(work.workspaceBusyMinutes, 0,
+        reason: 'Unconfirmed private Save cannot apply readiness drafts.');
+      expect(work.workspaceFulfilmentMode, 'Delivery and pickup');
+      final settingsScroll = tester.state<ScrollableState>(find.descendant(
+        of: find.byKey(const Key('work-dashboard-status-screen')),
+        matching: find.byType(Scrollable)).first).position;
+      settingsScroll.jumpTo(settingsScroll.minScrollExtent);
+      await tester.pumpAndSettle();
       await reveal(tester, sound);
       expect(tester.widget<SwitchListTile>(sound).value, isTrue);
       expect((storage.value!['fields'] as Map)['alertSound'], isFalse);
@@ -46664,6 +46684,11 @@ void main() {
       expect(work.workspaceTradingPreferencesSaved, isTrue);
       expect(work.workspaceAcceptingOrders, isFalse);
       expect(work.workspaceVisibleToCustomers, isFalse);
+      expect(work.workspaceBusyMinutes, 15);
+      expect(work.workspaceFulfilmentMode, 'Pickup only');
+      expect(work.workspaceReadinessPreferencesSaved, isTrue);
+      expect(storage.value!['readinessPreferences'],
+        {'preparationMinutes': 15, 'fulfilmentMode': 'Pickup only'});
       expect((storage.value!['fields'] as Map)['alertSound'], isTrue);
       expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
       await openStoreSettings(tester);
@@ -46671,6 +46696,10 @@ void main() {
       expect(tester.widget<SwitchListTile>(sound).value, isTrue);
       expect(work.workspaceOpeningTime, '21:30');
       expect(work.workspaceClosingTime, '05:15');
+      await reveal(tester, preparation);
+      expect(find.descendant(of: preparation, matching: find.text('15 min')), findsOneWidget);
+      await reveal(tester, fulfilment);
+      expect(find.descendant(of: fulfilment, matching: find.text('Pickup only')), findsOneWidget);
       expect(work.workspaceCatalogueItems, orderedEquals(products));
       expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
