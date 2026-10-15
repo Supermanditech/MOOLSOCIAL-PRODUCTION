@@ -6177,7 +6177,9 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _deliveryExceptionBusyOrderIds = {};
   final Map<String, String> _selectedDeliveryRescheduleSlots = {};
   final Map<String, BuyV2LiveDeliverySnapshot> _liveDeliverySnapshots = {};
-  final Set<String> _liveDeliveryBusyOrderIds = {};
+  final Map<String, Object> _liveDeliveryOperations = {};
+  final Map<String, BuyV2Order> _liveDeliveryOrders = {};
+  (String?, String?, String?, int, int)? _liveDeliveryScope;
   final Map<String, String> _liveDeliveryRefreshMessages = {};
   final Map<BuyV2CartScope, double> _cartScrollOffsets = {};
   final Map<BuyV2Destination, String> _deliveryInstructionIds = {};
@@ -6795,7 +6797,7 @@ class BuyV2Session extends ChangeNotifier {
     return details.totalTax == order.tax;
   }
 
-  (String?, String?, String?, int, int) get _currentBalancePaymentScope => (
+  (String?, String?, String?, int, int) get _currentCustomerOrderScope => (
     customerStateStore?.ownerScope,
     collectionIdentity?.value?.accountId,
     collectionIdentity?.value?.sessionId,
@@ -6804,7 +6806,7 @@ class BuyV2Session extends ChangeNotifier {
   );
 
   void _syncBalancePaymentScope() {
-    final scope = _currentBalancePaymentScope;
+    final scope = _currentCustomerOrderScope;
     if (_balancePaymentScope == scope) return;
     _balancePaymentScope = scope;
     _balancePaymentResults.clear();
@@ -6835,7 +6837,7 @@ class BuyV2Session extends ChangeNotifier {
     bool current() {
       if (_collectionDisposed ||
           !procurementScopeCurrent ||
-          scope != _currentBalancePaymentScope ||
+          scope != _currentCustomerOrderScope ||
           !identical(_balancePaymentOperations[order.id], operation)) {
         return false;
       }
@@ -6851,7 +6853,7 @@ class BuyV2Session extends ChangeNotifier {
     void finish() {
       // Cleanup owns only its token, even if this order's facts changed.
       if (!_collectionDisposed &&
-          scope == _currentBalancePaymentScope &&
+          scope == _currentCustomerOrderScope &&
           identical(_balancePaymentOperations[order.id], operation)) {
         _balancePaymentOperations.remove(order.id);
         notifyListeners();
@@ -7286,40 +7288,91 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get liveDeliveryAvailable => liveDeliveryAdapter != null;
 
+  bool _sameLiveDeliveryOrder(BuyV2Order original, BuyV2Order? latest) =>
+      latest != null &&
+      original.id == latest.id &&
+      original.purchaseId == latest.purchaseId &&
+      original.destination == latest.destination &&
+      original.total == latest.total &&
+      original.totalMinor == latest.totalMinor &&
+      original.partner == latest.partner &&
+      original.trackingReference == latest.trackingReference;
+
+  BuyV2Order? _prepareLiveDeliveryOrder(String orderId) {
+    if (_collectionDisposed || !procurementScopeCurrent) return null;
+    final scope = _currentCustomerOrderScope;
+    if (_liveDeliveryScope != scope) {
+      _liveDeliveryScope = scope;
+      _liveDeliveryOperations.clear();
+      _liveDeliveryOrders.clear();
+      _liveDeliverySnapshots.clear();
+      _liveDeliveryRefreshMessages.clear();
+    }
+    final order = _orders.where((o) => o.id == orderId).firstOrNull;
+    final original = _liveDeliveryOrders[orderId];
+    if (order == null ||
+        (original != null && !_sameLiveDeliveryOrder(original, order))) {
+      _liveDeliveryOperations.remove(orderId);
+      _liveDeliveryOrders.remove(orderId);
+      _liveDeliverySnapshots.remove(orderId);
+      _liveDeliveryRefreshMessages.remove(orderId);
+    }
+    return order;
+  }
+
   bool liveDeliveryBusy(String orderId) =>
-      _liveDeliveryBusyOrderIds.contains(orderId);
+      _prepareLiveDeliveryOrder(orderId) != null &&
+      _liveDeliveryOperations.containsKey(orderId);
 
   BuyV2LiveDeliverySnapshot? liveDeliveryFor(String orderId) =>
-      _liveDeliverySnapshots[orderId];
+      _prepareLiveDeliveryOrder(orderId) == null
+      ? null
+      : _liveDeliverySnapshots[orderId];
 
   String? liveDeliveryRefreshMessage(String orderId) =>
-      _liveDeliveryRefreshMessages[orderId];
+      _prepareLiveDeliveryOrder(orderId) == null
+      ? null
+      : _liveDeliveryRefreshMessages[orderId];
+
+  bool _confirmedLiveDelivery(BuyV2LiveDeliverySnapshot? snapshot) =>
+      snapshot?.state == BuyV2LiveDeliveryState.ready ||
+      snapshot?.state == BuyV2LiveDeliveryState.delivered;
 
   Future<bool> refreshLiveDelivery(String orderId) async {
-    final orderExists = _orders.any((order) => order.id == orderId);
-    if (!orderExists || !_liveDeliveryBusyOrderIds.add(orderId)) return false;
+    final order = _prepareLiveDeliveryOrder(orderId);
+    if (order == null || _liveDeliveryOperations.containsKey(orderId)) return false;
+    final operation = Object();
+    final scope = _liveDeliveryScope;
+    _liveDeliveryOperations[orderId] = operation;
+    _liveDeliveryOrders[orderId] = order;
+    bool current() =>
+        !_collectionDisposed &&
+        procurementScopeCurrent &&
+        scope == _currentCustomerOrderScope &&
+        identical(_liveDeliveryOperations[orderId], operation) &&
+        _sameLiveDeliveryOrder(order, _orders.where((o) => o.id == orderId).firstOrNull);
     final adapter = liveDeliveryAdapter;
-    if (adapter == null) {
-      _liveDeliveryBusyOrderIds.remove(orderId);
-      _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
-        orderId: orderId,
-        state: BuyV2LiveDeliveryState.unavailable,
-        customerMessage:
-            'Live delivery updates are not available for this order yet.',
-        sourceId: 'not-connected',
-      );
-      _liveDeliveryRefreshMessages.remove(orderId);
-      notifyListeners();
-      return false;
-    }
-    notifyListeners();
     try {
+      notifyListeners();
+      // A listener may change owner/dispose the session before this read starts.
+      if (!current()) return false;
+      if (adapter == null) {
+        _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
+          orderId: orderId,
+          state: BuyV2LiveDeliveryState.unavailable,
+          customerMessage:
+              'Live delivery updates are not available for this order yet.',
+          sourceId: 'not-connected',
+        );
+        _liveDeliveryRefreshMessages.remove(orderId);
+        return false;
+      }
       final snapshot = await adapter.load(orderId: orderId);
+      if (!current()) return false;
       if (!_validLiveDeliverySnapshot(snapshot, orderId)) {
         const message =
             'Live delivery details are temporarily unavailable. Try again.';
-        if (_liveDeliverySnapshots[orderId]?.state ==
-            BuyV2LiveDeliveryState.ready) {
+        if (_confirmedLiveDelivery(_liveDeliverySnapshots[orderId])) {
           _liveDeliveryRefreshMessages[orderId] = message;
         } else {
           _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
@@ -7331,10 +7384,21 @@ class BuyV2Session extends ChangeNotifier {
         }
         return false;
       }
+      final previous = _liveDeliverySnapshots[orderId];
+      // Timestamps are comparable only within the same supplied stream.
+      if (previous != null &&
+          previous.sourceId == snapshot.sourceId &&
+          previous.trackingReference?.trim().isNotEmpty == true &&
+          previous.trackingReference == snapshot.trackingReference &&
+          previous.lastUpdatedAt != null &&
+          snapshot.lastUpdatedAt?.isBefore(previous.lastUpdatedAt!) == true) {
+        _liveDeliveryRefreshMessages[orderId] =
+            'An older delivery update was received. The last confirmed update is still shown.';
+        return false;
+      }
       if ((snapshot.state == BuyV2LiveDeliveryState.offline ||
               snapshot.state == BuyV2LiveDeliveryState.unavailable) &&
-          _liveDeliverySnapshots[orderId]?.state ==
-              BuyV2LiveDeliveryState.ready) {
+          _confirmedLiveDelivery(previous)) {
         _liveDeliveryRefreshMessages[orderId] = snapshot.customerMessage;
         return false;
       }
@@ -7343,10 +7407,10 @@ class BuyV2Session extends ChangeNotifier {
       return snapshot.state == BuyV2LiveDeliveryState.ready ||
           snapshot.state == BuyV2LiveDeliveryState.delivered;
     } on Object {
+      if (!current()) return false;
       const message =
           'Live delivery could not refresh. Check your connection and try again.';
-      if (_liveDeliverySnapshots[orderId]?.state ==
-          BuyV2LiveDeliveryState.ready) {
+      if (_confirmedLiveDelivery(_liveDeliverySnapshots[orderId])) {
         _liveDeliveryRefreshMessages[orderId] = message;
       } else {
         _liveDeliverySnapshots[orderId] = BuyV2LiveDeliverySnapshot(
@@ -7358,8 +7422,12 @@ class BuyV2Session extends ChangeNotifier {
       }
       return false;
     } finally {
-      _liveDeliveryBusyOrderIds.remove(orderId);
-      notifyListeners();
+      if (!_collectionDisposed &&
+          scope == _currentCustomerOrderScope &&
+          identical(_liveDeliveryOperations[orderId], operation)) {
+        _liveDeliveryOperations.remove(orderId);
+        notifyListeners();
+      }
     }
   }
 

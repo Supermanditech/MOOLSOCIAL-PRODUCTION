@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat;
 
@@ -8,12 +9,286 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Isolated host tracking/owner fixtures; never actual orders or location data.
+  (
+    BuyV2Session,
+    _LiveDeliveryAdapter,
+    _Lf11OwnerStore,
+    ValueNotifier<BuyV2CollectionIdentity?>,
+  )
+  lf11Fixture({bool manualDispose = false}) {
+    final owner = _Lf11OwnerStore();
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(
+        accountId: 'lf11-a',
+        sessionId: 'lf11-session-a',
+      ),
+    );
+    final core = BuySession();
+    final adapter = _LiveDeliveryAdapter();
+    final session = BuyV2Session(
+      core: core,
+      liveDeliveryAdapter: adapter,
+      customerStateStore: owner,
+      collectionIdentity: identity,
+    );
+    addTearDown(core.dispose);
+    addTearDown(identity.dispose);
+    if (!manualDispose) addTearDown(session.dispose);
+    return (session, adapter, owner, identity);
+  }
+
+  for (final drift in ['owner', 'auth', 'dispose']) {
+    for (final fails in [false, true]) {
+      test('LF11 tracking $drift late failure $fails stays isolated', () async {
+        final (session, adapter, owner, identity) = lf11Fixture(
+          manualDispose: drift == 'dispose',
+        );
+        final pending = adapter.pending =
+            Completer<BuyV2LiveDeliverySnapshot>();
+        final request = session.refreshLiveDelivery('PO-240783');
+        expect(adapter.loadCalls, 1);
+        switch (drift) {
+          case 'owner':
+            owner.scope = 'lf11-owner-b';
+          case 'auth':
+            identity.value = const BuyV2CollectionIdentity(
+              accountId: 'lf11-b',
+              sessionId: 'lf11-session-b',
+            );
+          case 'dispose':
+            session.dispose();
+        }
+        if (fails) {
+          pending.completeError(StateError('isolated lost read'));
+        } else {
+          pending.complete(adapter.readySnapshot('PO-240783'));
+        }
+        expect(await request, isFalse);
+        expect(session.liveDeliveryFor('PO-240783'), isNull);
+        expect(session.liveDeliveryRefreshMessage('PO-240783'), isNull);
+        expect(session.liveDeliveryBusy('PO-240783'), isFalse);
+      });
+    }
+  }
+  for (final drift in ['owner', 'auth']) {
+    test('LF11 cached tracking disappears on $drift change', () async {
+      final (session, _, owner, identity) = lf11Fixture();
+      expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+      expect(session.liveDeliveryFor('PO-240783')!.driverName, isNotNull);
+      if (drift == 'owner') {
+        owner.scope = 'lf11-owner-b';
+      } else {
+        identity.value = const BuyV2CollectionIdentity(
+          accountId: 'lf11-b',
+          sessionId: 'lf11-session-b',
+        );
+      }
+      expect(session.liveDeliveryFor('PO-240783'), isNull);
+      expect(session.liveDeliveryRefreshMessage('PO-240783'), isNull);
+    });
+  }
+  test(
+    'LF11 owner is rechecked after notification before tracking read',
+    () async {
+      final (session, adapter, owner, _) = lf11Fixture();
+      session.addListener(() => owner.scope = 'lf11-owner-b');
+      expect(await session.refreshLiveDelivery('PO-240783'), isFalse);
+      expect(adapter.loadCalls, 0);
+    },
+  );
+  test('LF11 old finally cannot clear next-owner tracking operation', () async {
+    final (session, adapter, owner, _) = lf11Fixture();
+    final first = adapter.pending = Completer<BuyV2LiveDeliverySnapshot>();
+    final old = session.refreshLiveDelivery('PO-240783');
+    owner.scope = 'lf11-owner-b';
+    final second = adapter.pending = Completer<BuyV2LiveDeliverySnapshot>();
+    final next = session.refreshLiveDelivery('PO-240783');
+    expect(adapter.loadCalls, 2);
+    first.complete(adapter.readySnapshot('PO-240783'));
+    expect(await old, isFalse);
+    expect(session.liveDeliveryBusy('PO-240783'), isTrue);
+    expect(session.liveDeliveryFor('PO-240783'), isNull);
+    second.complete(adapter.readySnapshot('PO-240783'));
+    expect(await next, isTrue);
+    expect(session.liveDeliveryBusy('PO-240783'), isFalse);
+  });
+  test('LF11 repeated polling makes only one read', () async {
+    final (session, adapter, _, _) = lf11Fixture();
+    final pending = adapter.pending = Completer<BuyV2LiveDeliverySnapshot>();
+    final first = session.refreshLiveDelivery('PO-240783');
+    expect(await session.refreshLiveDelivery('PO-240783'), isFalse);
+    expect(adapter.loadCalls, 1);
+    pending.complete(adapter.readySnapshot('PO-240783'));
+    expect(await first, isTrue);
+  });
+  for (final sameStream in [true, false]) {
+    test(
+      'LF11 old timestamp same stream $sameStream is handled explicitly',
+      () async {
+        final (session, adapter, _, _) = lf11Fixture();
+        final at = DateTime.now().subtract(const Duration(minutes: 1));
+        adapter.snapshot = adapter.readySnapshot('PO-240783', updatedAt: at);
+        expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+        final original = session.liveDeliveryFor('PO-240783');
+        adapter.snapshot = adapter.readySnapshot(
+          'PO-240783',
+          updatedAt: at.subtract(const Duration(minutes: 1)),
+          trackingReference: sameStream ? 'TRACK-240783' : 'TRACK-REASSIGNED',
+        );
+        expect(await session.refreshLiveDelivery('PO-240783'), !sameStream);
+        if (sameStream) {
+          expect(session.liveDeliveryFor('PO-240783'), same(original));
+          expect(session.liveDeliveryRefreshMessage('PO-240783'), isNotNull);
+        } else {
+          expect(
+            session.liveDeliveryFor('PO-240783')!.trackingReference,
+            'TRACK-REASSIGNED',
+          );
+        }
+      },
+    );
+  }
+  test(
+    'LF11 missing stream reference does not invent timestamp ordering',
+    () async {
+      final (session, adapter, _, _) = lf11Fixture();
+      final at = DateTime.now().subtract(const Duration(minutes: 1));
+      adapter.snapshot = adapter.readySnapshot(
+        'PO-240783',
+        updatedAt: at,
+        trackingReference: null,
+      );
+      expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+      adapter.snapshot = adapter.readySnapshot(
+        'PO-240783',
+        updatedAt: at.subtract(const Duration(minutes: 1)),
+        trackingReference: null,
+      );
+      expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+    },
+  );
+  test(
+    'LF11 valid newer tracking correction is not permanently frozen',
+    () async {
+      final (session, adapter, _, _) = lf11Fixture();
+      final at = DateTime.now().subtract(const Duration(minutes: 1));
+      adapter.snapshot = BuyV2LiveDeliverySnapshot(
+        orderId: 'PO-240783',
+        state: BuyV2LiveDeliveryState.delivered,
+        customerMessage: 'Host confirmed',
+        sourceId: 'delivery-location',
+        trackingReference: 'TRACK-240783',
+        lastUpdatedAt: at,
+      );
+      expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+      adapter.snapshot = adapter.readySnapshot(
+        'PO-240783',
+        updatedAt: at.add(const Duration(seconds: 1)),
+      );
+      expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+      expect(
+        session.liveDeliveryFor('PO-240783')!.state,
+        BuyV2LiveDeliveryState.ready,
+      );
+    },
+  );
+  for (final change in ['cached removal', 'pending removal', 'reassignment']) {
+    test('LF11 tracking follows current order identity $change', () async {
+      final commerce = _Lf11OrdersAdapter();
+      final adapter = _LiveDeliveryAdapter();
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        commerceAdapter: commerce,
+        liveDeliveryAdapter: adapter,
+        reviewDataEnabled: false,
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      const id = 'LF11-ORDER';
+      expect(session.commerceLoadState, BuyV2CommerceLoadState.ready);
+      expect(session.orders.map((o) => o.id), [id]);
+      Future<bool>? pending;
+      if (change == 'pending removal') {
+        adapter.pending = Completer<BuyV2LiveDeliverySnapshot>();
+        pending = session.refreshLiveDelivery(id);
+      } else {
+        expect(await session.refreshLiveDelivery(id), isTrue);
+      }
+      commerce.records = change == 'reassignment'
+          ? [commerce.order('NEW-DELIVERY')]
+          : [];
+      await session.restoreCommerce();
+      if (change == 'reassignment') {
+        expect(session.orders.single.trackingReference, 'NEW-DELIVERY');
+      }
+      expect(session.liveDeliveryFor(id), isNull);
+      expect(session.liveDeliveryBusy(id), isFalse);
+      if (pending != null) {
+        adapter.pending!.complete(adapter.readySnapshot(id));
+        expect(await pending, isFalse);
+        expect(session.liveDeliveryFor(id), isNull);
+      }
+    });
+  }
+  for (final failure in ['invalid', 'offline', 'unavailable', 'throw']) {
+    test(
+      'LF11 confirmed delivered survives $failure refresh without business effects',
+      () async {
+        final (session, adapter, _, _) = lf11Fixture();
+        final originalOrders = [
+          for (final o in session.orders)
+            (
+              o.id,
+              o.status,
+              o.amountPaidNow,
+              o.balanceDue,
+              o.proofOfDeliveryStatus,
+            ),
+        ];
+        adapter.snapshot = const BuyV2LiveDeliverySnapshot(
+          orderId: 'PO-240783',
+          state: BuyV2LiveDeliveryState.delivered,
+          customerMessage: 'Isolated confirmed delivery',
+          sourceId: 'delivery-location',
+        );
+        expect(await session.refreshLiveDelivery('PO-240783'), isTrue);
+        final delivered = session.liveDeliveryFor('PO-240783');
+        adapter.throwOnLoad = failure == 'throw';
+        adapter.snapshot = BuyV2LiveDeliverySnapshot(
+          orderId: failure == 'invalid' ? 'OTHER' : 'PO-240783',
+          state: failure == 'offline'
+              ? BuyV2LiveDeliveryState.offline
+              : BuyV2LiveDeliveryState.unavailable,
+          customerMessage: 'Isolated read unavailable',
+          sourceId: 'delivery-location',
+        );
+        expect(await session.refreshLiveDelivery('PO-240783'), isFalse);
+        expect(session.liveDeliveryFor('PO-240783'), same(delivered));
+        expect(session.liveDeliveryRefreshMessage('PO-240783'), isNotNull);
+        expect([
+          for (final o in session.orders)
+            (
+              o.id,
+              o.status,
+              o.amountPaidNow,
+              o.balanceDue,
+              o.proofOfDeliveryStatus,
+            ),
+        ], originalOrders);
+      },
+    );
+  }
 
   test(
     'live delivery validates coordinates and retains the last known update',
@@ -471,6 +746,7 @@ final class _LiveDeliveryAdapter implements BuyV2LiveDeliveryAdapter {
   int loadCalls = 0;
   bool throwOnLoad = false;
   BuyV2LiveDeliverySnapshot? snapshot;
+  Completer<BuyV2LiveDeliverySnapshot>? pending;
 
   BuyV2LiveDeliverySnapshot readySnapshot(
     String orderId, {
@@ -478,6 +754,8 @@ final class _LiveDeliveryAdapter implements BuyV2LiveDeliveryAdapter {
       latitude: 26.2771,
       longitude: 73.0243,
     ),
+    DateTime? updatedAt,
+    String? trackingReference = 'TRACK-240783',
   }) => BuyV2LiveDeliverySnapshot(
     orderId: orderId,
     state: BuyV2LiveDeliveryState.ready,
@@ -491,15 +769,53 @@ final class _LiveDeliveryAdapter implements BuyV2LiveDeliveryAdapter {
     driverName: 'Ravi Kumar',
     vehicleLabel: 'RJ 19 EV 4821',
     etaLabel: 'About 12 minutes',
-    lastUpdatedAt: DateTime.now(),
+    lastUpdatedAt: updatedAt ?? DateTime.now(),
     routeProgress: .72,
-    trackingReference: 'TRACK-240783',
+    trackingReference: trackingReference,
   );
 
   @override
   Future<BuyV2LiveDeliverySnapshot> load({required String orderId}) async {
     loadCalls += 1;
+    if (pending != null) return pending!.future;
     if (throwOnLoad) throw StateError('offline');
     return snapshot ?? readySnapshot(orderId);
   }
+}
+
+class _Lf11OwnerStore implements BuyV2CustomerStateStore {
+  String scope = 'lf11-owner-a';
+  @override
+  String get ownerScope => scope;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
+class _Lf11OrdersAdapter implements BuyV2CommerceAdapter {
+  late List<BuyV2Order> records = [order('ORIGINAL-DELIVERY')];
+  BuyV2Order order(String reference) => BuyV2Order(
+    id: 'LF11-ORDER',
+    destination: BuyV2Destination.shop,
+    title: 'Isolated host order',
+    itemSummary: 'Original host item',
+    total: 100,
+    partner: 'host-store-a',
+    partnerType: 'Store',
+    promise: 'Provider timing unavailable',
+    destinationLabel: 'Host address',
+    progress: .4,
+    status: BuyV2OrderStatus.preparing,
+    purchaseId: 'LF11-PURCHASE',
+    trackingReference: reference,
+  );
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    orders: records,
+  );
+  // These read-only tests must never submit an order or financial operation.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
