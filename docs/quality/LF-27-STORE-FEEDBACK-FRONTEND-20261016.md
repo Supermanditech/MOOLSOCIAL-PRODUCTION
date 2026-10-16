@@ -193,3 +193,75 @@ Founder approval remains pending; backend/APK/publication scope unchanged.
 - No native New order submission, business-data edit, fake populated feed,
   backend, APK, push or neighbouring-screen redesign. Enlarged/populated layouts
   are host evidence only; live provider evidence and founder review remain open.
+
+## Single manual entry — founder execution, 16 October 2026
+
+Founder approved removing Orders Create customer order shortcut and manual
+Counter/Phone/Chat source selector. Sales -> Counter sale is the shared manual
+editor with new-shop defaults and existing optional delivery recipient/address
+validation. Keep Orders for incoming/fulfilment and its feedback/search/alerts.
+
+Existing Phone/Chat sources, draft identity, history, amounts, Stock and payment
+state must survive. Reuse the old entry's async account/Store/journal guards in
+Sales selection, not merely remove the button and strand recovery behind its
+Counter+At-the-shop-only condition. Preserve currently mounted bill/invoice.
+Delivery completion returns to Orders only for its exact saved context; selecting
+a payment method is not collection or dispatch. No provider or schema change.
+
+Regression-first: Orders shortcut absent; retarget existing manual/journal tests
+to actual Sales entry, replacing obsolete source-dropdown assertions with source
+preservation/no-selector checks. Keep amount/Stock/payment/stale-scope assertions.
+Test shop/own/Mool fulfilment and failures, account/Store change during journal
+read, unknown submission, close/reopen and accessibility. Hot reload OPPO without
+creating commerce. No backend, APK, push, policy/registry or new framework.
+
+Implementation test incident: the new manual-sale smoke test was registered
+before local enterSaleCustomer declaration, repeating the known Dart forward-
+local helper error. Move the test after that declaration, retaining assertions;
+do not alter app logic or skip the test. An earlier readback also used ROOT-style
+path in APP cwd; use explicit ROOT reads and APP Flutter commands. Failed compile
+and wrong-path diagnostic are not app regressions or passed test evidence.
+A generated test-only replacement patch was rejected for a missing added-line
+prefix; no file changed. Correct the patch encoding and retain exact-match review.
+Another test-only patch mixed reverse-ordered hunks and was rejected without
+writes. Keep follow-up hunks in source order. Navigation fixtures must stop at
+Sales home instead of blindly issuing the old Orders-based number of Back taps.
+
+Architect review identified a delayed-entry navigation risk. A focused held-read
+test reproduced it: leave Sales and return before the journal read completes;
+the old async preparation cleared selected APP-1043 to null despite the original
+Sales widget being gone. Bind preparation to the originating Sales widget's
+mounted/view/scope callback before any selection reset, not merely current root
+account/Store equality. Keep the failing test and exact-order assertions.
+
+### Single-entry result
+
+- Orders Create shortcut/callback removed. Source dropdown and operational-only
+  widget flag removed, not the shared billing engine or persisted source field.
+  Sales Counter selection now awaits the existing journal/scope guards before
+  mounting its editor; merely opening Sales home does not load that editor.
+  A mounted bill/invoice is retained. New bills default to shop; existing
+  Phone/Chat source, draft ID, fulfilment and payment facts survive recovery.
+- Existing review offers Take now/My delivery/Mool delivery and requires the
+  confirmed address for delivery. Its exact successful saved-order callback
+  returns to Orders without treating a retired submission as an unsaved draft.
+  No inferred serviceability, dispatch or payment collection was added.
+- Fixed the reproduced late-read selection reset through a callback bound to
+  the originating Sales state. The focused test also proves the existing
+  single-flight guard rejects competing Manage/Counter choices while the read
+  is pending. No extra global navigation epoch or framework was introduced.
+- Final suites: DASH06185 (including Phone and Chat journal states and delayed
+  visit), LF2711, O01-0458, DASH096, first-tap2, Mool layout1, RESTOCK022:
+  265 passed. One existing local Store1-40 screenshot-capture case stayed skipped;
+  it is not native acceptance. Analysis:0errors/0warnings,9existing style infos.
+- Native OPPO hot reload4259ms and VM script readback confirm removed shortcut/
+  selector, visit-bound preparation and existing fulfilment choice. Inspected
+  outputs/lf27-single-entry-orders-20261016.png and
+  outputs/lf27-single-entry-counter-final-20261016.png. Search widened after
+  shortcut removal. Sales -> Counter -> Back -> Sales -> Counter works; original
+  customer9000091941,0units/₹0 and visible saved products remain. No bill saved,
+  quantity changed, transaction or synthetic record created on the device.
+- OPPO is left on Counter sale. Completed sales/delivery/recovery scenarios are
+  host-fixture evidence only; native real commerce/provider results, APK and
+  founder acceptance remain unclaimed. Four literal owners only, no policy,
+  registry, admission-script, backend, schema, other tree or push changes.

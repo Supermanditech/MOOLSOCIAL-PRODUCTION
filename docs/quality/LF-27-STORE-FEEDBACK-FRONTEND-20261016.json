@@ -48,7 +48,7 @@
         "Backend contract, real feed/moderation/security and durable recovery remain unimplemented."
       ],
       "manifestPath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
-      "manifestSha256": "FF5E9C9C0AD622A770A8B0256C9280DA31FE34C75CE039B9E479E065552E0D4F",
+      "manifestSha256": "E4E8098E47F4DA6F2CC67F814C3F54DAED7717E78F3DAEA095B2B5B08E1B529E",
       "evidencePath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -66,7 +66,8 @@
       "Reuse Orders for three feedback filters and scoped detail/reply/report UI.",
       "Optional typed frontend adapter, exact scope/version/capability/audience validation, correlated command/unknown handling.",
       "Host fixture tests and truthful native unavailable state; preserve existing records.",
-      "Founder-requested Orders visual follow-up: compact one-tap toolbar, clearer selected stage, contextual scanner visibility and concise coverage wording, preserving existing actions."
+      "Founder-requested Orders visual follow-up: compact one-tap toolbar, clearer selected stage, contextual scanner visibility and concise coverage wording, preserving existing actions.",
+      "Founder-directed simplification: retire duplicate Orders creation/source question; reuse Sales Counter editor and journal/context safeguards for new shop bills and retained Phone/Chat/delivery drafts."
     ],
     "explicitExclusions": [
       "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."

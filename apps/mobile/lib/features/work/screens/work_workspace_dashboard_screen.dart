@@ -691,7 +691,7 @@ class _WorkWorkspaceDashboardScreenState
   final _purchasesKey = GlobalKey<_StorePurchasesSurfaceState>();
   final _receivingKey = GlobalKey<_StoreReceiveGoodsState>();
   bool _purchaseNavigationPending = false;
-  bool _openingCustomerOrder = false;
+  bool _openingCounterSale = false;
   Offset? _saleSwipeStart;
   final _salesKey = GlobalKey<_StoreStatementSurfaceState>();
   String? _salesTask;
@@ -1284,8 +1284,6 @@ class _WorkWorkspaceDashboardScreenState
     final saleOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.counterOrder;
-    final operationalComposer = saleOpen &&
-        _operationReturnOperation == _WorkspaceOperation.orders;
     final salesOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.sales;
@@ -1370,14 +1368,12 @@ class _WorkWorkspaceDashboardScreenState
       query: _saleSearchController.text,
       session: session,
       fullScreen: expanded,
-      operationalOrder: operationalComposer,
       onExit: () => unawaited(_leaveOperation()),
       onArrangeDelivery: (orderId) {
-        if (operationalComposer) {
           final saved = session.currentWorkspaceOrder;
           if (!mounted || _view != _WorkspaceControlView.operation ||
-              _operation != _WorkspaceOperation.counterOrder ||
-              _operationReturnOperation != _WorkspaceOperation.orders ||
+              !(_operation == _WorkspaceOperation.counterOrder ||
+                (_operation == _WorkspaceOperation.sales && _salesTask == 'counter')) ||
               (session.activeWorkspace?.id ?? session.workspaceId) != composerStore ||
               (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) != composerAccount ||
               session.currentWorkspaceOrderId != orderId || saved?.id != orderId ||
@@ -1389,11 +1385,6 @@ class _WorkWorkspaceDashboardScreenState
           // Exact successful submission is not an unfinished draft. Do not
           // reset its selected saved identity or attempt another journal save.
           _showOperation(_WorkspaceOperation.orders);
-          return;
-        }
-        unawaited(_navigateFromCounterDraft(
-          () => _showOperation(_WorkspaceOperation.storeLink),
-        ));
       },
       onOpenCatalogue: () => unawaited(
         _navigateFromCounterDraft(
@@ -1445,7 +1436,7 @@ class _WorkWorkspaceDashboardScreenState
                       double.infinity,
                     ),
                 title: Text(
-                  operationalComposer ? 'Create customer order' : 'Counter sale',
+                  'Counter sale',
                   softWrap: true,
                   maxLines: 2,
                   style: TextStyle(fontSize: 18),
@@ -1716,20 +1707,11 @@ class _WorkWorkspaceDashboardScreenState
                     initialSalesTask: _salesTask ?? 'home',
                     salesOnly: true,
                     showNewSaleAction: true,
-                    counterContent: session.workspaceOrderSource == 'Counter' &&
-                            session.workspaceOrderFulfilment == 'At the shop' &&
-                            (session.currentWorkspaceOrderId == null || _counterKey.currentState != null)
+                    counterContent: _salesTask == 'counter' || _counterKey.currentState != null
                         ? counterSurface(true)
-                        : Center(child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            const Text('Counter sale', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                            const Padding(padding: EdgeInsets.all(12), child: Text('Create a bill for a customer buying at your shop.', textAlign: TextAlign.center)),
-                            FilledButton(key: const Key('work-sales-start-counter'),
-                              onPressed: () {
-                                if (session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop')) setState(() {});
-                              }, child: const Text('Start counter bill')),
-                          ]))),
+                        : const SizedBox.shrink(),
                     beforeSalesViewChange: () async => await (_counterKey.currentState?.flushForNavigation() ?? Future.value(true)),
-                    onPrepareCounter: () => session.prepareWorkspaceOrder(source: 'Counter', fulfilment: 'At the shop'),
+                    onPrepareCounter: _prepareCounterSale,
                     onOpenOperation: (operation) => unawaited(_navigateFromCounterDraft(() => _showOperation(operation))),
                     onNewSale: () {
                       if (session.prepareWorkspaceOrder(
@@ -1977,7 +1959,6 @@ class _WorkWorkspaceDashboardScreenState
             onBuyStock: _showProcurement,
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
-            onCreateCustomerOrder: () => unawaited(_openCustomerOrderComposer()),
             onSearchOrders: _showSearch,
             onOrderAlerts: _showAlerts,
             onTrackPurchase: _showPurchaseTracking,
@@ -1990,16 +1971,16 @@ class _WorkWorkspaceDashboardScreenState
     );
   }
 
-  Future<void> _openCustomerOrderComposer() async {
-    if (_openingCustomerOrder || _view != _WorkspaceControlView.operation ||
-        _operation != _WorkspaceOperation.orders || _focusedOrderId != null) {
-      return;
+  Future<bool> _prepareCounterSale(bool Function() stillCurrent) async {
+    if (!stillCurrent() || _openingCounterSale || _view != _WorkspaceControlView.operation ||
+        _operation != _WorkspaceOperation.sales) {
+      return false;
     }
     final store = session.activeWorkspace?.id ?? session.workspaceId;
     final account = session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope;
     final selected = session.currentWorkspaceOrderId;
-    bool current() => mounted && _view == _WorkspaceControlView.operation &&
-        _operation == _WorkspaceOperation.orders && _focusedOrderId == null &&
+    bool current() => mounted && stillCurrent() && _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.sales &&
         (session.activeWorkspace?.id ?? session.workspaceId) == store &&
         (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) == account &&
         session.currentWorkspaceOrderId == selected;
@@ -2009,17 +1990,19 @@ class _WorkWorkspaceDashboardScreenState
         session.counterDraftNeedsReconciliation ||
         session.currentCollection?.busy == true ||
         session.currentCollection?.needsReconciliation == true;
-    if (store == null || pending()) return;
-    _openingCustomerOrder = true;
+    if (store == null || pending()) return false;
+    // Returning to an already mounted bill/invoice must not start another sale.
+    if (_counterKey.currentState != null) return true;
+    _openingCounterSale = true;
     try {
       await session.loadWorkspaceCounterDraft(retry: true, shouldRestore: () => false);
-      if (!current() || pending() || !session.counterDraftLoaded) return;
+      if (!current() || pending() || !session.counterDraftLoaded) return false;
       // Explicit create/resume decision only. The existing journal is retained
       // and the composer restores it; changing source never resets the editor.
-      if (selected != null && !session.startNewWorkspaceOrder()) return;
-      _showOperation(_WorkspaceOperation.counterOrder);
+      if (selected != null && !session.startNewWorkspaceOrder()) return false;
+      return true;
     } finally {
-      _openingCustomerOrder = false;
+      _openingCounterSale = false;
     }
   }
 
@@ -19406,7 +19389,7 @@ class _StoreStatementSurface extends StatefulWidget {
   final ValueChanged<String?>? onSalesTaskChanged;
   final String initialSalesTask;
   final Future<bool> Function()? beforeSalesViewChange;
-  final bool Function()? onPrepareCounter;
+  final Future<bool> Function(bool Function() stillCurrent)? onPrepareCounter;
   final VoidCallback? onNewSale;
   final ValueChanged<_WorkspaceOperation>? onOpenOperation;
   @override
@@ -19722,7 +19705,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           (key: 'work-sales-new-counter-sale', label: hasDraft ? 'Resume sale' : 'Counter sale',
             guide: hasDraft ? 'Continue the saved draft.' : 'Choose goods and bill the customer.',
             tap: widget.counterContent != null ? () {
-                  if (widget.onPrepareCounter?.call() ?? false) unawaited(_selectSalesHubView('counter'));
+                  unawaited(_selectSalesHubView('counter'));
                 }
                 : widget.onNewSale == null ? null : () { setState(() => _salesManageOpen = false); widget.onNewSale!(); }),
       ]),
@@ -20093,10 +20076,16 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
     if (_changingSalesHubView) return;
     _changingSalesHubView = true;
     final scope = (widget.session.activeWorkspace?.id, widget.session.workspaceFinance?.accountScope);
+    final origin = _salesHubView;
+    bool current() => mounted && _salesHubView == origin &&
+        scope == (widget.session.activeWorkspace?.id, widget.session.workspaceFinance?.accountScope);
     FocusScope.of(context).unfocus();
     try {
-      if (!(await (widget.beforeSalesViewChange?.call() ?? Future.value(true))) || !mounted ||
-          scope != (widget.session.activeWorkspace?.id, widget.session.workspaceFinance?.accountScope)) {
+      if (!(await (widget.beforeSalesViewChange?.call() ?? Future.value(true))) || !current()) {
+        return;
+      }
+      if (view == 'counter' &&
+          (!(await (widget.onPrepareCounter?.call(current) ?? Future.value(true))) || !current())) {
         return;
       }
       setState(() {
@@ -20892,7 +20881,6 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenOperation,
     required this.onOpenRoute,
     required this.onTrackPurchase,
-    required this.onCreateCustomerOrder,
     required this.onSearchOrders,
     required this.onOrderAlerts,
     this.onPurchaseBack,
@@ -20919,7 +20907,6 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
   final ValueChanged<String> onTrackPurchase;
-  final VoidCallback onCreateCustomerOrder;
   final VoidCallback onSearchOrders;
   final VoidCallback onOrderAlerts;
   final VoidCallback? onPurchaseBack;
@@ -21289,7 +21276,6 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         ),
         onOpenCollection: onOpenStore,
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
-        onCreateOrder: onCreateCustomerOrder,
         onSearch: onSearchOrders,
         onAlerts: onOrderAlerts,
       );
@@ -28375,7 +28361,6 @@ class _OrdersDestinationSurface extends StatefulWidget {
     required this.session,
     required this.onOpenCollection,
     required this.onOpenDelivery,
-    required this.onCreateOrder,
     required this.onSearch,
     required this.onAlerts,
     this.orderId,
@@ -28384,7 +28369,6 @@ class _OrdersDestinationSurface extends StatefulWidget {
   final WorkSession session;
   final VoidCallback onOpenCollection;
   final VoidCallback onOpenDelivery;
-  final VoidCallback onCreateOrder;
   final VoidCallback onSearch;
   final VoidCallback onAlerts;
   final String? orderId;
@@ -28589,10 +28573,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
               fontSize: widget.orderId == null ? 16 : 14,
               fontWeight: FontWeight.w700,
             );
-            final createBlocked = session.busy || session.workspaceOperationsSyncing ||
-                session.counterDraftLoading || session.counterDraftSubmitting ||
-                session.counterDraftNeedsReconciliation || session.hasPendingOrderTime ||
-                session.workspaceHandoverBusy;
             final header = Semantics(
               header: true,
               label: widget.orderId == null ? 'Customer orders' : null,
@@ -28638,29 +28618,6 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                       ),
                     ),
                 ])),
-                if (widget.orderId == null) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Create customer order',
-                    excludeFromSemantics: true,
-                    child: TextButton(
-                      key: const Key('work-orders-create-customer-order'),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 48),
-                        foregroundColor: MoolColors.navy,
-                        backgroundColor: MoolColors.navy.withValues(alpha: .07),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: createBlocked ? null : widget.onCreateOrder,
-                      child: Semantics(
-                        label: 'Create customer order',
-                        excludeSemantics: true,
-                        child: const Icon(Icons.add, size: 22),
-                      ),
-                    ),
-                  ),
-                ],
                 IconButton(
                   key: const Key('work-orders-customer-feedback'),
                   tooltip: widget.orderId == null ? 'Customer feedback' : 'Feedback for this order',
@@ -39025,7 +38982,6 @@ class _CounterOrderSurface extends StatefulWidget {
     required this.onOpenCatalogue,
     required this.onExit,
     this.fullScreen = false,
-    this.operationalOrder = false,
     super.key,
   });
 
@@ -39035,7 +38991,6 @@ class _CounterOrderSurface extends StatefulWidget {
   final VoidCallback onOpenCatalogue;
   final VoidCallback onExit;
   final bool fullScreen;
-  final bool operationalOrder;
 
   @override
   State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
@@ -39197,23 +39152,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       !widget.session.workspaceHandoverBusy && !widget.session.hasPendingOrderTime &&
       widget.session.currentCollection?.busy != true &&
       widget.session.currentCollection?.needsReconciliation != true;
-
-  Widget get _operationalSourceSelector => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-    child: DropdownButtonFormField<String>(
-      key: const Key('work-operational-order-source'),
-      initialValue: _source,
-      isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Order received through'),
-      items: [for (final source in const ['Counter', 'Phone', 'Chat'])
-        DropdownMenuItem(value: source, child: Text(source))],
-      onChanged: !_detailsEditable ? null : (value) {
-        if (value == null || !_detailsEditable) return;
-        setState(() => _source = value);
-        _rememberDetails();
-      },
-    ),
-  );
 
   @override
   void dispose() {
@@ -39751,7 +39689,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
             fulfilment: _fulfilment,
             payment: _payment,
             counterOnly: true,
-            allowFulfilmentSelection: widget.operationalOrder,
+            allowFulfilmentSelection: true,
             enabled: _detailsEditable,
             compact: true,
             addressController: _address,
@@ -40213,9 +40151,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       );
     }
     if (_stage == 'customer') {
-      return Material(color: Colors.white, child: widget.operationalOrder
-          ? Column(children: [_operationalSourceSelector, Expanded(child: _customerPanel())])
-          : _customerPanel());
+      return Material(color: Colors.white, child: _customerPanel());
     }
     if (_stage == 'review') return _reviewPanel();
     final query = _productSearch.text.trim().toLowerCase();
@@ -40288,7 +40224,6 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     final controls = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.operationalOrder) _operationalSourceSelector,
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Semantics(
