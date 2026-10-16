@@ -9,6 +9,7 @@ import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
 import 'work_models.dart';
 import 'work_publication.dart';
 import 'work_services.dart';
+import 'work_customer_feedback.dart';
 import 'scan_and_pick_contract.dart';
 
 /// Receipt authority and its recoverable Stock projection are distinct.
@@ -596,6 +597,7 @@ class WorkSession extends ChangeNotifier {
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
     this.tradingPreferencesStoreFactory,
+    this.customerFeedbackAdapter,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -645,6 +647,7 @@ class WorkSession extends ChangeNotifier {
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
     this.tradingPreferencesStoreFactory,
+    this.customerFeedbackAdapter,
   }) : _productionSession = true,
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
@@ -660,6 +663,20 @@ class WorkSession extends ChangeNotifier {
        proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
+  final StoreFeedbackAdapter? customerFeedbackAdapter;
+  final Map<StoreFeedbackScope, StoreFeedbackController> _customerFeedback = {};
+
+  StoreFeedbackController? get workspaceCustomerFeedback {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (_disposed || account == null || account.isEmpty || store == null) return null;
+    final scope = (account: account, store: store);
+    return _customerFeedback.putIfAbsent(scope, () => StoreFeedbackController(
+      scope: scope, adapter: customerFeedbackAdapter,
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
+          ? null : publicationPreferencesContext,
+    ));
+  }
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
   final WorkPendingProofStore Function(String storeId)? pickupPreferencesStoreFactory;
   final WorkPendingProofStore Function(String storeId)? publicationPreferencesStoreFactory;
@@ -11866,6 +11883,8 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    for (final feedback in _customerFeedback.values) { feedback.dispose(); }
+    _customerFeedback.clear();
     _counterDraftRecovery.clear();
     _workspaceApplications.clear();
     _clearCollection();

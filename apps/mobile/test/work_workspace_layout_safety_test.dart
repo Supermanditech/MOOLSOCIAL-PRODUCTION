@@ -5215,6 +5215,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final layout in [(const Size(360, 720), 1.0), (const Size(640, 360), 2.0)]) {
+    testWidgets('LF27 Orders feedback entry and return preserve Store records ${layout.$1}', (tester) async {
+      final work = liveStore();
+      final products = List.of(work.workspaceCatalogueItems);
+      final orders = List.of(work.workspaceOrders);
+      final invoices = List.of(work.workspaceInvoices);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: layout.$1, textScale: layout.$2);
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      final entry = find.byKey(const Key('work-orders-customer-feedback'));
+      await tester.ensureVisible(entry); await tester.pumpAndSettle();
+      expect(entry.hitTestable(), findsOneWidget);
+      await tester.tap(entry); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-customer-feedback')), findsOneWidget);
+      final feedbackScroll = find.descendant(of: find.byKey(const Key('work-customer-feedback')),
+        matching: find.byType(Scrollable)).first;
+      await tester.scrollUntilVisible(find.text('Customer feedback is not connected yet.'), 120,
+        scrollable: feedbackScroll);
+      await tester.pumpAndSettle();
+      expect(find.text('Customer feedback is not connected yet.'), findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(const Key('work-feedback-back')), -120,
+        scrollable: feedbackScroll);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('work-feedback-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-feedback-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(work.workspaceCatalogueItems, orderedEquals(products));
+      expect(work.workspaceOrders, orderedEquals(orders));
+      expect(work.workspaceInvoices, orderedEquals(invoices));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'HOME stock child stays compact with reachable canonical action',
     (tester) async {

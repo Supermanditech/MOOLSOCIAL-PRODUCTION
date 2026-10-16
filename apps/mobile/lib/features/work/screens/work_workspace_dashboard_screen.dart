@@ -25,6 +25,7 @@ import '../widgets/work_widgets.dart';
 import '../widgets/store_settings_widgets.dart';
 import '../widgets/store_publication_settings.dart';
 import '../widgets/store_payment_terms.dart';
+import '../widgets/store_customer_feedback.dart';
 import '../widgets/store_product_thumbnail.dart';
 import '../widgets/store_catalogue_categories.dart';
 import '../work_models.dart';
@@ -28382,6 +28383,7 @@ class _OrdersDestinationSurface extends StatefulWidget {
 class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     with WidgetsBindingObserver {
   late String _filter;
+  bool _feedbackOpen = false;
   final _selectedFilterKey = GlobalKey();
   final _filterScroll = ScrollController();
   bool _filterOverflow = false, _atFilterEnd = false;
@@ -28488,6 +28490,17 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     final session = widget.session;
     final allOrders = session.visibleWorkspaceOrders
         .where((order) => !_isCounterSaleOrder(order));
+    if (_feedbackOpen) {
+      return StoreCustomerFeedback(
+        controller: widget.session.workspaceCustomerFeedback,
+        orderId: widget.orderId,
+        onClose: () => setState(() { _feedbackOpen = false; }),
+        onOpenOrder: (id) {
+          setState(() { _feedbackOpen = false; });
+          widget.onOpenOrder(id);
+        },
+      );
+    }
     bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
       'Live' => !order.isClosed,
       'Done' => order.isClosed,
@@ -28609,7 +28622,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
             );
             final compactHeader = pageConstraints.maxHeight <
                 MediaQuery.textScalerOf(context).scale(260);
-            final header = Padding(
+            final orderHeader = Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
               child: inlineCreate
                   ? Row(children: [
@@ -28633,6 +28646,18 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                         Align(alignment: Alignment.centerLeft, child: createOrder),
                     ]),
             );
+            final header = Column(children: [
+              orderHeader,
+              Align(alignment: Alignment.centerLeft, child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: TextButton.icon(
+                  key: const Key('work-orders-customer-feedback'),
+                  onPressed: () => setState(() { _feedbackOpen = true; }),
+                  icon: const Icon(Icons.rate_review_outlined),
+                  label: Text(widget.orderId == null ? 'Customer feedback' : 'Feedback for this order'),
+                ),
+              )),
+            ]);
             if (compactHeader) {
               // Retain all header controls, but let them scroll rather than
               // consuming the space required by an enlarged response field.
@@ -28649,7 +28674,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                   primary: false, child: header),
               );
             }
-            return header;
+              return header;
           }),
           if (widget.orderId == null)
             keyboardVisible ? const SizedBox.shrink() : Row(
