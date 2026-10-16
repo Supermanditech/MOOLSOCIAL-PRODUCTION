@@ -19,6 +19,7 @@ import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'fixtures/store_public_handoff_v1.dart' show handoffStock;
 
 class _ReviewCaseMemoryStore implements BuyV2CustomerStateStore {
   @override
@@ -730,6 +731,59 @@ void main() {
         matching: find.byType(EditableText))).controller.text, 'Unsaved Store A');
       expect(tester.takeException(), isNull);
     });
+    testWidgets('LF24 valid offer form cannot publish without a publisher at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      // Isolated host fixture: no native stock, customer consent or campaign.
+      final draftStore = _Lf04DelayedOfferDraft();
+      final work = _testWorkSession(offerDraftStoreFactory: (_) => draftStore)
+        ..seedVerifiedWorkspace();
+      final product = handoffStock();
+      expect(product.published, isTrue);
+      work.workspaceCatalogueItems..clear()..add(product);
+      work.workspaceOrders..clear()..add(WorkspaceOrderRecord(
+        id: 'lf24-host-order', customer: 'Host buyer · 9000000042',
+        createdAt: DateTime.now(), amount: 100, payment: 'Paid',
+        source: 'Host test', items: 'Host item', quantities: const {},
+        fulfilment: 'Pickup', address: '', stage: 'Completed',
+        needsDelivery: false,
+        actionDeadline: DateTime.now().add(const Duration(hours: 1)),
+      ));
+      work.workspaceCustomersAllowingMessages.add(work.workspaceCustomerBook.single.id);
+      expect(work.workspaceCustomerBook.single.messagesAllowed, isTrue);
+      final storeId = work.activeWorkspace!.id;
+      expect(await work.loadWorkspaceOfferDraft(expectedStoreId: storeId), isTrue);
+      final fields = <String, String>{
+        'title': 'Host valid offer', 'detail': 'Host draft only, not published',
+        'productId': product.id, 'orderCap': '27',
+        'validUntil': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
+      };
+      work.workspaceOfferDraft.addAll(fields);
+      await mount(tester, route: '/app/work/workspace/dashboard', workSession: work,
+        size: const Size(320, 568));
+      for (final key in ['work-dashboard-profile', 'global-profile-quick-operations',
+        'work-business-grow', 'work-growth-offers']) {
+        await tapVisible(tester, Key(key));
+      }
+      expect(find.byKey(const Key('work-offer-prerequisites')), findsNothing);
+      expect(find.byKey(const Key('work-offer-private-product')), findsNothing);
+      expect(find.byKey(const Key('work-offer-publication-unavailable')), findsOneWidget);
+      final publish = find.byKey(const Key('work-offer-publish'));
+      await tester.scrollUntilVisible(publish, 120, scrollable: find.descendant(
+        of: find.byKey(const Key('work-store-offers-screen')),
+        matching: find.byType(Scrollable)).first, maxScrolls: 40);
+      await tester.pumpAndSettle();
+      expect(publish.hitTestable(), findsOneWidget);
+      expect(tester.widget<FilledButton>(publish).onPressed, isNull);
+      await tapVisible(tester, const Key('work-offer-save-draft'));
+      expect(draftStore.saved!['fields'], fields);
+      expect(work.workspaceOfferDraft, fields);
+      expect(work.noticeMessage, contains('Not published'));
+      expect(work.workspaceOffers, isEmpty);
+      expect(work.workspaceCatalogueItems.single.stock, product.stock);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('LF04 offer form saves and restores a private draft at $scale', (tester) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);

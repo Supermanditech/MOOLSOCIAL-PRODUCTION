@@ -37174,7 +37174,8 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
           FilledButton.icon(
             key: const Key('work-offer-publish'),
             onPressed:
-                _title.text.trim().isEmpty ||
+                !widget.session.workspaceOfferPublishingAvailable ||
+                    _title.text.trim().isEmpty ||
                     _detail.text.trim().isEmpty ||
                     _validUntil == null ||
                     _validUntil!.isBefore(DateUtils.dateOnly(DateTime.now())) ||

@@ -8477,6 +8477,9 @@ class WorkSession extends ChangeNotifier {
   Map<String, String> get workspaceOfferDraft => _offerDraftRecovery.values;
   String? get workspaceOfferDraftError => _offerDraftRecovery.error;
   bool get workspaceOfferDraftSaving => _offerDraftRecovery.saving;
+
+  // No accepted publisher is connected. Valid draft fields are not capability.
+  bool get workspaceOfferPublishingAvailable => false;
   String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
   set currentWorkspaceOrderId(String? value) =>
       _storeData.currentWorkspaceOrderId = value;
