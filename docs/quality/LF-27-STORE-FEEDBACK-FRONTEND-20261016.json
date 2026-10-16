@@ -48,7 +48,7 @@
         "Backend contract, real feed/moderation/security and durable recovery remain unimplemented."
       ],
       "manifestPath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
-      "manifestSha256": "8FFC8C42A4F5DB5093D94A0348CD3909D816DEFD5B32CAFB493B050E582F1B66",
+      "manifestSha256": "8AAA57D18EEE68FAECF1658103F0905B382FA2A9D0EAEFFF15AE3DDDD49B5305",
       "evidencePath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -65,7 +65,8 @@
     "minimumCompleteScope": [
       "Reuse Orders for three feedback filters and scoped detail/reply/report UI.",
       "Optional typed frontend adapter, exact scope/version/capability/audience validation, correlated command/unknown handling.",
-      "Host fixture tests and truthful native unavailable state; preserve existing records."
+      "Host fixture tests and truthful native unavailable state; preserve existing records.",
+      "Founder-requested Orders visual follow-up: compact one-tap toolbar, clearer selected stage, contextual scanner visibility and concise coverage wording, preserving existing actions."
     ],
     "explicitExclusions": [
       "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."

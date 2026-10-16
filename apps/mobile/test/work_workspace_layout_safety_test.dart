@@ -5251,6 +5251,55 @@ void main() {
     });
   }
 
+  for (final layout in [(const Size(360, 720), 1.0),
+      (const Size(320, 568), 2.0), (const Size(640, 360), 2.0)]) {
+    testWidgets('LF27 compact Orders toolbar reserves the busy queue ${layout.$1}', (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+        work: work, viewport: layout.$1, textScale: layout.$2);
+      final surface = find.byKey(const Key('work-orders-destination'));
+      final strip = find.byKey(const Key('work-orders-filter-strip'));
+      final create = find.byKey(const Key('work-orders-create-customer-order'));
+      final feedback = find.byKey(const Key('work-orders-customer-feedback'));
+      final budget = layout.$2 == 1 ? 112.0 : 164.0;
+      expect(tester.getBottomLeft(strip).dy - tester.getTopLeft(surface).dy,
+        lessThanOrEqualTo(budget), reason: 'Orders and not navigation must own the viewport');
+      for (final action in [create, feedback]) {
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      }
+      expect((tester.getCenter(create).dy - tester.getCenter(feedback).dy).abs(), lessThanOrEqualTo(2));
+      expect(find.byTooltip('Create customer order'), findsOneWidget);
+      expect(find.byTooltip('Customer feedback'), findsOneWidget);
+      expect(find.byKey(const Key('work-dashboard-scan')), findsNothing);
+      expect(find.text('All · 0 active'), findsNothing);
+      expect(find.byKey(const Key('work-orders-current-scope')), findsOneWidget);
+      final chip = tester.widget<ChoiceChip>(find.byKey(const Key('work-orders-filter-live')));
+      expect(chip.selected, isTrue);
+      expect(chip.selectedColor, MoolColors.navy);
+      expect(chip.labelStyle?.color, Colors.white);
+      expect(tester.getSemantics(find.byKey(const Key('work-orders-filter-live')))
+        .flagsCollection.isSelected, ui.Tristate.isTrue);
+      expect(tester.getSemantics(create).label, 'Create customer order');
+      expect(tester.takeException(), isNull);
+      } finally { semantics.dispose(); }
+    });
+  }
+
+  testWidgets('LF27 Orders reclaims product-scanner width for order search', (tester) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard?section=orders', work: work,
+      viewport: const Size(360, 720), textScale: 1);
+    expect(find.byKey(const Key('work-dashboard-scan')), findsNothing);
+    final search = find.byKey(const Key('work-dashboard-search'));
+    expect(search.hitTestable(), findsOneWidget);
+    expect(tester.getSize(search).width, greaterThanOrEqualTo(250));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'HOME stock child stays compact with reachable canonical action',
     (tester) async {
@@ -44266,7 +44315,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-orders-empty-state')), findsOneWidget);
       expect(find.text('No active orders'), findsOneWidget);
-      expect(find.textContaining('Online order coverage is unverified.'), findsOneWidget);
+      expect(find.textContaining('Online orders may be missing.'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Accept'), findsNothing);
       expect(work.visibleWorkspaceOrders, isEmpty);
       expect(work.activeGroupBuy, isNull);
@@ -48128,7 +48177,7 @@ void main() {
         viewport: Size(display.$1, display.$2),
         textScale: display.$3,
       );
-      expect(find.text('History · 3'), findsOneWidget);
+      expect(find.text('History 3'), findsOneWidget);
       expect(
         find.byKey(Key('work-order-history-open-${counter.id}')),
         findsNothing,
@@ -48137,7 +48186,7 @@ void main() {
       await tester.ensureVisible(all);
       await tester.tap(all);
       await tester.pumpAndSettle();
-      expect(find.text('All · 1 active'), findsOneWidget);
+      expect(find.text('All 1'), findsOneWidget);
       expect(
         find.byKey(const Key('work-order-ticket-COUNTER-ACTIVE')),
         findsNothing,
@@ -48203,6 +48252,9 @@ void main() {
         await tester.pumpAndSettle();
         // Orders search deliberately excludes Counter sales. Legacy Counter
         // references remain recoverable through the global saved-record search.
+        // The approved single profile entry is on Store home, not Orders.
+        await tester.tap(find.byKey(const Key('work-store-home')));
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('work-dashboard-profile')));
         await tester.pumpAndSettle();
         final operations = find.byKey(
@@ -48465,7 +48517,7 @@ void main() {
       expect(status.color, Colors.transparent);
       final strip = find.byKey(const Key('work-orders-filter-strip'));
       final empty = find.byKey(const Key('work-orders-empty-state'));
-      expect(find.textContaining('Online order coverage is unverified.'), findsOneWidget);
+      expect(find.textContaining('Online orders may be missing.'), findsOneWidget);
       final viewport = find
           .ancestor(of: empty, matching: find.byType(Align))
           .first;
@@ -48476,12 +48528,12 @@ void main() {
         lessThanOrEqualTo(16),
       );
       expect(find.byKey(const Key('work-orders-empty-history')), findsNothing);
-      expect(find.text('All · 0 active'), findsOneWidget);
+      expect(find.text('All 0'), findsOneWidget);
       final create = find.byKey(const Key('work-orders-create-customer-order'));
       expect(create.hitTestable(), findsOneWidget);
       expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(create).width, greaterThanOrEqualTo(48));
-      final createLabel = find.text('Create customer order');
+      final createLabel = find.byTooltip('Create customer order');
       expect(createLabel.hitTestable(), findsOneWidget);
       expect(tester.getRect(createLabel).left, greaterThanOrEqualTo(0));
       expect(tester.getRect(createLabel).right, lessThanOrEqualTo(display.$1));
@@ -48749,7 +48801,7 @@ void main() {
     await tester.tap(shortcut);
     await tester.pumpAndSettle();
     expect(work.workspaceOrderFilter, 'Done');
-    expect(find.text('History · 1'), findsOneWidget);
+    expect(find.text('History 1'), findsOneWidget);
     expect(
       find.byKey(const Key('work-order-stage-label-SALE-1042')),
       findsOneWidget,
@@ -54424,7 +54476,6 @@ void main() {
     await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
     expect(find.text('Customer orders'), findsOneWidget);
-    expect(find.text('All · 1 active'), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
     expect(find.text('New 1'), findsOneWidget);
     expect(find.text('Create bill'), findsNothing);
@@ -63015,7 +63066,7 @@ void main() {
         final selectedStageBeforeFilters = work.workspaceOrderStage;
         await tester.tap(find.byKey(const Key('work-store-orders')));
         await tester.pumpAndSettle();
-        expect(find.text('All · $activeOrders active'), findsOneWidget);
+        expect(find.text('All $activeOrders'), findsOneWidget);
         for (final (filter, label, count) in [
           ('live', 'All', activeOrders),
           ('new', 'New', 30 * (activeOrders ~/ 100)),

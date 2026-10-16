@@ -1535,6 +1535,7 @@ class _WorkWorkspaceDashboardScreenState
                   _view == _WorkspaceControlView.search ||
                   (procurementOpen && _procurementSearchOpen),
               keepSearchUtilities: procurementOpen,
+              showProductScanner: !ordersContext,
               nameTextStyle: procurementOpen
                   ? Theme.of(context).textTheme.titleLarge!.copyWith(
                       fontSize: 13,
@@ -3712,6 +3713,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     this.backKey = const Key('work-operation-back'),
     this.backSize = 44,
     this.keepSearchUtilities = false,
+    this.showProductScanner = true,
     this.compact = false,
     this.showStatusLabel = false,
     this.singleLine = false,
@@ -3739,6 +3741,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final Key backKey;
   final double backSize;
   final bool keepSearchUtilities;
+  final bool showProductScanner;
   final bool compact;
   final bool showStatusLabel;
   final bool singleLine;
@@ -4029,7 +4032,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                               ),
                               padding: EdgeInsets.zero,
                             ),
-                          if (!searchOpen || keepSearchUtilities)
+                          if (showProductScanner && (!searchOpen || keepSearchUtilities))
                             _HeaderSearchUtility(
                               key: const Key('work-dashboard-scan'),
                               tooltip: 'Scan product barcode',
@@ -28385,8 +28388,10 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
   late String _filter;
   bool _feedbackOpen = false;
   final _selectedFilterKey = GlobalKey();
+  final _filterViewportKey = GlobalKey();
   final _filterScroll = ScrollController();
   bool _filterOverflow = false, _atFilterEnd = false;
+  bool _selectedFilterOffscreen = false;
   bool _filterMetricsScheduled = false;
 
   @override
@@ -28433,10 +28438,22 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
       final overflow = position.maxScrollExtent > 1;
       final atEnd = position.extentAfter <= 1;
       final cueWidthChanged = overflow != _filterOverflow;
-      if (overflow != _filterOverflow || atEnd != _atFilterEnd) {
+      final selectedBox = _selectedFilterKey.currentContext?.findRenderObject();
+      final viewportBox = _filterViewportKey.currentContext?.findRenderObject();
+      var offscreen = false;
+      if (selectedBox is RenderBox && selectedBox.hasSize &&
+          viewportBox is RenderBox && viewportBox.hasSize) {
+        final left = selectedBox.localToGlobal(Offset.zero).dx;
+        final viewportLeft = viewportBox.localToGlobal(Offset.zero).dx;
+        offscreen = left < viewportLeft - 1 ||
+            left + selectedBox.size.width > viewportLeft + viewportBox.size.width + 1;
+      }
+      if (overflow != _filterOverflow || atEnd != _atFilterEnd ||
+          offscreen != _selectedFilterOffscreen) {
         setState(() {
           _filterOverflow = overflow;
           _atFilterEnd = atEnd;
+          _selectedFilterOffscreen = offscreen;
         });
         // The cue takes space after the first layout. Reveal again in the
         // final viewport, but never snap the strip during manual scrolling.
@@ -28559,13 +28576,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
               fontSize: widget.orderId == null ? 16 : 14,
               fontWeight: FontWeight.w700,
             );
-            const scopeStyle = TextStyle(
-              color: MoolColors.navy,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            );
-            final scopeLabel = '${filterLabels[_filter]} · ${countFor(_filter)}'
-                '${_filter == 'Live' ? ' active' : ''}';
+            final actionStyle = Theme.of(context).textTheme.labelLarge!
+                .copyWith(fontWeight: FontWeight.w600);
             double labelWidth(String text, TextStyle style) {
               final painter = TextPainter(
                 text: TextSpan(text: text, style: style),
@@ -28577,90 +28589,72 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
               painter.dispose();
               return width;
             }
-            final createOrder = TextButton.icon(
-              key: const Key('work-orders-create-customer-order'),
-              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-              onPressed: session.busy || session.workspaceOperationsSyncing ||
-                      session.counterDraftLoading || session.counterDraftSubmitting ||
-                      session.counterDraftNeedsReconciliation || session.hasPendingOrderTime ||
-                      session.workspaceHandoverBusy
-                  ? null : widget.onCreateOrder,
-              icon: const Icon(Icons.add),
-              label: const Text('Create customer order'),
-            );
-            final titleWidth = labelWidth('Customer orders', headingStyle);
-            final scopeWidth = labelWidth(scopeLabel, scopeStyle);
-            final inlineCreate = widget.orderId == null &&
-                constraints.maxWidth >=
-                    (titleWidth > scopeWidth ? titleWidth : scopeWidth) +
-                    labelWidth('Create customer order',
-                        Theme.of(context).textTheme.labelLarge!) + 112;
-            final heading = Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    widget.orderId == null
-                        ? 'Customer orders'
-                        : 'Order details',
-                    style: headingStyle,
-                  ),
-                ),
-                if (widget.orderId != null)
-                  const SizedBox.shrink()
-                else
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      scopeLabel,
+            // Prefer a visible primary label; use a named 48dp icon when
+            // enlarged text needs the width. Neither action gets a new row.
+            final showCreateLabel = constraints.maxWidth - 22 >=
+                labelWidth('Customer orders', headingStyle) +
+                labelWidth('New order', actionStyle) + 98;
+            final createBlocked = session.busy || session.workspaceOperationsSyncing ||
+                session.counterDraftLoading || session.counterDraftSubmitting ||
+                session.counterDraftNeedsReconciliation || session.hasPendingOrderTime ||
+                session.workspaceHandoverBusy;
+            final header = Padding(
+              key: const Key('work-orders-toolbar'),
+              padding: const EdgeInsets.fromLTRB(14, 2, 8, 2),
+              child: Row(children: [
+                Expanded(child: Column(mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Semantics(header: true,
+                    child: Text(widget.orderId == null ? 'Customer orders' : 'Order details',
+                      style: headingStyle)),
+                  if (widget.orderId == null && _selectedFilterOffscreen)
+                    Text('${filterLabels[_filter]} · ${countFor(_filter)}',
                       key: const Key('work-orders-current-scope'),
-                      textAlign: TextAlign.end,
-                      style: scopeStyle,
+                      style: const TextStyle(fontSize: 11, color: MoolColors.navy)),
+                ])),
+                if (widget.orderId == null) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Create customer order',
+                    excludeFromSemantics: true,
+                    child: TextButton(
+                      key: const Key('work-orders-create-customer-order'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        foregroundColor: MoolColors.navy,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: createBlocked ? null : widget.onCreateOrder,
+                      child: Semantics(
+                        label: 'Create customer order',
+                        excludeSemantics: true,
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.add, size: 20),
+                          if (showCreateLabel) ...[
+                            const SizedBox(width: 6),
+                            Text('New order', style: actionStyle),
+                          ],
+                        ]),
+                      ),
                     ),
                   ),
-              ],
+                ],
+                IconButton(
+                  key: const Key('work-orders-customer-feedback'),
+                  tooltip: widget.orderId == null ? 'Customer feedback' : 'Feedback for this order',
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                  visualDensity: VisualDensity.standard,
+                  color: MoolColors.navy,
+                  onPressed: () => setState(() { _feedbackOpen = true; }),
+                  icon: const Icon(Icons.rate_review_outlined, size: 22),
+                ),
+              ]),
             );
             final compactHeader = pageConstraints.maxHeight <
                 MediaQuery.textScalerOf(context).scale(260);
-            final orderHeader = Padding(
-              padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
-              child: inlineCreate
-                  ? Row(children: [
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Customer orders', style: headingStyle),
-                          Text(scopeLabel,
-                            key: const Key('work-orders-current-scope'),
-                            style: scopeStyle),
-                        ],
-                      )),
-                      const SizedBox(width: 12),
-                      createOrder,
-                    ])
-                  : Column(children: [
-                      if (compactHeader && widget.orderId == null)
-                        Align(alignment: Alignment.centerLeft, child: createOrder),
-                      heading,
-                      if (!compactHeader && widget.orderId == null)
-                        Align(alignment: Alignment.centerLeft, child: createOrder),
-                    ]),
-            );
-            final header = Column(children: [
-              orderHeader,
-              Align(alignment: Alignment.centerLeft, child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextButton.icon(
-                  key: const Key('work-orders-customer-feedback'),
-                  onPressed: () => setState(() { _feedbackOpen = true; }),
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: Text(widget.orderId == null ? 'Customer feedback' : 'Feedback for this order'),
-                ),
-              )),
-            ]);
             if (compactHeader) {
-              // Retain all header controls, but let them scroll rather than
-              // consuming the space required by an enlarged response field.
+              // Preserve enlarged labels and reachable controls, not a fixed
+              // height that clips the title or steals the queue's viewport.
               return ConstrainedBox(
                 constraints: BoxConstraints(maxHeight:
                   (pageConstraints.maxHeight *
@@ -28674,13 +28668,14 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                   primary: false, child: header),
               );
             }
-              return header;
+            return header;
           }),
           if (widget.orderId == null)
             keyboardVisible ? const SizedBox.shrink() : Row(
               children: [
                 Expanded(
                   child: NotificationListener<ScrollMetricsNotification>(
+                    key: _filterViewportKey,
                     onNotification: (_) {
                       _scheduleFilterMetrics();
                       return false;
@@ -28702,7 +28697,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                                 key: Key('work-orders-filter-${filter.toLowerCase()}'),
                                 showCheckmark: false,
                                 backgroundColor: Colors.white,
-                                selectedColor: const Color(0xFFF4F5FA),
+                                selectedColor: MoolColors.navy,
                                 surfaceTintColor: Colors.transparent,
                                 labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -28720,9 +28715,11 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                                   fontSize: 12,
                                   fontWeight: _filter == filter
                                       ? FontWeight.w700 : FontWeight.w500,
-                                  color: MoolColors.navy,
+                                  color: _filter == filter ? Colors.white : MoolColors.navy,
                                 ),
-                                label: Text('${filterLabels[filter]} ${countFor(filter)}'),
+                                label: Text('${filterLabels[filter]} ${countFor(filter)}',
+                                  key: _filter == filter && !_selectedFilterOffscreen
+                                      ? const Key('work-orders-current-scope') : null),
                                 selected: _filter == filter,
                                 onSelected: (_) {
                                   widget.session.setWorkspaceOrderFilter(filter);
@@ -28829,8 +28826,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                             widget.orderId != null
                                 ? 'Return to the order list and search again.'
                                 : _filter == 'Done'
-                                ? 'Saved completed and cancelled orders are shown here. Online order coverage is unverified. Counter sales are in Sales.'
-                                : 'Only saved orders are shown. Online order coverage is unverified. Counter sales are in Sales.',
+                                ? 'Saved completed and cancelled orders. Online orders may be missing. Counter sales are in Sales.'
+                                : 'Saved orders only. Online orders may be missing. Counter sales are in Sales.',
                             style: const TextStyle(
                               color: Color(0xFF4C5268), fontSize: 12,
                             ),
