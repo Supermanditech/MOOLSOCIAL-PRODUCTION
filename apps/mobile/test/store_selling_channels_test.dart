@@ -14,6 +14,57 @@ import 'fixtures/store_public_handoff_v1.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final saleType in BuyV2WholesaleSaleType.values) {
+    test('LF26 Retail-disabled facts agree while ${saleType.name} and Counter remain independent', () {
+      final original = handoffStock(retail: false);
+      final item = original.copyWith(wholesaleOffer: WorkspaceWholesaleOffer.fromJson({
+        ...original.wholesaleOffer!.toJson(), 'saleType': saleType.name,
+      }));
+      final before = item.toInventoryJson();
+      final retail = item.toBuyPublicProduct(storeId: 'a', storeName: 'Store A');
+      expect(item.customerProductFieldsComplete, isTrue);
+      expect(retail.mediaAssets, isNotEmpty);
+      expect(retail.catalogueListing, isFalse);
+      final trade = item.toBuyPublicProduct(storeId: 'a', storeName: 'Store A',
+        channel: BuyV2Destination.wholesale,
+        publicPackTerms: handoffSellingTerms(item, 'a', now: handoffTime), now: handoffTime);
+      expect(trade.catalogueListing, isTrue);
+      expect(trade.offerClass, saleType == BuyV2WholesaleSaleType.bulk
+        ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale);
+      expect(trade.id, item.id);
+      expect(trade.pack, item.pack);
+      expect(trade.price, 250);
+      expect(trade.minimumOrder, 6);
+      expect(item.canSellAtCounter, isTrue);
+      final facts = item.toBuyPublicFacts(storeName: 'Store A', sourceId: 'host-only-a',
+        storeVisible: true, acceptingOrders: true, observedAt: handoffTime);
+      expect(facts.productId, item.id);
+      expect(facts.price, item.sellingPrice);
+      expect(facts.orderabilityLabel, 'Not listed for customers');
+      final restored = WorkspaceCatalogueItem.fromInventoryJson(before);
+      expect(restored.retailEnabled, isFalse);
+      expect(restored.wholesaleOffer!.saleType, saleType);
+      expect(restored.toBuyPublicFacts(storeName: 'Store A', sourceId: 'host-only-a',
+        storeVisible: true, acceptingOrders: true, observedAt: handoffTime).orderabilityLabel,
+        'Not listed for customers');
+      expect(item.toInventoryJson(), before);
+      expect(restored.stock, item.stock);
+    });
+  }
+  test('LF26 retail facts preserve status precedence and explicit Retail re-enable', () {
+    String facts(WorkspaceCatalogueItem item, {bool visible = true, bool accepting = true}) =>
+      item.toBuyPublicFacts(storeName: 'Store A', sourceId: 'host-only-a',
+        storeVisible: visible, acceptingOrders: accepting, observedAt: handoffTime).orderabilityLabel;
+    final item = handoffStock();
+    expect(facts(item), 'Available to order');
+    expect(facts(item.copyWith(retailEnabled: false)), 'Not listed for customers');
+    expect(facts(item.copyWith(retailEnabled: false, stock: 0), accepting: false), 'Not listed for customers');
+    expect(facts(item.copyWith(stock: 0)), 'Out of stock');
+    expect(facts(item, accepting: false), 'Store is not accepting orders');
+    expect(facts(item, visible: false, accepting: false), 'Not listed for customers');
+    expect(facts(item.copyWith(publicListing: false, stock: 0)), 'Not listed for customers');
+    expect(facts(item.copyWith(retailEnabled: false).copyWith(retailEnabled: true)), 'Available to order');
+  });
   test(
     'offer classification is explicit, survives edits and never follows MOQ',
     () {

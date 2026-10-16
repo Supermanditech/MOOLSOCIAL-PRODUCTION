@@ -10364,6 +10364,8 @@ class WorkspaceCatalogueItem {
         : product;
   }
 
+  /// Retail-priced facts only. Trade offers have their separate product projection.
+  /// These owner inputs are not authoritative publication or serviceability.
   BuyV2ProductFactsSnapshot toBuyPublicFacts({
     required String storeName,
     required String sourceId,
@@ -10376,6 +10378,7 @@ class WorkspaceCatalogueItem {
   }) {
     final orderable =
         storeVisible &&
+        retailEnabled &&
         publicListing &&
         customerProductFieldsComplete &&
         !catalogueFactsRequireReview &&
@@ -10391,6 +10394,7 @@ class WorkspaceCatalogueItem {
       orderabilityLabel: orderable
           ? 'Available to order'
           : !storeVisible ||
+                !retailEnabled ||
                 !publicListing ||
                 !customerProductFieldsComplete ||
                 catalogueFactsRequireReview ||
