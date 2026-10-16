@@ -44,11 +44,11 @@
         "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
       ],
       "dependenciesAndApprovals": [
-        "Founder delegated frontend versus wait decision; choose minimal frontend now, morning review pending.",
+        "Founder accepted the bounded frontend checkpoints on 2026-10-16 at cf08fb91ee6ba64973c9230c7db2f424bdd67cf1; exact source publication only is authorized.",
         "Backend contract, real feed/moderation/security and durable recovery remain unimplemented."
       ],
       "manifestPath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
-      "manifestSha256": "E4E8098E47F4DA6F2CC67F814C3F54DAED7717E78F3DAEA095B2B5B08E1B529E",
+      "manifestSha256": "420FBD49F95070107D2C430FCDD8302FED76C6F564DA2B0EF4A601194C1B145B",
       "evidencePath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -73,7 +73,7 @@
       "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
     ],
     "dependenciesAndApprovals": [
-      "Founder delegated frontend versus wait decision; choose minimal frontend now, morning review pending.",
+      "Founder accepted the bounded frontend checkpoints on 2026-10-16 at cf08fb91ee6ba64973c9230c7db2f424bdd67cf1; exact source publication only is authorized.",
       "Backend contract, real feed/moderation/security and durable recovery remain unimplemented."
     ],
     "testAndEvidencePlan": [
@@ -203,7 +203,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder delegated minimal frontend decision; implement this bounded seam under standing mapped authority. New checkpoint not founder-approved; provider/live work excluded."
+    "founderAcceptance": "Founder approved the bounded LF17/22/24/25/26/27 review at cf08fb91ee6ba64973c9230c7db2f424bdd67cf1 and separately approved only its normal source publication with at most one existing checker/test/ticket metadata-only successor. Native/host-only limits, existing customer-title ellipsis and provider/APK dependencies remain; no build, backend, live service or worktree split authority."
   },
   "execution": {
     "referenceWriteAuthorized": false,

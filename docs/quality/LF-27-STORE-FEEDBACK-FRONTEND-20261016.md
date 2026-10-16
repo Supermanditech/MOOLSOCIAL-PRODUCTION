@@ -265,3 +265,47 @@ account/Store equality. Keep the failing test and exact-order assertions.
   host-fixture evidence only; native real commerce/provider results, APK and
   founder acceptance remain unclaimed. Four literal owners only, no policy,
   registry, admission-script, backend, schema, other tree or push changes.
+
+## Founder acceptance and exact source publication — 16 October 2026
+
+Current disposition supersedes the historical pending-review statements above.
+Founder accepted the single manual Sales entry and private settings recovery,
+then replied "Approve bounded review checkpoint" for LF17/22/24/25/26/27.
+The final review reran60 focused cases (LF17:2, LF22:23, LF24:2, LF26:3,
+feedback:30), all passed, and reused unchanged valid caller/settings evidence.
+Actual OPPO reviewed attention full details, the existing private Cumin offer,
+customer defaults, feedback filters/Orders return and the unchanged164 Cart/
+original payment hold without Save/Apply, financial commands or injected records.
+Running VM source matched six relevant files; unchanged-source hot reload953ms.
+Host-only cases, existing customer-title ellipsis, live provider dependencies,
+customer-term durability and cold new-APK qualification remain explicitly open.
+
+Founder then answered "yes" to allowing only publication of this checkpoint.
+Accepted application SHA:cf08fb91ee6ba64973c9230c7db2f424bdd67cf1. The existing
+LF branch contains41 incremental commits after accepted combined base3c5a454b.
+Allow only that source or one direct metadata-only successor touching this MD/
+JSON and the existing two checker scripts/test. Published HEAD will therefore
+be recorded separately from the accepted application SHA. No app/test/assets/
+native/build/provider change, history rewrite, force push, split or new framework.
+
+The focused new publication reproduction first rejected the exact accepted LF27
+handoff identity before the bounded allowance. Afterward33 checks passed in both
+PowerShell7 and Windows PowerShell: exact/missing/foreign identity, unrelated
+ticket, source/asset/backend/policy/other-doc delta, unapproved descendant/merge,
+empty successor, build denial and wrong accepted-source argument. These are
+guard tests, not repeated app/device qualification. Real committed publication
+gate and exact remote equality must still pass before reporting publication.
+
+All existing literal ownership, base/history/registry/policy-byte and secret
+checks remain. Handoff additionally rejects staged/unstaged/untracked content;
+the four already-audited generated support paths may retain only their observed
+unstaged, normalized-empty line-ending state, never arbitrary generated work.
+No file is reset or deleted to make status appear clean.
+
+This is publication of the existing LF frontend branch under its current
+admission, not an integration edit/merge or reopening either old pinned
+integration worktree. The completed direct-baseline guard/state is untouched;
+its integration-only procedure is not repurposed as a new publication framework.
+No application implementation occurs, so no new Store/Counter application-edit
+receipt is claimed. Founder-source coverage and all provider/APK limits remain.
+Keep the normal remote-state/fast-forward safety check immediately before push.

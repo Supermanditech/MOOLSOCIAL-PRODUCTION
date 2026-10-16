@@ -2,7 +2,8 @@
 param(
   [string]$RepositoryRoot,
   [switch]$RequireCompatibilityProbes,
-  [switch]$RequireLf01Probes
+  [switch]$RequireLf01Probes,
+  [switch]$RequireLfPublicationProbes
 )
 
 Set-StrictMode -Version Latest
@@ -50,6 +51,69 @@ function Assert-GateFails([scriptblock]$Invocation, [string]$Expected) {
     ) -ge 0
   }
   Assert-Fixture $failed "negative fixture did not fail with: $Expected"
+}
+
+if ($RequireLfPublicationProbes) {
+  $checker = Join-Path $sourceRoot 'scripts/check-codex-subagent-coordination-policy.ps1'
+  $tokens=$null; $errors=$null
+  $ast=[Management.Automation.Language.Parser]::ParseFile($checker,[ref]$tokens,[ref]$errors)
+  Assert-Fixture ($errors.Count -eq 0) 'publication checker has parse errors.'
+  $identity=@($ast.FindAll({param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -ceq 'Test-Lf01AdmissionIdentity'
+  },$true))
+  Assert-Fixture ($identity.Count -eq 1) 'LF identity predicate absent/duplicated.'
+  . ([scriptblock]::Create($identity[0].Extent.Text))
+  $facts=@{Root=$sourceRoot.Replace('\','/');Branch='work/codex-ui/last-frontend-lf01-20261015'
+    Role='primary';Task='/root';Lane='codex_ui';WorkId='last-frontend-lf01-20261015'
+    Ticket='LF-27';Phase='handoff'}
+  Assert-Fixture (Test-Lf01AdmissionIdentity $facts) 'accepted LF27 publication identity rejected.'
+  $cases=1
+  foreach($key in @($facts.Keys)) {
+    $probe=$facts.Clone();$probe[$key]='unrelated'
+    Assert-Fixture (-not (Test-Lf01AdmissionIdentity $probe)) "publication changed $key admitted."
+    $probe=$facts.Clone();$probe.Remove($key)
+    Assert-Fixture (-not (Test-Lf01AdmissionIdentity $probe)) "publication missing $key admitted."
+    $cases+=2
+  }
+  foreach($ticket in @('LF-01','LF-26')) {
+    $probe=$facts.Clone();$probe.Ticket=$ticket
+    Assert-Fixture (-not (Test-Lf01AdmissionIdentity $probe)) 'another ticket gained publication.'
+    $cases++
+  }
+  $delta=@($ast.FindAll({param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -ceq 'Test-Lf27PublicationDelta'
+  },$true))
+  Assert-Fixture ($delta.Count -eq 1) 'publication delta predicate absent/duplicated.'
+  . ([scriptblock]::Create($delta[0].Extent.Text))
+  $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+  $successor='1111111111111111111111111111111111111111'
+  $metadata=@('scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/check-cross-agent-incremental-ticket-gate.ps1',
+    'scripts/test-cross-agent-incremental-ticket-gate.ps1',
+    'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md',
+    'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
+  Assert-Fixture (Test-Lf27PublicationDelta $accepted @() @()) 'accepted source rejected.'
+  Assert-Fixture (Test-Lf27PublicationDelta $successor @($accepted) $metadata) 'one metadata-only successor rejected.'
+  $cases+=2
+  foreach($owner in @('apps/mobile/lib/features/work/work_session.dart',
+      'apps/mobile/assets/changed.png','backend/functions/src/index.ts',
+      'config/codex-subagent-coordination-policy.json','docs/quality/unrelated.md')) {
+    Assert-Fixture (-not (Test-Lf27PublicationDelta $successor @($accepted) ($metadata+@($owner)))) "unaccepted publication owner admitted: $owner"
+    $cases++
+  }
+  Assert-Fixture (-not (Test-Lf27PublicationDelta $successor @('2222222222222222222222222222222222222222') $metadata)) 'unapproved descendant admitted.'
+  Assert-Fixture (-not (Test-Lf27PublicationDelta $successor @($accepted,$accepted) $metadata)) 'merge successor admitted.'
+  Assert-Fixture (-not (Test-Lf27PublicationDelta $successor @($accepted) @())) 'unexplained empty successor admitted.'
+  Assert-Fixture (-not (Test-Lf27PublicationDelta $accepted @() $metadata)) 'accepted SHA with changed content admitted.'
+  $cases+=4
+  Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase pre_build -Lane codex_ui -TicketId LF-27 -UiScope last-frontend-store-feedback-frontend -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime } 'no build/handoff'
+  Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase handoff -Lane codex_ui -TicketId LF-26 -UiScope last-frontend-retail-facts-consistency -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit $accepted } 'no build/handoff'
+  Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase handoff -Lane codex_ui -TicketId LF-27 -UiScope last-frontend-store-feedback-frontend -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit '3c5a454bf8af173d9736c75213cafb88e641765c' } 'no build/handoff'
+  $cases+=3
+  Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."
+  return
 }
 
 if ($RequireLf01Probes) {

@@ -97,7 +97,7 @@ function Test-CompatibilityIncrementalImplementationStage([object]$Stage) {
 
 # The accepted combined source is LF-01's start, not the retired August ticket.
 # Delegate to the current exact owner/scope/Git checks; historical paths below
-# remain unchanged. This grants no build, install or handoff acceptance.
+# remain unchanged. Exact accepted LF27 source publication grants no build/install.
 if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10','LF-11','LF-12','LF-13','LF-14','LF-15','LF-16','LF-17','LF-18','LF-19','LF-20','LF-21','LF-22','LF-23','LF-24','LF-25','LF-26','LF-27') -or $UiScope -cin @('last-frontend-entry-recovery','last-frontend-store-details','last-frontend-product-media','last-frontend-selling-terms-offers','last-frontend-payment-return-policy','last-frontend-fulfilment-readiness','last-frontend-public-store-consistency','last-frontend-cart-checkout-consistency','last-frontend-payment-recovery','last-frontend-store-customer-orders','last-frontend-handover-tracking','last-frontend-after-sales-documents','last-frontend-customer-feedback','last-frontend-analytics-reconciliation','last-frontend-store-settings-truthfulness','last-frontend-pickup-preferences-recovery','last-frontend-store-attention-visual','last-frontend-store-defaults-recovery','last-frontend-store-input-consumers','last-frontend-trading-preferences-recovery','last-frontend-product-defaults-recovery','last-frontend-balance-payment-hold-recovery','last-frontend-readiness-preferences-recovery','last-frontend-offer-publish-availability','last-frontend-customer-terms-context','last-frontend-retail-facts-consistency','last-frontend-store-feedback-frontend')) {
   Assert-IncrementalTicket (($TicketId -ceq 'LF-01' -and $UiScope -ceq 'last-frontend-entry-recovery' -or
     $TicketId -ceq 'LF-02-1' -and $UiScope -ceq 'last-frontend-store-details' -or
@@ -128,14 +128,18 @@ if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','
     $TicketId -ceq 'LF-27' -and $UiScope -ceq 'last-frontend-store-feedback-frontend') -and $Lane -ceq 'codex_ui' -and
     $PackageId -ceq 'com.moolsocial.app.runtime' -and
     $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
-    $Phase -cin @('ticket_start','implementation')) 'LF-01 permits only its current hot-reload source identity; no build/handoff.'
+    ($Phase -cin @('ticket_start','implementation') -or
+      ($Phase -ceq 'handoff' -and $TicketId -ceq 'LF-27' -and
+        $AcceptedUiCommit -ceq 'cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'))) 'LF-01 permits only its current hot-reload source identity; no build/handoff except accepted LF27 source publication.'
   $binding = (Get-Content -Raw -LiteralPath (Join-Path $root 'config/codex-subagent-coordination-policy.json') | ConvertFrom-Json).registryBinding
-  $coordinationPhase = if ($Phase -ceq 'ticket_start') { 'task_start' } else { 'implementation' }
+  $coordinationPhase = if ($Phase -ceq 'ticket_start') { 'task_start' }
+    elseif ($Phase -ceq 'handoff') { 'handoff' } else { 'implementation' }
   & (Join-Path $root 'scripts/check-codex-subagent-coordination-policy.ps1') `
     -RepositoryRoot $root -AgentRole primary -AgentTask /root -UseRecordedClaim `
     -ExpectedRegistryEntryCount $binding.entryCount -ExpectedRegistrySha256 $binding.sha256 `
     -ProductionLane codex_ui -ProductionPhase $coordinationPhase `
-    -ProductionWorkId last-frontend-lf01-20261015 -ProductionTicketId $TicketId
+    -ProductionWorkId last-frontend-lf01-20261015 -ProductionTicketId $TicketId `
+    -AcceptedUiCommit $AcceptedUiCommit
   return
 }
 

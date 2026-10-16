@@ -7909,8 +7909,22 @@ function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
   return $Facts.ContainsKey('Ticket') -and $Facts.Ticket -cin @('LF-27','LF-26','LF-25','LF-24','LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','LF-08','LF-09','LF-10','LF-11','LF-12','LF-13','LF-14','LF-15','LF-16','LF-17','LF-18','LF-19','LF-20','LF-21','LF-22','LF-23') -and
     $Facts.ContainsKey('Role') -and $Facts.ContainsKey('Task') -and
     $Facts.ContainsKey('Phase') -and $Facts.Role -ceq 'primary' -and
-    $Facts.Task -ceq '/root' -and $Facts.Phase -cin @(
-      'coordination_bootstrap','task_start','implementation','pre_commit')
+    $Facts.Task -ceq '/root' -and ($Facts.Phase -cin @(
+      'coordination_bootstrap','task_start','implementation','pre_commit') -or
+      ($Facts.Ticket -ceq 'LF-27' -and $Facts.Phase -ceq 'handoff'))
+}
+
+function Test-Lf27PublicationDelta([string]$Head, [string[]]$Parents, [string[]]$Owners) {
+  $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+  if ($Head -ceq $accepted) { return @($Owners).Count -eq 0 }
+  if ($Head -cnotmatch '^[0-9a-f]{40}$' -or @($Parents).Count -ne 1 -or
+      $Parents[0] -cne $accepted -or @($Owners).Count -eq 0) { return $false }
+  $metadata=@('scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/check-cross-agent-incremental-ticket-gate.ps1',
+    'scripts/test-cross-agent-incremental-ticket-gate.ps1',
+    'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md',
+    'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
+  return @($Owners | Where-Object { $_ -cnotin $metadata }).Count -eq 0
 }
 
 function Invoke-Lf01Admission {
@@ -8103,7 +8117,7 @@ function Invoke-Lf01Admission {
     Root=$root.Replace('\','/'); Branch=$branch[0]; Role=$AgentRole; Task=$AgentTask
     Lane=$ProductionLane; WorkId=$ProductionWorkId; Ticket=$ProductionTicketId
     Phase=$ProductionPhase
-  })) 'LF-01 requires its exact authorized feature identity; build, device and closure phases are not admitted.'
+  })) 'LF-01 requires its exact authorized feature identity; only accepted LF27 publication adds handoff, not build/device/closure.'
   $record = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
   $admission = $record.ticket.frontendAdmission
   Assert-Coordination ($record.ticket.id -ceq $ProductionTicketId -and
@@ -8175,6 +8189,26 @@ function Invoke-Lf01Admission {
     -StatePath $recordOwner -CandidateId $ProductionTicketId -RequireExecutionAuthorized
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
+  if ($ProductionPhase -ceq 'handoff') {
+    $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+    Assert-Coordination ($AcceptedUiCommit -ceq $accepted) 'LF27 publication requires the exact founder-accepted source.'
+    Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$accepted,$head) | Out-Null
+    $parents=@((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$head)))[0] -split ' ')
+    $delta=@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$accepted,$head))
+    Assert-Coordination (Test-Lf27PublicationDelta $head $parents $delta) 'LF27 publication permits only accepted source or its one metadata-only successor.'
+    Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -eq 0 -and
+      @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
+      @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'LF27 publication requires committed changes and no untracked content.'
+    $support=@('apps/mobile/.dart_tool/package_config.json','apps/mobile/.dart_tool/package_graph.json',
+      'apps/mobile/.flutter-plugins-dependencies',
+      'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java')
+    foreach($row in @(Get-OctoberCompatibilityGitLines @('status','--porcelain=v1','--untracked-files=normal'))) {
+      Assert-Coordination ($row.Length -gt 3 -and $row.Substring(0,3) -ceq ' M ' -and
+        $row.Substring(3) -cin $support) 'LF27 publication has unaudited worktree modifications.'
+    }
+    Get-OctoberCompatibilityGitLines (@('diff','--ignore-space-at-eol','--exit-code','--')+$support) | Out-Null
+    Write-Output "LF27 source publication qualified: accepted=$accepted; head=$head; no APK/provider acceptance."
+  }
   if ($ProductionPhase -ceq 'pre_commit') {
     Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -gt 0 -and
       @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
