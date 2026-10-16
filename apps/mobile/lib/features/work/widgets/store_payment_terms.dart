@@ -174,70 +174,121 @@ class StoreCustomerPaymentTerms extends StatefulWidget {
 }
 
 class _StoreCustomerPaymentTermsState extends State<StoreCustomerPaymentTerms> {
-  late bool _inherit = !widget
-      .session
-      .workspacePublicationDetails
-      .customerPaymentTerms
-      .containsKey(widget.customerId);
-  late List<WorkspacePaymentTerm> _terms = List.of(
-    widget.session.workspacePublicationDetails.customerPaymentTerms[widget
-            .customerId] ??
-        widget.session.workspacePublicationDetails.wholesalePaymentTerms,
-  );
+  late bool _inherit;
+  late List<WorkspacePaymentTerm> _terms;
+  late Object _draftContext;
+  Object _draftBinding = Object();
   String? _message;
+
   @override
-  Widget build(BuildContext context) => StoreSettingsStyle(
-    child: ExpansionTile(
-      key: PageStorageKey(
-        'customer-payment-terms-${widget.storeId}-${widget.customerId}',
-      ),
-      title: const Text('Wholesale payment terms'),
-      childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        SwitchListTile.adaptive(
-          key: const Key('work-customer-terms-inherit'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Use Store defaults'),
-          value: _inherit,
-          onChanged: (value) => setState(() {
-            _inherit = value;
-            _message = null;
-          }),
-        ),
-        if (!_inherit)
-          StorePaymentTermsEditor(
-            initial: _terms,
-            onChanged: (value) {
-              _terms = value;
-            },
+  void initState() {
+    super.initState();
+    _initializeDraft();
+  }
+
+  @override
+  void didUpdateWidget(StoreCustomerPaymentTerms oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.storeId != widget.storeId ||
+        oldWidget.customerId != widget.customerId) {
+      _initializeDraft();
+    }
+  }
+
+  void _initializeDraft() {
+    _draftContext = widget.session.publicationPreferencesContext;
+    _draftBinding = Object();
+    final details = widget.session.workspacePublicationDetails;
+    _inherit = !details.customerPaymentTerms.containsKey(widget.customerId);
+    _terms = List.of(details.customerPaymentTerms[widget.customerId] ??
+        details.wholesalePaymentTerms);
+    _message = null;
+  }
+
+  bool _current(Object binding) => mounted &&
+      identical(binding, _draftBinding) &&
+      widget.session.navigationScopeRevision != null &&
+      _draftContext == widget.session.publicationPreferencesContext;
+
+  void _apply(Object binding) {
+    if (!mounted || !identical(binding, _draftBinding)) return;
+    final ok = widget.session.saveWorkspaceCustomerPaymentTerms(
+      expectedContext: _draftContext,
+      expectedStoreId: widget.storeId,
+      customerId: widget.customerId,
+      terms: _inherit ? null : _terms,
+    );
+    if (!mounted || !identical(binding, _draftBinding)) return;
+    setState(() {
+      _message = ok
+          ? 'Customer preferences applied'
+          : 'Check the terms and reopen this customer in the correct Store.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, child) {
+      final binding = _draftBinding;
+      return StoreSettingsStyle(
+        child: ExpansionTile(
+          key: PageStorageKey(
+            'customer-payment-terms-${widget.storeId}-${widget.customerId}',
           ),
-        const Text(
-          'Applies only to this customer’s wholesale orders. Retail stays full advance through MoolSocial.',
-          style: TextStyle(fontSize: 12),
+          title: const Text('Wholesale payment terms'),
+          childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
+          children: [
+            if (!_current(binding))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Semantics(
+                  liveRegion: true,
+                  child: const Text('Your Store or account changed. Reopen this customer to edit payment terms.'),
+                ),
+              )
+            else ...[
+              SwitchListTile.adaptive(
+                key: const Key('work-customer-terms-inherit'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use Store defaults'),
+                value: _inherit,
+                onChanged: (value) {
+                  if (!_current(binding)) return;
+                  setState(() {
+                    _inherit = value;
+                    _message = null;
+                  });
+                },
+              ),
+              if (!_inherit)
+                StorePaymentTermsEditor(
+                  key: ObjectKey(binding),
+                  initial: _terms,
+                  onChanged: (value) {
+                    if (_current(binding)) _terms = value;
+                  },
+                ),
+              const Text(
+                'Applies only to this customer’s wholesale orders. Retail stays full advance through MoolSocial.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                key: const Key('work-customer-terms-save'),
+                onPressed: () => _apply(binding),
+                child: const Text('Apply customer terms'),
+              ),
+              if (_message != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Semantics(liveRegion: true, child: Text(_message!)),
+                ),
+            ],
+          ],
         ),
-        const SizedBox(height: 8),
-        FilledButton(
-          key: const Key('work-customer-terms-save'),
-          onPressed: () {
-            final ok = widget.session.saveWorkspaceCustomerPaymentTerms(
-              expectedStoreId: widget.storeId,
-              customerId: widget.customerId,
-              terms: _inherit ? null : _terms,
-            );
-            setState(() {
-              _message = ok
-                  ? 'Customer preferences applied'
-                  : 'Check the terms and reopen this customer in the correct Store.';
-            });
-          },
-          child: const Text('Apply customer terms'),
-        ),
-        if (_message != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Semantics(liveRegion: true, child: Text(_message!)),
-          ),
-      ],
-    ),
+      );
+    },
   );
 }

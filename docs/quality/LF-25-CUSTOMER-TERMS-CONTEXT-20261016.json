@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_successor_assessed",
+    "currentTicketId": "LF-25",
+    "selectedTicketAssessment": {
+      "ticketId": "LF-25",
+      "customerOutcome": "Retailer/Grocery Store owner applies private customer terms only from the current account, Store visit and customer editor; stale callbacks cannot write the destination preferences.",
+      "necessityProof": "Existing customer editor and session mutation pass only Store/customer IDs; reproduce stale account/Store-ABA/retarget/dispose callbacks before repair.",
+      "implementationDisposition": [
+        "reuse",
+        "configuration"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "Stale account and Store ABA preserve destination preferences",
+        "Disposed/retargeted callbacks cannot write; valid Apply/inheritance and invalid input behavior retained",
+        "Private customer map remains excluded from public projections; normal/200% text"
+      ],
+      "adjustments": [
+        "Reuse the existing feature tree and narrow admission; no policy or registry changes."
+      ],
+      "explicitExclusions": [
+        "No redesign, backend, new authentication provider, delivery workspace, APK or live transaction."
+      ],
+      "dependenciesAndApprovals": [
+        "Founder explicitly resumed implementation and clarified Codex ownership; only literal LF25 admission, no policy/checker rule expansion.",
+        "Durable customer identity/migration, live policy and eligibility remain unimplemented dependencies."
+      ],
+      "manifestPath": "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.md",
+      "manifestSha256": "708A582987911DCF3945F2901E5E606FC1BFF71CC1BFB8496ECF00AC498595BB",
+      "evidencePath": "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "ticket": {
+    "id": "LF-25",
+    "parentTicketId": "LF-05",
+    "customerOutcome": "Retailer/Grocery Store owner applies private customer terms only from the current account, Store visit and customer editor; stale callbacks cannot write the destination preferences.",
+    "classification": "mvp_supporting",
+    "classificationReason": "Bounded isolation/recovery correction in the existing private customer-terms editor, not new eligibility or customer identities.",
+    "minimumCompleteScope": [
+      "Reproduce stale customer-terms callbacks before changing application behavior.",
+      "Capture existing publicationPreferencesContext eagerly and enforce it at the session mutation boundary; reject disposed or superseded editors.",
+      "Preserve normal override/inheritance, invalid input guards and approved layout; focused regressions and read-only OPPO source reload."
+    ],
+    "explicitExclusions": [
+      "No backend, discount/quote/funding engine, live publishing/payment, dispatch/operator workspace, APK, unrelated redesign or another tree."
+    ],
+    "dependenciesAndApprovals": [
+      "Founder resumed listed frontend implementation, with Codex sole owner until work is divided; only exact ticket/path admission permitted.",
+      "Morning acceptance remains pending; stable customer identities, durable terms and authoritative policies are not implemented."
+    ],
+    "testAndEvidencePlan": [
+      "Normal/200% stale account, Store ABA, disposed and retargeted editor callbacks must leave destination map unchanged.",
+      "Verify valid override/inheritance, invalid terms, all internal callers and private-map public exclusion; native section read-only, no Apply."
+    ],
+    "frontendAdmission": {
+      "task": "/root",
+      "role": "primary",
+      "lane": "codex_ui",
+      "workId": "last-frontend-lf01-20261015",
+      "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015",
+      "branch": "work/codex-ui/last-frontend-lf01-20261015",
+      "baselineHead": "3c5a454bf8af173d9736c75213cafb88e641765c",
+      "packageId": "com.moolsocial.app.runtime",
+      "reviewVersionName": "1.0.0-r67.3",
+      "reviewVersionCode": 2026101303,
+      "owners": [
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.md",
+        "docs/quality/LF-01-ENTRY-RECOVERY-20261015.json",
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+        "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+        "apps/mobile/lib/features/journey01/journey_router.dart",
+        "apps/mobile/lib/features/journey01/journey_session.dart",
+        "apps/mobile/lib/features/work/work_session.dart",
+        "apps/mobile/lib/features/work/work_services.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/test/journey_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/universal/uaw_r12_personal_legacy_route_containment_test.dart",
+        "apps/mobile/test/work_vertical_slice_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.md",
+        "docs/quality/LF-02-STORE-DETAILS-20261015.json",
+        "apps/mobile/lib/features/work/work_publication_data.dart",
+        "apps/mobile/lib/features/work/widgets/store_publication_settings.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_store_address.dart",
+        "apps/mobile/lib/features/work/work_publication.dart",
+        "apps/mobile/test/work_store_publication_settings_test.dart",
+        "apps/mobile/test/work_publication_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_store_address_test.dart",
+        "apps/mobile/test/store_settings_widgets_test.dart",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.md",
+        "docs/quality/LF-03-PRODUCT-MEDIA-20261015.json",
+        "apps/mobile/lib/features/work/work_models.dart",
+        "apps/mobile/test/work_product_content_test.dart",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.md",
+        "docs/quality/LF-04-SELLING-TERMS-OFFERS-20261015.json",
+        "apps/mobile/test/work_public_handoff_test.dart",
+        "apps/mobile/test/store_selling_channels_test.dart",
+        "apps/mobile/test/fixtures/store_public_handoff_v1.dart",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.md",
+        "docs/quality/LF-05-PAYMENT-RETURN-POLICY-20261015.json",
+        "apps/mobile/lib/features/work/widgets/store_payment_terms.dart",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.md",
+        "docs/quality/LF-06-FULFILMENT-READINESS-20261015.json",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.md",
+        "docs/quality/LF-07-PUBLIC-STORE-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.md",
+        "docs/quality/LF-08-CART-CHECKOUT-CONSISTENCY-20261015.json",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.md",
+        "docs/quality/LF-09-PAYMENT-RECOVERY-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.md",
+        "docs/quality/LF-10-STORE-CUSTOMER-ORDERS-20261015.json",
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.md",
+        "docs/quality/LF-11-HANDOVER-TRACKING-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.md",
+        "docs/quality/LF-12-AFTER-SALES-DOCUMENTS-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_delivery_exception_scope_test.dart",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.md",
+        "docs/quality/LF-13-CUSTOMER-FEEDBACK-20261015.json",
+        "apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.md",
+        "docs/quality/LF-14-ANALYTICS-RECONCILIATION-20261015.json",
+        "docs/quality/LF-15-STORE-SETTINGS-TRUTHFULNESS-20261016.md",
+        "docs/quality/LF-15-STORE-SETTINGS-TRUTHFULNESS-20261016.json",
+        "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.md",
+        "docs/quality/LF-16-PICKUP-PREFERENCES-RECOVERY-20261016.json",
+        "apps/mobile/lib/features/work/widgets/store_settings_widgets.dart",
+        "docs/quality/LF-17-STORE-ATTENTION-VISUAL-20261016.md",
+        "docs/quality/LF-17-STORE-ATTENTION-VISUAL-20261016.json",
+        "docs/quality/LF-18-STORE-DEFAULTS-RECOVERY-20261016.md",
+        "docs/quality/LF-18-STORE-DEFAULTS-RECOVERY-20261016.json",
+        "docs/quality/LF-19-STORE-INPUT-CONSUMERS-20261016.md",
+        "docs/quality/LF-19-STORE-INPUT-CONSUMERS-20261016.json",
+        "docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.md",
+        "docs/quality/LF-20-TRADING-PREFERENCES-RECOVERY-20261016.json",
+        "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.md",
+        "docs/quality/LF-21-PRODUCT-DEFAULTS-RECOVERY-20261016.json",
+        "apps/mobile/lib/features/work/widgets/store_product_thumbnail.dart",
+        "apps/mobile/test/store_product_thumbnail_test.dart",
+        "docs/quality/LF-22-BALANCE-PAYMENT-HOLD-RECOVERY-20261016.md",
+        "docs/quality/LF-22-BALANCE-PAYMENT-HOLD-RECOVERY-20261016.json",
+        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+        "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.md",
+        "docs/quality/LF-23-READINESS-PREFERENCES-RECOVERY-20261016.json",
+        "docs/quality/LF-24-OFFER-PUBLISH-AVAILABILITY-20261016.md",
+        "docs/quality/LF-24-OFFER-PUBLISH-AVAILABILITY-20261016.json",
+        "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.md",
+        "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.json"
+      ]
+    }
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "evidence": "docs/quality/LF-25-CUSTOMER-TERMS-CONTEXT-20261016.md",
+    "beyondMvpExplicitlyAuthorized": false,
+    "founderAcceptance": "Frontend implementation explicitly resumed; LF25 exact admission only, existing checks unchanged. Checkpoint remains unaccepted until actual founder review."
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": false,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

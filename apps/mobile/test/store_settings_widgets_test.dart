@@ -3,9 +3,123 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/work/widgets/store_payment_terms.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 
 void main() {
+  for (final boundary in ['account', 'Store ABA', 'disposed']) {
+    test('LF25 session mutation rejects stale $boundary context', () {
+      final accounts = _Lf25Accounts();
+      final work = _lf25Work(accounts);
+      var disposed = false;
+      addTearDown(() { if (!disposed) work.dispose(); });
+      final originalContext = work.publicationPreferencesContext;
+      final customer = work.workspaceCustomerBook.first.id;
+      if (boundary == 'account') {
+        accounts.accountScope = 'host-account-b';
+      } else if (boundary == 'Store ABA') {
+        work.activeWorkspace = _lf25Store('host-store-b');
+        work.activeWorkspace = _lf25Store('host-store-a');
+      } else {
+        work.dispose();
+        disposed = true;
+      }
+      final destination = work.workspacePublicationDetails.toJson();
+      expect(work.saveWorkspaceCustomerPaymentTerms(expectedContext: originalContext,
+        expectedStoreId: 'host-store-a', customerId: customer, terms: const [
+          WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.wholesaleAdvance)]), isFalse);
+      expect(work.workspacePublicationDetails.toJson(), destination);
+    });
+  }
+
+  testWidgets('LF25 current customer can apply, reject invalid terms and inherit', (tester) async {
+    final work = _lf25Work(_Lf25Accounts());
+    addTearDown(work.dispose);
+    final customer = work.workspaceCustomerBook.first.id;
+    await _lf25Mount(tester, work, customer, 1);
+    await tester.tap(find.text('Wholesale payment terms'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-customer-terms-inherit')));
+    await tester.pumpAndSettle();
+    void edit(List<WorkspacePaymentTerm> terms) => tester.widget<StorePaymentTermsEditor>(
+      find.byType(StorePaymentTermsEditor)).onChanged(terms);
+    VoidCallback apply() => tester.widget<FilledButton>(
+      find.byKey(const Key('work-customer-terms-save'))).onPressed!;
+    edit(const [WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+      advancePercent: 25)]);
+    apply()();
+    await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.customerPaymentTerms[customer]!.single.advancePercent, 25);
+    final valid = work.workspacePublicationDetails.toJson();
+    edit(const [WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+      advancePercent: 100)]);
+    apply()();
+    await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.toJson(), valid);
+    expect(find.text('Check the terms and reopen this customer in the correct Store.'), findsOneWidget);
+    edit(const []);
+    apply()();
+    await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.customerPaymentTerms[customer], isEmpty);
+    await tester.ensureVisible(find.byKey(const Key('work-customer-terms-inherit')));
+    await tester.tap(find.byKey(const Key('work-customer-terms-inherit')));
+    await tester.pumpAndSettle();
+    apply()();
+    await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.customerPaymentTerms.containsKey(customer), isFalse);
+    expect(find.text('Customer preferences applied'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  for (final scale in [1.0, 2.0]) {
+    for (final boundary in ['account', 'Store ABA', 'disposed', 'customer retarget']) {
+      testWidgets('LF25 $boundary callback preserves destination terms at $scale', (tester) async {
+        final accounts = _Lf25Accounts();
+        final work = _lf25Work(accounts);
+        addTearDown(work.dispose);
+        final customerA = work.workspaceCustomerId('Host buyer A · 9000091991');
+        final customerB = work.workspaceCustomerId('Host buyer B · 9000091992');
+        expect(work.workspaceCustomerBook.map((c) => c.id), containsAll([customerA, customerB]));
+        await _lf25Mount(tester, work, customerA, scale);
+        await tester.tap(find.text('Wholesale payment terms'));
+        await tester.pumpAndSettle();
+        final inherit = find.byKey(const Key('work-customer-terms-inherit'));
+        await tester.ensureVisible(inherit);
+        await tester.tap(inherit);
+        await tester.pumpAndSettle();
+        expect(tester.widget<SwitchListTile>(inherit).value, isFalse);
+        final oldApply = tester.widget<FilledButton>(find.byKey(const Key('work-customer-terms-save'))).onPressed!;
+        if (boundary == 'account') {
+          accounts.accountScope = 'host-account-b';
+          expect(work.saveWorkspacePublicationDetails(const WorkspaceStorePublicationDetails(
+            legalName: 'Destination account preferences')), isTrue);
+        } else if (boundary == 'Store ABA') {
+          work.activeWorkspace = _lf25Store('host-store-b');
+          work.activeWorkspace = _lf25Store('host-store-a');
+        } else if (boundary == 'disposed') {
+          await tester.pumpWidget(const SizedBox.shrink());
+        } else {
+          await _lf25Mount(tester, work, customerB, scale);
+          await tester.tap(find.text('Wholesale payment terms'));
+          await tester.pumpAndSettle();
+          expect(tester.widget<SwitchListTile>(inherit).value, isTrue,
+            reason: 'A deliberately retargeted editor must initialize the new customer');
+        }
+        final destination = work.workspacePublicationDetails.toJson();
+        expect(oldApply, returnsNormally);
+        await tester.pumpAndSettle();
+        expect(work.workspacePublicationDetails.toJson(), destination);
+        expect(tester.takeException(), isNull);
+        if (boundary == 'customer retarget') {
+          final currentApply = tester.widget<FilledButton>(find.byKey(const Key('work-customer-terms-save'))).onPressed!;
+          currentApply();
+          await tester.pumpAndSettle();
+          expect(find.text('Customer preferences applied'), findsOneWidget);
+          expect(work.workspacePublicationDetails.customerPaymentTerms.containsKey(customerB), isFalse);
+        }
+      });
+    }
+  }
   for (final scale in [1.0, 2.0]) {
     testWidgets('LF05 payment fields explain invalid values at $scale', (tester) async {
       tester.view.devicePixelRatio = 1;
@@ -146,4 +260,46 @@ void main() {
       expect(StoreSettingsInput.pin(invalid), isNotNull);
     }
   });
+}
+
+// Isolated host-only account/Store/customer fixture, never runtime Stock/orders.
+class _Lf25Accounts implements WorkPendingProofStore {
+  @override
+  String accountScope = 'host-account-a';
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+
+WorkWorkspace _lf25Store(String id) => WorkWorkspace(id: id, name: 'Host Store',
+  profileLabel: 'Retailer / Grocery Store', profileId: 'retailer-grocery-store',
+  area: 'Host area', verified: true);
+
+WorkSession _lf25Work(_Lf25Accounts accounts) {
+  final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: accounts)
+    ..activeWorkspace = _lf25Store('host-store-a');
+  for (final buyer in ['Host buyer A · 9000091991', 'Host buyer B · 9000091992']) {
+    work.workspaceOrders.add(WorkspaceOrderRecord(id: buyer, customer: buyer,
+      items: 'Host item × 1', quantities: const {'host-item': 1}, amount: 1,
+      source: 'App', fulfilment: 'Pickup', payment: 'Paid online', address: '',
+      stage: 'Completed', needsDelivery: false, createdAt: DateTime(2026, 10, 16)));
+  }
+  return work;
+}
+
+Future<void> _lf25Mount(WidgetTester tester, WorkSession work, String customer, double scale) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(320, 700);
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(MaterialApp(
+    builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(
+      textScaler: TextScaler.linear(scale)), child: child!),
+    home: Scaffold(body: SingleChildScrollView(child: StoreCustomerPaymentTerms(
+      key: const ValueKey('host-customer-editor'), session: work,
+      storeId: 'host-store-a', customerId: customer))),
+  ));
+  await tester.pumpAndSettle();
 }

@@ -841,6 +841,7 @@ void main() {
       needsDelivery: false, createdAt: DateTime.now()));
     final customerId = work.workspaceCustomerBook.single.id;
     expect(work.saveWorkspaceCustomerPaymentTerms(expectedStoreId: 'lf18-a',
+      expectedContext: work.publicationPreferencesContext,
       customerId: customerId, terms: []), isTrue);
     expect(work.workspacePublicationPreferencesSaved, isFalse);
     expect(f.rows[f.key('lf18-a')], encoded);

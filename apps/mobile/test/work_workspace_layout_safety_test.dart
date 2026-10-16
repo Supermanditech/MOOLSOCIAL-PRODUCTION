@@ -66172,6 +66172,7 @@ void main() {
       );
       expect(
         work.saveWorkspaceCustomerPaymentTerms(
+          expectedContext: work.publicationPreferencesContext,
           expectedStoreId: 'wrong-store',
           customerId: '9829012345',
           terms: [],
@@ -66180,6 +66181,7 @@ void main() {
       );
       expect(
         work.saveWorkspaceCustomerPaymentTerms(
+          expectedContext: work.publicationPreferencesContext,
           expectedStoreId: store.id,
           customerId: 'unknown',
           terms: [],

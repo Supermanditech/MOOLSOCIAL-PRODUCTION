@@ -8272,11 +8272,13 @@ class WorkSession extends ChangeNotifier {
   /// Customer preference only; the backend must authorise and quote these terms
   /// for the authenticated buyer. Never match by display name or auto-grant credit.
   bool saveWorkspaceCustomerPaymentTerms({
+    required Object expectedContext,
     required String expectedStoreId,
     required String customerId,
     required List<WorkspacePaymentTerm>? terms,
   }) {
-    if ((activeWorkspace?.id ?? workspaceId) != expectedStoreId ||
+    if (_disposed || expectedContext != publicationPreferencesContext ||
+        (activeWorkspace?.id ?? workspaceId) != expectedStoreId ||
         !workspaceCustomerBook.any((c) => c.id == customerId)) {
       return false;
     }
