@@ -5284,8 +5284,49 @@ void main() {
       expect(tester.getSemantics(find.byKey(const Key('work-orders-filter-live')))
         .flagsCollection.isSelected, ui.Tristate.isTrue);
       expect(tester.getSemantics(create).label, 'Create customer order');
+      expect(find.bySemanticsLabel('Customer orders'), findsOneWidget);
       expect(tester.takeException(), isNull);
       } finally { semantics.dispose(); }
+    });
+  }
+
+  for (final layout in [(const Size(360, 720), 1.0),
+      (const Size(320, 568), 2.0), (const Size(640, 360), 2.0)]) {
+    testWidgets('LF27 unified Orders utilities remove a fixed band ${layout.$1}', (tester) async {
+      final work = liveStore();
+      await mount(tester, route: '/app/work/workspace/dashboard?section=orders',
+        work: work, viewport: layout.$1, textScale: layout.$2);
+      expect(find.byKey(const Key('work-dashboard-inline-search-band')), findsNothing);
+      final toolbar = find.byKey(const Key('work-orders-toolbar'));
+      for (final key in ['work-dashboard-search', 'work-orders-create-customer-order',
+          'work-orders-customer-feedback', 'work-orders-alerts']) {
+        final action = find.byKey(Key(key));
+        expect(find.descendant(of: toolbar, matching: action), findsOneWidget);
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+      }
+      if (layout.$2 == 1) {
+        final strip = find.byKey(const Key('work-orders-filter-strip'));
+        final before = tester.getTopLeft(strip).dy;
+        await tester.tap(find.byKey(const Key('work-orders-filter-more')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-orders-current-scope')), findsOneWidget);
+        expect(tester.getTopLeft(strip).dy, closeTo(before, 1),
+          reason: 'Offscreen-stage reminder must not move the working queue');
+      }
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      expect(field.hitTestable(), findsOneWidget);
+      await tester.enterText(field, 'LF27 search');
+      await tester.pumpAndSettle();
+      expect(work.workspaceSearchQuery, 'LF27 search');
+      expect(find.byKey(const Key('work-dashboard-search-close')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
 
@@ -5296,7 +5337,7 @@ void main() {
     expect(find.byKey(const Key('work-dashboard-scan')), findsNothing);
     final search = find.byKey(const Key('work-dashboard-search'));
     expect(search.hitTestable(), findsOneWidget);
-    expect(tester.getSize(search).width, greaterThanOrEqualTo(250));
+    expect(tester.getSize(search).width, greaterThanOrEqualTo(180));
     expect(tester.takeException(), isNull);
   });
 
@@ -47993,14 +48034,15 @@ void main() {
       expect(find.text('Create bill'), findsNothing);
       expect(find.byKey(const Key('work-orders-filter-strip')), findsOneWidget);
       final heading = tester.renderObject<RenderParagraph>(
-        find.text('Customer orders'),
+        find.descendant(of: find.byKey(const Key('work-dashboard-search')),
+          matching: find.byType(Text)),
       );
       expect(
         heading.getBoxesForSelection(
-          const TextSelection(baseOffset: 0, extentOffset: 8),
+          const TextSelection(baseOffset: 0, extentOffset: 6),
         ),
         hasLength(1),
-        reason: 'Customer must not break inside the word',
+        reason: 'Search must not break inside the word',
       );
       expect(heading.textScaler.scale(1), closeTo(display.$3, .01));
       final orderScroll = ordersQueueScroll(
@@ -48392,7 +48434,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Customer orders'), findsOneWidget);
+      expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
       expect(row, findsOneWidget);
       expect(
         find.byKey(const Key('work-orders-filter-done')).hitTestable(),
@@ -48459,7 +48501,7 @@ void main() {
       expect(find.text('Order details'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Customer orders'), findsOneWidget);
+      expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
       expect(tester.getTopLeft(find.byKey(key!)).dy, closeTo(before.dy, 1));
       expect(
         find.byKey(const Key('work-orders-filter-done')).hitTestable(),
@@ -48509,7 +48551,9 @@ void main() {
         viewport: Size(display.$1, display.$2),
         textScale: display.$3,
       );
-      expect(find.text('Search order or customer'), findsOneWidget);
+      expect(find.descendant(
+        of: find.byKey(const Key('work-dashboard-search')),
+        matching: find.textContaining('Search')), findsOneWidget);
       expect(find.text('Open'), findsOneWidget);
       final status = tester.widget<Material>(
         find.byKey(const Key('work-dashboard-settings')),
@@ -48609,7 +48653,7 @@ void main() {
         expect(work.workspaceSearchQuery, '98765');
         await tester.tap(find.byKey(const Key('work-dashboard-search-close')));
         await tester.pumpAndSettle();
-        expect(find.text('Customer orders'), findsOneWidget);
+        expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
         expect(work.workspaceOrderFilter, 'Packing');
         expect(work.workspaceSearchQuery, isEmpty);
         expect(work.workspaceOrders, orderedEquals(originals));
@@ -49427,7 +49471,7 @@ void main() {
         await tester.tap(find.byKey(const Key('work-operation-back')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('work-dashboard-search')), findsOneWidget);
-        expect(find.text('Customer orders'), findsOneWidget);
+        expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
         expect(tester.takeException(), isNull);
         if (variant == 'mixed-reference') {
           await tester.ensureVisible(entry);
@@ -49961,7 +50005,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Customer orders'), findsOneWidget);
+      expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
       expect(work.workspaceOrderFilter, 'Packing');
       expect(work.workspaceSearchQuery, isEmpty);
       expect(work.workspaceOrders, orderedEquals(originalOrders));
@@ -54475,7 +54519,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
-    expect(find.text('Customer orders'), findsOneWidget);
+    expect(find.byKey(const Key('work-orders-toolbar')), findsOneWidget);
     expect(find.text('All 1'), findsOneWidget);
     expect(find.text('New 1'), findsOneWidget);
     expect(find.text('Create bill'), findsNothing);

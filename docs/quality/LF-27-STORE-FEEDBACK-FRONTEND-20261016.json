@@ -48,7 +48,7 @@
         "Backend contract, real feed/moderation/security and durable recovery remain unimplemented."
       ],
       "manifestPath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
-      "manifestSha256": "8AAA57D18EEE68FAECF1658103F0905B382FA2A9D0EAEFFF15AE3DDDD49B5305",
+      "manifestSha256": "FF5E9C9C0AD622A770A8B0256C9280DA31FE34C75CE039B9E479E065552E0D4F",
       "evidencePath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,

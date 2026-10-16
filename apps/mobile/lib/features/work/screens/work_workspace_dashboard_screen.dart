@@ -1303,8 +1303,8 @@ class _WorkWorkspaceDashboardScreenState
             _operation == _WorkspaceOperation.orders) ||
         (_view == _WorkspaceControlView.search &&
             _ordersSearchStoreId == workspace.id);
-    final focusedOrderDetails = _view == _WorkspaceControlView.operation &&
-        _operation == _WorkspaceOperation.orders && _focusedOrderId != null;
+    final ordersOperation = _view == _WorkspaceControlView.operation &&
+        _operation == _WorkspaceOperation.orders;
     final compactOperation =
         _view == _WorkspaceControlView.operation &&
         const {
@@ -1331,7 +1331,8 @@ class _WorkWorkspaceDashboardScreenState
         _view == _WorkspaceControlView.alerts ||
         _reviewedOrder != null;
     final shortHomeHeader =
-        (_view == _WorkspaceControlView.dashboard || ordersContext) &&
+        (_view == _WorkspaceControlView.dashboard ||
+          (_view == _WorkspaceControlView.search && ordersContext)) &&
         MediaQuery.sizeOf(context).width >= 700 &&
         MediaQuery.sizeOf(context).height <= 450;
     final namePainter =
@@ -1355,9 +1356,9 @@ class _WorkWorkspaceDashboardScreenState
                   .clamp(64.0, double.infinity),
         );
     final storeHeaderHeight =
-        (compactOperation || focusedOrderDetails || shortHomeHeader ? 0 : 47) +
+        (compactOperation || ordersOperation || shortHomeHeader ? 0 : 47) +
         (namePainter.height + 8).clamp(
-          procurementOpen || shortHomeHeader ? 48.0 : 44.0,
+          procurementOpen || ordersOperation || shortHomeHeader ? 48.0 : 44.0,
           double.infinity,
         );
     final analyticsHeaderHeight = (namePainter.height + 12).clamp(48.0, double.infinity);
@@ -1525,7 +1526,7 @@ class _WorkWorkspaceDashboardScreenState
               showStatusLabel:
                   _view == _WorkspaceControlView.dashboard || ordersContext ||
                   _view == _WorkspaceControlView.alerts,
-              compact: compactOperation || focusedOrderDetails ||
+              compact: compactOperation || ordersOperation ||
                   _view == _WorkspaceControlView.alerts,
               singleLine: shortHomeHeader,
               session: session,
@@ -1977,6 +1978,8 @@ class _WorkWorkspaceDashboardScreenState
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
             onCreateCustomerOrder: () => unawaited(_openCustomerOrderComposer()),
+            onSearchOrders: _showSearch,
+            onOrderAlerts: _showAlerts,
             onTrackPurchase: _showPurchaseTracking,
             onPurchaseBack: _operationReturnView == _WorkspaceControlView.search
                 ? _leaveOperation
@@ -20890,6 +20893,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenRoute,
     required this.onTrackPurchase,
     required this.onCreateCustomerOrder,
+    required this.onSearchOrders,
+    required this.onOrderAlerts,
     this.onPurchaseBack,
     this.focusedOrderId,
     this.focusedCustomerId,
@@ -20915,6 +20920,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final ValueChanged<String> onOpenRoute;
   final ValueChanged<String> onTrackPurchase;
   final VoidCallback onCreateCustomerOrder;
+  final VoidCallback onSearchOrders;
+  final VoidCallback onOrderAlerts;
   final VoidCallback? onPurchaseBack;
   final String? focusedOrderId, focusedCustomerId;
 
@@ -21283,6 +21290,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         onOpenCollection: onOpenStore,
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
         onCreateOrder: onCreateCustomerOrder,
+        onSearch: onSearchOrders,
+        onAlerts: onOrderAlerts,
       );
     }
     if (operation == _WorkspaceOperation.counterOrder) {
@@ -28367,6 +28376,8 @@ class _OrdersDestinationSurface extends StatefulWidget {
     required this.onOpenCollection,
     required this.onOpenDelivery,
     required this.onCreateOrder,
+    required this.onSearch,
+    required this.onAlerts,
     this.orderId,
   });
 
@@ -28374,6 +28385,8 @@ class _OrdersDestinationSurface extends StatefulWidget {
   final VoidCallback onOpenCollection;
   final VoidCallback onOpenDelivery;
   final VoidCallback onCreateOrder;
+  final VoidCallback onSearch;
+  final VoidCallback onAlerts;
   final String? orderId;
 
   final ValueChanged<String> onOpenOrder;
@@ -28576,41 +28589,54 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
               fontSize: widget.orderId == null ? 16 : 14,
               fontWeight: FontWeight.w700,
             );
-            final actionStyle = Theme.of(context).textTheme.labelLarge!
-                .copyWith(fontWeight: FontWeight.w600);
-            double labelWidth(String text, TextStyle style) {
-              final painter = TextPainter(
-                text: TextSpan(text: text, style: style),
-                textDirection: Directionality.of(context),
-                textScaler: MediaQuery.textScalerOf(context),
-                maxLines: 1,
-              )..layout();
-              final width = painter.width;
-              painter.dispose();
-              return width;
-            }
-            // Prefer a visible primary label; use a named 48dp icon when
-            // enlarged text needs the width. Neither action gets a new row.
-            final showCreateLabel = constraints.maxWidth - 22 >=
-                labelWidth('Customer orders', headingStyle) +
-                labelWidth('New order', actionStyle) + 98;
             final createBlocked = session.busy || session.workspaceOperationsSyncing ||
                 session.counterDraftLoading || session.counterDraftSubmitting ||
                 session.counterDraftNeedsReconciliation || session.hasPendingOrderTime ||
                 session.workspaceHandoverBusy;
-            final header = Padding(
+            final header = Semantics(
+              header: true,
+              label: widget.orderId == null ? 'Customer orders' : null,
+              child: Padding(
               key: const Key('work-orders-toolbar'),
-              padding: const EdgeInsets.fromLTRB(14, 2, 8, 2),
+              padding: const EdgeInsets.fromLTRB(14, 8, 6, 2),
               child: Row(children: [
                 Expanded(child: Column(mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Semantics(header: true,
-                    child: Text(widget.orderId == null ? 'Customer orders' : 'Order details',
-                      style: headingStyle)),
-                  if (widget.orderId == null && _selectedFilterOffscreen)
-                    Text('${filterLabels[_filter]} · ${countFor(_filter)}',
-                      key: const Key('work-orders-current-scope'),
-                      style: const TextStyle(fontSize: 11, color: MoolColors.navy)),
+                  if (widget.orderId != null)
+                    Text('Order details', style: headingStyle)
+                  else
+                    TextButton(
+                      key: const Key('work-dashboard-search'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        foregroundColor: MoolColors.muted,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: widget.onSearch,
+                      child: Semantics(
+                        label: 'Search saved orders by order number or customer details',
+                        value: _selectedFilterOffscreen
+                            ? '${filterLabels[_filter]} · ${countFor(_filter)}' : null,
+                        excludeSemantics: true,
+                        child: Row(children: [
+                          const Icon(Icons.search_rounded, size: 20),
+                          const SizedBox(width: 6),
+                          Expanded(child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(constraints.maxWidth < 360 ? 'Search' : 'Search orders',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              if (_selectedFilterOffscreen)
+                                Text('${filterLabels[_filter]} · ${countFor(_filter)}',
+                                  key: const Key('work-orders-current-scope'),
+                                  style: const TextStyle(fontSize: 11, color: MoolColors.navy)),
+                            ],
+                          )),
+                        ]),
+                      ),
+                    ),
                 ])),
                 if (widget.orderId == null) ...[
                   const SizedBox(width: 4),
@@ -28622,19 +28648,15 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 48),
                         foregroundColor: MoolColors.navy,
+                        backgroundColor: MoolColors.navy.withValues(alpha: .07),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: createBlocked ? null : widget.onCreateOrder,
                       child: Semantics(
                         label: 'Create customer order',
                         excludeSemantics: true,
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.add, size: 20),
-                          if (showCreateLabel) ...[
-                            const SizedBox(width: 6),
-                            Text('New order', style: actionStyle),
-                          ],
-                        ]),
+                        child: const Icon(Icons.add, size: 22),
                       ),
                     ),
                   ),
@@ -28648,7 +28670,18 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                   onPressed: () => setState(() { _feedbackOpen = true; }),
                   icon: const Icon(Icons.rate_review_outlined, size: 22),
                 ),
+                if (widget.orderId == null)
+                  SizedBox(
+                    key: const Key('work-orders-alerts'),
+                    width: 48,
+                    height: 48,
+                    child: _DashboardAlertButton(
+                      count: _workspaceAlerts(session).length,
+                      onPressed: widget.onAlerts,
+                    ),
+                  ),
               ]),
+              ),
             );
             final compactHeader = pageConstraints.maxHeight <
                 MediaQuery.textScalerOf(context).scale(260);
@@ -28736,7 +28769,12 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                   ),
                 ),
                 if (_filterOverflow)
-                  IconButton(
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF7F8FC),
+                      border: Border(left: BorderSide(color: Color(0xFFE3E6EE))),
+                    ),
+                    child: IconButton(
                     key: const Key('work-orders-filter-more'),
                     tooltip: _atFilterEnd
                         ? 'Earlier order stages' : 'More order stages',
@@ -28747,6 +28785,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                           ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
                       size: 20,
                       color: MoolColors.navy,
+                    ),
                     ),
                   ),
               ],

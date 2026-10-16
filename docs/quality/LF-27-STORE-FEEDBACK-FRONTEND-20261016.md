@@ -139,3 +139,57 @@ unapproved duplicate profile icon or claim the failed group green.
   OPPO has no applicable live customer orders; populated/large-text queues and
   financial/recovery cases remain labelled host evidence, not native provider
   acceptance. No business data, backend/service, APK or publication changes.
+
+## Second Orders recheck — founder request, 16 October 2026
+
+Fresh OPPO capture `lf27-recheck-0701.png` confirms ca795c04 is loaded, not an old
+APK/source diagnosis. Remaining defects: four fixed header/control bands; New
+order and Feedback still reserve their own row; duplicate title consumes useful
+queue height; horizontal stage edge lacks a strong separation from its arrow.
+
+Predetermined correction: retain Store identity/status. Merge order search,
+Create, Feedback and Alerts into one utility row; minimum48dp touch targets,
+flexible readable search, named secondary icons, subtly tinted primary creation.
+No visible duplicate Customer orders heading; retain screen heading semantics.
+Keep active search's existing editable header and return context. Keep filters
+immediately below, explicit divided More/Earlier control and current-stage
+breadcrumb when its chip is offscreen. A partially visible horizontal chip is
+not itself evidence of text truncation inside its full chip.
+
+Acceptance: separate search band absent only on Orders operation; all four
+utilities direct/reachable at360x720,320x568200%,640x360200%; existing busy/create,
+search/history, feedback return and data-preservation tests retained. Native
+before/after queue bounds measured, no invented populated queue or transactions.
+Architect context review recommended this consolidation without new action logic.
+Founder approval remains pending; backend/APK/publication scope unchanged.
+
+### Second recheck result
+
+- Demonstrated the extra fixed band with three failing unified-layout tests.
+  Final selected suites: LF27 layout/semantics/search/feedback9, O01-04 Orders/
+  search/history/details58, DASH06 guarded creation/draft/journal/recovery180,
+  RESTOCK02 procurement/scanner2:249 passed, no failures/skips. Final analysis
+  has no errors/warnings and the same nine existing style infos.
+- Old visible-heading/search-caption assertions were updated to the consolidated
+  toolbar and readable Search text; heading semantics, actual text scale, queue
+  viewport, exact-order returns and financial assertions remain. Initial fixture
+  errors used search-button instead of existing search-field key; corrected to
+  verify actual editable input and retained search query, not remove that check.
+- Native inspection also exposed a clipped badge after consolidation; top8dp
+  padding fixes it. A focused test reproduced16dp queue movement when the selected
+  stage reminder appeared; putting it within the search button fixes that move
+  while preserving its visible text and semantic value. No fixed-height text crop.
+- Fresh OPPO before `lf27-recheck-0701.png` and final
+  `lf27-orders-final-0744.png` inspected: queue starts y484 ->410 physical pixels,
+  another74px recovered on this same empty All view. All four utilities are
+  separate48dp targets, badge5 fully visible, no duplicate title/action row.
+  Final source reload3803ms; VM script readback confirms the actual unified
+  header, original search callback and inline selected-stage reminder.
+- Native search/Finish, Feedback/Back and Alerts opening checked. More shows the
+  full Delivery label; selecting Delivery0 shows its proper empty state and
+  Earlier/All restores selection. Queue remains y410 when All scrolls offscreen.
+  The strip intentionally remains horizontally scrollable; a partial preview
+  chip can still appear at its edge. Do not claim every chip simultaneously fits.
+- No native New order submission, business-data edit, fake populated feed,
+  backend, APK, push or neighbouring-screen redesign. Enlarged/populated layouts
+  are host evidence only; live provider evidence and founder review remain open.
