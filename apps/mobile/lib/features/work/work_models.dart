@@ -8082,6 +8082,7 @@ class WorkspaceProductImportRow {
     this.sku = '',
     this.rawValues = const {},
     this.sourceValues = const {},
+    this.inputValues,
     this.canCorrect = false,
     this.issueKind,
     this.relatedRowNumber,
@@ -8098,17 +8099,35 @@ class WorkspaceProductImportRow {
 
   /// Current inputs and original source evidence; neither is sellable stock.
   final Map<String, String> rawValues, sourceValues;
+  /// Current explicit inputs, distinct from inherited effective rawValues and
+  /// immutable original file sourceValues. Null keeps old row fixtures valid.
+  final Map<String, String>? inputValues;
   final bool canCorrect;
   final WorkspaceProductImportIssueKind? issueKind;
   final int? relatedRowNumber;
 
   /// Positional evidence for malformed CSV rows; never guessed product fields.
   final List<String> sourceCells, sourceHeaders;
+  WorkspaceProductImportRow withReviewedProduct(WorkspaceCatalogueItem value) => WorkspaceProductImportRow(
+    number, value.title, value.copyWith(publicListing: false), null, matched,
+    issueValues: issueValues, variant: value.variant, pack: value.pack, sku: value.sku,
+    rawValues: rawValues, sourceValues: sourceValues, inputValues: inputValues,
+    canCorrect: canCorrect, issueKind: issueKind, relatedRowNumber: relatedRowNumber,
+    sourceCells: sourceCells, sourceHeaders: sourceHeaders);
 }
 
 class WorkspaceProductImport {
-  const WorkspaceProductImport(this.rows);
+  const WorkspaceProductImport(this.rows, {this.variantFamilyFingerprints = const {}});
   final List<WorkspaceProductImportRow> rows;
+  final Map<String, String> variantFamilyFingerprints;
+  static bool isOptionColumn(String name) => name.startsWith('option:') &&
+      name.substring(7).trim().isNotEmpty && name.substring(7).trim().length <= 120;
+  static String? variantTuple(WorkspaceCatalogueItem product) {
+    final member = product.variantMembership;
+    if (member == null) return null;
+    final dimensions = member.selections.keys.toList()..sort();
+    return jsonEncode([member.familyId, for (final d in dimensions) [d, member.selections[d]]]);
+  }
   // The same compliance keys used by the shared editor and Buy projection.
   // Batch dates are deliberately not SKU-wide import fields.
   static const packFieldLabels = {
@@ -8153,6 +8172,8 @@ class WorkspaceProductImport {
     'visualLabel',
     'composition',
     'regulatoryNote',
+    'productGroup',
+    'shareGroupContent',
     ...WorkspaceProductContent.labels.keys,
     ...packFieldLabels.keys,
   });
@@ -8181,6 +8202,10 @@ class WorkspaceProductImport {
     'origin': 'Product origin',
     'composition': 'Ingredients or composition',
     'regulatoryNote': 'Product regulatory note',
+    'productGroup': 'Saved group name, reference or existing group SKU',
+    'shareGroupContent': 'Share group description and specifications: true or false',
+    'option:Colour': 'Option column: replace Colour with a saved dimension name',
+    'option:Storage': 'Option column: replace Storage with a saved dimension name',
     ...WorkspaceProductContent.labels,
     ...packFieldLabels,
   };
@@ -8195,6 +8220,7 @@ class WorkspaceProductImport {
     required List<WorkspaceCatalogueItem> owned,
     List<WorkspaceProductImportRow> readyRows = const [],
     WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
+    List<WorkspaceVariantFamily> variantFamilies = const [],
   }) {
     if (!original.canCorrect) {
       throw const FormatException(
@@ -8208,13 +8234,23 @@ class WorkspaceProductImport {
         );
       }
     }
+    final inputs = Map<String, String>.of(values);
+    if (original.inputValues case final explicit?) {
+      for (final entry in original.rawValues.entries) {
+        if (values[entry.key] == entry.value) {
+          if (explicit.containsKey(entry.key)) { inputs[entry.key] = explicit[entry.key]!; }
+          else { inputs.remove(entry.key); }
+        }
+      }
+    }
     final result = parse(
-      jsonEncode([values]),
+      jsonEncode([inputs]),
       json: true,
       catalogue: catalogue,
       owned: owned,
       readyRows: readyRows,
       defaults: defaults,
+      variantFamilies: variantFamilies,
     ).rows.single;
     return WorkspaceProductImportRow(
       original.number,
@@ -8228,6 +8264,7 @@ class WorkspaceProductImport {
       sku: result.sku,
       rawValues: result.rawValues,
       sourceValues: original.sourceValues,
+      inputValues: result.inputValues,
       canCorrect: true,
       issueKind: result.issueKind,
       relatedRowNumber: result.relatedRowNumber,
@@ -8254,7 +8291,7 @@ class WorkspaceProductImport {
     var quoted = false, endedQuote = false;
     void endCell() {
       row.add(cell.toString().trim());
-      if (row.length > columns.length) {
+      if (row.length > columns.length + 8) {
         throw const FormatException(
           'Too many columns. Use the listed product columns.',
         );
@@ -8326,6 +8363,7 @@ class WorkspaceProductImport {
     required List<WorkspaceCatalogueItem> owned,
     List<WorkspaceProductImportRow> readyRows = const [],
     WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
+    List<WorkspaceVariantFamily> variantFamilies = const [],
   }) {
     if (text.length > 10 * 1024 * 1024) {
       throw const FormatException('Choose a file smaller than 10 MB.');
@@ -8365,6 +8403,10 @@ class WorkspaceProductImport {
           headers.any((h) => h.isEmpty)) {
         throw const FormatException('Use a unique name for every column.');
       }
+      final optionNames = headers.where(isOptionColumn).map((h) => h.substring(7).trim().toLowerCase()).toList();
+      if (optionNames.length > 8 || optionNames.toSet().length != optionNames.length) {
+        throw const FormatException('Use at most eight unique option:Dimension columns.');
+      }
       if (!headers.toSet().containsAll(requiredColumns)) {
         throw const FormatException(
           'Required columns: title, brand, pack, purchasePrice, sellingPrice, stock.',
@@ -8379,7 +8421,8 @@ class WorkspaceProductImport {
         });
       }
     }
-    final unknown = records.expand((r) => r.keys).toSet().difference(columns);
+    final unknown = records.expand((r) => r.keys).toSet().difference(columns)
+      ..removeWhere(isOptionColumn);
     if (unknown.isNotEmpty) {
       throw FormatException(
         'Unsupported columns: ${unknown.take(5).join(', ')}. No products were saved.',
@@ -8406,6 +8449,8 @@ class WorkspaceProductImport {
     final batchBarcodes = <String, int>{};
     final batchIdentities = <String, int>{};
     final batchIds = <String, int>{};
+    final savedTuples = owned.map(variantTuple).whereType<String>().toSet();
+    final batchTuples = <String, int>{};
     void indexReady(WorkspaceCatalogueItem product, int row) {
       batchSkus.putIfAbsent(product.sku.toLowerCase().trim(), () => row);
       if (product.barcode.isNotEmpty) {
@@ -8413,6 +8458,7 @@ class WorkspaceProductImport {
       }
       batchIdentities.putIfAbsent(identity(product), () => row);
       batchIds.putIfAbsent(product.id, () => row);
+      if (variantTuple(product) case final tuple?) batchTuples.putIfAbsent(tuple, () => row);
     }
 
     for (final row in readyRows) {
@@ -8421,9 +8467,10 @@ class WorkspaceProductImport {
     final stamp = DateTime.now().microsecondsSinceEpoch;
     final result = <WorkspaceProductImportRow>[];
     for (var index = 0; index < records.length; index++) {
-      final r = records[index].map((k, v) => MapEntry(k, v.trim()));
+      final sourceRecord = records[index].map((k, v) => MapEntry(k, v.trim()));
+      final r = Map<String, String>.of(sourceRecord);
       String value(String key) => r[key] ?? '';
-      final title = value('title');
+      var title = value('title');
       WorkspaceProductImportRow blocked(
         String issue, {
         List<String> fields = const [],
@@ -8443,7 +8490,8 @@ class WorkspaceProductImport {
         pack: value('pack'),
         sku: value('sku'),
         rawValues: Map.unmodifiable(r),
-        sourceValues: Map.unmodifiable(r),
+        sourceValues: Map.unmodifiable(sourceRecord),
+        inputValues: Map.unmodifiable(sourceRecord),
         canCorrect: !malformed.contains(index),
         issueKind: kind,
         relatedRowNumber: relatedRow,
@@ -8457,6 +8505,78 @@ class WorkspaceProductImport {
             kind: WorkspaceProductImportIssueKind.malformedColumns,
           ),
         );
+        continue;
+      }
+      final optionNames = r.keys.where(isOptionColumn).map((k) => k.substring(7).trim().toLowerCase()).toList();
+      if (optionNames.length > 8 || optionNames.toSet().length != optionNames.length) {
+        result.add(blocked('Use at most eight unique option:Dimension columns.', fields: ['productGroup']));
+        continue;
+      }
+      WorkspaceVariantFamily? family;
+      WorkspaceVariantMembership? membership;
+      try {
+        final reference = value('productGroup');
+        final suppliedOptions = r.entries.where((e) => isOptionColumn(e.key) && e.value.isNotEmpty).toList();
+        if (reference.isEmpty) {
+          if (suppliedOptions.isNotEmpty || value('shareGroupContent').isNotEmpty) {
+            throw const FormatException('productGroup: Choose a saved product group before entering its options.');
+          }
+        } else {
+          final candidateIds = <String>{
+            for (final f in variantFamilies)
+              if (f.id == reference || f.title.toLowerCase() == reference.toLowerCase()) f.id,
+            for (final p in owned)
+              if (p.sku.toLowerCase() == reference.toLowerCase() && p.variantMembership != null)
+                p.variantMembership!.familyId,
+          };
+          final candidates = variantFamilies.where((f) => candidateIds.contains(f.id)).toList();
+          if (candidates.length != 1 || !candidates.single.valid) {
+            throw const FormatException('productGroup: Use one unambiguous saved group name, reference or member SKU. Create its options in Store first.');
+          }
+          family = candidates.single;
+          for (final common in {'title': family.title, 'brand': family.brand, 'categoryId': family.categoryId}.entries) {
+            if (value(common.key).isNotEmpty && value(common.key) != common.value) {
+              throw FormatException('${common.key}: This value differs from the saved group. Edit the group in Store or choose the correct group.');
+            }
+            r[common.key] = common.value;
+          }
+          title = family.title;
+          if (value('shareGroupContent').isNotEmpty && !{'true', 'false'}.contains(value('shareGroupContent').toLowerCase())) {
+            throw const FormatException('shareGroupContent: Use true or false.');
+          }
+          final shared = value('shareGroupContent').toLowerCase() != 'false';
+          if (shared) {
+            for (final common in family.content.inputValues.entries) {
+              if (value(common.key).isNotEmpty && value(common.key) != common.value) {
+                throw const FormatException('shareGroupContent: Set false for this SKU’s description or specification exceptions.');
+              }
+              r[common.key] = common.value;
+            }
+          }
+          final selections = <String, String>{};
+          for (final entry in suppliedOptions) {
+            final name = entry.key.substring(7).trim().toLowerCase();
+            final dimensions = family.options.where((o) => o.dimensionLabel.toLowerCase() == name)
+              .map((o) => o.dimensionId).toSet();
+            if (dimensions.length != 1 || selections.containsKey(dimensions.single)) {
+              throw FormatException('${entry.key}: Choose a dimension from this saved group.');
+            }
+            final options = family.options.where((o) => o.dimensionId == dimensions.single &&
+              (o.optionId == entry.value || o.optionLabel.toLowerCase() == entry.value.toLowerCase())).toList();
+            if (options.length != 1) throw FormatException('${entry.key}: Choose an existing option from the saved group.');
+            selections[dimensions.single] = options.single.optionId;
+          }
+          membership = WorkspaceVariantMembership(familyId: family.id, selections: selections, useSharedContent: shared);
+          final selected = family.attributesFor(membership);
+          final variant = selected.map((a) => a.optionLabel).join(' · ');
+          if (value('variant').isNotEmpty && value('variant') != variant) {
+            throw const FormatException('variant: This label differs from the selected group options. Leave it blank to use those options.');
+          }
+          r['variant'] = variant;
+        }
+      } on FormatException catch (failure) {
+        result.add(blocked(failure.message, fields: [r.keys.where((key) =>
+          failure.message.startsWith('$key:')).firstOrNull ?? 'productGroup']));
         continue;
       }
       final purchase = workspacePriceMinorFromInput(value('purchasePrice'), maximumMinor: 9007199254740991);
@@ -8594,6 +8714,18 @@ class WorkspaceProductImport {
           batchSkus[sku.toLowerCase()] ??
           (barcode.isEmpty ? null : batchBarcodes[barcode]) ??
           batchIdentities[exactKey];
+      final tuple = membership == null ? null : jsonEncode([membership.familyId,
+        for (final d in (membership.selections.keys.toList()..sort())) [d, membership.selections[d]]]);
+      if (tuple != null && (savedTuples.contains(tuple) || batchTuples.containsKey(tuple))) {
+        final previous = batchTuples[tuple];
+        result.add(blocked(savedTuples.contains(tuple)
+          ? 'This option combination already has a saved Store SKU. Edit it from Stock.'
+          : 'This option combination repeats CSV row $previous.', fields: ['productGroup',
+            ...r.keys.where(isOptionColumn)], relatedRow: previous,
+          kind: savedTuples.contains(tuple) ? WorkspaceProductImportIssueKind.duplicateInStore
+            : WorkspaceProductImportIssueKind.duplicateInFile));
+        continue;
+      }
       if (inStore || duplicateRow != null) {
         result.add(
           blocked(
@@ -8673,7 +8805,7 @@ class WorkspaceProductImport {
       );
       WorkspaceProductContent content;
       try {
-        content = WorkspaceProductContent.parse(
+        content = membership?.useSharedContent == true ? family!.content : WorkspaceProductContent.parse(
           r,
           existing: base.content,
           preserveBlank: true,
@@ -8707,6 +8839,7 @@ class WorkspaceProductImport {
         continue;
       }
       final product = base.copyWith(
+        variantMembership: membership,
         packMeasure: sellingDetails.measure,
         wholesaleOffer: sellingDetails.wholesale,
         retailEnabled: sellingDetails.retailEnabled,
@@ -8755,6 +8888,7 @@ class WorkspaceProductImport {
             : value('regulatoryNote'),
         content: content,
         catalogueFactsRequireReview:
+            membership != null ||
             base.catalogueFactsRequireReview ||
             jsonEncode(sellingDetails.measure?.toJson()) !=
                 jsonEncode(base.packMeasure?.toJson()) ||
@@ -8795,14 +8929,17 @@ class WorkspaceProductImport {
           null,
           matched != null,
           rawValues: Map.unmodifiable(r),
-          sourceValues: Map.unmodifiable(r),
+          sourceValues: Map.unmodifiable(sourceRecord),
+          inputValues: Map.unmodifiable(sourceRecord),
           canCorrect: true,
           sourceCells: json ? const [] : sourceCells[index],
           sourceHeaders: sourceHeaders,
         ),
       );
     }
-    return WorkspaceProductImport(List.unmodifiable(result));
+    return WorkspaceProductImport(List.unmodifiable(result), variantFamilyFingerprints: Map.unmodifiable({
+      for (final f in variantFamilies) f.id: jsonEncode(f.toJson()),
+    }));
   }
 }
 

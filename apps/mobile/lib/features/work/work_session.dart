@@ -12538,8 +12538,18 @@ class WorkSession extends ChangeNotifier {
     List<WorkspaceCatalogueItem> products, {
     bool addOnly = false,
     WorkspaceStockEntryMethod? stockEntryMethod,
+    Map<String, String>? variantFamilyFingerprints,
   }) {
     if (!_stockEditAvailable()) return false;
+    for (final product in products) {
+      final member = product.variantMembership;
+      if (member == null) continue;
+      final family = _storeData.variantFamilies.where((f) => f.id == member.familyId).firstOrNull;
+      if ((addOnly || variantFamilyFingerprints != null) && (family == null ||
+          variantFamilyFingerprints?[member.familyId] != jsonEncode(family.toJson()))) {
+        throw const FormatException('The product group changed after review. Import the file again; nothing was added.');
+      }
+    }
     // Resolve every explicit money field before any row, activity or movement
     // is committed. Generic import must not admit an invalid final row either.
     for (final product in products) {

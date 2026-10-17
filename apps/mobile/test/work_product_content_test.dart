@@ -233,6 +233,151 @@ void main() {
     expect(session.workspaceCatalogueItems.single.canonicalId, plain.canonicalId);
   });
 
+  test('LF03 CSV saved family inherits facts once and keeps exact actual combination', () {
+    final source = {'title': '', 'brand': '', 'pack': '1 unit', 'sku': 'HOST-CSV-BLUE',
+      'purchasePrice': '85.10', 'sellingPrice': '100.25', 'stock': '0',
+      'productGroup': ownerFamily().title, 'option:Colour': 'blue', 'option:Storage': '512 GB'};
+    final review = WorkspaceProductImport.parse(jsonEncode([source]), json: true,
+      catalogue: [], owned: [memberProduct('host-a', 'pink', '128')],
+      variantFamilies: [ownerFamily()]);
+    final row = review.rows.single;
+    expect(row.issue, isNull);
+    final product = row.product!;
+    expect(product.title, ownerFamily().title); expect(product.brand, ownerFamily().brand);
+    expect(product.content.description, ownerFamily().content.description);
+    expect(product.variantMembership!.familyId, ownerFamily().id);
+    expect(product.variantMembership!.selections, {'colour': 'blue', 'storage': '512'});
+    expect(product.variant, 'blue · 512 GB');
+    expect(product.purchasePriceMinor, 8510); expect(product.sellingPriceMinor, 10025);
+    expect(product.publicListing, isFalse); expect(product.catalogueFactsRequireReview, isTrue);
+    expect(row.sourceValues, source);
+    expect(row.rawValues['title'], ownerFamily().title);
+  });
+  test('LF03 CSV rejects missing invalid and already-saved group combinations', () {
+    final source = {'title': '', 'brand': '', 'pack': '1 unit', 'purchasePrice': '85',
+      'sellingPrice': '100', 'stock': '0', 'productGroup': ownerFamily().id,
+      'option:Colour': 'blue', 'option:Storage': '512 GB'};
+    for (final fault in ['unknown-group', 'missing', 'option', 'extra', 'duplicate', 'common']) {
+      final raw = Map<String, String>.of(source);
+      final owned = [memberProduct('host-a', 'pink', '128')];
+      switch (fault) {
+        case 'unknown-group': raw['productGroup'] = 'missing'; break;
+        case 'missing': raw.remove('option:Storage'); break;
+        case 'option': raw['option:Colour'] = 'green'; break;
+        case 'extra': raw['option:RAM'] = '8 GB'; break;
+        case 'duplicate': owned.add(memberProduct('host-b', 'blue', '512')); break;
+        case 'common': raw['title'] = 'Contradictory group name'; break;
+      }
+      final row = WorkspaceProductImport.parse(jsonEncode([raw]), json: true,
+        catalogue: [], owned: owned, variantFamilies: [ownerFamily()]).rows.single;
+      expect(row.product, isNull, reason: fault);
+      expect(row.issue, isNotNull, reason: fault);
+      expect(row.sourceValues, raw, reason: fault);
+    }
+  });
+
+  test('LF03 CSV named columns preserve mixed rows correction and source evidence', () {
+    const csv = 'title,brand,pack,purchasePrice,sellingPrice,stock,productGroup,option:Storage,option:Colour,sku\n'
+      ',,1 unit,85.10,100.25,0,host-a,512 GB,green,HOST-NEW\n'
+      'Legacy rice,Host,1 kg,50,60,0,,,,HOST-LEGACY\n';
+    final owned = [memberProduct('host-a', 'pink', '128')];
+    final review = WorkspaceProductImport.parse(csv, catalogue: [], owned: owned, variantFamilies: [ownerFamily()]);
+    final invalid = review.rows.first;
+    expect(invalid.product, isNull); expect(invalid.issueValues.keys, ['option:Colour']);
+    final corrected = WorkspaceProductImport.revalidateRow(invalid,
+      {...invalid.rawValues, 'option:Colour': 'blue'}, catalogue: [], owned: owned,
+      variantFamilies: [ownerFamily()], readyRows: [review.rows.last]);
+    expect(corrected.issue, isNull); expect(corrected.number, 2);
+    expect(corrected.sourceValues['option:Colour'], 'green');
+    expect(corrected.sourceValues['title'], ''); expect(corrected.sourceCells, invalid.sourceCells);
+    expect(corrected.product!.variantMembership!.selections, {'colour': 'blue', 'storage': '512'});
+    expect(review.rows.last.product!.title, 'Legacy rice');
+    expect(review.rows.last.product!.variantMembership, isNull);
+  });
+  test('LF03 CSV references reject namespace ambiguity and repeated actual tuples', () {
+    final source = {'title': '', 'brand': '', 'pack': '1 unit', 'purchasePrice': '85',
+      'sellingPrice': '100', 'stock': '0', 'productGroup': ownerFamily().id,
+      'option:Colour': 'blue', 'option:Storage': '512 GB'};
+    final duplicate = WorkspaceProductImport.parse(jsonEncode([source, {...source, 'sku': 'DIFFERENT', 'pack': '2 units'}]),
+      json: true, catalogue: [], owned: [], variantFamilies: [ownerFamily()]);
+    expect(duplicate.rows.first.issue, isNull);
+    expect(duplicate.rows.last.product, isNull);
+    expect(duplicate.rows.last.relatedRowNumber, 1);
+    final other = WorkspaceVariantFamily(id: 'other-host-family', revision: 1, title: ownerFamily().id,
+      brand: ownerFamily().brand, categoryId: ownerFamily().categoryId, options: ownerFamily().options);
+    final ambiguous = WorkspaceProductImport.parse(jsonEncode([source]), json: true, catalogue: [],
+      owned: [], variantFamilies: [ownerFamily(), other]);
+    expect(ambiguous.rows.single.issue, contains('unambiguous'));
+    expect(() => WorkspaceProductImport.parse(
+      'title,brand,pack,purchasePrice,sellingPrice,stock,option:Colour,option: colour\nA,B,1,1,2,0,pink,pink',
+      catalogue: [], owned: []), throwsFormatException);
+  });
+  test('LF03 CSV content exceptions are explicit and reviewed family snapshots fence save', () {
+    final source = {'title': '', 'brand': '', 'pack': '1 unit', 'purchasePrice': '85',
+      'sellingPrice': '100', 'stock': '0', 'productGroup': ownerFamily().id,
+      'option:Colour': 'blue', 'option:Storage': '512 GB', 'description': 'SKU-only details'};
+    WorkspaceProductImport parse(Map<String, String> row) => WorkspaceProductImport.parse(jsonEncode([row]),
+      json: true, catalogue: [], owned: [], variantFamilies: [ownerFamily()]);
+    expect(parse(source).rows.single.issue, contains('Set false'));
+    final review = parse({...source, 'shareGroupContent': 'false'});
+    final product = review.rows.single.product!;
+    expect(product.content.description, 'SKU-only details');
+    expect(product.variantMembership!.useSharedContent, isFalse);
+    final session = WorkSession()..seedVerifiedWorkspace();
+    addTearDown(session.dispose);
+    session.workspaceCatalogueItems.clear();
+    final original = memberProduct('host-a', 'pink', '128');
+    session.addOrUpdateWorkspaceProduct(original, variantFamily: ownerFamily());
+    final changed = ownerFamily(revision: 2).copyWith(options: [...ownerFamily().options,
+      const BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'green',
+        optionLabel: 'green', kind: BuyV2VariantDimensionKind.colour)]);
+    session.addOrUpdateWorkspaceProduct(original, variantFamily: changed);
+    final before = jsonEncode(session.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList());
+    expect(() => session.importWorkspaceProducts([product], addOnly: true,
+      stockEntryMethod: WorkspaceStockEntryMethod.csv, variantFamilyFingerprints: review.variantFamilyFingerprints),
+      throwsFormatException);
+    expect(jsonEncode(session.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()), before);
+  });
+
+  test('LF03 CSV correction recomputes inherited values and preserves explicit input intent', () {
+    const csv = 'title,brand,pack,purchasePrice,sellingPrice,stock,productGroup,option:Colour,option:Storage,sku\n'
+      ',,1 unit,85,bad,0,host-phone-family,blue,512 GB,HOST-INTENT\n';
+    final invalid = WorkspaceProductImport.parse(csv, catalogue: [], owned: [],
+      variantFamilies: [ownerFamily()]).rows.single;
+    expect(invalid.issueValues.keys, ['sellingPrice']);
+    expect(invalid.rawValues['variant'], 'blue · 512 GB');
+    expect(invalid.inputValues!.containsKey('variant'), isFalse);
+    final corrected = WorkspaceProductImport.revalidateRow(invalid, {...invalid.rawValues,
+      'sellingPrice': '100', 'option:Colour': 'pink', 'option:Storage': '128 GB'},
+      catalogue: [], owned: [], variantFamilies: [ownerFamily()]);
+    expect(corrected.issue, isNull);
+    expect(corrected.product!.variant, 'pink · 128 GB');
+    expect(corrected.sourceValues['sellingPrice'], 'bad');
+    expect(corrected.inputValues!['sellingPrice'], '100');
+    expect(corrected.inputValues!['title'], '');
+    final edited = corrected.withReviewedProduct(corrected.product!.copyWith(sellingPriceMinor: 10025));
+    expect(edited.sourceCells, invalid.sourceCells); expect(edited.sourceHeaders, invalid.sourceHeaders);
+    expect(edited.sourceValues, invalid.sourceValues); expect(edited.rawValues, corrected.rawValues);
+    expect(edited.inputValues, corrected.inputValues); expect(edited.product!.sellingPriceMinor, 10025);
+    expect(edited.product!.publicListing, isFalse);
+  });
+  test('LF03 CSV exact blank shared content never restores another catalogue description', () {
+    final blank = ownerFamily().copyWith(content: const WorkspaceProductContent());
+    final raw = memberProduct('host-reviewed', 'blue', '512').toInventoryJson()
+      ..remove('variantMembership')..remove('moneyVersion');
+    raw['version'] = 1;
+    final catalogue = WorkspaceCatalogueItem.fromInventoryJson(raw).copyWith(pack: '1 unit',
+      variant: 'blue · 512 GB', content: const WorkspaceProductContent(description: 'Other catalogue details'));
+    final row = WorkspaceProductImport.parse(jsonEncode([{'title': '', 'brand': '', 'pack': '1 unit',
+      'purchasePrice': '85', 'sellingPrice': '100', 'stock': '0', 'productGroup': blank.id,
+      'option:Colour': 'blue', 'option:Storage': '512 GB'}]), json: true,
+      catalogue: [catalogue], owned: [], variantFamilies: [blank]).rows.single;
+    expect(row.issue, isNull);
+    expect(row.matched, isTrue);
+    expect(row.product!.content.description, isEmpty);
+    expect(() => WorkspaceVariantFamily.validateInventory([blank], [row.product!]), returnsNormally);
+  });
+
   test('LF-PAISE CSV preserves exact prices tiers source rows and legacy amounts', () {
     // Host import review only; these records never seed a device or provider.
     const csv = 'title,brand,pack,purchasePrice,sellingPrice,mrp,stock,sku,sellingChannels,wholesaleSaleType,wholesalePrice,wholesaleMinimum,wholesaleTiers\n'

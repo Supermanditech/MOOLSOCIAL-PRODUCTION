@@ -22186,12 +22186,15 @@ class _WorkspaceCatalogueSurfaceState
     final storeId =
         widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
     final inputContext = widget.session.tradingPreferencesContext;
+    String? familyFingerprint;
     var invalidated = false;
     bool current() =>
         !invalidated &&
         mounted &&
         identity == widget.session.counterDraftIdentity &&
         inputContext == widget.session.tradingPreferencesContext &&
+        (familyFingerprint == null || familyFingerprint == jsonEncode(
+          widget.session.workspaceVariantFamilies.map((f) => f.toJson()).toList())) &&
         storeId ==
             (widget.session.activeWorkspace?.id ?? widget.session.workspaceId);
     void trackScope() {
@@ -22204,6 +22207,8 @@ class _WorkspaceCatalogueSurfaceState
       if (!current()) return 'Your store changed. Import the file again.';
       if (!loaded) return widget.session.workspaceTradingPreferencesError ?? 'Saved product defaults could not be opened. Try again.';
       final importDefaults = defaults ?? widget.session.workspaceProductDefaults;
+      final importFamilies = List<WorkspaceVariantFamily>.unmodifiable(widget.session.workspaceVariantFamilies);
+      familyFingerprint = jsonEncode(importFamilies.map((f) => f.toJson()).toList());
       final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: csvOnly ? const ['csv'] : const ['csv', 'json'],
@@ -22224,6 +22229,7 @@ class _WorkspaceCatalogueSurfaceState
         catalogue: widget.session.referenceCatalogue,
         owned: List.of(widget.session.workspaceCatalogueItems),
         defaults: importDefaults,
+        variantFamilies: importFamilies,
       );
       if (!current()) return 'Your store changed. Import the file again.';
       if (!mounted) return null;
@@ -22300,6 +22306,7 @@ class _WorkspaceCatalogueSurfaceState
                                 ],
                                 readyRows: readyProducts,
                                 defaults: importDefaults,
+                                variantFamilies: importFamilies,
                               );
                             },
                             onImportReviewed: (result) =>
@@ -22406,6 +22413,7 @@ class _WorkspaceCatalogueSurfaceState
                 products.map((p) => p.copyWith(publicListing: false)).toList(),
                 addOnly: true,
                 stockEntryMethod: csvOnly ? WorkspaceStockEntryMethod.csv : null,
+                variantFamilyFingerprints: review.variantFamilyFingerprints,
               )) {
                 return 'Goods receipt is being saved. Your reviewed products are kept; try again when it finishes.';
               }
@@ -23630,8 +23638,8 @@ class _WorkspaceProductRow extends StatelessWidget {
                   ),
                   Text(
                     owned
-                        ? '${product.pack} · ${product.mrpMinor == null ? 'MRP not set' : 'MRP ₹${_formatStoreMinorAmount(product.mrpMinor!)}'} · ${product.sku}'
-                        : '${product.pack} · ${product.sku}',
+                        ? '${product.variantMembership != null && product.variant.isNotEmpty ? '${product.variant} · ' : ''}${product.pack} · ${product.mrpMinor == null ? 'MRP not set' : 'MRP ₹${_formatStoreMinorAmount(product.mrpMinor!)}'} · ${product.sku}'
+                        : '${product.variantMembership != null && product.variant.isNotEmpty ? '${product.variant} · ' : ''}${product.pack} · ${product.sku}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -23837,7 +23845,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                               ]),
                               const SizedBox(height: 3),
                               Text(
-                                '${product.pack} · ${product.sku}',
+                                '${product.variantMembership != null && product.variant.isNotEmpty ? '${product.variant} · ' : ''}${product.pack} · ${product.sku}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -25321,6 +25329,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   void _refreshIdentity() => setState(() {});
+  bool get _importFamilyReview => widget.onDraftReviewed != null && widget.product.variantMembership != null;
 
   void _loadVariantFamily(WorkspaceVariantFamily family) {
     _variantFamily = family;
@@ -25385,15 +25394,17 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         }),
       ),
       Wrap(spacing: 8, children: [
-        TextButton.icon(key: const Key('work-product-create-family'),
-          onPressed: _savingInventory || widget.product.variantMembership != null ? null : () => _editVariantOptions(create: true),
+        if (!_importFamilyReview && widget.product.variantMembership == null)
+          TextButton.icon(key: const Key('work-product-create-family'),
+          onPressed: _savingInventory ? null : () => _editVariantOptions(create: true),
           icon: const Icon(Icons.add, size: 18), label: const Text('New product group')),
-        if (family != null) TextButton.icon(key: const Key('work-product-edit-family'),
+        if (family != null && !_importFamilyReview) TextButton.icon(key: const Key('work-product-edit-family'),
           onPressed: _savingInventory ? null : _editVariantOptions,
           icon: const Icon(Icons.tune, size: 18), label: const Text('Edit options')),
       ]),
       if (family != null) ...[
         const Text('Name, brand and category are shared by this group. Each combination keeps its own SKU, price and Stock.'),
+        if (_importFamilyReview) const Text('To change group details or options, edit the group in Stock and import again. This review changes only this SKU.'),
         for (final dimension in family.dimensionIds) ...[
           const SizedBox(height: 10),
           Builder(builder: (_) {
@@ -25418,8 +25429,10 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         ],
         CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
           key: const Key('work-product-shared-family-content'),
-          title: const Text('Share description, highlights and specifications'),
-          subtitle: const Text('Edits apply to group members using shared content. Untick for this SKU’s exceptions.'),
+          title: Text(_importFamilyReview ? 'Use saved group content' : 'Share description, highlights and specifications'),
+          subtitle: Text(_importFamilyReview
+            ? 'Untick for this SKU’s content exceptions. This import does not change the group.'
+            : 'Edits apply to group members using shared content. Untick for this SKU’s exceptions.'),
           value: _useSharedVariantContent, onChanged: _savingInventory ? null : (value) => setState(() {
             _useSharedVariantContent = value ?? true;
             if (_useSharedVariantContent) {
@@ -25584,11 +25597,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     'available': 'Available for sale',
     'publicListing': 'Visibility value (import stays private)',
     'canonicalId': 'Catalogue reference from CSV',
+    'productGroup': 'Saved product group or member SKU',
+    'shareGroupContent': 'Share group content: true or false',
   };
   late final _rawImportFields = <String, TextEditingController>{
     for (final entry
         in (widget.importRow?.rawValues ?? const <String, String>{}).entries)
-      if (_rawImportLabels.containsKey(entry.key))
+      if (_rawImportLabels.containsKey(entry.key) || WorkspaceProductImport.isOptionColumn(entry.key))
         entry.key: TextEditingController(text: entry.value),
   };
   Map<String, TextEditingController> get _importControllers => {
@@ -26146,6 +26161,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         lowStockThreshold: lowStockThreshold,
       );
       if (widget.onDraftReviewed != null) {
+        WorkspaceVariantFamily.validateInventory(widget.session.workspaceVariantFamilies, [reviewedProduct]);
         _saved = true;
         FocusManager.instance.primaryFocus?.unfocus();
         _finish(afterExit: () => widget.onDraftReviewed!(
@@ -26228,7 +26244,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     'other': 'Other products',
   };
 
-  String _fieldSection(String field) => _rawImportLabels.containsKey(field)
+  String _fieldSection(String field) => _rawImportLabels.containsKey(field) || WorkspaceProductImport.isOptionColumn(field)
       ? 'reference'
       : WorkspaceProductImport.packFieldLabels.containsKey(field)
       ? 'pack'
@@ -26313,6 +26329,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           TextField(
             key: Key(keyName),
             controller: controller,
+            readOnly: _importFamilyReview && const {'title', 'brand', 'variant'}.contains(id),
             focusNode: _fieldFocus.putIfAbsent(id, () => FocusNode()),
             // Replace the initial zero on entry without clearing valid existing
             // prices/quantities or changing the stored value merely on focus.
@@ -26505,7 +26522,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     child: InkWell(
       key: const Key('work-product-category'),
       focusNode: _fieldFocus.putIfAbsent('categoryId', () => FocusNode()),
-      onTap: () async {
+      onTap: _importFamilyReview ? null : () async {
         FocusScope.of(context).unfocus();
         final value = await showModalBottomSheet<String>(context: context,
           isScrollControlled: true, useSafeArea: true, showDragHandle: false,
@@ -26873,7 +26890,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           ],
                           initiallyExpanded: widget.product.title.isEmpty,
                         ),
-                        if (widget.importRow == null && widget.purchaseScope == null && widget.onDraftReviewed == null)
+                        if (widget.importRow == null && widget.purchaseScope == null &&
+                            (widget.onDraftReviewed == null || _importFamilyReview))
                           _variantFamilySection(),
                         _section(
                           'selling',
@@ -27059,12 +27077,16 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   child: _field(
                                     entry.key,
                                     'work-product-csv-${entry.key}',
-                                    _rawImportLabels[entry.key]!,
+                                    _rawImportLabels[entry.key] ?? 'Option: ${entry.key.substring(7)}',
                                     entry.value,
                                     hint: entry.key == 'stockMode'
                                         ? 'exactQuantity or availabilityOnly'
                                         : entry.key == 'canonicalId'
                                         ? 'Exact catalogue reference'
+                                        : entry.key == 'productGroup'
+                                        ? 'Saved group name, reference or member SKU'
+                                        : WorkspaceProductImport.isOptionColumn(entry.key)
+                                        ? 'Choose an option already saved in this group'
                                         : 'true or false',
                                   ),
                                 ),

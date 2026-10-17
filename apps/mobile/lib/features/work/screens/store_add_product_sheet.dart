@@ -617,7 +617,7 @@ class _StoreAddProductEntryScreenState
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'Purchase price stays private. Use whole rupees without ₹ or commas, and whole stock quantities.',
+                'Purchase price stays private. Use rupees with up to two decimal places, without ₹ or commas, and whole stock quantities.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.5,
@@ -644,7 +644,7 @@ class _StoreAddProductEntryScreenState
             const Padding(
               padding: EdgeInsets.only(bottom: 12),
               child: Text(
-                'Use a separate row for each variant and pack. Keep SKU and barcode columns as text to preserve leading zeros. Stock tracking: exactQuantity or availabilityOnly. Available for sale: true or false. Low-stock levels stay private.',
+                'Use one row per actual variant and pack. For a saved group, enter its name, reference or member SKU in productGroup, then use columns such as option:Colour and option:Storage with its saved choices. Create the group and options in Stock first. Leave shared name, brand, category, content and variant blank to inherit; set shareGroupContent to false for this SKU’s content exceptions. Import stays private. Keep SKU and barcode columns as text to preserve leading zeros. Stock tracking: exactQuantity or availabilityOnly. Available for sale: true or false. Low-stock levels stay private.',
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.5,
@@ -871,14 +871,7 @@ class _StoreProductImportReviewScreenState
             'This SKU, barcode or product is already in this file. Your previous details are unchanged.';
       } else {
         _error = null;
-        _rows[index] = WorkspaceProductImportRow(
-          row.number,
-          edited.title,
-          edited.copyWith(publicListing: false),
-          null,
-          row.matched,
-          sourceValues: row.sourceValues,
-        );
+        _rows[index] = row.withReviewedProduct(edited);
         _searchIndex[row.number] = _searchable(_rows[index]);
       }
     });

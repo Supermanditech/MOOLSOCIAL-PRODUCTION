@@ -32362,6 +32362,91 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03 CSV actual group correction retry and restart $scale', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final storage = _InventoryWriteFailureFixture(
+        SecureWorkInventoryStore(accountScope: () => account.accountScope));
+      const store = WorkWorkspace(id: 'qa-host-csv-group', name: 'Host CSV evaluation Store',
+        profileId: 'retailer-grocery', profileLabel: 'Grocery / Kirana Shop', area: 'Local QA', verified: true);
+      WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage)
+        ..selectedProfile = workProfiles.first..workspaceId = store.id..activeWorkspace = store
+        ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final family = WorkspaceVariantFamily(id: 'host-csv-family', revision: 1,
+        title: 'Host phone group', brand: 'Host', categoryId: 'other',
+        content: const WorkspaceProductContent(description: 'Shared group details'), options: const [
+          BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'pink',
+            optionLabel: 'Pink', kind: BuyV2VariantDimensionKind.colour),
+          BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'blue',
+            optionLabel: 'Blue', kind: BuyV2VariantDimensionKind.colour),
+        ]);
+      final original = family.applyTo(WorkspaceCatalogueItem.fromInventoryJson({
+        ...workspaceMasterCatalogue.first.toInventoryJson(), 'id': 'host-csv-pink',
+        'canonicalId': 'host-exact-csv-pink', 'sku': 'HOST-PINK', 'stock': 0,
+        'cataloguePhoto': null, 'privatePhoto': null, 'publicListing': false,
+      }).copyWith(variantMembership: WorkspaceVariantMembership(familyId: family.id,
+        selections: const {'colour': 'pink'})));
+      work.addOrUpdateWorkspaceProduct(original, variantFamily: family,
+        stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final previousPicker = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile(
+        'title,brand,pack,purchasePrice,sellingPrice,stock,productGroup,option:Colour,sku\n'
+        ',,1 unit,85.10,100.25,0,HOST-PINK,Green,HOST-CSV-BLUE\n');
+      addTearDown(() => FilePickerPlatform.instance = previousPicker);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: scale, openHomeActions: false);
+      await openAddProductsFromHome(tester);
+      await chooseAddProductMode(tester, 'import');
+      await tester.tap(find.byKey(const Key('work-add-product-choose-csv')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-import-correct-2')));
+      await tester.pumpAndSettle();
+      final option = find.byKey(const Key('work-product-csv-option:Colour'));
+      await reveal(tester, option);
+      await tester.enterText(option, 'Blue');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(find.byType(StoreProductImportReviewScreen), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-import-edit-2')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-title'))).readOnly, isTrue);
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      storage.failSave = true;
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(await work.workspaceInventorySaved, isFalse);
+      final imported = work.workspaceCatalogueItems.singleWhere((p) => p.sku == 'HOST-CSV-BLUE');
+      final beforeRetry = jsonEncode(imported.toInventoryJson());
+      expect(imported.variantMembership!.selections, {'colour': 'blue'});
+      expect(imported.content.description, 'Shared group details');
+      storage.failSave = false;
+      await tester.tap(find.byKey(const Key('work-import-save')));
+      await tester.pumpAndSettle();
+      expect(await work.workspaceInventorySaved, isTrue);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      expect(find.text('${imported.variant} · ${imported.pack} · ${imported.sku}'), findsOneWidget);
+      final restarted = fresh();
+      addTearDown(restarted.dispose);
+      expect(await restarted.loadWorkspaceInventory(), isTrue);
+      expect(restarted.workspaceCatalogueItems.length, 2);
+      final restored = restarted.workspaceCatalogueItems.singleWhere((p) => p.sku == 'HOST-CSV-BLUE');
+      expect(jsonEncode(restored.toInventoryJson()), beforeRetry);
+      expect(restored.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+      expect(restarted.workspaceStockMovements, isEmpty);
+      expect(restarted.workspaceVariantFamilies.single.toJson(), family.toJson());
+    });
+  }
+
   for (final sample in [(1.0, false), (2.0, false), (1.0, true)]) {
     final scale = sample.$1, large = sample.$2;
     testWidgets('LF-PAISE actual editor retains exact prices clears MRP and restarts $scale large=$large', (tester) async {

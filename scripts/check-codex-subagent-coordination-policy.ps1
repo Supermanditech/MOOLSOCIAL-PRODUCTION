@@ -8012,6 +8012,7 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     $storeVariantOwners=@('apps/mobile/lib/features/work/work_models.dart',
       'apps/mobile/lib/features/work/work_session.dart',
       'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+      'apps/mobile/lib/features/work/screens/store_add_product_sheet.dart',
       'apps/mobile/test/work_product_content_test.dart',
       'apps/mobile/test/work_workspace_layout_safety_test.dart')
     if ($null -eq $ownerVariants -or $ownerVariants -isnot [pscustomobject]) { return $false }
