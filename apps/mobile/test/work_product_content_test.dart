@@ -54,6 +54,99 @@ class _Lf05ConsentStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  test('CONTENT-GUIDE optional descriptive controls follow category without forcing variants', () {
+    expect(WorkspaceProductContent.guidedLabelsForCategory('cooking-oil'), ['Storage', 'Preparation']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('surface-cleaners'), ['Intended use', 'Usage', 'Dilution', 'Storage']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('hair-care'), ['Intended use', 'Usage', 'Storage']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('other'), isEmpty);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('unknown-category'), isEmpty);
+    expect(const WorkspaceProductContent().withGuidedDetails({'Storage': '', 'Preparation': ' '}).isEmpty, isTrue);
+  });
+  test('CONTENT-GUIDE edit and clear retain original case and unrelated source details', () {
+    final original = WorkspaceProductContent.parse({'description': 'Host description', 'highlights': 'Host highlight',
+      'specifications': 'Container: Pouch\nstorage: Dry\nCustom source detail: Retain'});
+    final changed = original.withGuidedDetails({'Storage': ' Cool, dry place ', 'Preparation': ''});
+    expect(changed.specifications, {'Container': 'Pouch', 'storage': 'Cool, dry place', 'Custom source detail': 'Retain'});
+    expect(changed.description, original.description); expect(changed.highlights, original.highlights);
+    final cleared = changed.withGuidedDetails({'Storage': ''});
+    expect(cleared.specifications, {'Container': 'Pouch', 'Custom source detail': 'Retain'});
+    expect(original.specifications['storage'], 'Dry');
+    // Changing the category changes suggestions only; it is never a delete command.
+    WorkspaceProductContent.guidedLabelsForCategory('other');
+    expect(changed.specifications['storage'], 'Cool, dry place');
+  });
+  test('CONTENT-GUIDE rejects invalid paragraphs and limits without mutating the source', () {
+    final original = WorkspaceProductContent.parse({'specifications': 'Storage: Dry'});
+    for (final value in ['One\nTwo', 'One\rTwo', List.filled(501, 'x').join()]) {
+      expect(() => original.withGuidedDetails({'Storage': value}), throwsFormatException);
+      expect(original.specifications, {'Storage': 'Dry'});
+    }
+    final full = WorkspaceProductContent(specifications: {for (var i = 0; i < 30; i++) 'Host $i': 'Source $i'});
+    expect(() => full.withGuidedDetails({'Storage': 'Dry'}), throwsFormatException);
+  });
+  test('CONTENT-GUIDE optional cucumber Catalogue manual and CSV paths need no family or phone dimensions', () {
+    final cucumber = workspaceMasterCatalogue.first.copyWith(title: 'Host cucumber', brand: '', variant: '',
+      categoryId: 'fruits-vegetables', pack: '1 kg', content: const WorkspaceProductContent(),
+      sellingPriceMinor: 4025, purchasePriceMinor: 3000, stock: 0, publicListing: false);
+    expect(cucumber.variantMembership, isNull);
+    expect(cucumber.content.isEmpty, isTrue);
+    final roundtrip = WorkspaceCatalogueItem.fromInventoryJson(cucumber.toInventoryJson());
+    expect(roundtrip.variantMembership, isNull); expect(roundtrip.content.isEmpty, isTrue);
+    const csv = 'title,brand,variant,pack,categoryId,purchasePrice,sellingPrice,stock,sku\n'
+      'Host cucumber,,,1 kg,fruits-vegetables,30,40.25,0,HOST-CUCUMBER\n';
+    for (final catalogue in [<WorkspaceCatalogueItem>[], [cucumber]]) {
+      final row = WorkspaceProductImport.parse(csv, catalogue: catalogue, owned: []).rows.single;
+      expect(row.issue, isNull); expect(row.product!.variantMembership, isNull);
+      expect(row.product!.content.isEmpty, isTrue); expect(row.product!.sellingPriceMinor, 4025);
+      expect(row.product!.publicListing, isFalse);
+    }
+    const withoutBrandColumn = 'title,pack,categoryId,purchasePrice,sellingPrice,stock,sku\n'
+      'Host cucumber,1 kg,fruits-vegetables,30,40.25,0,HOST-CUCUMBER\n';
+    final noBrand = WorkspaceProductImport.parse(withoutBrandColumn, catalogue: [], owned: []).rows.single;
+    expect(noBrand.issue, isNull); expect(noBrand.product!.brand, isEmpty);
+    final applicableBrand = WorkspaceProductImport.parse(withoutBrandColumn.replaceAll('fruits-vegetables', 'surface-cleaners'),
+      catalogue: [], owned: []).rows.single;
+    expect(applicableBrand.product, isNull); expect(applicableBrand.issueValues.keys, contains('brand'));
+  });
+  test('CONTENT-GUIDE CSV corrected explicit clear cannot revive catalogue specifications', () {
+    final base = workspaceMasterCatalogue.first.copyWith(content: const WorkspaceProductContent(specifications: {'Storage': 'Dry'}));
+    final source = {'title': base.title, 'brand': base.brand, 'pack': base.pack,
+      'variant': base.variant, 'canonicalId': base.canonicalId, 'purchasePrice': '0',
+      'sellingPrice': '260', 'stock': '0', 'specifications': 'Storage: Dry'};
+    final original = WorkspaceProductImport.parse(jsonEncode([source]), json: true, catalogue: [base], owned: []).rows.single;
+    expect(original.product, isNull);
+    final corrected = WorkspaceProductImport.revalidateRow(original,
+      {...original.rawValues, 'purchasePrice': '200', 'specifications': ''}, catalogue: [base], owned: []);
+    expect(corrected.issue, isNull);
+    expect(corrected.product!.content.specifications, isEmpty);
+    expect(corrected.sourceValues, original.sourceValues);
+  });
+  test('CONTENT-GUIDE CSV blank inheritance differs from clear through failed correction retry', () {
+    final base = workspaceMasterCatalogue.first.copyWith(content: const WorkspaceProductContent(specifications: {'Storage': 'Dry'}));
+    final source = {'title': base.title, 'brand': base.brand, 'pack': base.pack,
+      'variant': base.variant, 'canonicalId': base.canonicalId, 'purchasePrice': '0',
+      'sellingPrice': '260', 'stock': '0', 'specifications': ''};
+    final original = WorkspaceProductImport.parse(jsonEncode([source]), json: true, catalogue: [base], owned: []).rows.single;
+    final inherited = WorkspaceProductImport.revalidateRow(original,
+      {...original.rawValues, 'purchasePrice': '200'}, catalogue: [base], owned: []);
+    expect(inherited.product!.content.specifications, {'Storage': 'Dry'});
+    final failed = WorkspaceProductImport.revalidateRow(original, original.rawValues,
+      catalogue: [base], owned: [], clearedContentFields: {'specifications'});
+    expect(failed.product, isNull); expect(failed.clearedContentFields, {'specifications'});
+    final retried = WorkspaceProductImport.revalidateRow(failed,
+      {...failed.rawValues, 'purchasePrice': '200'}, catalogue: [base], owned: []);
+    expect(retried.product!.content.specifications, isEmpty);
+    expect(retried.withReviewedProduct(retried.product!).clearedContentFields, {'specifications'});
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(retried.product!.toInventoryJson());
+    expect(restored.content.specifications, isEmpty); expect(restored.id, retried.product!.id);
+    final refilled = WorkspaceProductImport.revalidateRow(retried,
+      {...retried.rawValues, 'specifications': 'Storage: New source'}, catalogue: [base], owned: []);
+    expect(refilled.clearedContentFields, isEmpty);
+    expect(refilled.product!.content.specifications, {'Storage': 'New source'});
+    expect(refilled.sourceValues, original.sourceValues);
+    expect(() => WorkspaceProductImport.parse(jsonEncode([source, source]), json: true,
+      catalogue: [base], owned: [], clearedContentFields: {'specifications'}), throwsFormatException);
+  });
   // Local authoring fixtures only; never injected Stock or reviewed public data.
   WorkspaceVariantFamily ownerFamily({int revision = 1}) => WorkspaceVariantFamily(
     id: 'host-phone-family', revision: revision, title: 'Host phone', brand: 'Host maker',
@@ -80,6 +173,36 @@ void main() {
     savedAt: DateTime.utc(2026, 10, 17), products: products, movements: const [],
     variantFamilies: families ?? [ownerFamily()]);
 
+  test('CONTENT-GUIDE shared family details and SKU exceptions survive saved recovery', () {
+    final shared = ownerFamily().copyWith(content: const WorkspaceProductContent()
+      .withGuidedDetails({'Storage': 'Shared source instructions'}));
+    final a = shared.applyTo(memberProduct('host-a', 'pink', '128'));
+    final b = memberProduct('host-b', 'blue', '512', shared: false).copyWith(
+      content: const WorkspaceProductContent().withGuidedDetails({'Storage': 'Exact SKU exception'}));
+    final recovered = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(familyInventory([a, b], families: [shared]).toJson())));
+    expect(recovered.products.first.content.specifications['Storage'], 'Shared source instructions');
+    expect(recovered.products.last.content.specifications['Storage'], 'Exact SKU exception');
+    expect(recovered.products.map((p) => p.id), ['host-a', 'host-b']);
+    expect(recovered.products.every((p) => !p.publicListing), isTrue);
+  });
+
+  test('CONTENT-GUIDE CSV shared clear requires explicit SKU exception', () {
+    final family = ownerFamily().copyWith(content: const WorkspaceProductContent(specifications: {'Storage': 'Shared source'}));
+    final source = {'title': '', 'brand': '', 'pack': '1 unit', 'purchasePrice': '85.10',
+      'sellingPrice': '100.25', 'stock': '-1', 'sku': 'HOST-GUIDED-GROUP',
+      'productGroup': family.id, 'option:Colour': 'pink', 'option:Storage': '256 GB'};
+    final original = WorkspaceProductImport.parse(jsonEncode([source]), json: true,
+      catalogue: [], owned: [], variantFamilies: [family]).rows.single;
+    final blocked = WorkspaceProductImport.revalidateRow(original,
+      {...original.rawValues, 'stock': '0', 'specifications': ''}, catalogue: [], owned: [],
+      variantFamilies: [family], clearedContentFields: {'specifications'});
+    expect(blocked.product, isNull); expect(blocked.issueValues.keys, contains('shareGroupContent'));
+    final exception = WorkspaceProductImport.revalidateRow(blocked,
+      {...blocked.rawValues, 'shareGroupContent': 'false'}, catalogue: [], owned: [], variantFamilies: [family]);
+    expect(exception.issue, isNull); expect(exception.product!.content.specifications, isEmpty);
+    expect(exception.product!.variantMembership!.useSharedContent, isFalse);
+    expect(family.content.specifications, {'Storage': 'Shared source'});
+  });
   test('LF03 owner family and exact SKU membership survive one v4 aggregate', () {
     final first = memberProduct('host-a', 'pink', '128');
     final second = memberProduct('host-b', 'blue', '512').copyWith(sellingPriceMinor: 10025);

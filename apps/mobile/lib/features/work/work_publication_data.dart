@@ -37,6 +37,44 @@ class WorkspaceProductContent {
     'highlights': 'Highlights — one per line',
     'specifications': 'Specifications — one Name: value per line',
   };
+  /// Optional descriptive capture over the existing specification map, not typed
+  /// nutrition, safety certification, or a change to the reviewed wire format.
+  static List<String> guidedLabelsForCategory(String categoryId) {
+    if (const {'surface-cleaners', 'laundry-dishwash'}.contains(categoryId)) {
+      return const ['Intended use', 'Usage', 'Dilution', 'Storage'];
+    }
+    if (const {'bath-hand-care', 'oral-care', 'hair-care', 'skin-care',
+      'air-waste-care', 'diapers-wipes', 'baby-care'}.contains(categoryId)) {
+      return const ['Intended use', 'Usage', 'Storage'];
+    }
+    if (const {'fruits-vegetables', 'dairy-bakery', 'eggs-poultry', 'meat-seafood',
+      'flour-rice-grains', 'flour-grains', 'dals-staples', 'oils-ghee', 'cooking-oil',
+      'ground-spices', 'whole-spices', 'salt-spices', 'breakfast-cereals',
+      'instant-foods', 'sauces-spreads', 'biscuits-chocolate', 'namkeen-chips',
+      'tea-coffee', 'juices-water', 'frozen-foods', 'icecream-cheese',
+      'horeca-food-packs'}.contains(categoryId)) {
+      return const ['Storage', 'Preparation'];
+    }
+    return const [];
+  }
+
+  WorkspaceProductContent withGuidedDetails(Map<String, String> changes) {
+    final updated = Map<String, String>.of(specifications);
+    for (final entry in changes.entries) {
+      final key = updated.keys.where((key) => key.toLowerCase() == entry.key.toLowerCase()).firstOrNull ?? entry.key;
+      final value = entry.value.trim();
+      if (value.contains('\n') || value.contains('\r')) {
+        throw const FormatException('specifications: Use one paragraph for each detail.');
+      }
+      if (value.isEmpty) {
+        updated.remove(key);
+      } else {
+        updated[key] = value;
+      }
+    }
+    return parse({...inputValues, 'specifications': updated.entries
+      .map((e) => '${e.key}: ${e.value}').join('\n')});
+  }
   Map<String, String> get inputValues => {
     'description': description,
     'highlights': highlights.join('\n'),

@@ -2087,6 +2087,30 @@ void main() {
   }
   for (final trade in [false, true]) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('CONTENT-GUIDE reviewed details display supplied fields only trade=$trade scale=$scale', (tester) async {
+        final base = listingItem();
+        final authored = base.copyWith(content: base.content.withGuidedDetails({
+          'Storage': 'Host published storage instructions', 'Preparation': ''}));
+        final saved = WorkspaceCatalogueItem.fromInventoryJson(authored.toInventoryJson());
+        final projection = saved.toBuyPublicContent(storeId: 'store-one', sourceId: 'Host reviewed source');
+        // This is a labelled accepted-source host response, not automatic publication.
+        final data = publicPage(trade: trade);
+        (row(data)['content'] as Map)['specifications'] = [for (final field in projection.specifications)
+          {'label': field.label, 'value': field.value}];
+        final entry = factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail);
+        final content = _HostOptionalProductContent()..specifications = entry.readback.content.specifications;
+        final session = await optionalDetailsSession(entry.product, content);
+        final privateEdit = saved.copyWith(content: saved.content.withGuidedDetails({'Storage': 'Host private unpublished edit'}));
+        expect(privateEdit.content.specifications['Storage'], 'Host private unpublished edit');
+        await mountOptionalDetails(tester, session, scale);
+        final details = find.byKey(ValueKey('buy-product-content-ready-${entry.product.id}'));
+        await revealOptionalDetails(tester, entry.product, details);
+        expect(find.text('Host published storage instructions'), findsOneWidget);
+        expect(find.text('Host private unpublished edit'), findsNothing);
+        expect(find.text('Preparation'), findsNothing);
+        expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
       testWidgets('LF03 READINESS public product labels do not promise unsourced delivery trade=$trade scale=$scale', (tester) async {
         final semantics = tester.ensureSemantics();
         try {

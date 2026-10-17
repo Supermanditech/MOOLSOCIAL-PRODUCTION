@@ -33446,7 +33446,9 @@ void main() {
       headers.containsAll(WorkspaceProductImport.packFieldLabels.keys),
       isTrue,
     );
-    expect(headers, hasLength(41));
+    expect(headers, hasLength(48));
+    expect(headers, containsAll(['manufacturerAddress', 'packerAddress', 'importerAddress',
+      'productGroup', 'shareGroupContent', 'option:Colour', 'option:Storage']));
     expect(headers, containsAll(WorkspaceSellingInputs.labels.keys));
     expect(headers, containsAll(WorkspaceProductContent.labels.keys));
     for (final field in [
@@ -33514,7 +33516,8 @@ void main() {
       );
       expect(table, hasLength(1));
       expect(table.single, WorkspaceProductImport.templateLabels.keys.toList());
-      expect(WorkspaceProductImport.columns.containsAll(table.single), isTrue);
+      expect(table.single.every((key) => WorkspaceProductImport.columns.contains(key) ||
+        WorkspaceProductImport.isOptionColumn(key)), isTrue);
       expect(
         table.single.toSet().containsAll(
           WorkspaceProductImport.requiredColumns,
@@ -67014,7 +67017,168 @@ void main() {
     });
   }
 
+  testWidgets('CONTENT-GUIDE CSV guided clear survives save retry and storage restart', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(SecureWorkInventoryStore(accountScope: () => account.accountScope));
+    final base = workspaceMasterCatalogue.first.copyWith(content: const WorkspaceProductContent(specifications: {'Storage': 'Dry'}));
+    const store = WorkWorkspace(id: 'qa-guided-clear', name: 'Host category evaluation Store',
+      profileId: 'retailer-grocery', profileLabel: 'Grocery / Kirana Shop', area: 'Local QA', verified: true);
+    WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage, catalogueReference: [base])
+      ..selectedProfile = workProfiles.first..workspaceId = store.id..activeWorkspace = store
+      ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+    final work = fresh(); expect(await work.loadWorkspaceInventory(), isTrue);
+    final values = {'title': base.title, 'brand': base.brand, 'variant': base.variant, 'pack': base.pack,
+      'purchasePrice': '200', 'sellingPrice': '260', 'stock': '-1', 'sku': 'HOST-GUIDED-CLEAR', 'specifications': ''};
+    String cell(String s) => '"${s.replaceAll('"', '""')}"';
+    final previous = FilePickerPlatform.instance;
+    FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile(
+      '${values.keys.join(',')}\n${values.values.map(cell).join(',')}');
+    addTearDown(() => FilePickerPlatform.instance = previous);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 806), textScale: 2, openHomeActions: false);
+    await openAddProductsFromHome(tester); await chooseAddProductMode(tester, 'import');
+    await tester.tap(find.byKey(const Key('work-add-product-choose-csv'))); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-import-correct-2'))); await tester.pumpAndSettle();
+    Future<void> show(Finder finder) async {
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(finder), alignment: .2); await tester.pumpAndSettle();
+    }
+    final stock = find.byKey(const Key('work-product-stock'));
+    await show(stock); await tester.enterText(stock, '0');
+    final section = find.byKey(const Key('work-product-customer-facts-section'));
+    await show(section); await tester.tap(section); await tester.pumpAndSettle();
+    final guide = find.byKey(const Key('work-product-guided-details'));
+    await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+    final storageField = find.byKey(const Key('work-product-guided-Storage'));
+    expect(tester.widget<TextField>(storageField).controller!.text, 'Dry');
+    await tester.enterText(storageField, '');
+    await show(find.byKey(const Key('work-product-guided-apply')));
+    await tester.tap(find.byKey(const Key('work-product-guided-apply'))); await tester.pumpAndSettle();
+    final apply = find.byKey(const Key('work-product-save'));
+    await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
+    expect(find.byType(StoreProductImportReviewScreen), findsOneWidget);
+    storage.failSave = true;
+    await tester.tap(find.byKey(const Key('work-import-save'))); await tester.pumpAndSettle();
+    expect(await work.workspaceInventorySaved, isFalse);
+    final imported = work.workspaceCatalogueItems.single;
+    expect(imported.content.specifications, isEmpty);
+    final original = jsonEncode(imported.toInventoryJson());
+    storage.failSave = false;
+    await tester.tap(find.byKey(const Key('work-import-save'))); await tester.pumpAndSettle();
+    expect(await work.workspaceInventorySaved, isTrue);
+    final restarted = fresh(); addTearDown(restarted.dispose);
+    expect(await restarted.loadWorkspaceInventory(), isTrue);
+    expect(jsonEncode(restarted.workspaceCatalogueItems.single.toInventoryJson()), original);
+    expect(restarted.workspaceCatalogueItems.single.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+    expect(restarted.workspaceCatalogueItems.single.publicListing, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('CONTENT-GUIDE manual cucumber saves without brand variant or optional details', (tester) async {
+    final work = storeViewFixture(); work.workspaceCatalogueItems.clear();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+      viewport: const Size(320, 806), textScale: 2, bottomInset: 0);
+    final add = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, add); await tester.tap(add); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-add-product-options')).hitTestable().first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-add-product-enter'))); await tester.pumpAndSettle();
+    Future<void> show(Finder finder) async {
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await Scrollable.ensureVisible(tester.element(finder), alignment: .2); await tester.pumpAndSettle();
+    }
+    for (final e in {'title': 'Host cucumber', 'purchase-price': '30', 'selling-price': '40.25', 'stock': '0'}.entries) {
+      final field = find.byKey(Key('work-product-${e.key}'));
+      await show(field); await tester.enterText(field, e.value);
+    }
+    final details = find.byKey(const Key('work-product-details-section'));
+    await show(details); await tester.tap(details); await tester.pumpAndSettle();
+    final category = find.byKey(const Key('work-product-category'));
+    await show(category); await tester.tap(category); await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-catalogue-category-search')), 'Fruits');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-category-fruits-vegetables'))); await tester.pumpAndSettle();
+    final pack = find.byKey(const Key('work-product-pack'));
+    await show(pack); await tester.enterText(pack, '1 kg');
+    expect(tester.widget<TextField>(find.byKey(const Key('work-product-brand'))).controller!.text, isEmpty);
+    expect(find.text('Optional for loose fruit and vegetables'), findsOneWidget);
+    final save = find.byKey(const Key('work-product-save'));
+    await show(save); await tester.tap(save); await tester.pumpAndSettle();
+    final saved = work.workspaceCatalogueItems.single;
+    expect(saved.title, 'Host cucumber'); expect(saved.brand, isEmpty);
+    expect(saved.variantMembership, isNull); expect(saved.variant, isEmpty);
+    expect(saved.content.isEmpty, isTrue); expect(saved.pack, '1 kg');
+    expect(saved.sellingPriceMinor, 4025); expect(saved.publicListing, isFalse);
+    expect(tester.takeException(), isNull);
+  });
   for (final display in [360.0, 320.0]) {
+    testWidgets('CONTENT-GUIDE category details reuse saved specifications $display', (tester) async {
+      final work = storeViewFixture();
+      work.workspaceCatalogueItems.clear();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: Size(display, 806), textScale: display == 320 ? 2 : 1, bottomInset: 0);
+      final add = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, add); await tester.tap(add); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}')));
+      await tester.pumpAndSettle();
+      Future<void> show(Finder finder) async {
+        FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+        await Scrollable.ensureVisible(tester.element(finder), alignment: .2);
+        await tester.pumpAndSettle();
+      }
+      for (final e in {'purchase-price': '200', 'selling-price': '260', 'stock': '0'}.entries) {
+        final field = find.byKey(Key('work-product-${e.key}'));
+        await show(field); await tester.enterText(field, e.value);
+      }
+      final section = find.byKey(const Key('work-product-customer-facts-section'));
+      await show(section); await tester.tap(section); await tester.pumpAndSettle();
+      final specs = find.byKey(const Key('work-product-specifications'));
+      await show(specs); await tester.enterText(specs, 'Container: Pouch\nstorage: Dry');
+      final guide = find.byKey(const Key('work-product-guided-details'));
+      expect(guide, findsOneWidget, reason: 'Owner needs named category inputs, not another repeated product form');
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      final storage = find.byKey(const Key('work-product-guided-Storage'));
+      expect(tester.widget<TextField>(storage).controller!.text, 'Dry');
+      expect(find.byKey(const Key('work-product-guided-Preparation')), findsOneWidget);
+      expect(find.text('No'), findsNothing);
+      await tester.enterText(storage, 'Cancelled edit');
+      await tester.tap(find.byKey(const Key('work-product-guided-cancel'))); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Dry');
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      await tester.enterText(storage, 'Cool, dry place');
+      final apply = find.byKey(const Key('work-product-guided-apply'));
+      await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      final productDetails = find.byKey(const Key('work-product-details-section'));
+      await show(productDetails); await tester.tap(productDetails); await tester.pumpAndSettle();
+      Future<void> category(String query, String id) async {
+        final picker = find.byKey(const Key('work-product-category'));
+        await show(picker); await tester.tap(picker); await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('work-catalogue-category-search')), query);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key('work-catalogue-category-$id'))); await tester.pumpAndSettle();
+      }
+      await category('Surface', 'surface-cleaners');
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(storage).controller!.text, 'Cool, dry place');
+      expect(find.byKey(const Key('work-product-guided-Preparation')), findsNothing);
+      expect(find.byKey(const Key('work-product-guided-Dilution')), findsOneWidget);
+      final usage = find.byKey(const Key('work-product-guided-Usage'));
+      await show(usage); await tester.enterText(usage, 'Unsaved care edit');
+      final cancel = find.byKey(const Key('work-product-guided-cancel'));
+      await show(cancel); await tester.tap(cancel); await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      await category('Other', 'other');
+      expect(guide, findsNothing);
+      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      await category('Cooking', workspaceMasterCatalogue.first.categoryId);
+      await show(find.byKey(const Key('work-product-save')));
+      await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
+      final saved = work.workspaceCatalogueItems.single;
+      expect(saved.content.specifications, {'Container': 'Pouch', 'storage': 'Cool, dry place'});
+      expect(saved.catalogueFactsRequireReview, isTrue); expect(saved.publicListing, isFalse);
+      expect(saved.stock, 0); expect(tester.takeException(), isNull);
+    });
     testWidgets(
       'CONTENT-MAP shared product copy validation and save $display',
       (tester) async {

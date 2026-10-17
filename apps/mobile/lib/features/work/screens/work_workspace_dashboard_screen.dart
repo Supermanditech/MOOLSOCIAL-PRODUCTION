@@ -22291,7 +22291,7 @@ class _WorkspaceCatalogueSurfaceState
                             embeddedPage: true,
                             importRow: row,
                             onDone: () => Navigator.of(editorContext).pop(),
-                            validateImport: (values) {
+                            validateImport: (values, clearedContentFields) {
                               if (!current()) {
                                 throw const FormatException(
                                   'Your Store changed. Close this import and open the correct Store.',
@@ -22307,6 +22307,7 @@ class _WorkspaceCatalogueSurfaceState
                                 readyRows: readyProducts,
                                 defaults: importDefaults,
                                 variantFamilies: importFamilies,
+                                clearedContentFields: clearedContentFields,
                               );
                             },
                             onImportReviewed: (result) =>
@@ -24937,6 +24938,57 @@ class _StoreEmptyPanel extends StatelessWidget {
   }
 }
 
+class _StoreGuidedDetailsDialog extends StatefulWidget {
+  const _StoreGuidedDetailsDialog({required this.original, required this.labels});
+  final WorkspaceProductContent original;
+  final List<String> labels;
+  @override
+  State<_StoreGuidedDetailsDialog> createState() => _StoreGuidedDetailsDialogState();
+}
+
+class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog> {
+  late final _controllers = {for (final label in widget.labels) label: TextEditingController(text:
+    widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
+  String? _error;
+  @override
+  void dispose() {
+    for (final controller in _controllers.values) { controller.dispose(); }
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
+    title: Text('Category details', style: Theme.of(context).textTheme.titleMedium),
+    content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('Optional details from the product label. Blank fields are omitted from public pages.'),
+      for (final entry in _controllers.entries) ...[
+        const SizedBox(height: 16),
+        Text(entry.key),
+        Semantics(label: '${entry.key} details', child: TextField(
+          key: Key('work-product-guided-${entry.key}'), controller: entry.value,
+          minLines: 1, maxLines: 3, maxLength: 500,
+          decoration: const InputDecoration(hintText: 'Optional', counterText: ''),
+          onChanged: (_) { if (_error != null) setState(() => _error = null); })),
+      ],
+      if (_error != null) Semantics(liveRegion: true, child: Text(_error!,
+        style: TextStyle(color: Theme.of(context).colorScheme.error))),
+      const Text('Private until reviewed and published.'),
+    ]),
+    actions: [
+      TextButton(key: const Key('work-product-guided-cancel'),
+        onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      FilledButton(key: const Key('work-product-guided-apply'), onPressed: () {
+        try {
+          final next = widget.original.withGuidedDetails({for (final e in _controllers.entries) e.key: e.value.text});
+          Navigator.pop(context, next);
+        } on FormatException catch (error) {
+          setState(() => _error = error.message.replaceFirst('specifications: ', ''));
+        }
+      }, child: const Text('Apply')),
+    ],
+  );
+}
+
 class _CatalogueProductEditor extends StatefulWidget {
   const _CatalogueProductEditor({
     super.key,
@@ -24964,7 +25016,7 @@ class _CatalogueProductEditor extends StatefulWidget {
   final VoidCallback? onSaved;
   final ValueChanged<WorkspaceCatalogueItem>? onDraftReviewed;
   final WorkspaceProductImportRow? importRow;
-  final WorkspaceProductImportRow Function(Map<String, String>)? validateImport;
+  final WorkspaceProductImportRow Function(Map<String, String>, Set<String>)? validateImport;
   final ValueChanged<WorkspaceProductImportRow>? onImportReviewed;
   // Only new-product setup launched by a purchase. All other editors are unchanged.
   final (String, String, bool)? purchaseScope;
@@ -25605,6 +25657,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         in (widget.importRow?.rawValues ?? const <String, String>{}).entries)
       if (_rawImportLabels.containsKey(entry.key) || WorkspaceProductImport.isOptionColumn(entry.key))
         entry.key: TextEditingController(text: entry.value),
+    if ((widget.importRow?.rawValues['productGroup'] ?? '').isNotEmpty &&
+        !widget.importRow!.rawValues.containsKey('shareGroupContent'))
+      'shareGroupContent': TextEditingController(text: 'true'),
   };
   Map<String, TextEditingController> get _importControllers => {
     'title': _title,
@@ -25642,7 +25697,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         for (final entry in _importControllers.entries)
           if (entry.value.text != _initialImportInputs[entry.key])
             entry.key: entry.value.text,
-      });
+      }, {for (final entry in _contentFields.entries)
+        if (entry.value.text != _initialImportInputs[entry.key] && entry.value.text.trim().isEmpty) entry.key});
       if (corrected.product == null) {
         _reject(
           corrected.issue ?? 'Check this product.',
@@ -26517,6 +26573,25 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     ),
   );
 
+  Future<void> _editGuidedDetails() async {
+    final labels = WorkspaceProductContent.guidedLabelsForCategory(_category.text);
+    if (labels.isEmpty || _savingInventory) return;
+    FocusScope.of(context).unfocus();
+    WorkspaceProductContent original;
+    try {
+      original = WorkspaceProductContent.parse({'specifications': _contentFields['specifications']!.text});
+    } on FormatException catch (error) {
+      setState(() { _errorField = 'specifications'; _error = error.message.replaceFirst('specifications: ', ''); });
+      _revealImportIssue('specifications');
+      return;
+    }
+    final result = await showDialog<WorkspaceProductContent>(context: context,
+      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels));
+    if (!mounted || result == null) return;
+    setState(() => _contentFields['specifications']!.text = result.inputValues['specifications']!);
+    _clearFieldError('specifications');
+  }
+
   Widget _categoryField() => Container(
     key: _fieldKeys.putIfAbsent('categoryId', () => GlobalKey()),
     child: InkWell(
@@ -26837,6 +26912,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 'work-product-brand',
                                 'Brand or maker',
                                 _brand,
+                                hint: _category.text == 'fruits-vegetables' ? 'Optional for loose fruit and vegetables' : null,
                               ),
                               _categoryField(),
                               _field(
@@ -27003,6 +27079,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                 _contentFields[entry.key]!,
                                 lines: 2,
                               ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (WorkspaceProductContent.guidedLabelsForCategory(_category.text).isNotEmpty) ...[
+                              Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                                key: const Key('work-product-guided-details'),
+                                onPressed: _savingInventory ? null : _editGuidedDetails,
+                                icon: const Icon(Icons.edit_note), label: const Text('Edit category details'))),
                               const SizedBox(height: 8),
                             ],
                             _field(

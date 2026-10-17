@@ -176,11 +176,14 @@ if ($RequireLfPublicationProbes) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 facts owner rejected.'
       $cases++
     }
-    $legacyFacts=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-    $legacyFacts.batch02Facts.owners=@($legacyFacts.batch02Facts.owners | Where-Object { $_ -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart' })
-    Assert-Fixture (Test-Lf27Batch01Continuation $legacyFacts @()) 'Historical facts owner list rejected.'
-    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacyFacts @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'))) 'Unclaimed price decision owner admitted.'
-    $cases+=2
+    foreach ($optionalOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+        'apps/mobile/lib/features/work/work_publication_data.dart')) {
+      $legacyFacts=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $legacyFacts.batch02Facts.owners=@($legacyFacts.batch02Facts.owners | Where-Object { $_ -cne $optionalOwner })
+      Assert-Fixture (Test-Lf27Batch01Continuation $legacyFacts @()) 'Historical facts owner list rejected.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacyFacts @($optionalOwner))) 'Unclaimed optional facts owner admitted.'
+      $cases+=2
+    }
     foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
       $probe.batch02Facts.PSObject.Properties.Remove($key)

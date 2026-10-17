@@ -8083,6 +8083,7 @@ class WorkspaceProductImportRow {
     this.rawValues = const {},
     this.sourceValues = const {},
     this.inputValues,
+    this.clearedContentFields = const {},
     this.canCorrect = false,
     this.issueKind,
     this.relatedRowNumber,
@@ -8102,6 +8103,8 @@ class WorkspaceProductImportRow {
   /// Current explicit inputs, distinct from inherited effective rawValues and
   /// immutable original file sourceValues. Null keeps old row fixtures valid.
   final Map<String, String>? inputValues;
+  /// Explicit editor clears, never inferred from untouched blank file cells.
+  final Set<String> clearedContentFields;
   final bool canCorrect;
   final WorkspaceProductImportIssueKind? issueKind;
   final int? relatedRowNumber;
@@ -8112,6 +8115,7 @@ class WorkspaceProductImportRow {
     number, value.title, value.copyWith(publicListing: false), null, matched,
     issueValues: issueValues, variant: value.variant, pack: value.pack, sku: value.sku,
     rawValues: rawValues, sourceValues: sourceValues, inputValues: inputValues,
+    clearedContentFields: clearedContentFields,
     canCorrect: canCorrect, issueKind: issueKind, relatedRowNumber: relatedRowNumber,
     sourceCells: sourceCells, sourceHeaders: sourceHeaders);
 }
@@ -8145,7 +8149,6 @@ class WorkspaceProductImport {
   };
   static const requiredColumns = {
     'title',
-    'brand',
     'pack',
     'purchasePrice',
     'sellingPrice',
@@ -8153,6 +8156,7 @@ class WorkspaceProductImport {
   };
   static final columns = Set<String>.unmodifiable({
     ...requiredColumns,
+    'brand',
     ...WorkspaceSellingInputs.labels.keys,
     'sku',
     'barcode',
@@ -8182,7 +8186,7 @@ class WorkspaceProductImport {
   static const templateLabels = {
     ...WorkspaceSellingInputs.labels,
     'title': 'Product name',
-    'brand': 'Brand or maker',
+    'brand': 'Brand or maker, when applicable',
     'pack': 'Pack size',
     'purchasePrice': 'Purchase price',
     'sellingPrice': 'Selling price',
@@ -8221,6 +8225,7 @@ class WorkspaceProductImport {
     List<WorkspaceProductImportRow> readyRows = const [],
     WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
     List<WorkspaceVariantFamily> variantFamilies = const [],
+    Set<String> clearedContentFields = const {},
   }) {
     if (!original.canCorrect) {
       throw const FormatException(
@@ -8243,6 +8248,10 @@ class WorkspaceProductImport {
         }
       }
     }
+    final clears = {...original.clearedContentFields, ...clearedContentFields,
+      for (final key in WorkspaceProductContent.labels.keys)
+        if (values[key]?.trim().isEmpty == true && original.rawValues[key]?.trim().isNotEmpty == true) key}
+      ..removeWhere((key) => inputs[key]?.trim().isNotEmpty == true);
     final result = parse(
       jsonEncode([inputs]),
       json: true,
@@ -8251,6 +8260,7 @@ class WorkspaceProductImport {
       readyRows: readyRows,
       defaults: defaults,
       variantFamilies: variantFamilies,
+      clearedContentFields: clears,
     ).rows.single;
     return WorkspaceProductImportRow(
       original.number,
@@ -8265,6 +8275,7 @@ class WorkspaceProductImport {
       rawValues: result.rawValues,
       sourceValues: original.sourceValues,
       inputValues: result.inputValues,
+      clearedContentFields: result.clearedContentFields,
       canCorrect: true,
       issueKind: result.issueKind,
       relatedRowNumber: result.relatedRowNumber,
@@ -8364,6 +8375,7 @@ class WorkspaceProductImport {
     List<WorkspaceProductImportRow> readyRows = const [],
     WorkspaceProductDefaults defaults = const WorkspaceProductDefaults(),
     List<WorkspaceVariantFamily> variantFamilies = const [],
+    Set<String> clearedContentFields = const {},
   }) {
     if (text.length > 10 * 1024 * 1024) {
       throw const FormatException('Choose a file smaller than 10 MB.');
@@ -8409,7 +8421,7 @@ class WorkspaceProductImport {
       }
       if (!headers.toSet().containsAll(requiredColumns)) {
         throw const FormatException(
-          'Required columns: title, brand, pack, purchasePrice, sellingPrice, stock.',
+          'Required columns: title, pack, purchasePrice, sellingPrice, stock. Include brand or maker when applicable.',
         );
       }
       for (final values in table.skip(1)) {
@@ -8464,6 +8476,10 @@ class WorkspaceProductImport {
     for (final row in readyRows) {
       if (row.product case final product?) indexReady(product, row.number);
     }
+    if (clearedContentFields.isNotEmpty && (records.length != 1 ||
+        clearedContentFields.any((key) => !WorkspaceProductContent.labels.containsKey(key)))) {
+      throw const FormatException('Clear details only while correcting one product.');
+    }
     final stamp = DateTime.now().microsecondsSinceEpoch;
     final result = <WorkspaceProductImportRow>[];
     for (var index = 0; index < records.length; index++) {
@@ -8492,6 +8508,7 @@ class WorkspaceProductImport {
         rawValues: Map.unmodifiable(r),
         sourceValues: Map.unmodifiable(sourceRecord),
         inputValues: Map.unmodifiable(sourceRecord),
+        clearedContentFields: Set.unmodifiable(clearedContentFields),
         canCorrect: !malformed.contains(index),
         issueKind: kind,
         relatedRowNumber: relatedRow,
@@ -8547,6 +8564,9 @@ class WorkspaceProductImport {
           final shared = value('shareGroupContent').toLowerCase() != 'false';
           if (shared) {
             for (final common in family.content.inputValues.entries) {
+              if (clearedContentFields.contains(common.key) && common.value.isNotEmpty) {
+                throw const FormatException('shareGroupContent: Set false for this SKU’s description or specification exceptions.');
+              }
               if (value(common.key).isNotEmpty && value(common.key) != common.value) {
                 throw const FormatException('shareGroupContent: Set false for this SKU’s description or specification exceptions.');
               }
@@ -8575,7 +8595,7 @@ class WorkspaceProductImport {
           r['variant'] = variant;
         }
       } on FormatException catch (failure) {
-        result.add(blocked(failure.message, fields: [r.keys.where((key) =>
+        result.add(blocked(failure.message, fields: [{...columns, ...r.keys}.where((key) =>
           failure.message.startsWith('$key:')).firstOrNull ?? 'productGroup']));
         continue;
       }
@@ -8806,9 +8826,9 @@ class WorkspaceProductImport {
       WorkspaceProductContent content;
       try {
         content = membership?.useSharedContent == true ? family!.content : WorkspaceProductContent.parse(
-          r,
-          existing: base.content,
-          preserveBlank: true,
+          {...r, for (final key in WorkspaceProductContent.labels.keys)
+            key: clearedContentFields.contains(key) ? '' :
+              value(key).isEmpty ? base.content.inputValues[key]! : value(key)},
         );
       } on FormatException catch (error) {
         result.add(
@@ -8931,6 +8951,7 @@ class WorkspaceProductImport {
           rawValues: Map.unmodifiable(r),
           sourceValues: Map.unmodifiable(sourceRecord),
           inputValues: Map.unmodifiable(sourceRecord),
+          clearedContentFields: Set.unmodifiable(clearedContentFields),
           canCorrect: true,
           sourceCells: json ? const [] : sourceCells[index],
           sourceHeaders: sourceHeaders,
@@ -8959,7 +8980,7 @@ class WorkspaceProductImport {
   required String delivery,
 }) => title.isEmpty
     ? (field: 'title', message: 'Enter the product name shown to customers.')
-    : brand.isEmpty
+    : brand.isEmpty && category != 'fruits-vegetables'
     ? (field: 'brand', message: 'Enter the product brand or maker.')
     : pack.isEmpty
     ? (field: 'pack', message: 'Enter the customer pack size.')

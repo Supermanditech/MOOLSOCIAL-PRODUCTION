@@ -7991,6 +7991,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart') {
       $factsOwners += 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'
     }
+    if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/work_publication_data.dart') {
+      $factsOwners += 'apps/mobile/lib/features/work/work_publication_data.dart'
+    }
     if ($facts.ticket -cne 'LF-03-C01' -or $facts.batch -ne 2 -or
         $facts.sourceCheckpoint -cne 'd29879a31412d4cc2859c1eb23a8debe959d5786' -or
         $facts.state -cne 'founder_authorized_local_facts_contract_and_frontend' -or
