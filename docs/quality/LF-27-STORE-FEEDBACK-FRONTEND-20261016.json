@@ -349,6 +349,32 @@
         "limits": "No authenticated counterparty resolution, message production or historical-conversation migration. Order-help routing is unchanged/name-based and remains part of the order-identity continuation. Product facts/variant/media/discovery/campaign work remains open; no whole LF03, Batch02, provider or APK completion claimed."
       }
     },
+    "batch02VariantOwnerAudit": {
+      "ticket": "LF-03-C01",
+      "batch": 2,
+      "state": "confirmed_pending_owner_to_public_variant_connection",
+      "sourceCheckpoint": "b557eb99cca5c7342801362cda606a49218cd4d4",
+      "founderDirection": "Inspect OPPO iPhone16 storage128/256/512 and two colours; check Store entry/publishing for additional options and add missing scope without duplicates. Founder clarified: for production grade it should come from store.",
+      "observed": "OPPO screenshots show Pink/Ultramarine and128/256GB; horizontal scrolling reveals512GB. These are explicit Review only products from BuyV2DevelopmentCatalogueSource, not Store-owner publication evidence. Capture/scroll only; no save, Cart change, message or transaction.",
+      "gap": "Store WorkspaceCatalogueItem/editor/CSV retain a free-text variant rather than structured family/dimension/option membership. Publication sourceProductAuditValues emits empty variantAttributes. Strict reviewed content and Store catalogue reader do not supply the existing public variant-family contract. A buyer selector does not fulfil the missing owner producer.",
+      "minimumOwnerFlow": [
+        "Maintain common product/family facts once; reuse approved catalogue options or submit new/changed descriptive options for trusted review. Store owners cannot self-approve canonical facts.",
+        "Define applicable dimensions/options and actual sellable combinations, including more colours/storage or another category-appropriate dimension; reuse the shared editor/contracts, not hard-coded phone options or another editor.",
+        "Each actual combination retains its stable SKU/pack, one Stock record, price/MRP/channel terms and correctly bound media. Six actual combinations mean six sellable SKUs, not duplicate records per channel or shared quantity across variants.",
+        "Preserve Catalogue/manual/CSV compatibility, saved identities, failed-save input, original pending retries and restart continuity. Shared facts are not repeatedly re-entered for every option.",
+        "Private Save stays private. Reviewed Store-scoped publication/readback carries family/dimension/option IDs and revisions to product/Visit Store consumers. Production options come from that Store's actual published SKUs, never review fixtures or generated combinations."
+      ],
+      "acceptance": [
+        "Supplied128/256/512GB and two colours, an extra option/dimension and a missing combination; no client-generated Cartesian inventory.",
+        "Exact SKU/pack/price/image/Cart continuity on selection; reject duplicate tuples, foreign Store/family, stale and withdrawn records; preserve Back/Cart context.",
+        "Applicable OPPO option discoverability and normal/enlarged fitment, owner save/edit/restart and reviewed public readback. Keep host fixtures, actual evaluation journeys and live-provider qualification distinct."
+      ],
+      "sourceAnchors": ["apps/mobile/lib/features/buy/buy_v2_session.dart:965,1051", "apps/mobile/lib/features/work/work_models.dart:8135,10162", "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart:26563", "apps/mobile/lib/features/work/work_publication.dart:394", "backend/functions/src/workspace/workspace_catalogue_service.ts:11,703", "apps/mobile/lib/features/work/work_catalogue_gateway.dart:674,740", "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart:326"],
+      "evidenceRoot": "C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs/evidence",
+      "evidence": ["followup-b02-iphone-variants-20261017-v1.png", "followup-b02-iphone-variants-20261017-v1.xml", "followup-b02-iphone-variants-scroll-20261017-v1.png", "followup-b02-iphone-variants-scroll-20261017-v1.xml"],
+      "architectReview": "Read-only review independently confirmed the owner model/editor/import to reviewed-public-family connection is missing; reuse the existing selector/family contract and forbid inferred combinations.",
+      "limits": "Ticket clarification only, not implemented or founder-accepted behavior. No app source, runtime data, publication, deployment, APK, policy or registry changed. Existing inventory remains12 unique tickets; descriptive compliance wiring alone cannot close this variant obligation."
+    },
     "oppoResult": "OPPO 2b3e0f71: current-source full hot restart succeeded; Wholesale product terms visibly show Tax and invoice not confirmed, with original approved layout/actions retained. Screenshots and accessibility readback were inspected. Original 164-rupee Cart/payment-review hold and saved evaluation Stock identities/quantities were checked without saving/transacting. Populated coupon and tax-authority variants remain labelled host-test evidence only. Founder review remains pending; no APK qualification claimed.",
     "taxDisplayDecision": {
       "purpose": "Wholesale product decision, existing Wholesale terms row: explain tax inclusion without promising GST registration or invoice issuance.",
