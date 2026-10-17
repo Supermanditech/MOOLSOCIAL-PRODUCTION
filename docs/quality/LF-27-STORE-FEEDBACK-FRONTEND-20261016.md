@@ -3281,3 +3281,32 @@ No new worktree split is authorized by this record. Proposed later ownership:
 Codex Store/ad and designated shared contracts; Cursor Buy/public; one writer
 for shared money/identity/API/session/router/recovery owners. Live backend,
 deployment, payment/Stock posting and APK work remain outside this goal.
+
+### Founder acceptance and common publication — 17 October
+
+Founder answered both pending reviews: "Approve visible checkpoint; continue"
+and "Approve checkpoint and publication" for exact source
+7d550665cff4a48d2f06735f6bc065008e82f8d5. This supersedes the pending-acceptance
+status above, not the explicit test limitations. The reviewed current-source OPPO
+editor/keyboard, saved Stock and Cart164/payment-review hold are accepted within
+the stated scope. Populated decimal save/restart, CSV/export, public readback and
+Chat amounts have host evidence only; live providers, native decimal transactions
+and fresh-APK qualification remain pending. No new worktrees are created.
+
+The accepted source is the sole child of published46670dc3. It preserves the
+published Store8002e8cd and Cursorf32c17e1 ancestry and all required local sources.
+Its working tree was verified clean after commit. The publication-only successor
+changes the existing three checker/fixture files and these two evidence owners:
+only the exact accepted-source pin is refreshed from the earliercf08fb91 record.
+Historical extension approvals remain pinned to their original source. All owner,
+secret, ancestry, clean-tree and single metadata-successor restrictions remain;
+there is no new phase, policy, registry, framework, application or native edit.
+
+Publication remains pending until the narrow checks, normal commit/push and exact
+remote readback finish. The final report will identify both the accepted app
+source and its metadata-only published head. Goal completion means accepted
+common-checkpoint/split readiness, not full production/MVP/backend/APK completion.
+
+Publication fixture run:33 focused positive/negative checks passed after the pin
+refresh. Unaccepted parents, merges, application/backend/policy deltas, empty
+successors, other-ticket publication and build admission remain rejected.

@@ -7915,7 +7915,7 @@ function Test-Lf01AdmissionIdentity([hashtable]$Facts) {
 }
 
 function Test-Lf27PublicationDelta([string]$Head, [string[]]$Parents, [string[]]$Owners) {
-  $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+  $accepted='7d550665cff4a48d2f06735f6bc065008e82f8d5'
   if ($Head -ceq $accepted) { return @($Owners).Count -eq 0 }
   if ($Head -cnotmatch '^[0-9a-f]{40}$' -or @($Parents).Count -ne 1 -or
       $Parents[0] -cne $accepted -or @($Owners).Count -eq 0) { return $false }
@@ -8270,7 +8270,7 @@ function Invoke-Lf01Admission {
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head
   Assert-ProductionSecretSafe -BaseCommit $base -HeadCommit $head -IndexOnly
   if ($ProductionPhase -ceq 'handoff') {
-    $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+    $accepted='7d550665cff4a48d2f06735f6bc065008e82f8d5'
     Assert-Coordination ($AcceptedUiCommit -ceq $accepted) 'LF27 publication requires the exact founder-accepted source.'
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$accepted,$head) | Out-Null
     $parents=@((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$head)))[0] -split ' ')

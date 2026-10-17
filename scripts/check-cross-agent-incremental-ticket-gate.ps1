@@ -130,7 +130,7 @@ if ($TicketId -cin @('LF-01','LF-02-1','LF-03','LF-04','LF-05','LF-06','LF-07','
     $CandidateVersionName -ceq '1.0.0-r67.3' -and $CandidateVersionCode -eq 2026101303 -and
     ($Phase -cin @('ticket_start','implementation') -or
       ($Phase -ceq 'handoff' -and $TicketId -ceq 'LF-27' -and
-        $AcceptedUiCommit -ceq 'cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'))) 'LF-01 permits only its current hot-reload source identity; no build/handoff except accepted LF27 source publication.'
+        $AcceptedUiCommit -ceq '7d550665cff4a48d2f06735f6bc065008e82f8d5'))) 'LF-01 permits only its current hot-reload source identity; no build/handoff except accepted LF27 source publication.'
   $binding = (Get-Content -Raw -LiteralPath (Join-Path $root 'config/codex-subagent-coordination-policy.json') | ConvertFrom-Json).registryBinding
   $coordinationPhase = if ($Phase -ceq 'ticket_start') { 'task_start' }
     elseif ($Phase -ceq 'handoff') { 'handoff' } else { 'implementation' }

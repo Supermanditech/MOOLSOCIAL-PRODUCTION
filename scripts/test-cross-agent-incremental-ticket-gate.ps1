@@ -87,7 +87,7 @@ if ($RequireLfPublicationProbes) {
   },$true))
   Assert-Fixture ($delta.Count -eq 1) 'publication delta predicate absent/duplicated.'
   . ([scriptblock]::Create($delta[0].Extent.Text))
-  $accepted='cf08fb91ee6ba64973c9230c7db2f424bdd67cf1'
+  $accepted='7d550665cff4a48d2f06735f6bc065008e82f8d5'
   $successor='1111111111111111111111111111111111111111'
   $metadata=@('scripts/check-codex-subagent-coordination-policy.ps1',
     'scripts/check-cross-agent-incremental-ticket-gate.ps1',

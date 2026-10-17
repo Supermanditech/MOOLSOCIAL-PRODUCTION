@@ -48,7 +48,7 @@
         "Local secure original-intent recovery is implemented and host-tested; backend contract, real feed/moderation/security and native populated-request qualification remain pending."
       ],
       "manifestPath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
-      "manifestSha256": "01F9CC587CDA928907B475B9C00FF8EFC47AAC52CBC2142DC0C8A6FF393F9520",
+      "manifestSha256": "B322A57F6AD1EA861DE926299235248B0F6EA991E62BEE924B382F9A4F369917",
       "evidencePath": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,
@@ -249,7 +249,7 @@
     "state": "founder_acknowledged_mvp_scope",
     "evidence": "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.md",
     "beyondMvpExplicitlyAuthorized": false,
-    "founderAcceptance": "Founder approved the bounded LF17/22/24/25/26/27 review at cf08fb91ee6ba64973c9230c7db2f424bdd67cf1 and separately approved only its normal source publication with at most one existing checker/test/ticket metadata-only successor. Native/host-only limits, existing customer-title ellipsis and provider/APK dependencies remain; no build, backend, live service or worktree split authority."
+    "founderAcceptance": "Founder approved the visible checkpoint and exact common source 7d550665cff4a48d2f06735f6bc065008e82f8d5 for normal publication and later work splitting on 17 October 2026. Earlier cf08fb91ee6ba64973c9230c7db2f424bdd67cf1 acceptance remains historical. The current publication permits only one existing checker/test/ticket metadata-only successor; approved application source is unchanged. OPPO saved Stock and Cart164/payment hold are retained. Populated decimal/provider paths remain host-tested only; native decimal transactions, live services and fresh-APK qualification remain pending. No deployment, transaction, APK or actual worktree creation authority is added."
   },
   "sharedCatalogueExtension": {
     "authorized": true,
