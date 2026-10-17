@@ -2372,6 +2372,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                 orderId: order.id,
               ),
       );
+    } on FormatException {
+      widget.session.showNotice(
+        '$chatLabel is unavailable right now. Your order is unchanged.',
+      );
     } on ArgumentError {
       widget.session.showNotice(
         '$chatLabel is unavailable right now. Your order is unchanged.',
@@ -2400,6 +2404,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           product: product,
           quantity: widget.session.quantityFor(product.id),
         ),
+      );
+    } on FormatException {
+      widget.session.showNotice(
+        'Supplier Chat is unavailable right now. Your product is unchanged.',
       );
     } on ArgumentError {
       widget.session.showNotice(

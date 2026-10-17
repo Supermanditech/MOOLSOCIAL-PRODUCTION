@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -10,7 +12,269 @@ import 'package:moolsocial/features/journey01/review_journey_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 
+// Isolated SDK fakes only, never native sign-in or provider acceptance.
+class _LfIdentityApp extends Fake implements FirebaseApp {
+  _LfIdentityApp(this.projectId);
+  final String projectId;
+  @override
+  FirebaseOptions get options => FirebaseOptions(apiKey: 'host-fixture',
+    appId: 'host-fixture', messagingSenderId: 'host-fixture', projectId: projectId);
+}
+class _LfIdentityUser extends Fake implements User {
+  _LfIdentityUser(this.uid, {this.tenantId, this.token});
+  @override
+  final String uid;
+  @override
+  final String? tenantId;
+  final Completer<IdTokenResult>? token;
+  final claimsStarted = Completer<void>();
+  @override
+  String get displayName => 'Host member';
+  @override
+  String get email => 'same-contact@example.invalid';
+  @override
+  String? get phoneNumber => null;
+  @override
+  List<UserInfo> get providerData => [];
+  @override
+  Future<IdTokenResult> getIdTokenResult([bool forceRefresh = false]) {
+    if (!claimsStarted.isCompleted) claimsStarted.complete();
+    return token?.future ?? Future.error(StateError('Host optional claims unavailable'));
+  }
+}
+class _LfIdentityAuth extends Fake implements FirebaseAuth {
+  final changes = StreamController<User?>.broadcast(sync: true);
+  User? user;
+  String? tenant;
+  String projectId = 'host-project';
+  @override
+  User? get currentUser => user;
+  @override
+  String? get tenantId => tenant;
+  @override
+  FirebaseApp get app => _LfIdentityApp(projectId);
+  @override
+  Stream<User?> userChanges() => changes.stream;
+}
+class _LfDelayedIdentity extends ReviewAuthenticatedAccountIdentityGateway {
+  final reply = Completer<AuthenticatedAccountIdentity?>();
+  final started = Completer<void>();
+  @override
+  Future<AuthenticatedAccountIdentity?> currentIdentity() {
+    started.complete();
+    return reply.future;
+  }
+}
+
 void main() {
+  test('LF identity gateway drops an old account after optional claims await', () async {
+    final token = Completer<IdTokenResult>();
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a', token: token);
+    final pending = FirebaseAuthenticatedAccountIdentityGateway(auth).currentIdentity();
+    auth.user = _LfIdentityUser('host-user-b');
+    token.completeError(StateError('Host optional claims unavailable'));
+    expect(await pending, isNull);
+  });
+  for (final change in ['logout', 'tenant', 'project']) {
+    test('LF identity gateway rejects $change during optional claims await', () async {
+      final token = Completer<IdTokenResult>();
+      final auth = _LfIdentityAuth()
+        ..tenant = 'tenant-a'
+        ..user = _LfIdentityUser('host-user-a', tenantId: 'tenant-a', token: token);
+      final pending = FirebaseAuthenticatedAccountIdentityGateway(auth).currentIdentity();
+      switch (change) {
+        case 'logout': auth.user = null;
+        case 'tenant': auth.tenant = 'tenant-b';
+        case 'project': auth.projectId = 'host-other-project';
+      }
+      token.completeError(StateError('Host optional claims unavailable'));
+      expect(await pending, isNull);
+    });
+  }
+  test('LF identity actual scoped principal survives optional claims failure', () async {
+    final auth = _LfIdentityAuth()..tenant = 'tenant-a'
+      ..user = _LfIdentityUser('host-user-a', tenantId: 'tenant-a');
+    final result = await FirebaseAuthenticatedAccountIdentityGateway(auth).currentIdentity();
+    expect(result!.firebasePrincipal,
+      (projectId: 'host-project', tenantId: 'tenant-a', userId: 'host-user-a'));
+    expect(result.primaryLabel, 'Host member');
+  });
+  test('LF identity identical contacts never identify the same Firebase principal', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final gateway = FirebaseAuthenticatedAccountIdentityGateway(auth);
+    final a = await gateway.currentIdentity();
+    auth.user = _LfIdentityUser('host-user-b');
+    final b = await gateway.currentIdentity();
+    expect(a!.emailAddress, b!.emailAddress);
+    expect(a.primaryLabel, b.primaryLabel);
+    expect(a.firebasePrincipal, isNot(b.firebasePrincipal));
+    auth.projectId = 'host-other-project';
+    final otherProject = await gateway.currentIdentity();
+    expect(otherProject!.firebaseUserId, b.firebaseUserId);
+    expect(otherProject.firebasePrincipal, isNot(b.firebasePrincipal));
+  });
+  test('LF identity legacy or invalid principal data remains unavailable', () {
+    expect(const AuthenticatedAccountIdentity(emailAddress: 'host@example.invalid')
+      .firebasePrincipal, isNull);
+    expect(const AuthenticatedAccountIdentity(firebaseUserId: 'host-user')
+      .firebasePrincipal, isNull);
+    expect(const AuthenticatedAccountIdentity(firebaseUserId: ' ', firebaseProjectId: 'host-project')
+      .firebasePrincipal, isNull);
+    expect(const AuthenticatedAccountIdentity(firebaseUserId: 'host-user', firebaseProjectId: 'host-project',
+      firebaseTenantId: '').firebasePrincipal, isNull);
+  });
+  JourneySession principalFixture(AuthenticatedAccountIdentityGateway gateway) => JourneySession(
+    store: MemoryJourneyStore(snapshot: const JourneySnapshot(languageCode: 'en',
+      areaMode: 'skipped', setupComplete: true)),
+    otpGateway: ReviewOtpGateway(signedIn: true), accountIdentityGateway: gateway);
+  const hostIdentity = AuthenticatedAccountIdentity(firebaseUserId: 'host-user-a',
+    firebaseProjectId: 'host-project');
+  test('LF account storage rejects live SDK change after accepted identity', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedFirebasePrincipal, hostIdentity.firebasePrincipal);
+    auth.user = _LfIdentityUser('host-user-b');
+    expect(session.authenticatedFirebasePrincipal, isNull);
+  });
+  test('LF account storage observes SDK change and cannot revive an old accepted owner', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));
+    addTearDown(auth.changes.close);
+    addTearDown(session.dispose);
+    await session.start();
+    var notifications = 0;
+    session.addListener(() => notifications++);
+    expect(session.authenticatedBuyPersistenceIdentity,
+      (environment: 'firebase-service', projectId: 'host-project', tenantId: null, userId: 'host-user-a'));
+    auth.user = _LfIdentityUser('host-user-b');
+    auth.changes.add(auth.user);
+    expect(notifications, 1);
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+    auth.user = _LfIdentityUser('host-user-a');
+    auth.changes.add(auth.user);
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+  });
+  test('LF account storage stream errors and completion fail closed', () async {
+    final auth = _LfIdentityAuth()..user = _LfIdentityUser('host-user-a');
+    final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedBuyPersistenceIdentity, isNotNull);
+    auth.changes.addError(StateError('Host observation unavailable'));
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+    auth.changes.add(auth.user);
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+    await auth.changes.close();
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+  });
+  test('LF account storage review contact snapshots never grant device ownership', () async {
+    final session = principalFixture(ReviewAuthenticatedAccountIdentityGateway(identity: hostIdentity));
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedFirebasePrincipal, isNotNull);
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+  });
+  test('LF account storage returning user cannot admit an identity read from a retired epoch', () async {
+    final claims = Completer<IdTokenResult>();
+    final userA = _LfIdentityUser('host-user-a', token: claims);
+    final auth = _LfIdentityAuth()..user = userA;
+    final session = principalFixture(FirebaseAuthenticatedAccountIdentityGateway(auth));
+    addTearDown(auth.changes.close);
+    addTearDown(session.dispose);
+    final boot = session.start();
+    await userA.claimsStarted.future;
+    auth.user = _LfIdentityUser('host-user-b');
+    auth.changes.add(auth.user);
+    auth.user = userA;
+    auth.changes.add(auth.user);
+    claims.completeError(StateError('Host claims unavailable'));
+    await boot;
+    expect(session.authenticatedBuyPersistenceIdentity, isNull);
+  });
+  test('LF identity session exposes only a ready verified principal and clears on logout', () async {
+    final session = principalFixture(ReviewAuthenticatedAccountIdentityGateway(identity: hostIdentity));
+    addTearDown(session.dispose);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    await session.start();
+    expect(session.authenticatedFirebasePrincipal, hostIdentity.firebasePrincipal);
+    session.accountIdentity = const AuthenticatedAccountIdentity(emailAddress: 'changed@example.invalid');
+    expect(session.authenticatedFirebasePrincipal, hostIdentity.firebasePrincipal);
+    session.authenticatedRevalidationPending = true;
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    session.authenticatedRevalidationPending = false;
+    session.stage = JourneyStage.signIn;
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    session.stage = JourneyStage.ready;
+    expect(await session.signOut(), isTrue);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+  });
+  test('LF identity contact fallback never becomes a principal', () async {
+    final session = principalFixture(ReviewAuthenticatedAccountIdentityGateway(
+      identity: const AuthenticatedAccountIdentity(emailAddress: 'host@example.invalid')));
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.isAuthenticated, isTrue);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+  });
+  test('LF identity initial late snapshot cannot revive a disposed session', () async {
+    final gateway = _LfDelayedIdentity();
+    final session = principalFixture(gateway);
+    final boot = session.start();
+    await gateway.started.future;
+    session.dispose();
+    gateway.reply.complete(hostIdentity);
+    await boot;
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    expect(session.accountIdentity, isNull);
+  });
+  test('LF identity late revalidation snapshot cannot undo logout', () async {
+    final gateway = _LfDelayedIdentity();
+    final binding = await const ReviewPrincipalBindingProtector().protect('host-user-a');
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(snapshot: const JourneySnapshot(languageCode: 'en',
+        areaMode: 'skipped', setupComplete: true)),
+      otpGateway: ReviewOtpGateway(signedIn: true), accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(binding: binding),
+      accountIdentityGateway: gateway);
+    addTearDown(session.dispose);
+    await session.start();
+    final revalidation = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+    await gateway.started.future;
+    expect(await session.signOut(), isTrue);
+    gateway.reply.complete(hostIdentity);
+    expect(await revalidation, isFalse);
+    expect(session.isAuthenticated, isFalse);
+    expect(session.stage, JourneyStage.signIn);
+    expect(session.accountIdentity, isNull);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+  });
+  test('LF identity offline revalidation must finish before principal exposure', () async {
+    final binding = await const ReviewPrincipalBindingProtector().protect('host-user-a');
+    final bootstrap = _ControlledRevalidationBootstrap(binding);
+    final session = JourneySession(
+      store: MemoryJourneyStore(snapshot: const JourneySnapshot(languageCode: 'en',
+        areaMode: 'skipped', setupComplete: true)),
+      otpGateway: ReviewOtpGateway(signedIn: true), accountBootstrapGateway: bootstrap,
+      verifiedPrincipalBindingStore: MemoryVerifiedPrincipalBindingStore(binding: binding),
+      accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(identity: hostIdentity));
+    addTearDown(session.dispose);
+    await session.start();
+    expect(session.authenticatedRevalidationPending, isTrue);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    final pending = session.retryAuthenticatedAccountRevalidation();
+    await Future<void>.delayed(Duration.zero);
+    expect(session.authenticatedFirebasePrincipal, isNull);
+    bootstrap.complete(AuthenticatedAccountBootstrapResult.verified(binding));
+    expect(await pending, isTrue);
+    expect(session.authenticatedFirebasePrincipal, hostIdentity.firebasePrincipal);
+    expect(hostIdentity.primaryLabel, 'MoolSocial member');
+    expect(hostIdentity.detailLabel, 'Signed in to MoolSocial');
+  });
   test('Back during pending sign-in preserves the Buy destination', () async {
     final social = _PendingSocialAuthGateway();
     final session = JourneySession(

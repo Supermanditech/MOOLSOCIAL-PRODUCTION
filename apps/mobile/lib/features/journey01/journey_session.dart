@@ -122,6 +122,12 @@ class JourneySession extends ChangeNotifier {
   String? errorMessage;
   String? noticeMessage;
   AuthenticatedAccountIdentity? accountIdentity;
+  ({String projectId, String? tenantId, String userId})? _firebasePrincipal;
+  int? _firebasePrincipalGeneration;
+  StreamSubscription<void>? _firebasePrincipalSubscription;
+  bool _livePrincipalSourceFailed = false;
+  int _livePrincipalEpoch = 0;
+  ({String projectId, String? tenantId, String userId})? _observedFirebasePrincipal;
   AuthenticatedAccountBootstrapState? authenticatedBootstrapState;
   bool authenticatedRevalidationPending = false;
   String? reviewCode;
@@ -156,6 +162,9 @@ class JourneySession extends ChangeNotifier {
 
   bool get isReady => stage == JourneyStage.ready;
   bool get isAuthenticated => _isAuthenticated;
+  bool get usesReviewAccountIdentity =>
+      _accountIdentityGateway is ReviewAuthenticatedAccountIdentityGateway &&
+      _accountIdentityGateway is! AuthenticatedAccountPrincipalSource;
 
   /// Read-only validity for retained navigation; never authenticates a caller.
   int? get navigationAuthenticationGeneration =>
@@ -166,6 +175,78 @@ class JourneySession extends ChangeNotifier {
       ? _authenticationGeneration
       : null;
   bool get socialAuthCleanupRequired => _socialAuthCleanupRequired;
+  /// Read-only Firebase namespace, not Store capability or a customer entity ID.
+  /// A displayed profile alone cannot authorize account-owned data access.
+  ({String projectId, String? tenantId, String userId})? get authenticatedFirebasePrincipal {
+    if (navigationAuthenticationGeneration != _firebasePrincipalGeneration ||
+        navigationAuthenticationGeneration == null ||
+        _authenticationCompletionInProgress || _principalBindingCleanupRequired ||
+        authenticatedBootstrapState != AuthenticatedAccountBootstrapState.verified ||
+        _livePrincipalSourceFailed) {
+      return null;
+    }
+    final source = _accountIdentityGateway;
+    if (source is AuthenticatedAccountPrincipalSource) {
+      final live = source as AuthenticatedAccountPrincipalSource;
+      try {
+        if (live.currentFirebasePrincipal != _firebasePrincipal) return null;
+      } on Object {
+        return null;
+      }
+    }
+    return _firebasePrincipal;
+  }
+
+  /// Private device namespace only, never a backend buyer/Store entity ID.
+  ({String environment, String projectId, String? tenantId, String userId})?
+      get authenticatedBuyPersistenceIdentity {
+    final principal = authenticatedFirebasePrincipal;
+    final source = _accountIdentityGateway;
+    if (principal == null || source is! AuthenticatedAccountPrincipalSource) return null;
+    final live = source as AuthenticatedAccountPrincipalSource;
+    try {
+      final environment = live.persistenceEnvironment;
+      if (environment.isEmpty || environment.trim() != environment || environment.length > 512) return null;
+      return (environment: environment, projectId: principal.projectId,
+        tenantId: principal.tenantId, userId: principal.userId);
+    } on Object {
+      return null;
+    }
+  }
+
+  void _observeFirebasePrincipal() {
+    final source = _accountIdentityGateway;
+    if (source is! AuthenticatedAccountPrincipalSource) return;
+    final live = source as AuthenticatedAccountPrincipalSource;
+    void changed({bool failed = false}) {
+      if (_disposed) return;
+      _livePrincipalSourceFailed = failed;
+      try {
+        final current = live.currentFirebasePrincipal;
+        if (failed || current != _observedFirebasePrincipal) {
+          // Switching back cannot revive the old accepted snapshot.
+          _firebasePrincipalGeneration = null;
+          _livePrincipalEpoch++;
+          if (_isAuthenticated) authenticatedRevalidationPending = true;
+        }
+        _observedFirebasePrincipal = current;
+      } on Object {
+        _livePrincipalSourceFailed = true;
+        _firebasePrincipalGeneration = null;
+        _livePrincipalEpoch++;
+        if (_isAuthenticated) authenticatedRevalidationPending = true;
+      }
+      notifyListeners();
+    }
+    try {
+      _observedFirebasePrincipal = live.currentFirebasePrincipal;
+      _firebasePrincipalSubscription = live.firebasePrincipalChanges.listen(
+        (_) => changed(), onError: (Object _) => changed(failed: true),
+        onDone: () => changed(failed: true));
+    } on Object {
+      _livePrincipalSourceFailed = true;
+    }
+  }
   bool get principalBindingCleanupRequired => _principalBindingCleanupRequired;
   bool isSocialAuthProviderAvailable(SocialAuthProvider provider) =>
       availableSocialAuthProviders.contains(provider);
@@ -219,7 +300,9 @@ class JourneySession extends ChangeNotifier {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    _observeFirebasePrincipal();
     _authenticationGeneration += 1;
+    final startingGeneration = _authenticationGeneration;
     _completedSetupExperienceVersion = 0;
     _setBusy(true);
     errorMessage = null;
@@ -289,6 +372,7 @@ class JourneySession extends ChangeNotifier {
           if (!authenticatedRevalidationPending) {
             await _refreshAuthenticatedAccountIdentity();
           }
+          if (_disposed || startingGeneration != _authenticationGeneration) return;
           stage = JourneyStage.ready;
         }
       } else if (snapshot.setupComplete) {
@@ -1764,6 +1848,7 @@ class JourneySession extends ChangeNotifier {
   }
 
   void _setBusy(bool value) {
+    if (_disposed) return;
     busy = value;
     notifyListeners();
   }
@@ -2130,16 +2215,22 @@ class JourneySession extends ChangeNotifier {
   }
 
   Future<void> _refreshAuthenticatedAccountIdentity({int? generation}) async {
+    final capturedGeneration = _authenticationGeneration;
+    final principalEpoch = _livePrincipalEpoch;
     AuthenticatedAccountIdentity? refreshed;
     try {
       refreshed = await _accountIdentityGateway.currentIdentity();
     } on Object {
       refreshed = null;
     }
-    if (generation != null && !_isCurrentAuthenticationGeneration(generation)) {
+    if (_disposed || capturedGeneration != _authenticationGeneration ||
+        principalEpoch != _livePrincipalEpoch ||
+        (generation != null && !_isCurrentAuthenticationGeneration(generation))) {
       return;
     }
     accountIdentity = refreshed;
+    _firebasePrincipal = refreshed?.firebasePrincipal;
+    _firebasePrincipalGeneration = capturedGeneration;
     accountIdentity ??= switch ((emailAddress, phoneNumber)) {
       (final email?, _) when email.trim().isNotEmpty =>
         AuthenticatedAccountIdentity(
@@ -2160,6 +2251,11 @@ class JourneySession extends ChangeNotifier {
     if (!_disposed) {
       _disposed = true;
       _authenticationGeneration += 1;
+      final subscription = _firebasePrincipalSubscription;
+      _firebasePrincipalSubscription = null;
+      if (subscription != null) {
+        unawaited(subscription.cancel().catchError((Object _) {}));
+      }
     }
     super.dispose();
   }

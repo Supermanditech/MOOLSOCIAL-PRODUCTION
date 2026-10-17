@@ -1,8 +1,13 @@
 // Isolated host adapter fixtures only. Never loaded into runtime Store data.
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moolsocial/features/work/work_customer_feedback.dart';
+import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/widgets/store_customer_feedback.dart';
 
 const scope = (account: 'host-account', store: 'host-store');
@@ -70,6 +75,44 @@ class Adapter implements StoreFeedbackAdapter {
   }
 }
 
+class FeedbackStorage extends FlutterSecureStorage {
+  final values = <String, String>{};
+  bool failRead = false, failWrite = false, loseWriteResponse = false;
+  Completer<void>? holdWrite;
+  int writes = 0;
+  @override
+  Future<String?> read({required String key, AppleOptions? iOptions,
+    AndroidOptions? aOptions, LinuxOptions? lOptions, WebOptions? webOptions,
+    AppleOptions? mOptions, WindowsOptions? wOptions}) async {
+    if (failRead) throw StateError('Host read failure');
+    return values[key];
+  }
+  @override
+  Future<void> write({required String key, required String? value,
+    AppleOptions? iOptions, AndroidOptions? aOptions, LinuxOptions? lOptions,
+    WebOptions? webOptions, AppleOptions? mOptions, WindowsOptions? wOptions}) async {
+    writes++;
+    await holdWrite?.future;
+    if (failWrite) throw StateError('Host write failure');
+    values[key] = value!;
+    if (loseWriteResponse) {
+      loseWriteResponse = false;
+      throw StateError('Host native response lost after write');
+    }
+  }
+}
+
+class FeedbackAccount implements WorkPendingProofStore {
+  @override
+  String? get accountScope => scope.account;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+
 void main() {
   late Adapter adapter;
   late StoreFeedbackController controller;
@@ -118,6 +161,265 @@ void main() {
     expect(missing.coverage, StoreFeedbackCoverage.unavailable);
     expect(missing.entries, isEmpty);
     expect(missing.actionsReady, isFalse);
+  });
+
+  test('LF feedback restart retains the original uncertain request', () async {
+    final storage = FeedbackStorage();
+    SecureStoreFeedbackPendingStore journal() => SecureStoreFeedbackPendingStore(
+      storage: storage, currentAccount: () => scope.account);
+    controller.dispose();
+    controller = StoreFeedbackController(scope: scope, context: () => current,
+      adapter: adapter, pendingStore: journal());
+    adapter.write = (_) async => throw TimeoutException('host lost response');
+    await ready();
+    draft('Keep this original reply');
+    await send();
+    final original = controller.pending!;
+    final restarted = StoreFeedbackController(
+      scope: scope, context: () => current, adapter: adapter, pendingStore: journal());
+    addTearDown(restarted.dispose);
+    await restarted.load();
+    expect(restarted.pending, isNotNull);
+    expect(StoreFeedbackResult(command: restarted.pending!,
+      outcome: StoreFeedbackOutcome.unknown).matches(original), isTrue);
+    expect(adapter.submitted, hasLength(1));
+    adapter.read = (_) async => page(entries: [], coverage: StoreFeedbackCoverage.partial);
+    await restarted.load();
+    expect(restarted.pending!.operationId, original.operationId);
+    await restarted.reconcile();
+    expect(adapter.reconciled.single.operationId, original.operationId);
+    expect(restarted.pending, isNull);
+    expect(await journal().readPending(scope), isNull);
+  });
+
+  group('LF feedback durable intent', () {
+    late FeedbackStorage storage;
+    String? signedIn;
+    SecureStoreFeedbackPendingStore journal() => SecureStoreFeedbackPendingStore(
+      storage: storage, currentAccount: () => signedIn);
+    StoreFeedbackController make() {
+      final value = StoreFeedbackController(scope: scope, context: () => current,
+        adapter: adapter, pendingStore: journal());
+      addTearDown(value.dispose);
+      return value;
+    }
+    Future<void> reply(StoreFeedbackController value) async {
+      final binding = value.bindingFor('central-review')!;
+      value.setDraft(binding, StoreFeedbackAction.reply, 'Original persisted content');
+      await value.submit(binding, StoreFeedbackAction.reply,
+        StoreFeedbackAudience.storeAndCustomer);
+    }
+    StoreFeedbackCommand command(String id, {StoreFeedbackScope owner = scope,
+      StoreFeedbackAction action = StoreFeedbackAction.reply,
+      StoreFeedbackAudience audience = StoreFeedbackAudience.storeAndCustomer}) =>
+        StoreFeedbackCommand(scope: owner, reviewId: 'central-review', version: 'opaque-v1',
+          operationId: id, action: action, audience: audience, content: 'Original persisted content');
+    Future<void> waitForWrite(int count) async {
+      while (storage.writes < count) { await Future<void>.delayed(Duration.zero); }
+    }
+    setUp(() { storage = FeedbackStorage(); signedIn = scope.account; });
+
+    test('failed restoration blocks dispatch and refresh retries safely', () async {
+      storage.failRead = true;
+      final value = make();
+      await value.load();
+      expect(value.recoveryReady, isFalse);
+      expect(value.actionsReady, isFalse);
+      expect(value.message, contains('restore'));
+      expect(adapter.submitted, isEmpty);
+      storage.failRead = false;
+      await value.load();
+      expect(value.actionsReady, isTrue);
+    });
+    test('failed journal save never dispatches or erases the typed text', () async {
+      final value = make(); await value.load(); storage.failWrite = true;
+      await reply(value);
+      expect(adapter.submitted, isEmpty);
+      expect(value.recoveryReady, isFalse);
+      expect(value.draft('central-review', StoreFeedbackAction.reply), 'Original persisted content');
+      expect(value.message, contains('not sent'));
+      storage.failWrite = false; await value.load();
+      expect(value.pending, isNull);
+      expect(value.actionsReady, isTrue);
+    });
+    test('lost native save response restores exact intent without resubmission', () async {
+      final value = make(); await value.load(); storage.loseWriteResponse = true;
+      await reply(value);
+      expect(adapter.submitted, isEmpty);
+      final original = value.pending!;
+      await value.load();
+      expect(value.pending!.operationId, original.operationId);
+      expect(value.actionsReady, isFalse);
+      await value.reconcile();
+      expect(adapter.reconciled.single.toJson(), original.toJson());
+      expect(value.pending, isNull);
+    });
+    test('matched acceptance cannot clear hold before durable removal succeeds', () async {
+      adapter.write = (c) async {
+        storage.failWrite = true;
+        return StoreFeedbackResult(command: c, outcome: StoreFeedbackOutcome.accepted);
+      };
+      final value = make(); await value.load(); await reply(value);
+      final original = value.pending!;
+      expect(value.message, contains('original request again'));
+      expect((await journal().readPending(scope))!.operationId, original.operationId);
+      storage.failWrite = false;
+      await value.reconcile();
+      expect(value.pending, isNull);
+      expect(await journal().readPending(scope), isNull);
+    });
+    test('unavailable provider readiness is not supplied by a local journal', () async {
+      adapter.commandRecoveryReady = false;
+      final original = command('prior-operation'); await journal().savePending(original);
+      final value = make(); await value.load();
+      expect(value.pending!.toJson(), original.toJson());
+      expect(value.canAct('central-review', StoreFeedbackAction.reply), isFalse);
+      await value.reconcile();
+      expect(adapter.reconciled, isEmpty);
+      expect(value.pending, isNotNull);
+    });
+    test('provider readiness revoked during persistence prevents dispatch', () async {
+      final value = make(); await value.load();
+      storage.holdWrite = Completer<void>();
+      final sending = reply(value); await waitForWrite(1);
+      adapter.commandRecoveryReady = false;
+      storage.holdWrite!.complete(); await sending;
+      expect(adapter.submitted, isEmpty);
+      expect((await journal().readPending(scope))!.operationId, value.pending!.operationId);
+    });
+    test('listener revoking readiness blocks reconciliation too', () async {
+      await journal().savePending(command('original'));
+      final value = make(); await value.load();
+      value.addListener(() { if (value.commandInFlight) adapter.commandRecoveryReady = false; });
+      await value.reconcile();
+      expect(adapter.reconciled, isEmpty);
+      expect(value.pending, isNotNull);
+    });
+    test('retired writer and replacement restore share the native queue', () async {
+      final value = make(); await value.load();
+      storage.holdWrite = Completer<void>();
+      final sending = reply(value); await waitForWrite(1);
+      current = null;
+      current = (scope, 2);
+      final replacement = make();
+      var restored = false;
+      final restoring = replacement.load().then((_) => restored = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(restored, isFalse);
+      final original = value.pending!;
+      storage.holdWrite!.complete();
+      await sending; await restoring;
+      expect(adapter.submitted, isEmpty);
+      expect(replacement.pending!.toJson(), original.toJson());
+      expect(replacement.actionsReady, isFalse);
+    });
+    test('retired removal completes before a replacement reads the journal', () async {
+      final value = make(); await value.load();
+      adapter.write = (c) async {
+        storage.holdWrite = Completer<void>();
+        return StoreFeedbackResult(command: c, outcome: StoreFeedbackOutcome.accepted);
+      };
+      final sending = reply(value); await waitForWrite(2);
+      current = (scope, 2);
+      final replacement = make();
+      final restoring = replacement.load();
+      await Future<void>.delayed(Duration.zero);
+      expect(replacement.recoveryReady, isFalse);
+      storage.holdWrite!.complete();
+      await sending; await restoring;
+      expect(value.pending, isNotNull); // retired lifetime cannot consume the ack
+      expect(replacement.pending, isNull); // exact confirmed removal completed
+      expect(adapter.submitted, hasLength(1));
+    });
+    test('late original removal cannot erase a newer request', () async {
+      final first = command('first'), next = command('next');
+      await journal().savePending(first);
+      storage.holdWrite = Completer<void>();
+      final removing = journal().removePending(first); await waitForWrite(2);
+      final writing = journal().savePending(next);
+      storage.holdWrite!.complete();
+      await removing; await writing;
+      await expectLater(journal().removePending(first), throwsFormatException);
+      expect((await journal().readPending(scope))!.toJson(), next.toJson());
+    });
+    test('cross-account access and a copied cross-Store envelope are rejected', () async {
+      await journal().savePending(command('original'));
+      signedIn = 'another-account';
+      await expectLater(journal().readPending(scope), throwsA(isA<WorkGatewayException>()));
+      signedIn = scope.account;
+      const other = (account: 'host-account', store: 'other-store');
+      await journal().savePending(command('other', owner: other));
+      final keys = storage.values.keys.toList();
+      storage.values[keys.last] = storage.values[keys.first]!;
+      await expectLater(journal().readPending(other), throwsFormatException);
+    });
+    test('malformed journals remain errors, not empty successful restoration', () async {
+      await journal().savePending(command('original'));
+      final key = storage.values.keys.single;
+      final correct = storage.values[key]!;
+      for (final mutation in <Object?>['not-json', [], {'version': 1},
+        {...jsonDecode(correct) as Map, 'command': {'action': 'reply'}},
+        {...jsonDecode(correct) as Map, 'command': {...command('bad').toJson(), 'action': 'report'}},
+      ]) {
+        storage.values[key] = mutation is String ? mutation : jsonEncode(mutation);
+        final value = make(); await value.load();
+        expect(value.recoveryReady, isFalse);
+        expect(value.actionsReady, isFalse);
+        expect(adapter.submitted, isEmpty);
+      }
+    });
+    test('Store session supplies scoped journal and retains original pending', () async {
+      final original = command('pending-report', action: StoreFeedbackAction.report,
+        audience: StoreFeedbackAudience.moderation);
+      await journal().savePending(original);
+      final seen = <StoreFeedbackScope>[];
+      final work = WorkSession(contactDraftStore: FeedbackAccount(), customerFeedbackAdapter: adapter,
+        customerFeedbackPendingStoreFactory: (s) { seen.add(s); return journal(); })
+        ..activeWorkspace = const WorkWorkspace(id: 'host-store', name: 'Store',
+          profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'host-store';
+      addTearDown(work.dispose);
+      final value = work.workspaceCustomerFeedback!;
+      expect(value.pendingStore, isA<SecureStoreFeedbackPendingStore>());
+      expect(value.recoveryReady, isFalse);
+      await value.load();
+      expect(value.pending!.toJson(), original.toJson());
+      expect(seen, [scope]);
+      expect(adapter.submitted, isEmpty);
+    });
+    testWidgets('timed-out native save cannot dispatch late or bypass restore', (tester) async {
+      final value = make(); await value.load();
+      storage.holdWrite = Completer<void>();
+      final sending = reply(value); await tester.pump();
+      expect(storage.writes, 1);
+      await tester.pump(const Duration(seconds: 21)); await sending;
+      expect(value.recoveryReady, isFalse);
+      expect(adapter.submitted, isEmpty);
+      final original = value.pending!;
+      final restoring = value.load(); await tester.pump();
+      expect(value.recoveryReady, isFalse);
+      storage.holdWrite!.complete(); await tester.pump(); await restoring;
+      expect(value.pending!.toJson(), original.toJson());
+      expect(adapter.submitted, isEmpty);
+    });
+    testWidgets('late native removal never manufactures a confirmed UI outcome', (tester) async {
+      final value = make(); await value.load();
+      adapter.write = (c) async {
+        storage.holdWrite = Completer<void>();
+        return StoreFeedbackResult(command: c, outcome: StoreFeedbackOutcome.accepted);
+      };
+      final sending = reply(value); await tester.pump();
+      expect(storage.writes, 2);
+      await tester.pump(const Duration(seconds: 21)); await sending;
+      final original = value.pending!;
+      expect(value.message, isNot(contains('Reply confirmed')));
+      storage.holdWrite!.complete(); await tester.pump();
+      expect(value.pending!.operationId, original.operationId);
+      await value.reconcile();
+      expect(adapter.reconciled.single.toJson(), original.toJson());
+      expect(value.pending, isNull);
+      expect(adapter.submitted, hasLength(1));
+    });
   });
   test('complete empty and partial empty retain distinct coverage', () async {
     adapter.read = (_) async => page(entries: []);
@@ -512,6 +814,29 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('restored request is reachable with an empty feed at larger text', (tester) async {
+    final storage = FeedbackStorage();
+    final journal = SecureStoreFeedbackPendingStore(storage: storage, currentAccount: () => scope.account);
+    const original = StoreFeedbackCommand(scope: scope, reviewId: 'not-in-feed',
+      version: 'original-version', operationId: 'original-operation', action: StoreFeedbackAction.report,
+      audience: StoreFeedbackAudience.moderation, content: 'Original private report');
+    await journal.savePending(original);
+    adapter.read = (_) async => page(entries: [], coverage: StoreFeedbackCoverage.partial);
+    final value = StoreFeedbackController(scope: scope, context: () => current,
+      adapter: adapter, pendingStore: journal);
+    addTearDown(value.dispose);
+    await mount(tester, value: value, size: const Size(320, 640), scale: 2);
+    final check = find.byKey(const Key('work-feedback-check-request'));
+    await tester.ensureVisible(check); await tester.pumpAndSettle();
+    expect(check.hitTestable(), findsOneWidget);
+    expect(value.entries, isEmpty);
+    expect(adapter.submitted, isEmpty);
+    await tester.tap(check); await tester.pumpAndSettle();
+    expect(adapter.reconciled.single.toJson(), original.toJson());
+    expect(value.pending, isNull);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final config in [
     (const Size(320, 640), 1.0),

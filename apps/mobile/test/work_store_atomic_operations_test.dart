@@ -15,6 +15,9 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_downloads.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
+import 'package:crypto/crypto.dart' as contract_hash;
+import 'work_order_identity_gateway_test.dart' as identity_fixtures;
 
 // Automated invoice fixture only; never supplies OPPO runtime acceptance records.
 class _PurchaseInvoicePickerFixture implements WorkProofPicker {
@@ -588,6 +591,322 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('LF operational order bridge', () {
+    late identity_fixtures.Transport wire;
+    late WorkspaceOperationalOrderCommandGateway bridge;
+    late WorkspacePurchaseReference reference;
+    late Map<String, dynamic> raw;
+    setUp(() {
+      raw = identity_fixtures.operationalResponse(role: 'seller');
+      final original = raw['original'] as Map;
+      final first = Map<String, dynamic>.from((original['lines'] as List).single as Map)
+        ..['quantityMilli'] = 500
+        ..['quantityUnit'] = 'kg'
+        ..['lineTotalMinor'] = 5026;
+      final second = Map<String, dynamic>.from(first)
+        ..['lineId'] = 'line-two'
+        ..['quantityMilli'] = 250
+        ..['lineTotalMinor'] = 2513;
+      original['lines'] = [first, second];
+      original['totals'] = <String, int>{
+        'itemsMinor': 7539, 'discountMinor': 51, 'taxMinor': 5,
+        'deliveryMinor': 10, 'freightMinor': 20, 'paymentFeeMinor': 11,
+        'tipMinor': 9, 'totalMinor': 7543,
+      };
+      raw['originalFingerprint'] = contract_hash.sha256.convert(utf8.encode(jsonEncode({
+        'factsVersion': 2, 'storeId': raw['storeId'], 'orderId': raw['orderId'], 'original': original,
+      }))).toString();
+      final now = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch, isUtc: true);
+      raw['placedAt'] = now.subtract(const Duration(minutes: 10)).toIso8601String();
+      raw['acceptanceDeadline'] = now.add(const Duration(hours: 1)).toIso8601String();
+      raw['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
+      reference = WorkspacePurchaseReference(
+        purchaseId: raw['purchaseId'], storeId: raw['storeId'], orderId: raw['orderId'],
+        sourceRevision: raw['sourceRevision'], originalFingerprint: raw['originalFingerprint'],
+      );
+      wire = identity_fixtures.Transport()..data = raw;
+      bridge = WorkspaceOperationalOrderCommandGateway(
+        gateway: AuthenticatedWorkspaceOrderOperationsGateway(identity_fixtures.projectionGateway(wire, account: 'owner-1')),
+        realm: 'evaluation', accountScope: 'owner-1', workspaceId: 'store-one',
+      );
+    });
+    test('exact fractional repeated-SKU facts survive projection without ledger authority', () async {
+      final reply = await bridge.read(reference);
+      final order = reply!.order!;
+      expect(order.payableMinor, 7543);
+      expect(order.subtotalMinor, 7539);
+      expect(order.quantities, isEmpty);
+      expect(order.operational!.original.lines.map((l) => l.quantityMilli), [500, 250]);
+      expect(order.operational!.original.lines.map((l) => l.skuId), ['sku-one', 'sku-one']);
+      expect(order.operational!.original.totals['freightMinor'], 20);
+      expect(order.operational!.original.totals['paymentFeeMinor'], 11);
+      expect(order.operational!.original.totals['tipMinor'], 9);
+      expect(order.validBillAmounts, isTrue);
+      expect(order.stockReserved, isFalse);
+      expect(order.payment, 'Payment status unavailable');
+      expect(order.copyWith().operational, same(order.operational));
+      expect(() => order.copyWith(stage: 'Completed'), throwsStateError);
+      expect(order.toLedgerJson, throwsStateError);
+      WorkspaceOrderRecord contradictory({String? payment, String? fulfilment, DateTime? deadline}) => WorkspaceOrderRecord(id: order.id, customer: order.customer, items: order.items,
+        quantities: order.quantities, amount: order.amount, remainderPaise: order.remainderPaise,
+        discountMinor: order.discountMinor, source: order.source, fulfilment: fulfilment ?? order.fulfilment,
+        payment: payment ?? order.payment, address: order.address, stage: order.stage, needsDelivery: order.needsDelivery,
+        createdAt: order.createdAt, actionDeadline: deadline ?? order.actionDeadline, fulfilmentDeadline: order.fulfilmentDeadline,
+        operational: order.operational);
+      expect(contradictory(payment: 'Paid').validBillAmounts, isFalse);
+      expect(contradictory(fulfilment: 'At the shop').validBillAmounts, isFalse);
+      expect(contradictory(deadline: order.actionDeadline!.add(const Duration(hours: 1))).validBillAmounts, isFalse);
+    });
+    test('journal restores exact original reference then reconciles without resubmission', () async {
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkOrderPendingStore(storage: storage, currentAccount: () => 'owner-1');
+      final initial = (await bridge.read(reference))!;
+      final first = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge, pendingStore: journal);
+      expect(await first.restore(), isTrue);
+      expect(first.observe(initial), isTrue);
+      wire.fail = true;
+      expect(await first.act('order-v2', WorkOrderAction.accept), isFalse);
+      final pending = first.pending('order-v2')!;
+      expect(pending.purchaseReference!.purchaseId, 'purchase-v2');
+      first.dispose();
+      final reopened = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge, pendingStore: journal);
+      addTearDown(reopened.dispose);
+      expect(await reopened.restore(), isTrue);
+      expect(reopened.pending('order-v2')!.purchaseReference!.originalFingerprint, reference.originalFingerprint);
+      raw['revision'] = 2; raw['stage'] = 'Preparing'; raw['permittedActions'] = ['ready'];
+      wire.fail = false;
+      wire.data = {'schemaVersion': 1, 'operationId': pending.operationId, 'state': 'applied', 'snapshot': raw};
+      expect(await reopened.retry('order-v2'), isTrue);
+      expect(wire.sent!['operation'], 'reconcileStoreOrderCommand');
+      expect(wire.sent!['purchaseId'], 'purchase-v2');
+      expect(wire.sent!['expectedRevision'], 1);
+      expect(reopened.order('order-v2')!.order!.payableMinor, 7543);
+      expect(await journal.readPending('owner-1', 'store-one'), isEmpty);
+    });
+    test('missing permissions and expired acceptance never issue a command', () async {
+      raw['permittedActions'] = <String>[];
+      final operations = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge);
+      addTearDown(operations.dispose);
+      expect(operations.observe((await bridge.read(reference))!), isTrue);
+      final calls = wire.calls;
+      expect(await operations.act('order-v2', WorkOrderAction.accept), isFalse);
+      expect(await operations.act('order-v2', WorkOrderAction.requestTime, additionalMinutes: 2), isFalse);
+      expect(wire.calls, calls);
+      raw['revision'] = 2; raw['permittedActions'] = ['accept'];
+      raw['acceptanceDeadline'] = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch, isUtc: true).subtract(const Duration(minutes: 1)).toIso8601String();
+      expect(operations.observe((await bridge.read(reference))!), isTrue);
+      final afterRead = wire.calls;
+      expect(await operations.act('order-v2', WorkOrderAction.accept), isFalse);
+      expect(wire.calls, afterRead);
+    });
+    test('restored command cannot move to a different realm and stays pending', () async {
+      final journal = SecureWorkOrderPendingStore(storage: _OrderJournalStorage(), currentAccount: () => 'owner-1');
+      final command = WorkOrderCommand(accountScope: 'owner-1', workspaceId: 'store-one', orderId: 'order-v2',
+        operationId: 'original-evaluation-operation', expectedRevision: 1, action: WorkOrderAction.accept,
+        purchaseReference: reference, purchaseRealm: 'evaluation');
+      await journal.savePending(command);
+      final production = WorkspaceOperationalOrderCommandGateway(gateway: bridge.gateway,
+        realm: 'production', accountScope: 'owner-1', workspaceId: 'store-one');
+      final reopened = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: production, pendingStore: journal);
+      addTearDown(reopened.dispose);
+      expect(await reopened.restore(), isTrue);
+      expect(await reopened.retry('order-v2'), isFalse);
+      expect(wire.calls, 0);
+      expect((await journal.readPending('owner-1', 'store-one')).single.purchaseRealm, 'evaluation');
+    });
+    test('observed purchased order cannot be downgraded to a legacy record', () async {
+      final operations = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge);
+      addTearDown(operations.dispose);
+      expect(operations.observe((await bridge.read(reference))!), isTrue);
+      final legacy = WorkspaceOrderRecord(id: 'order-v2', customer: 'Evaluation buyer', items: 'Changed',
+        quantities: const {'sku-one': 1}, amount: 75, source: 'Counter', fulfilment: 'At the shop', payment: 'Paid',
+        address: '', stage: 'Completed', needsDelivery: false, createdAt: DateTime.now());
+      expect(operations.observe(WorkOrderReply(accountScope: 'owner-1', workspaceId: 'store-one', orderId: 'order-v2',
+        operationId: 'bad-observation', revision: 2, state: WorkOrderReplyState.applied, order: legacy)), isFalse);
+      expect(operations.order('order-v2')!.order!.operational, isNotNull);
+      expect(operations.order('order-v2')!.revision, 1);
+    });
+    test('fractional repeated-SKU packing uses exact purchased line identity', () async {
+      raw['stage'] = 'Preparing'; raw['revision'] = 2; raw['permittedActions'] = ['ready'];
+      final reply = (await bridge.read(reference))!;
+      final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _CommandAccountStore('owner-1'))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
+          profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose);
+      final operations = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge);
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      expect(operations.observe(reply), isTrue);
+      expect(work.selectWorkspaceOrder('order-v2'), isTrue);
+      final lines = work.workspacePackingLines;
+      expect(lines.map((l) => l.id), ['line-one', 'line-two']);
+      expect(lines.map((l) => l.quantityLabel), ['0.5 kg', '0.25 kg']);
+      expect(lines.first.label, contains('दाल'));
+      expect(work.setWorkspaceOrderPackingLine(storeId: 'store-one', orderId: 'order-v2', lineId: 'sku-one',
+        quantity: 500, packed: true, expectedOperational: reply.order!.operational), isFalse);
+      expect(work.setWorkspaceOrderPackingLine(storeId: 'store-one', orderId: 'order-v2', lineId: 'line-one',
+        quantity: 500, packed: true, expectedOperational: reply.order!.operational), isTrue);
+      expect(work.workspacePackingComplete, isFalse);
+      expect(work.workspacePackingLines.last.packed, isFalse);
+      raw['revision'] = 3;
+      final newer = (await bridge.read(reference))!;
+      expect(operations.observe(newer), isTrue);
+      expect(work.setWorkspaceOrderPackingLine(storeId: 'store-one', orderId: 'order-v2', lineId: 'line-two',
+        quantity: 250, packed: true, expectedOperational: reply.order!.operational), isFalse);
+      expect(work.setWorkspaceOrderPackingLine(storeId: 'store-one', orderId: 'order-v2', lineId: 'line-two',
+        quantity: 250, packed: true, expectedOperational: newer.order!.operational), isTrue);
+      expect(work.workspacePackingComplete, isTrue);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+    });
+    test('unbound and retired operational records cannot fall back to legacy sale actions', () async {
+      final order = (await bridge.read(reference))!.order!;
+      final legacy = ReviewWorkGateway();
+      final work = WorkSession(gateway: legacy, contactDraftStore: _CommandAccountStore('owner-1'))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
+          profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
+        ..workspaceId = 'store-one';
+      addTearDown(work.dispose);
+      work.workspaceOrders.add(order);
+      expect(work.selectWorkspaceOrder(order.id), isTrue);
+      expect(work.hasScopedWorkspaceOrder(order.id), isTrue);
+      work.saveWorkspaceStaffSettings(staffAccessEnabled: true, counterCount: 2);
+      expect(legacy.operationalSaveCalls, 0);
+      expect(work.saveWorkspaceOrderDraft(customer: 'Changed', source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: ''), isFalse);
+      expect(work.completeWorkspaceCounterSale(), isNull);
+      work.advanceWorkspaceOrder();
+      work.cancelWorkspaceOrder(reason: 'Cannot supply');
+      expect(await work.verifyWorkspaceHandover('123456'), isFalse);
+      expect(await work.verifyWorkspacePickup('123456'), isFalse);
+      await work.retryWorkspaceDeliveryAssignment();
+      expect(work.workspaceOrders.single, same(order));
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceSalesToday, 0);
+      expect(work.workspaceStockMovements, isEmpty);
+      final operations = WorkOrderOperations(accountScope: 'owner-1', workspaceId: 'store-one', gateway: bridge);
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      operations.dispose();
+      work.advanceWorkspaceOrder();
+      work.cancelWorkspaceOrder(reason: 'Cannot supply');
+      expect(work.workspaceOrders.single, same(order));
+      expect(work.workspaceInvoices, isEmpty);
+    });
+    WorkSession connected(_OrderJournalStorage storage) {
+      final page = identity_fixtures.referenceResponse(role: 'seller')
+        ..['storeId'] = 'store-one'
+        ..['references'] = [reference.toJson()];
+      wire.respond = (body) => body['operation'] == 'listStorePurchaseReferences' ? page : raw;
+      final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _CommandAccountStore('owner-1'),
+        operationalPendingStoreFactory: (account, store) => SecureWorkOrderPendingStore(storage: storage, currentAccount: () => 'owner-1'))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
+          profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
+        ..workspaceId = 'store-one';
+      work.bindOriginalPurchaseReader(bridge.gateway.identity, 'evaluation');
+      addTearDown(work.dispose);
+      return work;
+    }
+    test('feed reads exact Store orders and partial failures preserve existing data', () async {
+      final work = connected(_OrderJournalStorage());
+      expect(await work.loadWorkspaceOperationalOrders(), isTrue);
+      expect(work.workspaceOrders.single.payableMinor, 7543);
+      expect(work.workspaceOrderStageLabel(work.workspaceOrders.single), 'Awaiting acceptance');
+      expect(wire.requests.map((r) => r['operation']), ['listStorePurchaseReferences', 'readStoreOperationalOrder']);
+      expect(work.selectWorkspaceOrder('order-v2'), isTrue);
+      wire.fail = true;
+      expect(await work.loadWorkspaceOperationalOrders(), isFalse);
+      expect(work.workspaceOrders.single.operational, isNotNull);
+      expect(work.workspaceOperationalFeedError, contains('unavailable'));
+      work.bindOriginalPurchaseReader(null, '');
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceOrderCustomer, isEmpty);
+      expect(work.currentWorkspaceOrderId, isNull);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+    });
+    test('failed journal restore blocks feed and permits a later safe retry', () async {
+      final storage = _OrderJournalStorage()..failRead = true;
+      final work = connected(storage);
+      expect(await work.loadWorkspaceOperationalOrders(), isFalse);
+      expect(work.workspaceOperationalFeedBusy, isFalse);
+      expect(work.workspaceOrders, isEmpty);
+      expect(wire.calls, 0);
+      storage.failRead = false;
+      expect(await work.loadWorkspaceOperationalOrders(), isTrue);
+      expect(work.workspaceOrders.length, 1);
+      expect(wire.calls, 2);
+    });
+    test('late Store A B A load cannot clear the newer busy state or repopulate', () async {
+      final work = connected(_OrderJournalStorage());
+      final originalStore = work.activeWorkspace!;
+      final oldHold = Completer<void>(); wire.pending = oldHold;
+      final old = work.loadWorkspaceOperationalOrders();
+      while (wire.calls == 0) { await Future<void>.delayed(Duration.zero); }
+      work.activeWorkspace = _commandStore;
+      work.activeWorkspace = originalStore;
+      final newHold = Completer<void>(); wire.pending = newHold;
+      final newer = work.loadWorkspaceOperationalOrders();
+      while (wire.calls < 2) { await Future<void>.delayed(Duration.zero); }
+      oldHold.complete();
+      expect(await old, isFalse);
+      expect(work.workspaceOperationalFeedBusy, isTrue);
+      expect(work.workspaceOrders, isEmpty);
+      wire.pending = null; newHold.complete();
+      expect(await newer, isTrue);
+      expect(work.workspaceOperationalFeedBusy, isFalse);
+      expect(work.workspaceOrders.length, 1);
+    });
+    test('reader retirement removes only remote data and fences an old reply', () async {
+      final work = connected(_OrderJournalStorage());
+      final manual = WorkspaceOrderRecord(id: 'manual-only', customer: 'Counter customer', items: 'Saved', quantities: const {},
+        amount: 1, source: 'Counter', fulfilment: 'At the shop', payment: 'Cash', address: '', stage: 'Confirmed',
+        needsDelivery: false, createdAt: DateTime.now());
+      work.workspaceOrders.add(manual);
+      final hold = Completer<void>(); wire.pending = hold;
+      final old = work.loadWorkspaceOperationalOrders();
+      while (wire.calls == 0) { await Future<void>.delayed(Duration.zero); }
+      work.bindOriginalPurchaseReader(null, '');
+      work.bindOriginalPurchaseReader(identity_fixtures.projectionGateway(wire, account: 'owner-1'), 'evaluation');
+      wire.pending = null;
+      expect(await work.loadWorkspaceOperationalOrders(), isTrue);
+      expect(work.workspaceOrders.length, 2);
+      hold.complete(); expect(await old, isFalse);
+      expect(work.workspaceOrders.length, 2);
+      work.bindOriginalPurchaseReader(null, '');
+      expect(work.workspaceOrders, [manual]);
+    });
+    test('pending original attempt reconciles even when discovery is empty', () async {
+      final storage = _OrderJournalStorage();
+      final work = connected(storage);
+      final journal = SecureWorkOrderPendingStore(storage: storage, currentAccount: () => 'owner-1');
+      await journal.savePending(WorkOrderCommand(accountScope: 'owner-1', workspaceId: 'store-one', orderId: 'order-v2',
+        operationId: 'original-missing-from-feed', expectedRevision: 1, action: WorkOrderAction.accept,
+        purchaseReference: reference, purchaseRealm: 'evaluation'));
+      raw['stage'] = 'Preparing'; raw['revision'] = 2; raw['permittedActions'] = ['ready'];
+      wire.respond = (body) => body['operation'] == 'listStorePurchaseReferences'
+        ? (identity_fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one'..['references'] = <Object>[])
+        : {'schemaVersion': 1, 'operationId': body['operationId'], 'state': 'applied', 'snapshot': raw};
+      expect(await work.loadWorkspaceOperationalOrders(), isTrue);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceOperationalPending, isTrue);
+      await work.reconcileWorkspacePendingOrders();
+      expect(work.workspaceOperationalPending, isFalse);
+      expect(work.workspaceOrders.single.stage, 'Preparing');
+      expect(wire.requests.map((r) => r['operation']), ['listStorePurchaseReferences', 'reconcileStoreOrderCommand']);
+      expect(await journal.readPending('owner-1', 'store-one'), isEmpty);
+    });
+    test('collection operational facts remain visible without collection authority', () async {
+      final work = connected(_OrderJournalStorage());
+      raw['fulfilment'] = 'collection'; raw['permittedActions'] = <String>[];
+      expect(await work.loadWorkspaceOperationalOrders(), isTrue);
+      expect(work.workspaceOrders.single.isCustomerCollection, isTrue);
+      expect(work.workspaceOrders.single.payableMinor, 7543);
+      expect(work.workspaceOrderCanAct('order-v2', WorkOrderAction.accept), isFalse);
+      expect(work.workspaceOrderCanAct('order-v2', WorkOrderAction.ready), isFalse);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+    });
+  });
+
   group('ANALYTICS read-only report contract', () {
     final start = DateTime.utc(2026, 10, 1);
     final end = DateTime.utc(2026, 10, 2);
@@ -2055,6 +2374,185 @@ void main() {
         {int revision = 1, bool qa = true}) => WorkspaceSavedInventory(
       account: 'account-A', store: _commandStore.id, qa: qa,
       revision: revision, savedAt: at, products: products, movements: const []);
+
+    for (final enabled in [false, true]) {
+      test('LF-PAISE exact trade terms never enter legacy Store sync enabled=$enabled', () async {
+        final device = _OrderJournalStorage();
+        final owner = _CommandAccountStore();
+        WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(),
+          contactDraftStore: owner, inventoryStore: SecureWorkInventoryStore(
+            accountScope: () => owner.accountScope, storage: device))
+          ..activeWorkspace = _commandStore;
+        final work = fresh();
+        addTearDown(work.dispose);
+        expect(await work.loadWorkspaceInventory(), isTrue);
+        final trade = WorkspaceSellingInputs.parse({
+          'sellingChannels': 'both', 'wholesaleSaleType': 'bulk',
+          'wholesalePrice': '25.25', 'wholesaleMinimum': '1',
+          'wholesaleTiers': '2:24.15',
+        }).wholesale!;
+        final stored = enabled ? trade : WorkspaceSellingInputs.parse(
+          {'sellingChannels': 'retail'}, existingWholesale: trade).wholesale!;
+        final product = base.copyWith(wholesaleOffer: stored);
+        expect(product.usesMinorAmounts, isFalse);
+        expect(work.addOrUpdateWorkspaceProduct(product,
+          stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+        expect(await work.workspaceInventorySaved, isTrue);
+        work.saveWorkspaceStaffSettings(staffAccessEnabled: true, counterCount: 2);
+        await _drainOrderJournal();
+        expect((work.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+        expect(work.workspaceOperationsSyncError, contains('sync is not available'));
+        final restored = fresh();
+        addTearDown(restored.dispose);
+        expect(await restored.loadWorkspaceInventory(), isTrue);
+        expect(restored.workspaceCatalogueItems.single.wholesaleOffer!.toJson(), stored.toJson());
+        expect(restored.workspaceCatalogueItems.single.stockEntry!.purchasePriceMinor, 2500);
+        expect(restored.workspaceInvoices, isEmpty);
+      });
+    }
+
+    for (final method in WorkspaceStockEntryMethod.values) {
+      test('LF-PAISE Store save and restart keep exact first-product summary ${method.name}', () async {
+        final device = _OrderJournalStorage();
+        final owner = _CommandAccountStore();
+        WorkSession fresh() => WorkSession(gateway: ReviewWorkGateway(),
+          contactDraftStore: owner, inventoryStore: SecureWorkInventoryStore(
+            accountScope: () => owner.accountScope, storage: device))
+          ..activeWorkspace = _commandStore
+          ..retailerHomeDelivery = true;
+        final first = fresh();
+        expect(await first.loadWorkspaceInventory(), isTrue);
+        final exact = base.copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+        if (method == WorkspaceStockEntryMethod.csv) {
+          expect(first.importWorkspaceProducts([exact], addOnly: true, stockEntryMethod: method), isTrue);
+        } else {
+          expect(first.addOrUpdateWorkspaceProduct(exact, stockEntryMethod: method), isTrue);
+        }
+        expect(await first.workspaceInventorySaved, isTrue);
+        expect(first.retailerReady, isTrue);
+        expect(first.retailerBuyPriceMinor, 925); expect(first.retailerSellPriceMinor, 1025);
+        expect(() => first.retailerBuyPrice, throwsFormatException);
+        final original = first.workspaceCatalogueItems.single.stockEntry!;
+        expect(original.purchasePriceMinor, 925); expect(original.toJson()['version'], 2);
+        final second = workspaceMasterCatalogue.first.copyWith(publicListing: false);
+        first.addOrUpdateWorkspaceProduct(second);
+        first.addOrUpdateWorkspaceProduct(second.copyWith(stock: second.stock + 1));
+        expect(first.workspaceCatalogueItems.first.sellingPriceMinor, 1025);
+        expect(first.workspaceCatalogueItems.first.stockEntry!.contentIdentity, original.contentIdentity);
+        expect(first.retailerReady, isTrue);
+        expect(await first.workspaceInventorySaved, isTrue);
+        first.dispose();
+        final restored = fresh(); addTearDown(restored.dispose);
+        expect(await restored.loadWorkspaceInventory(), isTrue);
+        expect(restored.retailerQuantity, 6); expect(restored.retailerReady, isTrue);
+        expect(restored.retailerBuyPriceMinor, 925); expect(restored.retailerSellPriceMinor, 1025);
+        expect(restored.workspaceCatalogueItems.first.purchasePriceMinor, 925);
+        expect(restored.workspaceCatalogueItems.first.stockEntry!.contentIdentity, original.contentIdentity);
+        expect(restored.workspaceInvoices, isEmpty);
+        expect(await restored.finishRetailerSetup(), isFalse);
+        expect((restored.gateway as ReviewWorkGateway).setupCalls, 0);
+        expect(restored.errorMessage, contains('Setup sync does not support paise yet'));
+        final savedBefore = jsonEncode(restored.workspaceCatalogueItems.first.toInventoryJson());
+        restored.saveRetailerProduct(quantity: 8, buyPriceMinor: 950, sellPriceMinor: 1075,
+          updateCatalogue: false);
+        expect(restored.retailerBuyPriceMinor, 950); expect(restored.retailerSellPriceMinor, 1075);
+        expect(jsonEncode(restored.workspaceCatalogueItems.first.toInventoryJson()), savedBefore);
+        restored.saveRetailerProduct(quantity: 8, buyPrice: 10, sellPrice: 12, updateCatalogue: false);
+        expect(restored.retailerBuyPrice, 10); expect(restored.retailerSellPrice, 12);
+        expect(restored.retailerBuyPriceMinor, 1000); expect(restored.retailerSellPriceMinor, 1200);
+      });
+    }
+
+    for (final addOnly in [false, true]) {
+      test('LF-PAISE Store invalid last import row causes no mutation addOnly=$addOnly', () {
+        final work = WorkSession(gateway: ReviewWorkGateway())..activeWorkspace = _commandStore;
+        addTearDown(work.dispose);
+        final good = base.copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+        final bad = workspaceMasterCatalogue.first.copyWith(purchasePriceMinor: -1,
+          sellingPriceMinor: 1025, mrpMinor: 1250, publicListing: false);
+        expect(() => work.importWorkspaceProducts([good, bad], addOnly: addOnly), throwsFormatException);
+        expect(work.workspaceCatalogueItems, isEmpty);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.retailerProductAdded, isFalse);
+        expect(work.workspaceInvoices, isEmpty);
+      });
+    }
+
+    test('LF-PAISE Store setup cannot finish past failed cache and retries the preserved SKU', () async {
+      final device = _OrderJournalStorage(); final owner = _CommandAccountStore();
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway, contactDraftStore: owner,
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => owner.accountScope, storage: device))
+        ..activeWorkspace = _commandStore ..workspaceId = _commandStore.id ..retailerHomeDelivery = true;
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      work.addOrUpdateWorkspaceProduct(base, stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final original = work.workspaceCatalogueItems.single.stockEntry!.contentIdentity;
+      device.failWrite = true;
+      work.saveRetailerProduct(quantity: 8, buyPrice: 26, sellPrice: 31);
+      expect(await work.workspaceInventorySaved, isFalse);
+      expect(await work.finishRetailerSetup(), isFalse);
+      expect(gateway.setupCalls, 0); expect(work.retailerSetupSaved, isFalse);
+      device.failWrite = false;
+      work.saveRetailerProduct(quantity: 8, buyPrice: 26, sellPrice: 31);
+      expect(await work.finishRetailerSetup(), isTrue);
+      expect(gateway.setupCalls, 1); expect(work.retailerSetupSaved, isTrue);
+      final saved = await SecureWorkInventoryStore(accountScope: () => owner.accountScope, storage: device)
+        .read(owner.accountScope!, _commandStore.id, qa: true);
+      expect(saved!.products.single.purchasePriceMinor, 2600);
+      expect(saved.products.single.sellingPriceMinor, 3100); expect(saved.products.single.stock, 8);
+      expect(saved.products.single.stockEntry!.contentIdentity, original);
+      expect(saved.movements.fold<int>(0, (sum, movement) => sum + movement.quantityDelta), 8);
+    });
+
+    for (final change in ['account', 'store', 'input']) {
+      test('LF-PAISE Store setup holds dispatch while saving and rejects changed $change', () async {
+        final device = _OrderJournalStorage(); final owner = _CommandAccountStore();
+        final gateway = ReviewWorkGateway();
+        final work = WorkSession(gateway: gateway, contactDraftStore: owner,
+          inventoryStore: SecureWorkInventoryStore(accountScope: () => owner.accountScope, storage: device))
+          ..activeWorkspace = _commandStore ..workspaceId = _commandStore.id ..retailerHomeDelivery = true;
+        addTearDown(work.dispose); expect(await work.loadWorkspaceInventory(), isTrue);
+        work.addOrUpdateWorkspaceProduct(base, stockEntryMethod: WorkspaceStockEntryMethod.manual);
+        expect(await work.workspaceInventorySaved, isTrue);
+        final held = Completer<void>(); device.holdWrite = held;
+        addTearDown(() { if (!held.isCompleted) held.complete(); });
+        work.saveRetailerProduct(quantity: 8, buyPrice: 26, sellPrice: 31);
+        final finishing = work.finishRetailerSetup();
+        await Future<void>.delayed(Duration.zero);
+        expect(work.busy, isTrue); expect(gateway.setupCalls, 0);
+        if (change == 'account') {
+          owner.accountScope = 'account-B';
+        } else if (change == 'store') {
+          work.activeWorkspace = const WorkWorkspace(id: 'store-B', name: 'Store B',
+            profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Jodhpur', verified: true);
+        } else {
+          work.saveRetailerProduct(quantity: 9, buyPrice: 27, sellPrice: 32);
+        }
+        held.complete();
+        expect(await finishing, isFalse); expect(gateway.setupCalls, 0);
+        expect(work.retailerSetupSaved, isFalse);
+      });
+    }
+
+    test('LF-PAISE Store invalid setup draft never replaces the saved product', () async {
+      final device = _OrderJournalStorage(); final owner = _CommandAccountStore();
+      final store = SecureWorkInventoryStore(accountScope: () => owner.accountScope, storage: device);
+      final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: owner, inventoryStore: store)
+        ..activeWorkspace = _commandStore;
+      addTearDown(work.dispose); expect(await work.loadWorkspaceInventory(), isTrue);
+      work.addOrUpdateWorkspaceProduct(base, stockEntryMethod: WorkspaceStockEntryMethod.manual);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final before = jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson());
+      for (final draft in [(0, 25, 30), (6, 0, 30), (6, 30, 29)]) {
+        work.saveRetailerProduct(quantity: draft.$1, buyPrice: draft.$2, sellPrice: draft.$3);
+        expect(await work.workspaceInventorySaved, isTrue);
+        expect(jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson()), before);
+        expect(jsonEncode((await store.read(owner.accountScope!, _commandStore.id, qa: true))!
+          .products.single.toInventoryJson()), before);
+      }
+    });
 
     test('legacy unknown and strict new schema roundtrip', () {
       expect(WorkspaceCatalogueItem.fromInventoryJson(base.toInventoryJson()).stockEntry, isNull);
@@ -12916,6 +13414,152 @@ void main() {
       );
       expect(await work.saveWorkspaceCounterDraft(), isTrue);
     }
+
+    test('LF-PAISE Counter preserves existing int64 subtotal and rejects overflow before line multiplication', () {
+      final work = session();
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+          .copyWith(sellingPriceMinor: 1000000000);
+      work.workspaceOrderQuantities['atta-5kg'] = 2147483647;
+      expect(work.workspaceCounterSubtotalMinor, 2147483647000000000);
+      expect(work.workspaceOrderTotal, 21474836470000000);
+      expect(work.workspaceCounterPurchasedItems.single.lineTotalPaise, 2147483647000000000);
+      work.workspaceOrderQuantities['atta-5kg'] = 9223372037;
+      expect(() => work.workspaceCounterSubtotalMinor, throwsFormatException);
+      expect(() => work.workspaceCounterPurchasedItems, throwsFormatException);
+      expect(work.workspaceInvoices, isEmpty);
+    });
+
+    test('LF-PAISE Counter fractional subtotal preserves exact product price', () {
+      // Labelled host fixture only; no OPPO storage or commercial action.
+      final work = session();
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+          .copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+      work.workspaceOrderQuantities['atta-5kg'] = 2;
+      expect(work.workspaceCounterSubtotalMinor, 2050);
+      expect(work.workspaceCounterPurchasedItems.single.unitPricePaise, 1025);
+      expect(work.workspaceCounterPurchasedItems.single.lineTotalPaise, 2050);
+    });
+
+    for (final kind in ['none', 'fixed', 'percentage']) {
+      test('LF-PAISE Counter $kind exact draft restart invoice and original lines', () async {
+        final work = session();
+        work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+            .copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+        work.workspaceCatalogueItems.add(_product(id: 'host-second-sku')
+            .copyWith(purchasePriceMinor: 300, sellingPriceMinor: 333, mrpMinor: 400));
+        await fill(work);
+        work.adjustWorkspaceOrderQuantity('host-second-sku', 1);
+        final discount = switch (kind) {
+          'fixed' => const WorkspaceBillDiscount.fixed(55),
+          'percentage' => const WorkspaceBillDiscount.percentage(1001),
+          _ => const WorkspaceBillDiscount.none(),
+        };
+        expect(work.updateWorkspaceCounterDiscount(discount), isTrue);
+        expect(await work.saveWorkspaceCounterDraft(), isTrue);
+        final original = (await journal.read('account-A', 'store-A'))!;
+        expect(original.lines.map((line) => line.unitPricePaise), [1025, 333]);
+        expect(original.lines.map((line) => line.lineTotalPaise), [2050, 333]);
+        final restored = session();
+        restored.workspaceCatalogueItems..clear()..addAll(work.workspaceCatalogueItems);
+        await restored.loadWorkspaceCounterDraft();
+        expect(restored.counterDraftCatalogueChanged, isFalse);
+        expect(restored.counterDraftNeedsReconciliation, isFalse);
+        expect((await journal.read('account-A', 'store-A'))!.id, original.id);
+        expect(restored.workspaceOrderQuantities, {'atta-5kg': 2, 'host-second-sku': 1});
+        expect(restored.workspaceCounterSubtotalMinor, 2383);
+        final expected = kind == 'none' ? 2383 : kind == 'fixed' ? 2328 : 2144;
+        expect(restored.workspaceCounterPayableMinor, expected);
+        final submitted = await restored.submitWorkspaceCounterBill();
+        expect(submitted?.invoice, isNotNull);
+        final invoice = submitted!.invoice!;
+        expect(invoice.subtotalMinor, 2383); expect(invoice.payableMinor, expected);
+        expect(WorkspaceCustomerInvoice.fromLedgerJson(invoice.toLedgerJson()).payableMinor, expected);
+        final order = restored.workspaceOrders.single;
+        expect(order.payableMinor, expected);
+        expect(WorkspaceOrderRecord.fromLedgerJson(order.toLedgerJson())!.payableMinor, expected);
+        expect(order.itemSnapshots.map((line) => line.unitPricePaise), [1025, 333]);
+        expect(order.itemSnapshots.map((line) => line.lineTotalPaise),
+          kind == 'none' ? [2050, 333] : kind == 'fixed' ? [2003, 325] : [1845, 299]);
+        expect(restored.workspaceCatalogueItems.first.stock, 8);
+        expect(restored.workspaceCatalogueItems.first.sellingPriceMinor, 1025);
+        expect(restored.workspaceCatalogueItems.last.stock, 9);
+        final statement = StoreSalesStatement(accountId: 'account-A', storeId: 'store-A',
+          storeName: 'Host evaluation Store', from: invoice.issuedAt.subtract(const Duration(days: 1)),
+          until: invoice.issuedAt.add(const Duration(days: 1)),
+          generatedAt: invoice.issuedAt.add(const Duration(minutes: 1)),
+          invoices: restored.workspaceInvoices, reviewOnly: true);
+        expect(statement.billedMinor, expected);
+        expect(statement.recorded(WorkspaceLedgerEntryKind.collection), isNull);
+        expect(statement.report.summary.singleWhere((row) => row.first == 'Invoice totals after discount'),
+          ['Invoice totals after discount', 'INR ${expected ~/ 100}.${(expected % 100).toString().padLeft(2, '0')}']);
+        expect((restored.gateway as ReviewWorkGateway).operationalSaveCalls, 0);
+        expect(restored.workspaceOperationsSyncError, contains('sync is not available'));
+        final again = await restored.submitWorkspaceCounterBill();
+        expect(again == null || again.invoice?.id == invoice.id, isTrue);
+        expect(restored.workspaceInvoices, hasLength(1)); expect(restored.workspaceOrders, hasLength(1));
+        expect(restored.workspaceCatalogueItems.first.stock, 8);
+      });
+    }
+
+    test('LF-PAISE Counter one-paise catalogue change keeps original draft and requires review', () async {
+      final work = session();
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+          .copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+      await fill(work);
+      final original = (await journal.read('account-A', 'store-A'))!;
+      final signature = work.counterBillReviewSignature;
+      final next = session();
+      next.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0].copyWith(sellingPriceMinor: 1026);
+      await next.loadWorkspaceCounterDraft();
+      expect(next.counterDraftCatalogueChanged, isTrue);
+      expect(next.counterDraftEditingBlocked, isTrue);
+      // Preserve the existing changed-catalogue behavior: do not apply a new
+      // price to the composer automatically; keep the original readonly bill.
+      expect(next.workspaceOrderQuantities, isEmpty);
+      expect(next.retainedCounterDraft!.lines.single.quantity, 2);
+      expect((await journal.read('account-A', 'store-A'))!.id, original.id);
+      expect((await journal.read('account-A', 'store-A'))!.lines.single.unitPricePaise, 1025);
+      expect(next.counterBillReviewSignature, isNot(signature));
+      expect(await next.submitWorkspaceCounterBill(), isNull);
+      expect(next.workspaceInvoices, isEmpty); expect(next.workspaceCatalogueItems.single.stock, 10);
+    });
+
+    for (final fails in [false, true]) {
+      test('LF-PAISE Counter retired legacy sync cannot erase exact-data refusal fails=$fails', () async {
+        final gateway = _ScopeGateway();
+        final work = WorkSession(gateway: gateway, contactDraftStore: account)
+          ..activeWorkspace = _commandStore;
+        addTearDown(work.dispose);
+        work.workspaceCatalogueItems.add(_product());
+        work.saveWorkspaceStaffSettings(staffAccessEnabled: true, counterCount: 2);
+        expect(gateway.saves, hasLength(1));
+        work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0].copyWith(sellingPriceMinor: 1025);
+        work.saveWorkspaceStaffSettings(staffAccessEnabled: true, counterCount: 3);
+        final warning = work.workspaceOperationsSyncError;
+        expect(warning, contains('sync is not available'));
+        expect(gateway.saves, hasLength(1));
+        if (fails) {
+          gateway.saves.single.completeError(const WorkGatewayException('Older request failed'));
+        } else {
+          gateway.saves.single.complete();
+        }
+        await _drainOrderJournal();
+        expect(work.workspaceOperationsSyncError, warning);
+        expect(work.workspaceOperationsSyncing, isFalse);
+        expect(work.workspaceCatalogueItems.single.sellingPriceMinor, 1025);
+      });
+    }
+
+    test('LF-PAISE Counter legacy review signature keeps its original rupee shape', () async {
+      final work = session(); await fill(work);
+      final product = work.workspaceCatalogueItems.single;
+      expect(work.counterBillReviewSignature, jsonEncode([
+        'account-A', 'store-A', work.currentWorkspaceOrderId,
+        work.workspaceOrderCustomer, work.workspaceOrderBillingDetails.toJson(),
+        work.workspaceOrderBillingCustomer, work.workspaceCounterDiscount.toJson(),
+        [product.id, 2, product.title, product.pack, product.sellingPrice, product.available, true],
+      ]));
+    });
 
     for (final kind in ['percentage', 'fixed']) {
       for (final method in ['Cash', 'UPI', 'Bank Transfer']) {

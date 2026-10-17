@@ -14,6 +14,8 @@ import '../../features/buy/buy_v2_order_resolution_contracts.dart';
 import '../../features/buy/buy_v2_saved_products_store.dart';
 import '../../features/buy/buy_v2_session.dart';
 import '../../features/work/scan_and_pick_contract.dart';
+import '../../features/work/work_order_identity_gateway.dart';
+import '../../features/work/widgets/workspace_purchase_originals.dart';
 import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
@@ -1218,7 +1220,7 @@ class BuyV2ProductView extends StatelessWidget {
                                                         addSemanticLabel:
                                                             'Add minimum order of ${_packCountLabel(product.minimumOrder)} of '
                                                             '${product.customerTitle} to Cart for '
-                                                            '${buyV2Money(product.minimumOrderTotal(facts.price))}. '
+                                                            '${_comparisonMoney(product.minimumOrderTotalMinor(facts.priceMinor))}. '
                                                             '${buyV2FulfilmentModeLabel(session.fulfilmentModeFor(product))} · '
                                                             '${buyV2BuyerDeliveryPromise(facts, confirmAfterStoreAcceptance: product.destination != BuyV2Destination.medicine && BuyV2ThemeScope.refinedOf(context))}',
                                                         rxBlocked: rxBlocked,
@@ -1251,9 +1253,9 @@ class BuyV2ProductView extends StatelessWidget {
                                                                   .unitPrice
                                                                   .isNotEmpty &&
                                                               (!shop ||
-                                                                  facts.price ==
+                                                                  facts.priceMinor ==
                                                                       product
-                                                                          .price)
+                                                                          .priceMinor)
                                                           ? '${product.pack} · ${product.unitPrice}'
                                                           : product.pack,
                                                       style: context.buyMeta
@@ -1276,11 +1278,11 @@ class BuyV2ProductView extends StatelessWidget {
                                                         style: context.buyMeta,
                                                       ),
                                                     if (!shop &&
-                                                        product.mrp != null &&
-                                                        product.mrp! >
-                                                            facts.price)
+                                                        product.mrpMinor != null &&
+                                                        product.mrpMinor! >
+                                                            facts.priceMinor)
                                                       Text(
-                                                        'Save ${buyV2Money(product.mrp! - facts.price)}',
+                                                        'Save ${_comparisonMoney(product.mrpMinor! - facts.priceMinor)}',
                                                         style: context.buyMeta
                                                             .copyWith(
                                                               color: BuyV2Colors
@@ -1293,7 +1295,7 @@ class BuyV2ProductView extends StatelessWidget {
                                                   constraints.maxWidth,
                                                   buyV2ValueTextSize(
                                                         context,
-                                                        buyV2Money(facts.price),
+                                                        _comparisonMoney(facts.priceMinor),
                                                         context.buyTitle
                                                             .copyWith(
                                                               fontSize: 24,
@@ -1305,10 +1307,10 @@ class BuyV2ProductView extends StatelessWidget {
                                                   width: priceWidth,
                                                   child: _ProductHeroPrice(
                                                     productId: product.id,
-                                                    amount: facts.price,
-                                                    mrp: facts.stale
+                                                    amountMinor: facts.priceMinor,
+                                                    mrpMinor: facts.stale
                                                         ? null
-                                                        : product.mrp,
+                                                        : product.mrpMinor,
                                                     fontSize: 24,
                                                   ),
                                                 );
@@ -1381,7 +1383,7 @@ class BuyV2ProductView extends StatelessWidget {
                                     final purchaseWidth =
                                         buyV2ValueTextSize(
                                           context,
-                                          buyV2Money(facts.price),
+                                          _comparisonMoney(facts.priceMinor),
                                           context.buyTitle.copyWith(
                                             fontSize: 24,
                                           ),
@@ -2442,11 +2444,11 @@ class BuyV2ProductCompliancePanel extends StatelessWidget {
           label: netQuantity == null ? 'Pack' : 'Net quantity',
           value: netQuantity ?? product.pack,
         ),
-      if (!summaryAlreadyShown && product.mrp != null)
+      if (!summaryAlreadyShown && product.mrpMinor != null)
         _DecisionRow(
           icon: Icons.currency_rupee_rounded,
           label: 'MRP (incl. taxes)',
-          value: buyV2Money(product.mrp!),
+          value: _comparisonMoney(product.mrpMinor!),
         ),
       if (!summaryAlreadyShown && product.unitPrice.isNotEmpty)
         _DecisionRow(
@@ -2825,7 +2827,7 @@ Future<void> _shareBuyV2Product(
         subject: '${product.customerTitle} on MoolSocial',
         text:
             '${product.customerTitle} · ${product.pack}\n'
-            '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts, confirmAfterStoreAcceptance: product.destination != BuyV2Destination.medicine && BuyV2ThemeScope.refinedOf(context))}\n'
+            '${_comparisonMoney(facts.priceMinor)} · ${buyV2BuyerDeliveryPromise(facts, confirmAfterStoreAcceptance: product.destination != BuyV2Destination.medicine && BuyV2ThemeScope.refinedOf(context))}\n'
             'Available from ${product.customerSeller(facts.partner)} on MoolSocial.\n'
             '$productLink',
         sharePositionOrigin: origin,
@@ -2864,13 +2866,7 @@ Future<void> _showBuyV2ProductComparison(
   ),
 );
 
-String _comparisonMoney(int minor) {
-  final whole = buyV2Money(minor ~/ 100);
-  final fraction = minor % 100;
-  return fraction == 0
-      ? whole
-      : '$whole.${fraction.toString().padLeft(2, '0')}';
-}
+String _comparisonMoney(int minor) => buyV2MoneyMinor(minor);
 
 /// Reuses the existing Compare sheet; only eligible same-pack offers change.
 class _ProductComparisonSheet extends StatefulWidget {
@@ -3049,11 +3045,10 @@ class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
       final retained = session.cartLines
           .where((line) => line.product.id == refreshed.product.id)
           .firstOrNull;
-      if ((retained != null &&
-              retained.product.price != refreshed.product.price) ||
-          BigInt.from(refreshed.product.price) *
-                  BigInt.from(quantity) *
-                  BigInt.from(100) !=
+      if (!refreshed.product.hasValidMoney || (retained != null &&
+              (!retained.product.hasValidMoney || retained.product.priceMinor != refreshed.product.priceMinor)) ||
+          BigInt.from(refreshed.product.priceMinor) *
+                  BigInt.from(quantity) !=
               BigInt.from(result.itemSubtotalMinor!)) {
         _message =
             'The Cart price needs to refresh before this offer can be added. Try again.';
@@ -3414,9 +3409,9 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
     final facts = widget.session.productFactsFor(product);
     final terms = product.packTerms;
     final hasTiers = terms != null && terms.priceTiers.isNotEmpty;
-    final mrp = product.mrp;
+    final mrp = product.mrpMinor;
     final saving =
-        !facts.stale && facts.price > 0 && mrp != null && mrp > facts.price;
+        !facts.stale && facts.priceMinor > 0 && mrp != null && mrp > facts.priceMinor;
     final history = widget.content.priceHistory;
     final showDrop =
         widget.content.state == BuyV2ProductContentState.ready &&
@@ -3440,14 +3435,14 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.unitPrice.isNotEmpty && facts.price == product.price
+                  product.unitPrice.isNotEmpty && facts.priceMinor == product.priceMinor
                       ? '${product.pack} · ${product.unitPrice}'
                       : product.pack,
                   style: context.buyMeta.copyWith(fontWeight: FontWeight.w700),
                 ),
                 if (product.destination == BuyV2Destination.wholesale)
                   Text(
-                    'Minimum ${_packCountLabel(product.minimumOrder)} · ${buyV2Money(product.minimumOrderTotal(facts.price))}',
+                    'Minimum ${_packCountLabel(product.minimumOrder)} · ${_comparisonMoney(product.minimumOrderTotalMinor(facts.priceMinor))}',
                     style: context.buyMeta,
                   ),
                 if (product.packTerms != null &&
@@ -3469,7 +3464,7 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
                 spacing: 8,
                 children: [
                   Text(
-                    '${((mrp - facts.price) * 100) ~/ mrp}% off',
+                    '${(BigInt.from(mrp - facts.priceMinor) * BigInt.from(100)) ~/ BigInt.from(mrp)}% off',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.green,
                       fontSize: 12,
@@ -3517,31 +3512,31 @@ class _ProductPriceExtrasState extends State<_ProductPriceExtras>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (facts.stale || facts.price <= 0)
+                if (facts.stale || facts.priceMinor <= 0)
                   Text(
                     'Check availability to confirm the current price.',
                     style: context.buyMeta,
                   )
                 else ...[
-                  if (mrp != null && mrp >= facts.price) ...[
+                  if (mrp != null && mrp >= facts.priceMinor) ...[
                     _ProductInfoRow(
                       label: 'MRP (incl. taxes)',
-                      value: buyV2Money(mrp),
+                      value: _comparisonMoney(mrp),
                     ),
                     _ProductInfoRow(
                       label: 'Discount',
-                      value: buyV2Money(mrp - facts.price),
+                      value: _comparisonMoney(mrp - facts.priceMinor),
                     ),
                   ],
                   _ProductInfoRow(
                     label: hasTiers ? 'Price per ${terms.sellUnit}' : 'Total',
-                    value: buyV2Money(facts.price),
+                    value: _comparisonMoney(facts.priceMinor),
                   ),
                   if (hasTiers) ...[
                     for (final tier in terms.priceTiers)
                       _ProductInfoRow(
                         label: '${tier.minimumPacks}+ packs',
-                        value: '${buyV2Money(tier.price)} / ${terms.sellUnit}',
+                        value: '${_comparisonMoney(tier.priceMinor)} / ${terms.sellUnit}',
                       ),
                     _ProductInfoRow(
                       label: 'Tax',
@@ -4314,7 +4309,7 @@ class _ProductVariantOption extends StatelessWidget {
       button: true,
       selected: selected,
       label:
-          '${optionLabel ?? option.pack}, ${buyV2Money(facts.price)}, ${decision.statusLabel}',
+          '${optionLabel ?? option.pack}, ${_comparisonMoney(facts.priceMinor)}, ${decision.statusLabel}',
       onTap: select,
       excludeSemantics: true,
       child: SizedBox(
@@ -4373,7 +4368,7 @@ class _ProductVariantOption extends StatelessWidget {
                       ...[
                         const SizedBox(height: 3),
                         Text(
-                          buyV2Money(facts.price),
+                          _comparisonMoney(facts.priceMinor),
                           style: const TextStyle(
                             color: Color(0xFF24272B),
                             fontSize: 13,
@@ -4567,7 +4562,7 @@ class _WholesaleTradeDecisionPanelState
     final facts = widget.facts;
     final decision = widget.decision;
     final fulfilmentMode = widget.session.fulfilmentModeFor(product);
-    final minimumTotal = product.minimumOrderTotal(facts.price);
+    final minimumTotal = product.minimumOrderTotalMinor(facts.priceMinor);
     final showSignal =
         _loading ||
         _failure != null ||
@@ -4585,8 +4580,8 @@ class _WholesaleTradeDecisionPanelState
       container: true,
       label:
           '${product.customerTitle}. ${product.pack}. Minimum order '
-          '${_packCountLabel(product.minimumOrder)}. ${buyV2Money(facts.price)} per pack. '
-          '${buyV2Money(minimumTotal)} minimum order total. '
+          '${_packCountLabel(product.minimumOrder)}. ${_comparisonMoney(facts.priceMinor)} per pack. '
+          '${_comparisonMoney(minimumTotal)} minimum order total. '
           '${facts.orderabilityLabel}. ${widget.buyerPromise}. '
           '${buyV2AutomaticFulfilmentLabel(product.destination)}. '
           '${decision.statusLabel}. $signalSummary',
@@ -4724,19 +4719,19 @@ class _WholesaleTradeDecisionPanelState
 class _ProductHeroPrice extends StatelessWidget {
   const _ProductHeroPrice({
     required this.productId,
-    required this.amount,
+    required this.amountMinor,
     required this.fontSize,
-    this.mrp,
+    this.mrpMinor,
   });
   final String productId;
-  final int amount;
+  final int amountMinor;
   final double fontSize;
-  final int? mrp;
+  final int? mrpMinor;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final label = buyV2Money(amount);
+      final label = _comparisonMoney(amountMinor);
       final style = context.buyTitle.copyWith(
         color: const Color(0xFF24272B),
         fontSize: fontSize,
@@ -4759,9 +4754,9 @@ class _ProductHeroPrice extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           price,
-          if (mrp != null && mrp! > amount)
+          if (mrpMinor != null && mrpMinor! > amountMinor)
             Text(
-              buyV2Money(mrp!),
+              _comparisonMoney(mrpMinor!),
               key: ValueKey('buy-product-hero-mrp-$productId'),
               style: context.buyMeta.copyWith(
                 decoration: TextDecoration.lineThrough,
@@ -4793,7 +4788,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
     final priceWidth =
         buyV2ValueTextSize(
           context,
-          buyV2Money(facts.price),
+          _comparisonMoney(facts.priceMinor),
           context.buyTitle.copyWith(fontSize: 24),
         ).width +
         2;
@@ -4801,8 +4796,8 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
       width: priceWidth,
       child: _ProductHeroPrice(
         productId: product.id,
-        amount: facts.price,
-        mrp: facts.stale ? null : product.mrp,
+        amountMinor: facts.priceMinor,
+        mrpMinor: facts.stale ? null : product.mrpMinor,
         fontSize: 24,
       ),
     );
@@ -4818,7 +4813,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
                         8 +
                         buyV2ValueTextSize(
                           context,
-                          buyV2Money(facts.price),
+                          _comparisonMoney(facts.priceMinor),
                           context.buyTitle.copyWith(fontSize: 25),
                         ).width) {
               return Column(
@@ -5675,7 +5670,7 @@ class _ProductContinuationSectionState
           ).height +
           buyV2ValueTextSize(
             context,
-            buyV2Money(item.price),
+            _comparisonMoney(item.priceMinor),
             const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
             maxWidth: 102,
             maxLines: null,
@@ -5790,9 +5785,9 @@ _similarProductLines(
   final rating = trust.state == BuyV2MarketplaceTrustState.ready
       ? trust.productRating
       : null;
-  final mrp = product.mrp;
-  final validPrice = !facts.stale && facts.price > 0;
-  final discounted = validPrice && mrp != null && mrp > facts.price;
+  final mrp = product.mrpMinor;
+  final validPrice = !facts.stale && facts.priceMinor > 0;
+  final discounted = validPrice && mrp != null && mrp > facts.priceMinor;
   final hasDelivery =
       !facts.stale && session.deliveryOptionsFor(product).isNotEmpty;
   final pack =
@@ -5812,7 +5807,7 @@ _similarProductLines(
         price: false,
       ),
     (
-      text: validPrice ? buyV2Money(facts.price) : 'Price unavailable',
+      text: validPrice ? _comparisonMoney(facts.priceMinor) : 'Price unavailable',
       style: body.copyWith(
         fontWeight: FontWeight.w800,
         color: const Color(0xFF24272B),
@@ -5823,7 +5818,7 @@ _similarProductLines(
     if (discounted)
       (
         text:
-            'MRP ${buyV2Money(mrp)} · ${((mrp - facts.price) * 100 / mrp).floor()}% off',
+            'MRP ${_comparisonMoney(mrp)} · ${(BigInt.from(mrp - facts.priceMinor) * BigInt.from(100)) ~/ BigInt.from(mrp)}% off',
         style: meta,
         maxLines: null,
         price: false,
@@ -5991,7 +5986,7 @@ class _ProductContinuationCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              buyV2Money(product.price),
+                              _comparisonMoney(product.priceMinor),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -7521,9 +7516,9 @@ class _ProductBenefitPreviewTile extends StatelessWidget {
                   style: context.buyBody.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
-              if (benefit.savingAmount > 0)
+              if (benefit.savingAmountMinor > 0)
                 Text(
-                  'Save ${buyV2Money(benefit.savingAmount)}',
+                  'Save ${_comparisonMoney(benefit.savingAmountMinor)}',
                   style: context.buyBody.copyWith(
                     color: BuyV2Colors.green,
                     fontWeight: FontWeight.w600,
@@ -9590,7 +9585,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
               : 'Freight confirmed before payment';
           final totalText = priceUnavailable
               ? 'Pending'
-              : buyV2Money(session.scopedPayableTotal);
+              : _comparisonMoney(session.scopedPayableTotalMinor);
           final totalStyle = TextStyle(
             color: BuyV2Colors.ink,
             fontSize: compactAccessible ? 20 : 22,
@@ -9665,7 +9660,7 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             child: BuyV2FiniteValueTransition(
               key: const ValueKey('buy-cart-payable-total-motion'),
               incomingOnly: true,
-              stateKey: session.scopedPayableTotal,
+              stateKey: session.scopedPayableTotalMinor,
               text: displayedTotalText,
               ownerSize: displayedTotalSize,
               maxLines: currencyInLabel ? null : 1,
@@ -10884,10 +10879,10 @@ String _commercialPaymentTermTitle(
 };
 
 String _commercialPaymentTermDetail(BuyV2CommercialPaymentTerm term) {
-  final amounts = term.balanceDue == 0
-      ? '${buyV2Money(term.amountDueNow)} payable now'
-      : '${buyV2Money(term.amountDueNow)} now · '
-            '${buyV2Money(term.balanceDue)} ${term.balanceDueLabel}';
+  final amounts = term.balanceDueMinor == 0
+      ? '${_comparisonMoney(term.amountDueNowMinor)} payable now'
+      : '${_comparisonMoney(term.amountDueNowMinor)} now · '
+            '${_comparisonMoney(term.balanceDueMinor)} ${term.balanceDueLabel}';
   if (term.kind == BuyV2CommercialPaymentTermKind.regulatedCredit) {
     return '$amounts · APR ${term.annualPercentageRate!.toStringAsFixed(2)}% · '
         'Key facts from ${term.financierName}';
@@ -10923,20 +10918,20 @@ class _CheckoutQuoteCard extends StatelessWidget {
               label: 'Original total',
               value: original == null
                   ? 'Needs checking'
-                  : buyV2Money(original.total),
+                  : _comparisonMoney(original.totalMinor),
               strong: true,
               stacked: stacked,
             ),
             if (original != null)
               _CartAmountRow(
                 label: 'Original amount due now',
-                value: buyV2Money(original.amountDueNow),
+                value: _comparisonMoney(original.amountDueNowMinor),
                 stacked: stacked,
               ),
-            if (original != null && original.total > original.amountDueNow)
+            if (original != null && original.totalMinor > original.amountDueNowMinor)
               _CartAmountRow(
                 label: 'Balance due',
-                value: buyV2Money(original.total - original.amountDueNow),
+                value: _comparisonMoney(original.totalMinor - original.amountDueNowMinor),
                 stacked: stacked,
               ),
             Text(
@@ -10948,15 +10943,12 @@ class _CheckoutQuoteCard extends StatelessWidget {
       );
     }
     if (attempt != null) {
-      final agreed = attempt.groups.fold<int>(
-        0,
-        (sum, group) => sum + group.request.total,
-      );
-      final placed = attempt.groups
+      final agreed = buyV2SumMinor(attempt.groups.map((group) => group.request.totalMinor));
+      final placed = buyV2SumMinor(attempt.groups
           .where(
             (group) => group.state == BuyV2CheckoutSubmissionState.confirmed,
           )
-          .fold<int>(0, (sum, group) => sum + group.request.total);
+          .map((group) => group.request.totalMinor));
       return Container(
         key: const ValueKey('buy-checkout-committed-totals'),
         padding: const EdgeInsets.all(11),
@@ -10966,14 +10958,14 @@ class _CheckoutQuoteCard extends StatelessWidget {
           children: [
             _CartAmountRow(
               label: 'Agreed total',
-              value: buyV2Money(agreed),
+              value: _comparisonMoney(agreed),
               strong: true,
             ),
             if (placed > 0) ...[
-              _CartAmountRow(label: 'Placed orders', value: buyV2Money(placed)),
+              _CartAmountRow(label: 'Placed orders', value: _comparisonMoney(placed)),
               _CartAmountRow(
                 label: 'Remaining orders',
-                value: buyV2Money(agreed - placed),
+                value: _comparisonMoney(agreed - placed),
               ),
             ],
           ],
@@ -11037,15 +11029,9 @@ class _CheckoutQuoteCard extends StatelessWidget {
         ),
       );
     }
-    final itemSubtotal = quote.lines.fold<int>(
-      0,
-      (total, line) => total + line.itemSubtotal,
-    );
-    final couponSaving = quote.lines.fold<int>(
-      0,
-      (total, line) => total + line.couponSaving,
-    );
-    final tip = quote.lines.fold<int>(0, (total, line) => total + line.tip);
+    final itemSubtotal = buyV2SumMinor(quote.lines.map((line) => line.itemSubtotalMinor));
+    final couponSaving = buyV2SumMinor(quote.lines.map((line) => line.couponSavingMinor));
+    final tip = buyV2SumMinor(quote.lines.map((line) => line.tipMinor));
     return Container(
       key: const ValueKey('buy-checkout-live-quote'),
       padding: const EdgeInsets.all(11),
@@ -11074,43 +11060,43 @@ class _CheckoutQuoteCard extends StatelessWidget {
           const SizedBox(height: 6),
           _CartAmountRow(
             label: 'Items subtotal',
-            value: buyV2Money(itemSubtotal),
+            value: _comparisonMoney(itemSubtotal),
           ),
           if (couponSaving > 0)
             _CartAmountRow(
               label: 'Coupon saving',
-              value: '−${buyV2Money(couponSaving)}',
+              value: '−${_comparisonMoney(couponSaving)}',
               valueColor: BuyV2Colors.green,
             ),
-          if (session.checkoutQuotedTax > 0)
+          if (session.checkoutQuotedTaxMinor > 0)
             _CartAmountRow(
               label: 'GST and taxes',
-              value: buyV2Money(session.checkoutQuotedTax),
+              value: _comparisonMoney(session.checkoutQuotedTaxMinor),
             ),
-          if (session.checkoutQuotedFreight > 0)
+          if (session.checkoutQuotedFreightMinor > 0)
             _CartAmountRow(
               label: 'Freight',
-              value: buyV2Money(session.checkoutQuotedFreight),
+              value: _comparisonMoney(session.checkoutQuotedFreightMinor),
             ),
-          if (session.checkoutQuotedDeliveryFee > 0)
+          if (session.checkoutQuotedDeliveryFeeMinor > 0)
             _CartAmountRow(
               label: 'Delivery fee',
-              value: buyV2Money(session.checkoutQuotedDeliveryFee),
+              value: _comparisonMoney(session.checkoutQuotedDeliveryFeeMinor),
             ),
           if (tip > 0)
             _CartAmountRow(
               label: 'Optional delivery tips',
-              value: buyV2Money(tip),
+              value: _comparisonMoney(tip),
             ),
-          if (session.checkoutQuotedPaymentCharge > 0)
+          if (session.checkoutQuotedPaymentChargeMinor > 0)
             _CartAmountRow(
               label: 'Payment charge',
-              value: buyV2Money(session.checkoutQuotedPaymentCharge),
+              value: _comparisonMoney(session.checkoutQuotedPaymentChargeMinor),
             ),
           const Divider(height: 16),
           _CartAmountRow(
             label: 'Order total',
-            value: buyV2Money(quote.total),
+            value: _comparisonMoney(quote.totalMinor),
             strong: true,
           ),
           const SizedBox(height: 4),
@@ -11233,13 +11219,13 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
               children: [
                 Expanded(child: Text('Pay now', style: context.buyBody)),
                 Text(
-                  buyV2Money(session.checkoutAmountDueNow),
+                  _comparisonMoney(session.checkoutAmountDueNowMinor),
                   key: const ValueKey('buy-checkout-amount-due-now'),
                   style: context.buyTitle.copyWith(fontSize: 15),
                 ),
               ],
             ),
-            if (session.checkoutBalanceDue > 0) ...[
+            if (session.checkoutBalanceDueMinor > 0) ...[
               const SizedBox(height: 3),
               Row(
                 children: [
@@ -11247,7 +11233,7 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
                     child: Text('Balance due later', style: context.buyMeta),
                   ),
                   Text(
-                    buyV2Money(session.checkoutBalanceDue),
+                    _comparisonMoney(session.checkoutBalanceDueMinor),
                     key: const ValueKey('buy-checkout-balance-due'),
                     style: context.buyBody,
                   ),
@@ -11275,13 +11261,13 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
 }
 
 String _storePaymentChoiceLabel(BuyV2CommercialPaymentTerm term) {
-  if (term.balanceDue == 0) return 'Pay in full';
-  if (term.amountDueNow == 0 && term.netDays == null) return 'Pay on delivery';
-  if (term.amountDueNow == 0) {
+  if (term.balanceDueMinor == 0) return 'Pay in full';
+  if (term.amountDueNowMinor == 0 && term.netDays == null) return 'Pay on delivery';
+  if (term.amountDueNowMinor == 0) {
     return 'Pay within ${term.netDays} days of delivery';
   }
   final deposit = term.advancePercent == null
-      ? '${buyV2Money(term.amountDueNow)} to confirm'
+      ? '${_comparisonMoney(term.amountDueNowMinor)} to confirm'
       : '${term.advancePercent}% to confirm';
   return term.netDays == null
       ? '$deposit · balance on delivery'
@@ -11726,17 +11712,17 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
         );
       }
       return (
-        session.checkoutPaymentActionAmount == 0
+        session.checkoutPaymentActionAmountMinor == 0
             ? 'Place orders'
-            : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} · Payment ${session.checkoutPaymentNumber} of ${session.checkoutPaymentCount}',
+            : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} · Payment ${session.checkoutPaymentNumber} of ${session.checkoutPaymentCount}',
         () async {
-          final committedAmount = session.checkoutPaymentActionAmount;
+          final committedAmount = session.checkoutPaymentActionAmountMinor;
           final committedMethod = session.selectedPayment;
           final attemptId = session.checkoutPaymentAttempt?.id;
           await session.submitOrder();
           if (session.view == BuyV2View.checkout &&
               session.checkoutPaymentAttempt?.id == attemptId &&
-              session.checkoutPaymentActionAmount == committedAmount &&
+              session.checkoutPaymentActionAmountMinor == committedAmount &&
               session.selectedPayment == committedMethod &&
               session.checkoutSubmissionState ==
                   BuyV2CheckoutSubmissionState.paymentActionRequired &&
@@ -11773,7 +11759,7 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
       return (
         paymentHandoff == null
             ? 'Unavailable'
-            : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)}',
+            : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)}',
         paymentHandoff == null
             ? null
             : () => session.continuePayment(paymentHandoff),
@@ -11850,27 +11836,27 @@ class _BuyV2CheckoutViewState extends State<BuyV2CheckoutView> {
           : 'order';
       final label =
           session.selectedPayment == 'Cash on Delivery' ||
-              session.checkoutAmountDueNow == 0
+              session.checkoutAmountDueNowMinor == 0
           ? compactPlaceOrder
                 ? 'Place order'
                 : 'Place $orderWord'
           : session.canChooseUpiQr && session.useUpiQr
-          ? 'Show QR · ${buyV2Money(session.checkoutPaymentActionAmount)}'
+          ? 'Show QR · ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)}'
           : session.checkoutPaymentCount > 1
-          ? 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} · Payment 1 of ${session.checkoutPaymentCount}'
+          ? 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} · Payment 1 of ${session.checkoutPaymentCount}'
           : compactPlaceOrder
           ? 'Place order'
-          : 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} & place $orderWord';
+          : 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} & place $orderWord';
       return (
         label,
         reviewBlocked
             ? null
             : () async {
-                final committedAmount = session.checkoutPaymentActionAmount;
+                final committedAmount = session.checkoutPaymentActionAmountMinor;
                 final committedMethod = session.selectedPayment;
                 await session.submitOrder();
                 if (session.view == BuyV2View.checkout &&
-                    session.checkoutPaymentActionAmount == committedAmount &&
+                    session.checkoutPaymentActionAmountMinor == committedAmount &&
                     session.selectedPayment == committedMethod &&
                     session.checkoutSubmissionState ==
                         BuyV2CheckoutSubmissionState.paymentActionRequired &&
@@ -12014,7 +12000,7 @@ class _CheckoutCollectionDetails extends StatelessWidget {
               title: line.product.customerTitle,
               detail:
                   '${line.quantity} × ${line.product.pack} · '
-                  '${_collectionMoney(quote?.lineAmountsMinor[line.product.id] ?? line.total * 100)}',
+                  '${_collectionMoney(quote?.lineAmountsMinor[line.product.id] ?? line.totalMinor)}',
             ),
             const SizedBox(height: 8),
           ],
@@ -12434,7 +12420,7 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
             icon: selected.$2,
             title: 'Payment · ${selected.$1}',
             detail: selected.$1 == 'Cash on Delivery'
-                ? '${buyV2Money(session.checkoutAmountDueNow)} payable on delivery'
+                ? '${_comparisonMoney(session.checkoutAmountDueNowMinor)} payable on delivery'
                 : selected.$1 == 'Card'
                 ? '${selected.$3}. Enter card details in the secure payment provider flow.'
                 : selected.$3,
@@ -12506,10 +12492,10 @@ class _CheckoutPaymentStageState extends State<_CheckoutPaymentStage> {
             label: 'Payment charge',
             value: _comparisonMoney(session.currentPaymentChargeMinor!),
           ),
-        if (session.checkoutBalanceDue > 0)
+        if (session.checkoutBalanceDueMinor > 0)
           _CheckoutPaymentFact(
             label: 'Balance due',
-            value: buyV2Money(session.checkoutBalanceDue),
+            value: _comparisonMoney(session.checkoutBalanceDueMinor),
           ),
       ],
     );
@@ -12568,7 +12554,7 @@ class _CheckoutUpiQrState extends State<_CheckoutUpiQr> {
       children: [
         Text('Scan with another phone’s UPI app', style: context.buyBody),
         Text(
-          '${buyV2Money(widget.session.checkoutPaymentActionAmount)} · MoolSocial',
+          '${_comparisonMoney(widget.session.checkoutPaymentActionAmountMinor)} · MoolSocial',
           style: context.buyBody,
         ),
         Text(
@@ -12779,14 +12765,14 @@ class _CheckoutPaymentGroups extends StatelessWidget {
                               state == BuyV2CheckoutSubmissionState.idle
                         ? 'Not submitted'
                         : 'Check original payment';
-                    final due = group.amountDueNow == 0
+                    final due = group.amountDueNowMinor == 0
                         ? 'No payment due now'
-                        : '${buyV2Money(group.amountDueNow)} with ${group.paymentMethod}';
-                    final balance = group.total - group.amountDueNow;
+                        : '${_comparisonMoney(group.amountDueNowMinor)} with ${group.paymentMethod}';
+                    final balance = group.totalMinor - group.amountDueNowMinor;
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '$scope\n$due · $status${balance > 0 ? ' · ${buyV2Money(balance)} due later' : ''}',
+                        '$scope\n$due · $status${balance > 0 ? ' · ${_comparisonMoney(balance)} due later' : ''}',
                         style: context.buyMeta,
                       ),
                     );
@@ -12856,7 +12842,7 @@ class _CheckoutPaymentStateRow extends StatelessWidget {
               Icons.lock_outline_rounded,
               'Ready for secure payment',
               session.checkoutRecoveryAmountKnown
-                  ? 'Pay ${buyV2Money(session.checkoutPaymentActionAmount)} to MoolSocial with ${session.checkoutCommittedPaymentMethod}.${session.checkoutCommittedPaymentMethod == 'Card' ? ' Enter card details in the secure payment provider flow.' : ''}'
+                  ? 'Pay ${_comparisonMoney(session.checkoutPaymentActionAmountMinor)} to MoolSocial with ${session.checkoutCommittedPaymentMethod}.${session.checkoutCommittedPaymentMethod == 'Card' ? ' Enter card details in the secure payment provider flow.' : ''}'
                   : 'The original amount needs checking. Do not pay again.',
             ),
             BuyV2CheckoutSubmissionState.paymentPending => (
@@ -13316,7 +13302,7 @@ class _CheckoutOrderDetails extends StatelessWidget {
                   Text(
                     benefit.kind == BuyV2CartBenefitKind.paymentOffer
                         ? _paymentOfferStatus(session, benefit)
-                        : 'Coupon saving −${buyV2Money(session.couponSavingForDestination(benefit.destination))} included in this total.',
+                        : 'Coupon saving −${_comparisonMoney(session.couponSavingMinorForDestination(benefit.destination))} included in this total.',
                     style: context.buyMeta,
                   ),
                 ],
@@ -13443,7 +13429,7 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
               final amountText = session.collectionCheckoutSelected
                   ? _collectionCheckoutAmount(session)
                   : session.checkoutRecoveryAmountKnown
-                  ? buyV2Money(session.checkoutPaymentActionAmount)
+                  ? _comparisonMoney(session.checkoutPaymentActionAmountMinor)
                   : 'Amount needs checking';
               final amountStyle = TextStyle(
                 color: BuyV2Colors.ink,
@@ -13630,8 +13616,8 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
     final semanticLabel =
         '${product.customerTitle}. $quantityLabel. ${product.pack}. '
         'Minimum order ${_packCountLabel(product.minimumOrder)}. '
-        '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
-        'Item total ${buyV2Money(line.total)}.';
+        '${_comparisonMoney(product.priceMinor)} per pack. ${product.unitPrice}. '
+        'Item total ${_comparisonMoney(line.totalMinor)}.';
     return Semantics(
       key: ValueKey('buy-wholesale-checkout-receiving-line-${product.id}'),
       container: true,
@@ -13658,7 +13644,7 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 'Minimum order ${_packCountLabel(product.minimumOrder)} · '
-                '${buyV2Money(product.price)} per pack · ${product.unitPrice}',
+                '${_comparisonMoney(product.priceMinor)} per pack · ${product.unitPrice}',
                 style: context.buyMeta,
               ),
             ],
@@ -13675,7 +13661,7 @@ class _WholesaleCheckoutReceivingLine extends StatelessWidget {
                   Text('Item total', style: context.buyMeta),
                   const SizedBox(height: 2),
                   Text(
-                    buyV2Money(line.total),
+                    _comparisonMoney(line.totalMinor),
                     style: context.buyBody.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -13750,8 +13736,8 @@ class _CheckoutPriceChangeReview extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${buyV2Money(change.previousPrice)} → '
-                    '${buyV2Money(change.currentPrice)}',
+                    '${_comparisonMoney(change.previousPriceMinor)} → '
+                    '${_comparisonMoney(change.currentPriceMinor)}',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.ink,
                       fontWeight: FontWeight.w700,
@@ -13865,10 +13851,7 @@ class BuyV2ConfirmationView extends StatelessWidget {
         purchaseId.trim().isNotEmpty &&
         session.confirmedProductCount > 0 &&
         orders.isNotEmpty &&
-        orders.every(
-          (order) =>
-              order.id.trim().isNotEmpty && order.purchaseId == purchaseId,
-        );
+        session.confirmedOrderReferencesMatch;
     if (!hasConfirmedPurchase) {
       return ListView(
         key: const ValueKey('buy-confirmation'),
@@ -13953,14 +13936,14 @@ class BuyV2ConfirmationView extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                '${_productCountLabel(session.confirmedProductCount)} · ${buyV2Money(session.confirmedTotal)}',
+                '${_productCountLabel(session.confirmedProductCount)} · ${_comparisonMoney(session.confirmedTotalMinor)}',
                 style: context.buyBody,
               ),
-              if (session.confirmedBalanceDue > 0) ...[
+              if (session.confirmedBalanceDueMinor > 0) ...[
                 const SizedBox(height: 3),
                 Text(
-                  'Paid now ${buyV2Money(session.confirmedAmountPaidNow)} · '
-                  'Balance ${buyV2Money(session.confirmedBalanceDue)}',
+                  'Paid now ${_comparisonMoney(session.confirmedAmountPaidNowMinor)} · '
+                  'Balance ${_comparisonMoney(session.confirmedBalanceDueMinor)}',
                   key: const ValueKey('buy-confirmation-payment-schedule'),
                   style: context.buyMeta.copyWith(
                     color: BuyV2Colors.navy,
@@ -13971,7 +13954,7 @@ class BuyV2ConfirmationView extends StatelessWidget {
               if (session.confirmedPurchaseId case final purchaseId?) ...[
                 const SizedBox(height: 2),
                 Text(
-                  'Order reference · $purchaseId',
+                  '${session.confirmedCheckoutAttemptId == null ? 'Order reference' : 'Checkout reference'} · $purchaseId',
                   style: context.buyMeta.copyWith(fontSize: 8.5),
                 ),
               ],
@@ -14161,7 +14144,7 @@ class _PlacedOrderCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                buyV2Money(order.lines[index].total),
+                                _comparisonMoney(order.lines[index].totalMinor),
                                 style: context.buyBody.copyWith(fontSize: 10),
                               ),
                             ],
@@ -14602,24 +14585,32 @@ String _buyV2PurchaseSummary(BuyV2Session session, List<BuyV2Order> orders) {
   final collections = orders.where((order) => order.collection != null).length;
   if (collections == 0) {
     final count = orders.length;
-    final total = orders.fold<int>(0, (sum, order) => sum + order.total);
-    return '$count ${count == 1 ? 'delivery' : 'deliveries'} · ${buyV2Money(total)}';
+    try {
+      final totalMinor = buyV2SumMinor(orders.map((order) => order.payableTotalMinor));
+      return '$count ${count == 1 ? 'delivery' : 'deliveries'} · ${_comparisonMoney(totalMinor)}';
+    } on FormatException {
+      return '$count ${count == 1 ? 'delivery' : 'deliveries'} · Updating total';
+    }
   }
   final count = orders.length;
   final kind = collections == count
       ? (count == 1 ? 'collection' : 'collections')
       : (count == 1 ? 'order' : 'orders');
-  var totalMinor = 0;
-  for (final order in orders) {
-    if (order.collection == null) {
-      totalMinor += order.total * 100;
-    } else {
-      final snapshot = session.collectionSnapshotFor(order.id);
-      if (snapshot == null) return '$count $kind · Updating total';
-      totalMinor += snapshot.totalMinor;
+  final amounts = <int>[];
+  try {
+    for (final order in orders) {
+      if (order.collection == null) {
+        amounts.add(order.payableTotalMinor);
+      } else {
+        final snapshot = session.collectionSnapshotFor(order.id);
+        if (snapshot == null) return '$count $kind · Updating total';
+        amounts.add(snapshot.totalMinor);
+      }
     }
+    return '$count $kind · ${_collectionMoney(buyV2SumMinor(amounts))}';
+  } on FormatException {
+    return '$count $kind · Updating total';
   }
-  return '$count $kind · ${_collectionMoney(totalMinor)}';
 }
 
 class BuyV2OrdersView extends StatelessWidget {
@@ -14659,6 +14650,9 @@ class BuyV2OrdersView extends StatelessWidget {
         key: const PageStorageKey('buy-orders'),
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
         children: [
+          if (session.purchaseReader case final reader? when reader.isCurrent && session.query.trim().isEmpty)
+            WorkspacePurchaseOriginals(key: ValueKey(('buyer-originals',reader,session.purchaseRealm)),
+              gateway: reader, role: WorkspaceOrderIdentityRole.buyer, realm: session.purchaseRealm),
           if (session.canReturnToAccount) ...[
             _ReturnAffordance(
               key: const ValueKey('buy-orders-return-account'),
@@ -14868,8 +14862,8 @@ class BuyV2OrderItemsView extends StatelessWidget {
       return '${product.pack} · Ordered quantity unavailable';
     }
     final quantity = lines.fold<int>(0, (total, line) => total + line.quantity);
-    final amount = lines.fold<int>(0, (total, line) => total + line.total);
-    return '$quantity × ${product.pack} · ${buyV2Money(amount)}';
+    final amount = buyV2SumMinor(lines.map((line) => line.totalMinor));
+    return '$quantity × ${product.pack} · ${_comparisonMoney(amount)}';
   }
 
   @override
@@ -15708,7 +15702,7 @@ class _BalancePaymentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final result = session.balancePaymentFor(order.id);
     final busy = session.balancePaymentBusy(order.id);
-    if (order.balanceDue <= 0 &&
+    if (order.balanceDueMinor <= 0 &&
         result?.state != BuyV2BalancePaymentState.paid) {
       return const SizedBox.shrink();
     }
@@ -15716,7 +15710,7 @@ class _BalancePaymentCard extends StatelessWidget {
     final handoffUnavailable =
         state == BuyV2BalancePaymentState.paymentActionRequired &&
         paymentHandoff == null;
-    final amountDue = result?.amountDue ?? order.balanceDue;
+    final amountDueMinor = result?.amountDueMinor ?? order.balanceDueMinor;
     final dueLabel = result?.dueLabel ?? order.balanceDueLabel ?? 'Due later';
     final statusLabel = switch (state) {
       BuyV2BalancePaymentState.upcoming => 'Upcoming balance',
@@ -15793,7 +15787,7 @@ class _BalancePaymentCard extends StatelessWidget {
           Text(
             state == BuyV2BalancePaymentState.paid
                 ? 'No balance remains.'
-                : '${buyV2Money(amountDue)} · $dueLabel',
+                : '${_comparisonMoney(amountDueMinor)} · $dueLabel',
             key: const ValueKey('buy-tracking-balance-amount'),
             style: context.buyBody,
           ),
@@ -17354,11 +17348,11 @@ class BuyV2TrackingView extends StatelessWidget {
                 label: _deliveryInstructionOwner(order.destination),
                 value: order.deliveryInstruction!,
               ),
-            if (order.tip > 0)
+            if (order.tipMinor > 0)
               _DecisionRow(
                 icon: Icons.volunteer_activism_outlined,
                 label: 'Delivery tip',
-                value: buyV2Money(order.tip),
+                value: _comparisonMoney(order.tipMinor),
               ),
           ],
         ),
@@ -17366,7 +17360,7 @@ class BuyV2TrackingView extends StatelessWidget {
         if (order.paymentMethod != null ||
             order.purchaseOrderReference != null ||
             order.paymentTermLabel != null ||
-            order.amountPaidNow != null ||
+            order.amountPaidNowMinor != null ||
             order.paymentStatusLabel != null)
           _DecisionPanel(
             title: 'Payment',
@@ -17389,11 +17383,11 @@ class BuyV2TrackingView extends StatelessWidget {
                   label: 'Payment term',
                   value: paymentTerm,
                 ),
-              if (order.amountPaidNow case final paidNow?)
+              if (order.amountPaidNowMinor case final paidNow?)
                 _DecisionRow(
                   icon: Icons.payments_outlined,
                   label: 'Paid now',
-                  value: buyV2Money(paidNow),
+                  value: _comparisonMoney(paidNow),
                 ),
               if (order.paymentStatusLabel case final paymentStatus?)
                 _DecisionRow(
@@ -17403,7 +17397,7 @@ class BuyV2TrackingView extends StatelessWidget {
                 ),
             ],
           ),
-        if (order.balanceDue > 0 ||
+        if (order.balanceDueMinor > 0 ||
             session.balancePaymentFor(order.id)?.state ==
                 BuyV2BalancePaymentState.paid) ...[
           const SizedBox(height: 6),
@@ -21992,7 +21986,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
           runSpacing: 2,
           children: [
             Text(
-              buyV2Money(product.price),
+              _comparisonMoney(product.priceMinor),
               style: const TextStyle(
                 color: BuyV2Colors.navy,
                 fontSize: 22,
@@ -22000,9 +21994,9 @@ class _ProductOwnedActionPanel extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            if (product.mrp case final mrp?)
+            if (product.mrpMinor case final mrp?)
               Text(
-                '₹$mrp',
+                _comparisonMoney(mrp),
                 style: const TextStyle(
                   color: BuyV2Colors.muted,
                   fontSize: 10,
@@ -22429,7 +22423,7 @@ class _CartScopeBar extends StatelessWidget {
           final text = scope == BuyV2CartScope.all
               ? session.procurementPricesUnavailableFor()
                     ? 'Price pending'
-                    : buyV2Money(session.cartTotal)
+                    : _comparisonMoney(session.cartTotalMinor)
               : '${session.countForDestination(_destinationForCartScope(scope)!)}';
           final labelStyle = TextStyle(
             color: selected
@@ -22642,11 +22636,11 @@ String _paymentOfferStatus(BuyV2Session session, BuyV2CartBenefit offer) {
     reason = 'Not eligible. This offer has expired.';
   } else if (offer.validFrom != null && now.isBefore(offer.validFrom!)) {
     reason = 'Not eligible yet. This offer has not started.';
-  } else if (offer.minimumSpend != null &&
-      session.totalForDestination(offer.destination) < offer.minimumSpend!) {
+  } else if (offer.minimumSpendMinor != null &&
+      session.totalMinorForDestination(offer.destination) < offer.minimumSpendMinor!) {
     reason =
         'Not eligible. Minimum ${offer.destination.label} product subtotal '
-        '${buyV2Money(offer.minimumSpend!)}.';
+        '${_comparisonMoney(offer.minimumSpendMinor!)}.';
   } else if (offer.minimumQuantity != null &&
       session.countForDestination(offer.destination) < offer.minimumQuantity!) {
     reason =
@@ -23025,8 +23019,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
           ],
         ),
         const SizedBox(height: 6),
-        if (widget.session.liveCartBenefitsEnabled &&
-            widget.session.cartBenefitsLoadState !=
+        if (widget.session.cartBenefitsLoadState !=
                 BuyV2CartBenefitsLoadState.ready)
           _CartBenefitEligibilityState(session: widget.session)
         else if (benefits.isEmpty)
@@ -23085,7 +23078,7 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
             shape: const Border(),
             collapsedShape: const Border(),
             title: Text(
-              'Add ${buyV2Money(value.remainingSpend)} more to qualify',
+              'Add ${_comparisonMoney(value.remainingSpendMinor)} more to qualify',
               style: context.buyBody.copyWith(fontSize: 12),
             ),
             subtitle: Text(
@@ -23098,8 +23091,8 @@ class _CartBenefitsInlineState extends State<_CartBenefitsInline> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '${value.benefit.detail}\n'
-                  'Save ${buyV2Money(value.benefit.savingAmount)} on eligible products. '
-                  'Minimum ${buyV2Money(value.benefit.minimumSpend!)}. '
+                  'Save ${_comparisonMoney(value.benefit.savingAmountMinor)} on eligible products. '
+                  'Minimum ${_comparisonMoney(value.benefit.minimumSpendMinor!)}. '
                   'Select the coupon when eligible; it is not applied automatically.',
                   style: context.buyMeta.copyWith(fontSize: 11),
                 ),
@@ -23136,7 +23129,7 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
                 '${_cartDestinationLabel(session, destination)} offers, '
                 '${_productCountLabel(session.cartLines.where((line) => line.product.destination == destination).length)}, '
                 '${(destination == BuyV2Destination.wholesale ? _packCountLabel : _itemCountLabel)(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.quantity))}, '
-                '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.total))}',
+                '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : _comparisonMoney(session.totalMinorForDestination(destination))}',
             child: Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(12),
@@ -23172,7 +23165,7 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: Text(
                       '${_cartDestinationLabel(session, destination)} · '
-                      '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.cartLines.where((line) => line.product.destination == destination).fold<int>(0, (sum, line) => sum + line.total))}',
+                      '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : _comparisonMoney(session.totalMinorForDestination(destination))}',
                       maxLines: 1,
                       style: TextStyle(
                         color: selected == destination
@@ -23426,12 +23419,12 @@ class _CartBenefitCard extends StatelessWidget {
         benefit.strategy != BuyV2CartBenefitStrategy.partnerCampaign ||
         benefit.sponsor != BuyV2CartBenefitSponsor.moolSocial ||
         benefit.sponsorName != 'MoolSocial' ||
-        benefit.savingAmount > 0 ||
+        benefit.savingAmountMinor > 0 ||
         benefit.freeDelivery ||
         benefit.validFrom != null ||
         benefit.validUntil != null ||
         benefit.offerId != null ||
-        benefit.minimumSpend != null ||
+        benefit.minimumSpendMinor != null ||
         benefit.minimumQuantity != null ||
         benefit.eligiblePaymentMethods.isNotEmpty;
     void activate() => selected ? onRemove() : onSelect();
@@ -23579,21 +23572,21 @@ class _CartBenefitCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  if (benefit.savingAmount > 0 ||
+                  if (benefit.savingAmountMinor > 0 ||
                       benefit.freeDelivery ||
-                      benefit.minimumSpend != null ||
+                      benefit.minimumSpendMinor != null ||
                       benefit.minimumQuantity != null ||
                       benefit.validUntil != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if (benefit.savingAmount > 0)
+                        if (benefit.savingAmountMinor > 0)
                           benefit.kind == BuyV2CartBenefitKind.paymentOffer
-                              ? 'Potential saving ${buyV2Money(benefit.savingAmount)}'
-                              : 'Save ${buyV2Money(benefit.savingAmount)} now',
+                              ? 'Potential saving ${_comparisonMoney(benefit.savingAmountMinor)}'
+                              : 'Save ${_comparisonMoney(benefit.savingAmountMinor)} now',
                         if (benefit.freeDelivery) 'Free delivery',
-                        if (benefit.minimumSpend case final minimumSpend?)
-                          'Minimum order ${buyV2Money(minimumSpend)}',
+                        if (benefit.minimumSpendMinor case final minimumSpend?)
+                          'Minimum order ${_comparisonMoney(minimumSpend)}',
                         if (benefit.minimumQuantity case final minimumQuantity?)
                           'Minimum quantity $minimumQuantity',
                         if (benefit.validUntil case final validUntil?)
@@ -23656,7 +23649,7 @@ class _CartBenefitCard extends StatelessWidget {
                       builder: (context, constraints) {
                         final statusLabel =
                             benefit.kind == BuyV2CartBenefitKind.coupon &&
-                                benefit.savingAmount > 0
+                                benefit.savingAmountMinor > 0
                             ? 'Applied to Cart total'
                             : 'Selected for Checkout review';
                         final statusStyle = context.buyMeta.copyWith(
@@ -24456,11 +24449,11 @@ class _CartRecommendationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = session.productFactsFor(product);
-    final hasSaving = product.mrp != null && product.mrp! > facts.price;
+    final hasSaving = product.mrpMinor != null && product.mrpMinor! > facts.priceMinor;
     final tier = showDeal ? session.nextCartDealTierFor(product) : null;
     final priceWidth = buyV2ValueTextSize(
       context,
-      buyV2Money(hasSaving ? product.mrp! : facts.price),
+      _comparisonMoney(hasSaving ? product.mrpMinor! : facts.priceMinor),
       const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
     ).width;
     return SizedBox(
@@ -24538,7 +24531,7 @@ class _CartRecommendationCard extends StatelessWidget {
                             session.cartPurchaseTypeFor(product),
                           ),
                     product.customerVariantPack,
-                    if (facts.price == product.price) product.unitPrice,
+                    if (facts.priceMinor == product.priceMinor) product.unitPrice,
                   ].where((text) => text.trim().isNotEmpty).join(' · '),
                   style: context.buyMeta.copyWith(fontSize: 11, height: 1.2),
                 ),
@@ -24564,8 +24557,8 @@ class _CartRecommendationCard extends StatelessWidget {
                 if (showDeal && (tier != null || hasSaving))
                   Text(
                     tier != null
-                        ? 'Buy ${tier.minimumPacks}+ at ${buyV2Money(tier.price)} each'
-                        : 'Save ${buyV2Money(product.mrp! - facts.price)} each',
+                        ? 'Buy ${tier.minimumPacks}+ at ${_comparisonMoney(tier.priceMinor)} each'
+                        : 'Save ${_comparisonMoney(product.mrpMinor! - facts.priceMinor)} each',
                     key: ValueKey('buy-cart-deal-${product.id}'),
                     style: context.buyMeta.copyWith(
                       fontSize: 11,
@@ -24580,7 +24573,7 @@ class _CartRecommendationCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            buyV2Money(facts.price),
+                            _comparisonMoney(facts.priceMinor),
                             style: const TextStyle(
                               color: BuyV2Colors.ink,
                               fontSize: 14,
@@ -24589,7 +24582,7 @@ class _CartRecommendationCard extends StatelessWidget {
                           ),
                           if (hasSaving)
                             Text(
-                              buyV2Money(product.mrp!),
+                              _comparisonMoney(product.mrpMinor!),
                               style: context.buyMeta.copyWith(
                                 fontSize: 11,
                                 decoration: TextDecoration.lineThrough,
@@ -25303,7 +25296,7 @@ class _CartBillSummary extends StatelessWidget {
         ),
       );
     }
-    final familyTotals = session.scopedCartFamilyTotals;
+    final familyTotals = session.scopedCartFamilyTotalsMinor;
     return Container(
       key: const ValueKey('buy-cart-bill-summary'),
       padding: const EdgeInsets.all(11),
@@ -25334,9 +25327,9 @@ class _CartBillSummary extends StatelessWidget {
             _CartAmountRow(
               label:
                   '${_cartDestinationLabel(session, entry.key)} ${_cartItemFamilyLabel(entry.key).toLowerCase()}',
-              value: buyV2Money(entry.value),
+              value: _comparisonMoney(entry.value),
             ),
-          if (session.scopedCartSavings + session.scopedCouponSaving > 0)
+          if (session.scopedCartSavingsMinor + session.scopedCouponSavingMinor > 0)
             _CartSavingsSummary(session: session),
           if (session.scopedTipTotal > 0)
             _CartAmountRow(
@@ -25346,7 +25339,7 @@ class _CartBillSummary extends StatelessWidget {
           const Divider(height: 16),
           _CartAmountRow(
             label: 'Cart total',
-            value: buyV2Money(session.scopedPayableTotal),
+            value: _comparisonMoney(session.scopedPayableTotalMinor),
             strong: true,
           ),
           const SizedBox(height: 5),
@@ -25413,8 +25406,8 @@ class _CartSavingsSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final productSaving = session.scopedCartSavings;
-    final couponSaving = session.scopedCouponSaving;
+    final productSaving = session.scopedCartSavingsMinor;
+    final couponSaving = session.scopedCouponSavingMinor;
     final savings = productSaving + couponSaving;
     return Padding(
       key: const ValueKey('buy-cart-savings-summary'),
@@ -25433,15 +25426,15 @@ class _CartSavingsSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'You save ${buyV2Money(savings)}',
+                  'You save ${_comparisonMoney(savings)}',
                   style: context.buyBody.copyWith(fontSize: 12),
                 ),
                 Text(
                   [
                     if (productSaving > 0)
-                      'Listed MRP saving ${buyV2Money(productSaving)}',
+                      'Listed MRP saving ${_comparisonMoney(productSaving)}',
                     if (couponSaving > 0)
-                      'Applied coupon ${buyV2Money(couponSaving)}',
+                      'Applied coupon ${_comparisonMoney(couponSaving)}',
                   ].join(' · '),
                   style: context.buyMeta.copyWith(fontSize: 11),
                 ),
@@ -25600,7 +25593,7 @@ class _CartLine extends StatelessWidget {
             container: true,
             label:
                 'Minimum order ${_packCountLabel(product.minimumOrder)}. '
-                '${buyV2Money(product.price)} per pack. ${product.unitPrice}. '
+                '${_comparisonMoney(product.priceMinor)} per pack. ${product.unitPrice}. '
                 '${product.freightIncluded ? 'Freight included in price.' : 'Freight confirmed before payment.'}',
             excludeSemantics: true,
             child: Container(
@@ -25617,7 +25610,7 @@ class _CartLine extends StatelessWidget {
                     priceUnavailable
                         ? 'Price unavailable'
                         : 'Minimum order ${_packCountLabel(product.minimumOrder)} · '
-                              '${buyV2Money(product.price)} per pack',
+                              '${_comparisonMoney(product.priceMinor)} per pack',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.ink,
                       fontSize: 11,
@@ -25643,7 +25636,7 @@ class _CartLine extends StatelessWidget {
     );
     final lineTotalText = priceUnavailable
         ? 'Price pending'
-        : buyV2Money(line.total);
+        : _comparisonMoney(line.totalMinor);
     final lineTotalSize = buyV2ValueTextSize(
       context,
       lineTotalText,
@@ -25673,7 +25666,7 @@ class _CartLine extends StatelessWidget {
         BuyV2FiniteValueTransition(
           key: ValueKey('buy-cart-line-total-motion-${product.id}'),
           incomingOnly: true,
-          stateKey: line.total,
+          stateKey: line.totalMinor,
           text: lineTotalText,
           ownerSize: lineTotalSize,
           textAlign: TextAlign.end,
@@ -25687,9 +25680,9 @@ class _CartLine extends StatelessWidget {
             product.unitPrice,
             style: context.buyMeta.copyWith(fontSize: 11),
           ),
-        if (product.mrp != null && product.mrp! > product.price)
+        if (product.mrpMinor != null && product.mrpMinor! > product.priceMinor)
           Text(
-            buyV2Money(product.mrp! * line.quantity),
+            _comparisonMoney(buyV2MultiplyMinor(product.mrpMinor!, line.quantity)),
             style: context.buyMeta.copyWith(
               fontSize: 11,
               decoration: TextDecoration.lineThrough,
@@ -25899,8 +25892,8 @@ class _CartLine extends StatelessWidget {
                         ),
                         child: Text(
                           '${_packCountLabel(quantityTier.minimumPacks - line.quantity)} more'
-                          ' → ${buyV2Money(quantityTier.price)}/pack'
-                          ' · Item total ${buyV2Money(quantityTier.minimumPacks * quantityTier.price)}'
+                          ' → ${_comparisonMoney(quantityTier.priceMinor)}/pack'
+                          ' · Item total ${_comparisonMoney(buyV2MultiplyMinor(quantityTier.priceMinor, quantityTier.minimumPacks))}'
                           '${product.packTerms?.pricesIncludeTax == null
                               ? ''
                               : product.packTerms!.pricesIncludeTax!
@@ -26115,7 +26108,7 @@ class _CheckoutDeliverySummaryCardState
                     ).scale(120),
                     actionWidth: buyV2ValueTextSize(
                       context,
-                      buyV2Money(line.total),
+                      _comparisonMoney(line.totalMinor),
                       context.buyBody.copyWith(fontWeight: FontWeight.w700),
                     ).width,
                     body: Column(
@@ -26132,7 +26125,7 @@ class _CheckoutDeliverySummaryCardState
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          buyV2Money(line.total),
+                          _comparisonMoney(line.totalMinor),
                           style: context.buyBody.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -26379,7 +26372,7 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
             ? order.paymentStatusLabel!.trim()
             : 'Payment status unavailable',
     };
-    final remainingBalance = balance?.amountDue ?? order.balanceDue;
+    final remainingBalanceMinor = balance?.amountDueMinor ?? order.balanceDueMinor;
     final balanceLabel = balance?.dueLabel ?? order.balanceDueLabel;
     final statusColour = completed ? BuyV2Colors.green : BuyV2Colors.navy;
     final motionDuration = MediaQuery.disableAnimationsOf(context)
@@ -26396,7 +26389,7 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
     // These known labels describe the same partial-payment fact. Other signals,
     // including unknown/unavailable/action-required states, remain visible.
     final briefBalanceOnly =
-        remainingBalance > 0 &&
+        remainingBalanceMinor > 0 &&
         (balance == null ||
             balance.state == BuyV2BalancePaymentState.upcoming) &&
         const {
@@ -26404,7 +26397,7 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
           'Booking amount paid · balance due at delivery',
         }.contains(paymentStatus);
     final paymentSignal = briefBalanceOnly
-        ? '${buyV2Money(remainingBalance)} balance'
+        ? '${_comparisonMoney(remainingBalanceMinor)} balance'
         : paymentStatus;
     const amountStyle = TextStyle(
       color: BuyV2Colors.ink,
@@ -26623,9 +26616,9 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                                       ),
                                     ),
                                     if (!briefBalanceOnly &&
-                                        remainingBalance > 0)
+                                        remainingBalanceMinor > 0)
                                       Text(
-                                        '${buyV2Money(remainingBalance)} balance',
+                                        '${_comparisonMoney(remainingBalanceMinor)} balance',
                                         style: context.buyMeta.copyWith(
                                           fontSize: 11,
                                         ),
@@ -26728,7 +26721,7 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                               ),
                             const SizedBox(height: 6),
                             if (paymentSignal != paymentStatus ||
-                                remainingBalance > 0)
+                                remainingBalanceMinor > 0)
                               Text(
                                 'Payment',
                                 style: context.buyBody.copyWith(
@@ -26741,7 +26734,7 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                                 paymentStatus,
                                 style: context.buyMeta.copyWith(fontSize: 11),
                               ),
-                            if (remainingBalance > 0 &&
+                            if (remainingBalanceMinor > 0 &&
                                 balanceLabel?.trim().isNotEmpty == true)
                               Text(
                                 balanceLabel!.trim(),

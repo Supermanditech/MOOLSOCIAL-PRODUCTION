@@ -48,7 +48,7 @@ class WorkspacePublicContentAdapter implements BuyV2ProductContentAdapter {
         productId: product.id,
         state: BuyV2ProductContentState.unavailable,
         sourceId: sourceId,
-        supplierPolicyAcceptanceRequired: true,
+        supplierPolicyResolutionPending: true,
         customerMessage: 'Store policy could not be confirmed. Refresh this product.',
       );
       if (readback == null) return policyReadbackRequired ? held() : local;
@@ -58,9 +58,11 @@ class WorkspacePublicContentAdapter implements BuyV2ProductContentAdapter {
         final policy = supplied.supplierPolicy;
         final decision = supplied.supplierPolicyAcceptanceRequired;
         if (supplied.productId != product.id ||
+            supplied.supplierPolicyResolutionPending ||
             supplied.sourceId.trim().isEmpty ||
             supplied.state != BuyV2ProductContentState.ready ||
             supplied.observedAt?.isAfter(current) == true ||
+            supplied.supplierPolicyObservedAt?.isAfter(current) == true ||
             (policy == null && decision != false) ||
             (policy != null && (!policy.appliesTo(product, current) ||
                 decision != null && decision != policy.requiresAcceptance))) {
@@ -79,6 +81,8 @@ class WorkspacePublicContentAdapter implements BuyV2ProductContentAdapter {
           specifications: local.specifications,
           supplierPolicy: policy,
           supplierPolicyAcceptanceRequired: policy?.requiresAcceptance ?? decision,
+          supplierPolicyObservedAt:
+              supplied.supplierPolicyObservedAt ?? supplied.observedAt,
         );
       } catch (_) {
         // A failed supplied source is a hold, never a permissive local fallback.
@@ -139,9 +143,10 @@ abstract final class WorkspacePublicationContract {
   // Every stored public product property has an explicit source/disposition.
   // A source-coverage test fails when Buy adds a property without reconciling it.
   static const productBindings = <String, String>{
-    'id': 'Store SKU identity',
+    'id': 'Server-issued listing identity when bound; legacy Store SKU identity otherwise',
     'canonicalId': 'Exact catalogue family identity',
     'storeId': 'Store branch identity',
+    'publicListingIdentity': 'Server-issued realm/Store/SKU/channel binding; legacy local preview has none, never fabricated',
     'destination':
         'Explicit Shop or Wholesale channel; never inferred from price',
     'categoryId': 'Product category',
@@ -157,7 +162,8 @@ abstract final class WorkspacePublicationContract {
     'packTerms':
         'Supplied publication pack/pricing contract must match saved quantities/tiers; missing required terms block projection',
     'price':
-        'Channel selling price in whole rupees; comparison uses minor units',
+        'Legacy whole-rupee compatibility for the same channel price; no truncated fractional fallback',
+    'priceMinor': 'Canonical channel selling price in integer paise; same saved price input, never entered twice',
     'unitPrice':
         'Derived from structured pack quantity; legacy label is draft-only',
     'badge': 'Marketplace presentation, not retailer verification',
@@ -169,6 +175,7 @@ abstract final class WorkspacePublicationContract {
     'visualLabel': 'Product image accessibility label',
     'visualKind': 'Catalogue media renderer type',
     'mrp': 'Applicable pack MRP',
+    'mrpMinor': 'Canonical applicable pack MRP in integer paise; same saved MRP input',
     'requiresPrescription': 'Catalogue product classification',
     'composition': 'Applicable product composition',
     'regulatoryNote': 'Applicable product note; not an approval',
@@ -185,6 +192,13 @@ abstract final class WorkspacePublicationContract {
     'freightIncluded': 'Wholesale quote source pending; never inferred',
     'manufacturerVerified': 'Authoritative verification, not retailer input',
     'catalogueListing': 'Requested listing; not publication acknowledgement',
+  };
+
+  // Internal compatibility storage maps to the same public input dispositions;
+  // these are not additional owner-entry fields or extra provider authorities.
+  static const productMoneyStorageAliases = <String, String>{
+    '_legacyPrice': 'price', '_priceMinor': 'priceMinor',
+    '_legacyMrp': 'mrp', '_mrpMinor': 'mrpMinor',
   };
 
   static const storeBindings = <String, String>{
@@ -225,6 +239,8 @@ abstract final class WorkspacePublicationContract {
     'supplierPolicy': 'Optional exact-Store/product policy readback; live source pending',
     'supplierPolicyAcceptanceRequired':
         'Unknown until supplied by the authoritative policy owner; null is not consent',
+    'supplierPolicyObservedAt': 'Policy source observation, independent of local product-copy time',
+    'supplierPolicyResolutionPending': 'Configured unresolved source hold; never a consent requirement or acceptance',
     'retryable':
         'False for this local snapshot adapter; not a backend success state',
   };
@@ -237,6 +253,24 @@ abstract final class WorkspacePublicationContract {
     required String storeName,
     BuyV2Destination channel = BuyV2Destination.shop,
     WorkspaceStorePublicationDetails? storeDetails,
+  }) => _sourceProductValues(p, storeId: storeId, storeName: storeName,
+      channel: channel, storeDetails: storeDetails);
+
+  static int? _legacyRupees(int? minor) => minor == null || minor % 100 != 0
+      ? null : minor ~/ 100;
+
+  static int? _sourcePriceMinor(WorkspaceCatalogueItem p, BuyV2Destination channel) =>
+      channel == BuyV2Destination.wholesale
+          ? p.wholesaleOffer?.priceMinor
+          : p.sellingPriceMinor;
+
+  static Map<String, Object?> _sourceProductValues(
+    WorkspaceCatalogueItem p, {
+    required String storeId,
+    required String storeName,
+    BuyV2Destination channel = BuyV2Destination.shop,
+    WorkspaceStorePublicationDetails? storeDetails,
+    bool exactAudit = false,
   }) => {
     'id': p.id,
     'canonicalId': p.canonicalId,
@@ -247,24 +281,20 @@ abstract final class WorkspacePublicationContract {
     'title': p.title,
     'variant': p.variant,
     'pack': p.pack,
-    'price': channel == BuyV2Destination.wholesale
+    'price': exactAudit ? _legacyRupees(_sourcePriceMinor(p, channel))
+        : channel == BuyV2Destination.wholesale
         ? p.wholesaleOffer?.priceRupees
         : p.sellingPrice,
+    if (exactAudit) ...{
+      'priceMinor': _sourcePriceMinor(p, channel),
+      'mrpMinor': p.mrpMinor,
+      'publicListingIdentity': null,
+    },
     'unitPrice':
         p.packMeasure?.valid == true &&
-            (channel == BuyV2Destination.wholesale
-                    ? p.wholesaleOffer?.priceRupees ?? -1
-                    : p.sellingPrice) >=
-                0 &&
-            (channel == BuyV2Destination.wholesale
-                    ? p.wholesaleOffer?.priceRupees ?? -1
-                    : p.sellingPrice) <=
-                999999999
-        ? p.packMeasure!.pricePerUnit(
-            channel == BuyV2Destination.wholesale
-                ? p.wholesaleOffer?.priceRupees ?? 0
-                : p.sellingPrice,
-          )
+            (_sourcePriceMinor(p, channel) ?? -1) >= 0 &&
+            (_sourcePriceMinor(p, channel) ?? -1) <= 99999999900
+        ? p.packMeasure!.pricePerUnitMinor(_sourcePriceMinor(p, channel)!)
         : p.unitPrice,
     'seller': storeName,
     'sellerType': storeDetails?.publicSellerType ?? 'Store',
@@ -272,7 +302,7 @@ abstract final class WorkspacePublicationContract {
     'origin': p.origin,
     'visualLabel': p.visualLabel,
     'visualKind': p.visualKind,
-    'mrp': p.mrp,
+    'mrp': exactAudit ? _legacyRupees(p.mrpMinor) : p.mrp,
     'requiresPrescription': p.requiresPrescription,
     'composition': p.composition,
     'regulatoryNote': p.regulatoryNote,
@@ -297,7 +327,9 @@ abstract final class WorkspacePublicationContract {
       ),
   };
 
-  static Map<String, Object?> publicProductValues(BuyV2Product p) => {
+  static Map<String, Object?> publicProductValues(BuyV2Product p) => _publicProductValues(p);
+
+  static Map<String, Object?> _publicProductValues(BuyV2Product p, {bool exactAudit = false}) => {
     'id': p.id,
     'canonicalId': p.canonicalId,
     'storeId': p.storeId,
@@ -307,7 +339,12 @@ abstract final class WorkspacePublicationContract {
     'title': p.title,
     'variant': p.variant,
     'pack': p.pack,
-    'price': p.price,
+    'price': exactAudit ? _legacyRupees(p.priceMinor) : p.price,
+    if (exactAudit) ...{
+      'priceMinor': p.priceMinor,
+      'mrpMinor': p.mrpMinor,
+      'publicListingIdentity': p.publicListingIdentity?.toJson(),
+    },
     'unitPrice': p.unitPrice,
     'seller': p.seller,
     'sellerType': p.sellerType,
@@ -315,7 +352,7 @@ abstract final class WorkspacePublicationContract {
     'origin': p.origin,
     'visualLabel': p.visualLabel,
     'visualKind': p.visualKind,
-    'mrp': p.mrp,
+    'mrp': exactAudit ? _legacyRupees(p.mrpMinor) : p.mrp,
     'requiresPrescription': p.requiresPrescription,
     'composition': p.composition,
     'regulatoryNote': p.regulatoryNote,
@@ -346,18 +383,21 @@ abstract final class WorkspacePublicationContract {
     WorkspaceStorePublicationDetails? storeDetails,
     BuyV2PackTerms? publicPackTerms,
   }) => {
-    ...sourceProductValues(
+    ..._sourceProductValues(
       p,
       storeId: storeId,
       storeName: storeName,
       channel: channel,
       storeDetails: storeDetails,
+      exactAudit: true,
     ),
     'variantAttributes': const <BuyV2VariantAttribute>[],
     'packTerms': publicPackTerms,
     if (publicPackTerms != null) 'unitPrice': publicPackTerms.unitPriceLabel ?? '',
-    if (channel == BuyV2Destination.wholesale && p.wholesaleOffer?.valid == true)
-      'price': p.wholesaleOffer!.priceAt(p.wholesaleOffer!.minimumPacks),
+    if (channel == BuyV2Destination.wholesale && p.wholesaleOffer?.valid == true) ...{
+      'price': _legacyRupees(p.wholesaleOffer!.priceAtMinor(p.wholesaleOffer!.minimumPacks)),
+      'priceMinor': p.wholesaleOffer!.priceAtMinor(p.wholesaleOffer!.minimumPacks),
+    },
     'offerClass': channel == BuyV2Destination.shop
         ? BuyV2OfferClass.retail
         : switch (p.wholesaleOffer?.saleType) {
@@ -372,7 +412,7 @@ abstract final class WorkspacePublicationContract {
   };
 
   static Map<String, Object?> publicProductAuditValues(BuyV2Product p) => {
-    ...publicProductValues(p),
+    ..._publicProductValues(p, exactAudit: true),
     // Empty allocations are equivalent; nonempty unowned values must reject.
     'variantAttributes': p.variantAttributes.isEmpty
         ? const <BuyV2VariantAttribute>[]
@@ -433,16 +473,34 @@ abstract final class WorkspacePublicationContract {
         'Choose Standard wholesale or Bulk supply in the product editor.',
       );
     }
-    final price = channel == BuyV2Destination.wholesale
-        ? item.wholesaleOffer?.priceRupees ?? 0
-        : item.sellingPrice;
+    if (channel == BuyV2Destination.wholesale &&
+        (item.wholesaleOffer?.valid != true ||
+            item.wholesaleOffer?.enabled != true)) {
+      missing('channel', 'Complete and enable wholesale selling terms.');
+      return issues;
+    }
+    final int price;
+    final int? mrp;
+    try {
+      price = _sourcePriceMinor(item, channel) ?? 0;
+    } on FormatException {
+      missing('sellingPrice', 'enter a selling price.');
+      return issues;
+    }
+    try {
+      mrp = item.mrpMinor;
+    } on FormatException {
+      missing('mrp', 'Enter a valid MRP.');
+      return issues;
+    }
     final minimum = channel == BuyV2Destination.wholesale
         ? item.wholesaleOffer?.minimumPacks ?? 0
         : item.minimumOrder;
-    if (price <= 0 || price > 999999999) {
+    if (price <= 0 || price > 99999999900) {
       missing('sellingPrice', 'enter a selling price.');
+      return issues;
     }
-    if (item.mrp != null && item.mrp! < price) {
+    if (mrp != null && mrp < price) {
       missing('mrp', 'MRP is below the selling price.');
     }
     if (minimum <= 0) {
@@ -455,12 +513,6 @@ abstract final class WorkspacePublicationContract {
       WorkspaceProductContent.parse(item.content.inputValues);
     } on FormatException catch (error) {
       missing('content.${error.message.split(':').first}', error.message);
-    }
-    if (channel == BuyV2Destination.wholesale &&
-        (item.wholesaleOffer?.valid != true ||
-            item.wholesaleOffer?.enabled != true)) {
-      missing('channel', 'Complete and enable wholesale selling terms.');
-      return issues;
     }
     final termsIssue = item.publicSellingTermsIssue(
       channel: channel, storeId: storeId, terms: publicPackTerms, now: now,

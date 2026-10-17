@@ -119,6 +119,42 @@ class PdfSource implements WorkInvoicePdfSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('LF-PAISE Stock exports keep exact rupee cells and legacy numeric cells', () async {
+    final products = [
+      workspaceMasterCatalogue.first.copyWith(purchasePriceMinor: 925,
+        sellingPriceMinor: 1025, mrpMinor: 1250, sku: '=HOST-SKU', barcode: '000001'),
+      workspaceMasterCatalogue[1],
+      workspaceMasterCatalogue[2].copyWith(purchasePriceMinor: 185,
+        sellingPriceMinor: 199, clearMrp: true),
+    ];
+    final snapshot = StoreStockSnapshot(storeId: 'host-exact-store', storeName: 'Host Stock',
+      scope: 'Host-only snapshot', generatedAt: DateTime.utc(2026, 10, 17), products: products);
+    expect(snapshot.rows.first.sublist(10, 13), ['10.25', '9.25', '12.50']);
+    expect(snapshot.rows[1][10], products[1].sellingPrice);
+    expect(snapshot.rows[1][10], isA<int>());
+    expect(snapshot.rows[2][12], isNull);
+    expect(snapshot.presentationRows.first.sublist(10, 13), ['10.25', '9.25', '12.50']);
+    final csvBytes = await snapshot.generate(StoreStockExportFormat.csv);
+    expect(csvBytes.take(3).toList(), [0xef, 0xbb, 0xbf]);
+    final csv = utf8.decode(csvBytes);
+    expect(csv, contains('"10.25","9.25","12.50"'));
+    expect(csv, contains('"\'=HOST-SKU"'));
+    expect(csv, contains('"000001"'));
+    final workbook = xls.Excel.decodeBytes(await snapshot.generate(StoreStockExportFormat.excel));
+    final sheet = workbook['Current stock'];
+    expect(sheet.cell(xls.CellIndex.indexByString('K7')).value, xls.TextCellValue('10.25'));
+    expect(sheet.cell(xls.CellIndex.indexByString('L7')).value, xls.TextCellValue('9.25'));
+    expect(sheet.cell(xls.CellIndex.indexByString('M7')).value, xls.TextCellValue('12.50'));
+    expect(sheet.cell(xls.CellIndex.indexByString('K8')).value, xls.IntCellValue(products[1].sellingPrice));
+    expect(sheet.cell(xls.CellIndex.indexByString('M9')).value, isNull);
+    expect(sheet.cell(xls.CellIndex.indexByString('C7')).value, xls.TextCellValue('000001'));
+    for (final bytes in [await snapshot.generate(StoreStockExportFormat.pdf),
+      await snapshot.forPrint(PdfPageFormat.a4, null)]) {
+      expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
+    }
+    expect(snapshot.rows.first.sublist(10, 13), ['10.25', '9.25', '12.50']);
+  });
+
   test('ANALYTICSPDF shares provider eligibility with the screen', () {
     WorkspaceAnalyticsMetric metric(String id, WorkspaceAnalyticsUnit unit,
         WorkspaceAnalyticsBasis basis, {String? cohort}) => WorkspaceAnalyticsMetric(

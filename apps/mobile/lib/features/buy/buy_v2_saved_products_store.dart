@@ -140,13 +140,29 @@ class BuyV2BalancePaymentHold {
     required this.orderId,
     required this.orderIdentity,
     required this.idempotencyKey,
-    required this.amountDue,
+    required int amountDue,
     this.paymentReference,
-  });
+    // Keep the public legacy argument name and raw rupee representation.
+    // ignore: prefer_initializing_formals
+  }) : _amountDue = amountDue, _amountDueMinor = null;
+
+  const BuyV2BalancePaymentHold.minor({
+    required this.ownerScope,
+    required this.accountId,
+    required this.orderId,
+    required this.orderIdentity,
+    required this.idempotencyKey,
+    required int amountDueMinor,
+    this.paymentReference,
+    // ignore: prefer_initializing_formals
+  }) : _amountDue = null, _amountDueMinor = amountDueMinor;
 
   final String ownerScope, orderId, orderIdentity, idempotencyKey;
   final String? accountId, paymentReference;
-  final int amountDue;
+  final int? _amountDue, _amountDueMinor;
+  bool get usesMinorAmounts => _amountDue == null;
+  int get amountDueMinor => buyV2ExactMinorAmount(minor: _amountDueMinor, legacyRupees: _amountDue);
+  int get amountDue => _amountDue ?? buyV2WholeRupees(amountDueMinor);
   String get storageKey => jsonEncode([ownerScope, accountId, orderId]);
   bool get valid =>
       [ownerScope, orderId, idempotencyKey].every(
@@ -155,22 +171,35 @@ class BuyV2BalancePaymentHold {
       (accountId == null || (accountId!.trim().isNotEmpty &&
           accountId == accountId!.trim() && accountId!.length <= 1024)) &&
       RegExp(r'^[a-f0-9]{64}$').hasMatch(orderIdentity) &&
-      amountDue > 0 && amountDue <= 9007199254740991 &&
+      (usesMinorAmounts ? _amountDueMinor! > 0 && _amountDueMinor <= 9007199254740991
+          : _amountDue! > 0 && _amountDue <= 9007199254740991) &&
       (paymentReference == null || (paymentReference!.trim().isNotEmpty &&
           paymentReference == paymentReference!.trim() &&
           paymentReference!.length <= 1024));
 
   static String identityOf(BuyV2Order order) => sha256.convert(utf8.encode(
     jsonEncode([
-      order.id, order.purchaseId, order.destination.name, order.total,
-      order.totalMinor, order.partner, order.productIds,
+      if (order.usesMinorAmounts) 'buy-v2-order-money:2',
+      order.id, order.purchaseId, order.destination.name,
+      order.usesMinorAmounts ? order.payableTotalMinor : order.total,
+      if (!order.usesMinorAmounts) order.totalMinor,
+      order.partner, order.productIds,
+      if (order.usesMinorAmounts) ...[
+        order.tipMinor, order.discountMinor, order.taxMinor, order.freightMinor,
+        order.deliveryFeeMinor, order.paymentChargeMinor,
+        order.collection == null ? null : [order.collection!.storeId, order.collection!.purchaserAccountId],
+      ],
       for (final line in order.lines)
         [line.product.id, line.product.storeId, line.product.canonicalId,
-          line.product.variant, line.product.pack, line.quantity],
+          line.product.variant, line.product.pack, line.quantity,
+          if (order.usesMinorAmounts) line.product.priceMinor],
     ]),
   )).toString();
 
   BuyV2BalancePaymentHold withReference(String reference) =>
+      usesMinorAmounts ? BuyV2BalancePaymentHold.minor(ownerScope: ownerScope, accountId: accountId,
+        orderId: orderId, orderIdentity: orderIdentity,
+        idempotencyKey: idempotencyKey, amountDueMinor: _amountDueMinor!, paymentReference: reference) :
       BuyV2BalancePaymentHold(ownerScope: ownerScope, accountId: accountId,
         orderId: orderId, orderIdentity: orderIdentity,
         idempotencyKey: idempotencyKey, amountDue: amountDue,
@@ -179,23 +208,34 @@ class BuyV2BalancePaymentHold {
   Map<String, Object?> toJson() => {
     'ownerScope': ownerScope, 'accountId': accountId, 'orderId': orderId,
     'orderIdentity': orderIdentity, 'idempotencyKey': idempotencyKey,
-    'amountDue': amountDue, 'currency': 'INR',
+    if (usesMinorAmounts) ...{'moneyVersion': 2, 'amountDueMinor': _amountDueMinor}
+    else 'amountDue': amountDue,
+    'currency': 'INR',
     'paymentReference': paymentReference,
   };
 
   static BuyV2BalancePaymentHold fromJson(Object? raw) {
-    const keys = {'ownerScope', 'accountId', 'orderId', 'orderIdentity',
+    const legacyKeys = {'ownerScope', 'accountId', 'orderId', 'orderIdentity',
       'idempotencyKey', 'amountDue', 'currency', 'paymentReference'};
+    const minorKeys = {'ownerScope', 'accountId', 'orderId', 'orderIdentity',
+      'idempotencyKey', 'moneyVersion', 'amountDueMinor', 'currency', 'paymentReference'};
+    final exact = raw is Map && raw.containsKey('moneyVersion');
+    final keys = exact ? minorKeys : legacyKeys;
     if (raw is! Map || raw.length != keys.length ||
         raw.keys.any((k) => !keys.contains(k)) || raw['currency'] != 'INR' ||
         raw['ownerScope'] is! String || raw['orderId'] is! String ||
         raw['orderIdentity'] is! String || raw['idempotencyKey'] is! String ||
-        raw['amountDue'] is! int ||
+        (exact ? raw['moneyVersion'] is! int || raw['moneyVersion'] != 2 || raw['amountDueMinor'] is! int
+            : raw['amountDue'] is! int) ||
         (raw['accountId'] != null && raw['accountId'] is! String) ||
         (raw['paymentReference'] != null && raw['paymentReference'] is! String)) {
       throw const FormatException('Balance payment recovery needs checking.');
     }
-    final hold = BuyV2BalancePaymentHold(ownerScope: raw['ownerScope'] as String,
+    final hold = exact ? BuyV2BalancePaymentHold.minor(ownerScope: raw['ownerScope'] as String,
+      accountId: raw['accountId'] as String?, orderId: raw['orderId'] as String,
+      orderIdentity: raw['orderIdentity'] as String, idempotencyKey: raw['idempotencyKey'] as String,
+      amountDueMinor: raw['amountDueMinor'] as int, paymentReference: raw['paymentReference'] as String?) :
+      BuyV2BalancePaymentHold(ownerScope: raw['ownerScope'] as String,
       accountId: raw['accountId'] as String?, orderId: raw['orderId'] as String,
       orderIdentity: raw['orderIdentity'] as String,
       idempotencyKey: raw['idempotencyKey'] as String,
@@ -204,6 +244,35 @@ class BuyV2BalancePaymentHold {
     if (!hold.valid) {
       throw const FormatException('Balance payment recovery needs checking.');
     }
+    return hold;
+  }
+}
+
+/// Private uncertainty only; never a refund receipt or authority to replay.
+@immutable
+class BuyV2OrderResolutionHold {
+  const BuyV2OrderResolutionHold({required this.ownerScope, required this.accountId,
+    required this.orderId, required this.orderIdentity});
+  final String ownerScope, orderId, orderIdentity;
+  final String? accountId;
+  String get storageKey => jsonEncode([ownerScope, accountId, orderId]);
+  bool get valid => [ownerScope, orderId].every(
+    (s) => s.isNotEmpty && s.trim() == s && s.length <= 1024) &&
+    (accountId == null || (accountId!.isNotEmpty && accountId!.trim() == accountId &&
+      accountId!.length <= 1024)) && RegExp(r'^[a-f0-9]{64}$').hasMatch(orderIdentity);
+  Map<String, Object?> toJson() => {'ownerScope': ownerScope, 'accountId': accountId,
+    'orderId': orderId, 'orderIdentity': orderIdentity};
+  static BuyV2OrderResolutionHold fromJson(Object? raw) {
+    const keys = {'ownerScope', 'accountId', 'orderId', 'orderIdentity'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k)) ||
+        raw['ownerScope'] is! String || raw['orderId'] is! String ||
+        raw['orderIdentity'] is! String || (raw['accountId'] != null && raw['accountId'] is! String)) {
+      throw const FormatException('Order request recovery needs checking.');
+    }
+    final hold = BuyV2OrderResolutionHold(ownerScope: raw['ownerScope'] as String,
+      accountId: raw['accountId'] as String?, orderId: raw['orderId'] as String,
+      orderIdentity: raw['orderIdentity'] as String);
+    if (!hold.valid) throw const FormatException('Order request recovery needs checking.');
     return hold;
   }
 }
@@ -220,6 +289,7 @@ class BuyV2CustomerStateSnapshot {
     this.reviewDrafts = const {},
     this.supplierPolicyAcceptances = const {},
     this.supplierPolicyRequiredProductKeys = const {},
+    this.supplierPolicyUnresolvedProductKeys = const {},
     this.procurementDraft,
     this.addresses = const [],
     this.selectedAddressId,
@@ -239,6 +309,7 @@ class BuyV2CustomerStateSnapshot {
     this.retainedCheckoutPaymentAttempts = const [],
     this.paymentRecoveryIncomplete = false,
     this.balancePaymentHolds = const [],
+    this.orderResolutionHolds = const [],
     this.paymentReference,
     this.paymentActionUri,
     this.bankTransferInstructions,
@@ -265,6 +336,8 @@ class BuyV2CustomerStateSnapshot {
   /// Local buyer-scoped evidence only; never backend acceptance authority.
   final Map<String, String> supplierPolicyAcceptances;
   final Set<String> supplierPolicyRequiredProductKeys;
+  /// A retained resolution hold, distinct from a consent requirement/receipt.
+  final Set<String> supplierPolicyUnresolvedProductKeys;
   // Persist selection identifiers, not Google response labels or coordinates.
   final String? shoppingRegionId;
   final String? shoppingGooglePlaceId;
@@ -289,6 +362,7 @@ class BuyV2CustomerStateSnapshot {
   final List<BuyV2CheckoutPaymentAttempt> retainedCheckoutPaymentAttempts;
   final bool paymentRecoveryIncomplete;
   final List<BuyV2BalancePaymentHold> balancePaymentHolds;
+  final List<BuyV2OrderResolutionHold> orderResolutionHolds;
   final String? paymentReference;
   final Uri? paymentActionUri;
   final BuyV2BankTransferInstructions? bankTransferInstructions;
@@ -326,9 +400,41 @@ final class BuyV2SharedPreferencesCustomerStateStore
   const BuyV2SharedPreferencesCustomerStateStore(
     this._preferences, {
     required this.ownerScope,
-  });
+  }) : _isOwnerCurrent = null;
+
+  /// Fixed private device namespace. Never adopts guest/review data or grants
+  /// commerce authority. The caller owns the session-lifetime fence.
+  factory BuyV2SharedPreferencesCustomerStateStore.forAccount(
+    SharedPreferencesAsync preferences, {
+    required ({String environment, String projectId, String? tenantId, String userId}) identity,
+    required ({String environment, String projectId, String? tenantId, String userId})?
+        Function() currentIdentity,
+    required bool Function() isSessionCurrent,
+  }) {
+    bool valid(String value, int maximum) => value.isNotEmpty &&
+      value.trim() == value && value.length <= maximum;
+    if (!valid(identity.environment, 512) || !valid(identity.projectId, 128) ||
+        !valid(identity.userId, 128) ||
+        (identity.tenantId != null && !valid(identity.tenantId!, 128))) {
+      throw ArgumentError('A complete account storage namespace is required.');
+    }
+    final digest = sha256.convert(utf8.encode(jsonEncode([
+      identity.environment, identity.projectId, identity.tenantId, identity.userId,
+    ])));
+    return BuyV2SharedPreferencesCustomerStateStore._account(preferences,
+      'firebase-account:v1:$digest',
+      () => isSessionCurrent() && currentIdentity() == identity);
+  }
+
+  const BuyV2SharedPreferencesCustomerStateStore._account(
+    this._preferences, this.ownerScope, this._isOwnerCurrent);
 
   final SharedPreferencesAsync _preferences;
+  final bool Function()? _isOwnerCurrent;
+  bool get _ownerCurrent {
+    try { return _isOwnerCurrent?.call() ?? true; }
+    on Object { return false; }
+  }
 
   @override
   final String ownerScope;
@@ -338,7 +444,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async {
     try {
+      if (!_ownerCurrent) throw StateError('Account storage is no longer current.');
       final source = await _preferences.getString(_key);
+      // A stale read is not an empty account: retain payment/recovery gates.
+      if (!_ownerCurrent) throw StateError('Account storage changed while reading.');
       if (source == null) return null;
       if (source.trim().isEmpty) {
         throw const FormatException('Saved customer state is unreadable.');
@@ -352,7 +461,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
           decoded['checkoutIdempotencyKey'] == null &&
           !decoded.containsKey('legacyCheckoutAttempt') &&
           !decoded.containsKey('checkoutPaymentAttempt') &&
-          !decoded.containsKey('balancePaymentHolds')) {
+          !decoded.containsKey('balancePaymentHolds') &&
+          !decoded.containsKey('orderResolutionHolds')) {
         return null;
       }
       return _decodeSnapshot(decoded);
@@ -364,6 +474,17 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    if (!_ownerCurrent) return false;
+    if (snapshot.orders.any((order) => order.usesMinorAmounts && !_validExactOrderStorage(order))) return false;
+    if (snapshot.orders.any((order) => order.totalMinor != null &&
+        (order.totalMinor! < 0 || order.totalMinor! > 9007199254740991))) {
+      return false;
+    }
+    if (snapshot.orderResolutionHolds.any((h) => !h.valid || h.ownerScope != ownerScope) ||
+        snapshot.orderResolutionHolds.map((h) => h.storageKey).toSet().length !=
+          snapshot.orderResolutionHolds.length) {
+      return false;
+    }
     if (snapshot.balancePaymentHolds.any(
       (h) => !h.valid || h.ownerScope != ownerScope,
     ) || snapshot.balancePaymentHolds.map((h) => h.storageKey).toSet().length !=
@@ -386,7 +507,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
     }
     try {
       await _preferences.setString(_key, jsonEncode(_encodeSnapshot(snapshot)));
-      return true;
+      // Already dispatched writes keep their original immutable destination;
+      // a stale completion cannot authorize the old session's next action.
+      return _ownerCurrent;
     } on Object {
       return false;
     }
@@ -402,6 +525,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ),
     'productIdentityKeys': snapshot.productIdentityKeys,
     'supplierPolicyAcceptances': snapshot.supplierPolicyAcceptances,
+    'supplierPolicyUnresolvedProductKeys': snapshot.supplierPolicyUnresolvedProductKeys.toList(),
     'supplierPolicyRequiredProductKeys': snapshot
         .supplierPolicyRequiredProductKeys
         .toList(),
@@ -452,6 +576,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
       'version': 1,
       'records': [for (final hold in snapshot.balancePaymentHolds) hold.toJson()],
     },
+    'orderResolutionHolds': {'version': 1, 'records': [
+      for (final hold in snapshot.orderResolutionHolds) hold.toJson(),
+    ]},
     'paymentReference': snapshot.paymentReference,
     'paymentActionUri': snapshot.paymentActionUri?.toString(),
     if (snapshot.bankTransferInstructions case final bank?)
@@ -504,6 +631,21 @@ final class BuyV2SharedPreferencesCustomerStateStore
     return List.unmodifiable(result);
   }
 
+  List<BuyV2OrderResolutionHold> _decodeResolutionHolds(Map<String, Object?> source) {
+    if (!source.containsKey('orderResolutionHolds')) return const [];
+    final raw = source['orderResolutionHolds'];
+    if (raw is! Map || raw.length != 2 || raw['version'] is! int ||
+        raw['version'] != 1 || raw['records'] is! List) {
+      throw const FormatException('Order request recovery needs checking.');
+    }
+    final holds = (raw['records'] as List).map(BuyV2OrderResolutionHold.fromJson).toList();
+    if (holds.any((h) => h.ownerScope != ownerScope) ||
+        holds.map((h) => h.storageKey).toSet().length != holds.length) {
+      throw const FormatException('Order request recovery needs checking.');
+    }
+    return List.unmodifiable(holds);
+  }
+
   BuyV2CustomerStateSnapshot _decodeSnapshot(
     Map<String, Object?> source,
   ) => BuyV2CustomerStateSnapshot(
@@ -516,6 +658,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ).toSet(),
     productIdentityKeys: _stringMap(source['productIdentityKeys']),
     supplierPolicyAcceptances: _stringMap(source['supplierPolicyAcceptances']),
+    supplierPolicyUnresolvedProductKeys: _unresolvedPolicyKeys(source['supplierPolicyUnresolvedProductKeys']),
     supplierPolicyRequiredProductKeys: _stringList(
       source['supplierPolicyRequiredProductKeys'],
     ).toSet(),
@@ -565,6 +708,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
             .toList(growable: false),
     paymentRecoveryIncomplete: _paymentRecoveryIncomplete(source),
     balancePaymentHolds: _decodeBalanceHolds(source),
+    orderResolutionHolds: _decodeResolutionHolds(source),
     paymentReference: _string(source['paymentReference']),
     paymentActionUri: _uri(source['paymentActionUri']),
     bankTransferInstructions: _decodeTransfer(
@@ -587,17 +731,28 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   Map<String, Object?> _encodePaymentAttempt(
     BuyV2CheckoutPaymentAttempt attempt,
-  ) => {
-    'version': 1,
+  ) {
+    // Each valid group can still overflow the complete original commitment.
+    buyV2SumMinor(attempt.groups.map((group) => group.request.totalMinor));
+    buyV2SumMinor(attempt.groups.map((group) => group.request.amountDueNowMinor));
+    final minorAmounts = attempt.groups.any((group) => group.request.usesMinorAmounts);
+    return {
+    'version': minorAmounts ? 2 : 1,
     'id': attempt.id,
     'ownerScope': attempt.ownerScope,
     'quoteValidUntil': attempt.quoteValidUntil.toIso8601String(),
     'lateSettlementNeedsReview': attempt.lateSettlementNeedsReview,
-    'groups': [for (final group in attempt.groups) _encodeFrozenPayment(group)],
+    'groups': [for (final group in attempt.groups) _encodeFrozenPayment(group,
+      minorAmounts: minorAmounts)],
   };
+  }
 
-  Map<String, Object?> _encodeFrozenPayment(BuyV2CheckoutGroupAttempt group) =>
-      {
+  Map<String, Object?> _encodeFrozenPayment(BuyV2CheckoutGroupAttempt group, {bool minorAmounts = false}) {
+    if (!group.request.hasValidMoney) throw const FormatException('Original payment amounts are invalid.');
+    if (minorAmounts && !group.hasValidObligations) {
+      throw const FormatException('Original exact payment obligations are invalid.');
+    }
+    return {
         'fulfilmentKeys': group.fulfilmentKeys.toList(),
         'obligations': [
           for (final value in group.obligations)
@@ -620,8 +775,13 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'paymentGroupId': group.request.paymentGroupId,
           'idempotencyKey': group.request.idempotencyKey,
           'paymentMethod': group.request.paymentMethod,
-          'total': group.request.total,
-          'amountDueNow': group.request.amountDueNow,
+          if (minorAmounts) ...{
+            'totalMinor': group.request.totalMinor,
+            'amountDueNowMinor': group.request.amountDueNowMinor,
+          } else ...{
+            'total': group.request.total,
+            'amountDueNow': group.request.amountDueNow,
+          },
           'address': _encodeAddress(group.request.address),
           'commercialPaymentTermIds': group.request.commercialPaymentTermIds,
           'deliveryInstructionsByProductId':
@@ -642,16 +802,72 @@ final class BuyV2SharedPreferencesCustomerStateStore
           ],
         },
       };
+  }
 
   Map<String, Object?> _encodeLegacyAttempt(
     BuyV2LegacyCheckoutAttempt attempt,
   ) => {
-    'version': 1,
+    'version': attempt.payment.request.usesMinorAmounts ? 2 : 1,
     'ownerScope': attempt.ownerScope,
     'purchaseOrderAccountId': attempt.purchaseOrderAccountId,
     'lateSettlementNeedsReview': attempt.lateSettlementNeedsReview,
-    'payment': _encodeFrozenPayment(attempt.payment),
+    'payment': _encodeFrozenPayment(attempt.payment, minorAmounts: attempt.payment.request.usesMinorAmounts),
   };
+
+  /// A present invalid minor field cannot downgrade to a plausible old amount.
+  static ({int total, int due})? _decodeFrozenMoney(Map<String, Object?> request, Object? version) {
+    if (version is! int || !const {1, 2}.contains(version)) return null;
+    try {
+      if (version == 1) {
+        if (request.containsKey('totalMinor') || request.containsKey('amountDueNowMinor') ||
+            request['total'] is! int || request['amountDueNow'] is! int) {
+          return null;
+        }
+        final total = buyV2ExactMinorAmount(legacyRupees: request['total'] as int);
+        final due = buyV2ExactMinorAmount(legacyRupees: request['amountDueNow'] as int);
+        return due <= total ? (total: total, due: due) : null;
+      }
+      if (request['totalMinor'] is! int || request['amountDueNowMinor'] is! int ||
+          (request.containsKey('total') && request['total'] is! int) ||
+          (request.containsKey('amountDueNow') && request['amountDueNow'] is! int)) {
+        return null;
+      }
+      final total = buyV2ExactMinorAmount(minor: request['totalMinor'] as int,
+        legacyRupees: request['total'] as int?);
+      final due = buyV2ExactMinorAmount(minor: request['amountDueNowMinor'] as int,
+        legacyRupees: request['amountDueNow'] as int?);
+      return due <= total ? (total: total, due: due) : null;
+    } on FormatException { return null; }
+  }
+
+  static BuyV2OrderPlacementRequest _restoreFrozenRequest(
+    Map<String, Object?> raw, List<BuyV2CartLine> lines, BuyV2Address address,
+    ({int total, int due}) money, {required bool minorAmounts}) {
+    if (minorAmounts) {
+      return BuyV2OrderPlacementRequest.minor(
+        lines: List.unmodifiable(lines), address: address, paymentMethod: _string(raw['paymentMethod'])!,
+        totalMinor: money.total, amountDueNowMinor: money.due,
+        idempotencyKey: _string(raw['idempotencyKey'])!, useUpiQr: raw['useUpiQr'] as bool,
+        commercialPaymentTermIds: Map.unmodifiable(_stringMap(raw['commercialPaymentTermIds'])),
+        deliveryInstructionsByProductId: Map.unmodifiable(_stringMap(raw['deliveryInstructionsByProductId'])),
+        checkoutQuoteId: _string(raw['checkoutQuoteId']),
+        purchaseOrderRequestId: _string(raw['purchaseOrderRequestId']),
+        purchaseOrderRevision: _string(raw['purchaseOrderRevision']),
+        procurementContext: _decodeProcurementContext(raw['procurementContext']),
+        checkoutAttemptId: _string(raw['checkoutAttemptId']), paymentGroupId: _string(raw['paymentGroupId']));
+    }
+    return BuyV2OrderPlacementRequest(
+      lines: List.unmodifiable(lines), address: address, paymentMethod: _string(raw['paymentMethod'])!,
+      total: buyV2WholeRupees(money.total), amountDueNow: buyV2WholeRupees(money.due),
+      idempotencyKey: _string(raw['idempotencyKey'])!, useUpiQr: raw['useUpiQr'] as bool,
+      commercialPaymentTermIds: Map.unmodifiable(_stringMap(raw['commercialPaymentTermIds'])),
+      deliveryInstructionsByProductId: Map.unmodifiable(_stringMap(raw['deliveryInstructionsByProductId'])),
+      checkoutQuoteId: _string(raw['checkoutQuoteId']),
+      purchaseOrderRequestId: _string(raw['purchaseOrderRequestId']),
+      purchaseOrderRevision: _string(raw['purchaseOrderRevision']),
+      procurementContext: _decodeProcurementContext(raw['procurementContext']),
+      checkoutAttemptId: _string(raw['checkoutAttemptId']), paymentGroupId: _string(raw['paymentGroupId']));
+  }
 
   BuyV2LegacyCheckoutAttempt? _decodeLegacyAttempt(Object? value) {
     final source = _objectMap(value);
@@ -662,15 +878,14 @@ final class BuyV2SharedPreferencesCustomerStateStore
     final method = _string(request['paymentMethod']);
     final address = _decodeAddress(_objectMap(request['address']));
     final lines = _decodeOrderLines(request['lines']);
-    final total = request['total'];
-    final due = request['amountDueNow'];
+    final money = _decodeFrozenMoney(request, source['version']);
     final scopes = _stringList(group['fulfilmentKeys']);
     final state = _enumByName(
       BuyV2CheckoutSubmissionState.values,
       _string(group['state']),
     );
     final context = _decodeProcurementContext(request['procurementContext']);
-    if (source['version'] != 1 ||
+    if (money == null ||
         owner == null ||
         owner != ownerScope ||
         request['checkoutAttemptId'] != null ||
@@ -682,11 +897,6 @@ final class BuyV2SharedPreferencesCustomerStateStore
         request['lines'] is! List ||
         lines.length != (request['lines'] as List).length ||
         lines.map((line) => line.product.id).toSet().length != lines.length ||
-        total is! int ||
-        due is! int ||
-        due < 0 ||
-        total < due ||
-        total > 90071992547409 ||
         scopes.isEmpty ||
         scopes.toSet().length != scopes.length ||
         state == null ||
@@ -695,25 +905,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       return null;
     }
     final payment = BuyV2CheckoutGroupAttempt(
-      request: BuyV2OrderPlacementRequest(
-        lines: List.unmodifiable(lines),
-        address: address,
-        paymentMethod: method,
-        total: total,
-        amountDueNow: due,
-        idempotencyKey: key,
-        useUpiQr: request['useUpiQr'] as bool,
-        commercialPaymentTermIds: Map.unmodifiable(
-          _stringMap(request['commercialPaymentTermIds']),
-        ),
-        deliveryInstructionsByProductId: Map.unmodifiable(
-          _stringMap(request['deliveryInstructionsByProductId']),
-        ),
-        checkoutQuoteId: _string(request['checkoutQuoteId']),
-        purchaseOrderRequestId: _string(request['purchaseOrderRequestId']),
-        purchaseOrderRevision: _string(request['purchaseOrderRevision']),
-        procurementContext: context,
-      ),
+      request: _restoreFrozenRequest(request, lines, address, money, minorAmounts: source['version'] == 2),
       fulfilmentKeys: Set.unmodifiable(scopes),
       obligations: _decodeObligations(group['obligations']),
       state: state == BuyV2CheckoutSubmissionState.submitting
@@ -806,7 +998,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     final owner = _string(source['ownerScope']);
     final expiry = DateTime.tryParse(_string(source['quoteValidUntil']) ?? '');
     final rawGroups = source['groups'];
-    if (source['version'] != 1 ||
+    if (source['version'] is! int || !const {1, 2}.contains(source['version']) ||
         id == null ||
         owner == null ||
         expiry == null ||
@@ -829,8 +1021,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       final quoteId = _string(request['checkoutQuoteId']);
       final address = _decodeAddress(_objectMap(request['address']));
       final lines = _decodeOrderLines(request['lines']);
-      final total = request['total'];
-      final due = request['amountDueNow'];
+      final money = _decodeFrozenMoney(request, source['version']);
       final scope = _stringList(group['fulfilmentKeys']);
       final actionUri = _string(group['paymentActionUri']);
       final state = _enumByName(
@@ -852,11 +1043,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           request['lines'] is! List ||
           lines.length != (request['lines'] as List).length ||
           lines.any((line) => !productIds.add(line.product.id)) ||
-          total is! int ||
-          due is! int ||
-          due < 0 ||
-          total < due ||
-          total > 90071992547409 ||
+          money == null ||
           scope.isEmpty ||
           scope.any((value) => !keys.add(value)) ||
           state == null ||
@@ -874,29 +1061,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       }
       groups.add(
         BuyV2CheckoutGroupAttempt(
-          request: BuyV2OrderPlacementRequest(
-            lines: List.unmodifiable(lines),
-            address: address,
-            paymentMethod: method,
-            total: total,
-            amountDueNow: due,
-            idempotencyKey: key,
-            checkoutAttemptId: id,
-            paymentGroupId: groupId,
-            checkoutQuoteId: quoteId,
-            useUpiQr: request['useUpiQr'] as bool,
-            commercialPaymentTermIds: Map.unmodifiable(
-              _stringMap(request['commercialPaymentTermIds']),
-            ),
-            deliveryInstructionsByProductId: Map.unmodifiable(
-              _stringMap(request['deliveryInstructionsByProductId']),
-            ),
-            purchaseOrderRequestId: _string(request['purchaseOrderRequestId']),
-            purchaseOrderRevision: _string(request['purchaseOrderRevision']),
-            procurementContext: _decodeProcurementContext(
-              request['procurementContext'],
-            ),
-          ),
+          request: _restoreFrozenRequest(request, lines, address, money, minorAmounts: source['version'] == 2),
           fulfilmentKeys: Set.unmodifiable(scope),
           obligations: _decodeObligations(group['obligations']),
           state: state == BuyV2CheckoutSubmissionState.submitting
@@ -913,6 +1078,13 @@ final class BuyV2SharedPreferencesCustomerStateStore
           financiallyClosed: group['financiallyClosed'] == true,
         ),
       );
+      if (source['version'] == 2 && !groups.last.hasValidObligations) return null;
+    }
+    try {
+      buyV2SumMinor(groups.map((group) => group.request.totalMinor));
+      buyV2SumMinor(groups.map((group) => group.request.amountDueNowMinor));
+    } on FormatException {
+      return null;
     }
     return BuyV2CheckoutPaymentAttempt(
       id: id,
@@ -987,7 +1159,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   Map<String, Object?> _encodeProcurementDraft(
     BuyV2ProcurementDraftSnapshot draft,
   ) => {
-    'version': 1,
+    'version': draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1,
     'ownerScope': draft.ownerScope,
     if (draft.navigation case final navigation?)
       'navigation': _encodeProcurementNavigation(navigation),
@@ -996,6 +1168,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         entry.key: {
           'id': entry.value.id,
           'canonicalId': entry.value.canonicalId,
+          if (entry.value.publicListingIdentity case final identity?) 'publicListingIdentity': identity.toJson(),
           'storeId': entry.value.storeId,
           'categoryId': entry.value.categoryId,
           'brand': entry.value.brand,
@@ -1003,7 +1176,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'variant': entry.value.variant,
           'variantAttributes': _encodeVariantAttributes(entry.value),
           'pack': entry.value.pack,
-          'price': entry.value.price,
+          ..._encodeRetainedProductMoney(entry.value),
           'unitPrice': entry.value.unitPrice,
           'seller': entry.value.seller,
           'sellerType': entry.value.sellerType,
@@ -1021,19 +1194,19 @@ final class BuyV2SharedPreferencesCustomerStateStore
     if (value is! Map) return null;
     final source = _objectMap(value);
     final scope = _string(source['ownerScope']);
-    if (source['version'] != 1 || scope == null || scope != ownerScope) {
+    if (source['version'] is! int || !const {1, 2}.contains(source['version']) || scope == null || scope != ownerScope) {
       return null;
     }
     final products = <String, BuyV2Product>{};
     for (final entry in _objectMap(source['cartProducts']).entries) {
       final item = _objectMap(entry.value);
       final id = _string(item['id']);
-      final price = item['price'];
       final minimum = item['minimumOrder'];
+      final publicIdentity = BuyV2PublicListingIdentity.fromJson(item['publicListingIdentity']);
+      if (item.containsKey('publicListingIdentity') && publicIdentity == null) continue;
       if (id != entry.key ||
           id == null ||
-          price is! int ||
-          price < 0 ||
+          !_validRetainedProductMoney(item, allowMinor: source['version'] == 2) ||
           minimum is! int ||
           minimum < 1) {
         continue;
@@ -1054,6 +1227,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       products[id] = BuyV2Product(
         id: id,
         canonicalId: _string(item['canonicalId']),
+        publicListingIdentity: publicIdentity,
+        offerClass: publicIdentity?.channel,
         variantAttributes: _decodeVariantAttributes(item['variantAttributes']),
         storeId: _string(item['storeId']),
         destination: BuyV2Destination.wholesale,
@@ -1062,7 +1237,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
         title: _string(item['title']) ?? 'Unavailable item',
         variant: _string(item['variant']) ?? '',
         pack: _string(item['pack']) ?? 'Pack details unavailable',
-        price: price,
+        price: item['price'] as int?,
+        priceMinor: item['priceMinor'] as int?,
+        mrp: item['mrp'] as int?,
+        mrpMinor: item['mrpMinor'] as int?,
         unitPrice: _string(item['unitPrice']) ?? '',
         badge: '',
         seller: _string(item['seller']) ?? 'Supplier unavailable',
@@ -1076,6 +1254,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         procurementSupplierGrant: identity,
         catalogueListing: false,
       );
+      if (!products[id]!.hasValidPublicListingIdentity) products.remove(id);
     }
     return BuyV2ProcurementDraftSnapshot(
       ownerScope: scope,
@@ -1264,12 +1443,59 @@ final class BuyV2SharedPreferencesCustomerStateStore
     );
   }
 
+  static bool _validExactOrderStorage(BuyV2Order order) {
+    final requiredStrings = [order.id, order.title, order.itemSummary, order.partner,
+      order.partnerType, order.promise, order.destinationLabel];
+    if (!order.hasValidMoney || order.lines.isEmpty || !order.progress.isFinite ||
+        requiredStrings.any((value) => value.trim().isEmpty || value != value.trim()) ||
+        (order.purchaseId != null && (order.purchaseId!.trim().isEmpty || order.purchaseId != order.purchaseId!.trim())) ||
+        order.productIds.any((id) => id.trim().isEmpty || id != id.trim()) ||
+        order.productIds.toSet().length != order.productIds.length) {
+      return false;
+    }
+    final collection = order.collection;
+    if (collection != null && (collection.storeId.trim().isEmpty || collection.storeId != collection.storeId.trim() ||
+        collection.purchaserAccountId.trim().isEmpty || collection.purchaserAccountId != collection.purchaserAccountId.trim())) {
+      return false;
+    }
+    final ids = <String>{};
+    try {
+      for (final line in order.lines) {
+        final product = line.product;
+        if (line.quantity <= 0 || !ids.add(product.id) || product.id.trim().isEmpty ||
+            product.id != product.id.trim() || product.canonicalId.trim().isEmpty ||
+            product.title.trim().isEmpty || product.minimumOrder < 1 ||
+            (product.storeId != null && (product.storeId!.trim().isEmpty || product.storeId != product.storeId!.trim())) ||
+            !product.hasValidMoney || !product.hasValidPublicListingIdentity ||
+            (collection != null && product.storeId != collection.storeId)) {
+          return false;
+        }
+        line.totalMinor;
+      }
+      return order.productIds.isEmpty || setEquals(order.productIds.toSet(), ids);
+    } on FormatException { return false; }
+  }
+
   Map<String, Object?> _encodeOrder(BuyV2Order order) => {
     'id': order.id,
     'destination': order.destination.name,
     'title': order.title,
     'itemSummary': order.itemSummary,
-    'total': order.total,
+    if (order.usesMinorAmounts) ...{
+      'moneyVersion': 2, 'totalMinor': order.payableTotalMinor,
+      'tipMinor': order.tipMinor, 'discountMinor': order.discountMinor,
+      'amountPaidNowMinor': order.amountPaidNowMinor, 'balanceDueMinor': order.balanceDueMinor,
+      'taxMinor': order.taxMinor, 'freightMinor': order.freightMinor,
+      'deliveryFeeMinor': order.deliveryFeeMinor, 'paymentChargeMinor': order.paymentChargeMinor,
+    } else ...{
+      'total': order.total, 'totalMinor': ?order.totalMinor,
+      'tip': order.tip, 'discount': order.discount, 'amountPaidNow': order.amountPaidNow,
+      'balanceDue': order.balanceDue, 'tax': order.tax, 'freight': order.freight,
+      'deliveryFee': order.deliveryFee, 'paymentCharge': order.paymentCharge,
+    },
+    if (order.usesMinorAmounts)
+      if (order.collection case final collection?)
+        'collection': {'storeId': collection.storeId, 'purchaserAccountId': collection.purchaserAccountId},
     'partner': order.partner,
     'partnerType': order.partnerType,
     'promise': order.promise,
@@ -1293,19 +1519,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'recipient': order.recipient,
     'addressLine': order.addressLine,
     'deliveryInstruction': order.deliveryInstruction,
-    'tip': order.tip,
-    'discount': order.discount,
     'paymentTermLabel': order.paymentTermLabel,
-    'amountPaidNow': order.amountPaidNow,
-    'balanceDue': order.balanceDue,
     'balanceDueLabel': order.balanceDueLabel,
     'paymentStatusLabel': order.paymentStatusLabel,
     'buyerName': order.buyerName,
     'buyerType': order.buyerType,
-    'tax': order.tax,
-    'freight': order.freight,
-    'deliveryFee': order.deliveryFee,
-    'paymentCharge': order.paymentCharge,
     'dispatchPromise': order.dispatchPromise,
     'deliveryPartnerName': order.deliveryPartnerName,
     'deliveryPartnerType': order.deliveryPartnerType,
@@ -1317,6 +1535,21 @@ final class BuyV2SharedPreferencesCustomerStateStore
   };
 
   BuyV2Order? _decodeOrder(Map<String, Object?> source) {
+    const components = ['tipMinor', 'discountMinor', 'balanceDueMinor', 'taxMinor',
+      'freightMinor', 'deliveryFeeMinor', 'paymentChargeMinor'];
+    const legacyMoney = ['total', 'tip', 'discount', 'amountPaidNow', 'balanceDue',
+      'tax', 'freight', 'deliveryFee', 'paymentCharge'];
+    final exact = source.containsKey('moneyVersion');
+    if (exact && (source['moneyVersion'] is! int || source['moneyVersion'] != 2 ||
+        source['totalMinor'] is! int || components.any((key) => source[key] is! int) ||
+        !source.containsKey('amountPaidNowMinor') ||
+        (source['amountPaidNowMinor'] != null && source['amountPaidNowMinor'] is! int) ||
+        legacyMoney.any(source.containsKey))) {
+      throw const FormatException('Saved exact order money needs checking');
+    }
+    if (!exact && (components.any(source.containsKey) || source.containsKey('amountPaidNowMinor'))) {
+      throw const FormatException('Saved order money version needs checking');
+    }
     final destination = _destination(_string(source['destination']));
     final status = _enumByName(
       BuyV2OrderStatus.values,
@@ -1333,20 +1566,78 @@ final class BuyV2SharedPreferencesCustomerStateStore
     ];
     final total = _integer(source['total']);
     final progress = source['progress'];
+    final totalMinor = source['totalMinor'];
+    if (source.containsKey('totalMinor') &&
+        (totalMinor is! int || totalMinor < 0 || totalMinor > 9007199254740991)) {
+      throw const FormatException('Saved exact order amount needs checking');
+    }
     final lines = _decodeOrderLines(source['lines']);
     if (destination == null ||
         status == null ||
         requiredStrings.any((value) => value == null) ||
-        total == null ||
+        (!exact && total == null) ||
         progress is! num) {
+      if (exact) throw const FormatException('Saved exact order identity needs checking');
       return null;
+    }
+    if (exact) {
+      if (!progress.isFinite || requiredStrings.any((value) => value != value!.trim())) {
+        throw const FormatException('Saved exact order identity needs checking');
+      }
+      final rawPurchaseId = source['purchaseId'];
+      if (rawPurchaseId != null && (rawPurchaseId is! String || rawPurchaseId.trim().isEmpty || rawPurchaseId != rawPurchaseId.trim())) {
+        throw const FormatException('Saved exact purchase identity needs checking');
+      }
+      final rawLines = source['lines'], rawIds = source['productIds'];
+      if (rawLines is! List || lines.isEmpty || rawLines.length != lines.length || rawIds is! List ||
+          rawIds.length != _stringList(rawIds).length) {
+        throw const FormatException('Saved exact purchased lines need checking');
+      }
+      for (final rawLine in rawLines) {
+        final rawStoreId = ((rawLine as Map)['purchasedProduct'] as Map)['storeId'];
+        if (rawStoreId != null && (rawStoreId is! String || rawStoreId.trim().isEmpty || rawStoreId != rawStoreId.trim())) {
+          throw const FormatException('Saved exact Store identity needs checking');
+        }
+      }
+      BuyV2CollectionOrderReference? collection;
+      if (source.containsKey('collection')) {
+        final raw = source['collection'];
+        if (raw is! Map || raw.length != 2 || raw['storeId'] is! String || raw['purchaserAccountId'] is! String ||
+            (raw['storeId'] as String).trim().isEmpty || raw['storeId'] != (raw['storeId'] as String).trim() ||
+            (raw['purchaserAccountId'] as String).trim().isEmpty || raw['purchaserAccountId'] != (raw['purchaserAccountId'] as String).trim()) {
+          throw const FormatException('Saved collection reference needs checking');
+        }
+        collection = BuyV2CollectionOrderReference(storeId: raw['storeId'] as String, purchaserAccountId: raw['purchaserAccountId'] as String);
+      }
+      final order = BuyV2Order.minor(
+        id: requiredStrings[0]!, destination: destination, title: requiredStrings[1]!, itemSummary: requiredStrings[2]!,
+        totalMinor: source['totalMinor'] as int, partner: requiredStrings[3]!, partnerType: requiredStrings[4]!,
+        promise: requiredStrings[5]!, destinationLabel: requiredStrings[6]!, progress: progress.toDouble(), status: status,
+        collection: collection, purchaseId: _string(source['purchaseId']), promisedByLabel: _string(source['promisedByLabel']),
+        updatedDeliveryEstimate: _string(source['updatedDeliveryEstimate']), productIds: List.unmodifiable(_stringList(rawIds)),
+        lines: List.unmodifiable(lines), paymentMethod: _string(source['paymentMethod']),
+        purchaseOrderReference: _string(source['purchaseOrderReference']), recipient: _string(source['recipient']),
+        addressLine: _string(source['addressLine']), deliveryInstruction: _string(source['deliveryInstruction']),
+        tipMinor: source['tipMinor'] as int, discountMinor: source['discountMinor'] as int,
+        paymentTermLabel: _string(source['paymentTermLabel']), amountPaidNowMinor: source['amountPaidNowMinor'] as int?,
+        balanceDueMinor: source['balanceDueMinor'] as int, balanceDueLabel: _string(source['balanceDueLabel']),
+        paymentStatusLabel: _string(source['paymentStatusLabel']), buyerName: _string(source['buyerName']), buyerType: _string(source['buyerType']),
+        taxMinor: source['taxMinor'] as int, freightMinor: source['freightMinor'] as int,
+        deliveryFeeMinor: source['deliveryFeeMinor'] as int, paymentChargeMinor: source['paymentChargeMinor'] as int,
+        dispatchPromise: _string(source['dispatchPromise']), deliveryPartnerName: _string(source['deliveryPartnerName']),
+        deliveryPartnerType: _string(source['deliveryPartnerType']), trackingReference: _string(source['trackingReference']),
+        deliveryServiceLevel: _string(source['deliveryServiceLevel']), proofOfDeliveryStatus: _string(source['proofOfDeliveryStatus']),
+        invoiceAvailable: source['invoiceAvailable'] != false, receiptReference: _string(source['receiptReference']));
+      if (!_validExactOrderStorage(order)) throw const FormatException('Saved exact order facts need checking');
+      return order;
     }
     return BuyV2Order(
       id: requiredStrings[0]!,
       destination: destination,
       title: requiredStrings[1]!,
       itemSummary: requiredStrings[2]!,
-      total: total,
+      total: total!,
+      totalMinor: totalMinor as int?,
       partner: requiredStrings[3]!,
       partnerType: requiredStrings[4]!,
       promise: requiredStrings[5]!,
@@ -1398,6 +1689,15 @@ final class BuyV2SharedPreferencesCustomerStateStore
   static Uri? _uri(Object? value) {
     final source = _string(value);
     return source == null ? null : Uri.tryParse(source);
+  }
+
+  static Set<String> _unresolvedPolicyKeys(Object? value) {
+    if (value == null) return {};
+    if (value is! List || value.any((v) => v is! String || v.trim().isEmpty) ||
+        value.toSet().length != value.length) {
+      throw const FormatException('Saved Store policy recovery needs checking.');
+    }
+    return value.cast<String>().toSet();
   }
 
   static List<String> _stringList(Object? value) => value is List
@@ -1460,10 +1760,32 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   // Historical display data only. Never recover purchase facts from today's
   // catalogue or restore listing/fulfilment authority from this local cache.
+  static bool _hasExactProductMoney(BuyV2Product product) =>
+      product.hasExplicitPriceMinor || product.hasExplicitMrpMinor;
+  static Map<String, Object?> _encodeRetainedProductMoney(BuyV2Product product) {
+    if (!product.hasValidMoney) throw const FormatException('Invalid saved product amounts');
+    return _hasExactProductMoney(product)
+      ? {'priceMinor': product.priceMinor, 'mrpMinor': ?product.mrpMinor}
+      : {'price': product.price};
+  }
+  static bool _validRetainedProductMoney(Map<String, Object?> source, {required bool allowMinor}) {
+    if (!allowMinor && (source.containsKey('priceMinor') || source.containsKey('mrpMinor'))) return false;
+    for (final key in const ['price', 'priceMinor', 'mrp', 'mrpMinor']) {
+      if (source.containsKey(key) && source[key] is! int) return false;
+    }
+    try {
+      buyV2ExactMinorAmount(minor: source['priceMinor'] as int?, legacyRupees: source['price'] as int?);
+      if (source.containsKey('mrp') || source.containsKey('mrpMinor')) {
+        buyV2ExactMinorAmount(minor: source['mrpMinor'] as int?, legacyRupees: source['mrp'] as int?);
+      }
+      return true;
+    } on FormatException { return false; }
+  }
   static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
-    'version': 1,
+    'version': _hasExactProductMoney(product) ? 2 : 1,
     'id': product.id,
     'canonicalId': product.canonicalId,
+    if (product.publicListingIdentity case final identity?) 'publicListingIdentity': identity.toJson(),
     'storeId': product.storeId,
     'destination': product.destination.name,
     'categoryId': product.categoryId,
@@ -1472,7 +1794,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'variant': product.variant,
     'variantAttributes': _encodeVariantAttributes(product),
     'pack': product.pack,
-    'price': product.price,
+    ..._encodeRetainedProductMoney(product),
     'unitPrice': product.unitPrice,
     'seller': product.seller,
     'sellerType': product.sellerType,
@@ -1489,8 +1811,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
     final canonicalId = _string(source['canonicalId']);
     final destination = _destination(_string(source['destination']));
     final title = _string(source['title']);
-    final price = source['price'];
     final minimumOrder = source['minimumOrder'];
+    final publicIdentity = BuyV2PublicListingIdentity.fromJson(source['publicListingIdentity']);
     const textFields = [
       'categoryId',
       'brand',
@@ -1501,22 +1823,24 @@ final class BuyV2SharedPreferencesCustomerStateStore
       'sellerType',
       'origin',
     ];
-    if (source['version'] != 1 ||
+    if (source['version'] is! int || !const {1, 2}.contains(source['version']) ||
+        (source.containsKey('publicListingIdentity') && publicIdentity == null) ||
         id == null ||
         canonicalId == null ||
         destination == null ||
         title == null ||
-        price is! int ||
-        price < 0 ||
+        !_validRetainedProductMoney(source, allowMinor: source['version'] == 2) ||
         minimumOrder is! int ||
         minimumOrder < 1 ||
         source['requiresPrescription'] is! bool ||
         textFields.any((key) => source[key] is! String)) {
       return null;
     }
-    return BuyV2Product(
+    final product = BuyV2Product(
       id: id,
       canonicalId: canonicalId,
+      publicListingIdentity: publicIdentity,
+      offerClass: publicIdentity?.channel,
       variantAttributes: _decodeVariantAttributes(source['variantAttributes']),
       storeId: _string(source['storeId']),
       destination: destination,
@@ -1525,7 +1849,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
       title: title,
       variant: source['variant'] as String,
       pack: source['pack'] as String,
-      price: price,
+      price: source['price'] as int?,
+      priceMinor: source['priceMinor'] as int?,
+      mrp: source['mrp'] as int?,
+      mrpMinor: source['mrpMinor'] as int?,
       unitPrice: source['unitPrice'] as String,
       seller: source['seller'] as String,
       sellerType: source['sellerType'] as String,
@@ -1541,6 +1868,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       visualKind: 'unavailable',
       catalogueListing: false,
     );
+    return product.hasValidPublicListingIdentity ? product : null;
   }
 
   static List<Map<String, Object?>> _encodeVariantAttributes(

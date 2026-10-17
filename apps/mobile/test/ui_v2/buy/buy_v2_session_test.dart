@@ -5,12 +5,15 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_order_resolution_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
@@ -445,6 +448,8 @@ final class _R669PreferenceWriteState {
   Completer<void>? hold;
   int started = 0;
   bool failWrites = false;
+  Completer<void>? readHold;
+  int readsStarted = 0;
 }
 
 final class _R669StringPreferences implements SharedPreferencesAsync {
@@ -455,9 +460,19 @@ final class _R669StringPreferences implements SharedPreferencesAsync {
   Completer<void>? get holdNextWrite => _writeState.hold;
   set holdNextWrite(Completer<void>? value) => _writeState.hold = value;
   int get writesStarted => _writeState.started;
+  Completer<void>? get holdNextRead => _writeState.readHold;
+  set holdNextRead(Completer<void>? value) => _writeState.readHold = value;
+  int get readsStarted => _writeState.readsStarted;
 
   @override
-  Future<String?> getString(String key) async => values[key];
+  Future<String?> getString(String key) async {
+    final value = values[key];
+    final hold = holdNextRead;
+    holdNextRead = null;
+    _writeState.readsStarted++;
+    if (hold != null) await hold.future;
+    return value;
+  }
 
   @override
   Future<void> setString(String key, String value) async {
@@ -472,6 +487,36 @@ final class _R669StringPreferences implements SharedPreferencesAsync {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw StateError('Unexpected preferences fixture operation');
+}
+
+final class _LfResolutionRecoveryAdapter implements BuyV2OrderResolutionAdapter {
+  int calls = 0;
+  bool fail = true;
+  BuyV2OrderResolutionKind kind = BuyV2OrderResolutionKind.cancel;
+  DateTime? eligibleUntil;
+  final requests = <BuyV2OrderResolutionRequest>[];
+  final started = Completer<void>();
+  Future<BuyV2OrderResolutionResult>? reply;
+  @override
+  Future<BuyV2OrderResolutionSnapshot> load(BuyV2Order order) async =>
+      BuyV2OrderResolutionSnapshot(orderId: order.id,
+        state: BuyV2OrderResolutionState.ready, sourceId: 'host-resolution-source',
+        options: [BuyV2OrderResolutionOption(
+          kind: kind, title: 'Host request',
+          detail: 'Host fixture only', reasons: const ['Changed plans'])],
+        itemEligibility: kind == BuyV2OrderResolutionKind.cancel ? const [] : [
+          BuyV2OrderResolutionItemEligibility(productId: 's-tomato', kind: kind,
+            eligibleQuantity: 3, policyWindow: 'Host recorded policy', eligibleUntil: eligibleUntil)]);
+  @override
+  Future<BuyV2OrderResolutionResult> submit(BuyV2OrderResolutionRequest request) async {
+    calls++;
+    requests.add(request);
+    if (!started.isCompleted) started.complete();
+    if (reply != null) return reply!;
+    if (fail) throw StateError('Host reply lost');
+    return const BuyV2OrderResolutionResult(accepted: true,
+      customerMessage: 'Host request recorded', reference: 'host-request-one');
+  }
 }
 
 final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
@@ -538,6 +583,7 @@ final class _AssignedDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
 
 final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
   int? price;
+  int? priceMinor;
   String orderabilityLabel = 'Available to add';
   bool stale = false;
 
@@ -546,7 +592,8 @@ final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
     return const BuyV2CatalogueProductFactsAdapter()
         .snapshotFor(product)
         .copyWith(
-          price: price ?? product.price,
+          price: price,
+          priceMinor: priceMinor ?? (price == null ? product.priceMinor : null),
           orderabilityLabel: orderabilityLabel,
           sourceId: 'shop-live-facts',
           observedAt: DateTime(2026, 8, 29),
@@ -828,6 +875,7 @@ class _CollectionPurchaseHarness
   String quoteFault = '';
   String legacyCollection = 'enabled';
   bool collectionAddressAvailable = true;
+  bool fractionalCatalogue = false;
   BuyV2CollectionPurchaseState outcome = BuyV2CollectionPurchaseState.paid;
   Completer<bool>? reservationGate;
   Completer<void>? placementGate;
@@ -961,6 +1009,8 @@ class _CollectionPurchaseHarness
     String storeId = 'store-a',
     String? sku,
     String payment = 'UPI',
+    int? priceMinor,
+    bool minor = false,
   }) {
     final product = BuyV2Catalogue.allProducts
         .firstWhere((p) => p.destination == BuyV2Destination.shop)
@@ -969,9 +1019,11 @@ class _CollectionPurchaseHarness
           canonicalId: 'product-a',
           storeId: storeId,
           minimumOrder: 1,
-          price: 100,
+          price: priceMinor == null ? 100 : null,
+          priceMinor: priceMinor,
         );
-    return BuyV2CollectionBasket(
+    final create = minor ? BuyV2CollectionBasket.minor : BuyV2CollectionBasket.new;
+    return create(
       identity: identity.value!,
       paymentMethod: payment,
       store: BuyV2StoreListing(
@@ -1156,6 +1208,34 @@ class _CollectionPurchaseHarness
   }
 }
 
+// Host-only opt-in. Existing collection fixtures remain legacy by default.
+class _MinorCollectionPurchaseHarness extends _CollectionPurchaseHarness
+    implements BuyV2MinorCollectionCheckoutGateway {
+  _MinorCollectionPurchaseHarness() { fractionalCatalogue = true; }
+  int minorQuotes = 0, minorPlacements = 0;
+
+  @override
+  Future<BuyV2CollectionCheckoutQuote> quoteMinor(BuyV2CollectionBasket basket) async {
+    minorQuotes++;
+    final amounts = {for (final line in basket.lines)
+      line.product.id: line.totalMinor + (quoteFault == 'price' ? 1 : 0)};
+    return BuyV2CollectionCheckoutQuote(
+      id: 'host-minor-quote', sourceId: 'host-minor-service',
+      basketFingerprint: quoteFault == 'basket' ? 'another' : basket.fingerprint,
+      issuedAt: clock.subtract(const Duration(seconds: 1)),
+      validUntil: quoteFault == 'expiry' ? clock : clock.add(const Duration(minutes: 2)),
+      lineAmountsMinor: amounts, totalMinor: buyV2SumMinor(amounts.values) + 25,
+      taxMinor: 25,
+    );
+  }
+
+  @override
+  Future<BuyV2CollectionPurchaseResult> placeMinor(BuyV2CollectionPurchaseIntent intent) {
+    minorPlacements++;
+    return super.place(intent);
+  }
+}
+
 class _CollectionScannerPending implements BuyV2CollectionPendingStore {
   BuyV2CollectionPendingIntent? pending;
   @override
@@ -1195,7 +1275,9 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
           storeId: 'store-c',
           minimumOrder: 2,
         ),
-  ];
+  ].map((product) => harness.fractionalCatalogue
+      ? product.copyWith(priceMinor: 1025, mrpMinor: 1250)
+      : product).toList();
 
   @override
   Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
@@ -2033,6 +2115,619 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  // Isolated host identities and private codec fixtures, never runtime commerce.
+  const accountA = (environment: 'host-service', projectId: 'host-project',
+    tenantId: null as String?, userId: 'host-user-a');
+  const accountB = (environment: 'host-service', projectId: 'host-project',
+    tenantId: null as String?, userId: 'host-user-b');
+  // Host-only root lifecycle fixture; no runtime records/provider action.
+  ({BuyV2RootSessions root, _R669StringPreferences prefs, BuyV2Product product,
+      void Function(BuyV2AccountPersistenceIdentity?) select}) rootFixture({
+        BuyV2OrderResolutionAdapter? resolution, _R669StringPreferences? preferences}) {
+    final core = BuySession();
+    final prefs = preferences ?? _R669StringPreferences();
+    BuyV2AccountPersistenceIdentity? live;
+    final product = BuyV2Catalogue.products
+      .firstWhere((p) => p.destination == BuyV2Destination.shop)
+      .copyWith(storeId: 'host-owner-store');
+    final root = BuyV2RootSessions(core: core, currentIdentity: () => live,
+      accountStoreFactory: (identity, alive) => BuyV2SharedPreferencesCustomerStateStore.forAccount(
+        prefs, identity: identity, currentIdentity: () => live, isSessionCurrent: alive),
+      accountSessionFactory: (store, pending) => BuyV2Session(core: core,
+        reviewDataEnabled: false, customerStateStore: store, pendingAccountState: pending,
+        productFactsAdapter: const BuyTestEligibilityFacts(),
+        orderResolutionAdapter: resolution,
+        commerceAdapter: _R669ProcurementCommerce(BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready, products: [product], orders: [
+            if (resolution != null) const BuyV2Order(id: 'host-root-order',
+              purchaseId: 'host-root-purchase', destination: BuyV2Destination.shop,
+              title: 'Host purchase', itemSummary: 'Host purchase', total: 20,
+              partner: 'Host seller', partnerType: 'Retailer', promise: '',
+              destinationLabel: '', progress: 0, status: BuyV2OrderStatus.confirmed),
+          ]))));
+    addTearDown(core.dispose);
+    addTearDown(root.dispose);
+    return (root: root, prefs: prefs, product: product, select: (identity) {
+      live = identity;
+      root.synchronize(accountRequired: identity != null);
+    });
+  }
+  Future<void> restoreRoot(BuyV2Session session) async {
+    await session.restoreCommerce();
+    await session.restoreCustomerState();
+  }
+  test('LF root sessions isolate guest A B A guest and restore before editing', () async {
+    final f = rootFixture();
+    final guest = f.root.current;
+    guest.updateQuery('host guest search');
+    f.select(accountA);
+    final a = f.root.current;
+    expect(a.customerStateRecoveryPending, isTrue);
+    expect(a.addProduct(f.product.id), isFalse);
+    await restoreRoot(a);
+    expect(a.customerStateRecoveryPending, isFalse);
+    expect(a.addProduct(f.product.id, quantity: 2), isTrue, reason: a.notice);
+    await a.retainedAccountState();
+    final ownerA = a.customerStateStore!.ownerScope;
+    f.select(accountB);
+    final b = f.root.current;
+    await restoreRoot(b);
+    expect(b.cartLines, isEmpty);
+    expect(b.customerStateStore!.ownerScope, isNot(ownerA));
+    expect(b.addProduct(f.product.id, quantity: 3), isTrue);
+    await b.retainedAccountState();
+    f.select(accountA);
+    final resumed = f.root.current;
+    expect(identical(resumed, a), isFalse);
+    await restoreRoot(resumed);
+    expect(resumed.cartLines.single.quantity, 2);
+    f.select(null);
+    expect(identical(f.root.current, guest), isTrue);
+    expect(guest.query, 'host guest search');
+    expect(guest.cartLines, isEmpty);
+  });
+  test('LF root sessions preserve failed snapshot and uncertainty before retry', () async {
+    final f = rootFixture();
+    f.select(accountA);
+    final first = f.root.current;
+    final store = first.customerStateStore!;
+    final hold = BuyV2OrderResolutionHold(ownerScope: store.ownerScope!, accountId: null,
+      orderId: 'host-order', orderIdentity: 'b' * 64);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orderResolutionHolds: [hold])), isTrue);
+    await restoreRoot(first);
+    f.prefs.failWrites = true;
+    expect(first.addProduct(f.product.id, quantity: 4), isTrue, reason: first.notice);
+    expect(await first.retainedAccountState(), isNotNull);
+    f.select(accountB);
+    await restoreRoot(f.root.current);
+    expect(f.root.current.cartLines, isEmpty);
+    f.select(accountA);
+    final resumed = f.root.current;
+    await restoreRoot(resumed);
+    expect(resumed.customerStateRecoveryPending, isTrue);
+    expect(resumed.addProduct(f.product.id), isFalse);
+    f.prefs.failWrites = false;
+    await resumed.restoreCustomerState();
+    expect(resumed.customerStateRecoveryPending, isFalse);
+    expect(resumed.cartLines.single.quantity, 4);
+    expect((await resumed.customerStateStore!.read())!.orderResolutionHolds.single.toJson(), hold.toJson());
+  });
+  test('LF root sessions carry recovery transitively through repeated rapid switches', () async {
+    final f = rootFixture();
+    f.select(accountA);
+    final first = f.root.current;
+    await restoreRoot(first);
+    final gate = Completer<void>();
+    f.prefs.holdNextWrite = gate;
+    expect(first.addProduct(f.product.id, quantity: 5), isTrue, reason: first.notice);
+    expect(f.prefs.writesStarted, 1);
+    f.select(accountB);
+    await restoreRoot(f.root.current);
+    f.select(accountA);
+    final second = f.root.current;
+    var secondFinished = false;
+    final secondRestore = restoreRoot(second).then((_) => secondFinished = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(secondFinished, isFalse);
+    f.select(accountB);
+    f.select(accountA);
+    final third = f.root.current;
+    final thirdRestore = restoreRoot(third);
+    gate.complete();
+    await secondRestore;
+    await thirdRestore;
+    expect(third.customerStateRecoveryPending, isFalse);
+    expect(third.cartLines.single.quantity, 5);
+  });
+  test('LF root sessions unknown authenticated state never falls back to guest', () {
+    final f = rootFixture();
+    final guest = f.root.current;
+    expect(f.root.synchronize(accountRequired: true), isTrue);
+    expect(identical(f.root.current, f.root.unavailable), isTrue);
+    expect(identical(f.root.current, guest), isFalse);
+    expect(f.root.current.reviewDataEnabled, isFalse);
+    expect(f.root.synchronize(accountRequired: true), isFalse);
+    expect(f.root.synchronize(accountRequired: false), isTrue);
+    expect(identical(f.root.current, guest), isTrue);
+  });
+  test('LF root sessions wait for an inherited restore write before a newer lifetime', () async {
+    final f = rootFixture();
+    f.select(accountA);
+    final first = f.root.current;
+    await restoreRoot(first);
+    f.prefs.failWrites = true;
+    expect(first.addProduct(f.product.id, quantity: 2), isTrue);
+    await first.retainedAccountState();
+    f.prefs.failWrites = false;
+    f.select(accountB);
+    f.select(accountA);
+    final second = f.root.current;
+    final gate = Completer<void>();
+    f.prefs.holdNextWrite = gate;
+    final secondRestore = restoreRoot(second);
+    for (var i = 0; i < 20 && f.prefs.writesStarted == 0; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(f.prefs.writesStarted, 1);
+    f.select(accountB);
+    f.select(accountA);
+    final third = f.root.current;
+    var thirdReady = false;
+    final thirdRestore = restoreRoot(third).then((_) => thirdReady = true);
+    for (var i = 0; i < 5; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    try {
+      expect(thirdReady, isFalse);
+    } finally {
+      gate.complete();
+      await secondRestore;
+      await thirdRestore;
+    }
+    expect(third.cartLines.single.quantity, 2);
+    expect(third.addProduct(f.product.id), isTrue);
+    await third.retainedAccountState();
+    expect((await third.customerStateStore!.read())!.cartQuantities[f.product.id], 3);
+  });
+  test('LF root sessions newest queued snapshot wins after original write completes', () async {
+    final f = rootFixture();
+    f.select(accountA);
+    final first = f.root.current;
+    await restoreRoot(first);
+    final gate = Completer<void>();
+    f.prefs.holdNextWrite = gate;
+    expect(first.addProduct(f.product.id), isTrue);
+    expect(first.addProduct(f.product.id, quantity: 2), isTrue);
+    expect(f.prefs.writesStarted, 1);
+    f.select(accountB);
+    await restoreRoot(f.root.current);
+    f.select(accountA);
+    final resumed = f.root.current;
+    final restore = restoreRoot(resumed);
+    gate.complete();
+    await restore;
+    expect(resumed.cartLines.single.quantity, 3);
+    expect((await resumed.customerStateStore!.read())!.cartQuantities[f.product.id], 3);
+  });
+  test('LF root sessions late request success retains original uncertainty and cannot replay', () async {
+    final reply = Completer<BuyV2OrderResolutionResult>();
+    final adapter = _LfResolutionRecoveryAdapter()..reply = reply.future;
+    final f = rootFixture(resolution: adapter);
+    f.select(accountA);
+    final first = f.root.current;
+    await restoreRoot(first);
+    await first.refreshOrderResolution('host-root-order');
+    final command = first.submitOrderResolution(orderId: 'host-root-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    await adapter.started.future;
+    f.select(accountB);
+    reply.complete(const BuyV2OrderResolutionResult(accepted: true,
+      customerMessage: 'Host result', reference: 'host-late-request'));
+    expect(await command, isFalse);
+    f.select(accountA);
+    final resumed = f.root.current;
+    await restoreRoot(resumed);
+    await resumed.refreshOrderResolution('host-root-order');
+    expect(await resumed.submitOrderResolution(orderId: 'host-root-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(adapter.calls, 1);
+    expect((await resumed.customerStateStore!.read())!.orderResolutionHolds, hasLength(1));
+  });
+  test('LF root sessions new root restores saved owner state without adopting another owner', () async {
+    final first = rootFixture();
+    first.select(accountA);
+    await restoreRoot(first.root.current);
+    expect(first.root.current.addProduct(first.product.id, quantity: 6), isTrue);
+    await first.root.current.retainedAccountState();
+    first.root.dispose();
+    final next = rootFixture(preferences: first.prefs);
+    next.select(accountB);
+    await restoreRoot(next.root.current);
+    expect(next.root.current.cartLines, isEmpty);
+    next.select(accountA);
+    await restoreRoot(next.root.current);
+    expect(next.root.current.cartLines.single.quantity, 6);
+  });
+  test('LF root sessions explicit review lifetime keeps the original review owner', () {
+    final core = BuySession();
+    final root = BuyV2RootSessions(core: core, currentIdentity: () => accountA, preserveReview: true);
+    addTearDown(core.dispose);
+    addTearDown(root.dispose);
+    final original = root.current;
+    expect(root.synchronize(accountRequired: true), isFalse);
+    expect(identical(root.current, original), isTrue);
+    expect(original.customerStateStore?.ownerScope, isNot(startsWith('firebase-account:')));
+  });
+  test('LF root sessions late retired restore cannot populate the next account', () async {
+    final f = rootFixture();
+    f.select(accountA);
+    final first = f.root.current;
+    final gate = Completer<void>();
+    f.prefs.holdNextRead = gate;
+    final late = restoreRoot(first);
+    await Future<void>.delayed(Duration.zero);
+    f.select(accountB);
+    await restoreRoot(f.root.current);
+    gate.complete();
+    await late;
+    expect(f.root.current.customerStateRecoveryPending, isFalse);
+    expect(f.root.current.cartLines, isEmpty);
+    expect(f.root.current.notice, isNull);
+  });
+  test('LF account persistence isolates every namespace and preserves review storage', () async {
+    final prefs = _R669StringPreferences();
+    final review = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'device-review:buy');
+    expect(await review.write(const BuyV2CustomerStateSnapshot(cartQuantities: {'review-item': 1})), isTrue);
+    final identities = [accountA, accountB,
+      (environment: 'host-emulator', projectId: accountA.projectId, tenantId: accountA.tenantId, userId: accountA.userId),
+      (environment: accountA.environment, projectId: 'host-other-project', tenantId: accountA.tenantId, userId: accountA.userId),
+      (environment: accountA.environment, projectId: accountA.projectId, tenantId: 'host-tenant', userId: accountA.userId)];
+    final owners = <String>{};
+    for (var i = 0; i < identities.length; i++) {
+      final identity = identities[i];
+      final store = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+        identity: identity, currentIdentity: () => identity, isSessionCurrent: () => true);
+      expect(await store.read(), isNull);
+      owners.add(store.ownerScope);
+      expect(await store.write(BuyV2CustomerStateSnapshot(cartQuantities: {'item': i + 1})), isTrue);
+    }
+    expect(owners, hasLength(5));
+    for (var i = 0; i < identities.length; i++) {
+      final identity = identities[i];
+      final restored = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+        identity: identity, currentIdentity: () => identity, isSessionCurrent: () => true);
+      expect((await restored.read())!.cartQuantities, {'item': i + 1});
+    }
+    expect((await review.read())!.cartQuantities, {'review-item': 1});
+    expect(prefs.values.keys.any((key) => key.contains('host-user')), isFalse);
+  });
+  test('LF account persistence stale read throws instead of empty account', () async {
+    final prefs = _R669StringPreferences();
+    var current = accountA;
+    final store = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => current, isSessionCurrent: () => true);
+    expect(await store.write(const BuyV2CustomerStateSnapshot(cartQuantities: {'held-item': 2})), isTrue);
+    final gate = Completer<void>();
+    prefs.holdNextRead = gate;
+    final pending = store.read();
+    final expectation = expectLater(pending, throwsStateError);
+    current = accountB;
+    gate.complete();
+    await expectation;
+    expect(prefs.writesStarted, 1);
+  });
+  test('LF account persistence old lifetime never revives when same owner returns', () async {
+    final prefs = _R669StringPreferences();
+    var lifetime = true;
+    final store = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => accountA, isSessionCurrent: () => lifetime);
+    expect(await store.write(const BuyV2CustomerStateSnapshot(cartQuantities: {'retained': 3})), isTrue);
+    final gate = Completer<void>();
+    prefs.holdNextRead = gate;
+    final pending = store.read();
+    final expectation = expectLater(pending, throwsStateError);
+    lifetime = false;
+    gate.complete();
+    await expectation;
+    expect(await store.write(const BuyV2CustomerStateSnapshot()), isFalse);
+    final resumed = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => accountA, isSessionCurrent: () => true);
+    expect((await resumed.read())!.cartQuantities, {'retained': 3});
+  });
+  test('LF account persistence in-flight write stays at original owner and fences result', () async {
+    final prefs = _R669StringPreferences();
+    var current = accountA;
+    final storeA = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => current, isSessionCurrent: () => true);
+    final gate = Completer<void>();
+    prefs.holdNextWrite = gate;
+    final pending = storeA.write(const BuyV2CustomerStateSnapshot(cartQuantities: {'retained': 4}));
+    expect(prefs.writesStarted, 1);
+    current = accountB;
+    expect(await storeA.write(const BuyV2CustomerStateSnapshot()), isFalse);
+    gate.complete();
+    expect(await pending, isFalse);
+    final storeB = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountB, currentIdentity: () => current, isSessionCurrent: () => true);
+    expect(await storeB.read(), isNull);
+    current = accountA;
+    expect((await storeA.read())!.cartQuantities, {'retained': 4});
+  });
+  test('LF account persistence recreated codec preserves uncertain after-sales hold', () async {
+    final prefs = _R669StringPreferences();
+    BuyV2SharedPreferencesCustomerStateStore create() =>
+      BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs, identity: accountA,
+        currentIdentity: () => accountA, isSessionCurrent: () => true);
+    final store = create();
+    final hold = BuyV2OrderResolutionHold(ownerScope: store.ownerScope,
+      accountId: null, orderId: 'host-order', orderIdentity: 'a' * 64);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orderResolutionHolds: [hold])), isTrue);
+    final restored = await create().read();
+    expect(restored!.orderResolutionHolds.single.toJson(), hold.toJson());
+  });
+  test('LF account persistence unknown owner or failed observation never reads guest', () async {
+    final prefs = _R669StringPreferences();
+    final absent = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => null, isSessionCurrent: () => true);
+    await expectLater(absent.read(), throwsStateError);
+    expect(await absent.write(const BuyV2CustomerStateSnapshot()), isFalse);
+    final failed = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => throw StateError('Host observation failed'),
+      isSessionCurrent: () => true);
+    await expectLater(failed.read(), throwsStateError);
+    expect(await failed.write(const BuyV2CustomerStateSnapshot()), isFalse);
+    expect(prefs.readsStarted, 0);
+    expect(prefs.writesStarted, 0);
+  });
+  test('LF account persistence corrupt saved recovery is not silently empty', () async {
+    final prefs = _R669StringPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: accountA, currentIdentity: () => accountA, isSessionCurrent: () => true);
+    final key = 'moolsocial.buy.customer-state.${store.ownerScope}.v1';
+    prefs.values[key] = '{unreadable';
+    await expectLater(store.read(), throwsFormatException);
+    expect(prefs.values[key], '{unreadable');
+    expect(prefs.writesStarted, 0);
+  });
+  test('LF account persistence refuses incomplete namespace', () {
+    final prefs = _R669StringPreferences();
+    expect(() => BuyV2SharedPreferencesCustomerStateStore.forAccount(prefs,
+      identity: (environment: '', projectId: accountA.projectId, tenantId: null, userId: accountA.userId),
+      currentIdentity: () => accountA, isSessionCurrent: () => true), throwsArgumentError);
+  });
+  // Isolated host request fixtures; never real cancellation or provider evidence.
+  Future<BuyV2Session> resolutionRecoveryFixture(
+    BuyV2CustomerStateStore store, _LfResolutionRecoveryAdapter adapter, {
+    ValueNotifier<BuyV2CollectionIdentity?>? identity,
+    int total = 20,
+    bool delivered = false,
+  }) async {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core, reviewDataEnabled: false, customerStateStore: store,
+      collectionIdentity: identity, orderResolutionAdapter: adapter,
+      commerceAdapter: _R669ProcurementCommerce(BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        orders: [BuyV2Order(id: 'lf-resolution-order', purchaseId: 'lf-purchase',
+          destination: BuyV2Destination.shop, title: 'Host purchase',
+          itemSummary: 'Host purchase', total: total, partner: 'Host seller',
+          partnerType: 'Retailer', promise: '', destinationLabel: '',
+          progress: 0, status: delivered ? BuyV2OrderStatus.delivered : BuyV2OrderStatus.confirmed,
+          lines: delivered ? [BuyV2CartLine(product: BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato'),
+            quantity: 3)] : const [])],
+      )),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    await session.restoreCommerce();
+    await session.refreshOrderResolution('lf-resolution-order');
+    return session;
+  }
+  test('LF12 recovery unknown request remains blocked after session restart', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final firstAdapter = _LfResolutionRecoveryAdapter();
+    final first = await resolutionRecoveryFixture(store, firstAdapter);
+    expect(await first.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(firstAdapter.calls, 1);
+    final nextAdapter = _LfResolutionRecoveryAdapter();
+    final next = await resolutionRecoveryFixture(store, nextAdapter);
+    expect(next.orderResolutionFor('lf-resolution-order')?.state,
+      BuyV2OrderResolutionState.unavailable);
+    expect(await next.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(nextAdapter.calls, 0);
+  });
+  test('LF12 dispatch freezes quantities before recovery loading yields', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final adapter = _LfResolutionRecoveryAdapter()
+      ..kind = BuyV2OrderResolutionKind.refund
+      ..eligibleUntil = DateTime.now().add(const Duration(hours: 1));
+    final session = await resolutionRecoveryFixture(store, adapter, delivered: true);
+    final selection = {'s-tomato': 1};
+    final sending = session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.refund, reason: 'Changed plans', itemQuantities: selection);
+    selection['s-tomato'] = 2;
+    await sending;
+    expect(adapter.requests.single.itemQuantities, {'s-tomato': 1});
+  });
+  test('LF12 dispatch does not send caller mutations made during native persistence', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final adapter = _LfResolutionRecoveryAdapter()
+      ..kind = BuyV2OrderResolutionKind.refund
+      ..eligibleUntil = DateTime.now().add(const Duration(hours: 1));
+    final session = await resolutionRecoveryFixture(store, adapter, delivered: true);
+    store.pendingWrite = Completer<void>();
+    final selection = {'s-tomato': 1};
+    final previousWrites = store.writeCalls;
+    final sending = session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.refund, reason: 'Changed plans', itemQuantities: selection);
+    while (store.writeCalls == previousWrites) { await Future<void>.delayed(Duration.zero); }
+    selection..clear()..['not-purchased'] = 100;
+    store.pendingWrite!.complete(); await sending;
+    expect(adapter.requests.single.itemQuantities, {'s-tomato': 1});
+    expect(() => adapter.requests.single.itemQuantities['s-tomato'] = 2, throwsUnsupportedError);
+  });
+  test('LF12 dispatch expired during persistence stays unsent and can refresh eligibility', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    final adapter = _LfResolutionRecoveryAdapter()
+      ..kind = BuyV2OrderResolutionKind.refund ..eligibleUntil = deadline;
+    final session = await resolutionRecoveryFixture(store, adapter, delivered: true);
+    store.pendingWrite = Completer<void>();
+    final previousWrites = store.writeCalls;
+    final sending = session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.refund, reason: 'Changed plans', itemQuantities: {'s-tomato': 1});
+    while (store.writeCalls == previousWrites) { await Future<void>.delayed(Duration.zero); }
+    // Exercise the actual DateTime-based boundary without overriding production
+    // clocks or depending on a fixed scheduler delay being long enough.
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    store.pendingWrite!.complete(); expect(await sending, isFalse);
+    expect(adapter.calls, 0);
+    expect(session.notice, contains('eligibility'));
+    adapter.eligibleUntil = DateTime.now().add(const Duration(hours: 1));
+    expect(await session.refreshOrderResolution('lf-resolution-order'), isTrue);
+    await session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.refund, reason: 'Changed plans', itemQuantities: {'s-tomato': 1});
+    expect(adapter.calls, 1); // This process knows the expired request was unsent.
+  });
+  test('LF12 recovery failed device save prevents request dispatch', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner')..rejectWrites = true;
+    final adapter = _LfResolutionRecoveryAdapter();
+    final session = await resolutionRecoveryFixture(store, adapter);
+    expect(await session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(adapter.calls, 0);
+    store.rejectWrites = false;
+    await session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    expect(adapter.calls, 1); // Known-unsent failures are retryable in this process.
+  });
+  test('LF12 recovery double tap waits for the exact durable write', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final adapter = _LfResolutionRecoveryAdapter();
+    final session = await resolutionRecoveryFixture(store, adapter);
+    store.pendingWrite = Completer<void>();
+    final first = session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    final second = session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    await Future<void>.delayed(Duration.zero);
+    expect(adapter.calls, 0);
+    store.pendingWrite!.complete();
+    expect(await first, isFalse);
+    expect(await second, isFalse);
+    expect(adapter.calls, 1);
+  });
+  test('LF12 recovery changed purchased facts cannot bypass an unresolved hold', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final first = await resolutionRecoveryFixture(store, _LfResolutionRecoveryAdapter());
+    await first.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    final adapter = _LfResolutionRecoveryAdapter();
+    final changed = await resolutionRecoveryFixture(store, adapter, total: 21);
+    expect(changed.orderResolutionFor('lf-resolution-order')?.state,
+      BuyV2OrderResolutionState.unavailable);
+    expect(await changed.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(adapter.calls, 0);
+  });
+  test('LF12 recovery late other-account reply cannot clear original hold', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(accountId: 'owner-a', sessionId: 'session-a'));
+    addTearDown(identity.dispose);
+    final reply = Completer<BuyV2OrderResolutionResult>();
+    final adapter = _LfResolutionRecoveryAdapter()..reply = reply.future;
+    final first = await resolutionRecoveryFixture(store, adapter, identity: identity);
+    final pending = first.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    await adapter.started.future;
+    identity.value = const BuyV2CollectionIdentity(accountId: 'owner-b', sessionId: 'session-b');
+    reply.complete(const BuyV2OrderResolutionResult(accepted: true,
+      customerMessage: 'Host request recorded', reference: 'host-request-one'));
+    expect(await pending, isFalse);
+    expect(store.snapshot!.orderResolutionHolds.single.accountId, 'owner-a');
+    final other = await resolutionRecoveryFixture(store, _LfResolutionRecoveryAdapter(), identity: identity);
+    expect(other.orderResolutionFor('lf-resolution-order')?.state,
+      BuyV2OrderResolutionState.ready);
+    identity.value = const BuyV2CollectionIdentity(accountId: 'owner-a', sessionId: 'session-a2');
+    final original = await resolutionRecoveryFixture(store, _LfResolutionRecoveryAdapter(), identity: identity);
+    expect(original.orderResolutionFor('lf-resolution-order')?.state,
+      BuyV2OrderResolutionState.unavailable);
+  });
+  test('LF12 recovery failed receipt clearing keeps the hold and receipt', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner');
+    final adapter = _LfResolutionRecoveryAdapter()..fail = false;
+    final session = await resolutionRecoveryFixture(store, adapter);
+    store.onSaved = (snapshot) {
+      if (snapshot.orderResolutionHolds.isNotEmpty) store.rejectWrites = true;
+    };
+    expect(await session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isTrue);
+    expect(session.orderResolutionResultFor('lf-resolution-order')?.reference, 'host-request-one');
+    expect(session.orderResolutionFor('lf-resolution-order')?.state,
+      BuyV2OrderResolutionState.unavailable);
+    expect(adapter.calls, 1);
+  });
+  test('LF12 recovery malformed retained uncertainty prevents dispatch', () async {
+    final store = _MemoryCustomerStateStore('lf-resolution-owner')
+      ..snapshot = const BuyV2CustomerStateSnapshot(orderResolutionHolds: [
+        BuyV2OrderResolutionHold(ownerScope: 'lf-resolution-owner', accountId: null,
+          orderId: 'lf-resolution-order', orderIdentity: 'invalid-hash')]);
+    final adapter = _LfResolutionRecoveryAdapter();
+    final session = await resolutionRecoveryFixture(store, adapter);
+    expect(await session.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(adapter.calls, 0);
+    expect(store.snapshot!.orderResolutionHolds.single.orderIdentity, 'invalid-hash');
+  });
+  test('LF12 recovery hold codec rejects unknown or malformed fields', () {
+    final json = BuyV2OrderResolutionHold(ownerScope: 'owner', accountId: 'account',
+      orderId: 'order', orderIdentity: sha256.convert(utf8.encode('host-order')).toString()).toJson();
+    expect(BuyV2OrderResolutionHold.fromJson(json).toJson(), json);
+    expect(() => BuyV2OrderResolutionHold.fromJson({...json, 'extra': true}), throwsFormatException);
+    expect(() => BuyV2OrderResolutionHold.fromJson({...json, 'orderIdentity': 'bad'}), throwsFormatException);
+  });
+  test('LF12 recovery serialized fresh-store read retains uncertainty', () async {
+    final previous = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+    const owner = 'lf-serialized-owner';
+    BuyV2SharedPreferencesCustomerStateStore newStore() =>
+      BuyV2SharedPreferencesCustomerStateStore(SharedPreferencesAsync(), ownerScope: owner);
+    final first = await resolutionRecoveryFixture(newStore(), _LfResolutionRecoveryAdapter());
+    await first.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans');
+    final restored = await newStore().read();
+    expect(restored!.orderResolutionHolds.single.orderId, 'lf-resolution-order');
+    final adapter = _LfResolutionRecoveryAdapter();
+    final next = await resolutionRecoveryFixture(newStore(), adapter);
+    expect(await next.submitOrderResolution(orderId: 'lf-resolution-order',
+      kind: BuyV2OrderResolutionKind.cancel, reason: 'Changed plans'), isFalse);
+    expect(adapter.calls, 0);
+  });
+  test('LF12 recovery malformed codec is not erased and legacy absence is compatible', () async {
+    final previous = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+    final prefs = SharedPreferencesAsync();
+    const key = 'moolsocial.buy.customer-state.lf-codec-owner.v1';
+    final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'lf-codec-owner');
+    await prefs.setString(key, jsonEncode({'cartQuantities': {'retained-sku': 2},
+      'paymentReference': 'original-reference'}));
+    final legacy = await store.read();
+    expect(legacy!.orderResolutionHolds, isEmpty);
+    expect(legacy.cartQuantities, {'retained-sku': 2});
+    expect(legacy.paymentReference, 'original-reference');
+    final invalid = jsonEncode({'orderResolutionHolds': {'version': 2, 'records': []}});
+    await prefs.setString(key, invalid);
+    await expectLater(store.read(), throwsFormatException);
+    expect(await prefs.getString(key), invalid);
+  });
   Future<(BuyV2Session, TestLegacyRecoveryCommerce, _MemoryCustomerStateStore)>
   legacyRecoveryFixture({
     bool manualDispose = false,
@@ -5184,6 +5879,87 @@ void main() {
       productIds: [product.id],
       lines: [BuyV2CartLine(product: product, quantity: 3)],
     );
+    // Host-only bound public listings; no live provider/Stock/payment authority.
+    BuyV2Product publicListing(bool trade) {
+      final id = 'listing-${(trade ? 'e' : 'd') * 64}';
+      final channel = trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail;
+      return BuyV2Product(id: id, canonicalId: 'host-canonical', storeId: 'host-store',
+        publicListingIdentity: BuyV2PublicListingIdentity(listingId: id, realm: 'evaluation',
+          storeId: 'host-store', skuId: 'host-shared-sku', canonicalProductId: 'host-canonical',
+          verifiedPackId: 'host-pack', channel: channel),
+        destination: trade ? BuyV2Destination.wholesale : BuyV2Destination.shop,
+        categoryId: 'grocery', brand: 'Host', title: 'Host oil', variant: 'Sunflower', pack: '1 L',
+        price: trade ? 250 : 260, minimumOrder: trade ? 10 : 1, unitPrice: '', badge: '',
+        seller: 'Host Store', sellerType: 'Retailer', deliveryPromise: '', origin: '', confirmedOn: '',
+        visualLabel: '', visualKind: 'unavailable', offerClass: channel);
+    }
+    for (final trade in [false, true]) {
+      test('LF-LISTING purchased restart preserves original source identity without eligibility trade=$trade', () async {
+        final preferences = _R669StringPreferences(), selected = publicListing(trade);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)])), isTrue);
+        final fresh = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        final restored = (await fresh.read())!.orders.single.lines.single.product;
+        expect(restored.publicListingIdentity, selected.publicListingIdentity);
+        expect(restored.id, selected.id); expect(restored.sourceSkuId, 'host-shared-sku');
+        expect(restored.hasValidPublicListingIdentity, isTrue);
+        expect(restored.catalogueListing, isFalse); expect(restored.procurementSupplierGrant, isNull);
+        expect(restored.reviewDeliveryOptions, isEmpty); expect(restored.packTerms, isNull);
+      });
+    }
+    test('LF-LISTING procurement restart preserves source identity and refuses malformed present binding', () async {
+      final preferences = _R669StringPreferences(), selected = publicListing(true);
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+      expect(await store.write(BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+        ownerScope: 'receipt-buyer', cartProducts: {selected.id: selected}))), isTrue);
+      final restored = (await store.read())!.procurementDraft!.cartProducts[selected.id]!;
+      expect(restored.publicListingIdentity, selected.publicListingIdentity);
+      expect(restored.procurementSupplierGrant!.approved, isFalse);
+      expect(restored.procurementSupplierGrant!.published, isFalse);
+      final key = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      (raw['procurementDraft']['cartProducts'][selected.id]['publicListingIdentity'] as Map)['storeId'] = 'foreign-store';
+      preferences.values[key] = jsonEncode(raw);
+      expect((await store.read())!.procurementDraft!.cartProducts.containsKey(selected.id), isFalse);
+      expect(jsonDecode(preferences.values[key]!), raw, reason: 'Unreadable source metadata is not silently rewritten.');
+    });
+    for (final corruption in ['unknown schema', 'foreign Store', 'foreign listing', 'wrong channel', 'null binding']) {
+      test('LF-LISTING corrupt purchased binding retains order but never downgrades to legacy $corruption', () async {
+        final preferences = _R669StringPreferences(), selected = publicListing(false);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)]));
+        final key = preferences.values.keys.single;
+        final raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+        final snapshot = raw['orders'][0]['lines'][0]['purchasedProduct'] as Map;
+        final binding = snapshot['publicListingIdentity'] as Map;
+        if (corruption == 'unknown schema') binding['schemaVersion'] = 9;
+        if (corruption == 'foreign Store') binding['storeId'] = 'foreign-store';
+        if (corruption == 'foreign listing') binding['listingId'] = 'listing-${'c' * 64}';
+        if (corruption == 'wrong channel') binding['channel'] = 'wholesale';
+        if (corruption == 'null binding') snapshot['publicListingIdentity'] = null;
+        preferences.values[key] = jsonEncode(raw);
+        final order = (await store.read())!.orders.single;
+        expect(order.id, 'retained-order'); expect(order.total, 780);
+        expect(order.lines, isEmpty);
+        expect(jsonDecode(preferences.values[key]!), raw);
+      });
+    }
+    test('LF-LISTING two channels restore as separate Cart lines without enabling placement', () async {
+      final retail = publicListing(false), trade = publicListing(true), core = BuySession();
+      final store = _MemoryCustomerStateStore('host-listing-cart')..snapshot = BuyV2CustomerStateSnapshot(
+        cartQuantities: {retail.id: 1, trade.id: 10});
+      final commerce = _R669ProcurementCommerce(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        products: [retail, trade]));
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store,
+        commerceAdapter: commerce);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState();
+      expect(session.cartLines.map((line) => line.product.id).toSet(), {retail.id, trade.id});
+      expect(session.quantityFor(retail.id), 1); expect(session.quantityFor(trade.id), 10);
+      expect(session.cartLines.fold<int>(0, (sum, line) => sum + line.product.price * line.quantity), 2760);
+      expect(session.cartLines.every((line) => line.product.sourceSkuId == 'host-shared-sku'), isTrue);
+      expect(session.confirmOrder(), isFalse); expect(commerce.placements, isEmpty);
+    });
     for (final providerOnly in [false, true]) {
       test(
         'preserves exact purchased snapshot providerOnly=$providerOnly',
@@ -5856,6 +6632,7 @@ void main() {
     >
     scopedSession({
       bool withPaymentTerms = false,
+      BuyV2CommercialPaymentTermsAdapter? paymentTerms,
       BuyV2ProcurementContext? context,
       BuyV2CommerceSnapshot? snapshot,
       BuyV2CustomerStateStore? retainedStore,
@@ -5873,9 +6650,9 @@ void main() {
         procurementIdentity: identity,
         customerStateStore: store,
         commerceAdapter: adapter,
-        commercialPaymentTermsAdapter: withPaymentTerms
+        commercialPaymentTermsAdapter: paymentTerms ?? (withPaymentTerms
             ? _StoreScopedTermsFixture()
-            : null,
+            : null),
         reviewDataEnabled: false,
         productFactsAdapter: _R669OrderReadyFacts(),
         cataloguePageSource: catalogueSource,
@@ -7000,6 +7777,30 @@ void main() {
       }
     }
 
+    for (final candidate in [(due: 600, limit: 600, accepted: true),
+      (due: 525, limit: 10000000, accepted: false), (due: 600, limit: 599, accepted: false)]) {
+      test('LF-PAISE procurement booking preserves whole-rupee ceil and exact UPI limit due=${candidate.due} limit=${candidate.limit}', () async {
+        final offered = product.copyWith(price: 105, mrp: 200, minimumOrder: 1,
+          packTerms: BuyV2PackTerms(skuId: product.id, revision: 'host-rounding', sellUnit: 'pack'),
+          procurementSupplierGrant: supplier());
+        final fixture = await scopedSession(snapshot: commerceSnapshot(products: [offered]),
+          paymentTerms: _StoreScopedExactBookingTerms(candidate.due, candidate.limit));
+        final session = fixture.session;
+        expect(session.addProduct(product.id), isTrue, reason: session.notice);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isTrue, reason: session.notice);
+        expect(session.choosePayment('UPI'), isTrue);
+        expect(session.checkoutPayableTotalMinor, 10500);
+        expect(await session.refreshCommercialPaymentTerms(), isFalse, reason: 'Wholesale requires explicit selection');
+        final choices = session.commercialPaymentTermsFor(session.checkoutFulfilmentGroups.single.key);
+        expect(choices.length, candidate.accepted ? 1 : 0);
+        if (candidate.accepted) {
+          expect(session.chooseCommercialPaymentTerm(choices.single), isTrue);
+          expect(session.checkoutAmountDueNowMinor, 600); expect(session.checkoutBalanceDueMinor, 9900);
+        } else { expect(session.checkoutPaymentTermsReviewRequired, isTrue); }
+      });
+    }
+
     test(
       'payment placement carries exact scope and rejects late account result',
       () async {
@@ -8098,19 +8899,21 @@ void main() {
       bool openCheckout = true,
       bool purchaseServices = true,
       BuyV2PurchaseOrderAdapter? purchaseOrderAdapter,
+      _CollectionPurchaseHarness? services,
     }) async {
+      final activeHarness = services ?? harness;
       final core = BuySession();
       final session = BuyV2Session(
         core: core,
         reviewDataEnabled: true,
-        cataloguePageSource: _CollectionPurchaseCatalogueSource(harness),
-        catalogueNow: () => harness.clock,
-        collectionIdentity: harness.identity,
+        cataloguePageSource: _CollectionPurchaseCatalogueSource(activeHarness),
+        catalogueNow: () => activeHarness.clock,
+        collectionIdentity: activeHarness.identity,
         purchaseOrderAdapter: purchaseOrderAdapter,
-        collectionGateway: harness,
+        collectionGateway: activeHarness,
         collectionPendingStore: _CollectionScannerPending(),
-        collectionCheckoutGateway: purchaseServices ? harness : null,
-        collectionPurchaseStore: purchaseServices ? harness : null,
+        collectionCheckoutGateway: purchaseServices ? activeHarness : null,
+        collectionPurchaseStore: purchaseServices ? activeHarness : null,
       );
       addTearDown(() {
         session.dispose();
@@ -8128,7 +8931,7 @@ void main() {
         );
       }
       for (final product in _CollectionPurchaseCatalogueSource(
-        harness,
+        activeHarness,
       ).products) {
         await session.refreshCatalogueStore(
           product.storeId!,
@@ -9041,6 +9844,19 @@ void main() {
       },
     );
 
+    test('LF-PAISE collection offsetting unsafe components cannot enter exact order history', () {
+      final basket = harness.basket();
+      final quote = BuyV2CollectionCheckoutQuote(
+        id: 'host-overflow', sourceId: 'host-service',
+        basketFingerprint: basket.fingerprint, issuedAt: harness.clock,
+        validUntil: harness.clock.add(const Duration(minutes: 1)),
+        lineAmountsMinor: const {'sku-a': 10000}, totalMinor: 10000,
+        taxMinor: 9007199254740992, discountMinor: 9007199254740992,
+      );
+      expect(quote.matches(basket), isFalse);
+      expect(() => BuyV2CollectionPurchaseIntent(operationId: 'host-original', basket: basket, quote: quote), throwsFormatException);
+    });
+
     test('overflowing fee arithmetic cannot produce a small payable total', () {
       final basket = harness.basket();
       final quote = BuyV2CollectionCheckoutQuote(
@@ -9240,6 +10056,11 @@ void main() {
         expect(session.view, BuyV2View.tracking);
         expect(session.selectedOrderOrNull!.id, 'order-a');
         expect(session.selectedOrderOrNull!.totalMinor, 10025);
+        expect(session.selectedOrderOrNull!.usesMinorAmounts, isTrue);
+        expect(session.selectedOrderOrNull!.taxMinor, 25);
+        expect(session.selectedOrderOrNull!.amountPaidNowMinor, 10025);
+        expect(session.selectedOrderOrNull!.balanceDueMinor, 0);
+        expect(() => session.selectedOrderOrNull!.total, throwsFormatException);
         expect(session.selectedOrderOrNull!.collection!.storeId, 'store-a');
         expect(session.quantityFor('sku-a'), 0);
         expect(session.quantityFor('sku-b'), 1);
@@ -9247,6 +10068,27 @@ void main() {
         expect(harness.placements, 1);
       },
     );
+
+    test('LF-PAISE collection session recovers original after restart despite missing fresh payment eligibility', () async {
+      final session = await checkoutSession();
+      session.chooseCheckoutCollection(true, storeId: 'store-a');
+      session.continueCheckoutFromAddress();
+      expect(await session.prepareCollectionCheckout(), isTrue);
+      harness.outcome = BuyV2CollectionPurchaseState.unknown;
+      expect(await session.submitOrder(), isFalse);
+      final original = harness.pending!;
+      final restarted = await checkoutSession();
+      restarted.chooseCheckoutCollection(true, storeId: 'store-a');
+      restarted.continueCheckoutFromAddress();
+      restarted.availablePaymentMethods = {};
+      expect(await restarted.prepareCollectionCheckout(), isFalse);
+      expect(restarted.collectionCheckout!.intent, same(original));
+      expect(restarted.collectionCheckout!.unresolved, isTrue);
+      expect(harness.lastRequest, same(original));
+      expect(harness.reconciliations, 1);
+      expect(harness.quotes, 1); expect(harness.placements, 1);
+      expect(restarted.quantityFor('sku-a'), 1);
+    });
 
     test(
       'unresolved collection cannot switch branch delivery or payment',
@@ -9360,6 +10202,144 @@ void main() {
       expect(checkout.paidOrder, isNull);
       expect(harness.settlements, 0);
       expect(harness.pending, isNotNull);
+    });
+
+    test('LF-PAISE collection root dispatches exact lines and admits exact order components', () async {
+      final exact = _MinorCollectionPurchaseHarness();
+      final session = await checkoutSession(services: exact);
+      expect(session.chooseCheckoutCollection(true, storeId: 'store-a'), isTrue);
+      session.continueCheckoutFromAddress();
+      expect(session.currentCollectionBasket!.usesMinorAmounts, isTrue);
+      expect(session.currentCollectionBasket!.lines.single.totalMinor, 1025);
+      expect(await session.prepareCollectionCheckout(), isTrue);
+      expect(await session.submitOrder(), isTrue);
+      final order = session.selectedOrderOrNull!;
+      expect(order.payableTotalMinor, 1050); expect(order.taxMinor, 25);
+      expect(order.amountPaidNowMinor, 1050); expect(order.balanceDueMinor, 0);
+      expect(order.lines.single.product.priceMinor, 1025);
+      expect(order.usesMinorAmounts, isTrue);
+      expect(exact.minorQuotes, 1); expect(exact.minorPlacements, 1);
+      expect(exact.quotes, 0); expect(session.quantityFor('sku-a'), 0);
+      expect(session.quantityFor('sku-b'), 1);
+    });
+
+    test('LF-PAISE collection root recovers v2 intent even when legacy gateway cannot form new fractional basket', () async {
+      final exact = _MinorCollectionPurchaseHarness()..outcome = BuyV2CollectionPurchaseState.unknown;
+      final before = await checkoutSession(services: exact);
+      before.chooseCheckoutCollection(true, storeId: 'store-a');
+      before.continueCheckoutFromAddress();
+      expect(await before.prepareCollectionCheckout(), isTrue);
+      expect(await before.submitOrder(), isFalse);
+      final original = exact.pending!;
+      final legacy = _CollectionPurchaseHarness()
+        ..fractionalCatalogue = true
+        ..pending = original
+        ..outcome = BuyV2CollectionPurchaseState.unknown;
+      final after = await checkoutSession(services: legacy);
+      after.chooseCheckoutCollection(true, storeId: 'store-a');
+      after.continueCheckoutFromAddress();
+      expect(after.currentCollectionBasket, isNull);
+      expect(await after.prepareCollectionCheckout(), isFalse);
+      expect(after.collectionCheckout!.intent, same(original));
+      expect(after.collectionCheckout!.unresolved, isTrue);
+      expect(legacy.lastRequest, same(original)); expect(legacy.reconciliations, 1);
+      expect(legacy.quotes, 0); expect(legacy.placements, 0);
+      expect(after.quantityFor('sku-a'), 1);
+    });
+
+    test('LF-PAISE collection retains literal legacy hash and distinguishes exact whole prices', () {
+      final old = harness.basket();
+      final line = old.lines.single;
+      final literal = sha256.convert(utf8.encode(jsonEncode([
+        'buy-collection-checkout-v1', old.identity.accountId, old.identity.sessionId,
+        old.store.id, old.paymentMethod, [line.product.canonicalId, line.product.id,
+          line.product.destination.name, line.product.pack, line.product.variant, 100, 1],
+      ]))).toString();
+      expect(old.usesMinorAmounts, isFalse);
+      expect(old.fingerprint, literal);
+      expect(harness.basket(priceMinor: 10000).fingerprint, literal);
+      final exact = harness.basket(priceMinor: 10000, minor: true);
+      expect(exact.usesMinorAmounts, isTrue);
+      expect(exact.fingerprint, isNot(literal));
+      expect(() => harness.basket(priceMinor: 1025), throwsFormatException);
+    });
+
+    test('LF-PAISE collection exact request never dispatches to legacy gateway', () async {
+      final basket = harness.basket(priceMinor: 1025, minor: true);
+      expect(await checkout.prepare(basket), isFalse);
+      expect(await checkout.place(basket), isFalse);
+      expect(harness.quotes, 0); expect(harness.placements, 0);
+      expect(harness.pending, isNull);
+    });
+
+    for (final fault in ['', 'price', 'basket', 'expiry']) {
+      test('LF-PAISE collection minor quote/place preserves exact money fault=$fault', () async {
+        final exact = _MinorCollectionPurchaseHarness()..quoteFault = fault;
+        final controller = exact.controller();
+        addTearDown(controller.dispose);
+        final basket = exact.basket(priceMinor: 1025, quantity: 4, minor: true);
+        expect(await controller.prepare(basket), fault.isEmpty);
+        if (fault.isEmpty) {
+          expect(controller.quote!.totalMinor, 4125);
+          expect(await controller.place(basket), isTrue);
+          expect(controller.paidOrder!.totalMinor, 4125);
+          expect(controller.paidOrder!.lines.single.amountMinor, 4100);
+          expect(exact.minorPlacements, 1);
+        } else {
+          expect(await controller.place(basket), isFalse);
+          expect(exact.minorPlacements, 0);
+          expect(exact.pending, isNull);
+        }
+        expect(exact.minorQuotes, 1); expect(exact.quotes, 0);
+      });
+    }
+
+    test('LF-PAISE collection failed exact reservation never dispatches', () async {
+      final exact = _MinorCollectionPurchaseHarness()..rejectReserve = true;
+      final controller = exact.controller(); addTearDown(controller.dispose);
+      final basket = exact.basket(priceMinor: 1, minor: true);
+      expect(await controller.prepare(basket), isTrue);
+      expect(controller.quote!.totalMinor, 26);
+      expect(await controller.place(basket), isFalse);
+      expect(exact.minorPlacements, 0);
+      expect(controller.unresolved, isTrue);
+    });
+
+    for (final originalMinor in [false, true]) {
+      test('LF-PAISE collection recovery preserves original format minor=$originalMinor across capability/session change', () async {
+        final first = originalMinor ? _MinorCollectionPurchaseHarness() : _CollectionPurchaseHarness();
+        first.outcome = BuyV2CollectionPurchaseState.unknown;
+        final before = first.controller();
+        final basket = first.basket(priceMinor: originalMinor ? 1025 : 10000, minor: originalMinor);
+        expect(await before.prepare(basket), isTrue);
+        expect(await before.place(basket), isFalse);
+        final original = first.pending!; final fingerprint = original.fingerprint;
+        before.dispose();
+        final afterHarness = originalMinor ? _CollectionPurchaseHarness() : _MinorCollectionPurchaseHarness();
+        afterHarness.pending = original;
+        afterHarness.outcome = BuyV2CollectionPurchaseState.unknown;
+        afterHarness.identity.value = const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'new-session');
+        final after = afterHarness.controller(); addTearDown(after.dispose);
+        expect(await after.prepare(null), isFalse);
+        expect(afterHarness.lastRequest, same(original));
+        expect(after.intent!.fingerprint, fingerprint);
+        expect(after.intent!.basket.usesMinorAmounts, originalMinor);
+        expect(after.intent!.basket.identity.sessionId, 'session-a');
+        expect(after.unresolved, isTrue);
+        expect(afterHarness.reconciliations, 1);
+        expect(afterHarness.quotes, 0); expect(afterHarness.placements, 0);
+        if (afterHarness is _MinorCollectionPurchaseHarness) {
+          expect(afterHarness.minorQuotes, 0); expect(afterHarness.minorPlacements, 0);
+        }
+      });
+    }
+
+    test('LF-PAISE collection null candidate or failed storage cannot start a fresh attempt', () async {
+      expect(await checkout.prepare(null), isFalse);
+      harness.failRead = true;
+      expect(await checkout.prepare(harness.basket()), isFalse);
+      expect(harness.quotes, 0); expect(harness.placements, 0);
+      expect(harness.pending, isNull);
     });
 
     test('paid order matches exact branch SKU and retains 25 paise', () async {
@@ -13501,8 +14481,8 @@ void main() {
         expect(fixture.adapter.placementCalls, 0);
         expect(fixture.session.checkoutPriceReviewRequired, isTrue);
         expect(
-          fixture.session.checkoutPriceChanges.single.previousPrice,
-          fixture.product.price,
+          fixture.session.checkoutPriceChanges.single.previousPriceMinor,
+          fixture.product.priceMinor,
         );
         expect(
           fixture.session.checkoutPayableTotal,
@@ -13546,6 +14526,21 @@ void main() {
         expect(fixture.adapter.placementCalls, 1);
       },
     );
+
+    test('LF-PAISE one paise refresh requires price review before any placement', () async {
+      final facts = _MutableCommerceFactsAdapter();
+      final fixture = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.confirmed, factsAdapter: facts);
+      addTearDown(fixture.session.dispose);
+      facts.priceMinor = fixture.product.priceMinor + 1;
+      expect(await fixture.session.submitOrder(), isFalse);
+      expect(fixture.adapter.placementCalls, 0);
+      expect(fixture.session.checkoutPriceReviewRequired, isTrue);
+      final change = fixture.session.checkoutPriceChanges.single;
+      expect(change.previousPriceMinor, fixture.product.priceMinor);
+      expect(change.currentPriceMinor, fixture.product.priceMinor + 1);
+      expect(fixture.session.checkoutLines.single.product.priceMinor, fixture.product.priceMinor + 1);
+      expect(fixture.session.checkoutTotalMinor, fixture.product.priceMinor + 1);
+    });
 
     test('pending payment survives restart and keeps the Cart locked', () async {
       final store = _MemoryCustomerStateStore('account-payment');
@@ -16063,4 +17058,21 @@ class _StoreScopedTermsFixture implements BuyV2CommercialPaymentTermsAdapter {
         ),
     ],
   );
+}
+
+// Isolated exact supplier terms. No native/provider credit or payment authority.
+class _StoreScopedExactBookingTerms extends _StoreScopedTermsFixture
+    implements BuyV2MinorCommercialPaymentTermsAdapter {
+  _StoreScopedExactBookingTerms(this.dueMinor, this.limitMinor);
+  final int dueMinor, limitMinor;
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTermsMinor({required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod, required Map<String, int> quotedTotalsMinorByFulfilmentKey}) async =>
+    BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready, terms: [for (final group in groups)
+      BuyV2CommercialPaymentTerm.minor(id: 'host-exact-booking', fulfilmentKey: group.key, destination: group.destination,
+        supplierName: group.partner, kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+        orderTotalMinor: quotedTotalsMinorByFulfilmentKey[group.key]!, amountDueNowMinor: dueMinor,
+        balanceDueMinor: quotedTotalsMinorByFulfilmentKey[group.key]! - dueMinor,
+        balanceDueLabel: 'On delivery', sourceId: 'host-exact-booking-source', advancePercent: 5,
+        upiTransactionLimitMinor: limitMinor, acceptedPaymentMethods: const {'UPI'})]);
 }

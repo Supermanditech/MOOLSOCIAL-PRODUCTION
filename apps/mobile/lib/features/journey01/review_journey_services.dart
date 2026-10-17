@@ -1024,15 +1024,37 @@ class FirebaseAuthSocialClient implements FirebaseSocialAuthClient {
 }
 
 class FirebaseAuthenticatedAccountIdentityGateway
-    implements AuthenticatedAccountIdentityGateway {
+    implements AuthenticatedAccountIdentityGateway, AuthenticatedAccountPrincipalSource {
   FirebaseAuthenticatedAccountIdentityGateway(this._auth);
 
   final FirebaseAuth _auth;
 
   @override
+  ({String projectId, String? tenantId, String userId})? get currentFirebasePrincipal {
+    final user = _auth.currentUser;
+    if (user == null || _auth.tenantId != user.tenantId) return null;
+    return AuthenticatedAccountIdentity(firebaseUserId: user.uid,
+      firebaseProjectId: _auth.app.options.projectId,
+      firebaseTenantId: user.tenantId).firebasePrincipal;
+  }
+
+  @override
+  Stream<void> get firebasePrincipalChanges => _auth.userChanges().map((_) {});
+
+  @override
+  String get persistenceEnvironment =>
+    const bool.fromEnvironment('MOOLSOCIAL_USE_EMULATORS')
+      ? jsonEncode(['firebase-emulator',
+          const String.fromEnvironment('MOOLSOCIAL_EMULATOR_HOST', defaultValue: '127.0.0.1'),
+          const String.fromEnvironment('MOOLSOCIAL_EMULATOR_FALLBACK_HOST'), 9099])
+      : 'firebase-service';
+
+  @override
   Future<AuthenticatedAccountIdentity?> currentIdentity() async {
     final user = _auth.currentUser;
     if (user == null) return null;
+    final projectId = _auth.app.options.projectId;
+    final tenantId = user.tenantId;
 
     final providerLabels = user.providerData
         .map((provider) => _publicProviderLabel(provider.providerId))
@@ -1051,7 +1073,18 @@ class FirebaseAuthenticatedAccountIdentityGateway
     } on Object {
       // Firebase profile details remain usable without optional custom claims.
     }
+    // Optional claims may finish after logout/account/tenant changes.
+    // Never attach the previous principal to the new account's UI or storage.
+    final current = _auth.currentUser;
+    if (current == null || current.uid != user.uid ||
+        current.tenantId != tenantId || _auth.tenantId != tenantId ||
+        _auth.app.options.projectId != projectId) {
+      return null;
+    }
     return AuthenticatedAccountIdentity(
+      firebaseUserId: user.uid,
+      firebaseProjectId: projectId,
+      firebaseTenantId: tenantId,
       displayName: _nonEmpty(user.displayName),
       emailAddress:
           _nonEmpty(user.email) ??

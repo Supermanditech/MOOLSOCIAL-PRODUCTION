@@ -1,0 +1,5006 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_invoice_downloader.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_publication.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+// Host fixtures only. No upload, device storage or real commerce.
+final at = DateTime.utc(2026, 10, 16, 12);
+class _HostExactOrderCommerce implements BuyV2CommerceAdapter {
+  List<BuyV2Order> records = [];
+  BuyV2Order? refreshedOrder;
+  late BuyV2OrderPlacementResult reconciliation;
+  int reconciliationCalls = 0, placementCalls = 0;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready, orders: records);
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) async => BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.ready, customerMessage: 'Host refresh', order: refreshedOrder);
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({required String idempotencyKey, required String paymentReference}) async {
+    reconciliationCalls++;
+    if (idempotencyKey != 'host-original-key' || paymentReference != 'host-original-reference') {
+      throw StateError('Host original identity changed');
+    }
+    return reconciliation;
+  }
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(BuyV2OrderPlacementRequest request) async {
+    placementCalls++;
+    throw StateError('Read-only host fixture must not place');
+  }
+  // Read-only host fixture: no placement, payment or other command path.
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+class _HostPlacement extends _HostExactOrderCommerce implements BuyV2GroupedOrderPlacementAdapter {
+  final legacySingle = <BuyV2OrderPlacementRequest>[], legacyGroups = <BuyV2OrderPlacementRequest>[],
+      minorSingle = <BuyV2OrderPlacementRequest>[], minorGroups = <BuyV2OrderPlacementRequest>[];
+  void Function(BuyV2OrderPlacementRequest request)? onDispatch;
+  BuyV2OrderPlacementResult Function(BuyV2OrderPlacementRequest request)? reply;
+  BuyV2OrderPlacementResult record(BuyV2OrderPlacementRequest request) {
+    onDispatch?.call(request);
+    return reply?.call(request) ?? BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentUnknown,
+      customerMessage: 'Host original needs checking', paymentReference: 'host-placement-reference',
+      checkoutAttemptId: request.checkoutAttemptId, paymentGroupId: request.paymentGroupId, idempotencyKey: request.idempotencyKey);
+  }
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(BuyV2OrderPlacementRequest request) async {
+    legacySingle.add(request); return record(request);
+  }
+  @override
+  Future<BuyV2OrderPlacementResult> placePaymentGroup(BuyV2OrderPlacementRequest request) async {
+    legacyGroups.add(request); return record(request);
+  }
+}
+class _HostMinorPlacement extends _HostPlacement implements BuyV2MinorOrderPlacementAdapter {
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrderMinor(BuyV2OrderPlacementRequest request) async {
+    minorSingle.add(request); return record(request);
+  }
+}
+class _HostMinorGroupedPlacement extends _HostMinorPlacement implements BuyV2MinorGroupedOrderPlacementAdapter {
+  @override
+  Future<BuyV2OrderPlacementResult> placePaymentGroupMinor(BuyV2OrderPlacementRequest request) async {
+    minorGroups.add(request); return record(request);
+  }
+}
+class _HostExactOrderTracking implements BuyV2LiveDeliveryAdapter {
+  int calls = 0;
+  @override
+  Future<BuyV2LiveDeliverySnapshot> load({required String orderId}) async {
+    calls++;
+    return BuyV2LiveDeliverySnapshot(orderId: orderId,
+      state: BuyV2LiveDeliveryState.ready, customerMessage: 'Host tracking only', sourceId: 'host-tracking',
+      courierPosition: const BuyV2GeoPoint(latitude: 26.29, longitude: 73.02),
+      destinationPosition: const BuyV2GeoPoint(latitude: 26.30, longitude: 73.03),
+      driverName: 'Host driver', etaLabel: 'Host estimate', lastUpdatedAt: DateTime.now(), routeProgress: .5);
+  }
+}
+class _HostLegacyBalance implements BuyV2BalancePaymentAdapter {
+  int dueMinor = 1043, loads = 0, reconciles = 0;
+  bool failLoad = false, failStart = false, failReconcile = false;
+  final legacyAmounts = <int>[], minorAmounts = <int>[], keys = <String>[];
+  void Function()? onStart;
+  BuyV2BalancePaymentResult? nextLoad, nextStart, nextReconcile;
+  @override
+  Future<BuyV2BalancePaymentResult> loadBalance({required String orderId}) async {
+    loads++;
+    if (failLoad) throw StateError('Host load failure');
+    return nextLoad ?? BuyV2BalancePaymentResult.minor(state: BuyV2BalancePaymentState.due,
+      amountDueMinor: dueMinor, dueLabel: 'Host due', customerMessage: 'Host balance');
+  }
+  Future<BuyV2BalancePaymentResult> start(int minor, String key) async {
+    keys.add(key); onStart?.call();
+    if (failStart) throw StateError('Host lost response');
+    return nextStart ?? BuyV2BalancePaymentResult.minor(state: BuyV2BalancePaymentState.paymentActionRequired,
+      amountDueMinor: minor, dueLabel: 'Host due', customerMessage: 'Host original action',
+      paymentReference: 'host-balance-reference', paymentActionUri: Uri.parse('https://host.invalid/original'));
+  }
+  @override
+  Future<BuyV2BalancePaymentResult> startPayment({required String orderId, required int amountDue, required String idempotencyKey}) {
+    legacyAmounts.add(amountDue); return start(amountDue * 100, idempotencyKey);
+  }
+  @override
+  Future<BuyV2BalancePaymentResult> reconcilePayment({required String orderId, required String paymentReference}) async {
+    reconciles++;
+    if (paymentReference != 'host-balance-reference') throw StateError('Host reference changed');
+    if (failReconcile) throw StateError('Host reconcile failure');
+    return nextReconcile ?? const BuyV2BalancePaymentResult.minor(state: BuyV2BalancePaymentState.paid,
+      amountDueMinor: 0, dueLabel: 'Host checked', customerMessage: 'Host original paid', paymentReference: 'host-balance-reference');
+  }
+}
+class _HostMinorBalance extends _HostLegacyBalance implements BuyV2MinorBalancePaymentAdapter {
+  @override
+  Future<BuyV2BalancePaymentResult> startPaymentMinor({required String orderId, required int amountDueMinor, required String idempotencyKey}) {
+    minorAmounts.add(amountDueMinor); return start(amountDueMinor, idempotencyKey);
+  }
+}
+// Isolated quote/term transports. Never injected into the phone application.
+class _HostLegacyQuote implements BuyV2CheckoutQuoteAdapter {
+  int legacyCalls = 0;
+  Map<String, int>? legacyTips;
+  Future<BuyV2CheckoutQuoteSnapshot> Function(List<BuyV2FulfilmentGroup>, Map<String, int>)? reply;
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuote({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required Map<String, int> tipAmountsByFulfilmentKey}) async {
+    legacyCalls++; legacyTips = Map.of(tipAmountsByFulfilmentKey);
+    return reply?.call(groups, tipAmountsByFulfilmentKey) ??
+      const BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.unavailable);
+  }
+}
+class _HostMinorQuote extends _HostLegacyQuote implements BuyV2MinorCheckoutQuoteAdapter {
+  int minorCalls = 0;
+  Map<String, int>? minorTips;
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuoteMinor({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required Map<String, int> tipAmountsMinorByFulfilmentKey}) async {
+    minorCalls++; minorTips = Map.of(tipAmountsMinorByFulfilmentKey);
+    return reply?.call(groups, tipAmountsMinorByFulfilmentKey) ??
+      const BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.unavailable);
+  }
+}
+class _HostLegacyTerms implements BuyV2CommercialPaymentTermsAdapter {
+  int legacyCalls = 0;
+  Map<String, int>? legacyTotals;
+  Future<BuyV2CommercialPaymentTermsSnapshot> Function(List<BuyV2FulfilmentGroup>, Map<String, int>)? reply;
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod, required Map<String, int> quotedTotalsByFulfilmentKey}) async {
+    legacyCalls++; legacyTotals = Map.of(quotedTotalsByFulfilmentKey);
+    return reply?.call(groups, quotedTotalsByFulfilmentKey) ??
+      const BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.unavailable);
+  }
+}
+class _HostMinorTerms extends _HostLegacyTerms implements BuyV2MinorCommercialPaymentTermsAdapter {
+  int minorCalls = 0;
+  Map<String, int>? minorTotals;
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTermsMinor({required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod, required Map<String, int> quotedTotalsMinorByFulfilmentKey}) async {
+    minorCalls++; minorTotals = Map.of(quotedTotalsMinorByFulfilmentKey);
+    return reply?.call(groups, quotedTotalsMinorByFulfilmentKey) ??
+      const BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.unavailable);
+  }
+}
+class _HostTipPolicy implements BuyV2TipPolicy {
+  @override
+  List<BuyV2TipOption> optionsFor(BuyV2Destination destination) => const [BuyV2TipOption(amount: 10)];
+  @override
+  bool accepts(BuyV2Destination destination, int amount) => amount == 0 || amount == 10;
+}
+class _HostRetirableStateStore implements BuyV2CustomerStateStore {
+  @override
+  String? ownerScope = 'host-loading-owner';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+BuyV2CheckoutQuoteSnapshot _hostExactQuote(List<BuyV2FulfilmentGroup> groups, Map<String, int> tips,
+  {int coupon = 0, int fee = 0, String id = 'host-current-quote', DateTime? expires}) {
+  final now = DateTime.now();
+  final lines = [for (final group in groups) BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key,
+    itemSubtotalMinor: group.totalMinor, couponSavingMinor: coupon, taxMinor: 0, freightMinor: 0,
+    deliveryFeeMinor: fee, tipMinor: tips[group.key] ?? 0, paymentChargeMinor: 0,
+    totalMinor: group.totalMinor - coupon + fee + (tips[group.key] ?? 0))];
+  return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+    id: id, sourceId: 'host-exact-quote-source', evaluatedAt: now, validUntil: expires ?? now.add(const Duration(minutes: 5)),
+    lines: lines, totalMinor: buyV2SumMinor(lines.map((line) => line.totalMinor))));
+}
+BuyV2CommercialPaymentTermsSnapshot _hostExactRetailTerms(List<BuyV2FulfilmentGroup> groups, Map<String, int> totals) =>
+  BuyV2CommercialPaymentTermsSnapshot(state: BuyV2CommerceLoadState.ready, terms: [for (final group in groups)
+    BuyV2CommercialPaymentTerm.minor(id: 'host-retail-advance', fulfilmentKey: group.key, destination: group.destination,
+      supplierName: group.partner, kind: BuyV2CommercialPaymentTermKind.retailAdvance, orderTotalMinor: totals[group.key]!,
+      amountDueNowMinor: totals[group.key]!, balanceDueMinor: 0, balanceDueLabel: 'No balance', sourceId: 'host-terms-source')]);
+class _HostLegacyBenefits implements BuyV2CartBenefitsAdapter {
+  final offers = <BuyV2CartBenefit>[];
+  final legacyInputs = <int>[];
+  @override
+  List<BuyV2CartBenefit> benefitsFor({required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations, required int itemTotal}) {
+    legacyInputs.add(itemTotal);
+    return offers.where((b) => b.kind == kind && destinations.contains(b.destination)).toList();
+  }
+}
+class _HostMinorBenefits extends _HostLegacyBenefits implements BuyV2MinorCartBenefitsAdapter {
+  final minorInputs = <int>[];
+  @override
+  List<BuyV2CartBenefit> benefitsForMinor({required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations, required int itemTotalMinor}) {
+    minorInputs.add(itemTotalMinor);
+    return offers.where((b) => b.kind == kind && destinations.contains(b.destination)).toList();
+  }
+}
+class _HostSeededOverrideBenefits extends BuyV2SeededCartBenefitsAdapter {
+  final calls = <int>[];
+  @override
+  List<BuyV2CartBenefit> benefitsFor({required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations, required int itemTotal}) {
+    calls.add(itemTotal);
+    return const [];
+  }
+}
+class _HostLiveBenefits extends _HostLegacyBenefits implements BuyV2LiveCartBenefitsAdapter {
+  Completer<BuyV2CartBenefitsSnapshot>? held;
+  final requests = <BuyV2CartBenefitsRequest>[];
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(BuyV2CartBenefitsRequest request) async {
+    requests.add(request);
+    return held?.future ?? BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: at, benefits: List.of(offers));
+  }
+}
+class _HostBenefitFacts implements BuyV2ProductFactsAdapter {
+  int minor = 2000;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+    const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(priceMinor: minor);
+}
+// Explicit isolated review source. No backend, native state or authority grant.
+class _ExactMoneyHostCatalogue implements BuyV2CataloguePageSource {
+  final rows = <BuyV2Product>[];
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key,
+      snapshotId: 'host-exact-money', items: const [], startIndex: 0, totalCount: 0);
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query,
+    {String? cursor, required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key,
+      snapshotId: 'host-exact-money', items: rows.where((p) => p.destination == query.destination),
+      startIndex: 0, totalCount: rows.where((p) => p.destination == query.destination).length);
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async => rows.where((p) => ids.contains(p.id)).toList();
+}
+final class _ExactMoneyHostPreferences implements SharedPreferencesAsync {
+  _ExactMoneyHostPreferences({this.beforeSet});
+  final values = <String, String>{};
+  final void Function(String key, String value)? beforeSet;
+  @override
+  Future<String?> getString(String key) async => values[key];
+  @override
+  Future<void> setString(String key, String value) async {
+    beforeSet?.call(key, value);
+    values[key] = value;
+  }
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Unexpected host preferences operation');
+}
+// Isolated host journal/authority: never wired to a native evaluation Store.
+class PublicDetailsHostJournal implements WorkspacePublicDetailsJournal {
+  WorkspacePublicDetailsIntent? original;
+  bool failRead = false, failSave = false, failRemove = false;
+  Completer<void>? saveGate;
+  final events = <String>[];
+  @override
+  Future<WorkspacePublicDetailsIntent?> readPending(WorkspacePublicDetailsScope scope) async {
+    if (failRead) throw StateError('host read');
+    return original;
+  }
+  @override
+  Future<void> savePending(WorkspacePublicDetailsIntent value) async {
+    events.add('journal');
+    await saveGate?.future;
+    if (failSave) throw StateError('host save');
+    if (original != null && original!.fingerprint != value.fingerprint) throw StateError('different original');
+    original = value;
+  }
+  @override
+  Future<void> removePending(WorkspacePublicDetailsIntent value) async {
+    if (failRemove) throw StateError('host remove');
+    expect(original?.fingerprint, value.fingerprint);
+    original = null;
+  }
+}
+class PublicDetailsHostGateway implements WorkspacePublicDetailsOwnerGateway {
+  WorkspacePublicDetailsRecord? head;
+  WorkspacePublicDetailsWriteState outcome = WorkspacePublicDetailsWriteState.unknown;
+  WorkspacePublicDetailsRecord? acknowledgement;
+  Completer<WorkspacePublicDetailsWriteResult>? response;
+  final sent = <({WorkspacePublicDetailsIntent original, bool reconcile})>[];
+  int reads = 0;
+  @override
+  Future<WorkspacePublicDetailsRecord?> readPublicDetailsOwned({required String storeId, required bool Function() current}) async {
+    reads++;
+    return head;
+  }
+  @override
+  Future<WorkspacePublicDetailsWriteResult> writePublicDetails(WorkspacePublicDetailsIntent original,
+    {required bool Function() current, bool reconcile = false}) async {
+    sent.add((original: original, reconcile: reconcile));
+    return response?.future ?? WorkspacePublicDetailsWriteResult(outcome, acknowledgement);
+  }
+}
+// Host storage-completion boundary; this is not Android encryption acceptance.
+class _DelayedDetailsStorage extends FlutterSecureStorage {
+  final rows = <String, String>{};
+  final entered = Completer<void>(), release = Completer<void>();
+  int writes = 0;
+  @override
+  Future<String?> read({required String key, AppleOptions? iOptions, AndroidOptions? aOptions,
+    LinuxOptions? lOptions, WebOptions? webOptions, AppleOptions? mOptions, WindowsOptions? wOptions}) async => rows[key];
+  @override
+  Future<void> write({required String key, required String? value, AppleOptions? iOptions, AndroidOptions? aOptions,
+    LinuxOptions? lOptions, WebOptions? webOptions, AppleOptions? mOptions, WindowsOptions? wOptions}) async {
+    writes++; if (writes == 1) { entered.complete(); await release.future; }
+    if (value == null) throw StateError('Journal must use a matching tombstone, not deletion');
+    rows[key] = value;
+  }
+}
+const product = BuyV2Product(
+  id: 'sku-one',
+  canonicalId: 'canonical-one',
+  storeId: 'store-one',
+  destination: BuyV2Destination.shop,
+  categoryId: 'cooking-oil',
+  brand: 'Host fixture',
+  title: 'Host fixture oil',
+  variant: 'Sunflower',
+  pack: '1 L',
+  price: 260,
+  mrp: 280,
+  unitPrice: '',
+  badge: '',
+  seller: 'Host Store',
+  sellerType: 'Retailer',
+  deliveryPromise: '',
+  origin: '',
+  confirmedOn: '',
+  visualLabel: '',
+  visualKind: '',
+  offerClass: BuyV2OfferClass.retail,
+);
+Map<String, dynamic> page() => {
+  'schemaVersion': 1,
+  'realm': 'production',
+  'storeId': 'store-one',
+  'observedAt': '2026-10-16T12:00:00.000Z',
+  'orderingAvailable': false,
+  'coverage': 'verified_public_only',
+  'state': 'ready',
+  'catalogueVersion': 1,
+  'nextCursor': null,
+  'items': [
+    {
+      'skuId': 'sku-one',
+      'canonicalProductId': 'canonical-one',
+      'verifiedPackId': 'pack-one',
+      'sku': 'HOST-ONE',
+      'revision': 1,
+      'observedAt': '2026-10-16T11:00:00.000Z',
+      'content': {
+        'title': product.title,
+        'brand': product.brand,
+        'variant': product.variant,
+        'categoryId': 'cooking-oil',
+        'description': 'Verified host description',
+        'highlights': ['One litre'],
+        'specifications': [
+          {'label': 'Oil', 'value': 'Sunflower'},
+        ],
+        'media': [],
+      },
+      'pack': {
+        'label': '1 L',
+        'quantityMilli': 1000,
+        'unit': 'L',
+        'unitsPerCase': 1,
+      },
+      'channels': [
+        {
+          'kind': 'retail',
+          'offerId': 'offer-one',
+          'priceMinor': 26000,
+          'mrpMinor': 28000,
+          'minimumOrder': 1,
+          'quantityStep': 1,
+          'tiers': [],
+          'revision': 'term-one',
+          'validUntil': '2026-10-16T13:00:00.000Z',
+        },
+      ],
+    },
+  ],
+};
+
+class Credentials implements SocialContentCredentials {
+  final modes = <SocialAppCheckTokenMode>[];
+  @override
+  Future<String> firebaseIdToken() async => 'isolated-host-token';
+  @override
+  Future<String> appCheckToken(SocialAppCheckTokenMode mode) async {
+    modes.add(mode);
+    return 'isolated-host-appcheck';
+  }
+}
+
+class Transport implements SocialContentTransport {
+  Transport(this.data);
+  Map<String, dynamic> data;
+  Map<String, Object?>? sent;
+  bool fail = false;
+  @override
+  Future<SocialContentResponse> postJson(
+    Uri endpoint, {
+    required Map<String, String> headers,
+    required Map<String, Object?> body,
+  }) async {
+    sent = body;
+    if (fail) throw StateError('isolated host failure');
+    return SocialContentResponse(
+      statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': data}),
+    );
+  }
+}
+
+AuthenticatedWorkspaceCatalogueGateway gateway(
+  Transport transport, [
+  Credentials? credentials,
+]) => AuthenticatedWorkspaceCatalogueGateway(
+  endpoint: Uri.parse(
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+  ),
+  credentials: credentials ?? Credentials(),
+  transport: transport,
+  now: () => at,
+);
+
+class HoldingGateway implements WorkspaceCatalogueGateway {
+  final response = Completer<WorkspaceCatalogueContentResult>();
+  int calls = 0;
+  @override
+  Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) {
+    calls++;
+    return response.future;
+  }
+}
+
+Map<String, dynamic> row(Map<String, dynamic> data) =>
+    (data['items'] as List).single as Map<String, dynamic>;
+
+Map<String, dynamic> ownerRow({int revision = 1, bool listed = false}) {
+  final result = row(jsonDecode(jsonEncode(page())) as Map<String, dynamic>);
+  for (final channel in result['channels'] as List) {
+    (channel as Map)
+      ..remove('revision')
+      ..remove('validUntil');
+  }
+  return result
+    ..['schemaVersion'] = 1
+    ..['storeId'] = 'store-one'
+    ..['revision'] = revision
+    ..['publicListing'] = listed
+    ..['provenance'] = {
+      'entryMethod': 'manual',
+      'sourceRecordId': 'original-one',
+    };
+}
+
+class OwnerTransport implements SocialContentTransport {
+  OwnerTransport(this.reply);
+  final Future<SocialContentResponse> Function(Map<String, Object?> body) reply;
+  int calls = 0;
+  @override
+  Future<SocialContentResponse> postJson(
+    Uri endpoint, {
+    required Map<String, String> headers,
+    required Map<String, Object?> body,
+  }) {
+    calls++;
+    return reply(body);
+  }
+}
+
+class RetiringOwnerCredentials extends Credentials {
+  RetiringOwnerCredentials(this.retire);
+  final void Function() retire;
+  @override
+  Future<String> appCheckToken(SocialAppCheckTokenMode mode) async {
+    retire();
+    return super.appCheckToken(mode);
+  }
+}
+
+AuthenticatedWorkspaceCatalogueGateway ownerGateway(
+  OwnerTransport transport, [
+  Credentials? credentials,
+]) => AuthenticatedWorkspaceCatalogueGateway(
+  endpoint: Uri.parse(
+    'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace',
+  ),
+  credentials: credentials ?? Credentials(),
+  transport: transport,
+  now: () => at,
+  ownerAccountId: 'owner-one',
+);
+
+WorkspaceCatalogueBindingIntent ownerIntent() =>
+    WorkspaceCatalogueOwnedSku.decode(
+      ownerRow(),
+      storeId: 'store-one',
+      skuId: 'sku-one',
+      now: at,
+      realm: 'production',
+    ).listingIntent(
+      accountId: 'owner-one',
+      idempotencyKey: 'binding-original',
+      listed: true,
+    );
+
+SocialContentResponse ownerAck(Map<String, Object?> request) =>
+    SocialContentResponse(
+      statusCode: 200,
+      body: jsonEncode({
+        'ok': true,
+        'data': {
+          'schemaVersion': 1,
+          'realm': 'production',
+          'storeId': 'store-one',
+          'saved': {
+            ...request['sku'] as Map,
+            'schemaVersion': 1,
+            'storeId': 'store-one',
+            'revision': 2,
+            'observedAt': at.toIso8601String(),
+          },
+          'publicationConfirmed': false,
+        },
+      }),
+    );
+
+const listingScope = (
+  account: 'owner-one',
+  store: 'store-one',
+  realm: 'production',
+);
+
+class BindingStore implements WorkspaceCatalogueBindingPendingStore {
+  WorkspaceCatalogueBindingIntent? saved;
+  Future<WorkspaceCatalogueBindingIntent?> Function()? read;
+  bool failWrite = false, failRemoval = false;
+  @override
+  Future<WorkspaceCatalogueBindingIntent?> readPending(
+    WorkspaceCatalogueBindingScope scope,
+  ) async => read == null ? saved : await read!();
+  @override
+  Future<void> savePending(WorkspaceCatalogueBindingIntent original) async {
+    if (failWrite) throw StateError('isolated journal failure');
+    saved = original;
+  }
+
+  @override
+  Future<void> removePending(WorkspaceCatalogueBindingIntent original) async {
+    if (failRemoval) throw StateError('isolated removal failure');
+    expect(saved?.idempotencyKey, original.idempotencyKey);
+    saved = null;
+  }
+}
+
+WorkspaceCatalogueBindingResult listingSaved(
+  WorkspaceCatalogueBindingIntent original,
+) {
+  final data = jsonDecode(ownerAck(original.body).body) as Map;
+  return WorkspaceCatalogueBindingResult(
+    WorkspaceCatalogueBindingState.saved,
+    saved: WorkspaceCatalogueOwnedSku.decode(
+      (data['data'] as Map)['saved'],
+      storeId: original.storeId,
+      skuId: original.skuId,
+      realm: original.realm,
+      now: at,
+    ),
+  );
+}
+
+class ListingGateway implements WorkspaceCatalogueOwnerGateway {
+  @override
+  String get realm => 'production';
+  int submitted = 0, reconciled = 0;
+  Future<WorkspaceCatalogueBindingResult> Function(
+    WorkspaceCatalogueBindingIntent,
+    bool Function(),
+  )
+  write = (original, _) async => listingSaved(original);
+  Future<WorkspaceCatalogueBindingResult> Function(
+    WorkspaceCatalogueBindingIntent,
+  )
+  check = (_) async => const WorkspaceCatalogueBindingResult(
+    WorkspaceCatalogueBindingState.unknown,
+  );
+  @override
+  Future<WorkspaceCatalogueOwnedSku?> readOwnedSku({
+    required String storeId,
+    required String skuId,
+    required bool Function() current,
+  }) async => null;
+  @override
+  Future<WorkspaceCatalogueBindingResult> bindReviewed(
+    WorkspaceCatalogueBindingIntent original, {
+    required bool Function() current,
+    required bool recoveringUnknown,
+  }) {
+    submitted++;
+    expect(recoveringUnknown, false);
+    return write(original, current);
+  }
+
+  @override
+  Future<WorkspaceCatalogueBindingResult> reconcileBinding(
+    WorkspaceCatalogueBindingIntent original, {
+    required bool Function() current,
+  }) {
+    reconciled++;
+    return check(original);
+  }
+}
+
+class ListingAccount implements WorkPendingProofStore {
+  String owner = 'owner-one';
+  @override
+  String? get accountScope => owner;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+
+class SessionCatalogue extends ListingGateway
+    implements WorkspaceCatalogueGateway {
+  int ownerReads = 0;
+  Future<WorkspaceCatalogueOwnedSku?> Function() ownerRead = () async {
+    final data = ownerRow();
+    (data['provenance'] as Map)['sourceRecordId'] = 'sku-one';
+    return WorkspaceCatalogueOwnedSku.decode(
+      data,
+      storeId: 'store-one',
+      skuId: 'sku-one',
+      realm: 'production',
+      now: at,
+    );
+  };
+  @override
+  Future<WorkspaceCatalogueOwnedSku?> readOwnedSku({
+    required String storeId,
+    required String skuId,
+    required bool Function() current,
+  }) {
+    ownerReads++;
+    return ownerRead();
+  }
+
+  @override
+  Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) async =>
+      WorkspaceCatalogueContentResult(
+        content: BuyV2ProductContentSnapshot(
+          productId: product.id,
+          state: BuyV2ProductContentState.unavailable,
+          sourceId: 'Isolated host source',
+        ),
+      );
+}
+
+WorkspaceCatalogueItem listingItem() => WorkspaceCatalogueItem(
+  id: 'sku-one',
+  canonicalId: 'canonical-one',
+  categoryId: 'cooking-oil',
+  brand: product.brand,
+  title: product.title,
+  variant: product.variant,
+  pack: '1 L',
+  sku: 'HOST-ONE',
+  barcode: '',
+  purchasePrice: 230,
+  sellingPrice: 260,
+  mrp: 280,
+  unitPrice: '₹260/L',
+  stock: 7,
+  deliveryPromise: 'Host Store pickup',
+  origin: 'Host fixture source',
+  visualLabel: 'Host image pending',
+  visualKind: 'catalogue-packshot',
+  publicListing: false,
+  catalogueFactsRequireReview: true,
+  packMeasure: const WorkspacePackMeasure(
+    unit: BuyV2ComparisonUnit.litre,
+    quantityMilli: 1000,
+  ),
+  content: const WorkspaceProductContent(
+    description: 'Verified host description',
+    highlights: ['One litre'],
+    specifications: {'Oil': 'Sunflower'},
+  ),
+  stockEntry: WorkspaceStockEntry(
+    method: WorkspaceStockEntryMethod.manual,
+    productId: 'sku-one',
+    sku: 'HOST-ONE',
+    pack: '1 L',
+    stockMode: WorkspaceStockMode.exactQuantity,
+    quantity: 7,
+    purchasePriceRupees: 230,
+    recordedAt: at,
+    stockAsOf: at,
+  ),
+);
+WorkSession listingSession(SessionCatalogue source, BindingStore journal) =>
+    WorkSession(
+        contactDraftStore: ListingAccount(),
+        catalogueGateway: source,
+        catalogueBindingPendingStoreFactory: (_) => journal,
+      )
+      ..activeWorkspace = const WorkWorkspace(
+        id: 'store-one',
+        name: 'Host Store',
+        profileLabel: 'Grocery',
+        profileId: 'retailer-grocery',
+        area: 'Jaipur',
+        verified: true,
+      )
+      ..workspaceId = 'store-one'
+      ..workspaceCatalogueItems.add(listingItem());
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  Map<String, dynamic> policyEnvelope({
+    int revision = 1,
+    String state = 'ready',
+    String body = 'Host supplier terms',
+  }) => {
+    'schemaVersion': 1,
+    'realm': 'production',
+    'storeId': 'store-one',
+    'skuId': 'sku-one',
+    'observedAt': at.toIso8601String(),
+    'state': state,
+    'revision': revision,
+    'requiresAcceptance': state == 'none' ? false : true,
+    'policy': state == 'ready'
+        ? {
+            'id': 'host-supplier-policy-sku-one',
+            'storeId': 'store-one',
+            'revision': 'policy-v$revision',
+            'title': 'Host supplier policy',
+            'body': body,
+            'productIds': ['sku-one'],
+            'requiresAcceptance': true,
+            'validUntil': at.add(const Duration(hours: 1)).toIso8601String(),
+          }
+        : null,
+  };
+  // Isolated server-response identities, never native/provider publication data.
+  BuyV2PublicListingIdentity publicIdentity({BuyV2OfferClass channel = BuyV2OfferClass.retail}) =>
+    BuyV2PublicListingIdentity(listingId: 'listing-${(channel == BuyV2OfferClass.retail ? 'a' : 'b') * 64}',
+      realm: 'production', storeId: 'store-one', skuId: 'sku-one', canonicalProductId: 'canonical-one',
+      verifiedPackId: 'pack-one', channel: channel);
+  BuyV2Product publicProduct({bool trade = false}) {
+    final identity = publicIdentity(channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail);
+    return BuyV2Product(id: identity.listingId, canonicalId: product.canonicalId, storeId: product.storeId,
+      publicListingIdentity: identity, destination: trade ? BuyV2Destination.wholesale : BuyV2Destination.shop,
+      categoryId: product.categoryId, brand: product.brand, title: product.title, variant: product.variant,
+      pack: product.pack, price: trade ? 250 : 260, mrp: 280, unitPrice: '', badge: '', seller: product.seller,
+      sellerType: product.sellerType, deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
+      minimumOrder: trade ? 10 : 1, offerClass: identity.channel);
+  }
+  Map<String, dynamic> publicPage({bool trade = false}) {
+    final data = jsonDecode(jsonEncode(page())) as Map<String, dynamic>;
+    data['listingReadbackVersion'] = 1; data['listingCoverage'] = 'complete';
+    data['mediaReadbackVersion'] = 1;
+    data['publicStore'] = {'id': 'store-one', 'name': 'Host Store', 'profileId': 'retailer-grocery'};
+    row(data)['listings'] = [publicIdentity().toJson(), if (trade) publicIdentity(channel: BuyV2OfferClass.wholesale).toJson()];
+    if (trade) { (row(data)['channels'] as List).add(<String, Object?>{
+      ...(row(data)['channels'] as List).first as Map<String, dynamic>,
+      'kind': 'wholesale', 'priceMinor': 25000, 'minimumOrder': 10, 'offerId': 'host-trade-offer'}); }
+    row(data)['supplierPolicy'] = policyEnvelope();
+    return data;
+  }
+  test('LF-LISTING source binding roundtrip and copy preserve legacy identities without authority', () {
+    final identity = publicIdentity(), selected = publicProduct();
+    expect(BuyV2PublicListingIdentity.fromJson(identity.toJson()), identity);
+    expect(selected.hasValidPublicListingIdentity, isTrue); expect(selected.sourceSkuId, 'sku-one');
+    expect(selected.copyWith(title: 'Updated display').publicListingIdentity, identity);
+    expect(selected.copyWith(id: 'different-listing').hasValidPublicListingIdentity, isFalse);
+    expect(selected.copyWith(storeId: 'different-store').hasValidPublicListingIdentity, isFalse);
+    expect(selected.copyWith(canonicalId: 'different-product').hasValidPublicListingIdentity, isFalse);
+    expect(selected.copyWith(offerClass: BuyV2OfferClass.bulk).hasValidPublicListingIdentity, isFalse);
+    expect(product.hasValidPublicListingIdentity, isTrue); expect(product.sourceSkuId, product.id);
+    for (final raw in [
+      {...identity.toJson(), 'schemaVersion': 1.0}, {...identity.toJson(), 'extra': true},
+      {...identity.toJson(), 'realm': 'unknown'}, {...identity.toJson(), 'storeId': 'store-one\n'},
+      {...identity.toJson(), 'channel': 'unknown'}, {...identity.toJson(), 'listingId': 'sku-one'},
+    ]) { expect(BuyV2PublicListingIdentity.fromJson(raw), isNull); }
+  });
+  test('LF-FACTORY bound pack cannot omit known source pricing metadata', () {
+    final selected = publicProduct();
+    final terms = BuyV2PackTerms(skuId: selected.id, revision: 'term-one', sellUnit: '1 L');
+    expect(selected.copyWith(packTerms: terms).hasValidPackTerms, isFalse);
+    expect(product.copyWith(packTerms: BuyV2PackTerms(skuId: product.id,
+      revision: 'term-one', sellUnit: '1 L')).hasValidPackTerms, isTrue);
+  });
+  test('LF-FACTORY fixed-price freshness cannot ignore supplied expiry', () {
+    final terms = BuyV2PackTerms(skuId: 'sku-one', revision: 'term-one', sellUnit: '1 L',
+      pricingStoreId: 'store-one', priceObservedAt: at.subtract(const Duration(hours: 1)),
+      priceValidUntil: at);
+    expect(terms.pricingCurrentAt(at), isFalse);
+  });
+  WorkspacePublicCatalogueEntry factoryEntry(Map<String, dynamic> data,
+    {BuyV2OfferClass channel = BuyV2OfferClass.retail}) =>
+      WorkspacePublicCatalogueEntry.fromResponse(data, storeId: 'store-one',
+        realm: 'production', channel: channel, now: at);
+  test('LF-FACTORY exact source facts and empty tiers retain real fixed-price freshness', () {
+    final entry = factoryEntry(publicPage()), value = entry.product, pack = value.packTerms!;
+    expect(value.id, publicIdentity().listingId); expect(value.sourceSkuId, 'sku-one');
+    expect(value.pack, '1 L'); expect(pack.label, '1 L'); expect(pack.contentUnit, 'L');
+    expect(pack.netContentMilli, 1000); expect(pack.containedUnits, 1);
+    expect(pack.priceTiers, isEmpty); expect(pack.priceObservedAt, at.subtract(const Duration(hours: 1)));
+    expect(pack.priceValidUntil, at.add(const Duration(hours: 1)));
+    expect(pack.pricingCurrentAt(at), isTrue); expect(value.hasValidPackTerms, isTrue);
+    expect(pack.pricesIncludeTax, isNull); expect(pack.pricesIncludeFreight, isNull);
+    expect(value.price, 260); expect(value.mrp, 280); expect(value.seller, 'Host Store');
+    expect(value.deliveryPromise, isEmpty); expect(value.manufacturerVerified, isFalse);
+    expect(value.reviewDeliveryOptions, isEmpty); expect(value.procurementSupplierGrant, isNull);
+    expect(entry.readback.content.supplierPolicy!.productIds, {'sku-one'});
+    expect(product.copyWith(packTerms: BuyV2PackTerms(skuId: product.id, revision: 'term-one',
+      sellUnit: 'pack', sourceLabel: '1 L')).hasValidPackTerms, isFalse);
+  });
+  test('LF-FACTORY exact source pack conversion keeps label case count and tier basis', () {
+    final data = publicPage(trade: true), source = row(data);
+    source['pack'] = {'label': 'Four bottles, total 1.001 L', 'quantityMilli': 1001,
+      'unit': 'L', 'unitsPerCase': 4};
+    final trade = (source['channels'] as List)[1] as Map;
+    trade['quantityStep'] = 5;
+    trade['tiers'] = [{'minimumQuantity': 10, 'unitPriceMinor': 25000},
+      {'minimumQuantity': 20, 'unitPriceMinor': 24000}];
+    final value = factoryEntry(data, channel: BuyV2OfferClass.wholesale).product, pack = value.packTerms!;
+    expect(value.pack, 'Four bottles, total 1.001 L'); expect(pack.contentUnit, 'mL');
+    expect(pack.netContentMilli, 250250); expect(pack.containedUnits, 4);
+    expect(value.minimumOrder, 10); expect(value.quantityStep, 5);
+    expect(pack.priceForQuantity(20, value.price), 240); expect(value.hasValidPackTerms, isTrue);
+  });
+  for (final channel in [BuyV2OfferClass.retail, BuyV2OfferClass.wholesale]) {
+    test('LF-FACTORY exact paise base MRP and tiers retain public authority boundaries ${channel.name}', () async {
+      final data = publicPage(trade: channel != BuyV2OfferClass.retail);
+      final terms = (row(data)['channels'] as List).cast<Map>().singleWhere((t) => t['kind'] == channel.name);
+      final price = channel == BuyV2OfferClass.retail ? 26025 : 25025;
+      final minimum = terms['minimumOrder'] as int;
+      terms['priceMinor'] = price; terms['mrpMinor'] = 28050;
+      terms['tiers'] = [{'minimumQuantity': minimum, 'unitPriceMinor': price},
+        {'minimumQuantity': minimum * 2, 'unitPriceMinor': price - 115}];
+      final entry = factoryEntry(data, channel: channel), value = entry.product;
+      expect(value.priceMinor, price); expect(value.mrpMinor, 28050);
+      expect(() => value.price, throwsFormatException);
+      expect(value.packTerms!.priceMinorForQuantity(minimum * 2, value.priceMinor), price - 115);
+      expect(value.sourceSkuId, 'sku-one'); expect(value.hasValidPackTerms, isTrue);
+      expect(value.publicListingIdentity!.channel, channel);
+      expect(value.reviewDeliveryOptions, isEmpty);
+      expect(entry.readback.content.state, BuyV2ProductContentState.ready);
+      final found = await gateway(Transport(data)).readPublicEntry(storeId: 'store-one',
+        skuId: 'sku-one', channel: channel, current: () => true);
+      expect(found!.product.priceMinor, price);
+      expect(data['orderingAvailable'], isFalse);
+    });
+  }
+  for (final change in ['tier paise', 'fraction count', 'inexact volume',
+    'wrong store', 'wrong realm', 'wrong binding', 'partial', 'unavailable', 'expired', 'future', 'missing policy']) {
+    test('LF-FACTORY rejects unsupported or unconfirmed source $change', () {
+      final data = publicPage(), source = row(data), terms = (source['channels'] as List).single as Map;
+      if (change == 'tier paise') terms['tiers'] = [{'minimumQuantity': 1, 'unitPriceMinor': 26001}];
+      if (change == 'fraction count') {
+        source['pack'] = {'label': 'one piece', 'quantityMilli': 1000, 'unit': 'count', 'unitsPerCase': 2};
+      }
+      if (change == 'inexact volume') {
+        source['pack'] = {'label': 'three bottles', 'quantityMilli': 1000, 'unit': 'L', 'unitsPerCase': 3};
+      }
+      if (change == 'wrong store') data['storeId'] = 'other-store';
+      if (change == 'wrong realm') data['realm'] = 'evaluation';
+      if (change == 'wrong binding') (source['listings'] as List).single['verifiedPackId'] = 'wrong-pack';
+      if (change == 'partial') data['listingCoverage'] = 'partial';
+      if (change == 'unavailable') data['state'] = 'unavailable';
+      if (change == 'expired') terms['validUntil'] = at.toIso8601String();
+      if (change == 'future') source['observedAt'] = at.add(const Duration(minutes: 1)).toIso8601String();
+      if (change == 'missing policy') source.remove('supplierPolicy');
+      expect(() => factoryEntry(data), throwsFormatException);
+    });
+  }
+  test('LF-FACTORY bound fixed-price metadata is complete and legacy labels remain derived', () {
+    final selected = publicProduct();
+    BuyV2PackTerms terms({String? store = 'store-one', DateTime? observed,
+      DateTime? expiry}) => BuyV2PackTerms(skuId: selected.id, revision: 'term-one',
+        sellUnit: 'bottle', sourceLabel: 'Reviewed one litre', netContentMilli: 1000, contentUnit: 'L',
+        pricingStoreId: store, priceObservedAt: observed, priceValidUntil: expiry);
+    expect(selected.copyWith(packTerms: terms(observed: at, expiry: at.add(const Duration(hours: 1))))
+      .hasValidPackTerms, isTrue);
+    expect(selected.copyWith(packTerms: terms(observed: at)).hasValidPackTerms, isFalse);
+    expect(selected.copyWith(packTerms: terms(store: null, observed: at,
+      expiry: at.add(const Duration(hours: 1)))).hasValidPackTerms, isFalse);
+    expect(terms(observed: at.add(const Duration(minutes: 1)), expiry: at.add(const Duration(hours: 1)))
+      .pricingCurrentAt(at), isFalse);
+    expect(const BuyV2PackTerms(skuId: 'sku-one', revision: 'term-one', sellUnit: 'bottle',
+      netContentMilli: 1000, contentUnit: 'L').label, '1 L · bottle');
+  });
+  test('LF-FACTORY authenticated discovery uses original source SKU and real response identity', () async {
+    final transport = Transport(publicPage()), credentials = Credentials();
+    final entry = await gateway(transport, credentials).readPublicEntry(storeId: 'store-one',
+      skuId: 'sku-one', channel: BuyV2OfferClass.retail, current: () => true);
+    expect(entry!.product.id, publicIdentity().listingId);
+    expect(transport.sent, {'operation': 'readPublicStoreCatalogue', 'storeId': 'store-one',
+      'skuId': 'sku-one', 'listingReadbackVersion': 1, 'mediaReadbackVersion': 1, 'policyReadbackVersion': 1,
+      'storeDetailsReadbackVersion': 1});
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+    expect(await gateway(transport).readPublicEntry(storeId: 'store-one', skuId: 'other-sku',
+      channel: BuyV2OfferClass.retail, current: () => true), isNull);
+    transport.sent = null;
+    expect(await gateway(transport).readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => false), isNull);
+    expect(transport.sent, isNull);
+  });
+  test('LF-FACTORY discovery rejects a response after account lifetime retires', () async {
+    var current = true;
+    final pending = Completer<SocialContentResponse>();
+    final sent = Completer<void>();
+    final source = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), now: () => at,
+      transport: OwnerTransport((body) { sent.complete(); return pending.future; }));
+    final result = source.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => current);
+    await sent.future; current = false;
+    pending.complete(SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': publicPage()})));
+    expect(await result, isNull);
+  });
+  BuyV2CatalogueQuery storeQuery({String search = ''}) => BuyV2CatalogueQuery(
+    destination: BuyV2Destination.shop, regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas,
+    storeId: 'store-one', query: search);
+  Map<String, dynamic> pageData(Map<String, Object?> body, {bool empty = false}) {
+    final data = jsonDecode(jsonEncode(publicPage())) as Map<String, dynamic>, source = row(data);
+    return {...data, 'cataloguePageVersion': 1, 'query': body['query'],
+      'items': [if (!empty) {'channel': 'retail', 'row': source}], 'nextCursor': null,
+      'page': {'snapshotId': 'c' * 64, 'startIndex': 0, 'totalCount': empty ? 0 : 1,
+        'previousCursor': null, 'nextCursor': null}};
+  }
+  AuthenticatedWorkspaceCatalogueGateway pageGateway(OwnerTransport transport) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at);
+  test('LF-PAGER client source enters existing Buy pager with exact source product and no ordering authority', () async {
+    final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': pageData(body)})));
+    final source = WorkspaceStoreCatalogueSource(gateway: pageGateway(transport), storeId: 'store-one', current: () => true);
+    final core = BuySession();
+    final consumer = BuyV2Session(core: core,
+      cataloguePageSource: source, reviewDataEnabled: false, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(consumer.dispose);
+    final pager = consumer.acquireCatalogueProducts('host-store-page');
+    await pager.open(storeQuery());
+    expect(pager.message, isNull); expect(pager.page!.totalCount, 1);
+    final selected = pager.page!.items.single;
+    expect(selected.id, publicIdentity().listingId); expect(selected.sourceSkuId, 'sku-one');
+    expect(selected.pack, '1 L'); expect(selected.price, 260);
+    expect(consumer.productFactsFor(selected).eligibility, isNull);
+    expect(selected.reviewDeliveryOptions, isEmpty);
+    consumer.releaseCatalogueProducts('host-store-page');
+  });
+  for (final mutation in ['query', 'realm', 'count', 'duplicate', 'binding', 'metadata', 'cursor']) {
+    test('LF-PAGER client rejects malformed or mismatched page $mutation', () async {
+      final transport = OwnerTransport((body) async {
+        final data = pageData(body), metadata = data['page'] as Map;
+        if (mutation == 'query') data['query'] = {...body['query'] as Map, 'search': 'other'};
+        if (mutation == 'realm') data['realm'] = 'evaluation';
+        if (mutation == 'count') metadata['totalCount'] = 2;
+        if (mutation == 'duplicate') { (data['items'] as List).add((data['items'] as List).single); metadata['totalCount'] = 2; }
+        if (mutation == 'binding') (((data['items'] as List).single['row']['listings'] as List).single as Map)['skuId'] = 'other-sku';
+        if (mutation == 'metadata') metadata['snapshotId'] = 'client-invented';
+        if (mutation == 'cursor') data['nextCursor'] = 'unmatched';
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      });
+      final source = WorkspaceStoreCatalogueSource(gateway: pageGateway(transport), storeId: 'store-one', current: () => true);
+      expect(() => source.loadProducts(storeQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
+  test('LF-PAGER client restores only requested actual listing IDs without guessing source joins', () async {
+    final requests = <Map<String, Object?>>[];
+    final transport = OwnerTransport((body) async {
+      requests.add(body);
+      final query = body['query'] as Map;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+        'data': pageData(body, empty: query['destination'] == 'wholesale')}));
+    });
+    final source = WorkspaceStoreCatalogueSource(gateway: pageGateway(transport), storeId: 'store-one', current: () => true);
+    expect((await source.resolveProducts({publicIdentity().listingId})).single.sourceSkuId, 'sku-one');
+    expect(requests, hasLength(2));
+    for (final request in requests) { expect((request['query'] as Map)['listingIds'], [publicIdentity().listingId]); }
+    expect(() => source.resolveProducts({'sku-one'}), throwsFormatException);
+    expect(() => source.loadStores(storeQuery(), pageSize: 40), throwsFormatException);
+    expect(() => source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
+      regionId: 'unverified-region', storeId: 'store-one'), pageSize: 40), throwsFormatException);
+  });
+  test('LF-PAGER client drops late scoped results after retirement', () async {
+    var current = true;
+    final response = Completer<SocialContentResponse>(), sent = Completer<Map<String, Object?>>();
+    final source = WorkspaceStoreCatalogueSource(gateway: pageGateway(OwnerTransport((body) {
+      sent.complete(body); return response.future;
+    })), storeId: 'store-one', current: () => current);
+    final result = source.loadProducts(storeQuery(), pageSize: 40);
+    final body = await sent.future; current = false;
+    response.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': pageData(body)})));
+    await expectLater(result, throwsFormatException);
+  });
+  test('LF-PAGER page A to B retains each verified content and policy through the existing admission cache', () async {
+    var second = false;
+    final transport = OwnerTransport((body) async {
+      final data = pageData(body);
+      if (second) {
+        final row = ((data['items'] as List).single as Map)['row'] as Map;
+        row.addAll(<String, dynamic>{'skuId': 'sku-two', 'canonicalProductId': 'canonical-two', 'verifiedPackId': 'pack-two'});
+        ((row['listings'] as List).single as Map).addAll(<String, dynamic>{'listingId': 'listing-${'e' * 64}',
+          'skuId': 'sku-two', 'canonicalProductId': 'canonical-two', 'verifiedPackId': 'pack-two'});
+        (row['content'] as Map).addAll(<String, dynamic>{'title': 'Second verified product', 'description': 'Second product description'});
+        final terms = (row['channels'] as List).single as Map;
+        terms['priceMinor'] = 26025; terms['mrpMinor'] = 28050;
+        final envelope = row['supplierPolicy'] as Map;
+        envelope['skuId'] = 'sku-two';
+        (envelope['policy'] as Map).addAll(<String, dynamic>{'id': 'host-supplier-policy-sku-two', 'productIds': ['sku-two']});
+        (data['page'] as Map)['snapshotId'] = 'e' * 64;
+      }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final connection = pageGateway(transport), readback = WorkspaceCatalogueReadback(
+      gateway: pageGateway(transport), context: () => 'host-owner', now: () => at);
+    final source = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one',
+      current: () => true, contentReadback: readback);
+    final core = BuySession();
+    final consumer = BuyV2Session(core: core,
+      cataloguePageSource: source, productContentAdapter: readback, reviewDataEnabled: false, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(consumer.dispose); addTearDown(readback.dispose);
+    final pager = consumer.acquireCatalogueProducts('host-public-content');
+    await pager.open(storeQuery());
+    final first = pager.page!.items.single;
+    expect(first.priceMinor, 26000);
+    expect(consumer.productContentFor(first).description, 'Verified host description');
+    expect(consumer.productContentFor(first).supplierPolicy!.productIds, {'sku-one'});
+    second = true;
+    expect((await source.loadProducts(storeQuery(), pageSize: 40)).items.single.sourceSkuId, 'sku-two');
+    await pager.refresh();
+    expect(pager.message, isNull);
+    final other = pager.page!.items.single;
+    expect(other.priceMinor, 26025); expect(other.mrpMinor, 28050);
+    expect(consumer.openProduct(other.id), isTrue);
+    expect(consumer.productContentFor(other).description, 'Second product description');
+    expect(consumer.productContentFor(other).supplierPolicy!.productIds, {'sku-two'});
+    expect(readback.snapshotFor(first).supplierPolicy!.productIds, {'sku-one'});
+    consumer.releaseCatalogueProducts('host-public-content');
+  });
+  test('LF-PAGER page admission cannot bypass policy highwater or retired cache context', () async {
+    var revision = 2, owner = 'first-owner';
+    final connection = pageGateway(OwnerTransport((body) async {
+      final data = pageData(body);
+      (((data['items'] as List).single as Map)['row'] as Map)['supplierPolicy'] = policyEnvelope(revision: revision);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }));
+    final cache = WorkspaceCatalogueReadback(gateway: connection, context: () => owner, now: () => at);
+    addTearDown(cache.dispose);
+    final source = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one',
+      current: () => true, contentReadback: cache);
+    final first = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+    expect(cache.snapshotFor(first).supplierPolicy!.revision, 'policy-v2');
+    revision = 1;
+    final old = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+    expect(cache.snapshotFor(old).state, BuyV2ProductContentState.unavailable);
+    expect(cache.snapshotFor(old).supplierPolicyResolutionPending, isTrue);
+    owner = 'second-owner';
+    cache.admitPublicEntry(factoryEntry(publicPage()), expectedContext: 'first-owner');
+    expect(cache.snapshotFor(first).state, BuyV2ProductContentState.unavailable);
+  });
+  test('LF-PAISE legacy products and Cart need canonical minor amounts', () {
+    final legacy = product;
+    final line = BuyV2CartLine(product: product, quantity: 3);
+    expect(legacy.priceMinor, 26000);
+    expect(line.totalMinor, 78000);
+    expect(legacy.mrpMinor, 28000);
+  });
+  test('LF-PAISE quote term and original request contracts retain exact money', () {
+    const line = BuyV2CheckoutQuoteLine.minor(fulfilmentKey: 'host-exact', itemSubtotalMinor: 1025,
+      couponSavingMinor: 1, taxMinor: 2, freightMinor: 3, deliveryFeeMinor: 4,
+      tipMinor: 5, paymentChargeMinor: 6, totalMinor: 1044);
+    const group = BuyV2CheckoutPaymentGroup.minor(id: 'host-group', fulfilmentKeys: {'host-exact'},
+      paymentMethod: 'UPI', totalMinor: 1044, amountDueNowMinor: 1);
+    final quote = BuyV2CheckoutQuote.minor(id: 'host-quote', sourceId: 'host-quote-source', evaluatedAt: at,
+      validUntil: at.add(const Duration(minutes: 5)), lines: const [line], totalMinor: 1044, paymentGroups: const [group]);
+    const term = BuyV2CommercialPaymentTerm.minor(id: 'host-term', fulfilmentKey: 'host-exact',
+      destination: BuyV2Destination.wholesale, supplierName: 'Host Store',
+      kind: BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch,
+      orderTotalMinor: 1044, amountDueNowMinor: 1, balanceDueMinor: 1043,
+      balanceDueLabel: 'Before dispatch', sourceId: 'host-terms', upiTransactionLimitMinor: 20000000);
+    expect([line.itemSubtotalMinor, line.couponSavingMinor, line.taxMinor, line.freightMinor,
+      line.deliveryFeeMinor, line.tipMinor, line.paymentChargeMinor, line.totalMinor], [1025, 1, 2, 3, 4, 5, 6, 1044]);
+    expect(quote.totalMinor, 1044); expect(group.amountDueNowMinor, 1);
+    expect(term.orderTotalMinor, 1044); expect(term.balanceDueMinor, 1043);
+    expect(term.upiTransactionLimitMinor, 20000000); expect(term.hasValidMoney, isTrue);
+    expect(() => quote.total, throwsFormatException); expect(() => line.total, throwsFormatException);
+    expect(() => group.amountDueNow, throwsFormatException); expect(() => term.orderTotal, throwsFormatException);
+    final request = BuyV2OrderPlacementRequest.minor(lines: [BuyV2CartLine(product: product, quantity: 1)],
+      address: const BuyV2Address(id: 'host-address', kind: BuyV2AddressKind.home, label: 'Host', recipient: 'Host buyer',
+        phone: '9000000000', line: 'Host address', area: 'Host area', pinCode: '342003', landmark: ''), paymentMethod: 'UPI', totalMinor: 1044,
+      amountDueNowMinor: 1, idempotencyKey: 'host-original');
+    expect(request.totalMinor, 1044); expect(request.amountDueNowMinor, 1);
+    expect(request.hasValidMoney, isTrue); expect(() => request.total, throwsFormatException);
+    const balance = BuyV2BalancePaymentResult.minor(state: BuyV2BalancePaymentState.due,
+      amountDueMinor: 1043, dueLabel: 'Host balance', customerMessage: 'Host result');
+    expect(balance.amountDueMinor, 1043); expect(() => balance.amountDue, throwsFormatException);
+  });
+  const frozenAddress = BuyV2Address(id: 'host-frozen-address', kind: BuyV2AddressKind.home,
+    label: 'Host', recipient: 'Host buyer', phone: '9000000000', line: 'Host address',
+    area: 'Host area', pinCode: '342003', landmark: '');
+  test('LF-PAISE legacy commercial DTOs preserve required rupee values and total inference', () {
+    const line = BuyV2CheckoutQuoteLine(fulfilmentKey: 'host-legacy', itemSubtotal: 20,
+      couponSaving: 1, tax: 2, freight: 3, deliveryFee: 4, tip: 5, paymentCharge: 6, total: 39);
+    final quote = BuyV2CheckoutQuote(id: 'host-legacy', sourceId: 'host-legacy-source', evaluatedAt: at,
+      validUntil: at.add(const Duration(minutes: 5)), lines: const [line],
+      total: [line].fold(0, (sum, value) => sum + value.total));
+    const group = BuyV2CheckoutPaymentGroup(id: 'host-legacy', fulfilmentKeys: {'host-legacy'},
+      paymentMethod: 'UPI', total: 39, amountDueNow: 1);
+    const term = BuyV2CommercialPaymentTerm(id: 'host-legacy', fulfilmentKey: 'host-legacy',
+      destination: BuyV2Destination.wholesale, supplierName: 'Host Store', kind: BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+      orderTotal: 39, amountDueNow: 1, balanceDue: 38, balanceDueLabel: 'At delivery', sourceId: 'host-legacy-source',
+      upiTransactionLimit: 200000);
+    const balance = BuyV2BalancePaymentResult(state: BuyV2BalancePaymentState.due, amountDue: 38,
+      dueLabel: 'At delivery', customerMessage: 'Host balance');
+    expect(line.hasValidMoney, isTrue); expect(line.total, 39); expect(quote.totalMinor, 3900);
+    expect(group.amountDueNow, 1); expect(group.amountDueNowMinor, 100);
+    expect(term.hasValidMoney, isTrue); expect(term.orderTotal, 39); expect(term.balanceDueMinor, 3800);
+    expect(term.upiTransactionLimit, 200000); expect(term.upiTransactionLimitMinor, 20000000);
+    expect(balance.amountDue, 38); expect(balance.amountDueMinor, 3800);
+  });
+  test('LF-PAISE exact quote arithmetic uses BigInt before netting discounts', () {
+    const maximum = 9007199254740991;
+    const value = BuyV2CheckoutQuoteLine.minor(fulfilmentKey: 'host-maximum', itemSubtotalMinor: maximum,
+      couponSavingMinor: 1, taxMinor: 1, freightMinor: 0, deliveryFeeMinor: 0, tipMinor: 0,
+      paymentChargeMinor: 0, totalMinor: maximum);
+    expect(value.hasValidMoney, isTrue);
+    const invalid = BuyV2CheckoutQuoteLine.minor(fulfilmentKey: 'host-invalid', itemSubtotalMinor: 1,
+      couponSavingMinor: 2, taxMinor: 1, freightMinor: 0, deliveryFeeMinor: 0, tipMinor: 0,
+      paymentChargeMinor: 0, totalMinor: 0);
+    expect(invalid.hasValidMoney, isFalse);
+  });
+  for (final invalid in [-1, 9007199254740992]) {
+    test('LF-PAISE commercial exact $invalid amount cannot become a rounded legacy amount', () {
+      final group = BuyV2CheckoutPaymentGroup.minor(id: 'host-invalid', fulfilmentKeys: const {'host-invalid'},
+        paymentMethod: 'UPI', totalMinor: invalid, amountDueNowMinor: 1);
+      final request = BuyV2OrderPlacementRequest.minor(lines: const [], address: frozenAddress,
+        paymentMethod: 'UPI', idempotencyKey: 'host-invalid', totalMinor: invalid, amountDueNowMinor: 1);
+      expect(group.hasValidMoney, isFalse); expect(request.hasValidMoney, isFalse);
+      expect(() => group.totalMinor, throwsFormatException); expect(() => group.total, throwsFormatException);
+      expect(() => request.totalMinor, throwsFormatException); expect(() => request.total, throwsFormatException);
+    });
+  }
+  BuyV2CheckoutGroupAttempt frozenPayment({required bool grouped, bool exact = true, int? totalOverride}) {
+    final value = exact ? product.copyWith(priceMinor: 1025) : product;
+    final request = exact ? BuyV2OrderPlacementRequest.minor(
+      lines: [BuyV2CartLine(product: value, quantity: 1)], address: frozenAddress,
+      paymentMethod: 'UPI', idempotencyKey: 'host-original-key', totalMinor: totalOverride ?? 1025, amountDueNowMinor: 1,
+      checkoutAttemptId: grouped ? 'host-original-attempt' : null, paymentGroupId: grouped ? 'host-original-group' : null,
+      checkoutQuoteId: 'host-original-quote', deliveryInstructionsByProductId: {value.id: 'Host original note'}) :
+      BuyV2OrderPlacementRequest(lines: [BuyV2CartLine(product: value, quantity: 1)], address: frozenAddress,
+        paymentMethod: 'UPI', idempotencyKey: 'host-original-key', total: 260, amountDueNow: 1,
+        checkoutAttemptId: grouped ? 'host-original-attempt' : null, paymentGroupId: grouped ? 'host-original-group' : null,
+        checkoutQuoteId: 'host-original-quote', deliveryInstructionsByProductId: {value.id: 'Host original note'});
+    return BuyV2CheckoutGroupAttempt(
+      request: request,
+      fulfilmentKeys: const {'host-original-fulfilment'},
+      obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'host-original-fulfilment',
+        productIds: {value.id}, totalMinor: exact ? 1025 : 26000, dueNowMinor: exact ? 1 : 100)],
+      state: BuyV2CheckoutSubmissionState.paymentUnknown, paymentReference: 'host-original-reference');
+  }
+  BuyV2CustomerStateSnapshot frozenSnapshot(BuyV2CheckoutGroupAttempt payment, {required bool grouped}) =>
+    BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 1}, checkoutIdempotencyKey: 'host-original-key',
+      legacyCheckoutAttempt: grouped ? null : BuyV2LegacyCheckoutAttempt(ownerScope: 'host-paise', payment: payment),
+      checkoutPaymentAttempt: grouped ? BuyV2CheckoutPaymentAttempt(id: 'host-original-attempt', ownerScope: 'host-paise',
+        quoteValidUntil: at.add(const Duration(minutes: 5)), groups: [payment]) : null);
+  for (final grouped in [false, true]) {
+    for (final difference in ['none', 'total', 'paid', 'balance', 'price', 'unknown paid']) {
+      test('LF-PAISE original confirmation grouped=$grouped difference=$difference retains exact commitment', () async {
+        final preferences = _ExactMoneyHostPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+        final frozen = frozenPayment(grouped: grouped), request = frozenPayment(grouped: grouped).request;
+        expect(await store.write(frozenSnapshot(frozen, grouped: grouped)), isTrue);
+        final order = BuyV2Order.minor(id: 'host-confirmed-order', purchaseId: 'host-confirmed-purchase',
+          destination: BuyV2Destination.shop, title: 'Host original purchase', itemSummary: 'One host SKU',
+          totalMinor: difference == 'total' ? 1026 : 1025, partner: 'Host Store', partnerType: 'Retailer',
+          promise: 'Host delivery', destinationLabel: request.address.shortLine, recipient: request.address.recipient,
+          addressLine: request.address.line, paymentMethod: request.paymentMethod, progress: 0, status: BuyV2OrderStatus.preparing,
+          productIds: [product.id], lines: [BuyV2CartLine(product: request.lines.single.product.copyWith(
+            priceMinor: difference == 'price' ? 1026 : 1025), quantity: 1)],
+          amountPaidNowMinor: difference == 'unknown paid' ? null : difference == 'paid' ? 2 : 1,
+          balanceDueMinor: difference == 'total' || difference == 'balance' ? 1025 : difference == 'paid' ? 1023 : 1024);
+        final commerce = _HostExactOrderCommerce()..reconciliation = BuyV2OrderPlacementResult(
+          outcome: BuyV2OrderPlacementOutcome.confirmed, customerMessage: 'Host original readback', orders: [order],
+          purchaseReference: 'host-confirmed-purchase', paymentReference: 'host-original-reference',
+          idempotencyKey: 'host-original-key', checkoutAttemptId: grouped ? 'host-original-attempt' : null,
+          paymentGroupId: grouped ? 'host-original-group' : null);
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce, customerStateStore: store,
+          cataloguePageSource: _ExactMoneyHostCatalogue()..rows.add(product.copyWith(priceMinor: 1025)),
+          reviewDataEnabled: true, catalogueNow: () => at);
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        await session.restoreCustomerState(restoreBrowsing: false);
+        expect(await session.reconcilePayment(), difference == 'none', reason: session.notice);
+        expect(commerce.reconciliationCalls, 1); expect(commerce.placementCalls, 0);
+        if (difference == 'none') {
+          expect(session.orders.firstWhere((value) => value.id == order.id).payableTotalMinor, 1025);
+          expect(session.orders.firstWhere((value) => value.id == order.id).amountPaidNowMinor, 1);
+          expect(session.quantityFor(product.id), 0);
+        } else {
+          expect(session.checkoutRequiresResolution, isTrue);
+          expect(session.quantityFor(product.id), 1);
+          expect(session.orders.any((value) => value.id == order.id), isFalse);
+          final retained = grouped ? session.currentCheckoutPaymentGroup!.request : session.legacyCheckoutAttempt!.payment.request;
+          expect(retained.totalMinor, 1025); expect(retained.amountDueNowMinor, 1);
+          expect(retained.idempotencyKey, 'host-original-key');
+        }
+      });
+    }
+  }
+  for (final grouped in [false, true]) {
+    test('LF-PAISE frozen session restart grouped=$grouped uses original exact commitment without new placement', () async {
+      final preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      expect(await store.write(frozenSnapshot(frozenPayment(grouped: grouped), grouped: grouped)), isTrue);
+      final core = BuySession();
+      final source = _ExactMoneyHostCatalogue()..rows.add(product.copyWith(priceMinor: 1025));
+      final session = BuyV2Session(core: core, customerStateStore: store, cataloguePageSource: source,
+        reviewDataEnabled: true, catalogueNow: () => at);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCustomerState(restoreBrowsing: false);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(session.checkoutPayableTotalMinor, 1025);
+      expect(session.checkoutAmountDueNowMinor, 1);
+      expect(session.checkoutBalanceDueMinor, 1024);
+      expect(session.checkoutPaymentActionAmountMinor, 1);
+      expect(session.checkoutPaymentCount, 1);
+      final original = grouped ? session.currentCheckoutPaymentGroup!.request : session.legacyCheckoutAttempt!.payment.request;
+      expect(original.idempotencyKey, 'host-original-key');
+      expect(original.totalMinor, 1025); expect(original.amountDueNowMinor, 1);
+      expect(session.addProduct(product.id), isFalse);
+      expect(session.checkoutRequiresResolution, isTrue);
+      expect(grouped ? session.checkoutPaymentGroups.single.id : original.idempotencyKey,
+        grouped ? 'host-original-group' : 'host-original-key');
+    });
+    for (final exact in [false, true]) {
+      test('LF-PAISE frozen request restart grouped=$grouped exact=$exact retains original amount and identity', () async {
+        final preferences = _ExactMoneyHostPreferences();
+        BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+        final original = frozenPayment(grouped: grouped, exact: exact);
+        expect(original.hasValidObligations, isTrue);
+        expect(await fresh().write(frozenSnapshot(original, grouped: grouped)), isTrue);
+        final restored = (await fresh().read())!;
+        final payment = grouped ? restored.checkoutPaymentAttempt!.groups.single : restored.legacyCheckoutAttempt!.payment;
+        expect(restored.paymentRecoveryIncomplete, isFalse);
+        expect(restored.cartQuantities[product.id], 1);
+        expect(payment.request.totalMinor, exact ? 1025 : 26000);
+        expect(payment.request.amountDueNowMinor, exact ? 1 : 100);
+        expect(payment.request.idempotencyKey, 'host-original-key');
+        expect(payment.request.checkoutAttemptId, grouped ? 'host-original-attempt' : null);
+        expect(payment.request.paymentGroupId, grouped ? 'host-original-group' : null);
+        expect(payment.request.checkoutQuoteId, 'host-original-quote');
+        expect(payment.request.deliveryInstructionsByProductId, {product.id: 'Host original note'});
+        expect(payment.paymentReference, 'host-original-reference');
+        expect(payment.state, BuyV2CheckoutSubmissionState.paymentUnknown);
+        expect(payment.request.lines.single.totalMinor, exact ? 1025 : 26000);
+        expect(payment.hasValidObligations, isTrue);
+        final raw = jsonDecode(preferences.values.values.single) as Map;
+        final attempt = raw[grouped ? 'checkoutPaymentAttempt' : 'legacyCheckoutAttempt'] as Map;
+        final request = (grouped ? (attempt['groups'] as List).single : attempt['payment'])['request'] as Map;
+        expect(attempt['version'], exact ? 2 : 1);
+        expect(request.containsKey('totalMinor'), exact);
+        expect(request.containsKey('total'), !exact);
+        if (!exact) expect(payment.request.total, 260);
+      });
+    }
+    for (final corrupt in ['null', 'string', 'negative', 'overflow', 'conflict', 'downgrade', 'obligation', 'version', 'missing']) {
+      test('LF-PAISE corrupt frozen $corrupt grouped=$grouped keeps recovery held and original bytes', () async {
+        final preferences = _ExactMoneyHostPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+        expect(await store.write(frozenSnapshot(frozenPayment(grouped: grouped), grouped: grouped)), isTrue);
+        final key = preferences.values.keys.single;
+        final raw = jsonDecode(preferences.values[key]!) as Map;
+        final attempt = raw[grouped ? 'checkoutPaymentAttempt' : 'legacyCheckoutAttempt'] as Map;
+        final payment = (grouped ? (attempt['groups'] as List).single : attempt['payment']) as Map;
+        final request = payment['request'] as Map;
+        switch (corrupt) {
+          case 'null': request['amountDueNowMinor'] = null;
+          case 'string': request['totalMinor'] = '1025';
+          case 'negative': request['totalMinor'] = -1;
+          case 'overflow': request['totalMinor'] = 9007199254740992;
+          case 'conflict': request['total'] = 11;
+          case 'downgrade': attempt['version'] = 1; request['total'] = 10; request['amountDueNow'] = 1;
+          case 'obligation': (payment['obligations'] as List).single['totalMinor'] = 1026;
+          case 'version': attempt['version'] = 2.0;
+          case 'missing': request.remove('totalMinor'); request['total'] = 10;
+        }
+        final corruptedBytes = jsonEncode(raw); preferences.values[key] = corruptedBytes;
+        final restored = (await store.read())!;
+        expect(restored.paymentRecoveryIncomplete, isTrue);
+        expect(restored.checkoutPaymentAttempt, isNull); expect(restored.legacyCheckoutAttempt, isNull);
+        expect(restored.cartQuantities[product.id], 1);
+        expect(preferences.values[key], corruptedBytes, reason: 'A read must not erase or rewrite original evidence');
+      });
+    }
+  }
+  for (final grouped in [false, true]) {
+  testWidgets('LF-PAISE confirmation renders exact original total paid and balance grouped=$grouped', (tester) async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    final payment = frozenPayment(grouped: grouped), request = frozenPayment(grouped: grouped).request;
+    expect(await store.write(frozenSnapshot(payment, grouped: grouped)), isTrue);
+    final order = BuyV2Order.minor(id: 'host-confirmed-order', purchaseId: 'host-confirmed-purchase',
+      destination: BuyV2Destination.shop, title: 'Host original purchase', itemSummary: 'One host SKU', totalMinor: 1025,
+      partner: 'Host Store', partnerType: 'Retailer', promise: 'Host delivery', destinationLabel: request.address.shortLine,
+      recipient: request.address.recipient, addressLine: request.address.line, paymentMethod: request.paymentMethod,
+      progress: 0, status: BuyV2OrderStatus.preparing, productIds: [product.id], lines: request.lines,
+      amountPaidNowMinor: 1, balanceDueMinor: 1024);
+    final commerce = _HostExactOrderCommerce()..reconciliation = BuyV2OrderPlacementResult(
+      outcome: BuyV2OrderPlacementOutcome.confirmed, customerMessage: 'Host original readback', orders: [order],
+      purchaseReference: 'host-confirmed-purchase', paymentReference: 'host-original-reference', idempotencyKey: 'host-original-key',
+      checkoutAttemptId: grouped ? 'host-original-attempt' : null, paymentGroupId: grouped ? 'host-original-group' : null);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: commerce, customerStateStore: store,
+      cataloguePageSource: _ExactMoneyHostCatalogue()..rows.add(product.copyWith(priceMinor: 1025)),
+      reviewDataEnabled: true, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCustomerState(restoreBrowsing: false);
+    expect(await session.reconcilePayment(), isTrue);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: BuyV2ConfirmationView(session: session))));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('₹10.25'), findsWidgets);
+    expect(find.text('Paid now ₹0.01 · Balance ₹10.24'), findsOneWidget);
+    expect(commerce.placementCalls, 0);
+  });
+  }
+  test('LF-PAISE invalid original request cannot replace the last saved hold', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(frozenSnapshot(frozenPayment(grouped: false), grouped: false)), isTrue);
+    final before = preferences.values.values.single;
+    expect(await store.write(frozenSnapshot(frozenPayment(grouped: false, totalOverride: -1), grouped: false)), isFalse);
+    expect(preferences.values.values.single, before);
+  });
+  BuyV2CheckoutPaymentAttempt twoFrozenGroups({int total = 1}) => BuyV2CheckoutPaymentAttempt(
+    id: 'host-two-groups', ownerScope: 'host-paise', quoteValidUntil: at.add(const Duration(minutes: 5)),
+    groups: [for (final id in ['first', 'second']) BuyV2CheckoutGroupAttempt(
+      request: BuyV2OrderPlacementRequest.minor(
+        lines: [BuyV2CartLine(product: product.copyWith(id: 'host-$id', priceMinor: total), quantity: 1)],
+        address: frozenAddress, paymentMethod: 'UPI', totalMinor: total, amountDueNowMinor: 0,
+        idempotencyKey: 'host-key-$id', checkoutAttemptId: 'host-two-groups', paymentGroupId: 'host-group-$id',
+        checkoutQuoteId: 'host-two-groups-quote'),
+      fulfilmentKeys: {'host-scope-$id'}, obligations: [BuyV2CheckoutFulfilmentObligation(
+        fulfilmentKey: 'host-scope-$id', productIds: {'host-$id'}, totalMinor: total, dueNowMinor: 0)],
+      state: BuyV2CheckoutSubmissionState.paymentUnknown)]);
+  test('LF-PAISE oversized frozen aggregate cannot overwrite a recoverable original', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(checkoutPaymentAttempt: twoFrozenGroups())), isTrue);
+    final before = preferences.values.values.single;
+    expect(await store.write(BuyV2CustomerStateSnapshot(
+      checkoutPaymentAttempt: twoFrozenGroups(total: 4503599627370496))), isFalse);
+    expect(preferences.values.values.single, before);
+  });
+  for (final version in [1, 2]) {
+    test('LF-PAISE oversized stored aggregate version=$version is incomplete recovery not a throwable usable attempt', () async {
+      final preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      expect(await store.write(BuyV2CustomerStateSnapshot(checkoutPaymentAttempt: twoFrozenGroups())), isTrue);
+      final key = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[key]!) as Map;
+      final attempt = raw['checkoutPaymentAttempt'] as Map; attempt['version'] = version;
+      for (final group in attempt['groups'] as List) {
+        final request = group['request'] as Map;
+        if (version == 1) {
+          request.remove('totalMinor'); request.remove('amountDueNowMinor');
+          request['total'] = 45035996273705; request['amountDueNow'] = 0;
+        } else { request['totalMinor'] = 4503599627370496; }
+        (group['obligations'] as List).single['totalMinor'] = version == 1 ? 4503599627370500 : 4503599627370496;
+      }
+      final corrupted = jsonEncode(raw); preferences.values[key] = corrupted;
+      final restored = (await store.read())!;
+      expect(restored.paymentRecoveryIncomplete, isTrue); expect(restored.checkoutPaymentAttempt, isNull);
+      expect(preferences.values[key], corrupted);
+    });
+  }
+  test('LF-PAISE benefit saving and threshold require canonical minor amounts', () {
+    const value = BuyV2CartBenefit(id: 'host-exact-coupon', kind: BuyV2CartBenefitKind.coupon,
+      destination: BuyV2Destination.shop, title: 'Host coupon', detail: 'Isolated host eligibility',
+      sourceId: 'host-benefits', savingAmount: 1, minimumSpend: 20);
+    final exact = value;
+    expect(exact.savingAmountMinor, 100); expect(exact.minimumSpendMinor, 2000);
+  });
+  BuyV2CartBenefit hostBenefit({int saving = 25, int minimum = 2001}) => BuyV2CartBenefit(
+    id: 'host-exact-coupon', kind: BuyV2CartBenefitKind.coupon, destination: BuyV2Destination.shop,
+    title: 'Host coupon', detail: 'Isolated host eligibility', sourceId: 'host-benefits',
+    savingAmountMinor: saving, minimumSpendMinor: minimum, scope: BuyV2CartBenefitScope.store, storeId: 'store-one',
+    strategy: BuyV2CartBenefitStrategy.minimumOrder, validUntil: at.add(const Duration(hours: 1)), revision: 1);
+  Future<BuyV2Session> benefitSession(BuyV2CartBenefitsAdapter adapter, List<BuyV2Product> values,
+    {BuyV2ProductFactsAdapter? facts, BuyV2CheckoutQuoteAdapter? quoteAdapter,
+      BuyV2CommercialPaymentTermsAdapter? termsAdapter, BuyV2TipPolicy tipPolicy = const BuyV2DisabledTipPolicy(),
+      BuyV2CustomerStateStore? customerStateStore, BuyV2CommerceAdapter? commerceAdapter, bool reviewDataEnabled = true}) async {
+    final core = BuySession(), source = _ExactMoneyHostCatalogue()..rows.addAll(values);
+    final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: reviewDataEnabled, catalogueNow: () => at,
+      productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), cartBenefitsAdapter: adapter,
+      checkoutQuoteAdapter: quoteAdapter, commercialPaymentTermsAdapter: termsAdapter, tipPolicy: tipPolicy,
+      customerStateStore: customerStateStore, commerceAdapter: commerceAdapter);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    if (customerStateStore != null) await session.restoreCustomerState(restoreBrowsing: false);
+    final pager = session.acquireCatalogueProducts('host-paise-benefits');
+    addTearDown(() => session.releaseCatalogueProducts('host-paise-benefits'));
+    await pager.open(BuyV2CatalogueQuery(destination: values.first.destination, regionId: 'host-region',
+      areaScope: BuyV2CatalogueAreaScope.allAreas));
+    expect(pager.page?.items.length, values.length, reason: pager.message);
+    return session;
+  }
+  Future<({BuyV2Session session, _ExactMoneyHostPreferences preferences})> placementFixture(
+    _HostPlacement adapter, {bool grouped = false, int price = 1025, int quantity = 1, int fee = 0,
+    int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet}) async {
+    final quote = _HostMinorQuote()..reply = ((groups, tips) async {
+      final value = _hostExactQuote(groups, tips, fee: fee).quote!;
+      return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+        id: value.id, sourceId: value.sourceId, evaluatedAt: value.evaluatedAt, validUntil: value.validUntil,
+        lines: value.lines, totalMinor: value.totalMinor,
+        paymentGroups: !grouped ? null : [BuyV2CheckoutPaymentGroup.minor(id: 'host-payment-group',
+          fulfilmentKeys: groups.map((group) => group.key).toSet(), paymentMethod: 'UPI',
+          totalMinor: value.totalMinor, amountDueNowMinor: value.totalMinor)]));
+    });
+    final preferences = _ExactMoneyHostPreferences(beforeSet: beforeSet);
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-placement');
+    final value = product.copyWith(priceMinor: price, mrpMinor: mrp ?? 28000, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(_HostMinorBenefits(), [value], quoteAdapter: quote,
+      customerStateStore: store, commerceAdapter: adapter, termsAdapter: !withTerms ? null :
+        (_HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals))));
+    expect(session.addProduct(value.id), isTrue); expect(session.setCartQuantity(value.id, '$quantity'), isTrue);
+    session.addAddress(frozenAddress); session.openCart(); expect(session.openCheckout(), isTrue);
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    return (session: session, preferences: preferences);
+  }
+  for (final grouped in [false, true]) {
+    test('LF-PAISE new exact placement grouped=$grouped saves original paise before explicit dispatch', () async {
+      final adapter = _HostMinorGroupedPlacement();
+      final fixture = await placementFixture(adapter, grouped: grouped, fee: 1), session = fixture.session;
+      adapter.onDispatch = (request) {
+        final store = BuyV2SharedPreferencesCustomerStateStore(fixture.preferences, ownerScope: 'host-placement');
+        expect(fixture.preferences.values.values.single, contains(request.idempotencyKey));
+        expect(store.ownerScope, 'host-placement');
+      };
+      expect(await session.submitOrder(), isFalse);
+      final requests = grouped ? adapter.minorGroups : adapter.minorSingle;
+      expect(requests, hasLength(1), reason: session.notice);
+      final request = requests.single;
+      expect(request.usesMinorAmounts, isTrue); expect(request.totalMinor, 1026); expect(request.amountDueNowMinor, 1026);
+      expect(request.lines.single.product.priceMinor, 1025);
+      expect(adapter.legacySingle, isEmpty); expect(adapter.legacyGroups, isEmpty);
+      final saved = await BuyV2SharedPreferencesCustomerStateStore(fixture.preferences, ownerScope: 'host-placement').read();
+      final payment = grouped ? saved!.checkoutPaymentAttempt!.groups.single : saved!.legacyCheckoutAttempt!.payment;
+      expect(payment.request.idempotencyKey, request.idempotencyKey);
+      expect(payment.request.usesMinorAmounts, isTrue); expect(payment.obligations.single.totalMinor, 1026);
+      expect(payment.obligations.single.dueNowMinor, 1026);
+      expect(await session.submitOrder(), isFalse); expect(requests, hasLength(1));
+    });
+  }
+  for (final grouped in [false, true]) {
+    for (final kind in ['whole', 'fractional unit with whole total', 'fractional MRP', 'fractional fee']) {
+      test('LF-PAISE legacy placement grouped=$grouped preserves units or blocks $kind', () async {
+        final adapter = _HostPlacement();
+        final fixture = await placementFixture(adapter, grouped: grouped,
+          price: kind == 'fractional unit with whole total' ? 1025 : 1000,
+          quantity: kind == 'fractional unit with whole total' ? 4 : 1,
+          mrp: kind == 'fractional MRP' ? 1251 : 28000, fee: kind == 'fractional fee' ? 1 : 0);
+        expect(await fixture.session.submitOrder(), isFalse);
+        final calls = grouped ? adapter.legacyGroups : adapter.legacySingle;
+        expect(calls.length, kind == 'whole' ? 1 : 0, reason: fixture.session.notice);
+        if (kind == 'whole') {
+          expect(calls.single.usesMinorAmounts, isFalse);
+          expect(calls.single.total, 10); expect(calls.single.amountDueNow, 10);
+        } else {
+          expect(fixture.session.checkoutPaymentAttempt, isNull);
+          expect(fixture.session.legacyCheckoutAttempt, isNull);
+          expect(fixture.session.quantityFor(product.id), kind == 'fractional unit with whole total' ? 4 : 1);
+        }
+        expect(adapter.minorGroups, isEmpty); expect(adapter.minorSingle, isEmpty);
+      });
+    }
+    test('LF-PAISE minor placement grouped=$grouped saves whole amounts explicitly in paise', () async {
+      final adapter = _HostMinorGroupedPlacement();
+      final fixture = await placementFixture(adapter, grouped: grouped, price: 1000);
+      expect(await fixture.session.submitOrder(), isFalse);
+      final request = (grouped ? adapter.minorGroups : adapter.minorSingle).single;
+      expect(request.usesMinorAmounts, isTrue); expect(request.totalMinor, 1000); expect(request.amountDueNowMinor, 1000);
+      expect(adapter.legacySingle, isEmpty); expect(adapter.legacyGroups, isEmpty);
+    });
+    test('LF-PAISE minor placement grouped=$grouped never dispatches on failed durable save', () async {
+      final adapter = _HostMinorGroupedPlacement();
+      var failWrite = false;
+      final fixture = await placementFixture(adapter, grouped: grouped, beforeSet: (_, text) {
+        if (failWrite) throw StateError('Host placement write failed');
+      });
+      failWrite = true;
+      expect(await fixture.session.submitOrder(), isFalse);
+      expect(adapter.minorSingle, isEmpty); expect(adapter.minorGroups, isEmpty);
+      expect(adapter.legacySingle, isEmpty); expect(adapter.legacyGroups, isEmpty);
+      expect(fixture.session.quantityFor(product.id), 1);
+    });
+    test('LF-PAISE frozen exact placement grouped=$grouped survives restart without downgrading capability', () async {
+      final adapter = _HostMinorGroupedPlacement();
+      final fixture = await placementFixture(adapter, grouped: grouped, fee: 1);
+      expect(await fixture.session.submitOrder(), isFalse);
+      final request = (grouped ? adapter.minorGroups : adapter.minorSingle).single;
+      final legacy = _HostPlacement()..reconciliation = BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.paymentUnknown, customerMessage: 'Host original held',
+        paymentReference: 'host-placement-reference', idempotencyKey: request.idempotencyKey,
+        checkoutAttemptId: request.checkoutAttemptId, paymentGroupId: request.paymentGroupId);
+      final recovered = await benefitSession(_HostMinorBenefits(), [request.lines.single.product], commerceAdapter: legacy,
+        customerStateStore: BuyV2SharedPreferencesCustomerStateStore(fixture.preferences, ownerScope: 'host-placement'));
+      final original = grouped ? recovered.currentCheckoutPaymentGroup!.request : recovered.legacyCheckoutAttempt!.payment.request;
+      expect(original.usesMinorAmounts, isTrue); expect(original.totalMinor, 1026);
+      expect(original.idempotencyKey, request.idempotencyKey);
+      expect(await recovered.submitOrder(), isFalse);
+      expect(await recovered.reconcilePayment(), isFalse);
+      expect(legacy.reconciliationCalls, 1); expect(legacy.legacySingle, isEmpty); expect(legacy.legacyGroups, isEmpty);
+      expect(recovered.checkoutRequiresResolution, isTrue); expect(recovered.quantityFor(product.id), 1);
+    });
+    for (final difference in [-1, 0, 1]) {
+      test('LF-PAISE exact placement QR grouped=$grouped rejects paise difference=$difference', () async {
+        final adapter = _HostMinorGroupedPlacement();
+        final fixture = await placementFixture(adapter, grouped: grouped, fee: 1);
+        fixture.session.upiQrAvailable = true;
+        expect(fixture.session.chooseUpiQr(true), isTrue);
+        final action = BuyV2UpiQrAction(uri: Uri.parse('upi://pay?pa=host@invalid&pn=Host&cu=INR&tr=host-qr&am=${((1026 + difference) / 100).toStringAsFixed(2)}'),
+          paymentReference: 'host-placement-reference', transactionReference: 'host-qr', expiresAt: at.add(const Duration(hours: 1)));
+        adapter.reply = (request) => BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentPending,
+          customerMessage: 'Host original QR', paymentReference: 'host-placement-reference', upiQrAction: action,
+          idempotencyKey: request.idempotencyKey, checkoutAttemptId: request.checkoutAttemptId, paymentGroupId: request.paymentGroupId);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(fixture.session.upiQrAction, difference == 0 ? same(action) : isNull);
+        expect((grouped ? adapter.minorGroups : adapter.minorSingle), hasLength(1));
+        expect(fixture.session.quantityFor(product.id), 1);
+        expect(fixture.session.checkoutRequiresResolution, isTrue);
+      });
+    }
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-PAISE frozen Checkout exact totals grouped=$grouped scale=$scale', (tester) async {
+        tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+        final fixture = await placementFixture(_HostMinorGroupedPlacement(), grouped: grouped, fee: 1);
+        final session = fixture.session;
+        expect(await session.submitOrder(), isFalse);
+        expect(session.checkoutRequiresResolution, isTrue);
+        session.checkoutStep = BuyV2CheckoutStep.payment;
+        final gst = BuyV2GstInvoiceController(); addTearDown(gst.dispose);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+          MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+          home: Scaffold(body: BuyV2CheckoutView(session: session, gstInvoiceController: gst))));
+        await tester.pumpAndSettle(); expect(tester.takeException(), isNull);
+        expect(find.text(grouped ? 'Agreed total' : 'Original total'), findsOneWidget);
+        expect(find.textContaining('₹10.26'), findsWidgets);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+      for (final step in BuyV2CheckoutStep.values) {
+        testWidgets('LF-PAISE Checkout exact labels grouped=$grouped scale=$scale step=${step.name}', (tester) async {
+          final faults = <FlutterErrorDetails>[];
+          final onError = FlutterError.onError;
+          FlutterError.onError = (details) { faults.add(details); onError?.call(details); };
+          addTearDown(() { FlutterError.onError = onError; });
+          tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+          final fixture = await placementFixture(_HostMinorGroupedPlacement(), grouped: grouped, fee: 1, withTerms: true);
+          final session = fixture.session;
+          expect(await session.refreshCommercialPaymentTerms(), isTrue);
+          session.checkoutStep = step;
+          final gst = BuyV2GstInvoiceController(); addTearDown(gst.dispose);
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+            MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+            home: Scaffold(body: BuyV2CheckoutView(session: session, gstInvoiceController: gst))));
+          await tester.pumpAndSettle(); expect(tester.takeException(), isNull,
+            reason: faults.map((detail) => '${detail.exception}\n${detail.stack}').join('\n'));
+          expect(find.textContaining('₹10.26'), findsWidgets);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
+  }
+  for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    for (final surface in ['catalogue', 'product', 'cart', 'purchased items']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('LF-PAISE shared $surface ${destination.name} exact money scale=$scale', (tester) async {
+          tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+          final faults = <FlutterErrorDetails>[];
+          final onError = FlutterError.onError;
+          FlutterError.onError = (detail) { faults.add(detail); onError?.call(detail); };
+          addTearDown(() { FlutterError.onError = onError; });
+          final value = BuyV2Product(id: product.id, canonicalId: product.canonicalId, storeId: product.storeId,
+            destination: destination, categoryId: product.categoryId, brand: product.brand, title: product.title,
+            variant: product.variant, pack: product.pack, priceMinor: 1025, mrpMinor: 1250,
+            unitPrice: '', badge: '', seller: product.seller, sellerType: product.sellerType,
+            origin: '', confirmedOn: '', visualLabel: product.visualLabel, visualKind: product.visualKind,
+            offerClass: destination == BuyV2Destination.shop ? BuyV2OfferClass.retail : BuyV2OfferClass.wholesale,
+            deliveryPromise: 'Host-only fulfilment');
+          final commerce = _HostExactOrderCommerce()..records = [BuyV2Order.minor(
+            id: 'host-render-order', purchaseId: 'host-render-purchase', destination: destination,
+            title: 'Host saved order', itemSummary: 'One product', totalMinor: 2050,
+            partner: 'Host Store', partnerType: 'Retailer', promise: 'Host delivery', destinationLabel: 'Host address',
+            progress: 0, status: BuyV2OrderStatus.preparing, productIds: [value.id],
+            lines: [BuyV2CartLine(product: value, quantity: 2)], amountPaidNowMinor: 0, balanceDueMinor: 2050)];
+          final session = await benefitSession(_HostMinorBenefits(), [value], commerceAdapter: commerce,
+            reviewDataEnabled: surface != 'purchased items');
+          session.openDestination(destination);
+          if (surface == 'product') expect(session.openProduct(value.id), isTrue);
+          if (surface == 'cart') {
+            expect(session.addProduct(value.id), isTrue); expect(session.setCartQuantity(value.id, '2'), isTrue);
+            session.openCart();
+          }
+          if (surface == 'purchased items') {
+            await session.restoreCommerce(); expect(session.openOrderItems('host-render-order'), isTrue);
+          }
+          final Widget child = switch (surface) {
+            'catalogue' => BuyV2CatalogueView(session: session),
+            'product' => BuyV2ProductView(session: session),
+            'cart' => BuyV2CartView(session: session, onBrowseMore: () {}),
+            _ => BuyV2OrderItemsView(session: session),
+          };
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+            MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+            home: Scaffold(body: child)));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull,
+            reason: faults.map((detail) => '${detail.exception}\n${detail.stack.toString().split('\n').take(8).join('\n')}').join('\n'));
+          expect(find.textContaining(surface == 'cart' || surface == 'purchased items' ? '₹20.50' : '₹10.25'), findsWidgets);
+          if (surface == 'product') {
+            final details = find.byKey(ValueKey('buy-product-price-details-${value.id}'));
+            await tester.scrollUntilVisible(details, 250, scrollable: find.byType(Scrollable).first);
+            await Scrollable.ensureVisible(tester.element(details), alignment: .5);
+            await tester.pumpAndSettle(); expect(details.hitTestable(), findsOneWidget);
+            await tester.tap(details); await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey('buy-product-price-details-inline-${value.id}')), findsOneWidget);
+            expect(find.text('₹12.50'), findsWidgets); expect(find.text('₹2.25'), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+    }
+  }
+  testWidgets('LF-PAISE tier Cart displays exact per-pack and next-quantity totals', (tester) async {
+    tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final value = product.copyWith(id: 'host-ui-tier', priceMinor: 1025, mrpMinor: 1250,
+      deliveryPromise: 'Host-only fulfilment', packTerms: BuyV2PackTerms(skuId: 'host-ui-tier',
+        revision: 'host-ui-tier-revision', sellUnit: 'piece', pricingStoreId: 'store-one', priceObservedAt: at,
+        priceValidUntil: at.add(const Duration(hours: 1)), priceTiers: const [
+          BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 1025), BuyV2PackPriceTier(minimumPacks: 3, priceMinor: 1001)]));
+    final session = await benefitSession(_HostMinorBenefits(), [value]);
+    expect(session.addProduct(value.id, quantity: 2), isTrue); session.openCart();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+      home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) =>
+        BuyV2CartView(session: session, onBrowseMore: () {})))));
+    await tester.pumpAndSettle(); expect(tester.takeException(), isNull);
+    final tier = find.byKey(ValueKey('buy-cart-quantity-tier-${value.id}'));
+    await tester.scrollUntilVisible(tier, 250, scrollable: find.byType(Scrollable).first);
+    expect(find.textContaining('₹10.01/pack'), findsOneWidget);
+    expect(find.textContaining('Item total ₹30.03'), findsOneWidget);
+    await tester.tap(tier); await tester.pumpAndSettle();
+    expect(session.quantityFor(value.id), 3); expect(session.cartLines.single.totalMinor, 3003);
+    expect(find.text('₹30.03'), findsWidgets); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  test('LF-PAISE single minor placement capability does not grant grouped fractional dispatch', () async {
+    final adapter = _HostMinorPlacement();
+    final fixture = await placementFixture(adapter, grouped: true);
+    expect(await fixture.session.submitOrder(), isFalse);
+    expect(adapter.minorSingle, isEmpty); expect(adapter.legacyGroups, isEmpty);
+    expect(fixture.session.checkoutPaymentAttempt, isNull);
+  });
+  test('LF-PAISE exact quote and retail terms consume canonical paise without legacy dispatch', () async {
+    final quote = _HostMinorQuote()..reply = ((groups, tips) async => _hostExactQuote(groups, tips, coupon: 25, fee: 1));
+    final terms = _HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals));
+    final benefits = _HostMinorBenefits()..offers.add(hostBenefit(minimum: 1));
+    final base = product.copyWith(priceMinor: 2001, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(benefits, [base], quoteAdapter: quote, termsAdapter: terms);
+    expect(session.addProduct(base.id), isTrue); expect(session.chooseCartBenefit(benefits.offers.single), isTrue);
+    session.addAddress(frozenAddress); session.openCart();
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    expect(await session.refreshCommercialPaymentTerms(), isTrue);
+    expect(session.checkoutPayableTotalMinor, 1977); expect(session.checkoutAmountDueNowMinor, 1977);
+    expect(session.checkoutQuotedDeliveryFeeMinor, 1); expect(session.checkoutBalanceDueMinor, 0);
+    expect(session.checkoutQuoteReviewRequired, isFalse); expect(session.checkoutPaymentTermsReviewRequired, isFalse);
+    expect(quote.minorCalls, greaterThan(0)); expect(quote.legacyCalls, 0); expect(quote.minorTips!.values.single, 0);
+    expect(terms.minorTotals!.values.single, 1977); expect(terms.legacyCalls, 0);
+  });
+  for (final component in ['unit price', 'MRP', 'future tier', 'benefit']) {
+    test('LF-PAISE legacy quote receives no fractional $component payload even with a whole basket total', () async {
+      final quote = _HostLegacyQuote();
+      final benefits = _HostMinorBenefits();
+      var base = product.copyWith(priceMinor: 2000, mrpMinor: component == 'MRP' ? 2001 : 28000,
+        deliveryPromise: 'Host-only fulfilment');
+      if (component == 'unit price') { base = base.copyWith(priceMinor: 1050, minimumOrder: 2); }
+      if (component == 'future tier') { base = base.copyWith(packTerms: BuyV2PackTerms(skuId: base.id, revision: 'host-tiers',
+        sellUnit: 'piece', pricingStoreId: base.storeId, priceObservedAt: at, priceValidUntil: at.add(const Duration(hours: 1)),
+        priceTiers: const [BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 2000), BuyV2PackPriceTier(minimumPacks: 2, priceMinor: 1001)])); }
+      if (component == 'benefit') benefits.offers.add(hostBenefit(minimum: 1));
+      final session = await benefitSession(benefits, [base], quoteAdapter: quote);
+      expect(session.addProduct(base.id), isTrue, reason: session.notice);
+      // Adding an ordinary whole-price item legitimately requests a quote before
+      // its fractional coupon is selected. Only subsequent dispatch is forbidden.
+      final permittedWholeCalls = quote.legacyCalls;
+      if (component != 'benefit') expect(permittedWholeCalls, 0);
+      if (component == 'benefit') expect(session.chooseCartBenefit(benefits.offers.single), isTrue);
+      session.addAddress(frozenAddress); session.openCart();
+      expect(session.checkoutTotalMinor % 100, 0);
+      expect(await session.refreshCheckoutQuote(), isFalse);
+      expect(quote.legacyCalls, permittedWholeCalls); expect(session.checkoutQuoteLoadState, BuyV2CommerceLoadState.unavailable);
+      expect(session.checkoutQuote, isNull);
+    });
+  }
+  test('LF-PAISE legacy terms receive no fractional quoted fee while Cart prices are whole', () async {
+    final quote = _HostMinorQuote()..reply = ((groups, tips) async => _hostExactQuote(groups, tips, fee: 1));
+    final terms = _HostLegacyTerms();
+    final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+      [product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment')], quoteAdapter: quote, termsAdapter: terms);
+    expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    expect(await session.refreshCommercialPaymentTerms(), isFalse);
+    expect(terms.legacyCalls, 0); expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.unavailable);
+  });
+  test('LF-PAISE legacy quote and term maps retain rupees while exact provider tip maps use paise', () async {
+    for (final exact in [false, true]) {
+      final quote = exact ? _HostMinorQuote() : _HostLegacyQuote();
+      quote.reply = (groups, tips) async => _hostExactQuote(groups,
+        exact ? tips : tips.map((key, value) => MapEntry(key, value * 100)));
+      final terms = exact ? _HostMinorTerms() : _HostLegacyTerms();
+      terms.reply = (groups, totals) async => _hostExactRetailTerms(groups,
+        exact ? totals : totals.map((key, value) => MapEntry(key, value * 100)));
+      final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+        [product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment')],
+        quoteAdapter: quote, termsAdapter: terms, tipPolicy: _HostTipPolicy());
+      expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+      final group = session.checkoutFulfilmentGroups.single;
+      expect(session.chooseTip(fulfilmentKey: group.key, destination: group.destination, amount: 10), isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      expect(await session.refreshCommercialPaymentTerms(), isTrue);
+      expect(exact ? (quote as _HostMinorQuote).minorTips!.values.single : quote.legacyTips!.values.single, exact ? 1000 : 10);
+      expect(exact ? (terms as _HostMinorTerms).minorTotals!.values.single : terms.legacyTotals!.values.single, exact ? 3000 : 30);
+      expect(session.checkoutPayableTotalMinor, 3000); expect(session.checkoutAmountDueNowMinor, 3000);
+    }
+  });
+  for (final mismatch in ['subtotal', 'coupon', 'tip', 'total', 'quote total', 'foreign group', 'negative tax']) {
+    test('LF-PAISE exact quote rejects $mismatch without retaining a usable total', () async {
+      final quote = _HostMinorQuote()..reply = ((groups, tips) async {
+        final good = _hostExactQuote(groups, tips).quote!, original = _hostExactQuote(groups, tips).quote!.lines.single;
+        final subtotal = original.itemSubtotalMinor + (mismatch == 'subtotal' ? 1 : 0);
+        final coupon = mismatch == 'coupon' ? 1 : 0, tip = mismatch == 'tip' ? 1 : 0;
+        final total = subtotal - coupon + tip + (mismatch == 'total' ? 1 : 0);
+        final line = BuyV2CheckoutQuoteLine.minor(fulfilmentKey: mismatch == 'foreign group' ? 'host-foreign' : original.fulfilmentKey,
+          itemSubtotalMinor: subtotal, couponSavingMinor: coupon, taxMinor: mismatch == 'negative tax' ? -1 : 0,
+          freightMinor: 0, deliveryFeeMinor: 0, tipMinor: tip, paymentChargeMinor: 0, totalMinor: total);
+        return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready, quote: BuyV2CheckoutQuote.minor(
+          id: good.id, sourceId: good.sourceId, evaluatedAt: good.evaluatedAt, validUntil: good.validUntil,
+          lines: [line], totalMinor: total + (mismatch == 'quote total' ? 1 : 0)));
+      });
+      final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+        [product.copyWith(priceMinor: 2001, deliveryPromise: 'Host-only fulfilment')], quoteAdapter: quote);
+      expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+      expect(await session.refreshCheckoutQuote(), isFalse);
+      expect(session.checkoutQuote, isNull); expect(session.checkoutQuoteLoadState, BuyV2CommerceLoadState.unavailable);
+      expect(session.cartTotalMinor, 2001); expect(quote.legacyCalls, 0);
+    });
+  }
+  test('LF-PAISE older terms cannot replace the newer one-paise fee and quote identity', () async {
+    final quote = _HostMinorQuote(); var fee = 1;
+    quote.reply = (groups, tips) async => _hostExactQuote(groups, tips, fee: fee, id: 'host-quote-$fee');
+    final held = Completer<BuyV2CommercialPaymentTermsSnapshot>();
+    final terms = _HostMinorTerms();
+    terms.reply = (groups, totals) => totals.values.single == 2001 ? held.future :
+      Future.value(_hostExactRetailTerms(groups, totals));
+    final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+      [product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment')], quoteAdapter: quote, termsAdapter: terms);
+    expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    final oldGroups = session.checkoutFulfilmentGroups;
+    expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.loading);
+    fee = 2; expect(await session.refreshCheckoutQuote(), isTrue);
+    expect(await session.refreshCommercialPaymentTerms(), isTrue);
+    held.complete(_hostExactRetailTerms(oldGroups, {oldGroups.single.key: 2001}));
+    await Future<void>.delayed(Duration.zero);
+    expect(session.checkoutPayableTotalMinor, 2002);
+    expect(session.selectedCommercialPaymentTermFor(oldGroups.single.key)!.orderTotalMinor, 2002);
+    expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.ready);
+  });
+  test('LF-PAISE quote expiry while terms are pending clears loading and cannot accept them', () async {
+    final quote = _HostMinorQuote()..reply = ((groups, tips) async => _hostExactQuote(groups, tips,
+      expires: DateTime.now().add(const Duration(milliseconds: 250))));
+    final held = Completer<BuyV2CommercialPaymentTermsSnapshot>();
+    final terms = _HostMinorTerms()..reply = ((groups, totals) => held.future);
+    final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+      [product.copyWith(priceMinor: 2001, deliveryPromise: 'Host-only fulfilment')], quoteAdapter: quote, termsAdapter: terms);
+    expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+    expect(await session.refreshCheckoutQuote(), isTrue);
+    final pending = session.refreshCommercialPaymentTerms(), groups = session.checkoutFulfilmentGroups;
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    held.complete(_hostExactRetailTerms(groups, {groups.single.key: 2001}));
+    expect(await pending, isFalse); expect(session.checkoutQuoteReviewRequired, isTrue);
+    expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.unavailable);
+    expect(session.selectedCommercialPaymentTermFor(groups.single.key), isNull);
+  });
+  for (final quoteOperation in [false, true]) {
+    for (final retire in [false, true]) {
+      test('LF-PAISE loading listener ${retire ? 'retirement' : 'newer request'} prevents stale ${quoteOperation ? 'quote' : 'term'} dispatch', () async {
+        final quote = _HostMinorQuote()..reply = ((groups, tips) async => _hostExactQuote(groups, tips));
+        final terms = _HostMinorTerms()..reply = ((groups, totals) async => _hostExactRetailTerms(groups, totals));
+        final store = _HostRetirableStateStore();
+        final session = await benefitSession(const BuyV2DisabledCartBenefitsAdapter(),
+          [product.copyWith(priceMinor: 2001, deliveryPromise: 'Host-only fulfilment')],
+          quoteAdapter: quoteOperation ? quote : null, termsAdapter: quoteOperation ? null : terms,
+          customerStateStore: store);
+        expect(session.addProduct(product.id), isTrue); session.addAddress(frozenAddress); session.openCart();
+        final Future<bool> Function() operation = quoteOperation ? session.refreshCheckoutQuote : session.refreshCommercialPaymentTerms;
+        expect(await operation(), isTrue);
+        final before = quoteOperation ? quote.minorCalls : terms.minorCalls;
+        var handled = false;
+        void listener() {
+          final loading = quoteOperation ? session.checkoutQuoteLoadState == BuyV2CommerceLoadState.loading :
+            session.commercialPaymentTermsLoadState == BuyV2CommerceLoadState.loading;
+          if (handled || !loading) return;
+          handled = true;
+          if (retire) { store.ownerScope = 'host-retired-owner'; }
+          else { unawaited(operation()); }
+        }
+        session.addListener(listener);
+        expect(await operation(), isFalse);
+        await Future<void>.delayed(Duration.zero);
+        session.removeListener(listener);
+        expect(handled, isTrue);
+        expect(quoteOperation ? quote.minorCalls : terms.minorCalls, before + (retire ? 0 : 1));
+        if (!retire) {
+          expect(quoteOperation ? session.checkoutQuoteLoadState : session.commercialPaymentTermsLoadState,
+            BuyV2CommerceLoadState.ready);
+        }
+      });
+    }
+  }
+  test('LF-PAISE benefit exact saving defaults do not conflict and malformed amounts never fall back', () {
+    final value = hostBenefit();
+    expect(value.validScope, isTrue); expect(value.savingAmountMinor, 25); expect(value.minimumSpendMinor, 2001);
+    expect(() => value.savingAmount, throwsFormatException); expect(() => value.minimumSpend, throwsFormatException);
+    for (final bad in [
+      BuyV2CartBenefit(id: 'bad', kind: value.kind, destination: value.destination, title: value.title, detail: value.detail,
+        sourceId: value.sourceId, savingAmount: 0, savingAmountMinor: 25),
+      BuyV2CartBenefit(id: 'bad', kind: value.kind, destination: value.destination, title: value.title, detail: value.detail,
+        sourceId: value.sourceId, savingAmountMinor: -1),
+      BuyV2CartBenefit(id: 'bad', kind: value.kind, destination: value.destination, title: value.title, detail: value.detail,
+        sourceId: value.sourceId, minimumSpend: 20, minimumSpendMinor: 2001),
+    ]) { expect(bad.hasValidMoney, isFalse); expect(bad.validScope, isFalse); }
+  });
+  test('LF-PAISE enabled minor benefits preserve threshold saving and Store scope', () async {
+    final adapter = _HostMinorBenefits(), coupon = hostBenefit(); adapter.offers.add(coupon);
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final tiny = base.copyWith(id: 'host-paise-unit', priceMinor: 1);
+    final other = base.copyWith(id: 'host-foreign-store-unit', storeId: 'other-store', priceMinor: 999);
+    final session = await benefitSession(adapter, [base, tiny, other]);
+    expect(session.addProduct(base.id), isTrue);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+    expect(session.chooseCartBenefit(coupon), isFalse);
+    expect(session.addProduct(tiny.id), isTrue);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon).single.id, coupon.id);
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    expect(session.scopedCouponSavingMinor, 25); expect(session.scopedPayableTotalMinor, 1976);
+    expect(session.calculatedCheckoutPayableTotalMinor, 1976);
+    expect(session.addProduct(other.id), isTrue);
+    expect(session.scopedCouponSavingMinor, 25); expect(session.scopedPayableTotalMinor, 2975);
+    expect(adapter.minorInputs, contains(2001)); expect(adapter.legacyInputs, isEmpty);
+    expect(session.productBenefitsFor(base), isEmpty, reason: 'One product preview remains one paise below the threshold');
+  });
+  testWidgets('LF-PAISE Cart renders the applied paise coupon and exact payable without rounding', (tester) async {
+    final adapter = _HostMinorBenefits()..offers.add(hostBenefit(minimum: 1));
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(adapter, [base]);
+    expect(session.addProduct(base.id), isTrue);
+    expect(session.chooseCartBenefit(adapter.offers.single), isTrue);
+    session.openCart();
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(
+      body: BuyV2CartView(session: session, onBrowseMore: () {}))));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('₹19.75'), findsWidgets);
+    final summary = find.byKey(const ValueKey('buy-cart-bill-summary'));
+    await tester.scrollUntilVisible(summary, 260,
+      scrollable: find.descendant(of: find.byKey(const ValueKey('buy-cart-scroll')),
+        matching: find.byType(Scrollable)).first);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Applied coupon ₹0.25'), findsOneWidget);
+    expect(session.scopedCouponSavingMinor, 25);
+    expect(session.cartTotalMinor, 2000);
+    expect(tester.takeException(), isNull);
+  });
+  test('LF-PAISE legacy enabled adapter receives whole rupees and unsupported fractional requests stay unavailable', () async {
+    final adapter = _HostLegacyBenefits(), coupon = hostBenefit(minimum: 1); adapter.offers.add(coupon);
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final tiny = base.copyWith(id: 'host-paise-unit', priceMinor: 1);
+    final session = await benefitSession(adapter, [base, tiny]);
+    expect(session.addProduct(base.id), isTrue);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon).single.id, coupon.id);
+    expect(adapter.legacyInputs.every((value) => value == 20), isTrue);
+    final before = adapter.legacyInputs.length;
+    expect(session.addProduct(tiny.id), isTrue);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+    expect(adapter.legacyInputs.length, before);
+    expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.unavailable);
+    expect(session.cartBenefitsMessage, isNotNull); expect(await session.refreshCartBenefits(), isFalse);
+    expect(session.productBenefitsStateFor(tiny), BuyV2CartBenefitsLoadState.unavailable);
+    expect(await session.refreshProductBenefits(tiny.id), isFalse);
+    expect(session.cartTotalMinor, 2001);
+  });
+  test('LF-PAISE seeded subclass retains its legacy override without inheriting an exact-money capability', () async {
+    final adapter = _HostSeededOverrideBenefits();
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final tiny = base.copyWith(id: 'host-seeded-paise-unit', priceMinor: 1);
+    final session = await benefitSession(adapter, [base, tiny]);
+    expect(session.addProduct(base.id), isTrue);
+    session.cartBenefits(kind: BuyV2CartBenefitKind.coupon);
+    expect(adapter.calls, isNotEmpty);
+    expect(adapter.calls.every((amount) => amount == 20), isTrue);
+    final before = adapter.calls.length;
+    expect(session.addProduct(tiny.id), isTrue);
+    expect(session.cartBenefits(kind: BuyV2CartBenefitKind.coupon), isEmpty);
+    expect(adapter.calls.length, before);
+    expect(session.cartBenefitsLoadState, BuyV2CartBenefitsLoadState.unavailable);
+    expect(session.cartTotalMinor, 2001);
+  });
+  test('LF-PAISE live opportunity keeps one-paise shortfall separate from applied saving', () async {
+    final adapter = _HostLiveBenefits(), coupon = hostBenefit(); adapter.offers.add(coupon);
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final tiny = base.copyWith(id: 'host-paise-unit', priceMinor: 1);
+    final session = await benefitSession(adapter, [base, tiny]);
+    expect(session.addProduct(base.id), isTrue); await session.refreshCartBenefits();
+    expect(session.cartOfferOpportunity()!.remainingSpendMinor, 1);
+    expect(session.scopedCouponSavingMinor, 0); expect(session.chooseCartBenefit(coupon), isFalse);
+    expect(session.addProduct(tiny.id), isTrue); await session.refreshCartBenefits();
+    expect(session.cartOfferOpportunity(), isNull); expect(session.chooseCartBenefit(coupon), isTrue);
+    expect(session.scopedCouponSavingMinor, 25); expect(session.scopedPayableTotalMinor, 1976);
+    expect(adapter.requests.last.lines.fold<int>(0, (sum, line) => sum + line.totalMinor), 2001);
+  });
+  test('LF-PAISE stale product benefit reply after one-paise refresh cannot remain loading or apply', () async {
+    final adapter = _HostLiveBenefits()..held = Completer<BuyV2CartBenefitsSnapshot>();
+    final facts = _HostBenefitFacts();
+    final base = product.copyWith(priceMinor: 2000, deliveryPromise: 'Host-only fulfilment');
+    final session = await benefitSession(adapter, [base], facts: facts);
+    final pending = session.refreshProductBenefits(base.id);
+    await Future<void>.delayed(Duration.zero);
+    facts.minor = 2001; expect(session.refreshProductFacts(base.id), isTrue);
+    adapter.held!.complete(BuyV2CartBenefitsSnapshot(state: BuyV2CartBenefitsLoadState.ready, evaluatedAt: at,
+      benefits: [hostBenefit(minimum: 1)]));
+    expect(await pending, isFalse); expect(session.productBenefitsFor(base), isEmpty);
+    expect(session.productBenefitsStateFor(base), BuyV2CartBenefitsLoadState.unavailable);
+  });
+  test('LF-PAISE catalogue facts require a canonical minor amount', () {
+    final facts = const BuyV2CatalogueProductFactsAdapter().snapshotFor(product);
+    expect(facts.priceMinor, 26000);
+  });
+  test('LF-PAISE missing money becomes unavailable facts without an invented amount', () {
+    const missing = BuyV2Product(id: 'host-no-price', destination: BuyV2Destination.shop,
+      categoryId: 'grocery', brand: 'Host', title: 'Host missing price', variant: '', pack: '1 piece', unitPrice: '',
+      badge: '', seller: 'Host Store', sellerType: 'Retailer', deliveryPromise: 'Host-only fulfilment',
+      origin: '', confirmedOn: '', visualLabel: '', visualKind: 'unavailable');
+    final snapshot = const BuyV2CatalogueProductFactsAdapter().snapshotFor(missing);
+    expect(snapshot.hasValidMoney, isFalse); expect(snapshot.stale, isTrue);
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    expect(session.productFactsFor(missing).orderabilityLabel, 'Unavailable');
+  });
+  test('LF-PAISE exact facts copy equality and hash retain the last paise', () {
+    const adapter = BuyV2CatalogueProductFactsAdapter();
+    final legacy = adapter.snapshotFor(product);
+    final exact = adapter.snapshotFor(product.copyWith(priceMinor: 1025));
+    expect(exact.priceMinor, 1025); expect(() => exact.price, throwsFormatException);
+    expect(exact.copyWith(stale: true).priceMinor, 1025);
+    expect(exact.copyWith(price: 11).priceMinor, 1100);
+    expect(exact.copyWith(priceMinor: 1026).priceMinor, 1026);
+    expect(exact.copyWith(priceMinor: 1026), isNot(exact));
+    final equivalent = legacy.copyWith(priceMinor: legacy.priceMinor);
+    expect(equivalent, legacy); expect(equivalent.hashCode, legacy.hashCode);
+    final bad = exact.copyWith(price: 10, priceMinor: 1025);
+    expect(bad.hasValidMoney, isFalse); expect(bad, isNot(exact));
+    expect(bad.copyWith(), bad); expect(() => bad.hashCode, returnsNormally);
+    final invalidProduct = product.copyWith(price: 10, priceMinor: 1025);
+    expect(adapter.snapshotFor(invalidProduct).hasValidMoney, isFalse);
+  });
+  test('LF-PAISE actual session admits one paise and reprices Cart across fractional tiers', () async {
+    final source = _ExactMoneyHostCatalogue(), core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: true, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final tiered = product.copyWith(id: 'host-tiered-paise', priceMinor: 1025, mrpMinor: 1250,
+      deliveryPromise: 'Host-only fulfilment', packTerms: BuyV2PackTerms(skuId: 'host-tiered-paise',
+        revision: 'host-price-revision', sellUnit: 'piece', pricingStoreId: 'store-one', priceObservedAt: at,
+        priceValidUntil: at.add(const Duration(hours: 1)), priceTiers: const [
+          BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 1025), BuyV2PackPriceTier(minimumPacks: 3, priceMinor: 1001)]));
+    final tiny = product.copyWith(id: 'host-one-paise', priceMinor: 1, mrpMinor: 2, deliveryPromise: 'Host-only fulfilment');
+    source.rows.addAll([tiered, tiny, product.copyWith(deliveryPromise: 'Host-only fulfilment')]);
+    final pager = session.acquireCatalogueProducts('host-paise-session');
+    addTearDown(() => session.releaseCatalogueProducts('host-paise-session'));
+    await pager.open(storeQuery());
+    expect(pager.page?.items.length, 3, reason: pager.message);
+    expect(session.addProduct(tiered.id, quantity: 2), isTrue, reason: session.notice);
+    expect(session.cartLines.single.totalMinor, 2050);
+    expect(session.nextCartDealTierFor(tiered)!.priceMinor, 1001);
+    expect(session.setCartQuantity(tiered.id, '3'), isTrue);
+    expect(session.cartLines.single.totalMinor, 3003);
+    expect(session.productFactsFor(tiered).priceMinor, 1001);
+    expect(session.addProduct(tiny.id, quantity: 2), isTrue);
+    expect(session.addProduct(product.id), isTrue);
+    final exactTotals = session;
+    expect(exactTotals.cartTotalMinor, 29005);
+    expect(exactTotals.scopedCartTotalMinor, 29005);
+    expect(exactTotals.scopedCartListPriceTotalMinor, 31754);
+    expect(exactTotals.scopedCartSavingsMinor, 2749);
+    expect(exactTotals.scopedCartFamilyTotalsMinor[BuyV2Destination.shop], 29005);
+    expect(() => session.cartTotal, throwsFormatException, reason: 'Unmigrated consumers must not truncate paise');
+    expect(session.setCartQuantity(tiered.id, '2'), isTrue);
+    expect(exactTotals.cartTotalMinor, 28052);
+    expect(session.quantityFor(tiered.id), 2);
+    expect(session.setCartQuantity(tiny.id, '9007199254740991'), isFalse);
+    expect(session.addProduct(tiny.id, quantity: 9007199254740991), isFalse);
+    expect(exactTotals.cartTotalMinor, 28052, reason: 'Rejected capacity changes must not mutate any line');
+    final historicalProduct = product.copyWith(id: tiered.id, pack: tiered.pack, price: 25);
+    final historical = BuyV2Order(id: 'host-old-order', destination: BuyV2Destination.shop, title: 'Host historical sale',
+      itemSummary: 'Four packs', total: 100, totalMinor: 10000, partner: product.seller, partnerType: product.sellerType,
+      promise: 'Host-only fulfilment', destinationLabel: 'Host address', progress: 1, status: BuyV2OrderStatus.confirmed,
+      productIds: [tiered.id], lines: [BuyV2CartLine(product: historicalProduct, quantity: 4)]);
+    session.clearCart();
+    expect(session.reorder(historical), isTrue);
+    expect(session.quantityFor(tiered.id), 1, reason: 'Preserve approved reorder-as-editable-selection behavior');
+    expect(session.cartTotalMinor, 1025, reason: 'Current exact selling price, not the historical ₹25');
+    expect(historical.lines.single.product.priceMinor, 2500);
+    expect(historical.totalMinor, 10000);
+  });
+  for (final difference in ['same', 'price', 'MRP']) {
+    test('LF-PAISE recommendation identity compares exact $difference without whole getters', () async {
+      final source = _ExactMoneyHostCatalogue(), core = BuySession();
+      final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: true, catalogueNow: () => at);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      final first = product.copyWith(id: 'host-choice-one', priceMinor: 1025, mrpMinor: 1250, deliveryPromise: 'Host-only fulfilment');
+      source.rows.addAll([first, first.copyWith(id: 'host-choice-two',
+        priceMinor: difference == 'price' ? 1026 : 1025, mrpMinor: difference == 'MRP' ? 1251 : 1250)]);
+      final pager = session.acquireCatalogueProducts('host-exact-choice');
+      addTearDown(() => session.releaseCatalogueProducts('host-exact-choice'));
+      await pager.open(storeQuery()); expect(pager.page?.items.length, 2, reason: pager.message);
+      final choices = session.cartRecommendationsFor(BuyV2Destination.shop, limit: 10)
+        .where((p) => p.id.startsWith('host-choice-')).toList();
+      expect(choices.length, difference == 'same' ? 1 : 2);
+    });
+  }
+  test('LF-PAISE exact product Cart copy and MRP never manufacture a whole rupee price', () {
+    final value = product.copyWith(priceMinor: 1025, mrpMinor: 1250);
+    expect(value.priceMinor, 1025); expect(value.mrpMinor, 1250); expect(value.hasValidMoney, isTrue);
+    expect(BuyV2CartLine(product: value, quantity: 3).totalMinor, 3075);
+    expect(() => value.price, throwsFormatException); expect(() => value.mrp, throwsFormatException);
+    final copy = value.copyWith(title: 'Retained exact price');
+    expect(copy.priceMinor, 1025); expect(copy.mrpMinor, 1250);
+    expect(copy.minimumOrderTotalMinor(), 1025);
+    expect(copy.copyWith(price: 20).priceMinor, 2000);
+    expect(copy.copyWith(priceMinor: 1).priceMinor, 1);
+    expect(product.copyWith(priceMinor: 26000).price, 260);
+    expect(product.copyWith(mrpMinor: 28000).mrp, 280);
+  });
+  test('LF-PAISE exact tiers and mixed legacy fulfilment sum use integer paise', () {
+    final terms = BuyV2PackTerms(skuId: product.id, revision: 'exact-host-tiers', sellUnit: 'piece',
+      pricingStoreId: product.storeId, priceObservedAt: at, priceValidUntil: at.add(const Duration(hours: 1)),
+      priceTiers: const [BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 1025),
+        BuyV2PackPriceTier(minimumPacks: 3, priceMinor: 1001)]);
+    expect(terms.validPricingFor(product.storeId, 1), isTrue);
+    expect(terms.priceMinorForQuantity(2, 1025), 1025); expect(terms.priceMinorForQuantity(3, 1025), 1001);
+    final lines = [BuyV2CartLine(product: product.copyWith(priceMinor: terms.priceMinorForQuantity(3, 1025)), quantity: 3),
+      BuyV2CartLine(product: product, quantity: 1), BuyV2CartLine(product: product.copyWith(priceMinor: 1), quantity: 2)];
+    final group = BuyV2FulfilmentGroup(groupKey: 'host-exact', destination: BuyV2Destination.shop,
+      partner: 'Host Store', partnerType: 'Retailer', promise: '', lines: lines);
+    expect(lines.first.totalMinor, 3003); expect(group.totalMinor, 29005);
+    expect(() => group.total, throwsFormatException);
+  });
+  for (final amount in [-1, 9007199254740992]) {
+    test('LF-PAISE invalid exact $amount cannot downgrade to legacy price', () {
+      final value = product.copyWith(price: 10, priceMinor: amount, mrp: 12, mrpMinor: amount);
+      expect(value.hasValidMoney, isFalse);
+      expect(() => value.priceMinor, throwsFormatException); expect(() => value.price, throwsFormatException);
+      expect(() => value.mrpMinor, throwsFormatException); expect(() => value.mrp, throwsFormatException);
+    });
+  }
+  test('LF-PAISE conflicting representations reject rather than choosing a convenient amount', () {
+    final value = product.copyWith(price: 10, priceMinor: 1025);
+    expect(value.hasValidMoney, isFalse); expect(() => value.priceMinor, throwsFormatException);
+    expect(() => const BuyV2PackPriceTier(minimumPacks: 1, price: 10, priceMinor: 1025).priceMinor, throwsFormatException);
+    expect(product.copyWith(price: 10, priceMinor: 1000).priceMinor, 1000);
+  });
+  test('LF-PAISE safe boundary uses BigInt before multiplication or sum', () {
+    const maximum = 9007199254740991;
+    expect(buyV2MultiplyMinor(maximum, 1), maximum);
+    expect(buyV2SumMinor([maximum, 0]), maximum);
+    expect(buyV2MultiplyMinor(1, 0), 0);
+    expect(() => buyV2MultiplyMinor(maximum, 2), throwsFormatException);
+    expect(() => buyV2MultiplyMinor(1, -1), throwsFormatException);
+    expect(() => buyV2SumMinor([maximum, 1]), throwsFormatException);
+    expect(() => buyV2ExactMinorAmount(legacyRupees: maximum), throwsFormatException);
+    // ₹100 crore remains exact; this is an isolated model fixture, not native data.
+    expect(buyV2MultiplyMinor(100000000000, 1), 100000000000);
+  });
+  test('LF-PAISE procurement restart preserves exact money and never restores eligibility', () async {
+    final preferences = _ExactMoneyHostPreferences(), value = product.copyWith(priceMinor: 1025, mrpMinor: 1250);
+    BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    final snapshot = BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+      ownerScope: 'host-paise', cartProducts: {value.id: value}));
+    expect(await fresh().write(snapshot), isTrue);
+    final retained = (await fresh().read())!.procurementDraft!.cartProducts[value.id]!;
+    expect(retained.priceMinor, 1025); expect(retained.mrpMinor, 1250);
+    expect(retained.procurementSupplierGrant!.approved, isFalse);
+    expect(retained.procurementSupplierGrant!.published, isFalse); expect(retained.catalogueListing, isFalse);
+    final raw = jsonDecode(preferences.values.values.single) as Map;
+    final stored = raw['procurementDraft']['cartProducts'][value.id] as Map;
+    expect(stored['priceMinor'], 1025); expect(stored.containsKey('price'), isFalse);
+  });
+  for (final corruption in ['null', 'string', 'negative', 'overflow', 'conflict', 'MRP', 'old version']) {
+    test('LF-PAISE corrupt retained $corruption never falls back to an apparently valid legacy price', () async {
+      final preferences = _ExactMoneyHostPreferences(), value = product.copyWith(priceMinor: 1025, mrpMinor: 1250);
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      expect(await store.write(BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+        ownerScope: 'host-paise', cartProducts: {value.id: value}))), isTrue);
+      final key = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      final row = raw['procurementDraft']['cartProducts'][value.id] as Map;
+      if (corruption == 'null') row['priceMinor'] = null;
+      if (corruption == 'string') row['priceMinor'] = '1025';
+      if (corruption == 'negative') row['priceMinor'] = -1;
+      if (corruption == 'overflow') row['priceMinor'] = 9007199254740992;
+      if (corruption == 'MRP') row['mrpMinor'] = '1250';
+      if (corruption == 'old version') raw['procurementDraft']['version'] = 1;
+      row['price'] = 10;
+      preferences.values[key] = jsonEncode(raw);
+      expect((await store.read())!.procurementDraft!.cartProducts, isEmpty);
+      expect(jsonDecode(preferences.values[key]!), raw, reason: 'Read must not silently rewrite retained evidence');
+    });
+  }
+  test('LF-PAISE mixed procurement and legacy v1 remain readable without granting a listing', () async {
+    final preferences = _ExactMoneyHostPreferences(), exact = product.copyWith(id: 'exact-row', priceMinor: 1);
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+      ownerScope: 'host-paise', cartProducts: {exact.id: exact, product.id: product}))), isTrue);
+    final rows = (await store.read())!.procurementDraft!.cartProducts;
+    expect(rows[exact.id]!.priceMinor, 1); expect(rows[product.id]!.price, 260);
+    expect(rows.values.every((p) => !p.catalogueListing), isTrue);
+    expect(await store.write(BuyV2CustomerStateSnapshot(procurementDraft: BuyV2ProcurementDraftSnapshot(
+      ownerScope: 'host-paise', cartProducts: {product.id: product}))), isTrue);
+    expect(jsonDecode(preferences.values.values.single)['procurementDraft']['version'], 1);
+    expect((await store.read())!.procurementDraft!.cartProducts[product.id]!.priceMinor, 26000);
+  });
+  test('LF-PAISE purchased-product restart retains fractional unit price and exact total', () async {
+    final preferences = _ExactMoneyHostPreferences(), value = product.copyWith(priceMinor: 1025, mrpMinor: 1250);
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    // Four packs at ₹10.25 is exactly ₹41. No dummy/truncated legacy total.
+    final order = BuyV2Order(id: 'host-purchased-paise', destination: value.destination, title: 'Host purchased items',
+      itemSummary: 'Four packs', total: 41, totalMinor: 4100, partner: value.seller, partnerType: value.sellerType,
+      promise: 'Awaiting fulfilment', destinationLabel: 'Host address', progress: 0, status: BuyV2OrderStatus.confirmed,
+      productIds: [value.id], lines: [BuyV2CartLine(product: value, quantity: 4)]);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order])), isTrue);
+    final restored = (await store.read())!.orders.single;
+    expect(restored.totalMinor, 4100); expect(restored.total, 41);
+    expect(restored.lines.single.product.priceMinor, 1025);
+    expect(restored.lines.single.product.mrpMinor, 1250); expect(restored.lines.single.totalMinor, 4100);
+    expect(restored.lines.single.product.catalogueListing, isFalse);
+    final key = preferences.values.keys.single;
+    final raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+    raw['orders'][0]['totalMinor'] = '4100'; preferences.values[key] = jsonEncode(raw);
+    await expectLater(store.read(), throwsFormatException);
+    expect(jsonDecode(preferences.values[key]!), raw);
+  });
+  BuyV2Order exactHistoryOrder({int? paid = 1, int balance = 1043, int tax = 2,
+    int price = 1025, String title = 'Host purchase', double progress = 0,
+    String? purchaseId = 'host-purchase', String storeId = 'store-one',
+    List<String>? ids, BuyV2CollectionOrderReference? collection, int total = 1044,
+    BuyV2TaxInvoiceDetails? invoice}) => BuyV2Order.minor(
+    id: 'host-order', destination: BuyV2Destination.shop, title: title, itemSummary: 'One host SKU',
+    totalMinor: total, partner: 'Host Store', partnerType: 'Retailer', promise: 'Host delivery',
+    destinationLabel: 'Host address', progress: progress, status: BuyV2OrderStatus.preparing,
+    purchaseId: purchaseId, productIds: ids ?? [product.id], collection: collection,
+    lines: [BuyV2CartLine(product: product.copyWith(priceMinor: price, storeId: storeId), quantity: 1)],
+    tipMinor: 5, discountMinor: 1, taxMinor: tax, freightMinor: 3, deliveryFeeMinor: 4,
+    paymentChargeMinor: 6, amountPaidNowMinor: paid, balanceDueMinor: balance,
+    taxInvoiceState: invoice == null ? null : BuyV2TaxInvoiceState.ready, taxInvoiceDetails: invoice);
+  for (final kind in ['matching whole tax', 'fractional cannot match legacy', 'unsafe legacy tax']) {
+    test('LF-PAISE invoice refresh $kind uses checked original units without offline misclassification', () async {
+      final tax = kind == 'fractional cannot match legacy' ? 2 : 100;
+      final total = 1044 + tax - 2;
+      final original = exactHistoryOrder(tax: tax, total: total, balance: total - 1);
+      final invoice = BuyV2TaxInvoiceDetails(invoiceNumber: 'HOST-INVOICE', issuedAt: at,
+        sellerLegalName: 'Host Store', sellerAddress: 'Host address', sellerGstin: '123456789012345',
+        placeOfSupply: 'Host state', sourceId: 'host-invoice-source', lines: [BuyV2TaxInvoiceLine(
+          description: 'Host product', hsnSac: '1234', taxableValue: 10, gstRate: 10,
+          cgst: kind == 'unsafe legacy tax' ? 9007199254740991 : tax == 100 ? 1 : 0, sgst: 0, igst: 0, cess: 0)]);
+      final commerce = _HostExactOrderCommerce()..records = [original]
+        ..refreshedOrder = exactHistoryOrder(tax: tax, total: total, balance: total - 1, invoice: invoice, progress: .5);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: commerce, reviewDataEnabled: false);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(await session.refreshOrder(original.id), kind == 'matching whole tax');
+      expect(session.orderRefreshState(original.id), kind == 'matching whole tax'
+        ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable);
+      expect(session.orders.single.taxMinor, tax); expect(session.orders.single.payableTotalMinor, total);
+      expect(session.orders.single.progress, kind == 'matching whole tax' ? .5 : 0);
+    });
+  }
+  for (final update in ['valid', 'invalid money', 'foreign purchase']) {
+    test('LF-PAISE exact order refresh $update retains truthful status and original amount', () async {
+      final original = exactHistoryOrder();
+      final commerce = _HostExactOrderCommerce()..records = [original]
+        ..refreshedOrder = exactHistoryOrder(progress: .5, tax: update == 'invalid money' ? -1 : 2,
+          purchaseId: update == 'foreign purchase' ? 'host-other-purchase' : 'host-purchase');
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: commerce, reviewDataEnabled: false);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      await session.restoreCommerce();
+      expect(await session.refreshOrder(original.id), update == 'valid');
+      expect(session.orderRefreshState(original.id), update == 'valid' ? BuyV2CommerceLoadState.ready : BuyV2CommerceLoadState.unavailable);
+      expect(session.orders.single.payableTotalMinor, 1044);
+      expect(session.orders.single.balanceDueMinor, 1043);
+      expect(session.orders.single.purchaseId, 'host-purchase');
+      expect(session.orders.single.progress, update == 'valid' ? .5 : 0);
+    });
+  }
+  BuyV2Order hostInvoiceOrder(BuyV2Destination destination, String kind) {
+    final price = kind == 'large' ? 100000000000 : 1025;
+    final value = BuyV2Catalogue.products.firstWhere((value) => value.destination == destination)
+      .copyWith(id: 'host-invoice-sku', canonicalId: 'host-invoice-product', storeId: 'host-invoice-store',
+        priceMinor: price, mrpMinor: price + 225);
+    final lines = [BuyV2CartLine(product: value, quantity: 1)];
+    if (kind == 'legacy override') {
+      return BuyV2Order(id: 'host-invoice-order', destination: destination, title: 'Host invoice', itemSummary: 'One product',
+        total: 10, totalMinor: 1025, partner: 'Host Store', partnerType: 'Retailer', promise: 'Host recorded estimate',
+        destinationLabel: 'Host address', progress: 0, status: BuyV2OrderStatus.preparing, lines: lines);
+    }
+    return BuyV2Order.minor(id: 'host-invoice-order', destination: destination, title: 'Host invoice', itemSummary: 'One product',
+      totalMinor: price + 19, partner: 'Host Store', partnerType: 'Retailer', promise: 'Host recorded estimate',
+      destinationLabel: 'Host address', progress: 0, status: BuyV2OrderStatus.preparing, lines: lines,
+      tipMinor: 5, discountMinor: 1, taxMinor: 2, freightMinor: 3, deliveryFeeMinor: 4, paymentChargeMinor: 6,
+      amountPaidNowMinor: kind == 'unknown paid' ? null : 1, balanceDueMinor: price + 18);
+  }
+  for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    for (final kind in ['exact', 'large', 'unknown paid', 'legacy override']) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('LF-PAISE invoice ${destination.name} $kind exact display scale=$scale', (tester) async {
+          tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+          final order = hostInvoiceOrder(destination, kind);
+          final faults = <FlutterErrorDetails>[]; final onError = FlutterError.onError;
+          FlutterError.onError = (detail) { faults.add(detail); onError?.call(detail); };
+          addTearDown(() { FlutterError.onError = onError; });
+          await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+            MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+            home: BuyV2InvoicePage(order: order)));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull, reason: faults.map((detail) =>
+            '${detail.exception}\n${detail.stack.toString().split('\n').take(8).join('\n')}').join('\n'));
+          expect(find.text(buyV2MoneyMinor(order.payableTotalMinor)), findsWidgets);
+          await tester.scrollUntilVisible(find.text('Order details'), 250, maxScrolls: 80);
+          if (kind == 'unknown paid') expect(find.text('Amount paid now'), findsNothing);
+          await tester.scrollUntilVisible(find.text('Order total'), 250, maxScrolls: 80);
+          expect(find.text(buyV2MoneyMinor(order.payableTotalMinor)), findsWidgets);
+          expect(find.text(buyV2MoneyMinor(order.lines.single.totalMinor)), findsWidgets);
+          expect(tester.takeException(), isNull);
+          if (kind == 'legacy override') expect(order.total, 10);
+          await tester.pumpWidget(const SizedBox.shrink());
+        });
+      }
+      test('LF-PAISE invoice ${destination.name} $kind exports original exact money without changing native protocol', () async {
+        const channel = MethodChannel('host.paise/invoice');
+        MethodCall? captured;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+          captured = call; return 'saved';
+        });
+        addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+        final order = hostInvoiceOrder(destination, kind);
+        expect(await saveBuyV2InvoiceWithChannel(BuyV2InvoiceDocument(order: order), channel: channel,
+          platform: TargetPlatform.android), BuyV2InvoiceDownloadOutcome.saved);
+        expect(captured!.method, 'saveInvoice');
+        final payload = captured!.arguments as Map;
+        expect(payload.keys.toSet(), {'fileName', 'lines'});
+        final lines = (payload['lines'] as List).cast<String>();
+        String amount(int minor) => minor % 100 == 0 ? '${minor ~/ 100}' : '${minor ~/ 100}.${(minor % 100).toString().padLeft(2, '0')}';
+        expect(lines, contains('Order total: INR ${amount(order.payableTotalMinor)}'));
+        expect(lines, contains('Items subtotal: INR ${amount(order.lines.single.totalMinor)}'));
+        expect(lines, contains('1 x ${order.lines.single.product.customerTitle} (${order.lines.single.product.pack}) - INR ${amount(order.lines.single.totalMinor)}'));
+        if (kind == 'unknown paid') expect(lines.where((line) => line.startsWith('Amount paid now:')), isEmpty);
+        if (kind == 'exact') {
+          expect(lines, contains('Amount paid now: INR 0.01')); expect(lines, contains('Balance due: INR 10.43 - Due later'));
+          expect(lines, contains('Delivery tip: INR 0.05')); expect(lines, contains('Coupon saving: -INR 0.01'));
+          expect(lines, contains('GST and taxes: INR 0.02')); expect(lines, contains('Freight: INR 0.03'));
+          expect(lines, contains('Delivery fee: INR 0.04')); expect(lines, contains('Payment charge: INR 0.06'));
+        }
+      });
+    }
+  }
+  for (final unitCase in [(500, '20.50'), (1000, '10.25'), (1500, '6.83'), (400, '25.63')]) {
+    test('LF-PAISE Store exact retail preview and per-unit amount quantity=${unitCase.$1}', () {
+      final measure = WorkspacePackMeasure(unit: BuyV2ComparisonUnit.kilogram,
+        quantityMilli: unitCase.$1, unitsPerCase: 1);
+      expect(measure.pricePerUnitMinor(1025), '₹${unitCase.$2}/kg');
+      expect(measure.pricePerUnit(10), measure.pricePerUnitMinor(1000));
+      final product = workspaceMasterCatalogue.first.copyWith(purchasePriceMinor: 925,
+        sellingPriceMinor: 1025, mrpMinor: 1250, packMeasure: measure);
+      final preview = product.toBuyPublicProduct(storeName: 'Host Store', storeId: 'host-store');
+      expect(preview.priceMinor, 1025); expect(preview.mrpMinor, 1250);
+      expect(preview.unitPrice, '₹${unitCase.$2}/kg');
+      expect(preview.id, product.id); expect(preview.canonicalId, product.canonicalId);
+      expect(preview.pack, product.pack); expect(preview.storeId, 'host-store');
+      expect(product.toCataloguePreviewProduct().priceMinor, 1025);
+      expect(() => measure.pricePerUnitMinor(-1), throwsFormatException);
+      expect(() => measure.pricePerUnitMinor(99999999901), throwsFormatException);
+    });
+  }
+
+  test('LF-PAISE Store current public audit binds paise and rejects one-paise changes while v1 stays strict', () {
+    final source = workspaceMasterCatalogue.first.copyWith(purchasePriceMinor: 925,
+      sellingPriceMinor: 1025, mrpMinor: 1250);
+    final target = source.toBuyPublicProduct(storeName: 'Host Store', storeId: 'host-store');
+    final sourceAudit = WorkspacePublicationContract.sourceProductAuditValues(source,
+      storeId: 'host-store', storeName: 'Host Store');
+    final targetAudit = WorkspacePublicationContract.publicProductAuditValues(target);
+    expect(sourceAudit['price'], isNull); expect(sourceAudit['priceMinor'], 1025);
+    expect(sourceAudit['mrp'], isNull); expect(sourceAudit['mrpMinor'], 1250);
+    expect(targetAudit['priceMinor'], 1025); expect(targetAudit['mrpMinor'], 1250);
+    expect(sourceAudit['publicListingIdentity'], isNull);
+    expect(targetAudit['publicListingIdentity'], isNull);
+    expect(() => WorkspacePublicationContract.sourceProductValues(source, storeId: 'host-store', storeName: 'Host Store'), throwsFormatException);
+    expect(() => WorkspacePublicationContract.publicProductValues(target), throwsFormatException);
+    for (final kind in ['matching', 'priceMinor', 'mrpMinor']) {
+      final projected = kind == 'priceMinor' ? target.copyWith(priceMinor: 1026)
+          : kind == 'mrpMinor' ? target.copyWith(mrpMinor: 1251) : target;
+      final issues = WorkspacePublicationContract.productIssues(source, storeId: 'host-store',
+        storeName: 'Host Store', projected: projected);
+      expect(issues.any((issue) => issue.field.endsWith(':priceMinor')), kind == 'priceMinor');
+      expect(issues.any((issue) => issue.field.endsWith(':mrpMinor')), kind == 'mrpMinor');
+    }
+  });
+
+  test('LF-PAISE shared Store price input keeps exact decimals and original ceiling', () {
+    for (final value in <(String, int)>[
+      ('0', 0), ('.5', 50), ('9.25', 925), ('10.2', 1020),
+      (' 10.25 ', 1025), ('2147483647', 214748364700),
+    ]) {
+      final minor = workspacePriceMinorFromInput(value.$1);
+      expect(minor, value.$2);
+      expect(workspacePriceMinorFromInput(workspacePriceInputFromMinor(minor!)), value.$2);
+    }
+    for (final value in ['', '9.251', '1e3', '2147483647.01', '9,25', '₹9', '-1', '.', '1.', 'NaN']) {
+      expect(workspacePriceMinorFromInput(value), isNull, reason: value);
+    }
+    expect(workspacePriceInputFromMinor(1025), '10.25');
+    expect(workspacePriceInputFromMinor(1000), '10');
+  });
+
+  for (final method in WorkspaceStockEntryMethod.values) {
+    test('LF-PAISE original Stock purchase provenance uses explicit minor schema ${method.name}', () {
+      final base = workspaceMasterCatalogue.first;
+      final legacy = WorkspaceStockEntry(method: method, productId: base.id,
+        sku: base.sku, pack: base.pack, stockMode: base.stockMode, quantity: base.stock,
+        purchasePriceRupees: 230, recordedAt: at, stockAsOf: at);
+      final legacyJson = legacy.toJson();
+      expect(jsonEncode(WorkspaceStockEntry.fromJson(legacyJson)!.toJson()), jsonEncode(legacyJson));
+      for (final price in [925, 1000, 214748364700]) {
+        final raw = <String, Object?>{...legacyJson, 'version': 2, 'purchasePriceMinor': price}
+          ..remove('purchasePriceRupees');
+        final exact = WorkspaceStockEntry.fromJson(raw)!;
+        expect(exact.valid, isTrue); expect(exact.toJson(), raw);
+        expect(exact.purchasePriceMinor, price);
+        expect(exact.usesMinorAmounts, isTrue);
+        if (price % 100 == 0) {
+          expect(exact.purchasePriceRupees, price ~/ 100);
+        } else {
+          expect(() => exact.purchasePriceRupees, throwsFormatException);
+        }
+        expect(exact.toJson().containsKey('purchasePriceRupees'), isFalse);
+        final product = base.copyWith(purchasePriceMinor: 925,
+          sellingPriceMinor: 1025, mrpMinor: 1250, stockEntry: exact);
+        final restored = WorkspaceCatalogueItem.fromInventoryJson(product.toInventoryJson());
+        expect(restored.stockEntry!.contentIdentity, exact.contentIdentity);
+        expect(restored.copyWith(purchasePriceMinor: 950, stock: 3)
+          .stockEntry!.contentIdentity, exact.contentIdentity);
+        for (final patch in <Map<String, Object?>>[
+          {'version': 1}, {'purchasePriceRupees': 9}, {'purchasePriceRupees': null},
+          {'purchasePriceMinor': null}, {'purchasePriceMinor': -1}, {'purchasePriceMinor': 0},
+          {'purchasePriceMinor': 214748364701}, {'purchasePriceMinor': 9.25},
+          {'purchasePriceMinor': '925'},
+        ]) {
+          expect(() => WorkspaceStockEntry.fromJson({...raw, ...patch}), throwsFormatException);
+        }
+        expect(() => WorkspaceStockEntry.fromJson({...raw}..remove('purchasePriceMinor')), throwsFormatException);
+      }
+      expect(() => WorkspaceStockEntry.fromJson({...legacyJson, 'purchasePriceMinor': 23000}), throwsFormatException);
+      final ambiguous = WorkspaceStockEntry(method: method, productId: base.id,
+        sku: base.sku, pack: base.pack, stockMode: base.stockMode, quantity: base.stock,
+        purchasePriceRupees: 9, purchasePriceMinor: 925, recordedAt: at, stockAsOf: at);
+      expect(ambiguous.valid, isFalse);
+      expect(() => ambiguous.purchasePriceMinor, throwsFormatException);
+      expect(() => ambiguous.toJson(), throwsFormatException);
+    });
+  }
+
+  test('LF-PAISE Store explicit minor inventory survives roundtrip without legacy price invention', () {
+    final original = workspaceMasterCatalogue.first;
+    final raw = <String, Object?>{...original.toInventoryJson(),
+      'version': 3, 'purchasePriceMinor': 925, 'sellingPriceMinor': 1025, 'mrpMinor': 1250}
+      ..remove('purchasePrice')..remove('sellingPrice')..remove('mrp');
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(raw);
+    expect(restored.toInventoryJson(), raw);
+    expect(restored.id, original.id); expect(restored.canonicalId, original.canonicalId);
+    expect(restored.sku, original.sku); expect(restored.stock, original.stock);
+  });
+
+  for (final withEntry in [false, true]) {
+    test('LF-PAISE Store legacy inventory stays literal and original Stock provenance survives exact edits entry=$withEntry', () {
+      final base = workspaceMasterCatalogue.first;
+      final entry = WorkspaceStockEntry(method: WorkspaceStockEntryMethod.catalogue,
+        productId: base.id, sku: base.sku, pack: base.pack, stockMode: base.stockMode,
+        quantity: base.stock, purchasePriceRupees: base.purchasePrice, recordedAt: at, stockAsOf: at);
+      final original = withEntry ? base.copyWith(stockEntry: entry) : base;
+      final raw = original.toInventoryJson();
+      expect(raw['version'], withEntry ? 2 : 1);
+      expect(raw.keys.toList().indexOf('mrp'), raw.keys.toList().indexOf('visualKind') + 1);
+      expect(jsonEncode(WorkspaceCatalogueItem.fromInventoryJson(raw).toInventoryJson()), jsonEncode(raw));
+      expect(jsonEncode(original.copyWith(stock: original.stock).toInventoryJson()), jsonEncode(raw));
+      final exact = original.copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+      expect(exact.usesMinorAmounts, isTrue);
+      expect(exact.purchasePriceMinor, 925); expect(exact.sellingPriceMinor, 1025); expect(exact.mrpMinor, 1250);
+      expect(() => exact.purchasePrice, throwsFormatException);
+      expect(() => exact.sellingPrice, throwsFormatException);
+      expect(() => exact.mrp, throwsFormatException);
+      final moved = exact.copyWith(stock: 7);
+      expect(moved.id, original.id); expect(moved.sku, original.sku); expect(moved.stock, 7);
+      expect(moved.purchasePriceMinor, 925); expect(moved.sellingPriceMinor, 1025);
+      expect(moved.cataloguePhoto?.toJson(), original.cataloguePhoto?.toJson());
+      expect(moved.stockEntry?.contentIdentity, original.stockEntry?.contentIdentity);
+      final inventory = WorkspaceSavedInventory(account: 'host-account', store: 'host-store', qa: true,
+        revision: 1, savedAt: at, products: [moved], movements: []);
+      final serialized = inventory.toJson();
+      expect(serialized['version'], 3);
+      final restored = WorkspaceSavedInventory.fromJson(serialized);
+      expect(restored.products, hasLength(1)); expect(restored.toJson(), serialized);
+      expect(restored.products.single.sellingPriceMinor, 1025);
+      expect(() => WorkspaceSavedInventory.fromJson({...serialized, 'version': withEntry ? 2 : 1}), throwsFormatException);
+    });
+  }
+  for (final price in [1000, 100000000000]) {
+    test('LF-PAISE Store exact whole-valued and100crore records keep explicit units price=$price', () {
+      final product = workspaceMasterCatalogue.first.copyWith(purchasePriceMinor: price,
+        sellingPriceMinor: price, mrpMinor: price);
+      expect(product.toInventoryJson()['version'], 3);
+      expect(product.sellingPrice, price ~/ 100);
+      expect(product.copyWith(sellingPrice: 20).sellingPriceMinor, 2000);
+      final restored = WorkspaceCatalogueItem.fromInventoryJson(product.toInventoryJson());
+      expect(restored.sellingPriceMinor, price); expect(restored.usesMinorAmounts, isTrue);
+    });
+  }
+  test('LF-PAISE Store missing MRP stays unknown and unsafe or ambiguous units reject without fallback', () {
+    final raw = <String, Object?>{...workspaceMasterCatalogue.first.toInventoryJson(),
+      'version': 3, 'purchasePriceMinor': 925, 'sellingPriceMinor': 1025, 'mrpMinor': null}
+      ..remove('purchasePrice')..remove('sellingPrice')..remove('mrp');
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(raw);
+    expect(restored.mrpMinor, isNull); expect(restored.mrp, isNull);
+    expect(restored.copyWith(stock: 2).mrpMinor, isNull);
+    for (final field in ['purchasePriceMinor', 'sellingPriceMinor', 'mrpMinor']) {
+      expect(() => WorkspaceCatalogueItem.fromInventoryJson({...raw}..remove(field)), throwsFormatException);
+      for (final bad in [-1, 9007199254740992, '1025', 10.25]) {
+        expect(() => WorkspaceCatalogueItem.fromInventoryJson({...raw, field: bad}), throwsFormatException);
+      }
+    }
+    for (final legacy in ['purchasePrice', 'sellingPrice', 'mrp']) {
+      expect(() => WorkspaceCatalogueItem.fromInventoryJson({...raw, legacy: null}), throwsFormatException);
+    }
+    expect(() => WorkspaceCatalogueItem.fromInventoryJson({...workspaceMasterCatalogue.first.toInventoryJson(), 'sellingPriceMinor': 1025}), throwsFormatException);
+    final conflict = workspaceMasterCatalogue.first.copyWith(sellingPrice: 10, sellingPriceMinor: 1025);
+    expect(() => conflict.sellingPriceMinor, throwsFormatException);
+    expect(() => conflict.sellingPrice, throwsFormatException);
+    expect(() => conflict.toInventoryJson(), throwsFormatException);
+  });
+
+  test('LF-PAISE invoice malformed money cannot invoke native save or claim success', () async {
+    const channel = MethodChannel('host.paise/invalid-invoice');
+    var calls = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (_) async {
+      calls++; return 'saved';
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+    final invalid = exactHistoryOrder(tax: -1);
+    expect(invalid.hasValidMoney, isFalse);
+    expect(await saveBuyV2InvoiceWithChannel(BuyV2InvoiceDocument(order: invalid),
+      channel: channel, platform: TargetPlatform.android), BuyV2InvoiceDownloadOutcome.failed);
+    expect(calls, 0);
+  });
+
+  test('LF-PAISE exact history order has no invented whole amount and retains every component', () {
+    final order = exactHistoryOrder();
+    expect(order.usesMinorAmounts, isTrue); expect(order.hasValidMoney, isTrue);
+    expect([order.payableTotalMinor, order.tipMinor, order.discountMinor, order.taxMinor,
+      order.freightMinor, order.deliveryFeeMinor, order.paymentChargeMinor, order.amountPaidNowMinor, order.balanceDueMinor],
+      [1044, 5, 1, 2, 3, 4, 6, 1, 1043]);
+    expect(() => order.total, throwsFormatException); expect(() => order.tax, throwsFormatException);
+    expect(exactHistoryOrder(paid: null).amountPaidNowMinor, isNull);
+    expect(exactHistoryOrder(tax: -1).hasValidMoney, isFalse);
+  });
+  test('LF-PAISE exact history restart preserves amounts original identities and private hold identity', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    final original = exactHistoryOrder(), identity = BuyV2BalancePaymentHold.identityOf(exactHistoryOrder());
+    // This helper also owns after-sales identity. Its amount-free hold does not
+    // pretend the still-legacy balance-payment adapter accepts paise requests.
+    final hold = BuyV2OrderResolutionHold(ownerScope: 'host-paise', accountId: 'host-buyer',
+      orderId: original.id, orderIdentity: identity);
+    expect(await fresh().write(BuyV2CustomerStateSnapshot(orders: [original], orderResolutionHolds: [hold])), isTrue);
+    final restored = (await fresh().read())!, order = (await fresh().read())!.orders.single;
+    expect(order.payableTotalMinor, 1044); expect(order.tipMinor, 5); expect(order.discountMinor, 1);
+    expect(order.taxMinor, 2); expect(order.freightMinor, 3); expect(order.deliveryFeeMinor, 4); expect(order.paymentChargeMinor, 6);
+    expect(order.amountPaidNowMinor, 1); expect(order.balanceDueMinor, 1043);
+    expect(order.lines.single.product.id, product.id); expect(order.lines.single.totalMinor, 1025);
+    expect(order.purchaseId, 'host-purchase'); expect(BuyV2BalancePaymentHold.identityOf(order), identity);
+    expect(restored.orderResolutionHolds.single.orderId, original.id);
+    expect(restored.orderResolutionHolds.single.orderIdentity, identity);
+    expect(BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(paid: 1044, balance: 0)), identity);
+    final row = jsonDecode(preferences.values.values.single)['orders'].single as Map;
+    expect(row['moneyVersion'], 2); expect(row['totalMinor'], 1044); expect(row.containsKey('total'), isFalse);
+  });
+  test('LF-PAISE legacy collection compatibility amount and absent override hashes are unchanged', () async {
+    for (final override in [null, 1025]) {
+      final preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      final original = BuyV2Order(id: 'host-order', destination: BuyV2Destination.shop, title: 'Host purchase', itemSummary: 'One host SKU',
+        total: 10, totalMinor: override, partner: 'Host Store', partnerType: 'Retailer', promise: 'Host delivery',
+        destinationLabel: 'Host address', progress: 0, status: BuyV2OrderStatus.preparing, purchaseId: 'host-purchase',
+        collection: const BuyV2CollectionOrderReference(storeId: 'store-one', purchaserAccountId: 'host-buyer'),
+        productIds: [product.id], lines: [BuyV2CartLine(product: product.copyWith(priceMinor: 1025), quantity: 1)]);
+      final expected = sha256.convert(utf8.encode(override == null ?
+        '["host-order","host-purchase","shop",10,null,"Host Store",["sku-one"],["sku-one","store-one","canonical-one","Sunflower","1 L",1]]' :
+        '["host-order","host-purchase","shop",10,1025,"Host Store",["sku-one"],["sku-one","store-one","canonical-one","Sunflower","1 L",1]]')).toString();
+      expect(BuyV2BalancePaymentHold.identityOf(original), expected);
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [original])), isTrue);
+      final restored = (await store.read())!.orders.single;
+      expect(restored.usesMinorAmounts, isFalse); expect(restored.total, 10); expect(restored.totalMinor, override);
+      expect(restored.payableTotalMinor, override ?? 1000); expect(restored.amountPaidNowMinor, isNull);
+      expect(BuyV2BalancePaymentHold.identityOf(restored), expected);
+      final row = jsonDecode(preferences.values.values.single)['orders'].single as Map;
+      expect(row.containsKey('moneyVersion'), isFalse); expect(row['total'], 10);
+    }
+  });
+  test('LF-PAISE exact history preserves unknown paid amount empty explicit IDs and collection routing without a grant', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    final original = exactHistoryOrder(paid: null, ids: [], collection:
+      const BuyV2CollectionOrderReference(storeId: 'store-one', purchaserAccountId: 'host-buyer'));
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [original])), isTrue);
+    final restored = (await store.read())!.orders.single;
+    expect(restored.amountPaidNowMinor, isNull); expect(restored.amountPaidNow, isNull);
+    expect(restored.productIds, isEmpty); expect(restored.lines.single.product.id, product.id);
+    expect(restored.collection!.storeId, 'store-one'); expect(restored.collection!.purchaserAccountId, 'host-buyer');
+    expect(BuyV2BalancePaymentHold.identityOf(restored), BuyV2BalancePaymentHold.identityOf(original));
+    expect(restored.lines.single.product.catalogueListing, isFalse);
+  });
+  for (final key in ['totalMinor', 'tipMinor', 'discountMinor', 'amountPaidNowMinor', 'balanceDueMinor',
+    'taxMinor', 'freightMinor', 'deliveryFeeMinor', 'paymentChargeMinor']) {
+    test('LF-PAISE malformed exact history $key cannot be silently defaulted or erased', () async {
+      final preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()])), isTrue);
+      final storageKey = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[storageKey]!) as Map;
+      (raw['orders'] as List).single[key] = '1';
+      final invalid = jsonEncode(raw); preferences.values[storageKey] = invalid;
+      await expectLater(store.read(), throwsFormatException);
+      expect(preferences.values[storageKey], invalid);
+    });
+  }
+  for (final corruption in ['missing paid', 'null fee', 'negative fee', 'overflow fee', 'legacy conflict',
+    'downgrade', 'version', 'missing lines', 'fractional quantity', 'duplicate lines', 'foreign product', 'collection']) {
+    test('LF-PAISE corrupt exact history $corruption retains bytes instead of partial recovery', () async {
+      final preferences = _ExactMoneyHostPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()])), isTrue);
+      final storageKey = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[storageKey]!) as Map;
+      final row = (raw['orders'] as List).single as Map;
+      switch (corruption) {
+        case 'missing paid': row.remove('amountPaidNowMinor');
+        case 'null fee': row['taxMinor'] = null;
+        case 'negative fee': row['taxMinor'] = -1;
+        case 'overflow fee': row['taxMinor'] = 9007199254740992;
+        case 'legacy conflict': row['total'] = 10;
+        case 'downgrade': row.remove('moneyVersion'); row['total'] = 10;
+        case 'version': row['moneyVersion'] = 2.0;
+        case 'missing lines': row['lines'] = [];
+        case 'fractional quantity': (row['lines'] as List).single['quantity'] = 1.5;
+        case 'duplicate lines': (row['lines'] as List).add((row['lines'] as List).single);
+        case 'foreign product': (row['lines'] as List).single['productId'] = 'foreign';
+        case 'collection': row['collection'] = {'storeId': '', 'purchaserAccountId': 'host-buyer'};
+      }
+      final invalid = jsonEncode(raw); preferences.values[storageKey] = invalid;
+      await expectLater(store.read(), throwsFormatException);
+      expect(preferences.values[storageKey], invalid);
+    });
+  }
+  test('LF-PAISE invalid exact order write cannot overwrite the last good history', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()])), isTrue);
+    final before = preferences.values.values.single;
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder(tax: -1)])), isFalse);
+    expect(preferences.values.values.single, before);
+  });
+  test('LF-PAISE exact identity binds purchased prices fees and collection owner not payment progress', () {
+    final identity = BuyV2BalancePaymentHold.identityOf(exactHistoryOrder());
+    expect(BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(price: 1026)), isNot(identity));
+    expect(BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(tax: 3)), isNot(identity));
+    expect(BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(paid: 1044, balance: 0)), identity);
+    final collection = BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(collection:
+      const BuyV2CollectionOrderReference(storeId: 'store-one', purchaserAccountId: 'host-buyer')));
+    expect(BuyV2BalancePaymentHold.identityOf(exactHistoryOrder(collection:
+      const BuyV2CollectionOrderReference(storeId: 'store-one', purchaserAccountId: 'other-buyer'))), isNot(collection));
+  });
+  test('LF-PAISE exact writer rejects facts which cannot be faithfully restored', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()])), isTrue);
+    final before = preferences.values.values.single;
+    for (final invalid in [exactHistoryOrder(title: ''), exactHistoryOrder(title: ' Host purchase '),
+      exactHistoryOrder(progress: double.nan), exactHistoryOrder(collection:
+        const BuyV2CollectionOrderReference(storeId: 'foreign-store', purchaserAccountId: 'host-buyer'))]) {
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [invalid])), isFalse);
+      expect(preferences.values.values.single, before);
+    }
+  });
+  test('LF-PAISE corrupt exact order cannot silently restore a new editable account Cart', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()])), isTrue);
+    final key = preferences.values.keys.single, raw = jsonDecode(preferences.values.values.single) as Map;
+    (raw['orders'] as List).single['amountPaidNowMinor'] = 'unknown';
+    final invalid = jsonEncode(raw); preferences.values[key] = invalid;
+    final core = BuySession();
+    final session = BuyV2Session(core: core, customerStateStore: store, reviewDataEnabled: true);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCustomerState(restoreBrowsing: false);
+    expect(session.customerStateRecoveryPending, isTrue); expect(session.addProduct('s-tomato'), isFalse);
+    expect(preferences.values[key], invalid);
+  });
+  test('LF-PAISE optional exact identity never normalizes empty into null after writing', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    final valid = exactHistoryOrder(purchaseId: null);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [valid])), isTrue);
+    expect(BuyV2BalancePaymentHold.identityOf((await store.read())!.orders.single),
+        BuyV2BalancePaymentHold.identityOf(valid));
+    final before = preferences.values.values.single;
+    for (final invalid in [exactHistoryOrder(purchaseId: ''), exactHistoryOrder(purchaseId: ' host-purchase '),
+      exactHistoryOrder(storeId: ''), exactHistoryOrder(storeId: ' store-one ')]) {
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [invalid])), isFalse);
+      expect(preferences.values.values.single, before);
+    }
+    for (final field in ['purchaseId', 'storeId']) {
+      final raw = jsonDecode(before) as Map, row = (jsonDecode(before)['orders'] as List).single as Map;
+      if (field == 'purchaseId') { row[field] = ''; }
+      else { (row['lines'] as List).single['purchasedProduct'][field] = ''; }
+      raw['orders'] = [row];
+      final malformed = jsonEncode(raw); preferences.values[preferences.values.keys.single] = malformed;
+      await expectLater(store.read(), throwsFormatException);
+      expect(preferences.values.values.single, malformed);
+    }
+  });
+  BuyV2BalancePaymentHold exactBalanceHold({int minor = 107}) => BuyV2BalancePaymentHold.minor(
+    ownerScope: 'host-paise', accountId: null, orderId: 'host-order',
+    orderIdentity: BuyV2BalancePaymentHold.identityOf(exactHistoryOrder()),
+    idempotencyKey: 'host-original-balance-key', amountDueMinor: minor);
+  test('LF-PAISE balance hold retains legacy literal units and tagged exact recovery', () async {
+    final legacy = BuyV2BalancePaymentHold(ownerScope: 'host-paise', accountId: null, orderId: 'host-order',
+      orderIdentity: BuyV2BalancePaymentHold.identityOf(exactHistoryOrder()), idempotencyKey: 'host-original-balance-key', amountDue: 7);
+    expect(legacy.toJson(), {'ownerScope': 'host-paise', 'accountId': null, 'orderId': 'host-order',
+      'orderIdentity': legacy.orderIdentity, 'idempotencyKey': 'host-original-balance-key', 'amountDue': 7,
+      'currency': 'INR', 'paymentReference': null});
+    expect(legacy.amountDue, 7); expect(legacy.amountDueMinor, 700); expect(legacy.usesMinorAmounts, isFalse);
+    final exact = exactBalanceHold(), referenced = exactBalanceHold().withReference('host-balance-reference');
+    expect(exact.amountDueMinor, 107); expect(() => exact.amountDue, throwsFormatException);
+    expect(exact.usesMinorAmounts, isTrue); expect(exact.storageKey, legacy.storageKey);
+    expect(exact.toJson()['moneyVersion'], 2); expect(exact.toJson().containsKey('amountDue'), isFalse);
+    expect(referenced.usesMinorAmounts, isTrue); expect(referenced.amountDueMinor, 107);
+    expect(BuyV2BalancePaymentHold.fromJson(legacy.toJson()).toJson(), legacy.toJson());
+    final preferences = _ExactMoneyHostPreferences();
+    BuyV2SharedPreferencesCustomerStateStore fresh() => BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await fresh().write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()], balancePaymentHolds: [referenced])), isTrue);
+    final restored = (await fresh().read())!.balancePaymentHolds.single;
+    expect(restored.toJson(), referenced.toJson()); expect(restored.idempotencyKey, exact.idempotencyKey);
+    expect(restored.amountDueMinor, 107); expect(restored.paymentReference, 'host-balance-reference');
+  });
+  for (final corruption in ['mixed', 'missing', 'null', 'string', 'fractional', 'version', 'downgrade', 'negative', 'overflow']) {
+    test('LF-PAISE malformed tagged balance hold $corruption never downgrades original units', () {
+      final raw = Map<String, Object?>.of(exactBalanceHold().toJson());
+      switch (corruption) {
+        case 'mixed': raw['amountDue'] = 1;
+        case 'missing': raw.remove('amountDueMinor');
+        case 'null': raw['amountDueMinor'] = null;
+        case 'string': raw['amountDueMinor'] = '107';
+        case 'fractional': raw['amountDueMinor'] = 107.0;
+        case 'version': raw['moneyVersion'] = 2.0;
+        case 'downgrade': raw.remove('moneyVersion');
+        case 'negative': raw['amountDueMinor'] = -1;
+        case 'overflow': raw['amountDueMinor'] = 9007199254740992;
+      }
+      expect(() => BuyV2BalancePaymentHold.fromJson(raw), throwsFormatException);
+    });
+  }
+  test('LF-PAISE invalid exact balance hold cannot replace prior recovery and large legacy bytes survive', () async {
+    final preferences = _ExactMoneyHostPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    expect(await store.write(BuyV2CustomerStateSnapshot(balancePaymentHolds: [exactBalanceHold()])), isTrue);
+    final before = preferences.values.values.single;
+    expect(await store.write(BuyV2CustomerStateSnapshot(balancePaymentHolds: [exactBalanceHold(minor: 0)])), isFalse);
+    expect(preferences.values.values.single, before);
+    final original = BuyV2BalancePaymentHold(ownerScope: 'host-paise', accountId: null, orderId: 'host-order',
+      orderIdentity: exactBalanceHold().orderIdentity, idempotencyKey: 'host-large-legacy-key', amountDue: 9007199254740991);
+    expect(original.valid, isTrue); expect(() => original.amountDueMinor, throwsFormatException);
+    expect(BuyV2BalancePaymentHold.fromJson(original.toJson()).toJson(), original.toJson());
+  });
+  Future<({BuyV2Session session, _ExactMoneyHostPreferences preferences})> balanceFixture(
+    _HostLegacyBalance adapter, {_ExactMoneyHostPreferences? restoredPreferences, BuyV2BalancePaymentHold? hold,
+    void Function(String key, String value)? beforeSet, bool recoveryExpected = true}) async {
+    final preferences = restoredPreferences ?? _ExactMoneyHostPreferences(beforeSet: beforeSet);
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-paise');
+    if (restoredPreferences == null) {
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [exactHistoryOrder()],
+        balancePaymentHolds: hold == null ? [] : [hold])), isTrue);
+    }
+    final core = BuySession(), commerce = _HostExactOrderCommerce()..records = [exactHistoryOrder()];
+    final session = BuyV2Session(core: core, commerceAdapter: commerce, balancePaymentAdapter: adapter,
+      customerStateStore: store, reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCustomerState(restoreBrowsing: false);
+    await session.restoreCommerce();
+    expect(session.customerStateRecoveryPending, !recoveryExpected, reason: session.notice ?? session.commerceMessage);
+    expect(session.orders.any((order) => order.id == 'host-order'), isTrue);
+    return (session: session, preferences: preferences);
+  }
+  test('LF-PAISE balance minor start saves exact original before dispatch then restores reconcile only', () async {
+    final adapter = _HostMinorBalance();
+    final actual = await balanceFixture(adapter);
+    expect(await actual.session.restoreBalancePayment('host-order'), isTrue);
+    adapter.onStart = () {
+      final record = jsonDecode(actual.preferences.values.values.single)['balancePaymentHolds']['records'].single as Map;
+      expect(record['moneyVersion'], 2); expect(record['amountDueMinor'], 1043);
+      expect(record['idempotencyKey'], adapter.keys.single); expect(record['paymentReference'], isNull);
+    };
+    expect(await actual.session.startBalancePayment('host-order'), isTrue);
+    expect(adapter.minorAmounts, [1043]); expect(adapter.legacyAmounts, isEmpty);
+    final restarted = await balanceFixture(adapter, restoredPreferences: actual.preferences);
+    expect(restarted.session.balancePaymentFor('host-order')!.amountDueMinor, 1043);
+    expect(restarted.session.balancePaymentFor('host-order')!.state, BuyV2BalancePaymentState.unknown);
+    expect(await restarted.session.startBalancePayment('host-order'), isFalse);
+    expect(await restarted.session.reconcileBalancePayment('host-order'), isTrue);
+    expect(adapter.reconciles, 1); expect(adapter.keys.length, 1);
+    expect(restarted.session.orders.single.balanceDueMinor, 1043, reason: 'No local ledger/payment posting');
+  });
+  test('LF-PAISE legacy balance start receives rupees only and fractional result grants no capability', () async {
+    final fractional = _HostLegacyBalance();
+    final unsupported = await balanceFixture(fractional);
+    expect(await unsupported.session.restoreBalancePayment('host-order'), isTrue);
+    expect(await unsupported.session.startBalancePayment('host-order'), isFalse);
+    expect(fractional.keys, isEmpty); expect(fractional.legacyAmounts, isEmpty);
+    final legacy = _HostLegacyBalance()..dueMinor = 1000;
+    final supported = await balanceFixture(legacy);
+    expect(await supported.session.restoreBalancePayment('host-order'), isTrue);
+    expect(await supported.session.startBalancePayment('host-order'), isTrue);
+    expect(legacy.legacyAmounts, [10]); expect(legacy.minorAmounts, isEmpty);
+    final record = jsonDecode(supported.preferences.values.values.single)['balancePaymentHolds']['records'].single as Map;
+    expect(record['amountDue'], 10); expect(record.containsKey('moneyVersion'), isFalse);
+  });
+  test('LF-PAISE balance saved without reference stays unknown after restart without another call', () async {
+    final adapter = _HostMinorBalance()..failStart = true;
+    final fixture = await balanceFixture(adapter);
+    expect(await fixture.session.restoreBalancePayment('host-order'), isTrue);
+    expect(await fixture.session.startBalancePayment('host-order'), isFalse);
+    final restarted = await balanceFixture(adapter, restoredPreferences: fixture.preferences);
+    expect(restarted.session.balancePaymentFor('host-order')!.amountDueMinor, 1043);
+    expect(await restarted.session.restoreBalancePayment('host-order'), isFalse);
+    expect(await restarted.session.startBalancePayment('host-order'), isFalse);
+    expect(await restarted.session.reconcileBalancePayment('host-order'), isFalse);
+    expect(adapter.loads, 1); expect(adapter.keys.length, 1); expect(adapter.reconciles, 0);
+  });
+  test('LF-PAISE balance failed save retries only its known-unsent key and amount unit', () async {
+    final adapter = _HostMinorBalance();
+    final attemptedKeys = <String>[];
+    var failWrite = false;
+    final actual = await balanceFixture(adapter, beforeSet: (_, text) {
+      final records = jsonDecode(text)['balancePaymentHolds']['records'] as List;
+      if (records.isNotEmpty) attemptedKeys.add(records.single['idempotencyKey'] as String);
+      if (failWrite) throw StateError('Host preference write failure');
+    });
+    expect(await actual.session.restoreBalancePayment('host-order'), isTrue);
+    failWrite = true;
+    expect(await actual.session.startBalancePayment('host-order'), isFalse);
+    expect(adapter.keys, isEmpty);
+    failWrite = false;
+    expect(await actual.session.startBalancePayment('host-order'), isTrue);
+    expect(attemptedKeys.toSet(), {adapter.keys.single}); expect(adapter.minorAmounts, [1043]);
+  });
+  test('LF-PAISE balance reference-save failure cannot bypass persistence through refresh or continuation', () async {
+    final adapter = _HostMinorBalance();
+    var failReferenceSave = false;
+    final fixture = await balanceFixture(adapter, beforeSet: (_, text) {
+      final records = jsonDecode(text)['balancePaymentHolds']['records'] as List;
+      if (failReferenceSave && records.isNotEmpty && records.single['paymentReference'] != null) {
+        throw StateError('Host reference write failed');
+      }
+    });
+    final session = fixture.session;
+    expect(await session.restoreBalancePayment('host-order'), isTrue);
+    failReferenceSave = true;
+    expect(await session.startBalancePayment('host-order'), isFalse);
+    adapter.nextLoad = BuyV2BalancePaymentResult.minor(state: BuyV2BalancePaymentState.paymentActionRequired,
+      amountDueMinor: 1043, dueLabel: 'Host due', customerMessage: 'Host original action',
+      paymentReference: 'host-balance-reference', paymentActionUri: Uri.parse('https://host.invalid/original'));
+    expect(await session.restoreBalancePayment('host-order'), isFalse);
+    var handoffs = 0;
+    expect(await session.continueBalancePayment('host-order', (_) async { handoffs++; return true; }), isFalse);
+    expect(handoffs, 0);
+    expect(session.balancePaymentFor('host-order')!.state, BuyV2BalancePaymentState.unknown);
+    final restarted = await balanceFixture(adapter, restoredPreferences: fixture.preferences);
+    expect(restarted.session.balancePaymentFor('host-order')!.paymentReference, isNull);
+    expect(await restarted.session.restoreBalancePayment('host-order'), isFalse);
+    failReferenceSave = false;
+    expect(await session.restoreBalancePayment('host-order'), isTrue);
+    expect(jsonDecode(fixture.preferences.values.values.single)['balancePaymentHolds']['records'].single['paymentReference'],
+      'host-balance-reference');
+    expect(await session.continueBalancePayment('host-order', (_) async { handoffs++; return true; }), isTrue);
+    expect(handoffs, 1); expect(adapter.keys.length, 1);
+  });
+  for (final reply in ['one-paise drift', 'foreign reference', 'due only', 'negative', 'unsafe']) {
+    test('LF-PAISE balance $reply reply preserves exact original unknown attempt', () async {
+      final adapter = _HostMinorBalance();
+      final fixture = await balanceFixture(adapter), session = fixture.session;
+      expect(await session.restoreBalancePayment('host-order'), isTrue);
+      expect(await session.startBalancePayment('host-order'), isTrue);
+      expect(await session.continueBalancePayment('host-order', (_) async => false), isFalse);
+      adapter.nextLoad = adapter.nextReconcile = BuyV2BalancePaymentResult.minor(
+        state: reply == 'due only' ? BuyV2BalancePaymentState.due : BuyV2BalancePaymentState.paymentPending,
+        amountDueMinor: switch (reply) { 'one-paise drift' => 1042, 'negative' => -1, 'unsafe' => 9007199254740992, _ => 1043 },
+        dueLabel: 'Host due', customerMessage: 'Host reply',
+        paymentReference: reply == 'foreign reference' ? 'host-other-reference' :
+          reply == 'due only' ? null : 'host-balance-reference');
+      expect(await session.restoreBalancePayment('host-order'), isFalse);
+      expect(await session.reconcileBalancePayment('host-order'), isFalse);
+      final retained = session.balancePaymentFor('host-order')!;
+      expect(retained.amountDueMinor, 1043); expect(retained.paymentReference, 'host-balance-reference');
+      expect(retained.state, BuyV2BalancePaymentState.unknown);
+      expect(await session.startBalancePayment('host-order'), isFalse); expect(adapter.keys.length, 1);
+    });
+  }
+  test('LF-PAISE balance failed transport keeps exact original reference and amount', () async {
+    final adapter = _HostMinorBalance();
+    final fixture = await balanceFixture(adapter), session = fixture.session;
+    expect(await session.restoreBalancePayment('host-order'), isTrue);
+    expect(await session.startBalancePayment('host-order'), isTrue);
+    expect(await session.continueBalancePayment('host-order', (_) async => throw StateError('Host handoff failure')), isFalse);
+    adapter.failLoad = adapter.failReconcile = true;
+    expect(await session.restoreBalancePayment('host-order'), isFalse);
+    expect(await session.reconcileBalancePayment('host-order'), isFalse);
+    expect(session.balancePaymentFor('host-order')!.amountDueMinor, 1043);
+    expect(session.balancePaymentFor('host-order')!.paymentReference, 'host-balance-reference');
+    expect(await session.startBalancePayment('host-order'), isFalse); expect(adapter.keys.length, 1);
+  });
+  test('LF-PAISE balance corrupt nested recovery is preserved and cannot dispatch', () async {
+    final adapter = _HostMinorBalance();
+    final initial = await balanceFixture(adapter, hold: exactBalanceHold());
+    final key = initial.preferences.values.keys.single;
+    final raw = jsonDecode(initial.preferences.values[key]!) as Map<String, dynamic>;
+    raw['balancePaymentHolds']['records'].single['amountDueMinor'] = '107';
+    final bytes = jsonEncode(raw); initial.preferences.values[key] = bytes;
+    final restarted = await balanceFixture(adapter, restoredPreferences: initial.preferences, recoveryExpected: false);
+    expect(await restarted.session.restoreBalancePayment('host-order'), isFalse);
+    expect(await restarted.session.startBalancePayment('host-order'), isFalse);
+    expect(adapter.loads, 0); expect(adapter.keys, isEmpty);
+    expect(initial.preferences.values[key], bytes);
+  });
+  test('LF-PAISE balance unsafe legacy conversion preserves original raw hold without calls', () async {
+    final adapter = _HostMinorBalance();
+    final hold = BuyV2BalancePaymentHold(ownerScope: 'host-paise', accountId: null, orderId: 'host-order',
+      orderIdentity: exactBalanceHold().orderIdentity, idempotencyKey: 'host-large-legacy-key', amountDue: 9007199254740991);
+    final fixture = await balanceFixture(adapter, hold: hold);
+    final before = fixture.preferences.values.values.single;
+    expect(fixture.session.balancePaymentFor('host-order'), isNull);
+    expect(await fixture.session.restoreBalancePayment('host-order'), isFalse);
+    expect(await fixture.session.startBalancePayment('host-order'), isFalse);
+    expect(adapter.loads, 0); expect(adapter.keys, isEmpty);
+    expect(fixture.preferences.values.values.single, before);
+  });
+  for (final exact in [false, true]) {
+    test('LF-PAISE balance whole amount retains explicit dispatch unit after unsent save exact=$exact', () async {
+      final adapter = exact ? _HostMinorBalance() : _HostLegacyBalance();
+      adapter.dueMinor = 1000;
+      var failWrite = false;
+      final fixture = await balanceFixture(adapter, beforeSet: (_, text) {
+        if (failWrite) throw StateError('Host initial save failure');
+      });
+      expect(await fixture.session.restoreBalancePayment('host-order'), isTrue);
+      failWrite = true; expect(await fixture.session.startBalancePayment('host-order'), isFalse);
+      expect(adapter.keys, isEmpty);
+      failWrite = false; expect(await fixture.session.startBalancePayment('host-order'), isTrue);
+      expect(adapter.minorAmounts, exact ? [1000] : isEmpty);
+      expect(adapter.legacyAmounts, exact ? isEmpty : [10]);
+      final row = jsonDecode(fixture.preferences.values.values.single)['balancePaymentHolds']['records'].single as Map;
+      expect(row.containsKey('moneyVersion'), exact);
+      expect(row[exact ? 'amountDueMinor' : 'amountDue'], exact ? 1000 : 10);
+    });
+  }
+  for (final surface in ['tracking', 'orders']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-PAISE $surface shows exact balance at text scale $scale', (tester) async {
+        tester.view.physicalSize = const Size(320, 568); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+        final fixture = await balanceFixture(_HostMinorBalance()), session = fixture.session;
+        expect(await session.restoreBalancePayment('host-order'), isTrue);
+        if (surface == 'tracking') expect(session.openTracking('host-order'), isTrue);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+          MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+          home: Scaffold(body: surface == 'tracking' ? BuyV2TrackingView(session: session, onOpenOrderHelp: (_) {}) :
+            BuyV2OrdersView(session: session, onOpenOrderHelp: (_) {}))));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        if (surface == 'tracking') {
+          await tester.scrollUntilVisible(find.byKey(const ValueKey('buy-tracking-balance-amount')), 250,
+            scrollable: find.byType(Scrollable).first);
+          await tester.pumpAndSettle();
+          expect(find.textContaining('₹10.43'), findsWidgets);
+        } else {
+          expect(find.textContaining('₹10.44'), findsWidgets);
+          expect(find.text('₹10.43 balance'), findsOneWidget);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+  BuyV2OrderSupplyProgress exactRefundProgress(int amount, {BuyV2SupplyRefundState state = BuyV2SupplyRefundState.refunded}) =>
+    BuyV2OrderSupplyProgress(orderId: 'host-order', purchaseId: 'host-purchase', sourceId: 'host-supply', revision: 1,
+      state: BuyV2SupplyState.ready,
+      lines: [BuyV2SupplyLine(productId: product.id, variant: product.variant, pack: product.pack,
+        orderedQuantity: 1, availableQuantity: 1, unavailableQuantity: 0, supplierId: 'host-supplier', supplierName: 'Host supplier')],
+      refundState: state, refundAmountMinor: amount, refundRoute: 'Host original route', refundReference: 'host-refund');
+  test('LF-PAISE supply refund bounds use exact paid money without rounding or unknown-paid inference', () {
+    expect(exactRefundProgress(1).matchesOrder(exactHistoryOrder()), isTrue);
+    expect(exactRefundProgress(2).matchesOrder(exactHistoryOrder()), isFalse);
+    expect(exactRefundProgress(1).matchesOrder(exactHistoryOrder(paid: null)), isFalse);
+    expect(exactRefundProgress(1045, state: BuyV2SupplyRefundState.pending).matchesOrder(exactHistoryOrder()), isFalse);
+    expect(exactRefundProgress(1).matchesOrder(exactHistoryOrder(tax: -1)), isFalse);
+  });
+  test('LF-PAISE exact tracking preserves money and invalidates immutable purchased-price drift', () async {
+    final commerce = _HostExactOrderCommerce()..records = [exactHistoryOrder()];
+    final tracking = _HostExactOrderTracking(), core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: commerce, liveDeliveryAdapter: tracking, reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce();
+    expect(await session.refreshLiveDelivery('host-order'), isTrue);
+    expect(tracking.calls, 1); expect(session.liveDeliveryFor('host-order'), isNotNull);
+    expect(session.orders.single.payableTotalMinor, 1044);
+    expect(session.orders.single.amountPaidNowMinor, 1);
+    commerce.records = [exactHistoryOrder(paid: 1044, balance: 0)];
+    await session.restoreCommerce();
+    expect(session.liveDeliveryFor('host-order'), isNotNull);
+    commerce.records = [exactHistoryOrder(price: 1026)];
+    await session.restoreCommerce();
+    expect(session.liveDeliveryFor('host-order'), isNull);
+  });
+  test('LF-PAISE malformed purchased price invalidates exact tracking without throwing', () async {
+    final commerce = _HostExactOrderCommerce()..records = [exactHistoryOrder()];
+    final core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: commerce,
+      liveDeliveryAdapter: _HostExactOrderTracking(), reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    await session.restoreCommerce();
+    expect(await session.refreshLiveDelivery('host-order'), isTrue);
+    commerce.records = [exactHistoryOrder(price: -1)];
+    await session.restoreCommerce();
+    expect(session.liveDeliveryFor('host-order'), isNull);
+  });
+  const publicFields = WorkspacePublicDetailsFields(street: 'Host market road', city: 'Jodhpur', state: 'Rajasthan',
+    pinCode: '342003', publicContactPhone: '+91 90000 00001', openingTime: '09:00', closingTime: '21:00');
+  Map<String, dynamic> metadata({int revision = 1}) => {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+    'observedAt': at.toIso8601String(), 'locationVerified': false, 'publicAvailabilityConfirmed': false,
+    'area': 'Host locality', 'state': 'ready', 'revision': revision, 'details': publicFields.toJson()};
+  Map<String, dynamic> ownerDetailsReply(Map<String, Object?> body) => {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+    'operation': body['operation'], 'idempotencyKey': body['idempotencyKey'], 'locationVerified': false, 'publicAvailabilityConfirmed': false,
+    'record': {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one', 'revision': 1,
+      'publishedAt': at.toIso8601String(), 'details': publicFields.toJson()}};
+  const metadataIntent = WorkspacePublicDetailsIntent(ownerAccountId: 'host-owner', realm: 'production', storeId: 'store-one',
+    expectedRevision: 0, idempotencyKey: 'original-details-one', details: publicFields);
+  WorkspacePublicDetailsRecord receipt(WorkspacePublicDetailsIntent intent, {int? revision, String? store}) =>
+    WorkspacePublicDetailsRecord(realm: intent.realm, storeId: store ?? intent.storeId,
+      revision: revision ?? intent.expectedRevision + 1, publishedAt: at, details: intent.details);
+  WorkspacePublicDetailsController publisher(PublicDetailsHostGateway gateway, PublicDetailsHostJournal journal,
+    {Object? Function()? context}) => WorkspacePublicDetailsController(scope: metadataIntent.scope,
+      gateway: gateway, journal: journal, context: context ?? () => 'host-lifetime', now: () => at);
+  test('public publisher journals before dispatch and separates original receipt from current head', () async {
+    final journal = PublicDetailsHostJournal(), authority = PublicDetailsHostGateway();
+    final controller = publisher(authority, journal); addTearDown(controller.dispose);
+    expect((await controller.publish(publicFields, inputCurrent: () => true)).state, WorkspacePublicDetailsWriteState.notSent);
+    expect(authority.sent, isEmpty);
+    expect(await controller.refresh(), isTrue);
+    authority.outcome = WorkspacePublicDetailsWriteState.saved;
+    final gate = Completer<void>(); journal.saveGate = gate;
+    final send = controller.publish(publicFields, inputCurrent: () => true);
+    await Future<void>.delayed(Duration.zero);
+    expect(journal.events, ['journal']); expect(authority.sent, isEmpty);
+    authority.acknowledgement = receipt(controller.pending!);
+    gate.complete();
+    expect((await send).state, WorkspacePublicDetailsWriteState.saved);
+    expect(journal.original, isNull); expect(controller.pending, isNull);
+    expect(controller.lastAcknowledged!.revision, 1); expect(controller.published, isNull);
+    expect(controller.canPublish, isFalse);
+    authority.head = receipt(metadataIntent, revision: 2);
+    expect(await controller.refresh(), isTrue); expect(controller.published!.revision, 2);
+    expect(controller.lastAcknowledged!.revision, 1);
+  });
+  test('public publisher restart and absent receipt allow only explicit identical-original retry', () async {
+    final journal = PublicDetailsHostJournal(), authority = PublicDetailsHostGateway();
+    final first = publisher(authority, journal); await first.refresh();
+    await first.publish(publicFields, inputCurrent: () => true);
+    final original = journal.original!; first.dispose();
+    final next = publisher(authority, journal); addTearDown(next.dispose);
+    expect(await next.restore(), isTrue); expect(authority.sent.length, 1);
+    expect(await next.refresh(), isFalse); expect(next.canPublish, isFalse);
+    authority.outcome = WorkspacePublicDetailsWriteState.notFound;
+    expect((await next.reconcile()).state, WorkspacePublicDetailsWriteState.unknown);
+    expect(next.canRetryOriginal, isTrue); expect(journal.original!.fingerprint, original.fingerprint);
+    expect(authority.sent.last.reconcile, isTrue);
+    authority.outcome = WorkspacePublicDetailsWriteState.saved; authority.acknowledgement = receipt(original);
+    expect((await next.retryOriginal()).state, WorkspacePublicDetailsWriteState.saved);
+    expect(authority.sent.last.reconcile, isFalse);
+    expect(authority.sent.last.original.fingerprint, original.fingerprint);
+    expect(next.pending, isNull);
+  });
+  for (final outcome in [WorkspacePublicDetailsWriteState.rejected, WorkspacePublicDetailsWriteState.notSent]) {
+    test('public publisher original retry $outcome cannot clear earlier uncertainty', () async {
+      final journal = PublicDetailsHostJournal()..original = metadataIntent;
+      final authority = PublicDetailsHostGateway()..outcome = WorkspacePublicDetailsWriteState.notFound;
+      final controller = publisher(authority, journal); addTearDown(controller.dispose);
+      await controller.restore(); await controller.reconcile(); authority.outcome = outcome;
+      expect((await controller.retryOriginal()).state, WorkspacePublicDetailsWriteState.unknown);
+      expect(journal.original!.fingerprint, metadataIntent.fingerprint); expect(controller.canPublish, isFalse);
+    });
+  }
+  test('public publisher failed journal save sends nothing and never forgets memory original', () async {
+    final journal = PublicDetailsHostJournal(), authority = PublicDetailsHostGateway();
+    final controller = publisher(authority, journal); addTearDown(controller.dispose);
+    await controller.refresh(); journal.failSave = true;
+    await controller.publish(publicFields, inputCurrent: () => true);
+    final original = controller.pending!; expect(authority.sent, isEmpty); expect(journal.original, isNull);
+    journal.failSave = false; expect(await controller.restore(), isTrue);
+    expect(controller.pending!.fingerprint, original.fingerprint); expect(controller.canPublish, isFalse);
+  });
+  test('public publisher failed journal removal retains original for reconciliation', () async {
+    final journal = PublicDetailsHostJournal()..original = metadataIntent;
+    journal.failRemove = true;
+    final authority = PublicDetailsHostGateway()..outcome = WorkspacePublicDetailsWriteState.saved
+      ..acknowledgement = receipt(metadataIntent);
+    final controller = publisher(authority, journal); addTearDown(controller.dispose);
+    await controller.restore(); expect((await controller.reconcile()).state, WorkspacePublicDetailsWriteState.unknown);
+    expect(controller.pending, isNotNull); expect(controller.lastAcknowledged, isNull);
+    journal.failRemove = false;
+    expect((await controller.reconcile()).state, WorkspacePublicDetailsWriteState.saved);
+  });
+  test('public publisher changed input while journaling cannot dispatch', () async {
+    final journal = PublicDetailsHostJournal(), authority = PublicDetailsHostGateway();
+    final controller = publisher(authority, journal); addTearDown(controller.dispose);
+    await controller.refresh(); journal.saveGate = Completer<void>(); var current = true;
+    final send = controller.publish(publicFields, inputCurrent: () => current);
+    await Future<void>.delayed(Duration.zero); current = false; journal.saveGate!.complete();
+    expect((await send).state, WorkspacePublicDetailsWriteState.unknown);
+    expect(authority.sent, isEmpty); expect(journal.original, isNotNull);
+  });
+  test('public publisher retired A-B-A lifetime cannot consume a late receipt', () async {
+    var lifetime = 1;
+    final journal = PublicDetailsHostJournal(), authority = PublicDetailsHostGateway()..response = Completer();
+    final first = publisher(authority, journal, context: () => lifetime); await first.refresh();
+    final send = first.publish(publicFields, inputCurrent: () => true);
+    while (authority.sent.isEmpty) { await Future<void>.delayed(Duration.zero); }
+    lifetime = 3;
+    authority.response!.complete(WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.saved,
+      receipt(journal.original!)));
+    expect((await send).state, WorkspacePublicDetailsWriteState.unknown); expect(journal.original, isNotNull);
+    first.dispose();
+    final next = publisher(authority, journal, context: () => lifetime); addTearDown(next.dispose);
+    await next.restore(); expect(next.pending, isNotNull);
+  });
+  for (final wrong in ['Store', 'revision']) {
+    test('public publisher wrong $wrong acknowledgement cannot clear original', () async {
+      final journal = PublicDetailsHostJournal()..original = metadataIntent;
+      final authority = PublicDetailsHostGateway()..outcome = WorkspacePublicDetailsWriteState.saved
+        ..acknowledgement = receipt(metadataIntent, store: wrong == 'Store' ? 'other-store' : null,
+          revision: wrong == 'revision' ? 3 : null);
+      final controller = publisher(authority, journal); addTearDown(controller.dispose);
+      await controller.restore(); expect((await controller.reconcile()).state, WorkspacePublicDetailsWriteState.unknown);
+      expect(journal.original, isNotNull);
+    });
+  }
+  test('public journal survives restart and isolates account Store realm and exact original', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var account = metadataIntent.ownerAccountId;
+    SecureWorkPublicDetailsJournal fresh() => SecureWorkPublicDetailsJournal(currentAccount: () => account);
+    await fresh().savePending(metadataIntent);
+    expect((await fresh().readPending(metadataIntent.scope))!.fingerprint, metadataIntent.fingerprint);
+    final other = WorkspacePublicDetailsIntent.fromJson({...metadataIntent.toJson(), 'idempotencyKey': 'other-original'});
+    await expectLater(fresh().savePending(other), throwsFormatException);
+    await expectLater(fresh().removePending(other), throwsFormatException);
+    expect(await fresh().readPending((account: account, store: 'other-store', realm: 'production')), isNull);
+    expect(await fresh().readPending((account: account, store: 'store-one', realm: 'evaluation')), isNull);
+    account = 'other-account'; await expectLater(fresh().readPending(metadataIntent.scope), throwsA(isA<WorkGatewayException>()));
+    account = metadataIntent.ownerAccountId; await fresh().removePending(metadataIntent);
+    expect(await fresh().readPending(metadataIntent.scope), isNull);
+  });
+  test('public journal storage tail survives caller timeout across instances', () async {
+    final storage = _DelayedDetailsStorage();
+    SecureWorkPublicDetailsJournal fresh() => SecureWorkPublicDetailsJournal(storage: storage,
+      currentAccount: () => metadataIntent.ownerAccountId);
+    final original = WorkspacePublicDetailsIntent.fromJson({...metadataIntent.toJson(), 'storeId': 'native-tail-store'});
+    final first = fresh().savePending(original); await storage.entered.future;
+    await expectLater(first.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final remove = fresh().removePending(original);
+    await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await first; await remove;
+    expect(storage.writes, 2); expect(await fresh().readPending(original.scope), isNull);
+  });
+  test('LF-METADATA whitelist excludes private settings and preserves explicit unknown hours', () {
+    final input = WorkspacePublicDetailsFields.fromSettings(const WorkspaceStorePublicationDetails(
+      street: 'Host market road', city: 'Jodhpur', state: 'Rajasthan', pinCode: '342003',
+      publicContactPhone: '+91 90000 00001', legalName: 'Private legal name', pan: 'PRIVATE-PAN',
+      billingAddress: 'Private billing address', signatory: 'Private signatory'));
+    expect(input.toJson().keys.toSet(), {'street', 'city', 'state', 'pinCode', 'publicContactPhone', 'openingTime', 'closingTime'});
+    expect(input.openingTime, isEmpty); expect(input.closingTime, isEmpty);
+    for (final invalid in [
+      {...publicFields.toJson(), 'regionId': 'invented'}, {...publicFields.toJson(), 'pinCode': '000000'},
+      {...publicFields.toJson(), 'city': ''}, {...publicFields.toJson(), 'closingTime': ''},
+      {...publicFields.toJson(), 'publicContactPhone': 'private-account-contact'},
+    ]) { expect(() => WorkspacePublicDetailsFields.fromJson(invalid), throwsFormatException); }
+  });
+  test('LF-METADATA owner transport correlates original payload and uses mutation-only limited AppCheck', () async {
+    final credentials = Credentials(), transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': ownerDetailsReply(body)})));
+    final owner = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: credentials, transport: transport, ownerAccountId: 'host-owner', now: () => at);
+    final saved = await owner.writePublicDetails(metadataIntent, current: () => true);
+    expect(saved.state, WorkspacePublicDetailsWriteState.saved); expect(saved.record!.details.address, publicFields.address);
+    final original = await owner.writePublicDetails(metadataIntent, current: () => true, reconcile: true);
+    expect(original.state, WorkspacePublicDetailsWriteState.saved);
+    final read = await owner.readPublicDetailsOwned(storeId: 'store-one', current: () => true);
+    expect(read!.revision, 1);
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
+  });
+  for (final change in ['realm', 'store', 'revision', 'key', 'operation', 'details', 'verified']) {
+    test('LF-METADATA mismatched owner response remains unknown: $change', () async {
+      final transport = OwnerTransport((body) async {
+        final data = jsonDecode(jsonEncode(ownerDetailsReply(body))) as Map<String, dynamic>;
+        if (change == 'realm') data['realm'] = 'evaluation';
+        if (change == 'store') data['storeId'] = 'other-store';
+        if (change == 'revision') (data['record'] as Map)['revision'] = 2;
+        if (change == 'key') data['idempotencyKey'] = 'other-original';
+        if (change == 'operation') data['operation'] = 'readStorePublicDetails';
+        if (change == 'details') ((data['record'] as Map)['details'] as Map)['city'] = 'Changed city';
+        if (change == 'verified') data['locationVerified'] = true;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      });
+      final owner = pageGateway(transport).forOwnerAccount('host-owner');
+      expect((await owner.writePublicDetails(metadataIntent, current: () => true)).state, WorkspacePublicDetailsWriteState.unknown);
+    });
+  }
+  test('LF-METADATA missing original denial and retired credential lifetime cannot publish', () async {
+    final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': ownerDetailsReply(body)..['record'] = null})));
+    final owner = pageGateway(transport).forOwnerAccount('host-owner');
+    expect((await owner.writePublicDetails(metadataIntent, current: () => true, reconcile: true)).state,
+      WorkspacePublicDetailsWriteState.notFound);
+    var current = true;
+    final retired = AuthenticatedWorkspaceCatalogueGateway(endpoint: owner.endpoint, ownerAccountId: 'host-owner',
+      credentials: RetiringOwnerCredentials(() => current = false), transport: transport, now: () => at);
+    final count = transport.calls;
+    expect((await retired.writePublicDetails(metadataIntent, current: () => current)).state, WorkspacePublicDetailsWriteState.notSent);
+    expect(transport.calls, count);
+    final denied = pageGateway(OwnerTransport((body) async => SocialContentResponse(statusCode: 403,
+      body: jsonEncode({'ok': false, 'error': {'code': 'forbidden', 'message': 'Not permitted.', 'retryable': false}}))))
+      .forOwnerAccount('host-owner');
+    expect((await denied.writePublicDetails(metadataIntent, current: () => true)).state, WorkspacePublicDetailsWriteState.rejected);
+    expect((await denied.writePublicDetails(metadataIntent, current: () => true, reconcile: true)).state, WorkspacePublicDetailsWriteState.unknown);
+  });
+  test('LF-METADATA a late accepted write cannot become another account success', () async {
+    var current = true;
+    final sent = Completer<Map<String, Object?>>(), response = Completer<SocialContentResponse>();
+    final owner = pageGateway(OwnerTransport((body) { sent.complete(body); return response.future; })).forOwnerAccount('host-owner');
+    final result = owner.writePublicDetails(metadataIntent, current: () => current), body = await sent.future;
+    current = false;
+    response.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': ownerDetailsReply(body)})));
+    expect((await result).state, WorkspacePublicDetailsWriteState.unknown);
+  });
+  test('LF-METADATA malformed rejection cannot prove the original write was not applied', () async {
+    for (final body in ['<html>proxy failure</html>', '{}',
+      jsonEncode({'ok': false, 'error': {'code': 'conflict', 'message': 'Original request changed.', 'retryable': false}})]) {
+      final owner = pageGateway(OwnerTransport((request) async => SocialContentResponse(statusCode: 409, body: body)))
+        .forOwnerAccount('host-owner');
+      expect((await owner.writePublicDetails(metadataIntent, current: () => true)).state,
+        WorkspacePublicDetailsWriteState.unknown);
+    }
+  });
+  test('LF-METADATA only a valid revision-conflict envelope confirms a rejected new write', () async {
+    final owner = pageGateway(OwnerTransport((request) async => SocialContentResponse(statusCode: 409,
+      body: jsonEncode({'ok': false, 'error': {'code': 'revision_conflict', 'message': 'Refresh public details.', 'retryable': false}}))))
+      .forOwnerAccount('host-owner');
+    expect((await owner.writePublicDetails(metadataIntent, current: () => true)).state, WorkspacePublicDetailsWriteState.rejected);
+  });
+  test('LF-METADATA exact-Store header uses owner public data without inventing a region or collection grant', () async {
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+      gateway: pageGateway(OwnerTransport((body) async {
+        final data = pageData(body)..['storeDetailsReadbackVersion'] = 1;
+        (data['publicStore'] as Map)['details'] = metadata();
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+    final core = BuySession();
+    final consumer = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: false);
+    addTearDown(core.dispose); addTearDown(consumer.dispose);
+    final pager = consumer.acquireCatalogueStores('host-described-store');
+    await pager.open(storeQuery());
+    expect(pager.message, isNull); final store = pager.page!.items.single;
+    expect(store.id, 'store-one'); expect(store.address, publicFields.address); expect(store.regionId, isEmpty);
+    expect(store.publicContactPhone, publicFields.publicContactPhone); expect(store.openingHoursLabel, '09:00 – 21:00');
+    expect(store.collection, isNull); expect(store.distanceMeters, isNull);
+    consumer.releaseCatalogueStores('host-described-store');
+  });
+  test('LF-METADATA stale absent and wrong-Store empty catalogue headers are not confirmed empty feeds', () async {
+    var revision = 2, wrongStore = false;
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+      gateway: pageGateway(OwnerTransport((body) async {
+        final data = pageData(body, empty: true)..['storeDetailsReadbackVersion'] = 1;
+        final store = data['publicStore'] as Map;
+        store['details'] = metadata(revision: revision);
+        if (wrongStore) store['id'] = 'other-store';
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+    expect((await source.loadStores(storeQuery(), pageSize: 40)).items.single.address, publicFields.address);
+    revision = 1; await expectLater(source.loadStores(storeQuery(), pageSize: 40), throwsFormatException);
+    revision = 3; wrongStore = true; await expectLater(source.loadStores(storeQuery(), pageSize: 40), throwsFormatException);
+  });
+  test('LF-LISTING source readback uses original SKU and keeps actual media and policy scopes', () async {
+    final data = publicPage();
+    (row(data)['content'] as Map)['media'] = [<String, Object?>{
+      'id': 'host-image', 'revision': 'image-one', 'url': 'https://example.com/host-image.jpg',
+      'storeId': 'store-one', 'skuId': 'sku-one', 'canonicalProductId': 'canonical-one',
+      'publisherWorkspaceId': 'supplier-one', 'file': {'mimeType': 'image/jpeg', 'byteLength': 1024,
+        'width': 640, 'height': 640, 'normalized': true, 'frameCount': 1}}];
+    final transport = Transport(data), selected = publicProduct();
+    final result = await gateway(transport).read(selected);
+    expect(result.content.state, BuyV2ProductContentState.ready);
+    expect(transport.sent!['skuId'], 'sku-one'); expect(transport.sent!['listingReadbackVersion'], 1);
+    expect(transport.sent!['policyReadbackVersion'], 1);
+    expect(result.content.productId, selected.id);
+    expect(result.content.media.single.binding!.skuId, 'sku-one');
+    expect(BuyV2SupplierMediaPolicy.publicationMessage(selected, result.content.media.single), isNull);
+    final policy = result.content.supplierPolicy!;
+    expect(policy.productIds, {'sku-one'}); expect(policy.sourceRealm, 'production');
+    expect(policy.appliesTo(selected, at), isTrue);
+    expect(policy.receiptKey, jsonEncode(['production', 'store-one', 'host-supplier-policy-sku-one']));
+  });
+  for (final change in ['missing', 'store', 'sku', 'channel', 'pack', 'realm', 'listing', 'partial', 'media', 'policy', 'duplicate channel']) {
+    test('LF-LISTING wrong public binding cannot be admitted $change', () async {
+      final data = publicPage(trade: change == 'duplicate channel'), selected = publicProduct();
+      final bindings = row(data)['listings'] as List;
+      final original = Map<String, Object?>.from(bindings.first as Map);
+      if (change == 'missing') row(data).remove('listings');
+      if (change == 'store') bindings[0] = {...original, 'storeId': 'other-store'};
+      if (change == 'sku') bindings[0] = {...original, 'skuId': 'other-sku'};
+      if (change == 'channel') bindings[0] = {...original, 'channel': 'bulk'};
+      if (change == 'pack') bindings[0] = {...original, 'verifiedPackId': 'other-pack'};
+      if (change == 'realm') bindings[0] = {...original, 'realm': 'evaluation'};
+      if (change == 'listing') bindings[0] = {...original, 'listingId': 'listing-${'c' * 64}'};
+      if (change == 'partial') data['listingCoverage'] = 'partial';
+      if (change == 'media') {
+        (row(data)['content'] as Map)['media'] = [<String, Object?>{'id': 'wrong', 'skuId': selected.id}];
+      }
+      if (change == 'policy') (row(data)['supplierPolicy'] as Map)['skuId'] = selected.id;
+      if (change == 'duplicate channel') bindings[1] = {...original, 'listingId': 'listing-${'c' * 64}'};
+      expect((await gateway(Transport(data)).read(selected)).content.state, BuyV2ProductContentState.unavailable);
+    });
+  }
+  test('LF-LISTING same source policy spans channels without rewriting applicability or legacy consent', () async {
+    final data = publicPage(trade: true), transport = Transport(data);
+    final source = gateway(transport), retail = publicProduct(), trade = publicProduct(trade: true);
+    final a = (await source.read(retail)).content.supplierPolicy!;
+    final b = (await source.read(trade)).content.supplierPolicy!;
+    expect(retail.id, isNot(trade.id)); expect(retail.sourceSkuId, trade.sourceSkuId);
+    expect(a.receiptKey, b.receiptKey);
+    expect(a.acceptanceFingerprint('host-owner'), b.acceptanceFingerprint('host-owner'));
+    final legacy = (await gateway(Transport(page()..['items'] = [row(page())..['supplierPolicy'] = policyEnvelope()])).read(product))
+      .content.supplierPolicy!;
+    expect(a.receiptKey, isNot(legacy.receiptKey));
+    expect(a.acceptanceFingerprint('host-owner'), isNot(legacy.acceptanceFingerprint('host-owner')));
+    expect(a.appliesTo(product, at), isFalse); expect(legacy.appliesTo(retail, at), isFalse);
+  });
+  test('LF-LISTING absent frame proof remains unknown and malformed static proof is rejected', () async {
+    final data = publicPage();
+    final file = <String, Object?>{'mimeType': 'image/jpeg', 'byteLength': 1024,
+      'width': 640, 'height': 640, 'normalized': true};
+    (row(data)['content'] as Map)['media'] = [<String, Object?>{
+      'id': 'host-image', 'revision': 'image-one', 'url': 'https://example.com/host-image.jpg',
+      'storeId': 'store-one', 'skuId': 'sku-one', 'canonicalProductId': 'canonical-one',
+      'publisherWorkspaceId': 'supplier-one', 'file': file}];
+    final transport = Transport(data), selected = publicProduct();
+    final unknown = await gateway(transport).read(selected);
+    expect(unknown.content.media.single.binding!.file.frameCount, isNull);
+    expect(BuyV2SupplierMediaPolicy.publicationMessage(selected, unknown.content.media.single), isNotNull);
+    for (final invalid in [null, 0, 2, 1.5, '1']) {
+      file['frameCount'] = invalid;
+      expect((await gateway(transport).read(selected)).content.state, BuyV2ProductContentState.unavailable);
+    }
+    file['frameCount'] = 1;
+    final checked = await gateway(transport).read(selected);
+    expect(checked.content.media.single.binding!.file.frameCount, 1);
+    expect(BuyV2SupplierMediaPolicy.publicationMessage(selected, checked.content.media.single), isNull);
+    data.remove('mediaReadbackVersion');
+    expect((await gateway(transport).read(selected)).content.state, BuyV2ProductContentState.unavailable);
+  });
+  test('LF-LISTING source policy highwater protects both listing channels', () async {
+    final data = publicPage(trade: true), transport = Transport(data);
+    final reader = WorkspaceCatalogueReadback(gateway: gateway(transport), context: () => 'host-owner', now: () => at);
+    addTearDown(reader.dispose);
+    final retail = publicProduct(), trade = publicProduct(trade: true);
+    await reader.refresh(retail);
+    row(data)['supplierPolicy'] = policyEnvelope(revision: 2);
+    await reader.refresh(trade);
+    expect(reader.snapshotFor(trade).supplierPolicy!.revision, 'policy-v2');
+    row(data)['supplierPolicy'] = policyEnvelope(revision: 1, state: 'none');
+    await reader.refresh(retail);
+    expect(reader.snapshotFor(retail).supplierPolicyResolutionPending, isTrue);
+  });
+  test('LF-LISTING bound cache preserves required policy hold before and after first failed read', () async {
+    final data = publicPage(), transport = Transport(data)..fail = true;
+    final reader = WorkspaceCatalogueReadback(gateway: gateway(transport), context: () => 'host-owner', now: () => at);
+    addTearDown(reader.dispose);
+    final selected = publicProduct();
+    expect(reader.snapshotFor(selected).supplierPolicyResolutionPending, isTrue);
+    await reader.refresh(selected);
+    expect(reader.snapshotFor(selected).supplierPolicyResolutionPending, isTrue);
+    transport.fail = false; row(data).remove('supplierPolicy');
+    await reader.refresh(selected);
+    expect(reader.snapshotFor(selected).supplierPolicyResolutionPending, isTrue);
+    expect(reader.snapshotFor(product).supplierPolicyResolutionPending, isFalse,
+      reason: 'Legacy unbound behavior is unchanged when no actual policy was observed.');
+  });
+  test(
+    'catalogue policy readback reaches accepted policy shape and keeps expired resolution separate',
+    () async {
+      final data = page();
+      row(data)['supplierPolicy'] = policyEnvelope();
+      final source = gateway(Transport(data));
+      final result = await source.read(product);
+      expect(result.content.state, BuyV2ProductContentState.ready);
+      expect(result.content.supplierPolicy?.body, 'Host supplier terms');
+      expect(result.content.supplierPolicyAcceptanceRequired, true);
+      expect(result.content.supplierPolicyResolutionPending, false);
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 2,
+        state: 'unavailable',
+      );
+      final held = (await source.read(product)).content;
+      expect(held.supplierPolicy, isNull);
+      expect(held.supplierPolicyResolutionPending, true);
+      expect(held.supplierPolicyAcceptanceRequired, true);
+    },
+  );
+  test(
+    'configured policy protocol holds the initial lookup and never falls back to a legacy response',
+    () async {
+      final data = page(),
+          transport = Transport(data),
+          legacy = gateway(transport);
+      final source = AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: legacy.endpoint,
+        credentials: legacy.credentials,
+        transport: transport,
+        now: () => at,
+        policyReadbackRequired: true,
+      );
+      final reader = WorkspaceCatalogueReadback(
+        gateway: source,
+        context: () => 'owner',
+        now: () => at,
+      );
+      addTearDown(reader.dispose);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      expect(transport.sent!['policyReadbackVersion'], 1);
+      row(data)['supplierPolicy'] = policyEnvelope(revision: 0, state: 'none');
+      await reader.refresh(product);
+      expect(
+        reader.snapshotFor(product).supplierPolicyResolutionPending,
+        false,
+      );
+      expect(
+        reader.snapshotFor(product).supplierPolicyAcceptanceRequired,
+        false,
+      );
+      transport.fail = true;
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+    },
+  );
+  for (final name in [
+    'foreign Store',
+    'foreign realm',
+    'foreign SKU',
+    'private field',
+    'wrong policy scope',
+    'conflicting requirement',
+  ]) {
+    test('unsafe policy $name cannot become a ready public policy', () async {
+      final data = page(), value = policyEnvelope();
+      switch (name) {
+        case 'foreign Store':
+          value['storeId'] = 'store-two';
+        case 'foreign realm':
+          value['realm'] = 'evaluation';
+        case 'foreign SKU':
+          value['skuId'] = 'sku-two';
+        case 'private field':
+          value['ownerUserId'] = 'private-owner';
+        case 'wrong policy scope':
+          (value['policy'] as Map)['productIds'] = ['sku-two'];
+        case 'conflicting requirement':
+          (value['policy'] as Map)['requiresAcceptance'] = false;
+      }
+      row(data)['supplierPolicy'] = value;
+      final held = (await gateway(Transport(data)).read(product)).content;
+      expect(held.supplierPolicy, isNull);
+      expect(held.supplierPolicyResolutionPending, true);
+    });
+  }
+  test(
+    'policy revision changes independently from SKU; stale none and same-version changes stay held',
+    () async {
+      final data = page();
+      row(data)['supplierPolicy'] = policyEnvelope();
+      final reader = WorkspaceCatalogueReadback(
+        gateway: gateway(Transport(data)),
+        context: () => 'owner',
+        now: () => at,
+      );
+      addTearDown(reader.dispose);
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicy?.revision, 'policy-v1');
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 2,
+        body: 'Updated host terms',
+      );
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicy?.revision, 'policy-v2');
+      row(data)['supplierPolicy'] = policyEnvelope(revision: 1, state: 'none');
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 2,
+        body: 'Changed without revision',
+      );
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 3,
+        state: 'unavailable',
+      );
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 2,
+        body: 'Updated host terms',
+      );
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+    },
+  );
+  test(
+    'same SKU policy revision is shared across Retail and Wholesale cached views',
+    () async {
+      final data = jsonDecode(jsonEncode(page())) as Map<String, dynamic>;
+      final channels = row(data)['channels'] as List;
+      channels.add({
+        ...channels.single as Map,
+        'kind': 'wholesale',
+        'offerId': 'host-wholesale-offer',
+      });
+      row(data)['supplierPolicy'] = policyEnvelope();
+      final reader = WorkspaceCatalogueReadback(
+        gateway: gateway(Transport(data)),
+        context: () => 'owner',
+        now: () => at,
+      );
+      addTearDown(reader.dispose);
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicy?.revision, 'policy-v1');
+      row(data)['supplierPolicy'] = policyEnvelope(
+        revision: 2,
+        body: 'Updated across both channels',
+      );
+      final wholesale = product.copyWith(offerClass: BuyV2OfferClass.wholesale);
+      await reader.refresh(wholesale);
+      expect(
+        reader.snapshotFor(wholesale).supplierPolicy?.revision,
+        'policy-v2',
+      );
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+      row(data)['supplierPolicy'] = policyEnvelope(revision: 1, state: 'none');
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
+    },
+  );
+  Future<void> openListingEditor(WidgetTester tester, WorkSession work) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 740);
+    addTearDown(tester.view.reset);
+    work.retailerSetupSaved = true;
+    work.reviewStage = WorkReviewStage.live;
+    final core = BuySession(),
+        consumer = BuyV2Session(core: core, reviewDataEnabled: false);
+    addTearDown(work.dispose);
+    addTearDown(core.dispose);
+    addTearDown(consumer.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkWorkspaceDashboardScreen(
+          session: work,
+          procurementSession: consumer,
+          initialSection: 'stock',
+          accountAuthenticated: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final edit = find.byKey(const Key('work-catalogue-edit-sku-one'));
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'reachable product editor saves an explicit listing request without a Stock movement',
+    (tester) async {
+      final source = SessionCatalogue(), journal = BindingStore();
+      final work = listingSession(source, journal);
+      source.write = (intent, current) async {
+        expect(current(), true);
+        expect(journal.saved?.idempotencyKey, intent.idempotencyKey);
+        return listingSaved(intent);
+      };
+      await openListingEditor(tester, work);
+      final row = find.byKey(const Key('work-product-public'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: row, matching: find.byType(Switch)));
+      await tester.pumpAndSettle();
+      final save = find.byKey(const Key('work-product-save'));
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(
+        source.submitted,
+        1,
+        reason:
+            'Owner reads=${source.ownerReads}; notice=${work.noticeMessage}; error=${work.errorMessage}; visible=${tester.widgetList<Text>(find.byType(Text)).map((t) => t.data).whereType<String>().join(" | ")}',
+      );
+      expect(work.workspaceCatalogueItems.single.publicListing, true);
+      expect(work.workspaceCatalogueItems.single.stock, 7);
+      expect(
+        work.workspaceCatalogueItems.single.catalogueFactsRequireReview,
+        true,
+      );
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(journal.saved, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'reopened product editor restores pending original before enabling listing changes',
+    (tester) async {
+      final source = SessionCatalogue(),
+          journal = BindingStore(),
+          restore = Completer<WorkspaceCatalogueBindingIntent?>();
+      final original = ownerIntent();
+      journal.saved = original;
+      journal.read = () => restore.future;
+      final work = listingSession(source, journal);
+      await openListingEditor(tester, work);
+      final row = find.byKey(const Key('work-product-public'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<Switch>(
+              find.descendant(of: row, matching: find.byType(Switch)),
+            )
+            .onChanged,
+        isNull,
+      );
+      restore.complete(original);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-product-public-check')),
+        findsOneWidget,
+      );
+      expect(source.submitted, 0);
+      expect(source.reconciled, 0);
+      expect(work.workspaceCatalogueItems.single.publicListing, false);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'retained Check listing callback never creates a new request after original cleared',
+    (tester) async {
+      final source = SessionCatalogue(),
+          journal = BindingStore()..saved = ownerIntent();
+      final work = listingSession(source, journal);
+      // Prepare the old state without a provider submission; then clear it elsewhere.
+      await work.requestWorkspaceProductListing('sku-one', listed: false);
+      await openListingEditor(tester, work);
+      final row = find.byKey(const Key('work-product-public-check'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      final callback = tester
+          .widget<IconButton>(
+            find.descendant(of: row, matching: find.byType(IconButton)),
+          )
+          .onPressed!;
+      source.check = (original) async => listingSaved(original);
+      expect(
+        await work.requestWorkspaceProductListing('sku-one', listed: false),
+        true,
+      );
+      expect(journal.saved, isNull);
+      callback();
+      await tester.pumpAndSettle();
+      expect(source.submitted, 0);
+      expect(work.workspaceCatalogueItems.single.publicListing, false);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'failed listing restoration stays read-only and can be retried without submission',
+    (tester) async {
+      final source = SessionCatalogue(), journal = BindingStore();
+      journal.read = () async =>
+          throw StateError('Isolated journal unavailable');
+      final work = listingSession(source, journal);
+      await openListingEditor(tester, work);
+      expect(find.byKey(const Key('work-product-public')), findsNothing);
+      final row = find.byKey(const Key('work-product-public-check'));
+      await tester.ensureVisible(row);
+      await tester.pumpAndSettle();
+      journal.read = () async => null;
+      await tester.tap(
+        find.descendant(of: row, matching: find.byType(IconButton)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-public')), findsOneWidget);
+      expect(source.submitted, 0);
+      expect(source.reconciled, 0);
+      expect(work.workspaceCatalogueItems.single.publicListing, false);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  test(
+    'quantity steps start at the minimum order in owner and public projections',
+    () async {
+      final data = page();
+      final channel = (row(data)['channels'] as List).single as Map;
+      channel['minimumOrder'] = 3;
+      channel['quantityStep'] = 2;
+      channel['tiers'] = [
+        {'minimumQuantity': 3, 'unitPriceMinor': 26000},
+        {'minimumQuantity': 5, 'unitPriceMinor': 25000},
+      ];
+      final requested = product.copyWith(
+        minimumOrder: 3,
+        packTerms: BuyV2PackTerms(
+          skuId: 'sku-one',
+          revision: 'pack-source-one',
+          sellUnit: 'bottle',
+          netContentMilli: 1000,
+          contentUnit: 'L',
+          quantityStep: 2,
+          pricingStoreId: 'store-one',
+          priceObservedAt: at.subtract(const Duration(hours: 1)),
+          priceValidUntil: at.add(const Duration(hours: 1)),
+          priceTiers: const [
+            BuyV2PackPriceTier(minimumPacks: 3, price: 260),
+            BuyV2PackPriceTier(minimumPacks: 5, price: 250),
+          ],
+        ),
+      );
+      (row(data)['pack'] as Map)['label'] = requested.pack;
+      expect(
+        (await gateway(Transport(data)).read(requested)).content.state,
+        BuyV2ProductContentState.ready,
+      );
+      final owned = Map<String, dynamic>.from(row(data));
+      (owned['channels'] as List).single.remove('revision');
+      (owned['channels'] as List).single.remove('validUntil');
+      owned.addAll({
+        'schemaVersion': 1,
+        'storeId': 'store-one',
+        'publicListing': true,
+        'provenance': {
+          'entryMethod': 'manual',
+          'sourceRecordId': 'original-one',
+        },
+      });
+      expect(
+        WorkspaceCatalogueOwnedSku.decode(
+          owned,
+          storeId: 'store-one',
+          skuId: 'sku-one',
+          now: at,
+          realm: 'production',
+        ).input['channels'],
+        isNotEmpty,
+      );
+      ((owned['channels'] as List).single['tiers']
+              as List)[1]['minimumQuantity'] =
+          4;
+      expect(
+        () => WorkspaceCatalogueOwnedSku.decode(
+          owned,
+          storeId: 'store-one',
+          skuId: 'sku-one',
+          now: at,
+          realm: 'production',
+        ),
+        throwsFormatException,
+      );
+    },
+  );
+  group('Store listing caller (isolated host)', () {
+    test(
+      'explicit owner action binds one saved SKU without Stock or review-flag mutation',
+      () async {
+        final source = SessionCatalogue(),
+            journal = BindingStore(),
+            work = listingSession(source, journal);
+        final original = work.workspaceCatalogueItems.single;
+        source.write = (intent, current) async {
+          expect(current(), true);
+          expect(intent.sku['provenance'], {
+            'entryMethod': 'manual',
+            'sourceRecordId': 'sku-one',
+          });
+          expect(jsonEncode(intent.body), isNot(contains('purchasePrice')));
+          expect(journal.saved?.idempotencyKey, intent.idempotencyKey);
+          return listingSaved(intent);
+        };
+        expect(await work.toggleWorkspaceProductListing('sku-one'), true);
+        expect(source.ownerReads, 1);
+        expect(source.submitted, 1);
+        expect(journal.saved, isNull);
+        expect(
+          work.workspaceCatalogueItems.single.toInventoryJson(),
+          original.copyWith(publicListing: true).toInventoryJson(),
+        );
+        expect(
+          work.workspaceCatalogueItems.single.catalogueFactsRequireReview,
+          true,
+        );
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        work.dispose();
+      },
+    );
+    test(
+      'configured missing or mismatched binding never falls back to local visibility',
+      () async {
+        for (final mismatch in [false, true]) {
+          final source = SessionCatalogue(),
+              work = listingSession(source, BindingStore());
+          if (mismatch) {
+            final record = await source.ownerRead();
+            final changed = record!.toJson();
+            (changed['content'] as Map)['description'] =
+                'Different reviewed description';
+            source.ownerRead = () async => WorkspaceCatalogueOwnedSku.decode(
+              changed,
+              storeId: 'store-one',
+              skuId: 'sku-one',
+              realm: 'production',
+              now: at,
+            );
+          } else {
+            source.ownerRead = () async => null;
+          }
+          final before = work.workspaceCatalogueItems.single.toInventoryJson();
+          expect(await work.toggleWorkspaceProductListing('sku-one'), false);
+          expect(source.submitted, 0);
+          expect(work.workspaceCatalogueItems.single.toInventoryJson(), before);
+          work.dispose();
+        }
+      },
+    );
+    test(
+      'ordinary edits and CSV import have no owner-read or upload side effect',
+      () async {
+        final source = SessionCatalogue(),
+            work = listingSession(source, BindingStore());
+        expect(
+          work.addOrUpdateWorkspaceProduct(
+            listingItem().copyWith(sellingPrice: 261),
+          ),
+          true,
+        );
+        final other = WorkspaceCatalogueItem.fromInventoryJson({
+          ...listingItem().toInventoryJson(),
+          'id': 'sku-two',
+          'canonicalId': 'canonical-two',
+          'sku': 'HOST-TWO',
+          'title': 'Host fixture flour',
+          'stockEntry': null,
+          'version': 1,
+        });
+        expect(
+          work.importWorkspaceProducts(
+            [other],
+            addOnly: true,
+            stockEntryMethod: WorkspaceStockEntryMethod.csv,
+          ),
+          true,
+        );
+        expect(source.ownerReads, 0);
+        expect(source.submitted, 0);
+        expect(work.workspaceCatalogueItems.length, 2);
+        work.dispose();
+      },
+    );
+    test(
+      'restored original checks receipt, never flips a later preference or resubmits',
+      () async {
+        final source = SessionCatalogue(), journal = BindingStore();
+        source.write = (_, _) async => const WorkspaceCatalogueBindingResult(
+          WorkspaceCatalogueBindingState.unknown,
+        );
+        var work = listingSession(source, journal);
+        expect(await work.toggleWorkspaceProductListing('sku-one'), false);
+        final saved = work.workspaceCatalogueItems.single;
+        work.dispose();
+        work = listingSession(source, journal)..workspaceCatalogueItems.clear();
+        work.workspaceCatalogueItems.add(saved);
+        source.check = (intent) async => listingSaved(intent);
+        expect(await work.toggleWorkspaceProductListing('sku-one'), true);
+        expect(source.submitted, 1);
+        expect(source.reconciled, 1);
+        expect(work.workspaceCatalogueItems.single.publicListing, true);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(journal.saved, isNull);
+        work.dispose();
+      },
+    );
+    test(
+      'withdrawal keeps changed local price but sends only the old mirror listing false',
+      () async {
+        final source = SessionCatalogue(),
+            work = listingSession(source, BindingStore());
+        work.workspaceCatalogueItems[0] = listingItem().copyWith(
+          publicListing: true,
+          sellingPrice: 261,
+        );
+        final owned = (await source.ownerRead())!.toJson()
+          ..['publicListing'] = true;
+        source.ownerRead = () async => WorkspaceCatalogueOwnedSku.decode(
+          owned,
+          storeId: 'store-one',
+          skuId: 'sku-one',
+          realm: 'production',
+          now: at,
+        );
+        source.write = (intent, _) async {
+          expect(intent.sku['publicListing'], false);
+          expect(
+            ((intent.sku['channels'] as List).single as Map)['priceMinor'],
+            26000,
+          );
+          return listingSaved(intent);
+        };
+        expect(await work.toggleWorkspaceProductListing('sku-one'), true);
+        expect(source.submitted, 1);
+        expect(work.workspaceCatalogueItems.single.sellingPrice, 261);
+        expect(work.workspaceCatalogueItems.single.publicListing, false);
+        expect(work.workspaceStockMovements, isEmpty);
+        work.dispose();
+      },
+    );
+    test(
+      'A-B-A Store transition during owner read cannot dispatch a stale request',
+      () async {
+        final source = SessionCatalogue(),
+            work = listingSession(source, BindingStore());
+        final entered = Completer<void>(),
+            release = Completer<void>(),
+            originalRead = source.ownerRead;
+        source.ownerRead = () async {
+          entered.complete();
+          await release.future;
+          return originalRead();
+        };
+        final operation = work.toggleWorkspaceProductListing('sku-one');
+        await entered.future;
+        final originalStore = work.activeWorkspace;
+        work.activeWorkspace = const WorkWorkspace(
+          id: 'store-two',
+          name: 'Other Store',
+          profileLabel: 'Grocery',
+          profileId: 'retailer-grocery',
+          area: 'Jaipur',
+          verified: true,
+        );
+        work.activeWorkspace = originalStore;
+        release.complete();
+        expect(await operation, false);
+        expect(source.submitted, 0);
+        expect(work.workspaceCatalogueItems.single.publicListing, false);
+        work.dispose();
+      },
+    );
+  });
+  group('listing original request recovery (isolated host)', () {
+    test(
+      'journal is saved before dispatch, matching acknowledgement is removed',
+      () async {
+        final store = BindingStore(), gateway = ListingGateway();
+        gateway.write = (original, _) async {
+          expect(store.saved?.toJson(), original.toJson());
+          return listingSaved(original);
+        };
+        final controller = WorkspaceCatalogueListingController(
+          scope: listingScope,
+          gateway: gateway,
+          pendingStore: store,
+          context: () => 'current-owner',
+        );
+        final result = await controller.submit(
+          ownerIntent(),
+          inputCurrent: () => true,
+        );
+        expect(result.state, WorkspaceCatalogueBindingState.saved);
+        expect(store.saved, isNull);
+        expect(controller.pending, isNull);
+        controller.dispose();
+      },
+    );
+    test(
+      'restart restores unknown original and checks receipt without another submission',
+      () async {
+        final store = BindingStore(), gateway = ListingGateway();
+        gateway.write = (_, _) async => const WorkspaceCatalogueBindingResult(
+          WorkspaceCatalogueBindingState.unknown,
+        );
+        var controller = WorkspaceCatalogueListingController(
+          scope: listingScope,
+          gateway: gateway,
+          pendingStore: store,
+          context: () => 'current-owner',
+        );
+        await controller.submit(ownerIntent(), inputCurrent: () => true);
+        controller.dispose();
+        controller = WorkspaceCatalogueListingController(
+          scope: listingScope,
+          gateway: gateway,
+          pendingStore: store,
+          context: () => 'current-owner',
+        );
+        expect(await controller.restore(), true);
+        expect(controller.pending?.idempotencyKey, 'binding-original');
+        final another = WorkspaceCatalogueBindingIntent.fromJson(
+          jsonDecode(
+            jsonEncode(
+              ownerIntent().toJson()..['idempotencyKey'] = 'do-not-replace',
+            ),
+          ),
+        );
+        expect(
+          (await controller.submit(another, inputCurrent: () => true)).state,
+          WorkspaceCatalogueBindingState.unknown,
+        );
+        gateway.check = (original) async => listingSaved(original);
+        expect(
+          (await controller.reconcile()).state,
+          WorkspaceCatalogueBindingState.saved,
+        );
+        expect(gateway.submitted, 1);
+        expect(gateway.reconciled, 1);
+        expect(store.saved, isNull);
+        controller.dispose();
+      },
+    );
+    test(
+      'failed journal cannot dispatch; failed removal retains original after a saved reply',
+      () async {
+        for (final failSave in [true, false]) {
+          final store = BindingStore()
+            ..failWrite = failSave
+            ..failRemoval = !failSave;
+          final gateway = ListingGateway();
+          final controller = WorkspaceCatalogueListingController(
+            scope: listingScope,
+            gateway: gateway,
+            pendingStore: store,
+            context: () => 'current-owner',
+          );
+          expect(
+            (await controller.submit(
+              ownerIntent(),
+              inputCurrent: () => true,
+            )).state,
+            WorkspaceCatalogueBindingState.unknown,
+          );
+          expect(gateway.submitted, failSave ? 0 : 1);
+          expect(controller.ready, false);
+          expect(controller.pending?.idempotencyKey, 'binding-original');
+          controller.dispose();
+        }
+      },
+    );
+    test(
+      'input changed during credentials prevents a stale listing dispatch',
+      () async {
+        final store = BindingStore(),
+            gateway = ListingGateway(),
+            entered = Completer<void>(),
+            release = Completer<void>();
+        var valid = true, sent = 0;
+        gateway.write = (original, current) async {
+          entered.complete();
+          await release.future;
+          if (!current()) {
+            return const WorkspaceCatalogueBindingResult(
+              WorkspaceCatalogueBindingState.notSent,
+            );
+          }
+          sent++;
+          return listingSaved(original);
+        };
+        final controller = WorkspaceCatalogueListingController(
+          scope: listingScope,
+          gateway: gateway,
+          pendingStore: store,
+          context: () => 'current-owner',
+        );
+        final operation = controller.submit(
+          ownerIntent(),
+          inputCurrent: () => valid,
+        );
+        await entered.future;
+        valid = false;
+        release.complete();
+        await operation;
+        expect(sent, 0);
+        controller.dispose();
+      },
+    );
+    test('retired Store result cannot clear the original journal', () async {
+      final store = BindingStore(),
+          gateway = ListingGateway(),
+          reply = Completer<WorkspaceCatalogueBindingResult>();
+      var context = 'first-store';
+      gateway.write = (_, _) => reply.future;
+      final controller = WorkspaceCatalogueListingController(
+        scope: listingScope,
+        gateway: gateway,
+        pendingStore: store,
+        context: () => context,
+      );
+      final operation = controller.submit(
+        ownerIntent(),
+        inputCurrent: () => true,
+      );
+      while (gateway.submitted == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      context = 'other-store';
+      reply.complete(listingSaved(ownerIntent()));
+      expect((await operation).state, WorkspaceCatalogueBindingState.unknown);
+      expect(store.saved?.idempotencyKey, 'binding-original');
+      controller.dispose();
+    });
+    test(
+      'native journal retains exact owner realm and original request across instances',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({});
+        final journal = SecureWorkCatalogueBindingPendingStore(
+          currentAccount: () => 'owner-one',
+        );
+        await journal.savePending(ownerIntent());
+        final restarted = SecureWorkCatalogueBindingPendingStore(
+          currentAccount: () => 'owner-one',
+        );
+        expect(
+          (await restarted.readPending(listingScope))?.toJson(),
+          ownerIntent().toJson(),
+        );
+        expect(
+          await restarted.readPending((
+            account: 'owner-one',
+            store: 'store-one',
+            realm: 'evaluation',
+          )),
+          isNull,
+        );
+        final different = WorkspaceCatalogueBindingIntent.fromJson(
+          jsonDecode(
+            jsonEncode(
+              ownerIntent().toJson()..['idempotencyKey'] = 'different-original',
+            ),
+          ),
+        );
+        await expectLater(
+          restarted.removePending(different),
+          throwsFormatException,
+        );
+        expect(
+          (await restarted.readPending(listingScope))?.idempotencyKey,
+          'binding-original',
+        );
+        await restarted.removePending(ownerIntent());
+        expect(await restarted.readPending(listingScope), isNull);
+      },
+    );
+  });
+  group('owner binding adapter (isolated host)', () {
+    test(
+      'checking an original binding is read-only, missing receipt stays unknown',
+      () async {
+        for (final exists in [true, false]) {
+          final credentials = Credentials();
+          final transport = OwnerTransport((request) async {
+            expect(request['operation'], 'reconcileStoreCatalogueBinding');
+            expect(request['idempotencyKey'], 'binding-original');
+            final data = jsonDecode(ownerAck(request).body) as Map;
+            if (!exists) (data['data'] as Map)['saved'] = null;
+            return SocialContentResponse(
+              statusCode: 200,
+              body: jsonEncode(data),
+            );
+          });
+          final result = await ownerGateway(
+            transport,
+            credentials,
+          ).reconcileBinding(ownerIntent(), current: () => true);
+          expect(
+            result.state,
+            exists
+                ? WorkspaceCatalogueBindingState.saved
+                : WorkspaceCatalogueBindingState.unknown,
+          );
+          expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+        }
+      },
+    );
+    test(
+      'restored intent cannot cross its original account or realm',
+      () async {
+        for (final changed in [
+          {'accountId': 'other-owner'},
+          {'realm': 'evaluation'},
+        ]) {
+          final intent = WorkspaceCatalogueBindingIntent.fromJson(
+            jsonDecode(jsonEncode(ownerIntent().toJson()..addAll(changed))),
+          );
+          final credentials = Credentials();
+          final transport = OwnerTransport(
+            (request) async => ownerAck(request),
+          );
+          final result = await ownerGateway(
+            transport,
+            credentials,
+          ).bindReviewed(intent, current: () => true, recoveringUnknown: true);
+          expect(result.state, WorkspaceCatalogueBindingState.unknown);
+          expect(transport.calls, 0);
+          expect(credentials.modes, isEmpty);
+        }
+      },
+    );
+    test(
+      'access denial during original recovery never proves the earlier write failed',
+      () async {
+        final transport = OwnerTransport(
+          (_) async => SocialContentResponse(
+            statusCode: 403,
+            body: jsonEncode({
+              'ok': false,
+              'error': {'code': 'forbidden'},
+            }),
+          ),
+        );
+        final result = await ownerGateway(transport).bindReviewed(
+          ownerIntent(),
+          current: () => true,
+          recoveringUnknown: true,
+        );
+        expect(result.state, WorkspaceCatalogueBindingState.unknown);
+        expect(transport.calls, 1);
+      },
+    );
+    test(
+      'read exact private row with source IDs, without publication authority',
+      () async {
+        final credentials = Credentials();
+        final transport = OwnerTransport((body) async {
+          expect(body, {
+            'operation': 'listStoreCatalogueSkus',
+            'mediaReadbackVersion': 1,
+            'storeId': 'store-one',
+            'skuId': 'sku-one',
+          });
+          return SocialContentResponse(
+            statusCode: 200,
+            body: jsonEncode({
+              'ok': true,
+              'data': {
+                'schemaVersion': 1,
+                'realm': 'production',
+                'storeId': 'store-one',
+                'items': [ownerRow()],
+                'nextCursor': null,
+              },
+            }),
+          );
+        });
+        final saved = await ownerGateway(transport, credentials).readOwnedSku(
+          storeId: 'store-one',
+          skuId: 'sku-one',
+          current: () => true,
+        );
+        expect(saved?.verifiedPackId, 'pack-one');
+        expect(saved?.canonicalProductId, 'canonical-one');
+        expect(saved?.input['provenance'], {
+          'entryMethod': 'manual',
+          'sourceRecordId': 'original-one',
+        });
+        expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+      },
+    );
+    test('LF-LISTING owner photo proof needs negotiated metadata and preserves original file facts', () async {
+      var negotiated = false;
+      final raw = ownerRow();
+      (raw['content'] as Map)['media'] = [<String, Object?>{
+        'id': 'host-owner-photo', 'revision': 'photo-one', 'url': 'https://example.com/host-photo.jpg',
+        'storeId': 'store-one', 'skuId': 'sku-one', 'canonicalProductId': 'canonical-one',
+        'publisherWorkspaceId': 'store-one', 'file': {'mimeType': 'image/jpeg', 'byteLength': 1024,
+          'width': 640, 'height': 640, 'normalized': true, 'frameCount': 1}}];
+      final transport = OwnerTransport((body) async {
+        expect(body['mediaReadbackVersion'], 1);
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+          'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one', 'items': [raw],
+          'nextCursor': null, if (negotiated) 'mediaReadbackVersion': 1}}));
+      });
+      final source = ownerGateway(transport, Credentials());
+      expect(await source.readOwnedSku(storeId: 'store-one', skuId: 'sku-one', current: () => true), isNull);
+      negotiated = true;
+      final saved = await source.readOwnedSku(storeId: 'store-one', skuId: 'sku-one', current: () => true);
+      expect((saved!.input['content']['media'] as List).single['file']['frameCount'], 1);
+      expect(saved.input['content'], raw['content']);
+    });
+    test(
+      'binding intent owns its immutable request and survives JSON restore',
+      () {
+        final original = ownerIntent(), encoded = jsonEncode(original.toJson());
+        (original.sku['content'] as Map)['title'] = 'Mutated caller copy';
+        final restored = WorkspaceCatalogueBindingIntent.fromJson(
+          jsonDecode(encoded),
+        );
+        expect(restored.sku['content'], original.sku['content']);
+        expect(restored.idempotencyKey, 'binding-original');
+        expect(restored.accountId, 'owner-one');
+      },
+    );
+    test(
+      'exact saved acknowledgement uses limited-use App Check but not publication success',
+      () async {
+        final credentials = Credentials();
+        final transport = OwnerTransport((request) async {
+          expect(request['operation'], 'bindReviewedStoreCatalogueSku');
+          expect(request['idempotencyKey'], 'binding-original');
+          expect(request.containsKey('accountId'), false);
+          return ownerAck(request);
+        });
+        final result = await ownerGateway(transport, credentials).bindReviewed(
+          ownerIntent(),
+          current: () => true,
+          recoveringUnknown: false,
+        );
+        expect(result.state, WorkspaceCatalogueBindingState.saved);
+        expect(result.saved?.revision, 2);
+        expect(result.publicationConfirmed, false);
+        expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse]);
+      },
+    );
+    test(
+      'retired context before dispatch cannot send an owner request',
+      () async {
+        var current = true;
+        final credentials = RetiringOwnerCredentials(() => current = false);
+        final transport = OwnerTransport((request) async => ownerAck(request));
+        final result = await ownerGateway(transport, credentials).bindReviewed(
+          ownerIntent(),
+          current: () => current,
+          recoveringUnknown: false,
+        );
+        expect(result.state, WorkspaceCatalogueBindingState.notSent);
+        expect(transport.calls, 0);
+      },
+    );
+    test(
+      'lost response and retired post-dispatch result remain unknown, with the original key',
+      () async {
+        for (final lose in [true, false]) {
+          var current = true;
+          final original = ownerIntent();
+          final transport = OwnerTransport((request) async {
+            if (lose) throw StateError('isolated lost reply');
+            current = false;
+            return ownerAck(request);
+          });
+          final result = await ownerGateway(transport).bindReviewed(
+            original,
+            current: () => current,
+            recoveringUnknown: false,
+          );
+          expect(result.state, WorkspaceCatalogueBindingState.unknown);
+          expect(original.idempotencyKey, 'binding-original');
+          expect(transport.calls, 1);
+        }
+      },
+    );
+    test(
+      'changed revision payload Store realm or publication claim cannot acknowledge an intent',
+      () async {
+        for (final change in [
+          'revision',
+          'content',
+          'store',
+          'realm',
+          'publication',
+        ]) {
+          final transport = OwnerTransport((request) async {
+            final envelope =
+                jsonDecode(ownerAck(request).body) as Map<String, dynamic>;
+            final data = envelope['data'] as Map<String, dynamic>,
+                saved = data['saved'] as Map<String, dynamic>;
+            switch (change) {
+              case 'revision':
+                saved['revision'] = 3;
+              case 'content':
+                (saved['content'] as Map)['title'] = 'Different product';
+              case 'store':
+                data['storeId'] = 'store-other';
+              case 'realm':
+                data['realm'] = 'evaluation';
+              case 'publication':
+                data['publicationConfirmed'] = true;
+            }
+            return SocialContentResponse(
+              statusCode: 200,
+              body: jsonEncode(envelope),
+            );
+          });
+          expect(
+            (await ownerGateway(transport).bindReviewed(
+              ownerIntent(),
+              current: () => true,
+              recoveringUnknown: false,
+            )).state,
+            WorkspaceCatalogueBindingState.unknown,
+            reason: change,
+          );
+        }
+      },
+    );
+    test(
+      'known server rejection is distinct from an unexplained failure',
+      () async {
+        for (final status in [409, 503]) {
+          final transport = OwnerTransport(
+            (_) async => SocialContentResponse(
+              statusCode: status,
+              body: jsonEncode({
+                'ok': false,
+                'error': {
+                  'code': status == 409 ? 'conflict' : 'service_unavailable',
+                },
+              }),
+            ),
+          );
+          expect(
+            (await ownerGateway(transport).bindReviewed(
+              ownerIntent(),
+              current: () => true,
+              recoveringUnknown: false,
+            )).state,
+            status == 409
+                ? WorkspaceCatalogueBindingState.rejected
+                : WorkspaceCatalogueBindingState.unknown,
+          );
+        }
+      },
+    );
+    test(
+      'private fields foreign identity or unknown provenance fail owner record decoding',
+      () {
+        for (final change in ['private', 'store', 'provenance', 'trade']) {
+          final data = ownerRow();
+          switch (change) {
+            case 'private':
+              (data['content'] as Map)['purchasePrice'] = 50;
+            case 'store':
+              data['storeId'] = 'store-other';
+            case 'provenance':
+              (data['provenance'] as Map)['entryMethod'] = 'guessed';
+            case 'trade':
+              (data['channels'] as List).addAll([
+                {
+                  ...(data['channels'] as List).single as Map,
+                  'kind': 'wholesale',
+                },
+                {...(data['channels'] as List).single as Map, 'kind': 'bulk'},
+              ]);
+          }
+          expect(
+            () => WorkspaceCatalogueOwnedSku.decode(
+              data,
+              storeId: 'store-one',
+              skuId: 'sku-one',
+              now: at,
+              realm: 'production',
+            ),
+            throwsFormatException,
+            reason: change,
+          );
+        }
+      },
+    );
+  });
+  test('LF-PAISE readback matches paise and invalidates price MRP and tier-only changes', () async {
+    BuyV2PackTerms terms(int tier) => BuyV2PackTerms(skuId: product.id,
+      revision: 'term-one', sellUnit: 'pouch', containedUnits: 1,
+      netContentMilli: 1000, contentUnit: 'L', quantityStep: 1,
+      pricingStoreId: product.storeId,
+      priceObservedAt: at.subtract(const Duration(hours: 1)),
+      priceValidUntil: at.add(const Duration(hours: 1)),
+      priceTiers: [BuyV2PackPriceTier(minimumPacks: 1, priceMinor: 26025),
+        BuyV2PackPriceTier(minimumPacks: 2, priceMinor: tier)]);
+    final exact = product.copyWith(priceMinor: 26025, mrpMinor: 28050,
+      pack: terms(25925).label, packTerms: terms(25925));
+    final data = page();
+    (row(data)['pack'] as Map)['label'] = exact.pack;
+    final channel = (row(data)['channels'] as List).single as Map;
+    channel['priceMinor'] = 26025; channel['mrpMinor'] = 28050;
+    channel['tiers'] = [{'minimumQuantity': 1, 'unitPriceMinor': 26025},
+      {'minimumQuantity': 2, 'unitPriceMinor': 25925}];
+    final reader = WorkspaceCatalogueReadback(gateway: gateway(Transport(data)),
+      context: () => 'host-owner', now: () => at);
+    addTearDown(reader.dispose);
+    await reader.refresh(exact);
+    expect(reader.snapshotFor(exact).state, BuyV2ProductContentState.ready);
+    for (final changed in [exact.copyWith(priceMinor: 26026),
+      exact.copyWith(mrpMinor: 28051), exact.copyWith(packTerms: terms(25924))]) {
+      expect(reader.snapshotFor(changed).state, BuyV2ProductContentState.unavailable);
+      expect((await gateway(Transport(data)).read(changed)).content.state,
+        BuyV2ProductContentState.unavailable);
+    }
+    expect(reader.snapshotFor(exact).state, BuyV2ProductContentState.ready);
+  });
+  test('LF-PAISE malformed catalogue money is unavailable without cache mutation or transport', () async {
+    final transport = Transport(page());
+    final reader = WorkspaceCatalogueReadback(gateway: gateway(transport),
+      context: () => 'host-owner', now: () => at);
+    addTearDown(reader.dispose);
+    await reader.refresh(product);
+    expect(reader.snapshotFor(product).state, BuyV2ProductContentState.ready);
+    final invalid = product.copyWith(priceMinor: -1);
+    expect(reader.snapshotFor(invalid).state, BuyV2ProductContentState.unavailable);
+    transport.sent = null;
+    await reader.refresh(invalid);
+    expect(transport.sent, isNull);
+    expect(reader.snapshotFor(product).state, BuyV2ProductContentState.ready);
+  });
+
+  test(
+    'exact verified public readback maps content and server revisions',
+    () async {
+      final transport = Transport(page()), credentials = Credentials();
+      final result = await gateway(transport, credentials).read(product);
+      expect(result.content.state, BuyV2ProductContentState.ready);
+      expect(result.content.description, 'Verified host description');
+      expect(result.skuRevision, 1);
+      expect(result.catalogueVersion, 1);
+      expect(result.content.observedAt, at);
+      expect(transport.sent, {
+        'operation': 'readPublicStoreCatalogue',
+        'mediaReadbackVersion': 1,
+        'storeId': 'store-one',
+        'skuId': 'sku-one',
+      });
+      expect(credentials.modes, [SocialAppCheckTokenMode.standard]);
+    },
+  );
+  test(
+    'failed readback remains unavailable with no save or publication side effect',
+    () async {
+      final transport = Transport(page())..fail = true;
+      final result = await gateway(transport).read(product);
+      expect(result.content.state, BuyV2ProductContentState.unavailable);
+      expect(result.skuRevision, isNull);
+      expect(transport.sent?['operation'], 'readPublicStoreCatalogue');
+    },
+  );
+  test('foreign realm and Store do not cross into public content', () async {
+    for (final changed in [
+      {'realm': 'evaluation'},
+      {'storeId': 'store-two'},
+    ]) {
+      final result = await gateway(
+        Transport(page()..addAll(changed)),
+      ).read(product);
+      expect(result.content.state, BuyV2ProductContentState.unavailable);
+    }
+  });
+  for (final entry in <String, void Function(Map<String, dynamic>)>{
+    'missing ordering hold': (d) {
+      d.remove('orderingAvailable');
+    },
+    'ordering permission': (d) {
+      d['orderingAvailable'] = true;
+    },
+    'wrong SKU': (d) {
+      row(d)['skuId'] = 'sku-other';
+    },
+    'wrong canonical identity': (d) {
+      row(d)['canonicalProductId'] = 'canonical-other';
+    },
+    'wrong pack': (d) {
+      (row(d)['pack'] as Map)['label'] = '2 L';
+    },
+    'different price': (d) {
+      ((row(d)['channels'] as List).single as Map)['priceMinor'] = 26100;
+    },
+    'expired terms': (d) {
+      ((row(d)['channels'] as List).single as Map)['validUntil'] = at
+          .toIso8601String();
+    },
+    'future observation': (d) {
+      d['observedAt'] = at.add(const Duration(minutes: 1)).toIso8601String();
+    },
+    'private field': (d) {
+      (row(d)['content'] as Map)['purchasePrice'] = 230;
+    },
+    'unknown tier': (d) {
+      ((row(d)['channels'] as List).single as Map)['tiers'] = [
+        {'minimumQuantity': 2, 'unitPriceMinor': 26000},
+      ];
+    },
+    'duplicate response rows': (d) {
+      (d['items'] as List).add((d['items'] as List).first);
+    },
+  }.entries) {
+    test('${entry.key} cannot masquerade as verified content', () async {
+      final data = page();
+      entry.value(data);
+      expect(
+        (await gateway(Transport(data)).read(product)).content.state,
+        BuyV2ProductContentState.unavailable,
+      );
+    });
+  }
+  test(
+    'reviewed media retains publisher, exact SKU and file metadata',
+    () async {
+      final data = page();
+      (row(data)['content'] as Map)['media'] = [
+        {
+          'id': 'photo-one',
+          'revision': 'media-one',
+          'url': 'https://example.invalid/product.png',
+          'storeId': 'store-one',
+          'skuId': 'sku-one',
+          'canonicalProductId': 'canonical-one',
+          'publisherWorkspaceId': 'publisher-one',
+          'file': {
+            'mimeType': 'image/png',
+            'byteLength': 40000,
+            'width': 800,
+            'height': 800,
+            'normalized': true,
+          },
+        },
+      ];
+      final result = await gateway(Transport(data)).read(product);
+      expect(result.content.state, BuyV2ProductContentState.ready);
+      final media = result.content.media.single;
+      expect(media.binding?.supplierWorkspaceId, 'publisher-one');
+      expect(media.binding?.skuId, product.id);
+      expect(media.binding?.assetRevision, 'media-one');
+      expect(media.binding?.file.byteLength, 40000);
+      ((row(data)['content'] as Map)['media'] as List).single['skuId'] =
+          'sku-other';
+      expect(
+        (await gateway(Transport(data)).read(product)).content.state,
+        BuyV2ProductContentState.unavailable,
+      );
+    },
+  );
+  test('late readback and duplicate refresh are fenced by lifetime', () async {
+    Object context = ('account-one', 'store-one', 0);
+    final held = HoldingGateway(),
+        reader = WorkspaceCatalogueReadback(
+          gateway: held,
+          context: () => context,
+          now: () => at,
+        );
+    final first = reader.refresh(product);
+    await reader.refresh(product);
+    expect(held.calls, 1);
+    context = ('account-two', 'store-one', 1);
+    held.response.complete(await gateway(Transport(page())).read(product));
+    await first;
+    expect(
+      reader.snapshotFor(product).state,
+      BuyV2ProductContentState.unavailable,
+    );
+    reader.dispose();
+  });
+  test(
+    'failed refresh never loses revision high-water or revives stale data',
+    () async {
+      final transport = Transport(page());
+      row(transport.data)['revision'] = 2;
+      final reader = WorkspaceCatalogueReadback(
+        gateway: gateway(transport),
+        context: () => 'same-owner',
+        now: () => at,
+      );
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).state, BuyV2ProductContentState.ready);
+      expect(
+        reader.snapshotFor(product.copyWith(title: 'Other product')).state,
+        BuyV2ProductContentState.unavailable,
+      );
+      transport.fail = true;
+      await reader.refresh(product);
+      expect(
+        reader.snapshotFor(product).state,
+        BuyV2ProductContentState.unavailable,
+      );
+      transport.fail = false;
+      row(transport.data)['revision'] = 1;
+      await reader.refresh(product);
+      expect(
+        reader.snapshotFor(product).state,
+        BuyV2ProductContentState.unavailable,
+      );
+      row(transport.data)['revision'] = 2;
+      (row(transport.data)['content'] as Map)['description'] =
+          'Mutated same revision';
+      await reader.refresh(product);
+      expect(
+        reader.snapshotFor(product).state,
+        BuyV2ProductContentState.unavailable,
+      );
+      reader.dispose();
+    },
+  );
+  testWidgets(
+    'source term expiry notifies the existing consumer and holds readback',
+    (tester) async {
+      var time = at;
+      final transport = Transport(page());
+      ((row(transport.data)['channels'] as List).single as Map)['validUntil'] =
+          at.add(const Duration(seconds: 1)).toIso8601String();
+      final reader = WorkspaceCatalogueReadback(
+        gateway: gateway(transport),
+        context: () => 'same-owner',
+        now: () => time,
+      );
+      var notices = 0;
+      reader.addListener(() {
+        notices++;
+      });
+      await reader.refresh(product);
+      expect(reader.snapshotFor(product).state, BuyV2ProductContentState.ready);
+      time = time.add(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(notices, 2);
+      expect(
+        reader.snapshotFor(product).state,
+        BuyV2ProductContentState.unavailable,
+      );
+      reader.dispose();
+    },
+  );
+  for (final units in [
+    (publicUnit: 'L', sourceUnit: 'L', storeUnit: BuyV2ComparisonUnit.litre),
+    (
+      publicUnit: 'kg',
+      sourceUnit: 'kg',
+      storeUnit: BuyV2ComparisonUnit.kilogram,
+    ),
+    (
+      publicUnit: 'piece',
+      sourceUnit: 'count',
+      storeUnit: BuyV2ComparisonUnit.count,
+    ),
+  ]) {
+    test(
+      'aggregate case content agrees with Store mapping for ${units.publicUnit}',
+      () async {
+        final terms = BuyV2PackTerms(
+          skuId: product.id,
+          revision: 'pack-source-one',
+          sellUnit: 'case',
+          containedUnits: 12,
+          netContentMilli: 1000,
+          contentUnit: units.publicUnit,
+        );
+        final requested = product.copyWith(packTerms: terms), data = page();
+        (row(data)['pack'] as Map).addAll(<String, Object>{
+          'label': requested.pack,
+          'quantityMilli': 12000,
+          'unit': units.sourceUnit,
+          'unitsPerCase': 12,
+        });
+        final item = listingItem().copyWith(
+          pack: requested.pack,
+          packMeasure: WorkspacePackMeasure(
+            unit: units.storeUnit,
+            quantityMilli: 12000,
+            unitsPerCase: 12,
+          ),
+        );
+        expect(
+          item.publicSellingTermsIssue(
+            channel: BuyV2Destination.shop,
+            storeId: product.storeId,
+            terms: terms,
+            now: at,
+          ),
+          null,
+        );
+        final result = await gateway(Transport(data)).read(requested);
+        expect(result.content.state, BuyV2ProductContentState.ready);
+        expect(requested.price, product.price);
+        expect(requested.minimumOrder, product.minimumOrder);
+        for (final mismatch in ['quantity', 'count', 'unit']) {
+          final changed = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+          final pack = row(changed)['pack'] as Map;
+          if (mismatch == 'quantity') pack['quantityMilli'] = 12001;
+          if (mismatch == 'count') pack['unitsPerCase'] = 11;
+          if (mismatch == 'unit') {
+            pack['unit'] = units.sourceUnit == 'L' ? 'kg' : 'L';
+          }
+          expect(
+            (await gateway(Transport(changed)).read(requested)).content.state,
+            BuyV2ProductContentState.unavailable,
+            reason: mismatch,
+          );
+        }
+      },
+    );
+  }
+  for (final units in [
+    (publicUnit: 'mL', sourceUnit: 'L', storeUnit: BuyV2ComparisonUnit.litre),
+    (
+      publicUnit: 'g',
+      sourceUnit: 'kg',
+      storeUnit: BuyV2ComparisonUnit.kilogram,
+    ),
+  ]) {
+    test(
+      'aggregate scaled ${units.publicUnit} content checks divisibility after contained units',
+      () async {
+        final terms = BuyV2PackTerms(
+          skuId: product.id,
+          revision: 'pack-source-one',
+          sellUnit: 'case',
+          containedUnits: 2,
+          netContentMilli: 500,
+          contentUnit: units.publicUnit,
+        );
+        final requested = product.copyWith(packTerms: terms), data = page();
+        (row(data)['pack'] as Map).addAll(<String, Object>{
+          'label': requested.pack,
+          'quantityMilli': 1,
+          'unit': units.sourceUnit,
+          'unitsPerCase': 2,
+        });
+        final item = listingItem().copyWith(
+          pack: requested.pack,
+          packMeasure: WorkspacePackMeasure(
+            unit: units.storeUnit,
+            quantityMilli: 1,
+            unitsPerCase: 2,
+          ),
+        );
+        expect(
+          item.publicSellingTermsIssue(
+            channel: BuyV2Destination.shop,
+            storeId: product.storeId,
+            terms: terms,
+            now: at,
+          ),
+          null,
+        );
+        expect(
+          (await gateway(Transport(data)).read(requested)).content.state,
+          BuyV2ProductContentState.ready,
+        );
+        final nonIntegral = product.copyWith(
+          packTerms: BuyV2PackTerms(
+            skuId: product.id,
+            revision: 'pack-source-one',
+            sellUnit: 'case',
+            containedUnits: 3,
+            netContentMilli: 500,
+            contentUnit: units.publicUnit,
+          ),
+        );
+        (row(data)['pack'] as Map).addAll(<String, Object>{
+          'label': nonIntegral.pack,
+          'unitsPerCase': 3,
+        });
+        expect(
+          (await gateway(Transport(data)).read(nonIntegral)).content.state,
+          BuyV2ProductContentState.unavailable,
+          reason: 'A fractional source milli-unit must not be rounded down',
+        );
+      },
+    );
+  }
+  test(
+    'aggregate whole-piece and source integer bounds remain enforced',
+    () async {
+      final invalid = product.copyWith(
+        packTerms: const BuyV2PackTerms(
+          skuId: 'sku-one',
+          revision: 'pack-source-one',
+          sellUnit: 'case',
+          containedUnits: 2,
+          netContentMilli: 500,
+          contentUnit: 'piece',
+        ),
+      );
+      final data = page();
+      (row(data)['pack'] as Map).addAll(<String, Object>{
+        'label': invalid.pack,
+        'quantityMilli': 1000,
+        'unit': 'count',
+        'unitsPerCase': 2,
+      });
+      expect(
+        (await gateway(Transport(data)).read(invalid)).content.state,
+        BuyV2ProductContentState.unavailable,
+      );
+      for (final value in [0, -1, 100000001]) {
+        final bounded = page();
+        (row(bounded)['pack'] as Map)['quantityMilli'] = value;
+        expect(
+          (await gateway(Transport(bounded)).read(product)).content.state,
+          BuyV2ProductContentState.unavailable,
+        );
+      }
+    },
+  );
+  test(
+    'structured pack facts must match even with the same display label',
+    () async {
+      final structured = product.copyWith(
+        packTerms: const BuyV2PackTerms(
+          skuId: 'sku-one',
+          revision: 'pack-source-one',
+          sellUnit: 'bottle',
+          netContentMilli: 1000,
+          contentUnit: 'L',
+        ),
+      );
+      final data = page();
+      (row(data)['pack'] as Map)['label'] = structured.pack;
+      expect(
+        (await gateway(Transport(data)).read(structured)).content.state,
+        BuyV2ProductContentState.ready,
+      );
+      (row(data)['pack'] as Map)['quantityMilli'] = 2000;
+      expect(
+        (await gateway(Transport(data)).read(structured)).content.state,
+        BuyV2ProductContentState.unavailable,
+      );
+    },
+  );
+  test(
+    'valid but different tier prices cannot pass the content binding',
+    () async {
+      final structured = product.copyWith(
+        packTerms: BuyV2PackTerms(
+          skuId: 'sku-one',
+          revision: 'pack-source-one',
+          sellUnit: 'bottle',
+          netContentMilli: 1000,
+          contentUnit: 'L',
+          priceTiers: const [
+            BuyV2PackPriceTier(minimumPacks: 1, price: 260),
+            BuyV2PackPriceTier(minimumPacks: 10, price: 250),
+          ],
+          pricingStoreId: 'store-one',
+          priceObservedAt: at.subtract(const Duration(hours: 1)),
+          priceValidUntil: at.add(const Duration(hours: 1)),
+        ),
+      );
+      final data = page();
+      (row(data)['pack'] as Map)['label'] = structured.pack;
+      ((row(data)['channels'] as List).single as Map)['tiers'] = [
+        {'minimumQuantity': 1, 'unitPriceMinor': 26000},
+        {'minimumQuantity': 10, 'unitPriceMinor': 25000},
+      ];
+      expect(
+        (await gateway(Transport(data)).read(structured)).content.state,
+        BuyV2ProductContentState.ready,
+      );
+      (((row(data)['channels'] as List).single as Map)['tiers']
+              as List)[1]['unitPriceMinor'] =
+          24000;
+      expect(
+        (await gateway(Transport(data)).read(structured)).content.state,
+        BuyV2ProductContentState.unavailable,
+      );
+    },
+  );
+  test('unapproved endpoint is rejected before credentials or transport', () {
+    expect(
+      () => AuthenticatedWorkspaceCatalogueGateway(
+        endpoint: Uri.parse('https://example.invalid/api'),
+        credentials: Credentials(),
+        transport: Transport(page()),
+      ),
+      throwsArgumentError,
+    );
+  });
+}

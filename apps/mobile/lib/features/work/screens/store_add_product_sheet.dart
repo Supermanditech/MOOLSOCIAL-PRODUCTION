@@ -1237,7 +1237,7 @@ class _StoreProductImportReviewScreenState
                                             Text(
                                               product == null
                                                   ? 'Row ${row.number} · ${_issueType(row)}'
-                                                  : '${product.variant.isEmpty ? '' : '${product.variant} · '}${product.pack} · ₹${product.sellingPrice} · ${product.stockMode == WorkspaceStockMode.availabilityOnly ? (product.available ? 'Available' : 'Unavailable') : '${product.stock} in stock'}',
+                                                  : '${product.variant.isEmpty ? '' : '${product.variant} · '}${product.pack} · ₹${workspacePriceInputFromMinor(product.sellingPriceMinor)} · ${product.stockMode == WorkspaceStockMode.availabilityOnly ? (product.available ? 'Available' : 'Unavailable') : '${product.stock} in stock'}',
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 color: MoolColors.muted,
@@ -2717,7 +2717,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
                         ),
                         Text(
                           widget.stockOnly
-                              ? '₹${product.sellingPrice} · ${_stockLabel(product)}'
+                              ? '₹${workspacePriceInputFromMinor(product.sellingPriceMinor)} · ${_stockLabel(product)}'
                               : owned != null
                               ? 'In your store'
                               : product.brand,
@@ -2826,7 +2826,7 @@ class _StoreAddProductSheetState extends State<StoreAddProductSheet> {
               const SizedBox(height: 2),
               Text(
                 widget.stockOnly
-                    ? '₹${product.sellingPrice}'
+                    ? '₹${workspacePriceInputFromMinor(product.sellingPriceMinor)}'
                     : owned != null
                     ? 'In your store'
                     : product.brand,

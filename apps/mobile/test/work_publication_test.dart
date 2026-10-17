@@ -2,11 +2,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'ui_v2/buy/buy_v2_qualified_provider_fixture.dart' show TestPaymentCommerce, testPaymentProducts;
+import 'ui_v2/buy/buy_v2_discovery_refinement_test.dart' show BuyTestEligibilityFacts;
 
 // Approved is simulated ONLY to exercise the local contract. No asset is uploaded.
 WorkspaceCatalogueItem fixture({String revision = 'r1'}) {
@@ -50,8 +55,129 @@ WorkspaceCatalogueItem fixture({String revision = 'r1'}) {
   );
 }
 
+// Isolated policy readback composed through the actual Store content wrapper.
+// This never publishes a policy or installs records on a device.
+class _PolicyReadback implements BuyV2ProductContentAdapter {
+  DateTime? observedAt = DateTime.now().subtract(const Duration(minutes: 1));
+  bool requiresAcceptance = true;
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) =>
+      BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'isolated-policy-readback',
+        observedAt: observedAt,
+        supplierPolicyAcceptanceRequired: requiresAcceptance,
+        supplierPolicy: BuyV2SupplierPolicy(
+          id: 'isolated-policy', storeId: product.storeId!,
+          revision: requiresAcceptance ? 'newer' : 'older',
+          title: 'Store policy', body: 'Isolated test policy',
+          productIds: {product.id}, requiresAcceptance: requiresAcceptance,
+        ),
+      );
+}
+
+class _StorePolicyContent implements BuyV2ProductContentAdapter {
+  final policy = _PolicyReadback();
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final item = WorkspaceCatalogueItem(
+      id: product.id, canonicalId: product.canonicalId,
+      categoryId: product.categoryId, brand: product.brand, title: product.title,
+      variant: product.variant, pack: product.pack, sku: product.id, barcode: '',
+      purchasePrice: 1, sellingPrice: product.price, unitPrice: product.unitPrice,
+      stock: 8, deliveryPromise: product.deliveryPromise, origin: product.origin,
+      visualLabel: product.visualLabel, visualKind: product.visualKind,
+    );
+    return WorkspacePublicContentAdapter(
+      storeId: product.storeId!, item: item, sourceId: 'isolated-local-content',
+      policyReadback: policy, policyReadbackRequired: true,
+    ).snapshotFor(product);
+  }
+}
+
+class _PolicyOwnerStore implements BuyV2CustomerStateStore {
+  @override
+  String ownerScope = 'isolated-a';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final path in ['add', 'refresh', 'media']) {
+    for (final time in ['older', 'missing', 'future']) {
+    test('LF mapped policy rejects wrapper rollback path=$path time=$time', () async {
+      final content = _StorePolicyContent();
+      final core = BuySession();
+      final session = BuyV2Session(core: core, productContentAdapter: content,
+          commerceAdapter: TestPaymentCommerce(), reviewDataEnabled: false,
+          productFactsAdapter: const BuyTestEligibilityFacts());
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
+      expect(content.snapshotFor(session.product('s-milk')).supplierPolicy,
+          isNotNull, reason: 'Fixture must reach the real policy wrapper');
+      expect(content.snapshotFor(session.product('s-milk')).observedAt, isNull);
+      expect(session.addProduct('s-milk'), isFalse);
+      expect(session.pendingSupplierPolicyAdd, isNotNull, reason: session.notice);
+      session.cancelSupplierPolicyAdd();
+      content.policy
+        ..observedAt = switch(time) {
+          'missing' => null,
+          'future' => DateTime.now().add(const Duration(hours: 1)),
+          _ => DateTime.now().subtract(const Duration(hours: 1)),
+        }
+        ..requiresAcceptance = false;
+      if (path == 'refresh') {
+        // Future readback is translated by the wrapper to an unavailable hold;
+        // refreshing that state is allowed, accepting its policy is not.
+        expect(session.refreshProductContent('s-milk'), time == 'future');
+        if (time == 'future') {
+          expect(session.productContentFor(session.product('s-milk')).state,
+              BuyV2ProductContentState.unavailable);
+        }
+      }
+      if (path == 'media') {
+        session.productContentFor(session.product('s-milk').copyWith(mediaAssets: const [
+          BuyV2ProductMediaAsset(id: 'changed-media', label: 'Pack',
+            semanticLabel: 'Isolated pack', kind: BuyV2ProductContentMediaKind.cataloguePackshot),
+        ]));
+      }
+      expect(session.addProduct('s-milk'), isFalse);
+      expect(session.quantityFor('s-milk'), 0);
+      content.policy.observedAt = DateTime.now();
+      expect(session.refreshProductContent('s-milk'), isTrue);
+      expect(session.addProduct('s-milk'), isTrue, reason: session.notice);
+      expect(session.quantityFor('s-milk'), 1);
+    });
+    }
+  }
+  test('LF mapped policy owner reset and other SKU do not inherit timestamps', () async {
+    final content = _StorePolicyContent();
+    final core = BuySession();
+    final owner = _PolicyOwnerStore();
+    final session = BuyV2Session(core: core, productContentAdapter: content,
+      commerceAdapter: TestPaymentCommerce(), reviewDataEnabled: false,
+      customerStateStore: owner, productFactsAdapter: const BuyTestEligibilityFacts());
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    await session.restoreCustomerState();
+    expect(session.addProduct('s-milk'), isFalse);
+    session.cancelSupplierPolicyAdd();
+    content.policy..observedAt = DateTime.now().subtract(const Duration(hours: 1))
+      ..requiresAcceptance = false;
+    final other = testPaymentProducts.firstWhere((p) => p.id != 's-milk' &&
+        p.storeId != null && p.destination == BuyV2Destination.shop);
+    expect(session.refreshProductContent(other.id), isTrue);
+    expect(session.refreshProductContent('s-milk'), isFalse);
+    owner.ownerScope = 'isolated-b';
+    expect(session.refreshProductContent('s-milk'), isTrue);
+    expect(session.pendingSupplierPolicyAdd, isNull);
+  });
   test(
     'DEFAULTS Store scoped preferences do not mutate existing stock or publish',
     () async {
@@ -165,14 +291,18 @@ void main() {
         final text = File(path).readAsStringSync();
         final body = text.split('class $name {')[1].split('\nclass ')[0];
         return RegExp(
-          r'^  final [^\r\n;=]+? (\w+);',
+          r'^  final [^\r\n;=]+? ([A-Za-z_]\w*(?:,\s*[A-Za-z_]\w*)*);',
           multiLine: true,
-        ).allMatches(body).map((m) => m[1]!).toSet();
+        ).allMatches(body).expand((m) => m[1]!.split(',').map((name) => name.trim())).toSet();
       }
 
+      final productFields = fields('lib/features/buy/buy_v2_models.dart', 'BuyV2Product');
+      final aliases = WorkspacePublicationContract.productMoneyStorageAliases;
+      expect(aliases.keys.toSet(), productFields.where((name) => name.startsWith('_')).toSet());
+      expect(aliases.values.toSet().length, aliases.length, reason: 'Each stored representation needs its own disposition');
       expect(
         WorkspacePublicationContract.productBindings.keys.toSet(),
-        fields('lib/features/buy/buy_v2_models.dart', 'BuyV2Product'),
+        productFields.map((name) => aliases[name] ?? name).toSet(),
       );
       expect(
         WorkspacePublicationContract.storeBindings.keys.toSet(),

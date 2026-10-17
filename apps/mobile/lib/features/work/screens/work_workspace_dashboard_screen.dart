@@ -25,7 +25,10 @@ import '../widgets/work_widgets.dart';
 import '../widgets/store_settings_widgets.dart';
 import '../widgets/store_publication_settings.dart';
 import '../widgets/store_payment_terms.dart';
+import '../widgets/store_product_promotions.dart';
 import '../widgets/store_customer_feedback.dart';
+import '../widgets/workspace_purchase_originals.dart';
+import '../work_order_identity_gateway.dart';
 import '../widgets/store_product_thumbnail.dart';
 import '../widgets/store_catalogue_categories.dart';
 import '../work_models.dart';
@@ -1987,16 +1990,22 @@ class _WorkWorkspaceDashboardScreenState
     bool pending() => session.busy || session.workspaceOperationsSyncing ||
         session.workspaceHandoverBusy || session.hasPendingOrderTime ||
         session.counterDraftLoading || session.counterDraftSubmitting ||
-        session.counterDraftNeedsReconciliation ||
         session.currentCollection?.busy == true ||
         session.currentCollection?.needsReconciliation == true;
-    if (store == null || pending()) return false;
+    if (store == null) return false;
+    if (pending()) {
+      session.showNotice('Wait for the current order update before starting a new bill.');
+      return false;
+    }
     // Returning to an already mounted bill/invoice must not start another sale.
     if (_counterKey.currentState != null) return true;
     _openingCounterSale = true;
     try {
       await session.loadWorkspaceCounterDraft(retry: true, shouldRestore: () => false);
-      if (!current() || pending() || !session.counterDraftLoaded) return false;
+      if (!current() || pending()) return false;
+      // Enter the existing recovery surface, but never reset the selected order
+      // or grant editing while its original draft is unreadable/unresolved.
+      if (!session.counterDraftLoaded || session.counterDraftEditingBlocked) return true;
       // Explicit create/resume decision only. The existing journal is retained
       // and the composer restores it; changing source never resets the editor.
       if (selected != null && !session.startNewWorkspaceOrder()) return false;
@@ -4467,6 +4476,25 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
   int _periodDays = 1;
   DateTime _periodEnd = DateTime.now();
   bool _periodRestored = false;
+  Object? _operationalViewScope;
+
+  void _loadOperationalPositions({bool refresh = false}) {
+    final session = widget.session;
+    final scope = (session, session.originalPurchaseReader, session.originalPurchaseRealm,
+      session.activeWorkspace?.id, session.navigationScopeRevision);
+    if (!session.workspaceOperationalFeedAvailable ||
+        (!refresh && scope == _operationalViewScope)) { return; }
+    _operationalViewScope = scope;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && scope == (widget.session, widget.session.originalPurchaseReader,
+          widget.session.originalPurchaseRealm, widget.session.activeWorkspace?.id,
+          widget.session.navigationScopeRevision)) {
+        // The same scoped reader/journal as Orders. Only loaded current positions,
+        // not complete online coverage, period activity or public tracking.
+        unawaited(widget.session.loadWorkspaceOperationalOrders());
+      }
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -4542,6 +4570,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     if (state == AppLifecycleState.resumed) {
       _scheduleDayBoundary();
       _startOrderClock();
+      _loadOperationalPositions(refresh: true);
       setState(() => _periodEnd = DateTime.now());
       _rememberPeriod();
     }
@@ -4564,6 +4593,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
     listenable: widget.session,
     builder: (context, _) {
       final session = widget.session;
+      _loadOperationalPositions();
       final periodEnd = _periodEnd;
       final periodStart = DateTime(_today.year, _today.month, _today.day - _periodDays + 1);
       final periodLabel = _periodDays == 1 ? 'today' : 'in last $_periodDays days';
@@ -4599,27 +4629,25 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       final costsKnown =
           exactStock &&
           products.every(
-            (product) => product.stock == 0 || product.purchasePrice > 0,
+            (product) => product.stock == 0 || product.purchasePriceMinor > 0,
           );
       final pricesKnown =
           exactStock &&
           products.every(
-            (product) => product.stock == 0 || product.sellingPrice > 0,
+            (product) => product.stock == 0 || product.sellingPriceMinor > 0,
           );
-      final cost = costsKnown
-          ? products.fold<int>(
-              0,
-              (sum, product) =>
-                  sum + product.stock * product.purchasePrice * 100,
-            )
-          : null;
-      final resale = pricesKnown
-          ? products.fold<int>(
-              0,
-              (sum, product) =>
-                  sum + product.stock * product.sellingPrice * 100,
-            )
-          : null;
+      int? stockValue(bool selling) {
+        if (!(selling ? pricesKnown : costsKnown)) return null;
+        var total = BigInt.zero;
+        for (final product in products) {
+          total += BigInt.from(product.stock) * BigInt.from(
+            selling ? product.sellingPriceMinor : product.purchasePriceMinor);
+        }
+        // The report/formatter owns integer output; never wrap an oversized
+        // aggregate into a plausible smaller amount on a native int64 runtime.
+        return total > BigInt.from(9223372036854775807) ? null : total.toInt();
+      }
+      final cost = stockValue(false), resale = stockValue(true);
       final finance = session.workspaceFinance;
       final collectionsReady =
           finance != null &&
@@ -4649,8 +4677,8 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           value == null ? '—' : _formatStoreAmount(value);
       String productCount(int value) => '$value ${value == 1 ? 'product' : 'products'}';
       final belowCost = stockReady
-          ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity && p.stock > 0 && p.purchasePrice > 0 &&
-              p.sellingPrice > 0 && p.sellingPrice < p.purchasePrice).length
+          ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity && p.stock > 0 && p.purchasePriceMinor > 0 &&
+              p.sellingPriceMinor > 0 && p.sellingPriceMinor < p.purchasePriceMinor).length
           : 0;
       final replenish = stockReady
           ? session.workspaceLowStockProducts.where((p) => p.stock > 0).length
@@ -4697,6 +4725,16 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
           ? finance.payments.where((p) => p.state == WorkspacePaymentState.refundPending).toList()
           : <WorkspacePaymentRecord>[];
       // A local order list is not proof of complete remote order coverage.
+      final hasOnlinePositions = session.workspaceOperationalFeedAvailable ||
+          session.workspaceOrders.any((order) => order.isOperationalProjection);
+      final orderCoverage = !hasOnlinePositions
+          ? 'Saved orders only · online coverage may be incomplete'
+          : session.workspaceOperationalFeedBusy
+          ? 'Updating online orders · partial coverage'
+          : session.workspaceOperationalFeedError != null
+          ? (session.workspaceOrders.isEmpty ? 'Online order source unavailable · not zero'
+              : 'Online refresh unavailable · retained partial records')
+          : 'Known local and online orders · partial coverage';
       final seenOrderIds = <String>{};
       final openOrders = session.workspaceOrders.where((order) =>
         seenOrderIds.add(order.id) && !order.isClosed &&
@@ -4738,7 +4776,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
       ].join(' · ');
       final missingCosts = stockReady
           ? products.where((p) => p.stockMode == WorkspaceStockMode.exactQuantity &&
-              p.stock > 0 && p.purchasePrice <= 0).length : 0;
+              p.stock > 0 && p.purchasePriceMinor <= 0).length : 0;
       final receiptPurchases = session.workspacePurchases.where(_homeReceiptNeedsReview).toList();
       final stockAlerts = <_OperatingAttention>[
         if (unavailable > 0)
@@ -4781,10 +4819,13 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         source: area == 'Stock' ? 'Saved inventory; captured at export, not a historical stock balance'
           : area == 'Sales' && label == 'Billed' || label == 'Invoice count' || label == 'Average bill'
           ? 'Saved invoices; cutoff ${periodEnd.toUtc().toIso8601String()}'
-          : area == 'Orders' ? 'Orders saved on this phone; captured at export'
+          : area == 'Orders' ? (hasOnlinePositions
+              ? 'Saved local records and loaded online positions; captured at export'
+              : 'Orders saved on this phone; captured at export')
           : 'Saved finance${asOf == null ? '; as-of unavailable' : '; as of ${asOf.toUtc().toIso8601String()}'}',
         coverage: value == '—' ? 'Unavailable; incomplete source' : area == 'Orders'
-          ? 'Partial saved records; online coverage unverified' : 'Saved device records only; backend coverage unverified',
+          ? (hasOnlinePositions ? '$orderCoverage; current positions, not selected-period activity'
+              : 'Partial saved records; online coverage unverified') : 'Saved device records only; backend coverage unverified',
         meaning: meaning);
       final exportRows = <StoreAnalyticsReportRow>[
         exportRow('Sales', 'Billed', money(billed), 'INR; before returns', period: true),
@@ -4816,9 +4857,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         exportRow('Stock', 'Stock cost', money(cost), 'INR; saved purchase prices; not audited valuation'),
         exportRow('Stock', 'Stock sale value', money(resale), 'INR; potential selling value, not received money'),
         exportRow('Stock', 'Potential gross profit', money(cost != null && resale != null ? resale - cost : null), 'INR; before taxes, discounts and expenses; not earned profit'),
-        exportRow('Orders', 'Open orders', count(session.workspaceOrders.isEmpty ? null : openOrders.length), 'Open saved orders; not all online orders'),
-        exportRow('Orders', 'Awaiting acceptance', count(session.workspaceOrders.isEmpty ? null : awaitingAcceptance.length), 'Saved orders; expired acceptance excluded'),
-        exportRow('Orders', 'Fulfilment overdue', count(session.workspaceOrders.isEmpty ? null : overdueOrders.length), 'Saved orders past recorded deadline; missing deadlines excluded'),
+        exportRow('Orders', 'Open orders', count(session.workspaceOrders.isEmpty ? null : openOrders.length), 'Known open orders; not all online orders'),
+        exportRow('Orders', 'Awaiting acceptance', count(session.workspaceOrders.isEmpty ? null : awaitingAcceptance.length), 'Known orders; expired acceptance excluded'),
+        exportRow('Orders', 'Fulfilment overdue', count(session.workspaceOrders.isEmpty ? null : overdueOrders.length), 'Known orders past recorded deadline; missing deadlines excluded'),
         exportRow('Money', 'Customer dues', money(financeReady ? finance.duesMinor : null), 'INR; money owed, not cash', asOf: financeReady ? finance.asOf : null),
         exportRow('Money', 'Supplier dues', '—', 'Complete supplier population unavailable; not zero'),
         exportRow('Money', 'Settlement available', money(financeReady ? finance.availableMinor : null), 'INR; MoolSocial settlement, not bank balance', asOf: financeReady ? finance.asOf : null),
@@ -4838,6 +4879,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
         onRefresh: () {
           setState(() => _periodEnd = DateTime.now());
           _rememberPeriod();
+          _loadOperationalPositions(refresh: true);
         },
         scrollController: widget.scrollController,
             overviewVisuals: {
@@ -4978,7 +5020,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'stock-cost',
                   label: 'Money in stock',
                   value: money(cost),
-                  detail: costsKnown
+                  detail: costsKnown && cost == null
+                      ? 'Current stock value exceeds the supported amount range.'
+                      : costsKnown
                       ? 'Current stock at saved purchase prices · not an audited inventory valuation'
                       : 'Exact stock quantities and purchase prices are needed',
                 ),
@@ -4986,7 +5030,9 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   id: 'stock-sale',
                   label: 'Stock sale value',
                   value: money(resale),
-                  detail: pricesKnown
+                  detail: pricesKnown && resale == null
+                      ? 'Current stock value exceeds the supported amount range.'
+                      : pricesKnown
                       ? 'Potential sales value · not money received'
                       : 'Exact stock quantities and selling prices are needed',
                 ),
@@ -5021,7 +5067,7 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                   onToggle: () => _toggleCategory('orders'),
                   primaryIds: const ['recorded-open-orders', 'overdue-fulfilment'],
                   alertCount: overdueOrders.length + acceptanceExpired.length + awaitingAcceptance.length,
-                  coverage: 'Saved orders only · online coverage may be incomplete',
+                  coverage: orderCoverage,
                   attention: orderAttention == null ? null :
                     _OperatingAttention(id: 'order-attention', title: orderAttentionTitle,
                       detail: 'Review order ${orderAttention.id}. ${acceptanceExpired.length} acceptance updates pending; $missingTargets preparing or ready orders have no recorded fulfilment deadline.',
@@ -5033,25 +5079,28 @@ class _StoreOperatingBoardState extends State<_StoreOperatingBoard>
                 _OperatingMetric(
                   id: 'recorded-open-orders', label: 'Open orders',
                   value: count(session.workspaceOrders.isEmpty ? null : openOrders.length),
-                  detail: 'Open orders saved on this phone only. Online orders may not all be included.',
+                  detail: hasOnlinePositions
+                    ? 'Saved local records and loaded online positions only. Online orders may not all be included.'
+                    : 'Open orders saved on this phone only. Online orders may not all be included.',
                   onTap: widget.onOrders,
                 ),
                 _OperatingMetric(
                   id: 'awaiting-acceptance', label: 'Awaiting acceptance',
                   value: count(session.workspaceOrders.isEmpty ? null : awaitingAcceptance.length),
-                  detail: 'Saved confirmed orders awaiting acceptance. Expired acceptance windows are excluded and need a status update.',
+                  detail: '${hasOnlinePositions ? 'Known' : 'Saved'} confirmed orders awaiting acceptance. Expired acceptance windows are excluded and need a status update.',
                   onTap: widget.onOrders,
                 ),
                 _OperatingMetric(
                   id: 'overdue-fulfilment', label: 'Fulfilment overdue',
                   value: count(session.workspaceOrders.isEmpty ? null : overdueOrders.length),
-                  detail: 'Saved preparing or ready orders past their recorded fulfilment deadline. Orders without a deadline are not counted. This is not a live delivery-status feed.',
+                  detail: '${hasOnlinePositions ? 'Known' : 'Saved'} preparing or ready orders past their recorded fulfilment deadline. Orders without a deadline are not counted. This is not a live delivery-status feed.',
                   alertColor: overdueOrders.isEmpty ? null : _OperatingPalette.error,
                   onTap: widget.onOrders,
                 ),
                 if (session.workspaceOrders.isEmpty)
-                  const Text('No saved order records · online coverage unavailable',
-                    style: TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
+                  Text(hasOnlinePositions ? 'No loaded order records · online coverage incomplete'
+                    : 'No saved order records · online coverage unavailable',
+                    style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
                 if (orderAttention == null && missingTargets > 0)
                   Text('$missingTargets preparing or ready orders have no recorded fulfilment deadline.',
                     style: const TextStyle(fontSize: 11, color: _OperatingPalette.secondary)),
@@ -5560,10 +5609,12 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
               Expanded(child: Padding(padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(_analyticsReportTitle(id), semanticsLabel: compact
-                    ? '${_analyticsReportTitle(id)}. Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)} – ${MaterialLocalizations.of(context).formatShortDate(end)}'
+                    ? id == 'orders' ? '${_analyticsReportTitle(id)}. Current order status, all dates.'
+                    : '${_analyticsReportTitle(id)}. Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)} – ${MaterialLocalizations.of(context).formatShortDate(end)}'
                     : null, style: TextStyle(fontSize: compact ? 14 : 16,
                     fontWeight: FontWeight.w700, color: Colors.white)),
-                  if (!compact) Text('Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
+                  if (!compact) Text(id == 'orders' ? 'Current order status · all dates'
+                    : 'Selected period: ${MaterialLocalizations.of(context).formatShortDate(start)}${DateUtils.isSameDay(start, end) ? '' : ' – ${MaterialLocalizations.of(context).formatShortDate(end)}'}',
                     key: Key(compact ? 'analytics-context-period-$id' : 'analytics-report-period-$id'),
                     style: const TextStyle(fontSize: 11, color: Color(0xFFE4EDF4))),
                 ])))]);
@@ -5735,6 +5786,7 @@ class _StoreAnalyticsPresentationState extends State<_StoreAnalyticsPresentation
                                       : 'Data unavailable',
                                   balanceDate: id == 'money' && local('customer-dues') != '—'
                                     ? widget.session.workspaceFinance?.asOf : null,
+                                  orderCoverage: id == 'orders' ? categories[id]?.coverage : null,
                                   expanded: expanded == id,
                                   publicRanking: verified ? snapshot.breakdowns.where((data) =>
                                     data.id == 'discovery-sources' && data.dimension == WorkspaceAnalyticsDimension.discoverySource).firstOrNull : null)),
@@ -5791,8 +5843,9 @@ double _analyticsNumberSize(BuildContext context, String value, double preferred
 /// Visible read-only report previews. Decorative stages never imply measured flow.
 class _AnalyticsExplorePreview extends StatelessWidget {
   const _AnalyticsExplorePreview({required this.id, required this.figures,
-    required this.unavailable, this.graphic, this.publicRanking, this.balanceDate, this.expanded = false});
+    required this.unavailable, this.graphic, this.publicRanking, this.balanceDate, this.orderCoverage, this.expanded = false});
   final String id, unavailable;
+  final String? orderCoverage;
   final List<(String, String)> figures;
   final Widget? graphic;
   final WorkspaceAnalyticsBreakdown? publicRanking;
@@ -5909,8 +5962,8 @@ class _AnalyticsExplorePreview extends StatelessWidget {
             style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary))),
         if (id == 'journey') const Text('Selected stages',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
-        if (id == 'orders') const Text('Saved orders · online coverage incomplete',
-          style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
+        if (id == 'orders' && !expanded) Text(orderCoverage ?? 'Saved orders · online coverage incomplete',
+          style: const TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
         if (id == 'money' && figures.last.$2 == '—') const Text('Supplier balance unavailable',
           style: TextStyle(fontSize: 11, color: _AnalyticsChartPalette.secondary)),
         const SizedBox(height: 6),
@@ -12294,6 +12347,10 @@ Future<void> _showRejectOrderSheet(
     return;
   }
   String ledger(WorkspaceOrderRecord record) {
+    if (record.operational case final exact?) {
+      return jsonEncode([exact.realm, exact.viewerUserId, exact.reference.toJson(),
+        exact.operationalSourceRevision, exact.revision, exact.stage]);
+    }
     final facts = record.toLedgerJson();
     if (anonymous) {
       // Only the unsaved fallback timestamp is regenerated by the model.
@@ -12329,6 +12386,10 @@ Future<void> _showRejectOrderSheet(
     if (current == null || current.stage != 'Confirmed' || current.isClosed ||
         current.isCustomerCollection || ledger(current) != capturedLedger ||
         current.actionDeadline?.isAfter(DateTime.now()) == false) {
+      return false;
+    }
+    if (current.isOperationalProjection &&
+        !session.workspaceOrderCanAct(current.id, WorkOrderAction.reject)) {
       return false;
     }
     return anonymous
@@ -22046,26 +22107,9 @@ class _WorkspaceCatalogueSurfaceState
     return true;
   }
 
-  void _togglePublic(WorkspaceCatalogueItem product) {
-    final makePublic = !product.publicListing;
-    if (makePublic && !product.matchesMasterCatalogueIdentity) {
-      widget.session.showError(
-        'This product stays private until its details are reviewed.',
-      );
-      return;
-    }
-    if (makePublic && (product.sellingPrice <= 0 || !product.available)) {
-      widget.session.showError(
-        'Add a customer price and make this product available before publishing.',
-      );
-      return;
-    }
-    if (!widget.session.addOrUpdateWorkspaceProduct(
-      product.copyWith(publicListing: makePublic),
-    )) {
-      return;
-    }
-    setState(() {});
+  Future<void> _togglePublic(WorkspaceCatalogueItem product) async {
+    await widget.session.toggleWorkspaceProductListing(product.id);
+    if (mounted) setState(() {});
   }
 
   // ignore: unused_element
@@ -22907,7 +22951,7 @@ class _WorkspacePublicSkuCard extends StatelessWidget {
                           runSpacing: 3,
                           children: [
                             Text(
-                              '₹${publicSku.price}',
+                              '₹${_formatStoreMinorAmount(publicSku.priceMinor)}',
                               style: const TextStyle(
                                 color: MoolColors.navy,
                                 fontSize: 24,
@@ -22915,9 +22959,9 @@ class _WorkspacePublicSkuCard extends StatelessWidget {
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
-                            if (publicSku.mrp case final mrp?) ...[
+                            if (publicSku.mrpMinor case final mrp?) ...[
                               Text(
-                                'MRP ₹$mrp',
+                                'MRP ₹${_formatStoreMinorAmount(mrp)}',
                                 style: const TextStyle(
                                   color: MoolColors.muted,
                                   fontSize: 11,
@@ -23218,11 +23262,11 @@ class _StoreStockStatementTableState extends State<_StoreStockStatementTable> {
     var moneyCharacters = 0;
     for (final product in widget.products) {
       for (final amount in [
-        product.sellingPrice,
-        product.purchasePrice,
-        product.mrp ?? product.sellingPrice,
+        product.sellingPriceMinor,
+        product.purchasePriceMinor,
+        product.mrpMinor ?? product.sellingPriceMinor,
       ]) {
-        final length = '₹${_formatStoreAmount(amount)}'.length;
+        final length = '₹${_formatStoreMinorAmount(amount)}'.length;
         if (length > moneyCharacters) moneyCharacters = length;
       }
     }
@@ -23553,8 +23597,8 @@ class _WorkspaceProductRow extends StatelessWidget {
     if (owned && statement) return _statementProduct(context);
     if (owned &&
         (MediaQuery.textScalerOf(context).scale(1) >= 1.4 ||
-            product.sellingPrice.abs() >= 10000000 ||
-            (product.mrp ?? product.sellingPrice).abs() >= 10000000)) {
+            product.sellingPriceMinor.abs() >= 1000000000 ||
+            (product.mrpMinor ?? product.sellingPriceMinor).abs() >= 1000000000)) {
       return _expandedProduct(context);
     }
     return KeyedSubtree(
@@ -23586,7 +23630,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                   ),
                   Text(
                     owned
-                        ? '${product.pack} · MRP ₹${product.mrp ?? product.sellingPrice} · ${product.sku}'
+                        ? '${product.pack} · ${product.mrpMinor == null ? 'MRP not set' : 'MRP ₹${_formatStoreMinorAmount(product.mrpMinor!)}'} · ${product.sku}'
                         : '${product.pack} · ${product.sku}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -23603,7 +23647,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                         _ProductQuickValue(
                           keyName: 'work-catalogue-price-${product.id}',
                           icon: Icons.sell_outlined,
-                          label: '₹${product.sellingPrice}',
+                          label: '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
                           onTap: onChangePrice,
                         ),
                         _ProductQuickValue(
@@ -23627,7 +23671,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                     )
                   else
                     Text(
-                      'MRP ₹${product.mrp ?? product.sellingPrice} · Product details ready',
+                      '${product.mrpMinor == null ? 'MRP not set' : 'MRP ₹${_formatStoreMinorAmount(product.mrpMinor!)}'} · Product details ready',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -23643,7 +23687,8 @@ class _WorkspaceProductRow extends StatelessWidget {
               _ProductVisibilityButton(
                 keyName: 'work-catalogue-visibility-${product.id}',
                 isPublic: product.publicListing,
-                onTap: onTogglePublic,
+                needsCheck: session.workspaceCatalogueListingPending,
+                onTap: session.workspaceCatalogueListingBusy ? null : onTogglePublic,
               ),
               IconButton(
                 key: Key('work-catalogue-edit-${product.id}'),
@@ -23830,21 +23875,21 @@ class _WorkspaceProductRow extends StatelessWidget {
               cell(
                 1,
                 'work-catalogue-price-${product.id}',
-                '₹${_formatStoreAmount(product.sellingPrice)}',
+                '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
                 onTap: onChangePrice,
               ),
               cell(
                 2,
                 'work-catalogue-purchase-${product.id}',
-                '₹${_formatStoreAmount(product.purchasePrice)}',
+                '₹${_formatStoreMinorAmount(product.purchasePriceMinor)}',
                 onTap: () => onEditField?.call('purchasePrice'),
               ),
               cell(
                 3,
                 'work-catalogue-mrp-${product.id}',
-                product.mrp == null
+                product.mrpMinor == null
                     ? 'Not set'
-                    : '₹${_formatStoreAmount(product.mrp!)}',
+                    : '₹${_formatStoreMinorAmount(product.mrpMinor!)}',
                 onTap: () => onEditField?.call('mrp'),
               ),
               cell(
@@ -23958,7 +24003,7 @@ class _WorkspaceProductRow extends StatelessWidget {
                         'Selling price',
                         style: TextStyle(fontSize: 12),
                       ),
-                      value: '₹${_formatStoreAmount(product.sellingPrice)}',
+                      value: '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
                       style: moneyStyle,
                     ),
                   ),
@@ -23973,9 +24018,9 @@ class _WorkspaceProductRow extends StatelessWidget {
               ),
               child: _StoreMoneyLine(
                 leading: const Text('MRP', style: TextStyle(fontSize: 12)),
-                value: product.mrp == null
+                value: product.mrpMinor == null
                     ? 'Not set'
-                    : '₹${_formatStoreAmount(product.mrp!)}',
+                    : '₹${_formatStoreMinorAmount(product.mrpMinor!)}',
                 style: moneyStyle.copyWith(fontWeight: FontWeight.w500),
               ),
             ),
@@ -24007,7 +24052,8 @@ class _WorkspaceProductRow extends StatelessWidget {
                 _ProductVisibilityButton(
                   keyName: 'work-catalogue-visibility-${product.id}',
                   isPublic: product.publicListing,
-                  onTap: onTogglePublic,
+                  needsCheck: session.workspaceCatalogueListingPending,
+                  onTap: session.workspaceCatalogueListingBusy ? null : onTogglePublic,
                 ),
               ],
             ),
@@ -24023,17 +24069,21 @@ class _ProductVisibilityButton extends StatelessWidget {
     required this.keyName,
     required this.isPublic,
     required this.onTap,
+    this.needsCheck = false,
   });
 
   final String keyName;
   final bool isPublic;
+  final bool needsCheck;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = isPublic ? const Color(0xFF08765D) : MoolColors.muted;
     return Tooltip(
-      message: isPublic ? 'Hide from customers' : 'Show to customers',
+      message: needsCheck ? 'Check the saved listing update' : isPublic
+        ? 'Customer listing requested. Public visibility is not confirmed. Tap to keep private.'
+        : 'Request customer listing',
       child: InkWell(
         key: Key(keyName),
         borderRadius: BorderRadius.circular(12),
@@ -24047,14 +24097,14 @@ class _ProductVisibilityButton extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  isPublic
+                  needsCheck ? Icons.sync_rounded : isPublic
                       ? Icons.public_rounded
                       : Icons.visibility_off_outlined,
                   color: color,
                   size: 18,
                 ),
                 Text(
-                  isPublic ? 'Public' : 'Private',
+                  needsCheck ? 'Check' : isPublic ? 'Requested' : 'Private',
                   style: TextStyle(
                     color: color,
                     fontSize: 9,
@@ -25252,6 +25302,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     _initialEditValues = {
       for (final entry in _importControllers.entries) entry.key: entry.value.text,
     };
+    if (_listingRecoveryRequired) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_restoreListing());
+      });
+    }
   }
 
   void _refreshIdentity() => setState(() {});
@@ -25367,15 +25422,16 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     text: widget.product.barcode,
   );
   late final TextEditingController _purchase = TextEditingController(
-    text: widget.product.purchasePrice == 0
-        ? ''
-        : '${widget.product.purchasePrice}',
+    text: widget.product.usesMinorAmounts
+        ? widget.product.purchasePriceMinor == 0 ? '' : workspacePriceInputFromMinor(widget.product.purchasePriceMinor)
+        : widget.product.purchasePrice == 0 ? '' : '${widget.product.purchasePrice}',
   );
   late final TextEditingController _selling = TextEditingController(
-    text: '${widget.product.sellingPrice}',
+    text: widget.product.usesMinorAmounts
+        ? workspacePriceInputFromMinor(widget.product.sellingPriceMinor) : '${widget.product.sellingPrice}',
   );
   late final TextEditingController _mrp = TextEditingController(
-    text: widget.product.mrp == null ? '' : '${widget.product.mrp}',
+    text: widget.product.mrpMinor == null ? '' : workspacePriceInputFromMinor(widget.product.mrpMinor!),
   );
   late final TextEditingController _stock = TextEditingController(
     text: '${widget.product.stock}',
@@ -25434,7 +25490,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     'wholesalePrice': TextEditingController(
       text: widget.product.wholesaleOffer == null
           ? ''
-          : '${widget.product.wholesaleOffer!.priceRupees}',
+          : workspacePriceInputFromMinor(widget.product.wholesaleOffer!.priceMinor),
     ),
     'wholesaleMinimum': TextEditingController(
       text: '${widget.product.wholesaleOffer?.minimumPacks ?? 1}',
@@ -25446,7 +25502,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       text:
           widget.product.wholesaleOffer?.tiers
               .map(
-                (tier) => '${tier.minimumPacks}:${tier.packPriceMinor ~/ 100}',
+                (tier) => '${tier.minimumPacks}:${workspacePriceInputFromMinor(tier.packPriceMinor)}',
               )
               .join('; ') ??
           '',
@@ -25552,6 +25608,20 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
             widget.product.content.inputValues[e.key]!.trim(),
       );
   late bool _public = widget.product.publicListing;
+  bool _listingIntentChanged = false;
+  bool _listingRestoring = false;
+  bool get _listingRecoveryRequired => _wasOwned && widget.importRow == null &&
+      widget.onDraftReviewed == null && widget.purchaseScope == null &&
+      widget.session.workspaceCatalogueListingConnectionConfigured;
+  Future<void> _restoreListing() async {
+    if (_listingRestoring) return;
+    final owner = widget.session.publicationPreferencesContext;
+    setState(() => _listingRestoring = true);
+    await widget.session.restoreWorkspaceCatalogueListing();
+    if (mounted && owner == widget.session.publicationPreferencesContext) {
+      setState(() => _listingRestoring = false);
+    }
+  }
   bool get _factsNeedReview =>
       widget.product.catalogueFactsRequireReview || _masterFactsChanged;
   late bool _available = widget.product.available;
@@ -25611,6 +25681,14 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   Future<void> _save() async {
     if (_saved || _savingInventory || _choosingPhoto) return;
+    final listingRequested = _public, listingWasChanged = _listingIntentChanged;
+    if (listingWasChanged && _listingRecoveryRequired &&
+        (!widget.session.workspaceCatalogueListingReady ||
+          widget.session.workspaceCatalogueListingPending ||
+          widget.session.workspaceCatalogueListingBusy)) {
+      _reject('Check the saved listing update before changing its visibility. Your product edits are kept.');
+      return;
+    }
     setState(() => _savingInventory = true);
     try {
       if (widget.importRow != null) {
@@ -25671,9 +25749,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         );
         return;
       }
-      final purchase = int.tryParse(_purchase.text.trim());
-      final selling = int.tryParse(_selling.text.trim());
-      final mrp = int.tryParse(_mrp.text.trim());
+      // Preserve the existing large-price editor range, not the narrower CSV
+      // or trade-input ceiling. All money comparisons below are in paise.
+      final purchase = workspacePriceMinorFromInput(_purchase.text, maximumMinor: 9007199254740991);
+      final selling = workspacePriceMinorFromInput(_selling.text, maximumMinor: 9007199254740991);
+      final mrp = workspacePriceMinorFromInput(_mrp.text, maximumMinor: 9007199254740991);
       final stock = widget.purchaseScope != null ? 0 : _stockMode == WorkspaceStockMode.availabilityOnly
           ? widget.product.stock.clamp(0, 1 << 31).toInt()
           : int.tryParse(_stock.text.trim());
@@ -25708,7 +25788,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         return;
       }
       if (_mrp.text.trim().isNotEmpty && mrp == null) {
-        _reject('Enter MRP in whole rupees, or leave it empty.', field: 'mrp');
+        _reject('Enter MRP with at most two decimal places, or leave it empty.', field: 'mrp');
         return;
       }
       late final WorkspaceProductContent content;
@@ -25743,7 +25823,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       }
       if (sellingInputs.wholesale?.enabled == true &&
           mrp != null &&
-          sellingInputs.wholesale!.priceRupees > mrp) {
+          sellingInputs.wholesale!.priceMinor > mrp) {
         _reject(
           'Wholesale price cannot exceed the pack MRP.',
           field: 'wholesalePrice',
@@ -25753,6 +25833,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       final measureChanged =
           jsonEncode(sellingInputs.measure?.toJson()) !=
           jsonEncode(widget.product.packMeasure?.toJson());
+      final purchaseMinor = purchase!, sellingMinor = selling!;
+      final exact = widget.product.usesMinorAmounts || purchaseMinor % 100 != 0 ||
+          sellingMinor % 100 != 0 || mrp != null && mrp % 100 != 0 ||
+          purchaseMinor > 214748364700 || sellingMinor > 214748364700 ||
+          mrp != null && mrp > 214748364700;
       final reviewedProduct = widget.product.copyWith(
         privatePhoto: _matchingPhoto,
         clearPrivatePhoto: _matchingPhoto == null,
@@ -25767,14 +25852,18 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         pack: _pack.text.trim(),
         sku: _sku.text.trim(),
         barcode: _barcode.text.trim(),
-        purchasePrice: purchase,
-        sellingPrice: selling,
-        mrp: mrp,
+        purchasePrice: exact ? null : purchaseMinor ~/ 100,
+        sellingPrice: exact ? null : sellingMinor ~/ 100,
+        purchasePriceMinor: exact ? purchaseMinor : null,
+        sellingPriceMinor: exact ? sellingMinor : null,
+        mrp: exact || mrp == null ? null : mrp ~/ 100,
+        mrpMinor: exact ? mrp : null,
+        clearMrp: _mrp.text.trim().isEmpty,
         stock: stock,
         unitPrice:
             _unitPrice.text.trim().isEmpty ||
                 _unitPrice.text.trim() == widget.product.unitPrice
-            ? '₹$selling/${_pack.text.trim()}'
+            ? '₹${workspacePriceInputFromMinor(sellingMinor)}/${_pack.text.trim()}'
             : _unitPrice.text.trim(),
         deliveryPromise: _delivery.text.trim(),
         origin: _origin.text.trim(),
@@ -25833,11 +25922,17 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           return;
         }
       }
+      if (listingWasChanged && widget.purchaseScope == null && widget.onDraftReviewed == null) {
+        await widget.session.requestWorkspaceProductListing(reviewedProduct.id, listed: listingRequested);
+        if (!mounted || (widget.session.activeWorkspace?.id ?? widget.session.workspaceId) != _storeId) return;
+      }
       _saved = true;
       if (widget.onSaved != null) {
         FocusManager.instance.primaryFocus?.unfocus();
-        widget.session.showNotice(widget.purchaseScope == null ? 'Saved to Store stock.'
-            : 'Product saved. Goods stay in your purchase draft until receipt.');
+        if (!listingWasChanged) {
+          widget.session.showNotice(widget.purchaseScope == null ? 'Saved to Store stock.'
+              : 'Product saved. Goods stay in your purchase draft until receipt.');
+        }
         _finish(afterExit: widget.onSaved);
       } else {
         _finish();
@@ -25972,7 +26067,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   }
                 : null,
             keyboardType: numeric
-                ? TextInputType.number
+                ? money ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number
                 : lines > 1
                 ? TextInputType.multiline
                 : TextInputType.text,
@@ -26403,20 +26498,46 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               )
+                            else if (widget.session.workspaceCatalogueListingPending ||
+                                _listingRecoveryRequired && !widget.session.workspaceCatalogueListingReady && !_listingRestoring)
+                              ListTile(
+                                key: const Key('work-product-public-check'), contentPadding: EdgeInsets.zero,
+                                title: Text(widget.session.workspaceCatalogueListingPending
+                                  ? 'Check listing update' : 'Open saved listing update'),
+                                subtitle: Text(widget.session.workspaceCatalogueListingPending
+                                  ? 'Your original request is kept. Checking does not send it again.'
+                                  : 'Saved listing details could not be opened. Try again before changing visibility.'),
+                                trailing: IconButton(icon: const Icon(Icons.sync_rounded), tooltip: 'Check saved listing update',
+                                  onPressed: _savingInventory || widget.session.workspaceCatalogueListingBusy ? null : () async {
+                                    if (!widget.session.workspaceCatalogueListingReady) {
+                                      await _restoreListing();
+                                    } else {
+                                      await widget.session.reconcileWorkspaceCatalogueListing();
+                                    }
+                                    if (mounted) setState(() {});
+                                  }),
+                              )
                             else
                               SwitchListTile.adaptive(
                                 key: const Key('work-product-public'),
                                 contentPadding: EdgeInsets.zero,
                                 title: const Text('Public visibility'),
                                 subtitle: Text(
-                                  _catalogueMatched && !_factsNeedReview
+                                  _listingRecoveryRequired && !widget.session.workspaceCatalogueListingReady
+                                      ? 'Opening saved listing details…'
+                                      : _catalogueMatched && !_factsNeedReview
                                       ? 'Saved setting · online visibility not confirmed'
+                                      : widget.session.workspaceCatalogueListingConnectionConfigured
+                                      ? 'Listing requests need matching reviewed product details'
                                       : 'Private until product details are reviewed',
                                 ),
                                 value: _public,
                                 onChanged:
-                                    _public || (_catalogueMatched && !_factsNeedReview)
-                                    ? (value) => setState(() => _public = value)
+                                    !_savingInventory && !_listingRestoring &&
+                                    (!_listingRecoveryRequired || widget.session.workspaceCatalogueListingReady) &&
+                                    (_public || (_catalogueMatched && !_factsNeedReview) ||
+                                      widget.session.workspaceCatalogueListingConnectionConfigured)
+                                    ? (value) => setState(() { _public = value; _listingIntentChanged = true; })
                                     : null,
                               ),
                           ],
@@ -28384,6 +28505,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     with WidgetsBindingObserver {
   late String _filter;
   bool _feedbackOpen = false;
+  Object? _operationalViewScope;
   final _selectedFilterKey = GlobalKey();
   final _filterViewportKey = GlobalKey();
   final _filterScroll = ScrollController();
@@ -28504,6 +28626,17 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     final session = widget.session;
     final allOrders = session.visibleWorkspaceOrders
         .where((order) => !_isCounterSaleOrder(order));
+    final operationalScope = (session, session.originalPurchaseReader, session.originalPurchaseRealm,
+      session.activeWorkspace?.id, session.navigationScopeRevision);
+    if (session.workspaceOperationalFeedAvailable && operationalScope != _operationalViewScope) {
+      _operationalViewScope = operationalScope;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && operationalScope == (widget.session, widget.session.originalPurchaseReader,
+            widget.session.originalPurchaseRealm, widget.session.activeWorkspace?.id, widget.session.navigationScopeRevision)) {
+          unawaited(widget.session.loadWorkspaceOperationalOrders());
+        }
+      });
+    }
     if (_feedbackOpen) {
       return StoreCustomerFeedback(
         controller: widget.session.workspaceCustomerFeedback,
@@ -28556,6 +28689,32 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
     };
     int countFor(String filter) => counts[filter] ?? 0;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final originalReader = widget.orderId == null && _filter == 'Live'
+        ? session.originalPurchaseReader : null;
+    final showOriginals = originalReader != null && storeId != null;
+    final showOnline = widget.orderId == null && session.workspaceOperationalFeedAvailable;
+    final showHeader = showOriginals || showOnline;
+    Widget originalDetails() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (showOnline) ...[
+        Text(session.workspaceOperationalFeedError ?? 'Saved online orders · partial coverage',
+          key: const Key('work-online-orders-coverage'), style: const TextStyle(color: MoolColors.muted, fontSize: 12)),
+        Wrap(spacing: 8, children: [
+          TextButton(key: const Key('work-online-orders-refresh'),
+            onPressed: session.workspaceOperationalFeedBusy ? null : () => session.loadWorkspaceOperationalOrders(),
+            child: Text(session.workspaceOperationalFeedBusy ? 'Checking online orders…' : 'Refresh online orders')),
+          if (session.workspaceOperationalFeedHasMore) TextButton(
+            onPressed: session.workspaceOperationalFeedBusy ? null : () => session.loadWorkspaceOperationalOrders(more: true),
+            child: const Text('More online orders')),
+          if (session.workspaceOperationalPending) TextButton(key: const Key('work-online-orders-reconcile'),
+            onPressed: session.workspaceOperationalFeedBusy ? null : session.reconcileWorkspacePendingOrders,
+            child: const Text('Check pending updates')),
+        ]),
+      ],
+      if (showOriginals) WorkspacePurchaseOriginals(
+        key: ValueKey(('store-originals',originalReader,storeId,session.originalPurchaseRealm)),
+        gateway: originalReader, role: WorkspaceOrderIdentityRole.seller,
+        realm: session.originalPurchaseRealm, storeId: storeId),
+    ]);
     _scheduleFilterMetrics();
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0 ||
         View.of(context).viewInsets.bottom > 0;
@@ -28757,17 +28916,19 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                       widget.orderId,
                     )),
                     padding: EdgeInsets.fromLTRB(14, widget.orderId == null ? 10 : 0, 14, 14),
-                    itemCount: visibleOrders.length,
+                    itemCount: visibleOrders.length + (showHeader ? 1 : 0),
                     addAutomaticKeepAlives: false,
                     findChildIndexCallback: (key) {
                       if (key is! ValueKey<(String?, String)> ||
                           key.value.$1 != storeId) {
                         return null;
                       }
-                      return indices[key.value.$2];
+                      final index = indices[key.value.$2];
+                      return index == null ? null : index + (showHeader ? 1 : 0);
                     },
                     itemBuilder: (context, index) {
-                      final order = visibleOrders[index];
+                      if (showHeader && index == 0) return originalDetails();
+                      final order = visibleOrders[index - (showHeader ? 1 : 0)];
                       return Padding(
                         key: ValueKey<(String?, String)>((storeId, order.id)),
                         padding: EdgeInsets.only(bottom: history ? 0 : 8),
@@ -28801,6 +28962,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface>
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (showHeader) originalDetails(),
                           Text(
                             widget.orderId != null ? 'Order unavailable' : switch (_filter) {
                               'Done' => 'No past orders yet',
@@ -28883,6 +29045,7 @@ class _ExactOrderInformation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (order.operational != null) return _operationalInformation(context);
     if (invoiceStyle) return _invoiceInformation(context);
     final localizations = MaterialLocalizations.of(context);
     final placed = order.createdAt.toLocal();
@@ -29039,6 +29202,52 @@ class _ExactOrderInformation extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  Widget _operationalInformation(BuildContext context) {
+    final exact = order.operational!;
+    final localizations = MaterialLocalizations.of(context);
+    String date(DateTime value) {
+      final local = value.toLocal();
+      return '${localizations.formatShortDate(local)} · ${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+    }
+    const totals = {
+      'itemsMinor': 'Items', 'discountMinor': 'Discount', 'taxMinor': 'Tax',
+      'deliveryMinor': 'Delivery', 'freightMinor': 'Freight',
+      'paymentFeeMinor': 'Payment fee', 'tipMinor': 'Tip', 'totalMinor': 'Order total',
+    };
+    return Column(key: Key('work-operational-details-${order.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (showFacts) ...[
+        Text('Placed ${date(exact.placedAt)}', style: const TextStyle(color: MoolColors.muted, fontSize: 12)),
+        Text(exact.fulfilment == 'collection' ? 'Collect at store · ${exact.address}' : 'Delivery · ${exact.address}',
+          style: const TextStyle(fontSize: 12)),
+        if (exact.stage == 'Confirmed' && exact.acceptanceDeadline != null)
+          Text('Accept by ${date(exact.acceptanceDeadline!)}', style: const TextStyle(fontSize: 12)),
+        if (exact.fulfilmentDeadline case final deadline?)
+          Text('Fulfil by ${date(deadline)}', style: const TextStyle(fontSize: 12)),
+        if (showPayment) const Text('Payment status unavailable', style: TextStyle(color: MoolColors.muted, fontSize: 12)),
+      ],
+      if (showItems) ...[
+        const Divider(height: 20),
+        for (final line in exact.original.lines)
+          Padding(key: Key('work-operational-line-${line.lineId}'),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              _StoreMoneyLine(leading: Text('${line.quantityLabel} × ${_price(line.unitPriceMinor)}'),
+                value: _price(line.lineTotalMinor), style: const TextStyle(fontWeight: FontWeight.w600)),
+            ])),
+      ],
+      if (showAmounts) ...[
+        const Divider(height: 20),
+        for (final total in totals.entries)
+          Padding(key: Key('work-operational-total-${total.key}'), padding: const EdgeInsets.symmetric(vertical: 3),
+            child: _StoreMoneyLine(leading: Text(total.value),
+              value: '${total.key == 'discountMinor' ? '−' : ''}${_price(exact.original.totals[total.key]!)}',
+              style: TextStyle(fontWeight: total.key == 'totalMinor' ? FontWeight.w700 : FontWeight.w500))),
+      ],
+    ]);
   }
 
   // Opt-in Orders details only; approved invoice/collection callers stay intact.
@@ -29362,8 +29571,77 @@ class _LiveOrderTicket extends StatelessWidget {
   final VoidCallback onReview;
   final bool detailed;
 
+  Widget _operationalTicket(BuildContext context) {
+    final exact = order.operational!;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    bool current() => context.mounted && storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+        exact.reference.storeId == storeId &&
+        exact.viewerUserId == (session.contactDraftStore?.accountScope ?? session.pendingProofStore?.accountScope) &&
+        identical(session.workspaceOrders.where((row) => row.id == order.id).firstOrNull?.operational, exact);
+    bool can(WorkOrderAction action) => current() && session.workspaceOrderCanAct(order.id, action);
+    Future<void> act(WorkOrderAction action) async {
+      if (!can(action) || !session.selectWorkspaceOrder(order.id)) return;
+      if (action == WorkOrderAction.reject) {
+        await _showRejectOrderSheet(context, session);
+      } else {
+        await session.submitWorkspaceOrderAction(order.id, action);
+      }
+    }
+    final lines = exact.stage == 'Preparing' && exact.fulfilment != 'collection'
+        ? session.workspacePackingLinesForOrder(order) : const <WorkspacePackingLine>[];
+    final packed = lines.where((line) => line.packed).length;
+    final originals = {for (final line in exact.original.lines) line.lineId: line};
+    return _OrderDeadlineBoundary(deadline: exact.stage == 'Confirmed' ? exact.acceptanceDeadline : null,
+      builder: (expired) => Material(key: ValueKey('work-operational-order-${order.id}'), color: Colors.white,
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _StoreMoneyLine(leading: Text(order.customer, style: const TextStyle(fontWeight: FontWeight.w700)),
+            value: _ExactOrderInformation._price(order.payableMinor), style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(session.workspaceOrderStageLabel(order), style: const TextStyle(color: MoolColors.navy, fontWeight: FontWeight.w600)),
+          Text(order.id, style: const TextStyle(color: MoolColors.muted, fontSize: 11)),
+          if (!detailed) const Text('Payment status unavailable', style: TextStyle(color: MoolColors.muted, fontSize: 12)),
+          if (exact.rejectionReason case final reason?) Text(reason),
+          if (detailed) _ExactOrderInformation(order: order, showItems: lines.isEmpty),
+          if (lines.isNotEmpty) ...[
+            Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('$packed/${lines.length} lines packed')),
+            for (final line in lines)
+              CheckboxListTile(key: Key('work-operational-pack-${line.id}'),
+                contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.trailing,
+                value: line.packed, title: Text('${line.label} · ${line.quantityLabel}'),
+                subtitle: Text('Each ${_ExactOrderInformation._price(originals[line.id]!.unitPriceMinor)} · '
+                  'Line total ${_ExactOrderInformation._price(originals[line.id]!.lineTotalMinor)}'),
+                onChanged: !current() || session.workspaceOrderOperationState(order.id) != null ? null : (value) {
+                  if (!current()) return;
+                  session.setWorkspaceOrderPackingLine(storeId: storeId, orderId: order.id,
+                    lineId: line.id, quantity: line.quantity, packed: value == true, expectedOperational: exact);
+                }),
+          ],
+          if (exact.stage == 'Ready') const Text('Delivery confirmation is not connected. Ready does not mean delivered.',
+            style: TextStyle(color: MoolColors.muted, fontSize: 12)),
+          if (exact.fulfilment == 'collection') const Text('Collection actions are unavailable for this order.',
+            style: TextStyle(color: MoolColors.muted, fontSize: 12)),
+          if (session.workspaceOrderOperationState(order.id) != null)
+            _OrderOperationStatus(session: session, orderId: order.id),
+          Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 4, children: [
+            if (!detailed) TextButton(onPressed: !current() ? null : onReview, child: const Text('Review')),
+            if (exact.stage == 'Confirmed') ...[
+              TextButton(key: Key('work-operational-reject-${order.id}'),
+                onPressed: expired || !can(WorkOrderAction.reject) ? null : () => act(WorkOrderAction.reject), child: const Text('Reject')),
+              FilledButton(key: Key('work-operational-accept-${order.id}'),
+                onPressed: expired || !can(WorkOrderAction.accept) ? null : () => act(WorkOrderAction.accept), child: const Text('Accept')),
+            ],
+            if (exact.stage == 'Preparing') FilledButton(key: Key('work-operational-ready-${order.id}'),
+              onPressed: !can(WorkOrderAction.ready) || lines.isEmpty || packed != lines.length ? null : () => act(WorkOrderAction.ready),
+              child: const Text('Mark ready')),
+          ]),
+          const Divider(height: 16),
+        ])),
+      ));
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (order.operational != null) return _operationalTicket(context);
     final stage = order.stage;
     final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     final invoiceAccount = session.workspaceFinance?.accountScope;
@@ -36929,6 +37207,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
       key: const Key('work-store-offers-screen'),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
       children: [
+        StoreProductPromotionPanel(session: widget.session),
         if (!hasPublicProducts || eligibleCustomers == 0)
           const Text(
             'Create offer',
@@ -37123,7 +37402,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
               Text(
                 selectedProduct == null
                     ? 'Choose an available product.'
-                    : '${selectedProduct.title} · ${selectedProduct.pack} · ₹${selectedProduct.sellingPrice}',
+                    : '${selectedProduct.title} · ${selectedProduct.pack} · ₹${_formatStoreMinorAmount(selectedProduct.sellingPriceMinor)}',
                 style: const TextStyle(color: MoolColors.muted, fontSize: 10),
               ),
               Text(
@@ -39356,7 +39635,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       final painter = TextPainter(
         text: TextSpan(
           text:
-              '₹${_formatStoreAmount(product.sellingPrice * widget.session.workspaceOrderQuantities[product.id]!)}',
+              '₹${_formatStoreMinorAmount(product.sellingPriceMinor * widget.session.workspaceOrderQuantities[product.id]!)}',
           style: DefaultTextStyle.of(
             context,
           ).style.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
@@ -39452,7 +39731,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                     0,
                     (sum, item) =>
                         sum +
-                        item.sellingPrice *
+                        item.sellingPriceMinor *
                             widget.session.workspaceOrderQuantities[item.id]!,
                   );
                   final label =
@@ -39497,7 +39776,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                                   ),
                                 ),
                                 Text(
-                                  '${items.length} ${items.length == 1 ? 'item' : 'items'} · ₹${_formatStoreAmount(subtotal)}',
+                                  '${items.length} ${items.length == 1 ? 'item' : 'items'} · ₹${_formatStoreMinorAmount(subtotal)}',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: MoolColors.muted,
@@ -39527,7 +39806,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final rate =
-                          '$quantity × ₹${_formatStoreAmount(product.sellingPrice)}';
+                          '$quantity × ₹${_formatStoreMinorAmount(product.sellingPriceMinor)}';
                       final separateRate =
                           constraints.maxWidth - amountWidth >= 260 &&
                           MediaQuery.textScalerOf(context).scale(12) <= 16;
@@ -39554,7 +39833,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                             Align(
                               alignment: Alignment.centerRight,
                               child: Text(
-                                '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                                '₹${_formatStoreMinorAmount(product.sellingPriceMinor * quantity)}',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -39607,7 +39886,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                           SizedBox(
                             width: amountWidth,
                             child: Text(
-                              '₹${_formatStoreAmount(product.sellingPrice * quantity)}',
+                              '₹${_formatStoreMinorAmount(product.sellingPriceMinor * quantity)}',
                               textAlign: TextAlign.right,
                               style: const TextStyle(
                                 fontSize: 12,
@@ -40393,7 +40672,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         border: Border(top: BorderSide(color: _counterSaleLine), bottom: BorderSide(color: _counterSaleLine)),
       ),
       child: _StoreScaledPair(
-        forceStack: widget.session.workspaceOrderTotal >= 10000000,
+        forceStack: widget.session.workspaceCounterSubtotalMinor >= 1000000000,
         first: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -40996,7 +41275,7 @@ class _SaleProductTile extends StatelessWidget {
         height: 1.3,
       ),
     );
-    final price = '₹${_formatStoreAmount(product.sellingPrice)}';
+    final price = '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}';
     final priceStyle = TextStyle(
       color: availableForSale ? MoolColors.navy : MoolColors.muted,
       fontSize: availableForSale ? 15 : 12,
@@ -41201,7 +41480,7 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                 ]),
                 const SizedBox(height: 12),
                 Text(
-                  '₹${_formatStoreAmount(product.sellingPrice)}',
+                  '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
                   style: const TextStyle(
                     color: MoolColors.navy,
                     fontSize: 20,
@@ -41209,8 +41488,8 @@ class _CounterStoreProductPageState extends State<_CounterStoreProductPage> {
                   ),
                 ),
                 if (product.unitPrice.trim().isNotEmpty) Text(product.unitPrice),
-                if (product.mrp != null)
-                  Text('MRP ₹${_formatStoreAmount(product.mrp!)}'),
+                if (product.mrpMinor != null)
+                  Text('MRP ₹${_formatStoreMinorAmount(product.mrpMinor!)}'),
                 const Divider(height: 20),
                 _ProductPreviewLine(label: 'In this bill', value: '$quantity'),
                 _ProductPreviewLine(
@@ -42082,7 +42361,7 @@ class _OrderCatalogueRow extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 Text(
-                  '${product.pack} · ₹${product.sellingPrice} · ${product.stock} available',
+                  '${product.pack} · ₹${_formatStoreMinorAmount(product.sellingPriceMinor)} · ${product.stock} available',
                   style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 9.5,
@@ -43040,7 +43319,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       purchase: null,
       title: product.title,
       detail: '${product.brand} · ${product.pack} · ${product.stock} available',
-      amount: '₹${_formatStoreAmount(product.sellingPrice)}',
+      amount: '₹${_formatStoreMinorAmount(product.sellingPriceMinor)}',
       route: Uri(
         path: '/app/retailer/home',
         queryParameters: {'view': 'stock', 'product': product.id},

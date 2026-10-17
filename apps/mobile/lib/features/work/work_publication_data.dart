@@ -1,6 +1,26 @@
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 
+/// Plain rupee text, parsed without floating-point money. Callers retain their
+/// original price ceiling; quantity limits are separate.
+int? workspacePriceMinorFromInput(String input, {int maximumMinor = 214748364700}) {
+  final text = input.trim();
+  if (!RegExp(r'^(?:[0-9]+(?:\.[0-9]{1,2})?|\.[0-9]{1,2})$').hasMatch(text)) return null;
+  final parts = text.split('.');
+  final whole = BigInt.tryParse(parts.first.isEmpty ? '0' : parts.first);
+  if (whole == null) return null;
+  final fraction = parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0'));
+  final value = whole * BigInt.from(100) + BigInt.from(fraction);
+  return maximumMinor < 0 || value > BigInt.from(maximumMinor) ? null : value.toInt();
+}
+
+String workspacePriceInputFromMinor(int minor) {
+  buyV2ExactMinorAmount(minor: minor);
+  final fraction = minor % 100;
+  return fraction == 0 ? '${minor ~/ 100}'
+      : '${minor ~/ 100}.${fraction.toString().padLeft(2, '0')}';
+}
+
 /// Public product copy, distinct from pack facts, policies and private stock.
 /// Text syntax is shared by the editor and quoted multiline CSV cells.
 class WorkspaceProductContent {
@@ -196,7 +216,7 @@ class WorkspaceSellingInputs {
         ].any((key) => value(key).isNotEmpty)) {
       int number(String key, int? fallback) {
         final parsed = value(key).isEmpty ? fallback : int.tryParse(value(key));
-        final maximum = key == 'wholesalePrice' ? 999999999 : 999999;
+        const maximum = 999999;
         if (parsed == null || parsed <= 0 || parsed > maximum) {
           throw FormatException(
             '$key: enter a whole number from 1 to $maximum.',
@@ -205,7 +225,14 @@ class WorkspaceSellingInputs {
         return parsed;
       }
 
-      final price = number('wholesalePrice', existingWholesale?.priceRupees);
+      final price = value('wholesalePrice').isEmpty
+          ? existingWholesale?.priceMinor
+          : workspacePriceMinorFromInput(value('wholesalePrice'), maximumMinor: 99999999900);
+      if (price == null || price <= 0 || price > 99999999900) {
+        throw const FormatException(
+          'wholesalePrice: enter a positive price up to 999999999 with at most two decimal places.',
+        );
+      }
       final minimum = number(
         'wholesaleMinimum',
         existingWholesale?.minimumPacks ?? 1,
@@ -222,7 +249,7 @@ class WorkspaceSellingInputs {
               ? int.tryParse(cells[0].trim())
               : null;
           final amount = cells.length == 2
-              ? int.tryParse(cells[1].trim())
+              ? workspacePriceMinorFromInput(cells[1].trim(), maximumMinor: 99999999900)
               : null;
           if (packs == null || amount == null) {
             throw const FormatException(
@@ -232,15 +259,18 @@ class WorkspaceSellingInputs {
           tiers.add(
             BuyV2ComparisonPriceTier(
               minimumPacks: packs,
-              packPriceMinor: amount * 100,
+              packPriceMinor: amount,
             ),
           );
         }
       } else if (!clearBlankTiers || !fields.containsKey('wholesaleTiers')) {
         tiers.addAll(existingWholesale?.tiers ?? []);
       }
+      final exact = existingWholesale?.usesExplicitMinor == true ||
+          price % 100 != 0 || tiers.any((tier) => tier.packPriceMinor % 100 != 0);
       wholesale = WorkspaceWholesaleOffer(
-        priceRupees: price,
+        priceRupees: exact ? null : price ~/ 100,
+        priceMinor: exact ? price : null,
         minimumPacks: minimum,
         incrementPacks: increment,
         tiers: tiers,
@@ -254,7 +284,8 @@ class WorkspaceSellingInputs {
       }
     } else if (wholesale != null && channel == 'retail') {
       wholesale = WorkspaceWholesaleOffer(
-        priceRupees: wholesale.priceRupees,
+        priceRupees: wholesale.usesExplicitMinor ? null : wholesale.priceRupees,
+        priceMinor: wholesale.usesExplicitMinor ? wholesale.priceMinor : null,
         minimumPacks: wholesale.minimumPacks,
         incrementPacks: wholesale.incrementPacks,
         tiers: wholesale.tiers,
@@ -302,8 +333,17 @@ class WorkspacePackMeasure {
     if (!valid || priceRupees < 0 || priceRupees > 999999999) {
       throw const FormatException('Complete the pack quantity and price.');
     }
-    // Whole-rupee legacy listing price -> exact minor units, half-up per unit.
-    final minor = (priceRupees * 100000 + quantityMilli ~/ 2) ~/ quantityMilli;
+    return pricePerUnitMinor(priceRupees * 100);
+  }
+
+  /// Explicit paise input; preserve the existing public price bound and
+  /// half-up per-unit display without converting through a decimal double.
+  String pricePerUnitMinor(int priceMinor) {
+    if (!valid || priceMinor < 0 || priceMinor > 99999999900) {
+      throw const FormatException('Complete the pack quantity and price.');
+    }
+    final minor = ((BigInt.from(priceMinor) * BigInt.from(1000) +
+            BigInt.from(quantityMilli ~/ 2)) ~/ BigInt.from(quantityMilli)).toInt();
     return '₹${minor ~/ 100}.${(minor % 100).toString().padLeft(2, '0')}/$unitLabel';
   }
 
@@ -352,18 +392,24 @@ class WorkspacePackMeasure {
 }
 
 /// Retail and wholesale share inventory; only their selling terms differ.
-/// Amounts here are explicitly whole rupees to match the current public product
-/// model. Comparison conversion is *100, never truncated paise-as-rupees.
+/// Legacy untagged whole-rupee JSON stays literal. New exact prices use a
+/// distinctly tagged minor-unit format, including quantity-tier amounts.
 class WorkspaceWholesaleOffer {
   WorkspaceWholesaleOffer({
-    required this.priceRupees,
+    int? priceRupees,
+    int? priceMinor,
     required this.minimumPacks,
     this.incrementPacks = 1,
     this.enabled = false,
     this.saleType,
     List<BuyV2ComparisonPriceTier> tiers = const [],
-  }) : tiers = List.unmodifiable(tiers);
-  final int priceRupees, minimumPacks, incrementPacks;
+  }) : _legacyPrice = priceRupees, _priceMinor = priceMinor,
+       tiers = List.unmodifiable(tiers);
+  final int? _legacyPrice, _priceMinor;
+  final int minimumPacks, incrementPacks;
+  bool get usesExplicitMinor => _priceMinor != null;
+  int get priceMinor => buyV2ExactMinorAmount(minor: _priceMinor, legacyRupees: _legacyPrice);
+  int get priceRupees => buyV2WholeRupees(priceMinor);
   final bool enabled;
 
   /// Explicit business classification, never inferred from pack, MOQ or price.
@@ -371,8 +417,11 @@ class WorkspaceWholesaleOffer {
   final BuyV2WholesaleSaleType? saleType;
   final List<BuyV2ComparisonPriceTier> tiers;
   bool get valid {
-    if (priceRupees <= 0 ||
-        priceRupees > 999999999 ||
+    if (_legacyPrice != null && _priceMinor != null) return false;
+    final int price;
+    try { price = priceMinor; } on FormatException { return false; }
+    if (price <= 0 ||
+        price > 99999999900 ||
         minimumPacks <= 0 ||
         incrementPacks <= 0 ||
         minimumPacks > 999999 ||
@@ -380,13 +429,13 @@ class WorkspaceWholesaleOffer {
       return false;
     }
     var previous = 0;
-    var previousPrice = priceRupees * 100;
+    var previousPrice = price;
     for (final tier in tiers) {
       if (tier.minimumPacks < minimumPacks ||
           tier.minimumPacks <= previous ||
           (tier.minimumPacks - minimumPacks) % incrementPacks != 0 ||
           tier.packPriceMinor <= 0 ||
-          tier.packPriceMinor % 100 != 0 ||
+          (!usesExplicitMinor && tier.packPriceMinor % 100 != 0) ||
           tier.packPriceMinor > previousPrice) {
         return false;
       }
@@ -396,21 +445,27 @@ class WorkspaceWholesaleOffer {
     return true;
   }
 
-  int priceAt(int packs) {
+  int priceAt(int packs) => buyV2WholeRupees(priceAtMinor(packs));
+
+  int priceAtMinor(int packs) {
     if (!valid ||
         packs < minimumPacks ||
         (packs - minimumPacks) % incrementPacks != 0) {
       throw const FormatException('Choose a valid wholesale quantity.');
     }
-    var amount = priceRupees;
+    var amount = priceMinor;
     for (final tier in tiers) {
-      if (packs >= tier.minimumPacks) amount = tier.packPriceMinor ~/ 100;
+      if (packs >= tier.minimumPacks) amount = tier.packPriceMinor;
     }
     return amount;
   }
 
-  Map<String, Object?> toJson() => {
-    'priceRupees': priceRupees,
+  Map<String, Object?> toJson() {
+    if (!valid) throw const FormatException('Invalid wholesale terms.');
+    return {
+    if (usesExplicitMinor) ...{
+      'schemaVersion': 2, 'moneyUnit': 'minor', 'priceMinor': priceMinor,
+    } else 'priceRupees': priceRupees,
     'minimumPacks': minimumPacks,
     'incrementPacks': incrementPacks,
     'enabled': enabled,
@@ -419,16 +474,22 @@ class WorkspaceWholesaleOffer {
       for (final t in tiers)
         {'minimumPacks': t.minimumPacks, 'packPriceMinor': t.packPriceMinor},
     ],
-  };
+    };
+  }
   static WorkspaceWholesaleOffer? fromJson(Object? raw) {
     if (raw == null) return null;
     if (raw is! Map ||
-        raw['priceRupees'] is! int ||
         raw['minimumPacks'] is! int ||
         raw['incrementPacks'] is! int ||
         raw['enabled'] is! bool ||
         raw['tiers'] is! List) {
       throw const FormatException('Invalid wholesale terms.');
+    }
+    final exact = raw['schemaVersion'] == 2 && raw['moneyUnit'] == 'minor';
+    if (exact ? raw['priceMinor'] is! int || raw.containsKey('priceRupees')
+        : raw.containsKey('schemaVersion') || raw.containsKey('moneyUnit') ||
+          raw.containsKey('priceMinor') || raw['priceRupees'] is! int) {
+      throw const FormatException('Invalid wholesale amount units.');
     }
     final rawType = raw['saleType'];
     final saleType = switch (rawType) {
@@ -452,7 +513,8 @@ class WorkspaceWholesaleOffer {
       );
     }
     final result = WorkspaceWholesaleOffer(
-      priceRupees: raw['priceRupees'] as int,
+      priceRupees: exact ? null : raw['priceRupees'] as int,
+      priceMinor: exact ? raw['priceMinor'] as int : null,
       minimumPacks: raw['minimumPacks'] as int,
       incrementPacks: raw['incrementPacks'] as int,
       enabled: raw['enabled'] as bool,
@@ -555,6 +617,42 @@ class WorkspacePaymentTerm {
 
 /// Additional one-time provider inputs, NOT verification/quote/ledger outputs.
 /// Existing Store ID/name/contact/GSTIN stay with their existing session owner.
+/// The seven descriptive fields explicitly allowed onto the public Store.
+/// Invoice/bank/customer settings and resolved location are never serialized here.
+class WorkspacePublicDetailsFields {
+  const WorkspacePublicDetailsFields({required this.street, required this.city, required this.state,
+    required this.pinCode, required this.publicContactPhone, required this.openingTime, required this.closingTime});
+  final String street, city, state, pinCode, publicContactPhone, openingTime, closingTime;
+  factory WorkspacePublicDetailsFields.fromSettings(WorkspaceStorePublicationDetails value) =>
+    WorkspacePublicDetailsFields.fromJson({'street': value.street, 'city': value.city, 'state': value.state,
+      'pinCode': value.pinCode, 'publicContactPhone': value.publicContactPhone,
+      'openingTime': value.openingTime, 'closingTime': value.closingTime});
+  factory WorkspacePublicDetailsFields.fromJson(Map<String, Object?> value) {
+    const keys = {'street', 'city', 'state', 'pinCode', 'publicContactPhone', 'openingTime', 'closingTime'};
+    if (value.length != keys.length || !keys.every(value.containsKey) ||
+        value.values.any((raw) => raw is! String || raw != raw.trim() ||
+          RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f]').hasMatch(raw))) {
+      throw const FormatException();
+    }
+    final fields = WorkspacePublicDetailsFields(street: value['street'] as String, city: value['city'] as String,
+      state: value['state'] as String, pinCode: value['pinCode'] as String, publicContactPhone: value['publicContactPhone'] as String,
+      openingTime: value['openingTime'] as String, closingTime: value['closingTime'] as String);
+    if (fields.street.isEmpty || fields.street.length > 2000 || fields.city.isEmpty || fields.city.length > 240 ||
+        fields.state.isEmpty || fields.state.length > 240 || !RegExp(r'^[1-9][0-9]{5}$').hasMatch(fields.pinCode) ||
+        !WorkspaceStorePublicationDetails.validPublicPhone(fields.publicContactPhone) ||
+        fields.openingTime.length > 16 || fields.closingTime.length > 16 ||
+        ((fields.openingTime.isNotEmpty || fields.closingTime.isNotEmpty) &&
+          (!WorkspaceStorePublicationDetails.validTradingTime(fields.openingTime) ||
+            !WorkspaceStorePublicationDetails.validTradingTime(fields.closingTime)))) {
+      throw const FormatException();
+    }
+    return fields;
+  }
+  String get address => [street, city, state, pinCode].join(', ');
+  Map<String, Object?> toJson() => {'street': street, 'city': city, 'state': state, 'pinCode': pinCode,
+    'publicContactPhone': publicContactPhone, 'openingTime': openingTime, 'closingTime': closingTime};
+}
+
 class WorkspaceStorePublicationDetails {
   const WorkspaceStorePublicationDetails({
     this.businessType = 'retailer',

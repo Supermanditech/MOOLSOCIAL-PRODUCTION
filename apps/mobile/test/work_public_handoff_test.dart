@@ -286,7 +286,6 @@ void main() {
         '12:240;24:245',
         '7:240',
         '12:260',
-        '12:1.25',
         '12:240;12:230',
       ]) {
         expect(
@@ -298,6 +297,85 @@ void main() {
       }
     },
   );
+  test('LF-PAISE wholesale tiers preserve exact amounts and legacy JSON', () {
+    final legacy = WorkspaceSellingInputs.parse({
+      'sellingChannels': 'both',
+      'wholesalePrice': '250',
+      'wholesaleMinimum': '6',
+      'wholesaleIncrement': '6',
+      'wholesaleTiers': '12:240',
+    }).wholesale!;
+    expect(legacy.toJson(), {
+      'priceRupees': 250, 'minimumPacks': 6, 'incrementPacks': 6,
+      'enabled': true,
+      'tiers': [{'minimumPacks': 12, 'packPriceMinor': 24000}],
+    });
+    final exact = WorkspaceSellingInputs.parse({
+      'sellingChannels': 'both', 'wholesaleSaleType': 'bulk',
+      'wholesalePrice': '250.25', 'wholesaleMinimum': '6',
+      'wholesaleIncrement': '6', 'wholesaleTiers': '12:240.15;24:230.05',
+    }).wholesale!;
+    expect(() => exact.priceAt(6), throwsFormatException);
+    expect(exact.toJson()['priceMinor'], 25025);
+    expect(exact.toJson().containsKey('priceRupees'), isFalse);
+    final restored = WorkspaceWholesaleOffer.fromJson(exact.toJson())!;
+    expect(restored.toJson(), exact.toJson());
+    expect([6, 12, 24].map(restored.priceAtMinor), [25025, 24015, 23005]);
+    expect(() => restored.priceAt(12), throwsFormatException);
+    final retained = WorkspaceSellingInputs.parse({}, existingWholesale: restored).wholesale!;
+    expect(retained.toJson(), restored.toJson());
+    final disabled = WorkspaceSellingInputs.parse({'sellingChannels': 'retail'},
+      existingWholesale: restored).wholesale!;
+    expect(disabled.enabled, isFalse);
+    expect(disabled.toJson()['priceMinor'], 25025);
+    expect(disabled.tiers.last.packPriceMinor, 23005);
+    expect(WorkspaceSellingInputs.parse({'wholesaleTiers': ''},
+      existingWholesale: restored, clearBlankTiers: true).wholesale!.tiers, isEmpty);
+    for (final value in ['250.001', '1e2', '999999999.01', '0', '-1']) {
+      expect(() => WorkspaceSellingInputs.parse({'wholesalePrice': value},
+        existingWholesale: restored), throwsFormatException);
+    }
+    for (final changed in [
+      {...exact.toJson(), 'priceRupees': null},
+      {...exact.toJson(), 'moneyUnit': 'rupees'},
+      {...exact.toJson(), 'schemaVersion': 3},
+      {...exact.toJson(), 'priceMinor': 250.25},
+    ]) {
+      expect(() => WorkspaceWholesaleOffer.fromJson(changed), throwsFormatException);
+    }
+    expect(WorkspaceSellingInputs.parse({'wholesaleTiers': '12:1.25'},
+      existingWholesale: legacy).wholesale!.tiers.single.packPriceMinor, 125);
+    final product = handoffStock().copyWith(wholesaleOffer: restored);
+    final clock = DateTime.now();
+    final terms = BuyV2PackTerms(
+      skuId: product.id, revision: 'host-exact-terms', sellUnit: product.pack,
+      quantityStep: restored.incrementPacks,
+      priceTiers: [
+        BuyV2PackPriceTier(minimumPacks: 6, priceMinor: 25025),
+        BuyV2PackPriceTier(minimumPacks: 12, priceMinor: 24015),
+        BuyV2PackPriceTier(minimumPacks: 24, priceMinor: 23005),
+      ],
+      pricingStoreId: 'fixture-store-a',
+      priceObservedAt: clock.subtract(const Duration(minutes: 1)),
+      priceValidUntil: clock.add(const Duration(hours: 1)),
+    );
+    final projected = product.toBuyPublicProduct(storeName: 'Fixture store',
+      storeId: 'fixture-store-a', channel: BuyV2Destination.wholesale,
+      publicPackTerms: terms);
+    expect(projected.priceMinor, 25025);
+    expect(projected.offerClass, BuyV2OfferClass.bulk);
+    final audit = WorkspacePublicationContract.sourceProductAuditValues(product,
+      storeName: 'Fixture store', storeId: 'fixture-store-a',
+      channel: BuyV2Destination.wholesale, publicPackTerms: terms);
+    expect(audit['priceMinor'], 25025);
+    expect(audit['price'], isNull);
+    expect(WorkspaceCatalogueItem.fromInventoryJson(product.toInventoryJson())
+      .wholesaleOffer!.priceAtMinor(24), 23005);
+    expect(WorkspaceWholesaleOffer(priceRupees: 250, priceMinor: 25000,
+      minimumPacks: 1).valid, isFalse);
+    expect(() => WorkspaceWholesaleOffer(priceRupees: 250, priceMinor: 25000,
+      minimumPacks: 1).toJson(), throwsFormatException);
+  });
   test(
     'SELLING CSV uses same parser, field-specific errors and private-save rule',
     () {

@@ -14,6 +14,7 @@ import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
 import '../work/work_publication.dart';
+import '../work/work_catalogue_gateway.dart';
 import '../shared/social_create_draft_repository.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
@@ -127,16 +128,20 @@ import 'journey_services.dart';
 import 'screens/universal_shell.dart';
 
 final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
-  const _WorkspacePublicBuyCommerceAdapter(this.product);
+  const _WorkspacePublicBuyCommerceAdapter(this.product, {this.loadProduct});
 
   final BuyV2Product? product;
+  final Future<BuyV2Product?> Function()? loadProduct;
 
   @override
-  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
-    state: BuyV2CommerceLoadState.ready,
-    products: [?product],
-    paymentMethods: const {},
-  );
+  Future<BuyV2CommerceSnapshot> refresh() async {
+    final selected = loadProduct == null ? product : await loadProduct!();
+    return BuyV2CommerceSnapshot(
+      state: loadProduct != null && selected == null
+          ? BuyV2CommerceLoadState.unavailable : BuyV2CommerceLoadState.ready,
+      products: [?selected], paymentMethods: const {},
+    );
+  }
 
   @override
   Future<BuyV2OrderPlacementResult> placeOrder(
@@ -213,9 +218,19 @@ final class _WorkspacePublicBuySession extends BuyV2Session {
     required super.core,
     required BuyV2CommerceAdapter commerceAdapter,
     super.productContentAdapter,
+    super.cataloguePageSource,
   }) : super(commerceAdapter: commerceAdapter, reviewDataEnabled: false);
 
   VoidCallback? directProductExit;
+  VoidCallback? releaseContentReadback;
+  String? resolvedProductId;
+
+  @override
+  void dispose() {
+    releaseContentReadback?.call();
+    releaseContentReadback = null;
+    super.dispose();
+  }
 
   @override
   void goBack() {
@@ -255,16 +270,19 @@ GoRouter createJourneyRouter(
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
   bool uiReviewOnly = false,
+  BuyV2Session? publicBuySession,
+  void Function(VoidCallback)? registerOwnedBuySessionCleanup,
   @visibleForTesting SocialCreateDraftStateCache? createDraftStateCache,
   bool legacyPresentationForTestsOnly = false,
 }) {
-  final buyV2Session = BuyV2Session(core: buySession);
+  final buyV2Session = publicBuySession ?? BuyV2Session(core: buySession);
   _WorkspacePublicBuySession? workspacePublicBuySession;
   String? workspacePublicBuySignature;
   Future<void>? workspacePublicBuyRestore;
-  BuyV2Session resolveWorkspacePublicBuySession(String productId) {
-    if (!workSession.workspaceVisibleToCustomers ||
-        !workSession.workspacePublicationReport.ready) {
+  BuyV2Session resolveWorkspacePublicBuySession(String productId, BuyV2Destination destination) {
+    final source = workSession.catalogueGateway;
+    final publicSource = source is AuthenticatedWorkspaceCatalogueGateway ? source : null;
+    BuyV2Session unavailablePreview() {
       workspacePublicBuySession?.dispose();
       final blocked = _WorkspacePublicBuySession(
         core: buySession,
@@ -275,13 +293,33 @@ GoRouter createJourneyRouter(
       workspacePublicBuyRestore = blocked.restoreCommerce();
       return blocked;
     }
+    // Private draft completeness never stands in for server publication. The
+    // configured path must obtain verified public readback, with no local fallback.
+    if (publicSource == null && (!workSession.workspaceVisibleToCustomers ||
+        !workSession.workspacePublicationReport.ready)) {
+      return unavailablePreview();
+    }
     final product = workSession.workspaceCatalogueItems
-        .where((item) => item.id == productId && item.published)
+        .where((item) => item.id == productId && (publicSource != null || item.published))
         .firstOrNull;
-    if (product == null) return buyV2Session;
+    if (product == null) return publicSource == null ? buyV2Session : unavailablePreview();
     final storeId = workSession.activeWorkspace?.id ?? workSession.workspaceId;
-    final signature = jsonEncode([
+    final authentication = session.navigationAuthenticationGeneration;
+    final ownerContext = workSession.publicationPreferencesContext;
+    final contextFields = ownerContext as (String?, String?, int);
+    final navigation = workSession.navigationScopeRevision;
+    final int priceMinor;
+    final int? mrpMinor;
+    try {
+      priceMinor = product.sellingPriceMinor;
+      mrpMinor = product.mrpMinor;
+    } on FormatException {
+      return unavailablePreview();
+    }
+    final exact = priceMinor % 100 != 0 || mrpMinor != null && mrpMinor % 100 != 0;
+    final signatureValues = [
       storeId,
+      if (publicSource != null) [authentication, contextFields.$1, contextFields.$2, contextFields.$3, destination.name],
       product.id,
       product.canonicalId,
       product.title,
@@ -289,8 +327,8 @@ GoRouter createJourneyRouter(
       product.variant,
       product.pack,
       product.barcode,
-      product.sellingPrice,
-      product.mrp,
+      exact ? priceMinor : priceMinor ~/ 100,
+      mrpMinor == null ? null : exact ? mrpMinor : mrpMinor ~/ 100,
       product.unitPrice,
       product.minimumOrder,
       product.returnPolicy,
@@ -315,22 +353,44 @@ GoRouter createJourneyRouter(
       product.retailEnabled,
       workSession.workspacePublicationDetails.toJson(),
       workSession.activeWorkspace?.name ?? workSession.workName,
-    ]);
+    ];
+    final signature = jsonEncode(exact
+        ? {'version': 2, 'moneyUnit': 'minor', 'values': signatureValues} : signatureValues);
     if (workspacePublicBuySession != null &&
         workspacePublicBuySignature == signature) {
       return workspacePublicBuySession!;
     }
     workspacePublicBuySession?.dispose();
-    final publicProduct = product.toBuyPublicProduct(
+    final publicProduct = publicSource == null ? product.toBuyPublicProduct(
       storeName: workSession.activeWorkspace?.name ?? workSession.workName,
       storeId: storeId,
       confirmedOn: 'Updated by Store',
       storeDetails: workSession.workspacePublicationDetails,
-    );
-    final next = _WorkspacePublicBuySession(
+    ) : null;
+    final contentReadback = workSession.workspaceCatalogueReadback;
+    late final _WorkspacePublicBuySession next;
+    bool current() => identical(workspacePublicBuySession, next) &&
+      authentication != null && session.navigationAuthenticationGeneration == authentication &&
+      workSession.activeWorkspace?.id == storeId && workSession.publicationPreferencesContext == ownerContext &&
+      workSession.navigationScopeRevision == navigation;
+    next = _WorkspacePublicBuySession(
       core: buySession,
-      commerceAdapter: _WorkspacePublicBuyCommerceAdapter(publicProduct),
-      productContentAdapter: WorkspacePublicContentAdapter(
+      commerceAdapter: publicSource == null
+          ? _WorkspacePublicBuyCommerceAdapter(publicProduct)
+          : _WorkspacePublicBuyCommerceAdapter(null, loadProduct: () async {
+              if (!current() || storeId == null) return null;
+              final entry = await publicSource.readPublicEntry(storeId: storeId, skuId: product.id,
+                channel: destination == BuyV2Destination.wholesale
+                    ? product.wholesaleOffer?.saleType == BuyV2WholesaleSaleType.bulk ? BuyV2OfferClass.bulk : BuyV2OfferClass.wholesale
+                    : BuyV2OfferClass.retail, current: current);
+              if (entry == null || !current()) return null;
+              next.resolvedProductId = entry.product.id;
+              contentReadback?.admitPublicEntry(entry, expectedContext: ownerContext);
+              return entry.product;
+            }),
+      cataloguePageSource: publicSource == null || storeId == null ? null : WorkspaceStoreCatalogueSource(
+        gateway: publicSource, storeId: storeId, current: current, contentReadback: contentReadback),
+      productContentAdapter: contentReadback ?? WorkspacePublicContentAdapter(
         storeId: storeId!,
         item: product,
         sourceId: 'store:$storeId:sku:${product.id}',
@@ -338,7 +398,25 @@ GoRouter createJourneyRouter(
     );
     workspacePublicBuySession = next;
     workspacePublicBuySignature = signature;
-    workspacePublicBuyRestore = next.restoreCommerce();
+    if (contentReadback != null) {
+      void changed() {
+        if (identical(workspacePublicBuySession, next) &&
+            identical(workSession.workspaceCatalogueReadback, contentReadback)) {
+          for (final id in contentReadback.observedProductIds) {
+            if (next.findProduct(id) != null) next.refreshProductContent(id);
+          }
+        }
+      }
+      contentReadback.addListener(changed);
+      next.releaseContentReadback = () => contentReadback.removeListener(changed);
+    }
+    workspacePublicBuyRestore = () async {
+      await next.restoreCommerce();
+      if (publicSource == null && contentReadback != null && identical(workspacePublicBuySession, next)) {
+        final selected = next.findProduct(publicProduct!.id);
+        if (selected != null) await contentReadback.refresh(selected);
+      }
+    }();
     return next;
   }
 
@@ -619,7 +697,7 @@ GoRouter createJourneyRouter(
               state.uri.queryParameters['workspaceProduct'];
           final routedBuySession = workspaceProductId == null
               ? buyV2Session
-              : resolveWorkspacePublicBuySession(workspaceProductId);
+              : resolveWorkspacePublicBuySession(workspaceProductId, destination);
           if (routedBuySession case final _WorkspacePublicBuySession session) {
             session.directProductExit = buyExit(context, state);
           }
@@ -636,7 +714,9 @@ GoRouter createJourneyRouter(
             initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
             initialView: view,
             initialCartScope: cartScope,
-            productId: state.uri.queryParameters['product'],
+            productId: routedBuySession is _WorkspacePublicBuySession
+                ? routedBuySession.resolvedProductId ?? state.uri.queryParameters['product']
+                : state.uri.queryParameters['product'],
             orderId: state.uri.queryParameters['order'],
             recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
             onExit: buyExit(context, state),
@@ -2072,6 +2152,11 @@ GoRouter createJourneyRouter(
       ),
     ],
   );
+  registerOwnedBuySessionCleanup?.call(() {
+    workspacePublicBuySession?.dispose();
+    workspacePublicBuySession = null;
+    if (publicBuySession == null) buyV2Session.dispose();
+  });
   return router;
 }
 

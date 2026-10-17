@@ -2092,9 +2092,9 @@ class StoreStockSnapshot {
                  ? 'Exact quantity'
                  : 'Availability only',
              p.available ? 'Available' : 'Unavailable',
-             p.sellingPrice,
-             p.purchasePrice,
-             p.mrp,
+             _priceCell(p.sellingPriceMinor),
+             _priceCell(p.purchasePriceMinor),
+             _priceCell(p.mrpMinor),
              p.stockMode == WorkspaceStockMode.exactQuantity
                  ? p.lowStockThreshold
                  : null,
@@ -2132,6 +2132,10 @@ class StoreStockSnapshot {
   final String storeId, storeName, scope;
   final DateTime generatedAt;
   final List<List<Object?>> rows;
+  // Keep legacy spreadsheet numeric cells literal. Fractional money is exact
+  // decimal text in both files and print, never a double or unlabelled paise.
+  static Object? _priceCell(int? minor) => minor == null ? null
+      : minor % 100 == 0 ? minor ~/ 100 : workspacePriceInputFromMinor(minor);
   static const headers = [
     'Product',
     'SKU',

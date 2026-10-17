@@ -669,6 +669,9 @@ abstract interface class AccountBootstrapGateway {
 
 class AuthenticatedAccountIdentity {
   const AuthenticatedAccountIdentity({
+    this.firebaseUserId,
+    this.firebaseProjectId,
+    this.firebaseTenantId,
     this.displayName,
     this.emailAddress,
     this.phoneNumber,
@@ -677,6 +680,17 @@ class AuthenticatedAccountIdentity {
   });
 
   final String? displayName;
+  /// Actual Firebase principal only, never a Store/customer entity or contact.
+  final String? firebaseUserId, firebaseProjectId, firebaseTenantId;
+  ({String projectId, String? tenantId, String userId})? get firebasePrincipal {
+    bool valid(String? value) => value != null && value.trim().isNotEmpty &&
+      value == value.trim() && value.length <= 128;
+    if (!valid(firebaseUserId) || !valid(firebaseProjectId) ||
+        (firebaseTenantId != null && !valid(firebaseTenantId))) {
+      return null;
+    }
+    return (projectId: firebaseProjectId!, tenantId: firebaseTenantId, userId: firebaseUserId!);
+  }
   final String? emailAddress;
   final String? phoneNumber;
   final String? providerAccountLabel;
@@ -711,6 +725,13 @@ class AuthenticatedAccountIdentity {
 
 abstract interface class AuthenticatedAccountIdentityGateway {
   Future<AuthenticatedAccountIdentity?> currentIdentity();
+}
+
+/// Optional live SDK boundary; display-only/review gateways grant no storage owner.
+abstract interface class AuthenticatedAccountPrincipalSource {
+  ({String projectId, String? tenantId, String userId})? get currentFirebasePrincipal;
+  Stream<void> get firebasePrincipalChanges;
+  String get persistenceEnvironment;
 }
 
 class ReviewAuthenticatedAccountIdentityGateway

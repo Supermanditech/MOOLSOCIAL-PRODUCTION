@@ -118,10 +118,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
         ((order.taxInvoiceState == BuyV2TaxInvoiceState.ready ||
                 order.taxInvoiceState == BuyV2TaxInvoiceState.corrected) &&
             taxInvoice != null);
-    final subtotal = order.lines.fold<int>(
-      0,
-      (total, line) => total + line.total,
-    );
+    final subtotal = buyV2SumMinor(order.lines.map((line) => line.totalMinor));
     return Scaffold(
       key: ValueKey('buy-invoice-page-${order.id}'),
       backgroundColor: BuyV2Colors.canvas,
@@ -163,7 +160,7 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
             Semantics(
               container: true,
               label:
-                  '${order.destination.label} order invoice ${order.id}, total ${buyV2Money(order.total)}',
+                  '${order.destination.label} order invoice ${order.id}, total ${buyV2MoneyMinor(order.payableTotalMinor)}',
               excludeSemantics: true,
               child: Container(
                 padding: const EdgeInsets.all(14),
@@ -171,67 +168,67 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   gradient: BuyV2ActionStyle.gradient,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: BuyV2ActionStyle.foreground.withValues(
-                          alpha: .14,
+                child: _InvoiceValueLayout(
+                  value: buyV2MoneyMinor(order.payableTotalMinor),
+                  valueStyle: const TextStyle(
+                    color: BuyV2ActionStyle.foreground,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  label: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: BuyV2ActionStyle.foreground.withValues(
+                            alpha: .14,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        child: const Icon(
+                          Icons.receipt_long_rounded,
+                          color: BuyV2ActionStyle.foreground,
+                          size: 25,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.receipt_long_rounded,
-                        color: BuyV2ActionStyle.foreground,
-                        size: 25,
-                      ),
-                    ),
-                    const SizedBox(width: 11),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'INVOICE',
-                            style: TextStyle(
-                              color: BuyV2Colors.orange,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: .8,
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'INVOICE',
+                              style: TextStyle(
+                                color: BuyV2Colors.orange,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .8,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            order.title,
-                            style: const TextStyle(
-                              color: BuyV2ActionStyle.foreground,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
+                            const SizedBox(height: 2),
+                            Text(
+                              order.title,
+                              style: const TextStyle(
+                                color: BuyV2ActionStyle.foreground,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                          ),
-                          Text(
-                            taxInvoice?.invoiceNumber ?? order.id,
-                            style: const TextStyle(
-                              color: BuyV2Colors.muted,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+                            Text(
+                              taxInvoice?.invoiceNumber ?? order.id,
+                              style: const TextStyle(
+                                color: BuyV2Colors.muted,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    Text(
-                      buyV2Money(order.total),
-                      style: const TextStyle(
-                        color: BuyV2ActionStyle.foreground,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -454,18 +451,18 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                     _InvoiceFact(label: 'Purchase order', value: reference),
                   if (order.paymentTermLabel case final term?)
                     _InvoiceFact(label: 'Payment term', value: term),
-                  if (order.amountPaidNow case final paidNow?)
+                  if (order.amountPaidNowMinor case final paidNow?)
                     _InvoiceFact(
                       label: 'Amount paid now',
-                      value: buyV2Money(paidNow),
+                      value: buyV2MoneyMinor(paidNow),
                     ),
                   if (order.paymentStatusLabel case final paymentStatus?)
                     _InvoiceFact(label: 'Payment status', value: paymentStatus),
-                  if (order.balanceDue > 0)
+                  if (order.balanceDueMinor > 0)
                     _InvoiceFact(
                       label: 'Balance due',
                       value:
-                          '${buyV2Money(order.balanceDue)} · '
+                          '${buyV2MoneyMinor(order.balanceDueMinor)} · '
                           '${order.balanceDueLabel ?? 'Due later'}',
                     ),
                 ],
@@ -495,36 +492,42 @@ class _BuyV2InvoicePageState extends State<BuyV2InvoicePage> {
                   if (order.lines.isNotEmpty)
                     _InvoiceAmountRow(
                       label: 'Items subtotal',
-                      amount: subtotal,
+                      amountMinor: subtotal,
                     ),
-                  if (order.tip > 0)
-                    _InvoiceAmountRow(label: 'Delivery tip', amount: order.tip),
-                  if (order.discount > 0)
+                  if (order.tipMinor > 0)
+                    _InvoiceAmountRow(
+                      label: 'Delivery tip',
+                      amountMinor: order.tipMinor,
+                    ),
+                  if (order.discountMinor > 0)
                     _InvoiceAmountRow(
                       label: 'Coupon saving',
-                      amount: order.discount,
+                      amountMinor: order.discountMinor,
                       deduction: true,
                     ),
-                  if (order.tax > 0)
+                  if (order.taxMinor > 0)
                     _InvoiceAmountRow(
                       label: 'GST and taxes',
-                      amount: order.tax,
+                      amountMinor: order.taxMinor,
                     ),
-                  if (order.freight > 0)
-                    _InvoiceAmountRow(label: 'Freight', amount: order.freight),
-                  if (order.deliveryFee > 0)
+                  if (order.freightMinor > 0)
+                    _InvoiceAmountRow(
+                      label: 'Freight',
+                      amountMinor: order.freightMinor,
+                    ),
+                  if (order.deliveryFeeMinor > 0)
                     _InvoiceAmountRow(
                       label: 'Delivery fee',
-                      amount: order.deliveryFee,
+                      amountMinor: order.deliveryFeeMinor,
                     ),
-                  if (order.paymentCharge > 0)
+                  if (order.paymentChargeMinor > 0)
                     _InvoiceAmountRow(
                       label: 'Payment charge',
-                      amount: order.paymentCharge,
+                      amountMinor: order.paymentChargeMinor,
                     ),
                   _InvoiceAmountRow(
                     label: 'Order total',
-                    amount: order.total,
+                    amountMinor: order.payableTotalMinor,
                     prominent: true,
                   ),
                 ],
@@ -686,49 +689,48 @@ class _InvoiceLine extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: BuyV2Colors.softBlue,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  '${line.quantity}×',
-                  style: const TextStyle(
-                    color: BuyV2Colors.navy,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
+          child: _InvoiceValueLayout(
+            value: buyV2MoneyMinor(line.totalMinor),
+            valueStyle: const TextStyle(
+              color: BuyV2Colors.navy,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+            label: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: BuyV2Colors.softBlue,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    '${line.quantity}×',
+                    style: const TextStyle(
+                      color: BuyV2Colors.navy,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(line.product.customerTitle, style: context.buyBody),
-                    Text(
-                      '${line.product.pack} · ${buyV2Money(line.product.price)} each',
-                      style: context.buyMeta.copyWith(fontSize: 8),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(line.product.customerTitle, style: context.buyBody),
+                      Text(
+                        '${line.product.pack} · ${buyV2MoneyMinor(line.product.priceMinor)} each',
+                        style: context.buyMeta.copyWith(fontSize: 8),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                buyV2Money(line.total),
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (showDivider) const Divider(height: 1),
@@ -800,13 +802,13 @@ class _TaxInvoiceLine extends StatelessWidget {
 class _InvoiceAmountRow extends StatelessWidget {
   const _InvoiceAmountRow({
     required this.label,
-    required this.amount,
+    required this.amountMinor,
     this.prominent = false,
     this.deduction = false,
   });
 
   final String label;
-  final int amount;
+  final int amountMinor;
   final bool prominent;
   final bool deduction;
 
@@ -822,12 +824,53 @@ class _InvoiceAmountRow extends StatelessWidget {
               border: Border(top: BorderSide(color: BuyV2Colors.line)),
             )
           : null,
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: style)),
-          Text('${deduction ? '−' : ''}${buyV2Money(amount)}', style: style),
-        ],
+      child: _InvoiceValueLayout(
+        label: Text(label, style: style),
+        value: '${deduction ? '−' : ''}${buyV2MoneyMinor(amountMinor)}',
+        valueStyle: style,
       ),
     );
   }
+}
+
+/// Gives large exact amounts their own row rather than truncating either fact.
+class _InvoiceValueLayout extends StatelessWidget {
+  const _InvoiceValueLayout({
+    required this.label,
+    required this.value,
+    required this.valueStyle,
+  });
+
+  final Widget label;
+  final String value;
+  final TextStyle valueStyle;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final amount = Text(value, style: valueStyle);
+      final amountWidth = buyV2ValueTextSize(context, value, valueStyle).width;
+      if (amountWidth + 128 > constraints.maxWidth) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            label,
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: amount,
+            ),
+          ],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(child: label),
+          const SizedBox(width: 8),
+          amount,
+        ],
+      );
+    },
+  );
 }

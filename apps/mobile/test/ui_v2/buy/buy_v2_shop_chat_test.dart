@@ -18,6 +18,75 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('LF-PAISE product Chat preserves exact editable context and return identity', () {
+    final product = BuyV2Catalogue.products.first.copyWith(priceMinor: 1025, mrpMinor: 1250);
+    final uri = Uri.parse(const BuyV2ChatRouteAdapter().productQuestionLocationFor(product: product, quantity: 3));
+    expect(uri.queryParameters['priceMinor'], '1025');
+    expect(uri.queryParameters['mrpMinor'], '1250');
+    expect(uri.queryParameters.containsKey('price'), isFalse);
+    expect(uri.queryParameters['draft'], contains('Price: ₹10.25'));
+    expect(uri.queryParameters['draft'], contains('MRP: ₹12.50'));
+    final snapshot = jsonDecode(uri.queryParameters['productSnapshot']!) as Map;
+    expect(snapshot['priceMinor'], 1025); expect(snapshot['mrpMinor'], 1250);
+    expect(snapshot.containsKey('price'), isFalse);
+    final context = ChatCommerceContext.fromUri(uri);
+    final facts = {for (final fact in context.decisionFacts) fact.label: fact.value};
+    expect(facts['Price'], '₹10.25'); expect(facts['MRP'], '₹12.50');
+    expect(context.skuId, product.id);
+    expect(Uri.parse(uri.queryParameters['return']!).queryParameters['product'], product.id);
+  });
+  test('LF-PAISE order Chat shows payable override while preserving legacy total and exact lines', () {
+    final product = BuyV2Catalogue.products.first.copyWith(priceMinor: 1025, mrpMinor: 1250);
+    final order = BuyV2Order(id: 'host-exact-order', destination: product.destination,
+      title: 'Host order', itemSummary: product.title, total: 10, totalMinor: 1025,
+      partner: product.seller, partnerType: product.sellerType, promise: 'Host estimate',
+      destinationLabel: 'Host address', progress: .3, status: BuyV2OrderStatus.confirmed,
+      productIds: [product.id], lines: [BuyV2CartLine(product: product, quantity: 1)]);
+    final uri = Uri.parse(const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order));
+    expect(uri.queryParameters['orderTotal'], '10');
+    expect(uri.queryParameters['orderTotalMinor'], '1025');
+    final line = (jsonDecode(uri.queryParameters['orderLines']!) as List).single as Map;
+    expect(line['priceMinor'], 1025); expect(line['lineTotalMinor'], 1025);
+    expect(line.containsKey('lineTotal'), isFalse);
+    final context = ChatCommerceContext.fromUri(uri);
+    expect(context.orderTotal, '10.25');
+    expect(context.decisionFacts.singleWhere((fact) => fact.label == 'Order total').value, '₹10.25');
+    expect(Uri.parse(uri.queryParameters['return']!).queryParameters['order'], order.id);
+    expect(order.total, 10); expect(order.payableTotalMinor, 1025);
+    final minorOrder = BuyV2Order.minor(id: 'host-minor-only-order', destination: product.destination,
+      title: 'Host order', itemSummary: product.title, totalMinor: 3075,
+      partner: product.seller, partnerType: product.sellerType, promise: 'Host estimate',
+      destinationLabel: 'Host address', progress: .3, status: BuyV2OrderStatus.confirmed,
+      productIds: [product.id], lines: [BuyV2CartLine(product: product, quantity: 3)]);
+    final minorUri = Uri.parse(const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: minorOrder));
+    expect(minorUri.queryParameters.containsKey('orderTotal'), isFalse);
+    expect(minorUri.queryParameters['orderTotalMinor'], '3075');
+    expect(ChatCommerceContext.fromUri(minorUri).orderTotal, '30.75');
+    expect(((jsonDecode(minorUri.queryParameters['orderLines']!) as List).single as Map)['lineTotalMinor'], 3075);
+  });
+  test('LF-PAISE invalid explicit Chat money never falls back to legacy context', () {
+    for (final value in ['', '1.5', '-1', 'NaN', '9007199254740992']) {
+      final context = ChatCommerceContext.fromUri(Uri(path: '/app/chat/thread/host', queryParameters: {
+        'context': 'supplier-product', 'price': '99', 'mrp': '100', 'orderTotal': '199',
+        'priceMinor': value, 'mrpMinor': value, 'orderTotalMinor': value,
+      }));
+      expect(context.price, isNull, reason: value);
+      expect(context.mrp, isNull, reason: value);
+      expect(context.orderTotal, isNull, reason: value);
+      expect(context.decisionFacts.where((fact) => ['Price', 'MRP', 'Order total'].contains(fact.label)), isEmpty);
+    }
+    final snapshot = ChatCommerceContext.fromUri(Uri(path: '/app/chat/thread/host', queryParameters: {
+      'context': 'supplier-product', 'productSnapshot': jsonEncode({'priceMinor': 1025.0, 'price': 10,
+        'mrpMinor': null, 'mrp': 99}),
+    }));
+    expect(snapshot.price, isNull); expect(snapshot.mrp, isNull);
+    final legacy = ChatCommerceContext.fromUri(Uri(path: '/app/chat/thread/host', queryParameters: {'price': '260'}));
+    expect(legacy.price, '260');
+    expect(ChatCommerceContext.fromUri(Uri.parse('/app/chat/thread/host?price=99&priceMinor=1025&priceMinor=1026')).price, isNull);
+    expect(ChatCommerceContext.fromUri(Uri.parse('/app/chat/thread/host?priceMinor=9007199254740991')).price,
+      '90071992547409.91');
+  });
+
   const freshnessOrder = BuyV2Order(
     id: 'RV6-D003',
     destination: BuyV2Destination.shop,

@@ -60,6 +60,13 @@ void main() {
   testWidgets('production boot hands a returning account to Social', (
     tester,
   ) async {
+    final lifecycle = tester.binding.lifecycleState;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    addTearDown(
+      () => tester.binding.handleAppLifecycleStateChanged(
+        lifecycle ?? AppLifecycleState.detached,
+      ),
+    );
     final session = JourneySession(
       store: MemoryJourneyStore(
         snapshot: readySnapshot(lastReadyRoute: '/app/work/my-work'),
@@ -72,10 +79,14 @@ void main() {
     await tester.pumpWidget(
       MoolSocialApp(session: session, initialLocation: '/boot'),
     );
+    // Mount the async router's first splash frame before timing its guard.
+    await tester.pump();
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
     expect(find.byKey(const Key('mvp-action-root-work')), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 }

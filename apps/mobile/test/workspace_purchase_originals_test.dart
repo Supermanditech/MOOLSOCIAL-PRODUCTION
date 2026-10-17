@@ -1,0 +1,667 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_services.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+import 'package:moolsocial/features/work/work_order_identity_gateway.dart';
+import 'package:moolsocial/features/work/widgets/workspace_purchase_originals.dart';
+import 'work_order_identity_gateway_test.dart' as fixtures;
+
+// Host-only account/journal fixtures, never installed evaluation records.
+class _OrderAccount implements WorkPendingProofStore {
+  @override
+  String? get accountScope => 'owner-1';
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+class _OrderPending implements WorkOrderPendingStore {
+  final entries = <String, WorkOrderCommand>{};
+  @override
+  Future<List<WorkOrderCommand>> readPending(String accountScope, String workspaceId) async => entries.values.toList();
+  @override
+  Future<void> savePending(WorkOrderCommand command) async { entries[command.orderId] = command; }
+  @override
+  Future<void> removePending(WorkOrderCommand command) async { entries.remove(command.orderId); }
+}
+
+void main() {
+  for (final scale in [1.0, 2.0]) {
+  testWidgets('ANALYTICS operational cold entry refresh and retirement use partial current positions $scale', (tester) async {
+    tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch, isUtc: true);
+    final raw = fixtures.operationalResponse(role: 'seller')
+      ..['placedAt'] = now.subtract(const Duration(minutes: 10)).toIso8601String()
+      ..['acceptanceDeadline'] = now.add(const Duration(hours: 1)).toIso8601String()
+      ..['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
+    final wire = fixtures.Transport();
+    wire.respond = (body) => body['operation'] == 'listStorePurchaseReferences'
+      ? fixtures.referenceResponse(role: 'seller') : raw;
+    final work = WorkSession(contactDraftStore: _OrderAccount(), operationalPendingStoreFactory: (_, _) => _OrderPending())
+      ..seedVerifiedWorkspace()
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
+      ..workspaceId = 'store-one' ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+    final localOrder = WorkspaceOrderRecord(id: 'manual-evaluation', customer: 'Host local customer', items: 'Host item',
+      quantities: const {}, amount: 1, source: 'Phone', fulfilment: 'Pickup', payment: 'Unpaid', address: '',
+      stage: 'Preparing', needsDelivery: false, createdAt: now, fulfilmentDeadline: now.add(const Duration(hours: 1)));
+    work.workspaceOrders.add(localOrder);
+    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1'), 'evaluation');
+    final stock = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    final invoices = work.workspaceInvoices.toList(growable: false);
+    final procurement = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
+    final router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
+      GoRoute(path: '/app/work/workspace/dashboard', builder: (context, state) => WorkWorkspaceDashboardScreen(
+        session: work, procurementSession: procurement, initialSection: 'dashboard')),
+    ]);
+    addTearDown(router.dispose); addTearDown(work.dispose); addTearDown(procurement.dispose); addTearDown(procurement.core.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router,
+      builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-store-operating-board')), findsOneWidget);
+    expect(find.text('Tracking not connected'), findsWidgets);
+    expect(wire.requests.map((r) => r['operation']), ['listStorePurchaseReferences', 'readStoreOperationalOrder']);
+    final preview = find.byKey(const Key('analytics-preview-orders'));
+    expect(find.descendant(of: preview, matching: find.text('Known local and online orders · partial coverage')), findsOneWidget);
+    final explore = find.byKey(const Key('analytics-preview-action-orders'));
+    await tester.ensureVisible(explore); await tester.pumpAndSettle();
+    await tester.tap(explore); await tester.pumpAndSettle();
+    expect(find.text('Current order status · all dates'), findsOneWidget);
+    String value(String id) => tester.widget<Text>(find.byKey(Key('store-overview-$id'))).data!;
+    expect(value('recorded-open-orders'), '2'); expect(value('awaiting-acceptance'), '1');
+    expect(find.text('Known local and online orders · partial coverage'), findsOneWidget);
+    final calls = wire.calls;
+    // Expanding and rebuilding must not issue another discovery pass.
+    work.setWorkspaceMoneyPeriod('Today'); await tester.pumpAndSettle(); expect(wire.calls, calls);
+    raw['stage'] = 'Preparing'; raw['revision'] = 2; raw['permittedActions'] = ['ready'];
+    raw['acceptanceDeadline'] = now.subtract(const Duration(minutes: 5)).toIso8601String();
+    raw['fulfilmentDeadline'] = now.subtract(const Duration(minutes: 1)).toIso8601String();
+    final refresh = find.byTooltip('Refresh analytics');
+    await tester.ensureVisible(refresh); await tester.tap(refresh); await tester.pumpAndSettle();
+    expect(wire.calls, calls + 2); expect(value('awaiting-acceptance'), '0'); expect(value('overdue-fulfilment'), '1');
+    await tester.ensureVisible(explore); await tester.tap(explore); await tester.pumpAndSettle();
+    wire.fail = true;
+    await tester.ensureVisible(refresh); await tester.tap(refresh); await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('analytics-preview-value-orders-0'))).data, '2');
+    expect(find.descendant(of: preview, matching: find.text('Online refresh unavailable · retained partial records')), findsOneWidget);
+    await tester.ensureVisible(explore); await tester.tap(explore); await tester.pumpAndSettle();
+    expect(value('recorded-open-orders'), '2');
+    work.bindOriginalPurchaseReader(null, ''); await tester.pumpAndSettle();
+    expect(value('recorded-open-orders'), '1'); expect(value('overdue-fulfilment'), '0');
+    expect(work.workspaceOrders.single, same(localOrder));
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), stock);
+    expect(work.workspaceInvoices, invoices); expect(work.workspaceStockMovements, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  }
+  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection')]) {
+  testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
+    await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+    tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+    final raw = fixtures.operationalResponse(role: 'seller');
+    if (scenario.$2 == 'collection') {
+      raw['fulfilment'] = 'collection'; raw['stage'] = 'Preparing'; raw['permittedActions'] = <String>[];
+    }
+    final now = DateTime.fromMillisecondsSinceEpoch(DateTime.now().millisecondsSinceEpoch, isUtc: true);
+    raw['placedAt'] = now.subtract(const Duration(minutes: 10)).toIso8601String();
+    raw['acceptanceDeadline'] = now.add(const Duration(hours: 1)).toIso8601String();
+    raw['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
+    final wire = fixtures.Transport();
+    wire.respond = (body) {
+      if (body['operation'] == 'listStorePurchaseReferences') return fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one';
+      if (body['operation'] == 'submitStoreOrderCommand') {
+        raw['revision'] = (body['expectedRevision'] as int) + 1;
+        raw['stage'] = body['action'] == 'accept' ? 'Preparing' : 'Ready';
+        raw['permittedActions'] = body['action'] == 'accept' ? ['ready'] : <String>[];
+        return {'schemaVersion': 1, 'operationId': body['operationId'], 'state': 'applied', 'snapshot': raw};
+      }
+      return raw;
+    };
+    final journal = _OrderPending();
+    final work = WorkSession(contactDraftStore: _OrderAccount(), operationalPendingStoreFactory: (_, _) => journal)
+      ..seedVerifiedWorkspace()
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Store', profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery', area: 'Jodhpur', verified: true)
+      ..workspaceId = 'store-one'
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live;
+    work.bindOriginalPurchaseReader(fixtures.projectionGateway(wire, account: 'owner-1'), 'evaluation');
+    final procurement = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
+    final router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
+      GoRoute(path: '/app/work/workspace/dashboard', builder: (context, state) => WorkWorkspaceDashboardScreen(
+        session: work, procurementSession: procurement, initialSection: 'orders')),
+    ]);
+    addTearDown(router.dispose); addTearDown(work.dispose); addTearDown(procurement.dispose); addTearDown(procurement.core.dispose);
+    final capture = GlobalKey();
+    await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp.router(routerConfig: router,
+      theme: ThemeData(fontFamily: 'Inter'),
+      builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scenario.$1)), child: child!))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('work-operational-order-order-v2')), findsOneWidget);
+    expect(find.text('Saved online orders · partial coverage'), findsOneWidget);
+    if (scenario.$2 == 'delivery') {
+    await tester.ensureVisible(find.byKey(const Key('work-operational-accept-order-v2')));
+    await tester.tap(find.byKey(const Key('work-operational-accept-order-v2'))); await tester.pumpAndSettle();
+    expect(work.workspaceOrders.single.stage, 'Preparing');
+    await tester.ensureVisible(find.byKey(const Key('work-operational-pack-line-one')));
+    await tester.tap(find.byKey(const Key('work-operational-pack-line-one'))); await tester.pumpAndSettle();
+    expect(work.workspacePackingComplete, isTrue);
+    await tester.ensureVisible(find.byKey(const Key('work-operational-ready-order-v2')));
+    await tester.tap(find.byKey(const Key('work-operational-ready-order-v2'))); await tester.pumpAndSettle();
+    expect(work.workspaceOrders.single.stage, 'Ready');
+    expect(find.text('Arrange delivery'), findsNothing);
+    } else {
+      expect(find.byKey(const Key('work-operational-pack-line-one')), findsNothing);
+      expect(find.text('Collection actions are unavailable for this order.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('work-operational-ready-order-v2'))).onPressed, isNull);
+      expect(work.workspaceOrders.single.stage, 'Preparing');
+    }
+    await tester.ensureVisible(find.text('Review')); await tester.tap(find.text('Review')); await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-operational-details-order-v2')), findsOneWidget);
+    for (final key in ['itemsMinor','discountMinor','taxMinor','deliveryMinor','freightMinor','paymentFeeMinor','tipMinor','totalMinor']) {
+      expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
+    }
+    expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (const bool.fromEnvironment('MOOLSOCIAL_CAPTURE_OPERATIONAL_HOST')) {
+      Future<void> captureView(String suffix) async {
+        final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+          final directory = Directory('build/lf-operational-ui-20261017'); await directory.create(recursive: true);
+          await File('${directory.path}/host-${scenario.$2}-${scenario.$1}-$suffix.png').writeAsBytes(bytes!.buffer.asUint8List());
+        });
+      }
+      await captureView('details-top');
+      await tester.ensureVisible(find.byKey(const Key('work-operational-total-totalMinor'))); await tester.pumpAndSettle();
+      await captureView('details-total');
+    }
+    expect(work.workspaceInvoices, isEmpty); expect(work.workspaceStockMovements, isEmpty);
+    expect(journal.entries, isEmpty); expect(tester.takeException(), isNull);
+  });
+  }
+  testWidgets('typed operational Orders render exact facts without local invoice or delivery actions', (tester) async {
+    final wire = fixtures.Transport()..data = fixtures.operationalResponse(role: 'seller');
+    final gateway = AuthenticatedWorkspaceOrderOperationsGateway(fixtures.projectionGateway(wire, account: 'owner-1'));
+    final snapshot = (await gateway.read(role: WorkspaceOrderIdentityRole.seller, realm: 'evaluation', reference: fixtures.operationalReference()))!;
+    final work = WorkSession()
+      ..seedVerifiedWorkspace()
+      ..retailerSetupSaved = true
+      ..reviewStage = WorkReviewStage.live
+      ..workspaceStoreState = WorkspaceStoreState.open;
+    work.workspaceOrders.add(WorkspaceOrderRecord.fromOperational(snapshot));
+    final core = BuySession(), procurement = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
+    final router = GoRouter(initialLocation: '/app/work/workspace/dashboard', routes: [
+      GoRoute(path: '/app/work/workspace/dashboard', builder: (context, state) => WorkWorkspaceDashboardScreen(
+        session: work, procurementSession: procurement, initialSection: 'orders')),
+    ]);
+    addTearDown(router.dispose); addTearDown(work.dispose); addTearDown(procurement.dispose);
+    addTearDown(procurement.core.dispose); addTearDown(core.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('work-operational-order-order-v2')), findsOneWidget);
+    expect(find.text('Payment status unavailable'), findsWidgets);
+    expect(find.text('Arrange delivery'), findsNothing);
+    expect(find.text('More time'), findsNothing);
+    expect(work.workspaceInvoices, isEmpty);
+    expect(work.workspaceStockMovements, isEmpty);
+  });
+  test(
+    'configured default root never creates a hosted reader for emulator identity',
+    () {
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      final core = BuySession();
+      final root = BuyV2RootSessions(
+        core: core,
+        currentIdentity: () => (
+          environment: jsonEncode(['firebase-emulator', '127.0.0.1', '', 9099]),
+          projectId: 'moolsocial-dev-503018',
+          tenantId: null as String?,
+          userId: 'buyer-1',
+        ),
+      );
+      addTearDown(core.dispose);
+      root.synchronize(accountRequired: true);
+      addTearDown(root.dispose);
+      expect(root.current.purchaseReader, isNull);
+    },
+  );
+  testWidgets(
+    'actual Buy Orders consumes discovered facts without adding operational orders',
+    (tester) async {
+      final core = BuySession();
+      final wire = fixtures.Transport()..data = fixtures.referenceResponse();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        purchaseReader: fixtures.projectionGateway(wire),
+        purchaseRealm: 'evaluation',
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      var helpCalls = 0;
+      await session.restoreCommerce();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BuyV2OrdersView(
+              session: session,
+              onOpenOrderHelp: (_) {
+                helpCalls++;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        wire.calls,
+        0,
+        reason: 'Collapsed optional details do not fetch or steal queue space',
+      );
+      await tester.tap(find.text('Saved purchase details'));
+      await tester.pumpAndSettle();
+      wire.data = fixtures.purchaseResponse();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      expect(find.text('₹100.15'), findsOneWidget);
+      expect(session.visibleOrderHistory, isEmpty);
+      expect(helpCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  test(
+    'root readers retire across A B A and Store binding rejects retired reader',
+    () {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final previous = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+      const a = (
+        environment: 'host-only',
+        projectId: 'host-project',
+        tenantId: null as String?,
+        userId: 'buyer-1',
+      );
+      const b = (
+        environment: 'host-only',
+        projectId: 'host-project',
+        tenantId: null as String?,
+        userId: 'buyer-2',
+      );
+      BuyV2AccountPersistenceIdentity? identity = a;
+      final core = BuySession(), work = WorkSession();
+      final root = BuyV2RootSessions(
+        core: core,
+        currentIdentity: () => identity,
+        purchaseRealm: 'evaluation',
+        purchaseReaderFactory: (owner, alive) => fixtures.projectionGateway(
+          fixtures.Transport(),
+          account: owner.userId,
+          lifetime: () => alive() ? owner : null,
+        ),
+      );
+      addTearDown(core.dispose);
+      addTearDown(work.dispose);
+      addTearDown(root.dispose);
+      root.synchronize(accountRequired: true);
+      final first = root.current.purchaseReader!;
+      work.bindOriginalPurchaseReader(first, root.current.purchaseRealm);
+      expect(work.originalPurchaseReader, same(first));
+      identity = b;
+      root.synchronize(accountRequired: true);
+      expect(first.isCurrent, isFalse);
+      expect(work.originalPurchaseReader, isNull);
+      identity = a;
+      root.synchronize(accountRequired: true);
+      expect(first.isCurrent, isFalse);
+      expect(root.current.purchaseReader!.isCurrent, isTrue);
+      expect(identical(first, root.current.purchaseReader), isFalse);
+      identity = null;
+      root.synchronize(accountRequired: false);
+      expect(root.current.purchaseReader, isNull);
+    },
+  );
+  testWidgets(
+    'actual Store Orders consumes originals without changing the operational queue',
+    (tester) async {
+      final work = WorkSession()
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live
+        ..workspaceStoreState = WorkspaceStoreState.open;
+      final core = BuySession(),
+          procurement = BuyV2Session(
+            core: BuySession(),
+            reviewDataEnabled: false,
+          );
+      final storeId = work.activeWorkspace!.id;
+      final wire = fixtures.Transport()
+        ..data = fixtures.referenceResponse(role: 'seller');
+      wire.data['storeId'] = storeId;
+      wire.data['references'][0]['storeId'] = storeId;
+      final data = fixtures.purchaseResponse(role: 'seller');
+      data['orders'][0]['storeId'] = storeId;
+      final fingerprint = sha256
+          .convert(
+            utf8.encode(
+              jsonEncode({
+                'factsVersion': 2,
+                'storeId': storeId,
+                'orderId': 'order-v2',
+                'original': data['orders'][0]['original'],
+              }),
+            ),
+          )
+          .toString();
+      wire.data['references'][0]['originalFingerprint'] = fingerprint;
+      data['orders'][0]['originalFingerprint'] = fingerprint;
+      work.bindOriginalPurchaseReader(
+        fixtures.projectionGateway(wire, account: 'owner-1'),
+        'evaluation',
+      );
+      final before = List.of(work.workspaceOrders);
+      final router = GoRouter(
+        initialLocation: '/app/work/workspace/dashboard',
+        routes: [
+          GoRoute(
+            path: '/app/work/workspace/dashboard',
+            builder: (context, state) => WorkWorkspaceDashboardScreen(
+              session: work,
+              procurementSession: procurement,
+              initialSection: 'orders',
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      addTearDown(work.dispose);
+      addTearDown(procurement.dispose);
+      addTearDown(procurement.core.dispose);
+      addTearDown(core.dispose);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      await tester.tap(find.text('Saved purchase details'));
+      await tester.pumpAndSettle();
+      wire.data = data;
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      expect(find.text('₹100.15'), findsOneWidget);
+      expect(work.workspaceOrders, orderedEquals(before));
+      expect(wire.sent!['operation'], 'readStorePurchaseProjection');
+      expect(wire.sent!['storeId'], storeId);
+      final update = fixtures.operationalResponse(role: 'seller')
+        ..['storeId'] = storeId
+        ..['originalFingerprint'] = fingerprint;
+      wire.data = update;
+      await tester.ensureVisible(find.text('Check order update'));
+      await tester.tap(find.text('Check order update'));
+      await tester.pumpAndSettle();
+      expect(find.text('Awaiting Store acceptance'), findsOneWidget);
+      expect(wire.sent!['operation'], 'readStoreOperationalOrder');
+      expect(work.workspaceOrders, orderedEquals(before));
+      expect(tester.takeException(), isNull);
+    },
+  );
+  Future<void> mount(
+    WidgetTester tester,
+    AuthenticatedWorkspaceOrderIdentityGateway gateway, {
+    double scale = 1,
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: SingleChildScrollView(
+              child: WorkspacePurchaseOriginals(
+                gateway: gateway,
+                role: WorkspaceOrderIdentityRole.buyer,
+                realm: 'evaluation',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Saved purchase details'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+    'buyer original details consume real typed order updates without payment authority',
+    (tester) async {
+      final wire = fixtures.Transport()..data = fixtures.referenceResponse();
+      await mount(tester, fixtures.projectionGateway(wire));
+      wire.data = fixtures.purchaseResponse();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      wire.data = fixtures.operationalResponse();
+      await tester.ensureVisible(find.text('Check order update'));
+      await tester.tap(find.text('Check order update'));
+      await tester.pumpAndSettle();
+      expect(find.text('Awaiting Store acceptance'), findsOneWidget);
+      expect(wire.sent!['operation'], 'readBuyerOperationalOrder');
+      wire.data
+        ..['revision'] = 2
+        ..['stage'] = 'Preparing';
+      await tester.tap(find.text('Refresh order update'));
+      await tester.pumpAndSettle();
+      expect(find.text('Preparing'), findsOneWidget);
+      wire.data
+        ..['revision'] = 1
+        ..['stage'] = 'Confirmed';
+      await tester.tap(find.text('Refresh order update'));
+      await tester.pumpAndSettle();
+      expect(find.text('Preparing'), findsOneWidget);
+      expect(
+        find.text('Update unavailable; showing earlier status.'),
+        findsOneWidget,
+      );
+      expect(find.text('Pay'), findsNothing);
+      expect(find.text('Accept order'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'discovered originals expand in place, exact paise and no commercial actions',
+    (tester) async {
+      final wire = fixtures.Transport()..data = fixtures.referenceResponse();
+      await mount(tester, fixtures.projectionGateway(wire));
+      expect(find.text('Saved purchase details'), findsOneWidget);
+      wire.data = fixtures.purchaseResponse();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      expect(find.text('दाल'), findsOneWidget);
+      expect(find.text('₹100.15'), findsOneWidget);
+      expect(find.text('1 pack · 1 kg'), findsOneWidget);
+      for (final action in [
+        'Pay',
+        'Accept order',
+        'Pack',
+        'Cancel order',
+        'Refund',
+        'Mark delivered',
+      ]) {
+        expect(find.text(action), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'narrow enlarged-text exact amounts do not overflow or disappear',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final wire = fixtures.Transport()..data = fixtures.referenceResponse();
+      await mount(tester, fixtures.projectionGateway(wire), scale: 2);
+      wire.data = fixtures.purchaseResponse();
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      expect(find.text('₹100.15'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('unavailable and empty coverage never claim zero online orders', (
+    tester,
+  ) async {
+    final wire = fixtures.Transport()
+      ..data = fixtures.referenceResponse()
+      ..fail = true;
+    await mount(tester, fixtures.projectionGateway(wire));
+    expect(find.text('Purchase details unavailable'), findsOneWidget);
+    wire.fail = false;
+    wire.data['references'] = [];
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('not the complete online order list'),
+      findsOneWidget,
+    );
+    expect(find.text('No orders'), findsNothing);
+  });
+  testWidgets(
+    'retry preserves failed continuation even when preceding page was empty',
+    (tester) async {
+      final wire = fixtures.Transport()
+        ..data = fixtures.referenceResponse()
+        ..data['references'] = []
+        ..data['nextCursor'] = 'scanned-page';
+      await mount(tester, fixtures.projectionGateway(wire));
+      wire.fail = true;
+      await tester.tap(find.text('Load more purchase details'));
+      await tester.pumpAndSettle();
+      expect(wire.sent!['cursor'], 'scanned-page');
+      wire.fail = false;
+      wire.data['nextCursor'] = null;
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(wire.sent!['cursor'], 'scanned-page');
+    },
+  );
+  testWidgets(
+    'late retired-owner discovery cannot repopulate a replacement widget',
+    (tester) async {
+      Object? owner = Object();
+      final old = fixtures.Transport()
+        ..data = fixtures.referenceResponse()
+        ..pending = Completer<void>();
+      final first = fixtures.projectionGateway(old, lifetime: () => owner);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WorkspacePurchaseOriginals(
+              gateway: first,
+              role: WorkspaceOrderIdentityRole.buyer,
+              realm: 'evaluation',
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Saved purchase details'));
+      await tester.pump();
+      owner = null;
+      final fresh = fixtures.Transport()
+        ..data = fixtures.referenceResponse()
+        ..data['references'] = [];
+      await mount(tester, fixtures.projectionGateway(fresh));
+      old.pending!.complete();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('original-order-order-v2')),
+        findsNothing,
+      );
+    },
+  );
+  testWidgets(
+    '1000 crore exact total fits at 320px enlarged text without horizontal scrolling',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 1200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final data = fixtures.purchaseResponse();
+      final original = data['orders'][0]['original'];
+      original['lines'][0]['unitPriceMinor'] = 1000000000000;
+      original['lines'][0]['lineTotalMinor'] = 1000000000000;
+      for (final key in (original['totals'] as Map).keys) {
+        original['totals'][key] = 0;
+      }
+      original['totals']['itemsMinor'] = original['totals']['totalMinor'] =
+          1000000000000;
+      final hash = sha256
+          .convert(
+            utf8.encode(
+              jsonEncode({
+                'factsVersion': 2,
+                'storeId': 'store-one',
+                'orderId': 'order-v2',
+                'original': original,
+              }),
+            ),
+          )
+          .toString();
+      data['orders'][0]['originalFingerprint'] = hash;
+      final wire = fixtures.Transport()..data = fixtures.referenceResponse();
+      wire.data['references'][0]['originalFingerprint'] = hash;
+      await mount(tester, fixtures.projectionGateway(wire), scale: 2);
+      wire.data = data;
+      await tester.tap(find.byKey(const ValueKey('original-order-order-v2')));
+      await tester.pumpAndSettle();
+      final amounts = find.text('₹10,00,00,00,000.00');
+      expect(amounts, findsWidgets);
+      for (final e in amounts.evaluate()) {
+        final paragraph = e.renderObject! as RenderParagraph;
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final target = find.byElementPredicate((x) => identical(x, e));
+        expect(
+          find.ancestor(
+            of: target,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is SingleChildScrollView &&
+                  w.scrollDirection == Axis.horizontal,
+            ),
+          ),
+          findsNothing,
+        );
+        final boxes = paragraph.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 18),
+        );
+        expect(boxes.every((b) => b.right <= paragraph.size.width + 1), isTrue);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+}

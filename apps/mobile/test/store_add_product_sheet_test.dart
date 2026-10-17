@@ -8,6 +8,7 @@ void main() {
   Future<void> open(
     WidgetTester tester, {
     List<WorkspaceCatalogueItem> owned = const [],
+    bool stockOnly = false,
     required ValueChanged<WorkspaceCatalogueItem?> result,
     Future<String?> Function()? scan,
   }) async {
@@ -24,6 +25,7 @@ void main() {
                       builder: (_) => StoreAddProductSheet(
                         catalogue: [master],
                         ownedProducts: owned,
+                        stockOnly: stockOnly,
                         createProduct: (code) => master.copyWith(
                           barcode: code,
                           publicListing: false,
@@ -66,12 +68,26 @@ void main() {
       final owned = master.copyWith(sku: 'MY-SKU', sellingPrice: 937, stock: 4);
       WorkspaceCatalogueItem? selected;
       await open(tester, owned: [owned], result: (value) => selected = value);
-      expect(find.textContaining('Already in your store'), findsOneWidget);
+      expect(find.text('In your store'), findsOneWidget);
       await tester.tap(find.byKey(Key('work-add-product-${master.id}')));
       await tester.pumpAndSettle();
       expect(identical(selected, owned), isTrue);
     },
   );
+
+  testWidgets('LF-PAISE existing exact SKU remains readable and opens its original record', (tester) async {
+    final owned = master.copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025,
+      mrpMinor: 1250, sku: 'HOST-EXACT', stock: 3);
+    WorkspaceCatalogueItem? selected;
+    await open(tester, owned: [owned], stockOnly: true, result: (value) => selected = value);
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('₹10.25'), findsWidgets);
+    await tester.tap(find.byKey(Key('work-catalogue-add-${master.id}')));
+    await tester.pumpAndSettle();
+    expect(identical(selected, owned), isTrue);
+    expect(selected!.sellingPriceMinor, 1025);
+    expect(selected!.stock, 3);
+  });
 
   testWidgets(
     'Unmatched scan carries its barcode only into explicit manual creation',
@@ -122,6 +138,7 @@ void main() {
       canonicalId: master.canonicalId,
       pack: 'Different pack',
     );
+    WorkspaceCatalogueItem? selected;
     await tester.pumpWidget(
       MaterialApp(
         home: StoreAddProductSheet(
@@ -129,11 +146,20 @@ void main() {
           ownedProducts: [owned],
           createProduct: (_) => master,
           scanBarcode: () async => null,
+          onSelected: (product) => selected = product,
         ),
       ),
     );
-    expect(find.byType(ListTile), findsNWidgets(2));
-    expect(find.textContaining('Already in your store'), findsOneWidget);
+    await tester.pumpAndSettle();
+    final action = find.byKey(Key('work-add-product-${master.id}'));
+    expect(action, findsOneWidget);
+    await tester.tap(action); await tester.pumpAndSettle();
+    expect(selected!.id, master.id);
+    expect(selected!.canonicalId, owned.canonicalId);
+    expect(selected!.pack, master.pack);
+    expect(selected!.pack, isNot(owned.pack));
+    expect(selected!.stock, 0);
+    expect(identical(selected, owned), isFalse);
   });
 
   testWidgets(

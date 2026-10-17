@@ -1033,7 +1033,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                   );
                   final width = buyV2ValueTextSize(
                     context,
-                    _glancePriceLabel(product.price),
+                    _glancePriceLabel(product.priceMinor),
                     style,
                   ).width;
                   final ratio = width > 0
@@ -1078,7 +1078,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         textWidth,
                       ) +
                       measure(
-                        _glancePriceLabel(product.price),
+                        _glancePriceLabel(product.priceMinor),
                         priceStyle(product).fontSize!,
                         FontWeight.w900,
                         textWidth,
@@ -1202,12 +1202,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          _glancePriceLabel(product.price),
+                                          _glancePriceLabel(product.priceMinor),
                                           key: ValueKey(
                                             'buy-offer-banner-price-${product.id}',
                                           ),
-                                          semanticsLabel: buyV2Money(
-                                            product.price,
+                                          semanticsLabel: buyV2MoneyMinor(
+                                            product.priceMinor,
                                           ),
                                           style: priceStyle(product),
                                           maxLines: 1,
@@ -1640,9 +1640,10 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       final known = widget.session.findProduct(offer.product.id);
       return offer.isCurrent(now: now) &&
           known != null &&
+          known.hasValidMoney && offer.product.hasValidMoney &&
           known.storeId == offer.product.storeId &&
           known.destination == offer.product.destination &&
-          known.price == offer.product.price &&
+          known.priceMinor == offer.product.priceMinor &&
           known.pack == offer.product.pack;
     });
   }
@@ -7714,8 +7715,8 @@ class BuyV2StoreCartBar extends StatelessWidget {
         ? session.itemCount
         : session.countForDestination(destination);
     final total = aggregate
-        ? session.cartTotal
-        : session.totalForDestination(destination);
+        ? session.cartTotalMinor
+        : session.totalMinorForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final acknowledgement = session.cartAcknowledgementForDestination(
       destination,
@@ -7749,7 +7750,7 @@ class BuyV2StoreCartBar extends StatelessWidget {
       fontSize: 8,
       fontWeight: FontWeight.w700,
     );
-    final totalText = buyV2Money(total);
+    final totalText = buyV2MoneyMinor(total);
     final messageSize = buyV2ValueTextSize(
       context,
       visibleMessage,
@@ -8835,7 +8836,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               ) &&
               (_category == 'all' || item.categoryId == _category) &&
               (_maximumPrice == null ||
-                  widget.session.productFactsFor(item).price <= _maximumPrice!),
+                  widget.session.productFactsFor(item).priceMinor <= buyV2ExactMinorAmount(legacyRupees: _maximumPrice!)),
         ),
         _search.text,
       );
@@ -8846,8 +8847,8 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               (_sort == BuyV2ProductSort.priceLowToHigh ? 1 : -1) *
               widget.session
                   .productFactsFor(a)
-                  .price
-                  .compareTo(widget.session.productFactsFor(b).price),
+                  .priceMinor
+                  .compareTo(widget.session.productFactsFor(b).priceMinor),
         );
       }
       return PopScope(
@@ -9253,7 +9254,7 @@ class _RelatedStoreCard extends StatelessWidget {
                               color: Colors.transparent,
                             ),
                             child: Text(
-                              buyV2Money(facts.price),
+                              buyV2MoneyMinor(facts.priceMinor),
                               textAlign: TextAlign.right,
                               style: context.buyBody.copyWith(
                                 color: BuyV2Colors.ink,
@@ -9272,7 +9273,7 @@ class _RelatedStoreCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: Text(delivery, style: detailStyle)),
-                      if (facts.price == product.price &&
+                      if (facts.priceMinor == product.priceMinor &&
                           product.unitPrice.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Expanded(
@@ -9839,7 +9840,7 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${product.customerVariantPack} · ${buyV2Money(facts.price)}',
+                              '${product.customerVariantPack} · ${buyV2MoneyMinor(facts.priceMinor)}',
                               style: context.buyMeta.copyWith(fontSize: 11),
                             ),
                             Text(
@@ -10010,7 +10011,7 @@ class _SavedProductInfoRow extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${product.customerVariantPack} · ${buyV2Money(product.price)}',
+                              '${product.customerVariantPack} · ${buyV2MoneyMinor(product.priceMinor)}',
                               style: context.buyMeta,
                             ),
                           ],
@@ -10052,7 +10053,7 @@ class _HouseholdBasket extends StatelessWidget {
   Widget build(BuildContext context) {
     final plan = session.monthlyBasketPlan;
     final complete = plan.length == 12;
-    final subtotal = plan.fold<int>(0, (total, line) => total + line.total);
+    final subtotal = buyV2SumMinor(plan.map((line) => line.totalMinor));
     final quickProducts = plan
         .where(
           (line) =>
@@ -10154,7 +10155,7 @@ class _HouseholdBasket extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         complete
-                            ? 'Product subtotal ${buyV2Money(subtotal)}'
+                            ? 'Product subtotal ${buyV2MoneyMinor(subtotal)}'
                             : 'Basket prices are unavailable right now',
                         key: const ValueKey('buy-household-subtotal'),
                         style: context.buyBody.copyWith(
@@ -11301,14 +11302,14 @@ List<double> _productGridRowHeights(
   return heights;
 }
 
-String _glancePriceLabel(num value) {
-  if (value >= 10000000 && value % 10000000 == 0) {
-    return '${buyV2Money(value / 10000000)} crore';
+String _glancePriceLabel(int minor) {
+  if (minor >= 1000000000 && minor % 1000000000 == 0) {
+    return '${buyV2Money(minor ~/ 1000000000)} crore';
   }
-  if (value >= 100000 && value % 100000 == 0) {
-    return '${buyV2Money(value / 100000)} lakh';
+  if (minor >= 10000000 && minor % 10000000 == 0) {
+    return '${buyV2Money(minor ~/ 10000000)} lakh';
   }
-  return buyV2Money(value);
+  return buyV2MoneyMinor(minor);
 }
 
 TextStyle _readableGlancePriceStyle(
@@ -12083,7 +12084,7 @@ class _PrescriptionMatchLane extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(5),
                                     ),
                                     child: Text(
-                                      buyV2Money(product.price),
+                                      buyV2MoneyMinor(product.priceMinor),
                                       style: const TextStyle(
                                         color: BuyV2Colors.ink,
                                         fontSize: 12,
@@ -12428,7 +12429,7 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
         curve: Curves.easeOutCubic,
         child: Semantics(
           label:
-              '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2Money(facts.price)}, '
+              '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2MoneyMinor(facts.priceMinor)}, '
               '${product.unitPrice}, '
               '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
               '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
@@ -12815,7 +12816,7 @@ List<_ProductGlanceField> _productGlanceFields(
     ),
     (text: product.customerVariantPack, style: detail),
     (
-      text: _glancePriceLabel(facts.price),
+      text: _glancePriceLabel(facts.priceMinor),
       style: const TextStyle(
         color: BuyV2Colors.navy,
         fontSize: 20,
@@ -12830,7 +12831,7 @@ List<_ProductGlanceField> _productGlanceFields(
       (
         text:
             'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'} · '
-            '${buyV2Money(product.minimumOrderTotal(facts.price))} total'
+            '${buyV2MoneyMinor(product.minimumOrderTotalMinor(facts.priceMinor))} total'
             '${product.quantityStep > 1 ? ' · Step ${product.quantityStep}' : ''}',
         style: detail.copyWith(color: BuyV2Colors.navy),
       ),
@@ -13343,7 +13344,7 @@ class BuyV2ProductCard extends StatelessWidget {
       spatial: true,
       child: Semantics(
         label:
-            '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2Money(facts.price)}, '
+            '${product.customerTitle}, ${product.customerVariantPack}, ${buyV2MoneyMinor(facts.priceMinor)}, '
             '${product.unitPrice}, '
             '${buyV2FulfilmentModeLabel(fulfilmentMode)}, '
             '$cataloguePromise${automaticFulfilment ? ', ${product.customerSeller(facts.partner)}, ${offerDecision!.statusLabel}' : ', fulfilled by ${product.customerSeller(facts.partner)}'}',
@@ -13486,7 +13487,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                   crossAxisAlignment: WrapCrossAlignment.end,
                                   children: [
                                     Text(
-                                      buyV2Money(facts.price),
+                                      buyV2MoneyMinor(facts.priceMinor),
                                       style: TextStyle(
                                         color: BuyV2Colors.navy,
                                         fontSize: compact ? 14 : 18,

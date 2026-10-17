@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/design/moolsocial_brand_motion.dart';
 import '../core/design/mool_theme.dart';
 import '../features/book/book_session.dart';
 import '../features/buy/buy_session.dart';
+import '../features/buy/buy_v2_session.dart';
 import '../features/captain/captain_session.dart';
 import '../features/chat/chat_session.dart';
 import '../features/creator/creator_session.dart';
@@ -139,9 +141,14 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   late bool _lastAuthenticated;
   bool _signedOutBoundaryActive = false;
   Future<void> _authenticationBoundaryTail = Future<void>.value();
-  late final GoRouter _router = _createRouter(widget.initialLocation);
+  late final BuyV2RootSessions _buyRoot;
+  late GoRouter _router;
+  VoidCallback? _routerBuyCleanup;
+  final List<VoidCallback> _retiredRouterCleanups = [];
 
-  GoRouter _createRouter(String initialLocation) => createJourneyRouter(
+  GoRouter _createRouter(String initialLocation) {
+    _workSession.bindOriginalPurchaseReader(_buyRoot.current.purchaseReader, _buyRoot.current.purchaseRealm);
+    return createJourneyRouter(
     _session,
     _bookSession,
     _buySession,
@@ -160,15 +167,26 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     launchInterruptionGuard: _launchInterruptionGuard,
     initialLocation: initialLocation,
     uiReviewOnly: widget.uiReviewOnly,
+    publicBuySession: _buyRoot.current,
+    registerOwnedBuySessionCleanup: (cleanup) => _routerBuyCleanup = cleanup,
     // Forward the test-only override; production leaves it null.
     // ignore: invalid_use_of_visible_for_testing_member
     createDraftStateCache: widget.createDraftStateCache,
     legacyPresentationForTestsOnly: widget.legacyPresentationForTestsOnly,
   );
+  }
 
   @override
   void initState() {
     super.initState();
+    _buyRoot = BuyV2RootSessions(core: _buySession,
+      currentIdentity: () => _session.authenticatedBuyPersistenceIdentity,
+      preserveReview: widget.uiReviewOnly ||
+        const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') ||
+        (kDebugMode && _session.usesReviewAccountIdentity));
+    _buyRoot.synchronize(accountRequired: _session.isAuthenticated ||
+      _session.authenticatedRevalidationPending || _session.principalBindingCleanupRequired);
+    _router = _createRouter(widget.initialLocation);
     _lastAuthenticated = _session.isAuthenticated;
     WidgetsBinding.instance.addObserver(this);
     _session.addListener(_handleAuthenticationBoundary);
@@ -178,6 +196,26 @@ class _MoolSocialAppState extends State<MoolSocialApp>
   }
 
   void _handleAuthenticationBoundary() {
+    if (_buyRoot.synchronize(accountRequired: _session.isAuthenticated ||
+        _session.authenticatedRevalidationPending || _session.principalBindingCleanupRequired)) {
+      final previous = _router;
+      final cleanup = _routerBuyCleanup;
+      final location = previous.routeInformationProvider.value.uri.toString();
+      _router = _createRouter(location);
+      var retired = false;
+      void retire() {
+        if (retired) return;
+        retired = true;
+        previous.dispose();
+        cleanup?.call();
+      }
+      _retiredRouterCleanups.add(retire);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _retiredRouterCleanups.remove(retire);
+        retire();
+      });
+      if (mounted) setState(() {});
+    }
     final authenticated = _session.isAuthenticated;
     if (authenticated == _lastAuthenticated) return;
     final signedOut = _lastAuthenticated && !authenticated;
@@ -266,6 +304,12 @@ class _MoolSocialAppState extends State<MoolSocialApp>
     WidgetsBinding.instance.removeObserver(this);
     _session.removeListener(_handleAuthenticationBoundary);
     _router.dispose();
+    _routerBuyCleanup?.call();
+    for (final cleanup in _retiredRouterCleanups.toList()) {
+      cleanup();
+    }
+    _retiredRouterCleanups.clear();
+    _buyRoot.dispose();
     _launchPresentationGate.dispose();
     _brandCadence.dispose();
     if (widget.launchInterruptionGuard == null ||

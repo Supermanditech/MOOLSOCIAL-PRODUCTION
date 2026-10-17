@@ -1134,7 +1134,7 @@ void main() {
             minimumSpend: matchingTotal + 40,
           );
           await publish([candidate]);
-          expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+          expect(opportunitySession.cartOfferOpportunity()?.remainingSpendMinor, 4000);
           expect(
             opportunitySession.cartBenefits(kind: BuyV2CartBenefitKind.coupon),
             isEmpty,
@@ -1145,13 +1145,13 @@ void main() {
         await publish([opportunity()]);
         opportunitySession.selectCartProduct(otherStore.id, false);
         await opportunitySession.refreshCartBenefits();
-        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpendMinor, 4000);
         opportunitySession.selectCartProduct(opportunityProduct.id, false);
         await opportunitySession.refreshCartBenefits();
         expect(opportunitySession.cartOfferOpportunity(), isNull);
         opportunitySession.selectCartProduct(opportunityProduct.id, true);
         await opportunitySession.refreshCartBenefits();
-        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpendMinor, 4000);
 
         for (final candidate in [
           opportunity(expiry: evaluatedAt),
@@ -1171,8 +1171,8 @@ void main() {
         );
         await publish([threshold]);
         expect(
-          opportunitySession.cartOfferOpportunity()?.remainingSpend,
-          opportunityProduct.price * opportunityProduct.quantityStep,
+          opportunitySession.cartOfferOpportunity()?.remainingSpendMinor,
+          opportunityProduct.priceMinor * opportunityProduct.quantityStep,
         );
         opportunitySession.increase(opportunityProduct.id);
         await opportunitySession.refreshCartBenefits();
@@ -1207,7 +1207,7 @@ void main() {
           kind: BuyV2CartBenefitKind.coupon,
           destination: BuyV2Destination.shop,
         );
-        expect(opportunitySession.cartOfferOpportunity()?.remainingSpend, 40);
+        expect(opportunitySession.cartOfferOpportunity()?.remainingSpendMinor, 4000);
         localNow = localNow.add(const Duration(hours: 2));
         expect(opportunitySession.cartOfferOpportunity(), isNull);
         opportunityAdapter.snapshot = BuyV2CartBenefitsSnapshot(

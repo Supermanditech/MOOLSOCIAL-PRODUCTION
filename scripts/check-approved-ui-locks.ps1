@@ -178,6 +178,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-combined-baseline-20261008' {
       'integration/moolsocial/store-buy-combined-baseline-20261008'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-last-frontend-lf01-20261015' {
+      'work/codex-ui/last-frontend-lf01-20261015'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -204,9 +207,14 @@ function Get-CursorAccessibilityNativeProjection {
   $octoberUIComposition = $requiredBranch -cin @(
     'work/integration-repair/store-buy-combined-20261008',
     'work/integration-repair/store-buy-compatibility-20261008',
-    'integration/moolsocial/store-buy-combined-baseline-20261008'
+    'integration/moolsocial/store-buy-combined-baseline-20261008',
+    'work/codex-ui/last-frontend-lf01-20261015'
   )
   if ($octoberUIComposition) {
+    if ($requiredBranch -ceq 'work/codex-ui/last-frontend-lf01-20261015') {
+      & git -C $root merge-base --is-ancestor '46670dc3caac8eabec38a18a41403c52fdded5d4' HEAD
+      if ($LASTEXITCODE -ne 0) { throw 'LF01 UI projection requires its published common checkpoint ancestor.' }
+    }
     if ($requiredBranch -ceq 'work/integration-repair/store-buy-compatibility-20261008') {
       # Exact forward successor inherits sealed native/reference bytes only.
       # This is not admission of E as a qualified integration source.
@@ -338,7 +346,8 @@ function Get-CursorAccessibilityNativeProjection {
       'integration/moolsocial/store-add-product-20260921',
       'work/integration-repair/store-buy-combined-20261008',
       'work/integration-repair/store-buy-compatibility-20261008',
-      'integration/moolsocial/store-buy-combined-baseline-20261008'
+      'integration/moolsocial/store-buy-combined-baseline-20261008',
+      'work/codex-ui/last-frontend-lf01-20261015'
     )) {
     # Founder-authorized r66.37 review: exact download bridge only. Project its
     # three registration/lifecycle blocks back to the unchanged combined native

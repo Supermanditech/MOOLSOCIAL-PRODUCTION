@@ -48,10 +48,7 @@ Future<BuyV2InvoiceDownloadOutcome> saveBuyV2InvoiceWithChannel(
 
 Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
   final order = invoice.order;
-  final subtotal = order.lines.fold<int>(
-    0,
-    (total, line) => total + line.total,
-  );
+  final subtotal = buyV2SumMinor(order.lines.map((line) => line.totalMinor));
   final lines = <String>[
     'MoolSocial order invoice',
     'Order ID: ${_invoiceText(order.id)}',
@@ -94,11 +91,12 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
       'Payment method: ${_invoiceText(value)}',
     if (order.paymentTermLabel case final value?)
       'Payment term: ${_invoiceText(value)}',
-    if (order.amountPaidNow case final value?) 'Amount paid now: INR $value',
+    if (order.amountPaidNowMinor case final value?)
+      'Amount paid now: INR ${_invoiceMinorNumber(value)}',
     if (order.paymentStatusLabel case final value?)
       'Payment status: ${_invoiceText(value)}',
-    if (order.balanceDue > 0)
-      'Balance due: INR ${order.balanceDue} - '
+    if (order.balanceDueMinor > 0)
+      'Balance due: INR ${_invoiceMinorNumber(order.balanceDueMinor)} - '
           '${_invoiceText(order.balanceDueLabel ?? 'Due later')}',
     if (order.recipient case final value?) 'Recipient: ${_invoiceText(value)}',
     'Address: ${_invoiceText(order.addressLine ?? order.destinationLabel)}',
@@ -117,7 +115,7 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
     'Items placed',
     for (final line in order.lines)
       '${line.quantity} x ${_invoiceText(line.product.customerTitle)} '
-          '(${_invoiceText(line.product.pack)}) - INR ${line.total}',
+          '(${_invoiceText(line.product.pack)}) - INR ${_invoiceMinorNumber(line.totalMinor)}',
     if (order.taxInvoiceDetails case final taxInvoice?) ...[
       '',
       'Tax breakdown',
@@ -148,19 +146,33 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
             'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',
     ],
     '',
-    'Items subtotal: INR $subtotal',
-    if (order.tip > 0) 'Delivery tip: INR ${order.tip}',
-    if (order.discount > 0) 'Coupon saving: -INR ${order.discount}',
-    if (order.tax > 0) 'GST and taxes: INR ${order.tax}',
-    if (order.freight > 0) 'Freight: INR ${order.freight}',
-    if (order.deliveryFee > 0) 'Delivery fee: INR ${order.deliveryFee}',
-    if (order.paymentCharge > 0) 'Payment charge: INR ${order.paymentCharge}',
-    'Order total: INR ${order.total}',
+    'Items subtotal: INR ${_invoiceMinorNumber(subtotal)}',
+    if (order.tipMinor > 0)
+      'Delivery tip: INR ${_invoiceMinorNumber(order.tipMinor)}',
+    if (order.discountMinor > 0)
+      'Coupon saving: -INR ${_invoiceMinorNumber(order.discountMinor)}',
+    if (order.taxMinor > 0)
+      'GST and taxes: INR ${_invoiceMinorNumber(order.taxMinor)}',
+    if (order.freightMinor > 0)
+      'Freight: INR ${_invoiceMinorNumber(order.freightMinor)}',
+    if (order.deliveryFeeMinor > 0)
+      'Delivery fee: INR ${_invoiceMinorNumber(order.deliveryFeeMinor)}',
+    if (order.paymentChargeMinor > 0)
+      'Payment charge: INR ${_invoiceMinorNumber(order.paymentChargeMinor)}',
+    'Order total: INR ${_invoiceMinorNumber(order.payableTotalMinor)}',
   ];
   return <String, Object>{
     'fileName': _safeInvoiceFileName(invoice.suggestedFileName),
     'lines': lines,
   };
+}
+
+String _invoiceMinorNumber(int minor) {
+  final exact = buyV2ExactMinorAmount(minor: minor);
+  final fraction = exact % 100;
+  return fraction == 0
+      ? '${exact ~/ 100}'
+      : '${exact ~/ 100}.${fraction.toString().padLeft(2, '0')}';
 }
 
 String _invoiceText(String value) {

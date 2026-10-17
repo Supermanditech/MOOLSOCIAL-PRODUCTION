@@ -23,6 +23,11 @@ import '../buy/buy_session.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
+import 'work_customer_feedback.dart';
+import 'work_catalogue_gateway.dart';
+import 'work_supplier_policy.dart';
+import 'work_product_promotions.dart';
+import 'work_order_identity_gateway.dart';
 
 typedef WorkProcurementSessionFactory =
     BuyV2Session Function(
@@ -802,23 +807,27 @@ abstract interface class WorkPendingProofStore {
 
 class SecureWorkPendingProofStore implements WorkPendingProofStore {
   SecureWorkPendingProofStore({this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
+    : _contactDraft = false, _offerStoreId = null, _customerTermsId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
   SecureWorkPendingProofStore.contactDraft({this.reviewOnly = false})
-    : _contactDraft = true, _offerStoreId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
+    : _contactDraft = true, _offerStoreId = null, _customerTermsId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
   SecureWorkPendingProofStore.offerDraft(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
+    : _contactDraft = false, _offerStoreId = storeId, _customerTermsId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
   SecureWorkPendingProofStore.pickupPreferences(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = true, _publicationPreferences = false, _tradingPreferences = false;
+    : _contactDraft = false, _offerStoreId = storeId, _customerTermsId = null, _pickupPreferences = true, _publicationPreferences = false, _tradingPreferences = false;
   SecureWorkPendingProofStore.publicationPreferences(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false, _publicationPreferences = true, _tradingPreferences = false;
+    : _contactDraft = false, _offerStoreId = storeId, _customerTermsId = null, _pickupPreferences = false, _publicationPreferences = true, _tradingPreferences = false;
   SecureWorkPendingProofStore.tradingPreferences(String storeId, {this.reviewOnly = false})
-    : _contactDraft = false, _offerStoreId = storeId, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = true;
+    : _contactDraft = false, _offerStoreId = storeId, _customerTermsId = null, _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = true;
+  SecureWorkPendingProofStore.customerPaymentTerms(String storeId, String customerId, {this.reviewOnly = false})
+    : _contactDraft = false, _offerStoreId = storeId, _customerTermsId = customerId,
+      _pickupPreferences = false, _publicationPreferences = false, _tradingPreferences = false;
   final bool reviewOnly;
   final bool _contactDraft;
   final bool _pickupPreferences;
   final bool _publicationPreferences;
   final bool _tradingPreferences;
   final String? _offerStoreId;
+  final String? _customerTermsId;
   static final Map<String, Future<void>> _offerWrites = {};
   static const _storage = FlutterSecureStorage();
   bool get _review =>
@@ -831,8 +840,8 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       : 'moolsocial.workspace.pending-proof.v1';
 
   String _scopedKey(String scope) => _offerStoreId != null
-      ? 'moolsocial.workspace.${_tradingPreferences ? 'trading-preferences' : _publicationPreferences ? 'publication-inputs' : _pickupPreferences ? 'pickup-preferences' : 'offer-draft'}.${_review ? 'review.' : ''}v1.'
-          '${Uri.encodeComponent(scope)}/${Uri.encodeComponent(_offerStoreId)}'
+      ? 'moolsocial.workspace.${_customerTermsId != null ? 'customer-payment-terms' : _tradingPreferences ? 'trading-preferences' : _publicationPreferences ? 'publication-inputs' : _pickupPreferences ? 'pickup-preferences' : 'offer-draft'}.${_review ? 'review.' : ''}v1.'
+          '${Uri.encodeComponent(scope)}/${Uri.encodeComponent(_offerStoreId)}${_customerTermsId == null ? '' : '/${Uri.encodeComponent(_customerTermsId)}'}'
       : _contactDraft
       ? 'moolsocial.workspace.contact-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}'
       : _key;
@@ -862,7 +871,9 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
         decoded['scope'] != scope ||
         decoded['draft'] is! Map) {
       if (_offerStoreId != null) {
-        throw WorkGatewayException(_tradingPreferences
+        throw WorkGatewayException(_customerTermsId != null
+            ? 'Your saved private customer preferences could not be opened.'
+            : _tradingPreferences
             ? 'Your saved Store hours and alerts could not be opened.'
             : _publicationPreferences
             ? 'Your saved Store defaults could not be opened.'
@@ -883,7 +894,8 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
       );
     }
     if (_offerStoreId != null) {
-      if (_offerStoreId.trim().isEmpty || _offerStoreId != _offerStoreId.trim()) {
+      if (_offerStoreId.trim().isEmpty || _offerStoreId != _offerStoreId.trim() ||
+          _customerTermsId != null && (_customerTermsId.trim().isEmpty || _customerTermsId != _customerTermsId.trim())) {
         throw const WorkGatewayException('Choose a Store before saving this draft.');
       }
       final key = _scopedKey(scope);
@@ -3683,6 +3695,8 @@ class WorkOrderCommand {
     this.additionalMinutes,
     this.expectedAcceptanceDeadline,
     this.version = contractVersion,
+    this.purchaseReference,
+    this.purchaseRealm,
   });
 
   static const contractVersion = 2;
@@ -3693,6 +3707,8 @@ class WorkOrderCommand {
   final int version;
   final int? additionalMinutes;
   final DateTime? expectedAcceptanceDeadline;
+  final WorkspacePurchaseReference? purchaseReference;
+  final String? purchaseRealm;
 }
 
 class WorkOrderReply {
@@ -3725,6 +3741,60 @@ class WorkOrderReply {
 abstract interface class WorkOrderCommandGateway {
   Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command);
   Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command);
+}
+
+/// Bridges exact purchased-order commands to the existing durable controller.
+/// References are captured in its pending journal, not guessed from legacy IDs.
+class WorkspaceOperationalOrderCommandGateway implements WorkOrderCommandGateway {
+  const WorkspaceOperationalOrderCommandGateway({required this.gateway,
+    required this.realm, required this.accountScope, required this.workspaceId});
+  final AuthenticatedWorkspaceOrderOperationsGateway gateway;
+  final String realm, accountScope, workspaceId;
+  bool get isCurrent => gateway.isCurrent &&
+      gateway.identity.accountUserId == accountScope &&
+      const ['evaluation', 'production'].contains(realm) && workspaceId.isNotEmpty;
+
+  WorkOrderReply _reply(WorkspaceOperationalOrderSnapshot snapshot, String operationId, WorkOrderReplyState state) {
+    if (!isCurrent || snapshot.realm != realm || snapshot.viewerUserId != accountScope ||
+        snapshot.viewerRole != WorkspaceOrderIdentityRole.seller || snapshot.reference.storeId != workspaceId) {
+      throw const WorkGatewayException('This order needs a current Store session.');
+    }
+    return WorkOrderReply(accountScope: accountScope, workspaceId: workspaceId,
+      orderId: snapshot.reference.orderId, operationId: operationId, revision: snapshot.revision,
+      state: state, order: WorkspaceOrderRecord.fromOperational(snapshot));
+  }
+
+  Future<WorkOrderReply?> read(WorkspacePurchaseReference reference) async {
+    if (!isCurrent || reference.storeId != workspaceId) return null;
+    final snapshot = await gateway.read(role: WorkspaceOrderIdentityRole.seller, realm: realm, reference: reference);
+    return snapshot == null || !isCurrent ? null : _reply(snapshot, 'snapshot', WorkOrderReplyState.applied);
+  }
+
+  Future<WorkOrderReply> _command(WorkOrderCommand command, bool reconcile) async {
+    final ref = command.purchaseReference;
+    if (!isCurrent || command.version != WorkOrderCommand.contractVersion ||
+        command.accountScope != accountScope || command.workspaceId != workspaceId ||
+        command.purchaseRealm != realm || ref == null || !ref.valid ||
+        ref.storeId != workspaceId || ref.orderId != command.orderId ||
+        command.action == WorkOrderAction.requestTime || command.additionalMinutes != null ||
+        command.expectedAcceptanceDeadline != null) {
+      throw const WorkGatewayException('The original order operation cannot be verified.');
+    }
+    final result = await gateway.command(realm: realm, reference: ref, operationId: command.operationId,
+      expectedRevision: command.expectedRevision, action: command.action.name, reason: command.reason, reconcile: reconcile);
+    if (result == null || !isCurrent) {
+      throw const WorkGatewayException('Order result unconfirmed. Check the original attempt.');
+    }
+    return _reply(result.snapshot, result.operationId, switch (result.state) {
+      'applied' => WorkOrderReplyState.applied,
+      'rejected' => WorkOrderReplyState.rejected,
+      _ => WorkOrderReplyState.pending,
+    });
+  }
+  @override
+  Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command) => _command(command, false);
+  @override
+  Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command) => _command(command, true);
 }
 
 /// Explicit capability: legacy timing endpoints are not revisioned commands.
@@ -3800,6 +3870,10 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
     'expectedAcceptanceDeadline': command.expectedAcceptanceDeadline
         ?.toUtc()
         .toIso8601String(),
+    if (command.purchaseReference != null) ...{
+      'purchaseReference': command.purchaseReference!.toJson(),
+      'purchaseRealm': command.purchaseRealm,
+    },
   };
 
   static bool _valid(WorkOrderCommand command) =>
@@ -3807,6 +3881,14 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
       command.orderId.trim().isNotEmpty &&
       command.operationId.trim().isNotEmpty &&
       command.expectedRevision >= 0 &&
+      (command.purchaseReference == null ? command.purchaseRealm == null :
+        command.version == WorkOrderCommand.contractVersion &&
+        command.expectedRevision >= 1 &&
+        const ['evaluation', 'production'].contains(command.purchaseRealm) &&
+        command.purchaseReference!.valid &&
+        command.purchaseReference!.storeId == command.workspaceId &&
+        command.purchaseReference!.orderId == command.orderId &&
+        command.action != WorkOrderAction.requestTime) &&
       (command.action == WorkOrderAction.reject
           ? command.reason != null && command.reason!.trim().isNotEmpty
           : command.reason == null) &&
@@ -3865,6 +3947,9 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
         version: (entry['version'] as int?) ?? 1,
         additionalMinutes: entry['additionalMinutes'] as int?,
         expectedAcceptanceDeadline: deadline,
+        purchaseReference: entry.containsKey('purchaseReference')
+            ? WorkspacePurchaseReference.fromJson(entry['purchaseReference']) : null,
+        purchaseRealm: entry['purchaseRealm'] as String?,
       );
       if (!_valid(command) ||
           !orders.add(command.orderId) ||
@@ -3941,6 +4026,355 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
   );
 }
 
+/// Encrypted intent only, not a feedback feed or a server outcome. Native work
+/// stays serialized across replacement controllers, including timed-out callers.
+class SecureStoreFeedbackPendingStore implements StoreFeedbackPendingStore {
+  SecureStoreFeedbackPendingStore({FlutterSecureStorage? storage,
+    String? Function()? currentAccount})
+      : _storage = storage ?? const FlutterSecureStorage(),
+        _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(StoreFeedbackScope scope) =>
+      'moolsocial.workspace.feedback-pending.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store])))}';
+  void _check(StoreFeedbackScope scope) {
+    if (scope.account.trim().isEmpty || scope.store.trim().isEmpty ||
+        _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check this request.');
+    }
+  }
+  Future<T> _serial<T>(StoreFeedbackScope scope, Future<T> Function() operation) {
+    final key = _key(scope);
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => operation());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) {
+      if (identical(_tails[key], tail)) _tails.remove(key);
+    }));
+    return result;
+  }
+  bool _same(StoreFeedbackCommand a, StoreFeedbackCommand b) =>
+      StoreFeedbackResult(command: a, outcome: StoreFeedbackOutcome.unknown).matches(b);
+  Future<StoreFeedbackCommand?> _read(StoreFeedbackScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final data = jsonDecode(raw);
+    if (data is! Map || data.length != 4 || data['version'] is! int || data['version'] != 1 ||
+        data['accountScope'] != scope.account || data['workspaceId'] != scope.store ||
+        !data.containsKey('command')) {
+      throw const FormatException('Invalid feedback journal');
+    }
+    if (data['command'] == null) return null;
+    final command = StoreFeedbackCommand.fromJson(data['command']);
+    if (command.scope != scope) throw const FormatException('Wrong feedback owner');
+    return command;
+  }
+  Future<void> _write(StoreFeedbackScope scope, StoreFeedbackCommand? command) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({
+      'version': 1, 'accountScope': scope.account, 'workspaceId': scope.store,
+      'command': command?.toJson(),
+    }));
+    _check(scope);
+  }
+  @override
+  Future<StoreFeedbackCommand?> readPending(StoreFeedbackScope scope) =>
+      _serial(scope, () => _read(scope));
+  @override
+  Future<void> savePending(StoreFeedbackCommand command) =>
+      _serial(command.scope, () async {
+        if (!command.valid) throw const FormatException('Invalid feedback request');
+        final previous = await _read(command.scope);
+        if (previous != null) {
+          if (_same(previous, command)) return;
+          throw const FormatException('Another feedback request remains pending');
+        }
+        await _write(command.scope, command);
+      });
+  @override
+  Future<void> removePending(StoreFeedbackCommand original) =>
+      _serial(original.scope, () async {
+        final previous = await _read(original.scope);
+        if (previous == null) return;
+        if (!_same(previous, original)) {
+          throw const FormatException('A different feedback request remains pending');
+        }
+        await _write(original.scope, null);
+      });
+}
+
+/// One encrypted original listing request per account/Store/realm. No inventory
+/// snapshot or provider outcome is stored; timeouts do not release native tails.
+class SecureWorkCatalogueBindingPendingStore implements WorkspaceCatalogueBindingPendingStore {
+  SecureWorkCatalogueBindingPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  WorkspaceCatalogueBindingScope _scope(WorkspaceCatalogueBindingIntent value) =>
+    (account: value.accountId, store: value.storeId, realm: value.realm);
+  String _key(WorkspaceCatalogueBindingScope scope) =>
+    'moolsocial.workspace.catalogue-binding.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(WorkspaceCatalogueBindingScope scope) {
+    if (scope.account.trim().isEmpty || scope.store.trim().isEmpty ||
+        !{'production', 'evaluation'}.contains(scope.realm) || _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check this listing update.');
+    }
+  }
+  Future<T> _serial<T>(WorkspaceCatalogueBindingScope scope, Future<T> Function() operation) {
+    final key = _key(scope);
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => operation());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspaceCatalogueBindingIntent?> _read(WorkspaceCatalogueBindingScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final envelope = jsonDecode(raw);
+    if (envelope is! Map || envelope.length != 5 || envelope['schemaVersion'] != 1 ||
+        envelope['accountId'] != scope.account || envelope['storeId'] != scope.store || envelope['realm'] != scope.realm ||
+        !envelope.containsKey('intent')) {
+      throw const FormatException('Invalid listing journal');
+    }
+    if (envelope['intent'] == null) return null;
+    final intent = WorkspaceCatalogueBindingIntent.fromJson(envelope['intent']);
+    if (_scope(intent) != scope) throw const FormatException('Wrong listing request owner');
+    return intent;
+  }
+  Future<void> _write(WorkspaceCatalogueBindingScope scope, WorkspaceCatalogueBindingIntent? intent) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({'schemaVersion': 1,
+      'accountId': scope.account, 'storeId': scope.store, 'realm': scope.realm, 'intent': intent?.toJson()}));
+    _check(scope);
+  }
+  bool _same(WorkspaceCatalogueBindingIntent a, WorkspaceCatalogueBindingIntent b) =>
+    jsonEncode(a.toJson()) == jsonEncode(b.toJson());
+  @override
+  Future<WorkspaceCatalogueBindingIntent?> readPending(WorkspaceCatalogueBindingScope scope) =>
+    _serial(scope, () => _read(scope));
+  @override
+  Future<void> savePending(WorkspaceCatalogueBindingIntent original) => _serial(_scope(original), () async {
+    final previous = await _read(_scope(original));
+    if (previous != null) {
+      if (_same(previous, original)) return;
+      throw const FormatException('Another listing update needs checking');
+    }
+    await _write(_scope(original), original);
+  });
+  @override
+  Future<void> removePending(WorkspaceCatalogueBindingIntent original) => _serial(_scope(original), () async {
+    final previous = await _read(_scope(original));
+    if (previous == null) return;
+    if (!_same(previous, original)) throw const FormatException('Keep the original listing request');
+    await _write(_scope(original), null);
+  });
+}
+
+/// Encrypted private policy draft and original request. Native tails remain
+/// serialized across instances through actual completion, not caller timeouts.
+/// Secure original-request recovery, not a local published-promotion database.
+class SecureStorePromotionPendingStore implements StorePromotionPendingStore {
+  SecureStorePromotionPendingStore({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(StorePromotionScope scope) => 'moolsocial.workspace.product-promotion.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(StorePromotionScope scope) {
+    if (_currentAccount() != scope.account || scope.account.isEmpty || scope.store.isEmpty ||
+        !{'evaluation', 'production'}.contains(scope.realm)) {
+      throw const WorkGatewayException('Sign in again to check this promotion update.');
+    }
+  }
+  Future<T> _serial<T>(StorePromotionScope scope, Future<T> Function() action) {
+    final key = _key(scope);
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) {if (identical(_tails[key], tail)) _tails.remove(key);}));
+    return result;
+  }
+  Future<StorePromotionIntent?> _read(StorePromotionScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final row = jsonDecode(raw);
+    if (row is! Map || row.length != 5 || row['schemaVersion'] != 1 || row['accountId'] != scope.account ||
+        row['storeId'] != scope.store || row['realm'] != scope.realm || !row.containsKey('original')) {
+      throw const FormatException('Saved promotion update needs checking.');
+    }
+    final original = StorePromotionIntent.fromJson(row['original']);
+    if (original.scope != scope) throw const FormatException('Wrong promotion request owner.');
+    return original;
+  }
+  @override
+  Future<StorePromotionIntent?> read(StorePromotionScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> save(StorePromotionIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous != null && previous.fingerprint != original.fingerprint) {
+      throw const FormatException('Check the original promotion update first.');
+    }
+    if (previous != null) return;
+    _check(original.scope);
+    await _storage.write(key: _key(original.scope), value: jsonEncode({'schemaVersion': 1,
+      'accountId': original.scope.account, 'storeId': original.scope.store, 'realm': original.scope.realm,
+      'original': original.toJson()}));
+    _check(original.scope);
+  });
+  @override
+  Future<void> clear(StorePromotionIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous == null) return;
+    if (previous.fingerprint != original.fingerprint) throw const FormatException('Keep the original promotion update.');
+    _check(original.scope);
+    await _storage.delete(key: _key(original.scope));
+    _check(original.scope);
+  });
+}
+
+/// Only the original public-details request, in its own encrypted namespace.
+/// Queues follow real native completion, even after a caller deadline expires.
+class SecureWorkPublicDetailsJournal implements WorkspacePublicDetailsJournal {
+  SecureWorkPublicDetailsJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(WorkspacePublicDetailsScope scope) =>
+    'moolsocial.workspace.public-details-command.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(WorkspacePublicDetailsScope scope) {
+    if (scope.account.trim().isEmpty || scope.store.trim().isEmpty ||
+        !{'production', 'evaluation'}.contains(scope.realm) || _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check this public-details update.');
+    }
+  }
+  Future<T> _serial<T>(WorkspacePublicDetailsScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[_key(scope)] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspacePublicDetailsIntent?> _read(WorkspacePublicDetailsScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final value = jsonDecode(raw);
+    if (value is! Map || value.length != 5 || value['schemaVersion'] != 1 || value['accountId'] != scope.account ||
+        value['storeId'] != scope.store || value['realm'] != scope.realm || !value.containsKey('original')) {
+      throw const FormatException('Saved public-details update needs checking.');
+    }
+    if (value['original'] == null) return null;
+    final original = WorkspacePublicDetailsIntent.fromJson(value['original']);
+    if (original.scope != scope) throw const FormatException('Wrong public-details request owner.');
+    return original;
+  }
+  Future<void> _write(WorkspacePublicDetailsScope scope, WorkspacePublicDetailsIntent? original) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({'schemaVersion': 1,
+      'accountId': scope.account, 'storeId': scope.store, 'realm': scope.realm, 'original': original?.toJson()}));
+    _check(scope);
+  }
+  @override
+  Future<WorkspacePublicDetailsIntent?> readPending(WorkspacePublicDetailsScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> savePending(WorkspacePublicDetailsIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous != null) {
+      if (previous.fingerprint != original.fingerprint) throw const FormatException('Check the original public-details update first.');
+      return;
+    }
+    WorkspacePublicDetailsIntent.fromJson(original.toJson());
+    await _write(original.scope, original);
+  });
+  @override
+  Future<void> removePending(WorkspacePublicDetailsIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous == null) return;
+    if (previous.fingerprint != original.fingerprint) throw const FormatException('Keep the original public-details request.');
+    await _write(original.scope, null);
+  });
+}
+
+class SecureStorePolicyJournal implements StorePolicyJournal {
+  SecureStorePolicyJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final Map<String, Future<void>> _tails = {};
+  String _key(StorePolicyScope scope) => 'moolsocial.workspace.supplier-policy.v1.${base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm])))}';
+  void _check(StorePolicyScope scope) {
+    if (scope.account.isEmpty || scope.store.isEmpty || !{'evaluation', 'production'}.contains(scope.realm) ||
+        _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check this policy update.');
+    }
+  }
+  Future<T> _serial<T>(StorePolicyScope scope, Future<T> Function() action) {
+    final key = _key(scope);
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) {if (identical(_tails[key], tail)) _tails.remove(key);}));
+    return result;
+  }
+  Future<StorePolicyRecovery> _read(StorePolicyScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return const StorePolicyRecovery();
+    final value = jsonDecode(raw);
+    if (value is! Map || value.length != 6 || value['schemaVersion'] != 1 || value['accountId'] != scope.account ||
+        value['storeId'] != scope.store || value['realm'] != scope.realm || !value.containsKey('draft') || !value.containsKey('pending')) {
+      throw const FormatException('Saved Store policy needs checking.');
+    }
+    final pending = value['pending'] == null ? null : StorePolicyIntent.fromJson(value['pending']);
+    if (pending != null && pending.scope != scope) throw const FormatException('Wrong policy request owner.');
+    return StorePolicyRecovery(draft: value['draft'] == null ? null : StorePolicyDraft.fromJson(value['draft']), pending: pending);
+  }
+  Future<void> _write(StorePolicyScope scope, StorePolicyRecovery value) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({'schemaVersion': 1, 'accountId': scope.account,
+      'storeId': scope.store, 'realm': scope.realm, 'draft': value.draft?.toJson(), 'pending': value.pending?.toJson()}));
+    _check(scope);
+  }
+  @override
+  Future<StorePolicyRecovery> read(StorePolicyScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> saveDraft(StorePolicyScope scope, StorePolicyDraft draft) => _serial(scope, () async {
+    final previous = await _read(scope);
+    await _write(scope, StorePolicyRecovery(draft: draft, pending: previous.pending));
+  });
+  @override
+  Future<void> savePending(StorePolicyIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous.pending != null && previous.pending!.fingerprint != original.fingerprint) {
+      throw const FormatException('Check the original policy request first.');
+    }
+    if (previous.pending == null) await _write(original.scope, StorePolicyRecovery(draft: previous.draft, pending: original));
+  });
+  @override
+  Future<void> clearPending(StorePolicyIntent original) => _serial(original.scope, () async {
+    final previous = await _read(original.scope);
+    if (previous.pending == null) return;
+    if (previous.pending!.fingerprint != original.fingerprint) throw const FormatException('Keep the original policy request.');
+    await _write(original.scope, StorePolicyRecovery(draft: previous.draft));
+  });
+}
+
 /// Per-Store frontend reconciliation. It never posts inventory, payments,
 /// invoices or collection completion. A/B operations may settle independently;
 /// an uncertain A keeps its original identity and cannot be submitted twice.
@@ -3985,6 +4419,9 @@ class WorkOrderOperations extends ChangeNotifier {
   WorkOrderOperationState? state(String id) => _states[id];
   List<WorkOrderCommand> get pendingCommands =>
       List.unmodifiable(_pending.values);
+  bool canAct(String orderId, WorkOrderAction action) =>
+      !_disposed && recoveryReady && !_pending.containsKey(orderId) &&
+      _orders[orderId] != null && _allowed(_orders[orderId]!, action);
 
   /// Complete before session binding. Corruption/read failure leaves new actions
   /// blocked; no restored command is automatically sent or treated as success.
@@ -4062,6 +4499,12 @@ class WorkOrderOperations extends ChangeNotifier {
       reply.revision >= 0 &&
       reply.order?.id == reply.orderId &&
       reply.order!.validBillAmounts &&
+      (reply.order!.operational == null ||
+        reply.order!.operational!.viewerRole == WorkspaceOrderIdentityRole.seller &&
+        reply.order!.operational!.viewerUserId == accountScope &&
+        reply.order!.operational!.reference.storeId == workspaceId &&
+        reply.order!.operational!.reference.orderId == reply.orderId &&
+        reply.order!.operational!.revision == reply.revision && reply.delivery == null) &&
       reply.order!.quantities.entries.every(
         (entry) => entry.key.isNotEmpty && entry.value > 0,
       ) &&
@@ -4076,6 +4519,9 @@ class WorkOrderOperations extends ChangeNotifier {
   bool observe(WorkOrderReply snapshot) {
     if (_disposed || !_belongs(snapshot)) return false;
     final previous = _orders[snapshot.orderId];
+    if (previous != null && !_sameOrderContext(previous, snapshot)) {
+      return false;
+    }
     if (previous != null && snapshot.revision <= previous.revision) {
       return false;
     }
@@ -4084,11 +4530,26 @@ class WorkOrderOperations extends ChangeNotifier {
     return true;
   }
 
+  bool _sameOrderContext(WorkOrderReply previous, WorkOrderReply next) {
+    final a = previous.order?.operational, b = next.order?.operational;
+    if (a == null || b == null) return a == null && b == null;
+    return a.realm == b.realm && a.viewerUserId == b.viewerUserId &&
+        a.operationalSourceRevision == b.operationalSourceRevision &&
+        jsonEncode(a.reference.toJson()) == jsonEncode(b.reference.toJson());
+  }
+
   bool _allowed(WorkOrderReply snapshot, WorkOrderAction action) {
     final record = snapshot.order!;
+    if (gateway is WorkspaceOperationalOrderCommandGateway &&
+        !(gateway as WorkspaceOperationalOrderCommandGateway).isCurrent) {
+      return false;
+    }
     // Readiness and handover of authenticated customer collection remain under
     // the existing collection controller, not this general-order contract.
     if (record.isCustomerCollection || record.isClosed) return false;
+    if (record.operational case final exact?) {
+      return exact.permits(action.name, DateTime.now());
+    }
     return switch (action) {
       WorkOrderAction.accept ||
       WorkOrderAction.reject => record.stage == 'Confirmed',
@@ -4133,6 +4594,8 @@ class WorkOrderOperations extends ChangeNotifier {
       expectedAcceptanceDeadline: action == WorkOrderAction.requestTime
           ? snapshot.order!.actionDeadline
           : null,
+      purchaseReference: snapshot.order!.operational?.reference,
+      purchaseRealm: snapshot.order!.operational?.realm,
     );
     _pending[orderId] = command;
     return _run(command, reconcile: false);
@@ -4178,6 +4641,19 @@ class WorkOrderOperations extends ChangeNotifier {
           reply.state == WorkOrderReplyState.pending) {
         return false;
       }
+      if (command.purchaseReference case final ref?) {
+        final exact = reply.order!.operational;
+        if (exact == null || exact.realm != command.purchaseRealm ||
+            jsonEncode(exact.reference.toJson()) != jsonEncode(ref.toJson()) ||
+            (reply.state == WorkOrderReplyState.applied &&
+              (reply.revision != command.expectedRevision + 1 ||
+                exact.stage != const {WorkOrderAction.accept: 'Preparing', WorkOrderAction.ready: 'Ready', WorkOrderAction.reject: 'Rejected'}[command.action] ||
+                (command.action == WorkOrderAction.reject && exact.rejectionReason != command.reason)))) {
+          return false;
+        }
+      } else if (reply.order!.isOperationalProjection) {
+        return false;
+      }
       if (command.action == WorkOrderAction.requestTime &&
           reply.state == WorkOrderReplyState.applied) {
         final deadline = reply.order!.actionDeadline;
@@ -4199,6 +4675,7 @@ class WorkOrderOperations extends ChangeNotifier {
       // A later full snapshot wins over this delayed acknowledgement. Resolving
       // its operation must not restore an older stage or replay business effects.
       final latest = _orders[command.orderId];
+      if (latest != null && !_sameOrderContext(latest, reply)) return false;
       if (latest == null || reply.revision > latest.revision) {
         _orders[command.orderId] = reply;
       }

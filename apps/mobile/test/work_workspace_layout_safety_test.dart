@@ -37,6 +37,9 @@ import 'package:moolsocial/features/work/work_downloads.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads.dart';
 import 'package:moolsocial/shared/commerce/commerce_downloads_screen.dart';
 import 'commerce_downloads_test.dart' as download_test show Source;
+import 'work_catalogue_gateway_test.dart' as catalogue_fixture;
+import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart' show SocialContentResponse;
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_workspace_benefits.dart';
@@ -1212,6 +1215,7 @@ class _InventoryWriteFailureFixture implements WorkInventoryStore {
   _InventoryWriteFailureFixture(this.delegate);
   final WorkInventoryStore delegate;
   bool failSave = false;
+  Completer<void>? holdSave;
   int saveAttempts = 0;
   @override
   Future<WorkspaceSavedInventory?> read(
@@ -1225,6 +1229,7 @@ class _InventoryWriteFailureFixture implements WorkInventoryStore {
     required int? expectedRevision,
   }) async {
     saveAttempts++;
+    await holdSave?.future;
     if (failSave) throw StateError('Test-only inventory write failure');
     await delegate.save(inventory, expectedRevision: expectedRevision);
   }
@@ -9375,6 +9380,40 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-PAISE Stock and overview show exact saved prices and valuation $scale', (tester) async {
+      // Host-only exact-price fixture; never native acceptance or injected Stock.
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      final work = WorkSession(contactDraftStore: account,
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+        ..seedVerifiedWorkspace() ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final product = work.workspaceCatalogueItems.first.copyWith(purchasePriceMinor: 925,
+        sellingPriceMinor: 1025, mrpMinor: 1250, stock: 3, publicListing: false);
+      work.workspaceCatalogueItems..clear()..add(product);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: scale, openHomeActions: false);
+      await _toggleHomeCategory(tester, 'stock');
+      for (final value in [('stock-cost', '₹27.75'), ('stock-sale', '₹30.75'), ('stock-spread', '₹3')]) {
+        expect(tester.widget<Text>(find.byKey(Key('store-overview-${value.$1}'))).data, value.$2);
+      }
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      for (final value in [('price', '₹10.25'), ('purchase', '₹9.25'), ('mrp', '₹12.50')]) {
+        final cell = find.byKey(Key('work-catalogue-${value.$1}-${product.id}'));
+        await reveal(tester, cell);
+        final exact = find.descendant(of: cell, matching: find.text(value.$2));
+        expect(exact, findsOneWidget); expectStatementMoneyUntruncated(tester, exact);
+      }
+      work.workspaceCatalogueItems[0] = WorkspaceCatalogueItem.fromInventoryJson({
+        ...product.toInventoryJson(), 'mrpMinor': null});
+      work.notifyListeners(); await tester.pumpAndSettle();
+      final mrp = find.byKey(Key('work-catalogue-mrp-${product.id}')); await reveal(tester, mrp);
+      expect(find.descendant(of: mrp, matching: find.text('Not set')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'HOMEBOARD exact stock values refresh and unknown cost stays unknown',
@@ -24161,6 +24200,49 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-PAISE Counter actual product/details/review display exact amounts scale=$scale', (tester) async {
+      // Host layout fixture only, never inserted into a device Store.
+      final work = liveStore();
+      final original = work.workspaceCatalogueItems.first;
+      work.workspaceCatalogueItems..clear()..add(original);
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: scale);
+      await openCounterSaleFromSales(tester);
+      await enterSaleCustomer(tester, '9829012345');
+      final product = original.copyWith(purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+      work.workspaceCatalogueItems[0] = product;
+      work.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('₹10.25'), findsWidgets);
+      final details = find.byKey(Key('work-sale-product-open-${product.id}'));
+      await reveal(tester, details); await tester.tap(details); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-counter-store-product-page')), findsOneWidget);
+      expect(find.text('₹10.25'), findsWidgets);
+      await tester.scrollUntilVisible(find.text('MRP ₹12.50'), 100,
+        scrollable: find.descendant(of: find.byKey(const Key('work-counter-store-product-page')),
+          matching: find.byType(Scrollable)).first);
+      expect(find.text('MRP ₹12.50').hitTestable(), findsOneWidget);
+      await tester.pageBack(); await tester.pumpAndSettle();
+      final add = find.byKey(Key('work-order-add-${product.id}'));
+      await addCounterProduct(tester, add); await addCounterProduct(tester, add);
+      expect(work.workspaceCounterSubtotalMinor, 2050);
+      expect(find.text('₹20.50'), findsWidgets);
+      await tester.tap(find.byKey(const Key('work-order-review'))); await tester.pumpAndSettle();
+      final item = find.byKey(ValueKey('work-review-item-${product.id}'));
+      if (item.evaluate().isEmpty) {
+        final category = find.byKey(ValueKey('work-review-category-${product.categoryId}'));
+        await reveal(tester, category); await tester.tap(category); await tester.pumpAndSettle();
+      }
+      await reveal(tester, item);
+      expect(find.textContaining('2 × ₹10.25'), findsWidgets);
+      expect(find.text('₹20.50'), findsWidgets);
+      expect(work.workspaceOrders, isEmpty); expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('Store collection controller', () {
     test('summary copy needs current scoped customer authorisation', () async {
       final gate = _CollectionFixtureGateway()..state = ScanPickState.matched;
@@ -25528,8 +25610,6 @@ void main() {
           await openRecordedSales(tester);
           await tester.pumpAndSettle();
         } else if (surface == 'credit') {
-          await tester.tap(find.byKey(const Key('work-store-orders')));
-          await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-dashboard-profile')));
           await tester.pumpAndSettle();
           final operations = find.byKey(
@@ -32152,6 +32232,111 @@ void main() {
     );
   }
 
+  for (final sample in [(1.0, false), (2.0, false), (1.0, true)]) {
+    final scale = sample.$1, large = sample.$2;
+    testWidgets('LF-PAISE actual editor retains exact prices clears MRP and restarts $scale large=$large', (tester) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final account = _ContactDraftFixtureStore();
+      WorkSession fresh() => WorkSession(contactDraftStore: account,
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+        ..seedVerifiedWorkspace() ..retailerSetupSaved = true ..reviewStage = WorkReviewStage.live;
+      final work = fresh();
+      expect(await work.loadWorkspaceInventory(), isTrue);
+      final base = work.workspaceCatalogueItems.first;
+      final exact = large ? base.copyWith(purchasePrice: 9, sellingPrice: 10, mrp: 12,
+          stock: 3, publicListing: false)
+        : base.copyWith(purchasePriceMinor: 925,
+          sellingPriceMinor: 1025, mrpMinor: 1250, stock: 3, publicListing: false);
+      work.workspaceCatalogueItems.clear();
+      expect(work.addOrUpdateWorkspaceProduct(exact, stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+      expect(await work.workspaceInventorySaved, isTrue);
+      final original = work.workspaceCatalogueItems.single;
+      final movements = work.workspaceStockMovements.length;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: scale, openHomeActions: false);
+      await tester.tap(find.byKey(const Key('work-store-stock'))); await tester.pumpAndSettle();
+      final edit = find.byKey(Key('work-catalogue-edit-${exact.id}'));
+      await reveal(tester, edit); await tester.tap(edit); await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      for (final value in large
+          ? [('purchase-price', '9'), ('selling-price', '10'), ('mrp', '12')]
+          : [('purchase-price', '9.25'), ('selling-price', '10.25'), ('mrp', '12.50')]) {
+        final field = find.byKey(Key('work-product-${value.$1}')); await reveal(tester, field);
+        final widget = tester.widget<TextField>(field);
+        expect(widget.controller!.text, value.$2);
+        expect(widget.keyboardType.decimal, isTrue);
+      }
+      final selling = find.byKey(const Key('work-product-selling-price'));
+      await reveal(tester, selling); await tester.enterText(selling, '10.255');
+      tester.testTextInput.hide(); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems.single.toInventoryJson(), original.toInventoryJson());
+      expect(tester.widget<TextField>(selling).controller!.text, '10.255');
+      for (final value in large
+          ? [('purchase-price', '9'), ('selling-price', '10000000000'), ('mrp', '10000000001')]
+          : [('purchase-price', '9.35'), ('selling-price', '10.35'), ('mrp', '')]) {
+        final field = find.byKey(Key('work-product-${value.$1}')); await reveal(tester, field);
+        await tester.enterText(field, value.$2);
+      }
+      tester.testTextInput.hide(); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
+      expect(await work.workspaceInventorySaved, isTrue);
+      final saved = work.workspaceCatalogueItems.single;
+      expect(saved.id, original.id); expect(saved.sku, original.sku);
+      expect(saved.purchasePriceMinor, large ? 900 : 935);
+      expect(saved.sellingPriceMinor, large ? 1000000000000 : 1035);
+      expect(saved.mrpMinor, large ? 1000000000100 : null); expect(saved.stock, 3);
+      expect(saved.stockEntry!.contentIdentity, original.stockEntry!.contentIdentity);
+      expect(work.workspaceStockMovements.length, movements);
+      expect(WorkspaceCatalogueItem.fromInventoryJson(saved.toInventoryJson()).toInventoryJson(), saved.toInventoryJson());
+      await tester.pumpWidget(const SizedBox.shrink());
+      final restarted = WorkSession(contactDraftStore: account,
+        inventoryStore: SecureWorkInventoryStore(accountScope: () => account.accountScope))
+        ..selectedProfile = work.selectedProfile ..workspaceId = work.workspaceId
+        ..activeWorkspace = work.activeWorkspace ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live;
+      addTearDown(restarted.dispose);
+      expect(await restarted.loadWorkspaceInventory(), isTrue);
+      expect(restarted.workspaceCatalogueItems.single.toInventoryJson(), saved.toInventoryJson());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final method in [WorkspaceStockEntryMethod.catalogue, WorkspaceStockEntryMethod.manual]) {
+    testWidgets('LF-PAISE actual decimal entry ${method.name} keeps one Stock record', (tester) async {
+      final work = storeViewFixture()..workspaceCatalogueItems.clear();
+      work.saveWorkspaceProductDefaults(const WorkspaceProductDefaults(
+        stockMode: WorkspaceStockMode.exactQuantity, lowStockThreshold: 5, customerListingRequested: false));
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: 2);
+      await openAddProductsFromHome(tester);
+      if (method == WorkspaceStockEntryMethod.manual) {
+        await chooseAddProductMode(tester, 'enter');
+        for (final value in [('title', 'Host decimal rice'), ('brand', 'Host'), ('pack', '1 kg')]) {
+          final field = find.byKey(Key('work-product-${value.$1}')); await reveal(tester, field);
+          await tester.enterText(field, value.$2);
+        }
+      } else {
+        final choice = find.byKey(Key('work-catalogue-add-${workspaceMasterCatalogue.first.id}'));
+        await reveal(tester, choice); await tester.tap(choice); await tester.pumpAndSettle();
+      }
+      for (final value in [('purchase-price', '9.25'), ('selling-price', '10.25'), ('mrp', '12.50'), ('stock', '3')]) {
+        final field = find.byKey(Key('work-product-${value.$1}')); await reveal(tester, field);
+        await tester.enterText(field, value.$2);
+      }
+      tester.testTextInput.hide(); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
+      final saved = work.workspaceCatalogueItems.single;
+      expect(saved.purchasePriceMinor, 925); expect(saved.sellingPriceMinor, 1025);
+      expect(saved.mrpMinor, 1250); expect(saved.stock, 3);
+      expect(saved.stockEntry!.method, method); expect(saved.stockEntry!.purchasePriceMinor, 925);
+      expect(saved.stockEntry!.sku, saved.sku);
+      expect(work.workspaceStockMovements, hasLength(1));
+      expect(work.workspacePurchaseCopies, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final method in [
     WorkspaceStockEntryMethod.catalogue,
     WorkspaceStockEntryMethod.manual,
@@ -32217,8 +32402,9 @@ void main() {
     });
   }
 
-  for (final changedReview in [false, true]) {
-    testWidgets('P03 host-only CSV failed save retry changed=$changedReview', (
+  for (final sample in [(false, false), (true, false), (false, true), (true, true)]) {
+    final changedReview = sample.$1, decimal = sample.$2;
+    testWidgets('P03 host-only CSV failed save retry changed=$changedReview decimal=$decimal', (
       tester,
     ) async {
       FlutterSecureStorage.setMockInitialValues({});
@@ -32245,7 +32431,9 @@ void main() {
       final work = fresh();
       expect(await work.loadWorkspaceInventory(), isTrue);
       final previous = FilePickerPlatform.instance;
-      FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile();
+      FilePickerPlatform.instance = _EntryFilePicker()..file = _EntryCsvFile(decimal
+        ? 'title,brand,pack,purchasePrice,sellingPrice,mrp,stock\nHost decimal rice,Host,1 kg,9.25,10.25,12.50,3\n'
+        : null);
       addTearDown(() => FilePickerPlatform.instance = previous);
       await mount(tester, route: '/app/work/workspace/dashboard', work: work);
       await openAddProductsFromHome(tester);
@@ -32264,6 +32452,11 @@ void main() {
           .map((m) => m.id)
           .toList();
       expect(original.stockEntry!.method, WorkspaceStockEntryMethod.csv);
+      if (decimal) {
+        expect(original.purchasePriceMinor, 925); expect(original.sellingPriceMinor, 1025);
+        expect(original.mrpMinor, 1250); expect(original.stockEntry!.purchasePriceMinor, 925);
+        expect(original.stockEntry!.quantity, 3);
+      }
       storage.failSave = false;
       if (changedReview) {
         final changed = review.review.rows.single.product!.copyWith(
@@ -52446,6 +52639,77 @@ void main() {
     }
   });
 
+  testWidgets('LF-PAISE existing retailer setup makes inputs read-only during pending cache save', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore(); final gateway = ReviewWorkGateway();
+    final inventory = _InventoryWriteFailureFixture(SecureWorkInventoryStore(accountScope: () => account.accountScope));
+    final work = WorkSession(gateway: gateway, contactDraftStore: account, inventoryStore: inventory)
+      ..seedVerifiedWorkspace() ..reviewStage = WorkReviewStage.live ..retailerHomeDelivery = true;
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    work.addOrUpdateWorkspaceProduct(work.workspaceCatalogueItems.first.copyWith(publicListing: false));
+    expect(await work.workspaceInventorySaved, isTrue);
+    await mount(tester, route: '/app/work/retailer/setup', work: work);
+    final buy = find.byKey(const Key('retailer-product-buy-price'));
+    await reveal(tester, buy);
+    await tester.enterText(buy, '230');
+    final sell = find.byKey(const Key('retailer-product-sell-price'));
+    await tester.enterText(sell, '260');
+    FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+    final held = Completer<void>(); inventory.holdSave = held;
+    try {
+      await tester.tap(find.byKey(const Key('retailer-finish-setup')));
+      await tester.pump(); await tester.pump(const Duration(milliseconds: 50));
+      expect(work.busy, isTrue); expect(gateway.setupCalls, 0);
+      for (final key in ['retailer-product-quantity', 'retailer-product-buy-price', 'retailer-product-sell-price']) {
+        expect(tester.widget<TextField>(find.byKey(Key(key))).readOnly, isTrue, reason: key);
+      }
+      expect(tester.widget<TextField>(sell).controller!.text, '260');
+    } finally {
+      held.complete();
+      await tester.pumpAndSettle();
+    }
+    expect(gateway.setupCalls, 1); expect(work.retailerSetupSaved, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-PAISE existing retailer setup preserves decimal prices and rejects invalid input $scale', (tester) async {
+      // Labelled host fixture; never injected into the device Store.
+      final gateway = ReviewWorkGateway();
+      final work = liveStore(gateway: gateway)
+        ..retailerSetupSaved = false
+        ..retailerHomeDelivery = true;
+      final exact = work.workspaceCatalogueItems.first.copyWith(
+        purchasePriceMinor: 925, sellingPriceMinor: 1025, mrpMinor: 1250);
+      work.addOrUpdateWorkspaceProduct(exact);
+      await mount(tester, route: '/app/work/retailer/setup', work: work,
+        viewport: const Size(320, 568), textScale: scale);
+      final buy = find.byKey(const Key('retailer-product-buy-price'));
+      final sell = find.byKey(const Key('retailer-product-sell-price'));
+      await reveal(tester, buy);
+      expect(tester.widget<TextField>(buy).controller!.text, '9.25');
+      expect(tester.widget<TextField>(sell).controller!.text, '10.25');
+      final before = jsonEncode(work.workspaceCatalogueItems.first.toInventoryJson());
+      await tester.enterText(buy, '9.251');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('retailer-finish-setup')));
+      await tester.pumpAndSettle();
+      expect(work.errorMessage, contains('up to 2 decimal places'));
+      expect(jsonEncode(work.workspaceCatalogueItems.first.toInventoryJson()), before);
+      expect(gateway.setupCalls, 0);
+      await reveal(tester, buy); await tester.enterText(buy, '9.35');
+      await tester.enterText(sell, '10.55');
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('retailer-finish-setup')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceCatalogueItems.first.purchasePriceMinor, 935);
+      expect(work.workspaceCatalogueItems.first.sellingPriceMinor, 1055);
+      expect(work.errorMessage, contains('Setup sync does not support paise yet'));
+      expect(gateway.setupCalls, 0); expect(work.retailerSetupSaved, isFalse);
+      expect(work.workspaceInvoices, isEmpty); expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'compact retailer setup uses actual catalogue and Store return sections',
     (tester) async {
@@ -52993,8 +53257,9 @@ void main() {
       expect(rect.right, lessThanOrEqualTo(viewport.right));
       expect(rect.top, greaterThanOrEqualTo(viewport.top));
       expect(rect.bottom, lessThanOrEqualTo(safeBottom));
-      if (previous != null)
+      if (previous != null) {
         expect(rect.left, greaterThanOrEqualTo(previous.right));
+      }
       previous = rect;
     }
     await tester.tap(find.byKey(const Key('work-store-orders')));
@@ -61820,11 +62085,11 @@ void main() {
         } else {
           final mrp = find.byKey(const Key('work-product-mrp'));
           await tester.ensureVisible(mrp);
-          await tester.enterText(mrp, '270.5');
+          await tester.enterText(mrp, '270.555');
           await tester.tap(find.byKey(const Key('work-product-save')));
           await tester.pumpAndSettle();
           expect(
-            find.text('Enter MRP in whole rupees, or leave it empty.'),
+            find.text('Enter MRP with at most two decimal places, or leave it empty.'),
             findsOneWidget,
           );
           expect(work.workspaceCatalogueItems, [product]);
@@ -67368,7 +67633,7 @@ void main() {
       expect(work.currentWorkspaceOrderId, selected);
       expect(find.byKey(const Key('work-sale-customer-sheet')), findsNothing);
       expect(
-        find.byKey(const Key('work-sales-start-counter')).hitTestable(),
+        find.byKey(const Key('work-sales-primary-counter-sale')).hitTestable(),
         findsOneWidget,
       );
       expect(find.byKey(const Key('work-contextual-shortcuts')), findsNothing);
@@ -67514,16 +67779,19 @@ void main() {
         expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
         expect(work.workspaceInvoices, isEmpty);
         await returnToSalesHome(tester);
-        await revealSalesAction(tester, 'work-sales-new-counter-sale');
-        final prepare = find.byKey(const Key('work-sales-new-counter-sale'));
-        expect(
-          find.descendant(of: prepare, matching: find.text('Counter sale')),
-          findsOneWidget,
-        );
-        await tester.tap(prepare);
+        // This unscoped host session has no durable journal: leaving retains
+        // its fields without a discard prompt. Fresh Counter entry after the
+        // composer unmounts is the explicit new-bill boundary.
+        final leave = find.byKey(const Key('work-store-home'));
+        await tester.tap(leave);
         await tester.pumpAndSettle();
-        // Explicit preparation starts a separate bill, never the incoming order.
-        // It clears transient fields; no preservation-after-reset is claimed.
+        expect(find.byKey(const Key('work-order-discard-dialog')), findsNothing);
+        expect(work.currentWorkspaceOrder, same(incoming));
+        expect(work.workspaceOrderCustomer, '9829012345');
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(jsonEncode(incoming.toLedgerJson()), incomingBefore);
+        await openCounterSaleFromSales(tester);
         expect(work.currentWorkspaceOrderId, isNull);
         expect(work.workspaceOrderCustomer, isEmpty);
         expect(work.workspaceOrderQuantities, isEmpty);
@@ -75319,6 +75587,82 @@ void main() {
         .session;
     expect(session.findProduct('oil-fortune-1l'), isNull);
   });
+
+  for (final decimal in [false, true]) {
+  testWidgets('LF-PAGER configured Store preview uses verified public identity rather than private draft decimal=$decimal', (tester) async {
+    Map<String, dynamic>? lastPublicReply;
+    final transport = catalogue_fixture.OwnerTransport((body) async {
+      final data = jsonDecode(jsonEncode(catalogue_fixture.page())) as Map<String, dynamic>, observed = DateTime.now().toUtc();
+      final row = catalogue_fixture.row(data), store = body['storeId'], sku = body['skuId'];
+      data.addAll({'realm': 'production', 'storeId': store, 'observedAt': observed.toIso8601String(),
+        'listingReadbackVersion': 1, 'listingCoverage': 'complete', 'mediaReadbackVersion': 1,
+        'publicStore': {'id': store, 'name': 'Host verified public Store', 'profileId': 'retailer-grocery'}});
+      row.addAll({'skuId': sku, 'observedAt': observed.subtract(const Duration(minutes: 1)).toIso8601String(),
+        'listings': [{'schemaVersion': 1, 'realm': 'production', 'listingId': 'listing-${'d' * 64}',
+          'storeId': store, 'skuId': sku, 'canonicalProductId': 'canonical-one', 'verifiedPackId': 'pack-one', 'channel': 'retail'}],
+        'supplierPolicy': {'schemaVersion': 1, 'realm': 'production', 'storeId': store, 'skuId': sku,
+          'observedAt': observed.toIso8601String(), 'state': 'none', 'revision': 0, 'requiresAcceptance': false, 'policy': null}});
+      ((row['channels'] as List).single as Map)['validUntil'] = observed.add(const Duration(hours: 1)).toIso8601String();
+      if (decimal) {
+        final channel = (row['channels'] as List).single as Map;
+        channel['priceMinor'] = 26025; channel['mrpMinor'] = 28050;
+      }
+      lastPublicReply = data;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final work = WorkSession(catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: catalogue_fixture.Credentials(), transport: transport))
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    final index = work.workspaceCatalogueItems.indexWhere((item) => item.id == 'oil-fortune-1l');
+    if (decimal) {
+      work.workspaceCatalogueItems[index] = work.workspaceCatalogueItems[index]
+        .copyWith(sellingPriceMinor: 1025, mrpMinor: 1250);
+    }
+    final original = work.workspaceCatalogueItems[index];
+    final probe = await (work.catalogueGateway! as AuthenticatedWorkspaceCatalogueGateway).readPublicEntry(
+      storeId: work.activeWorkspace!.id, skuId: original.id, channel: BuyV2OfferClass.retail, current: () => true);
+    if (probe == null && lastPublicReply != null) {
+      WorkspacePublicCatalogueEntry.fromResponse(lastPublicReply!, storeId: work.activeWorkspace!.id,
+        realm: 'production', channel: BuyV2OfferClass.retail, now: DateTime.now().toUtc());
+    }
+    expect(probe, isNotNull, reason: 'Host public-response fixture must pass the real decoder before router testing.');
+    expect(work.workspacePublicationReport.ready, isFalse);
+    await mount(tester, route: '/app/buy?view=product&product=${original.id}&workspaceProduct=${original.id}&return=/app/work/workspace/dashboard', work: work);
+    await tester.pumpAndSettle();
+    final consumer = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session;
+    expect(transport.calls, greaterThan(1), reason: 'The router must read public data independently of the fixture probe.');
+    final remote = consumer.findProduct('listing-${'d' * 64}');
+    expect(remote, isNotNull); expect(remote!.sourceSkuId, original.id);
+    expect(remote.title, 'Host fixture oil'); expect(remote.seller, 'Host verified public Store');
+    expect(remote.priceMinor, decimal ? 26025 : 26000);
+    expect(remote.mrpMinor, decimal ? 28050 : 28000);
+    expect(consumer.findProduct(original.id), isNull); expect(consumer.cataloguePageSource, isA<WorkspaceStoreCatalogueSource>());
+    expect(work.workspaceCatalogueItems.firstWhere((item) => item.id == original.id), same(original));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('LF-PAGER configured read failure never falls back to private Store product decimal=$decimal', (tester) async {
+    final transport = catalogue_fixture.OwnerTransport((body) async =>
+      SocialContentResponse(statusCode: 503, body: jsonEncode({'ok': false})));
+    final work = WorkSession(catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: catalogue_fixture.Credentials(), transport: transport))
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    if (decimal) {
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems[0]
+        .copyWith(sellingPriceMinor: 1025, mrpMinor: 1250);
+    }
+    await mount(tester, route: '/app/buy?view=product&product=oil-fortune-1l&workspaceProduct=oil-fortune-1l&return=/app/work/workspace/dashboard', work: work);
+    await tester.pumpAndSettle();
+    final consumer = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session;
+    expect(transport.calls, greaterThan(0));
+    expect(consumer.findProduct('oil-fortune-1l'), isNull);
+    expect(find.text('Fortune Sunflower Oil'), findsNothing);
+    expect(work.workspaceCatalogueItems.single.id, 'oil-fortune-1l');
+    expect(tester.takeException(), isNull);
+  });
+  }
 
   testWidgets('Store requirements use outcome-facing accessible fields', (
     tester,

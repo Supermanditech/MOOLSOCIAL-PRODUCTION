@@ -294,7 +294,10 @@ class ChatCommerceContext {
     final values = <String, String>{};
     for (final entry in uri.queryParameters.entries) {
       final value = entry.value.trim();
-      if (value.isNotEmpty) values[entry.key] = value;
+      if (value.isNotEmpty || _minorMoneyKeys.contains(entry.key)) {
+        values[entry.key] = _minorMoneyKeys.contains(entry.key) &&
+            uri.queryParametersAll[entry.key]?.length != 1 ? '' : value;
+      }
     }
     return ChatCommerceContext._(values: values);
   }
@@ -328,9 +331,9 @@ class ChatCommerceContext {
   String? get brand => _value('brand') ?? _snapshotString('brand');
   String? get variant => _value('variant') ?? _snapshotString('variant');
   String? get pack => _value('pack') ?? _snapshotString('pack');
-  String? get price => _value('price') ?? _snapshotString('price');
+  String? get price => _amount('price');
   String? get unitPrice => _value('unitPrice') ?? _snapshotString('unitPrice');
-  String? get mrp => _value('mrp') ?? _snapshotString('mrp');
+  String? get mrp => _amount('mrp');
   String? get quantity => _value('quantity');
   String? get minimumOrder =>
       _value('minimumOrder') ?? _snapshotString('minimumOrder');
@@ -341,7 +344,7 @@ class ChatCommerceContext {
   String? get productLink => _value('productLink');
   String? get orderId => _value('orderId');
   String? get purchaseId => _value('purchaseId');
-  String? get orderTotal => _value('orderTotal');
+  String? get orderTotal => _amount('orderTotal', snapshot: false);
   String? get deliveryDestination => _value('deliveryDestination');
 
   bool get isOrderConversation =>
@@ -462,6 +465,24 @@ class ChatCommerceContext {
   String? _value(String key) {
     final value = values[key]?.trim();
     return value == null || value.isEmpty ? null : value;
+  }
+
+  static const _minorMoneyKeys = {'priceMinor', 'mrpMinor', 'orderTotalMinor'};
+
+  // Conversation facts, not verified commercial values. A present malformed
+  // minor value must never revive a plausible but conflicting legacy amount.
+  String? _amount(String key, {bool snapshot = true}) {
+    final minorKey = '${key}Minor';
+    final fromQuery = values.containsKey(minorKey);
+    if (!fromQuery && (!snapshot || !productSnapshot.containsKey(minorKey))) {
+      return _value(key) ?? (snapshot ? _snapshotString(key) : null);
+    }
+    final raw = fromQuery ? values[minorKey] : productSnapshot[minorKey];
+    final int? minor = raw is int ? raw : raw is String && RegExp(r'^[0-9]+$').hasMatch(raw)
+        ? int.tryParse(raw) : null;
+    if (minor == null || minor < 0 || minor > 9007199254740991) return null;
+    return minor % 100 == 0 ? '${minor ~/ 100}'
+        : '${minor ~/ 100}.${(minor % 100).toString().padLeft(2, '0')}';
   }
 
   String? _snapshotString(String key) {

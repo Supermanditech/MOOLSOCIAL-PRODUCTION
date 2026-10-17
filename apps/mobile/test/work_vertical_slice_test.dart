@@ -17,6 +17,7 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'fixtures/store_public_handoff_v1.dart' show handoffStock;
@@ -708,27 +709,24 @@ void main() {
         matching: find.byType(EditableText))).controller.text, 'Chennai');
       expect(work.workspaceDeliveryCity, 'Jaipur'); // Copy edits a draft, not saved location.
       await tester.enterText(city, 'Unsaved Store A');
+      final retainedCity = tester.widget<EditableText>(find.descendant(of: city,
+        matching: find.byType(EditableText))).controller;
+      final retiredSave = tester.widget<StoreSettingsForm>(
+        find.byKey(const Key('work-delivery-settings-screen'))).onSave;
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
       work.activeWorkspace = const WorkWorkspace(id: 'lf06-host-b', name: 'Host Store B',
         profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Delhi', verified: true);
       final before = (work.workspaceDeliveryCity, work.workspaceDeliveryArea,
         work.workspaceDeliveryPincode, work.workspacePickupEnabled);
-      final save = find.byKey(const Key('work-delivery-settings-save'));
-      await tester.scrollUntilVisible(save, 120, scrollable: find.descendant(
-        of: find.byKey(const Key('work-delivery-settings-screen')),
-        matching: find.byType(Scrollable)).first);
-      await Scrollable.ensureVisible(tester.element(save), alignment: .3);
+      // Adversarial host callback: no tap or scrolling into an obsolete form.
+      // The existing LF16 guard must reject dispatch even after its UI retires.
+      retiredSave();
       await tester.pumpAndSettle();
-      await tester.tap(save);
-      await tester.pumpAndSettle();
+      expect(work.errorMessage, 'Your Store or account changed. Your entries are kept.');
       expect((work.workspaceDeliveryCity, work.workspaceDeliveryArea,
         work.workspaceDeliveryPincode, work.workspacePickupEnabled), before);
-      await tester.scrollUntilVisible(city, -120, scrollable: find.descendant(
-        of: find.byKey(const Key('work-delivery-settings-screen')),
-        matching: find.byType(Scrollable)).first);
-      expect(tester.widget<EditableText>(find.descendant(of: city,
-        matching: find.byType(EditableText))).controller.text, 'Unsaved Store A');
+      expect(retainedCity.text, 'Unsaved Store A');
       expect(tester.takeException(), isNull);
     });
     testWidgets('LF24 valid offer form cannot publish without a publisher at $scale', (tester) async {

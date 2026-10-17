@@ -113,6 +113,9 @@ void main() {
       expect(checkoutSession.addProduct(shop.id), isTrue);
       checkoutSession.openCart(scope: BuyV2CartScope.shop);
       expect(checkoutSession.openCheckout(), isTrue);
+      // Consumer Checkout owns the selected combined Cart, even when opened
+      // from Shop. Recovery must retain that captured scope, not narrow it.
+      expect(checkoutSession.checkoutScope, BuyV2CartScope.all);
       final itemCount = checkoutSession.itemCount;
       final cartTotal = checkoutSession.cartTotal;
       final payment = checkoutSession.selectedPayment;
@@ -120,7 +123,7 @@ void main() {
       expect(checkoutSession.recoveryReturnLabel, 'Return to Checkout');
       checkoutSession.retryRecovery();
       expect(checkoutSession.view, BuyV2View.checkout);
-      expect(checkoutSession.checkoutScope, BuyV2CartScope.shop);
+      expect(checkoutSession.checkoutScope, BuyV2CartScope.all);
       expect(checkoutSession.itemCount, itemCount);
       expect(checkoutSession.cartTotal, cartTotal);
       expect(checkoutSession.selectedPayment, payment);
@@ -142,7 +145,7 @@ void main() {
 
     expect(session.view, BuyV2View.checkout);
     expect(session.checkoutStep, BuyV2CheckoutStep.address);
-    expect(session.checkoutScope, BuyV2CartScope.shop);
+    expect(session.checkoutScope, BuyV2CartScope.all);
     expect(session.notice, 'Choose a delivery address to continue.');
     expect(session.itemCount, 1);
   });

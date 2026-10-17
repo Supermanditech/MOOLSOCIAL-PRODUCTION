@@ -218,7 +218,8 @@ class _StoreCustomerFeedbackState extends State<StoreCustomerFeedback> {
             ),
             TextButton.icon(
               key: const Key('work-feedback-check-request'),
-              onPressed: controller.commandInFlight
+              onPressed: controller.commandInFlight || !controller.recoveryReady ||
+                      controller.adapter?.commandRecoveryReady != true
                   ? null
                   : () => unawaited(controller.reconcile()),
               icon: const Icon(Icons.update),

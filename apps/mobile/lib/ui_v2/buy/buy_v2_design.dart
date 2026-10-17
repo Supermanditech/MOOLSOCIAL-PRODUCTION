@@ -19,6 +19,13 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Exact paise display with the existing whole-rupee appearance retained.
+String buyV2MoneyMinor(int minor) {
+  final whole = buyV2Money(minor ~/ 100);
+  final fraction = minor % 100;
+  return fraction == 0 ? whole : '$whole.${fraction.toString().padLeft(2, '0')}';
+}
+
 /// Mode artwork is illustrative, never evidence of a vehicle assignment.
 enum BuyV2DeliveryArtwork { quick, wholesale, bulk, courier }
 
@@ -951,16 +958,20 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
   final packQuantity = quantity < product.minimumOrder
       ? product.minimumOrder
       : quantity;
-  final expectedPrice = product.hasValidPackTerms
-      ? product.packTerms?.priceForQuantity(packQuantity, product.price) ??
-            product.price
-      : product.price;
-  if (facts.price != expectedPrice) {
+  if (!product.hasValidMoney || !facts.hasValidMoney) {
+    return const BuyV2ProductOfferDecision(state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Price unavailable', detail: 'Check the current price before adding this product.');
+  }
+  final expectedPriceMinor = product.hasValidPackTerms
+      ? product.packTerms?.priceMinorForQuantity(packQuantity, product.priceMinor) ??
+            product.priceMinor
+      : product.priceMinor;
+  if (facts.priceMinor != expectedPriceMinor) {
     return BuyV2ProductOfferDecision(
       state: BuyV2ProductOfferDecisionState.changedPrice,
       statusLabel: 'Price changed',
       detail:
-          'The price changed from ${buyV2Money(expectedPrice)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
+          'The price changed from ${buyV2MoneyMinor(expectedPriceMinor)} to ${buyV2MoneyMinor(facts.priceMinor)}. Check again or choose another product.',
     );
   }
   if (automaticFulfilment &&

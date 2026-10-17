@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -100,6 +101,40 @@ class StoreFeedbackCommand {
   final String reviewId, version, operationId, content;
   final StoreFeedbackAction action;
   final StoreFeedbackAudience audience;
+
+  bool get valid =>
+      [scope.account, scope.store, reviewId, version, operationId].every(
+        (s) => s.trim().isNotEmpty && s.length <= 512) &&
+      content.trim().isNotEmpty && content == content.trim() &&
+      content.length <= 2000 &&
+      (action == StoreFeedbackAction.report
+          ? audience == StoreFeedbackAudience.moderation
+          : audience != StoreFeedbackAudience.moderation);
+
+  Map<String, Object?> toJson() => {
+    'account': scope.account, 'store': scope.store, 'reviewId': reviewId,
+    'version': version, 'operationId': operationId, 'action': action.name,
+    'audience': audience.name, 'content': content,
+  };
+
+  static StoreFeedbackCommand fromJson(Object? value) {
+    const keys = {'account', 'store', 'reviewId', 'version', 'operationId',
+      'action', 'audience', 'content'};
+    if (value is! Map || value.length != keys.length ||
+        !keys.every((k) => value[k] is String)) {
+      throw const FormatException('Invalid feedback request');
+    }
+    final command = StoreFeedbackCommand(
+      scope: (account: value['account'] as String, store: value['store'] as String),
+      reviewId: value['reviewId'] as String, version: value['version'] as String,
+      operationId: value['operationId'] as String,
+      action: StoreFeedbackAction.values.byName(value['action'] as String),
+      audience: StoreFeedbackAudience.values.byName(value['audience'] as String),
+      content: value['content'] as String,
+    );
+    if (!command.valid) throw const FormatException('Invalid feedback request');
+    return command;
+  }
 }
 
 class StoreFeedbackResult {
@@ -119,12 +154,20 @@ class StoreFeedbackResult {
 
 abstract interface class StoreFeedbackAdapter {
   /// May be true only after the real adapter's authorization and durable command
-  /// restoration are qualified. The controller below holds commands in-session
-  /// only; it does not provide restart recovery or grant permission by itself.
+  /// reconciliation are qualified. A device intent journal does not grant
+  /// provider authorization or prove that a server request was accepted.
   bool get commandRecoveryReady;
   Future<StoreFeedbackPage> load(StoreFeedbackScope scope, {String? cursor});
   Future<StoreFeedbackResult> submit(StoreFeedbackCommand command);
   Future<StoreFeedbackResult> reconcile(StoreFeedbackCommand original);
+}
+
+/// One unresolved original request per authenticated account/Store. Production
+/// implementations must serialize reads/writes/removals across instances.
+abstract interface class StoreFeedbackPendingStore {
+  Future<StoreFeedbackCommand?> readPending(StoreFeedbackScope scope);
+  Future<void> savePending(StoreFeedbackCommand command);
+  Future<void> removePending(StoreFeedbackCommand original);
 }
 
 /// Session-owned per-account/Store presentation state. No local review database,
@@ -134,10 +177,16 @@ class StoreFeedbackController extends ChangeNotifier {
     required this.scope,
     required this.context,
     this.adapter,
-  });
+    this.pendingStore,
+  }) : _restored = pendingStore == null;
   final StoreFeedbackScope scope;
   final Object? Function() context;
   final StoreFeedbackAdapter? adapter;
+  // Optional only for isolated session fixtures. WorkSession supplies its secure
+  // implementation; absence must never be claimed as restart qualification.
+  final StoreFeedbackPendingStore? pendingStore;
+  bool _restored;
+  Future<bool>? _restoring;
   final Map<String, StoreFeedbackEntry> _entries = {};
   final Map<(String, StoreFeedbackAction), String> _drafts = {};
   final Set<String> _consumedCursors = {};
@@ -151,11 +200,13 @@ class StoreFeedbackController extends ChangeNotifier {
   List<StoreFeedbackEntry> get entries => List.unmodifiable(_entries.values);
   StoreFeedbackCommand? get pending => _pending;
   bool get commandInFlight => _commandInFlight;
+  bool get recoveryReady => _restored;
   bool get actionsReady =>
       !_disposed &&
       context() != null &&
       context() == _pageContext &&
       !loading &&
+      recoveryReady && !_commandInFlight &&
       _pending == null &&
       adapter?.commandRecoveryReady == true;
   bool get current =>
@@ -203,6 +254,7 @@ class StoreFeedbackController extends ChangeNotifier {
     if (_disposed || loading) return;
     final origin = context();
     if (origin == null) return;
+    if (!await restorePending() || !_matches(origin) || loading) return;
     final cursor = more ? nextCursor : null;
     if (more && (cursor == null || _pageContext != origin)) return;
     final epoch = ++_readEpoch;
@@ -268,6 +320,45 @@ class StoreFeedbackController extends ChangeNotifier {
     }
   }
 
+  Future<bool> restorePending() {
+    if (_disposed || context() == null) return Future.value(false);
+    if (_restored) return Future.value(true);
+    final existing = _restoring;
+    if (existing != null) return existing;
+    final origin = context()!;
+    final restoring = _restorePending(origin);
+    _restoring = restoring;
+    return restoring.whenComplete(() {
+      if (identical(_restoring, restoring)) _restoring = null;
+    });
+  }
+
+  Future<bool> _restorePending(Object origin) async {
+    // Publish single-flight state before a synchronous fixture can complete.
+    await Future<void>.value();
+    if (!_matches(origin)) return false;
+    try {
+      final saved = await pendingStore!.readPending(scope)
+          .timeout(const Duration(seconds: 20));
+      if (!_matches(origin)) return false;
+      if (saved != null && (!saved.valid || saved.scope != scope)) {
+        throw const FormatException('Wrong feedback request owner');
+      }
+      _pending = saved;
+      _restored = true;
+      message = saved == null ? null
+          : 'A saved request needs confirmation. Check it before sending another.';
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (_matches(origin)) {
+        message = 'Could not restore saved requests. Refresh before sending.';
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
   Future<void> submit(
     StoreFeedbackBinding binding,
     StoreFeedbackAction action,
@@ -307,6 +398,7 @@ class StoreFeedbackController extends ChangeNotifier {
     if (_disposed ||
         context() == null ||
         command == null ||
+        !recoveryReady ||
         _commandInFlight ||
         adapter?.commandRecoveryReady != true) {
       return;
@@ -334,6 +426,25 @@ class StoreFeedbackController extends ChangeNotifier {
         }
         return;
       }
+      if (!reconcile && pendingStore != null) {
+        try {
+          await pendingStore!.savePending(command)
+              .timeout(const Duration(seconds: 20));
+        } catch (_) {
+          if (_matches(origin)) {
+            // A native write may still finish after timeout. Restore is queued
+            // behind it; never dispatch or erase uncertain journal bytes.
+            _restored = false;
+            message = 'Could not safely save this request. It was not sent. Refresh to recover.';
+          }
+          return;
+        }
+        if (!_matches(origin)) return;
+      }
+      if (adapter?.commandRecoveryReady != true) {
+        message = 'Request checking is unavailable. The original request is kept; do not send it again.';
+        return;
+      }
       final result =
           await (reconcile
                   ? adapter!.reconcile(command)
@@ -345,6 +456,18 @@ class StoreFeedbackController extends ChangeNotifier {
         message =
             'Result not confirmed. Check the original request before trying again.';
         return;
+      }
+      if (pendingStore != null) {
+        try {
+          await pendingStore!.removePending(command)
+              .timeout(const Duration(seconds: 20));
+        } catch (_) {
+          if (_matches(origin)) {
+            message = 'Could not finish saving the result. Check the original request again.';
+          }
+          return;
+        }
+        if (!_matches(origin)) return;
       }
       _pending = null;
       if (result.outcome == StoreFeedbackOutcome.accepted) {

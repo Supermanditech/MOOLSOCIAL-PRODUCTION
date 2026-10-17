@@ -129,9 +129,17 @@ import {
 } from "./workspace/workspace_profile_service.js";
 import { GoogleCloudStorageWorkspaceProofStore } from "./workspace/workspace_proof_store.js";
 import {
+  FirestoreWorkspaceCatalogueRepository,
+  WorkspaceCatalogueService,
+} from "./workspace/workspace_catalogue_service.js";
+import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace/workspace_supplier_policy_service.js";
+import {WorkspacePromotionService, FirestorePromotionRepository} from "./workspace/workspace_promotion_service.js";
+import {
   FirestoreRetailerOrderRepository,
   RetailerOrderService,
 } from "./workspace/retailer_order_service.js";
+import {WorkspacePurchaseProjectionService, WorkspaceOrderOperationsService, requireDefaultPurchaseTenant}
+  from "./workspace/workspace_purchase_projection_service.js";
 
 const youtubeServerApiKey = defineSecret("YOUTUBE_SERVER_API_KEY");
 const youtubeOauthClientId = defineSecret("YOUTUBE_OAUTH_CLIENT_ID");
@@ -2886,13 +2894,28 @@ export const moolSocialWorkspace = onRequest(
         operation === "submitGst" ||
         operation === "finishRetailerSetup" ||
         operation === "setRetailerAvailability" ||
-        operation === "saveRetailerProduct";
+        operation === "saveRetailerProduct" ||
+        operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
+        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails";
+      const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
+        "reconcileStoreSupplierPolicy"].includes(operation);
+      const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
+        "listStorePromotions", "readPublicStorePromotions"].includes(operation);
+      const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
+        "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue",
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation);
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
         operation === "confirmRetailerHandover" ||
         operation === "createRetailerIssue" ||
         operation === "declineRetailerOrder";
+      const purchaseProjectionRead = operation === "readBuyerPurchaseProjection" ||
+        operation === "readStorePurchaseProjection" ||
+        operation === "listBuyerPurchaseReferences" || operation === "listStorePurchaseReferences";
+      const operationalRead = operation === "readBuyerOperationalOrder" || operation === "readStoreOperationalOrder";
+      const operationalCommand = operation === "submitStoreOrderCommand";
+      const operationalReconcile = operation === "reconcileStoreOrderCommand";
       const ownerUserId = await verifySocialInvocation(
         request.headers,
         {
@@ -2901,9 +2924,15 @@ export const moolSocialWorkspace = onRequest(
               token,
               consume ? { consume: true } : undefined,
             ),
-          verifyIdToken: async (token) => getAuth().verifyIdToken(token),
+          verifyIdToken: async (token) => {
+            const verified = await getAuth().verifyIdToken(token);
+            if (purchaseProjectionRead || operationalRead || operationalCommand || operationalReconcile || catalogueOperation || supplierPolicyOperation || promotionOperation) {
+              requireDefaultPurchaseTenant(verified.firebase?.tenant);
+            }
+            return verified;
+          },
         },
-        mutation || orderMutation,
+        mutation || orderMutation || operationalCommand,
         true,
       );
       if (!ownerUserId) {
@@ -2915,7 +2944,41 @@ export const moolSocialWorkspace = onRequest(
       }
       const service = workspaceProfileService();
       const orders = retailerOrderService();
-      const result = operation === "listWorkspaces"
+      const {operation: _operation, ...catalogueBody} = body;
+      const result = promotionOperation
+        ? await workspacePromotionService().handleOperation(ownerUserId, operation, catalogueBody)
+        : supplierPolicyOperation
+        ? await workspaceSupplierPolicyService().handleOwnerOperation(ownerUserId, operation, catalogueBody)
+        : operationalRead
+        ? await workspaceOrderOperationsService().read(ownerUserId,
+          operation === "readBuyerOperationalOrder" ? "buyer" : "seller", catalogueBody)
+        : operationalCommand || operationalReconcile
+          ? await workspaceOrderOperationsService().command(ownerUserId, catalogueBody, operationalReconcile)
+        : operation === "listBuyerPurchaseReferences"
+        ? await workspacePurchaseProjectionService().listBuyer(ownerUserId, catalogueBody)
+        : operation === "listStorePurchaseReferences"
+          ? await workspacePurchaseProjectionService().listStore(ownerUserId, catalogueBody)
+        : operation === "readBuyerPurchaseProjection"
+        ? await workspacePurchaseProjectionService().readBuyer(ownerUserId, catalogueBody)
+        : operation === "readStorePurchaseProjection"
+          ? await workspacePurchaseProjectionService().readStore(ownerUserId, catalogueBody)
+        : operation === "readBuyerOrderIdentity"
+        ? await orders.readIdentity(ownerUserId, "buyer", catalogueBody)
+        : operation === "readStoreOrderIdentity"
+          ? await orders.readIdentity(ownerUserId, "seller", catalogueBody)
+        : ["readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation)
+        ? await workspaceCatalogueService().handleStorePublicDetails(ownerUserId, operation, catalogueBody)
+        : operation === "reconcileStoreCatalogueBinding"
+        ? await workspaceCatalogueService().reconcileBinding(ownerUserId, catalogueBody)
+        : operation === "bindReviewedStoreCatalogueSku"
+        ? await workspaceCatalogueService().bindReviewedSku(ownerUserId, catalogueBody)
+        : operation === "saveStoreCatalogueSku"
+        ? await workspaceCatalogueService().saveSku(ownerUserId, catalogueBody)
+        : operation === "listStoreCatalogueSkus"
+          ? await workspaceCatalogueService().listSkus(ownerUserId, catalogueBody)
+          : operation === "readPublicStoreCatalogue"
+            ? await workspaceCatalogueService().publicCatalogue(catalogueBody)
+        : operation === "listWorkspaces"
         ? await service.listWorkspaces(ownerUserId)
         : operation === "prepareProofUpload"
           ? await service.prepareProofUpload(ownerUserId, body)
@@ -2989,6 +3052,57 @@ export const moolSocialWorkspace = onRequest(
     }
   },
 );
+
+function workspaceOrderOperationsService(): WorkspaceOrderOperationsService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (realm !== "evaluation" && realm !== "production") {
+    throw new WorkspaceProfileError("service_unavailable", "Order updates are unavailable.", 503, true);
+  }
+  // No initializer/source is exposed through HTTP; only accepted local records
+  // can participate in these authenticated operational reads/commands.
+  return new WorkspaceOrderOperationsService(getFirestore(), realm);
+}
+
+function workspacePurchaseProjectionService(): WorkspacePurchaseProjectionService {
+  const realm = process.env.MOOLSOCIAL_PURCHASE_REALM;
+  if (realm !== "evaluation" && realm !== "production") {
+    throw new WorkspaceProfileError("service_unavailable", "Purchase information is unavailable.", 503, true);
+  }
+  // Read-only HTTP consumer. No upstream placement source or create route here.
+  return new WorkspacePurchaseProjectionService(getFirestore(), realm);
+}
+
+function workspacePromotionService(): WorkspacePromotionService {
+  const realm = process.env.MOOLSOCIAL_CATALOGUE_REALM;
+  if (realm !== "evaluation" && realm !== "production") {
+    throw new WorkspaceProfileError("service_unavailable", "Store promotions are unavailable right now.", 503, true);
+  }
+  return new WorkspacePromotionService(new FirestorePromotionRepository(getFirestore(), realm), workspaceCatalogueService());
+}
+
+function workspaceSupplierPolicyService(): WorkspaceSupplierPolicyService {
+  const realm = process.env.MOOLSOCIAL_CATALOGUE_REALM;
+  if (realm !== "evaluation" && realm !== "production") {
+    throw new WorkspaceProfileError("service_unavailable", "Store policies are unavailable right now.", 503, true);
+  }
+  return new WorkspaceSupplierPolicyService(new FirestoreSupplierPolicyRepository(getFirestore(), realm));
+}
+
+function workspaceCatalogueService(): WorkspaceCatalogueService {
+  // Explicit trusted environment only. Never infer production from review data.
+  const realm = process.env.MOOLSOCIAL_CATALOGUE_REALM;
+  if (realm !== "evaluation" && realm !== "production") {
+    throw new WorkspaceProfileError("service_unavailable", "Store catalogue is unavailable right now.", 503, true);
+  }
+  const catalogueId = process.env.MOOLSOCIAL_CATALOGUE_ID;
+  const tenantId = process.env.MOOLSOCIAL_CATALOGUE_TENANT_ID;
+  return new WorkspaceCatalogueService(
+    new FirestoreWorkspaceCatalogueRepository(getFirestore(), realm),
+    catalogueId && tenantId ? {catalogueId, tenantId} : undefined,
+    undefined,
+    new WorkspaceSupplierPolicyService(new FirestoreSupplierPolicyRepository(getFirestore(), realm)),
+  );
+}
 
 export const youtubeOAuthCallback = onRequest(
   {

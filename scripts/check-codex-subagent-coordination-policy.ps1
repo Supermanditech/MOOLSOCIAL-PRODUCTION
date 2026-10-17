@@ -8108,9 +8108,89 @@ function Invoke-Lf01Admission {
   if ($ProductionTicketId -ceq 'LF-27') {
     $owners += @('docs/quality/LF-26-RETAIL-FACTS-CONSISTENCY-20261016.json',
       'docs/quality/LF-26-RETAIL-FACTS-CONSISTENCY-20261016.md',
+      'scripts/check-approved-ui-locks.ps1',
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+      'apps/mobile/lib/features/work/screens/store_add_product_sheet.dart',
+      'apps/mobile/test/store_add_product_sheet_test.dart',
+      'apps/mobile/lib/features/work/work_stock_export.dart',
+      'apps/mobile/test/work_downloads_test.dart',
+      'apps/mobile/lib/features/chat/chat_entry_context.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
+      'apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
       'apps/mobile/lib/features/work/work_customer_feedback.dart',
       'apps/mobile/lib/features/work/widgets/store_customer_feedback.dart',
-      'apps/mobile/test/work_customer_feedback_test.dart')
+      'apps/mobile/test/work_customer_feedback_test.dart',
+      'apps/mobile/.flutter-plugins-dependencies',
+      'apps/mobile/lib/features/journey01/journey_services.dart',
+      'apps/mobile/lib/features/journey01/review_journey_services.dart',
+      'apps/mobile/lib/app/moolsocial_app.dart',
+      'apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart',
+      'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_cold_launch_social_default_c10a_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_session_coverage_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart')
+    $owners += @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart')
+  }
+  # Founder-approved catalogue/policy local children, not blanket backend authority.
+  $catalogueExtensionOwners = @(
+    'apps/mobile/lib/features/buy/buy_v2_models.dart',
+    'backend/functions/src/workspace/workspace_catalogue_service.ts',
+    'backend/functions/src/workspace/workspace_catalogue_service.test.ts',
+    'backend/functions/src/workspace/workspace_supplier_policy_service.ts',
+    'backend/functions/src/workspace/workspace_supplier_policy_service.test.ts',
+    'backend/functions/src/workspace/workspace_promotion_service.ts',
+    'backend/functions/src/workspace/workspace_promotion_service.test.ts',
+    'apps/mobile/lib/features/work/work_supplier_policy.dart',
+    'apps/mobile/test/work_supplier_policy_test.dart',
+    'apps/mobile/lib/features/work/work_product_promotions.dart',
+    'apps/mobile/lib/features/work/widgets/store_product_promotions.dart',
+    'apps/mobile/test/work_product_promotions_test.dart',
+    'backend/functions/src/index.ts',
+    'apps/mobile/lib/features/work/work_catalogue_gateway.dart',
+    'apps/mobile/test/work_catalogue_gateway_test.dart')
+  if ($ProductionTicketId -ceq 'LF-27') {
+    $extensionRecord = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
+    if ($null -ne $extensionRecord.PSObject.Properties['sharedCatalogueExtension']) {
+      $extension = $extensionRecord.sharedCatalogueExtension
+      Assert-Coordination ($extension.authorized -eq $true -and
+        $extension.parentTickets -ceq 'LF03/LF07/LF04/LF08' -and
+        $extension.sourceCheckpoint -ceq '46670dc3caac8eabec38a18a41403c52fdded5d4' -and
+        $extension.acceptedUiCommit -ceq 'cf08fb91ee6ba64973c9230c7db2f424bdd67cf1' -and
+        $extension.localImplementationOnly -eq $true -and
+        $extension.deploymentAuthorized -eq $false -and
+        $extension.paymentsAuthorized -eq $false -and
+        $extension.apkAuthorized -eq $false -and
+        (@($extension.owners | Sort-Object) -join '|') -ceq
+        (@($catalogueExtensionOwners | Sort-Object) -join '|')) 'Catalogue/policy extension exceeds its exact local authority.'
+      $owners += $catalogueExtensionOwners
+    }
+  }
+  if ($ProductionTicketId -ceq 'LF-27' -and
+      $null -ne $extensionRecord.PSObject.Properties['sharedOrderIdentityExtension']) {
+    $identityExtension = $extensionRecord.sharedOrderIdentityExtension
+    $identityOwners = @('backend/functions/src/workspace/retailer_order_service.ts',
+      'backend/functions/src/workspace/retailer_order_service.test.ts',
+      'backend/functions/src/index.ts',
+      'apps/mobile/lib/features/work/work_order_identity_gateway.dart',
+      'apps/mobile/test/work_order_identity_gateway_test.dart',
+      'backend/functions/src/workspace/workspace_purchase_projection_service.ts',
+      'backend/functions/src/workspace/workspace_purchase_projection_service.test.ts',
+      'apps/mobile/lib/features/work/widgets/workspace_purchase_originals.dart',
+      'apps/mobile/test/workspace_purchase_originals_test.dart')
+    Assert-Coordination ($identityExtension.authorized -eq $true -and
+      $identityExtension.parentTickets -ceq 'LF05/LF09/LF10' -and
+      $identityExtension.sourceCheckpoint -ceq '46670dc3caac8eabec38a18a41403c52fdded5d4' -and
+      $identityExtension.localImplementationOnly -eq $true -and
+      $identityExtension.deploymentAuthorized -eq $false -and
+      $identityExtension.paymentsAuthorized -eq $false -and
+      $identityExtension.apkAuthorized -eq $false -and
+      (@($identityExtension.owners | Sort-Object) -join '|') -ceq
+      (@($identityOwners | Sort-Object) -join '|')) 'LF identity extension exceeds its exact local authority.'
+    $owners += @($identityOwners | Where-Object { $_ -cnotin $owners })
   }
   $branch = @(Get-OctoberCompatibilityGitLines @('branch','--show-current'))
   Assert-Coordination ($branch.Count -eq 1 -and (Test-Lf01AdmissionIdentity @{

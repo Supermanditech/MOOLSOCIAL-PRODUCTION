@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -50,7 +53,153 @@ class _Lf05ConsentStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  test('LF-PAISE CSV preserves exact prices tiers source rows and legacy amounts', () {
+    // Host import review only; these records never seed a device or provider.
+    const csv = 'title,brand,pack,purchasePrice,sellingPrice,mrp,stock,sku,sellingChannels,wholesaleSaleType,wholesalePrice,wholesaleMinimum,wholesaleTiers\n'
+      'Decimal rice,Host,1 kg,9.25,10.25,12.50,3,HOST-DEC,both,bulk,10.15,1,2:9.95\n'
+      'Whole rice,Host,1 kg,9,10,12,3,HOST-WHOLE,retail,,,,\n'
+      'Correct rice,Host,1 kg,9.25,10.255,12.50,3,HOST-FIX,retail,,,,';
+    final reviewed = WorkspaceProductImport.parse(csv, catalogue: [], owned: []);
+    final first = reviewed.rows.first;
+    expect(first.issue, isNull);
+    final item = first.product!;
+    expect(item.purchasePriceMinor, 925);
+    expect(item.sellingPriceMinor, 1025);
+    expect(item.mrpMinor, 1250);
+    expect(item.stock, 3);
+    expect(item.unitPrice, '₹10.25/1 kg');
+    expect(item.wholesaleOffer!.priceAtMinor(2), 995);
+    expect(item.publicListing, isFalse);
+    final facts = item.toBuyPublicFacts(storeName: 'Host Store', sourceId: 'Host inputs',
+      storeVisible: false, acceptingOrders: false, observedAt: DateTime.utc(2026, 10, 17));
+    expect(facts.priceMinor, 1025);
+    expect(facts.orderabilityLabel, 'Not listed for customers');
+    expect(WorkspaceCatalogueItem.fromInventoryJson(item.toInventoryJson()).sellingPriceMinor, 1025);
+    final whole = reviewed.rows[1].product!;
+    expect(whole.usesMinorAmounts, isFalse);
+    expect(whole.toInventoryJson()['sellingPrice'], 10);
+    final invalid = reviewed.rows.last;
+    expect(invalid.issueValues.keys, contains('sellingPrice'));
+    final fixed = WorkspaceProductImport.revalidateRow(invalid,
+      {...invalid.rawValues, 'sellingPrice': '10.25'}, catalogue: [], owned: [],
+      readyRows: reviewed.rows.where((row) => row.product != null).toList());
+    expect(fixed.issue, isNull);
+    expect(fixed.number, invalid.number);
+    expect(fixed.sourceCells, invalid.sourceCells);
+    expect(fixed.sourceValues, invalid.sourceValues);
+    expect(fixed.product!.sku, 'HOST-FIX');
+    expect(fixed.product!.sellingPriceMinor, 1025);
+  });
+
+  test('LF-PAISE CSV retains exact matched MRP and original independent limits', () {
+    final base = handoffStock().copyWith(purchasePriceMinor: 925,
+      sellingPriceMinor: 1025, mrpMinor: 1250, clearWholesaleOffer: true);
+    WorkspaceProductImportRow decode({String purchase = '9.25', String selling = '10.25',
+      String stock = '3', String mrp = ''}) => WorkspaceProductImport.parse(jsonEncode([{
+        'title': base.title, 'brand': base.brand, 'variant': base.variant, 'pack': base.pack,
+        'canonicalId': base.canonicalId, 'purchasePrice': purchase, 'sellingPrice': selling,
+        'stock': stock, 'mrp': mrp,
+      }]), json: true, catalogue: [base], owned: []).rows.single;
+    final retained = decode();
+    expect(retained.issue, isNull);
+    expect(retained.product!.id, base.id);
+    expect(retained.product!.mrpMinor, 1250);
+    expect(retained.product!.purchasePriceMinor, 925);
+    expect(decode(selling: '12.51').issueValues.keys, contains('sellingPrice'));
+    expect(decode(mrp: '10.24').issueValues.keys, contains('mrp'));
+    expect(decode(purchase: '2147483648', selling: '2147483649', mrp: '2147483650')
+      .issueValues.keys, contains('purchasePrice'));
+    expect(decode(stock: '2147483648').issueValues.keys, contains('stock'));
+    expect(decode(stock: '3.5').issueValues.keys, contains('stock'));
+    for (final text in ['9.001', '1e2', '-1', 'NaN']) {
+      expect(decode(purchase: text).issueValues.keys, contains('purchasePrice'));
+    }
+  });
+
+  test('LF05 device-state codec retains unresolved holds separately and reads legacy snapshots', () async {
+    final previous = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+    addTearDown(() => SharedPreferencesAsyncPlatform.instance = previous);
+    final preferences = SharedPreferencesAsync();
+    const owner = 'host-policy-codec', key = 'moolsocial.buy.customer-state.host-policy-codec.v1';
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner);
+    expect(await store.write(const BuyV2CustomerStateSnapshot(
+      supplierPolicyUnresolvedProductKeys: {'exact-host-product'}, cartQuantities: {'host-sku': 2})), true);
+    final restarted = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner);
+    final retained = (await restarted.read())!;
+    expect(retained.supplierPolicyUnresolvedProductKeys, {'exact-host-product'});
+    expect(retained.supplierPolicyRequiredProductKeys, isEmpty);
+    expect(retained.supplierPolicyAcceptances, isEmpty);
+    expect(retained.cartQuantities, {'host-sku': 2});
+    expect(await BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'other-host-owner').read(), isNull);
+    final legacy = jsonDecode((await preferences.getString(key))!) as Map<String, dynamic>;
+    legacy.remove('supplierPolicyUnresolvedProductKeys');
+    await preferences.setString(key, jsonEncode(legacy));
+    expect((await restarted.read())!.supplierPolicyUnresolvedProductKeys, isEmpty);
+    legacy['supplierPolicyUnresolvedProductKeys'] = 'corrupt-not-an-empty-hold';
+    await preferences.setString(key, jsonEncode(legacy));
+    await expectLater(restarted.read(), throwsFormatException);
+  });
   final policyNow = DateTime.utc(2026, 10, 15, 10);
+  test('LF05 unresolved policy at Checkout preserves Cart and creates no order', () async {
+    final item = handoffStock(), core = BuySession();
+    final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+    final source = _Lf05PolicySource(BuyV2ProductContentSnapshot(productId: product.id,
+      sourceId: 'host-policy', state: BuyV2ProductContentState.ready,
+      observedAt: policyNow, supplierPolicyAcceptanceRequired: false));
+    final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+      productContentAdapter: source, catalogueNow: () => policyNow);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    expect(await session.openLinkedProduct(product.id), true);
+    expect(session.addProduct(product.id), true);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), true);
+    source.value = BuyV2ProductContentSnapshot(productId: product.id,
+      sourceId: 'host-policy', state: BuyV2ProductContentState.unavailable,
+      supplierPolicyResolutionPending: true);
+    expect(session.confirmOrder(), false);
+    expect(session.notice, contains('policy'));
+    expect(session.quantityFor(product.id), 1);
+    expect(session.confirmedOrders, isEmpty);
+    expect(session.pendingSupplierPolicyAdd, isNull);
+  });
+  for (final state in [BuyV2ProductContentState.ready, BuyV2ProductContentState.unavailable]) {
+    test('LF05 first unresolved policy read blocks Add without inventing consent $state', () async {
+      final item = handoffStock();
+      final product = item.toBuyPublicProduct(storeId: 'a', storeName: 'Host Store');
+      final source = _Lf05PolicySource(BuyV2ProductContentSnapshot(productId: product.id,
+        sourceId: 'host-configured-policy', state: state, observedAt: policyNow,
+        supplierPolicyResolutionPending: true));
+      final store = _Lf05ConsentStore(), core = BuySession();
+      final session = BuyV2Session(core: core, cataloguePageSource: _Lf04Catalogue(product),
+        productContentAdapter: source, customerStateStore: store, catalogueNow: () => policyNow);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCustomerState();
+      expect(await session.openLinkedProduct(product.id), true);
+      expect(session.addProduct(product.id), false);
+      expect(session.quantityFor(product.id), 0);
+      expect(session.pendingSupplierPolicyAdd, isNull);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.saved?.supplierPolicyAcceptances ?? {}, isEmpty);
+      expect(store.saved!.supplierPolicyUnresolvedProductKeys, isNotEmpty);
+      expect(store.saved!.supplierPolicyRequiredProductKeys, isEmpty);
+      source.value = BuyV2ProductContentSnapshot(productId: product.id,
+        sourceId: 'host-configured-policy', state: BuyV2ProductContentState.ready);
+      final restoredCore = BuySession();
+      final restored = BuyV2Session(core: restoredCore, cataloguePageSource: _Lf04Catalogue(product),
+        productContentAdapter: source, customerStateStore: store, catalogueNow: () => policyNow);
+      addTearDown(restored.dispose); addTearDown(restoredCore.dispose);
+      await restored.restoreCustomerState();
+      expect(await restored.openLinkedProduct(product.id), true);
+      expect(restored.addProduct(product.id), false);
+      expect(restored.quantityFor(product.id), 0);
+      source.value = BuyV2ProductContentSnapshot(productId: product.id,
+        sourceId: 'host-configured-policy', state: BuyV2ProductContentState.ready,
+        observedAt: policyNow, supplierPolicyAcceptanceRequired: false);
+      expect(session.addProduct(product.id), true);
+      expect(session.quantityFor(product.id), 1);
+    });
+  }
   BuyV2ProductContentSnapshot policyReadback(WorkspaceCatalogueItem item, {
     String store = 'a', String? productId, String source = 'host-policy-source',
     String revision = 'host-policy-v1', String body = 'Host supplier purchase terms',
@@ -93,10 +242,11 @@ void main() {
       final held = adapter.snapshotFor(product);
       expect(held.state, BuyV2ProductContentState.unavailable);
       expect(held.supplierPolicy, isNull);
-      expect(held.supplierPolicyAcceptanceRequired, isTrue);
+      expect(held.supplierPolicyAcceptanceRequired, isNull);
+      expect(held.supplierPolicyResolutionPending, isTrue);
     }
     source.fail = true;
-    expect(adapter.snapshotFor(product).supplierPolicyAcceptanceRequired, isTrue);
+    expect(adapter.snapshotFor(product).supplierPolicyResolutionPending, isTrue);
     source.fail = false;
     source.value = policyReadback(item, required: false, omitPolicy: true);
     expect(adapter.snapshotFor(product).supplierPolicyAcceptanceRequired, isFalse);

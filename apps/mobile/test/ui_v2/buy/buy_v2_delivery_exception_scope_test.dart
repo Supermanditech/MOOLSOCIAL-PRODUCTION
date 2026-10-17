@@ -97,6 +97,9 @@ void main() {
             final request = action == 'read'
                 ? session.refreshOrderResolution('PO-240783')
                 : resolve(session);
+            // Saving the duplicate-prevention hold now precedes dispatch.
+            // These are late-reply cases, not pre-dispatch scope changes.
+            if (action == 'submit') await adapter.submitted.future;
             switch (drift) {
               case 'owner':
                 owner.scope = 'owner-b';
@@ -143,6 +146,7 @@ void main() {
         final old = action == 'read'
             ? session.refreshOrderResolution('PO-240783')
             : resolve(session);
+        if (action == 'submit') await adapter.submitted.future;
         owner.scope = 'owner-b';
         final second = adapter.pending = Completer<void>();
         final next = session.refreshOrderResolution('PO-240783');
@@ -332,6 +336,7 @@ void main() {
 
 class _ResolutionAdapter implements BuyV2OrderResolutionAdapter {
   Completer<void>? pending;
+  final submitted = Completer<void>();
   bool fail = false;
   int calls = 0;
   int submissions = 0;
@@ -360,6 +365,7 @@ class _ResolutionAdapter implements BuyV2OrderResolutionAdapter {
   ) async {
     calls++;
     submissions++;
+    if (!submitted.isCompleted) submitted.complete();
     await pending?.future;
     if (fail) throw StateError('Host lost reply');
     return const BuyV2OrderResolutionResult(

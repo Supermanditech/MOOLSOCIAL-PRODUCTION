@@ -68,7 +68,7 @@ void main() {
     apply()();
     await tester.pumpAndSettle();
     expect(work.workspacePublicationDetails.customerPaymentTerms.containsKey(customer), isFalse);
-    expect(find.text('Customer preferences applied'), findsOneWidget);
+    expect(find.text('Customer preferences applied for this session only.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   for (final scale in [1.0, 2.0]) {
@@ -114,7 +114,7 @@ void main() {
           final currentApply = tester.widget<FilledButton>(find.byKey(const Key('work-customer-terms-save'))).onPressed!;
           currentApply();
           await tester.pumpAndSettle();
-          expect(find.text('Customer preferences applied'), findsOneWidget);
+          expect(find.text('Customer preferences applied for this session only.'), findsOneWidget);
           expect(work.workspacePublicationDetails.customerPaymentTerms.containsKey(customerB), isFalse);
         }
       });

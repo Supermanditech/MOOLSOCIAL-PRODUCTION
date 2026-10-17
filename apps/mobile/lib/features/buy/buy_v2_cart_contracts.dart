@@ -47,19 +47,27 @@ class BuyV2CartBenefit {
     this.strategy = BuyV2CartBenefitStrategy.partnerCampaign,
     this.sponsor = BuyV2CartBenefitSponsor.moolSocial,
     this.sponsorName = 'MoolSocial',
-    this.savingAmount = 0,
+    int? savingAmount,
+    int? savingAmountMinor,
     this.validFrom,
     this.validUntil,
     this.freeDelivery = false,
     this.offerId,
-    this.minimumSpend,
+    int? minimumSpend,
+    int? minimumSpendMinor,
     this.minimumQuantity,
     this.eligiblePaymentMethods = const {},
     this.scope = BuyV2CartBenefitScope.platform,
     this.storeId,
     this.productIds = const {},
     this.revision = 0,
-  });
+  }) : _legacySaving = savingAmount ?? (savingAmountMinor == null ? 0 : null),
+       // Keep public argument names, not private initializing formals.
+       // ignore: prefer_initializing_formals
+       _savingMinor = savingAmountMinor,
+       _legacyMinimumSpend = minimumSpend,
+       // ignore: prefer_initializing_formals
+       _minimumSpendMinor = minimumSpendMinor;
 
   final String id;
   final BuyV2CartBenefitKind kind;
@@ -70,12 +78,39 @@ class BuyV2CartBenefit {
   final BuyV2CartBenefitStrategy strategy;
   final BuyV2CartBenefitSponsor sponsor;
   final String sponsorName;
-  final int savingAmount;
+  final int? _legacySaving,
+      _savingMinor,
+      _legacyMinimumSpend,
+      _minimumSpendMinor;
+  int get savingAmountMinor =>
+      buyV2ExactMinorAmount(minor: _savingMinor, legacyRupees: _legacySaving);
+  int get savingAmount => _savingMinor == null
+      ? _legacySaving!
+      : buyV2WholeRupees(savingAmountMinor);
+  int? get minimumSpendMinor =>
+      _minimumSpendMinor == null && _legacyMinimumSpend == null
+      ? null
+      : buyV2ExactMinorAmount(
+          minor: _minimumSpendMinor,
+          legacyRupees: _legacyMinimumSpend,
+        );
+  int? get minimumSpend => _minimumSpendMinor == null
+      ? _legacyMinimumSpend
+      : buyV2WholeRupees(minimumSpendMinor!);
+  bool get hasValidMoney {
+    try {
+      savingAmountMinor;
+      minimumSpendMinor;
+      return true;
+    } on FormatException {
+      return false;
+    }
+  }
+
   final DateTime? validFrom;
   final DateTime? validUntil;
   final bool freeDelivery;
   final String? offerId;
-  final int? minimumSpend;
   final int? minimumQuantity;
   final Set<String> eligiblePaymentMethods;
   final BuyV2CartBenefitScope scope;
@@ -86,6 +121,7 @@ class BuyV2CartBenefit {
   final int revision;
 
   bool get validScope =>
+      hasValidMoney &&
       revision >= 0 &&
       switch (scope) {
         BuyV2CartBenefitScope.platform => storeId == null && productIds.isEmpty,
@@ -154,6 +190,17 @@ abstract interface class BuyV2LiveCartBenefitsAdapter
   );
 }
 
+/// Exact amount capability in the existing benefit adapter. The legacy method
+/// retains its whole-rupee contract; callers may not round into that method.
+abstract interface class BuyV2MinorCartBenefitsAdapter
+    implements BuyV2CartBenefitsAdapter {
+  List<BuyV2CartBenefit> benefitsForMinor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotalMinor,
+  });
+}
+
 /// Compile-time boundary for founder device-review benefit states.
 ///
 /// Normal builds omit [MOOLSOCIAL_DEVICE_REVIEW] and remain fail-closed until
@@ -174,12 +221,17 @@ class BuyV2SeededCartBenefitsAdapter implements BuyV2CartBenefitsAdapter {
     if (itemTotal <= 0 || destinations.contains(BuyV2Destination.orders)) {
       return const [];
     }
-    return List.unmodifiable([
-      for (final destination in destinations)
-        if (destination != BuyV2Destination.orders)
-          ..._deviceReviewBenefits(destination, kind),
-    ]);
+    return _forDestinations(kind, destinations);
   }
+
+  List<BuyV2CartBenefit> _forDestinations(
+    BuyV2CartBenefitKind kind,
+    Set<BuyV2Destination> destinations,
+  ) => List.unmodifiable([
+    for (final destination in destinations)
+      if (destination != BuyV2Destination.orders)
+        ..._deviceReviewBenefits(destination, kind),
+  ]);
 }
 
 List<BuyV2CartBenefit> _deviceReviewBenefits(
@@ -263,7 +315,8 @@ List<BuyV2CartBenefit> _deviceReviewBenefits(
   ]);
 }
 
-class BuyV2DisabledCartBenefitsAdapter implements BuyV2CartBenefitsAdapter {
+class BuyV2DisabledCartBenefitsAdapter
+    implements BuyV2MinorCartBenefitsAdapter {
   const BuyV2DisabledCartBenefitsAdapter();
 
   @override
@@ -271,6 +324,12 @@ class BuyV2DisabledCartBenefitsAdapter implements BuyV2CartBenefitsAdapter {
     required BuyV2CartBenefitKind kind,
     required Set<BuyV2Destination> destinations,
     required int itemTotal,
+  }) => const [];
+  @override
+  List<BuyV2CartBenefit> benefitsForMinor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotalMinor,
   }) => const [];
 }
 

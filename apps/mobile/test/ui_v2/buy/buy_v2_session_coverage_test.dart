@@ -29,7 +29,7 @@ void main() {
       expect(session.shopCategoryId, shopCategory);
     });
 
-    test('vertical cart projections keep exact quantities and totals', () {
+    test('mixed consumer Cart and isolated Medicine keep exact quantities and totals', () {
       final session = _newSession();
       final products = {
         for (final destination in const [
@@ -59,14 +59,16 @@ void main() {
           BuyV2Destination.orders => BuyV2CartScope.all,
         };
         session.chooseCartScope(scope);
-        expect(
-          session.cartLines.every(
-            (line) => line.product.destination == entry.key,
-          ),
-          isTrue,
-        );
-        expect(session.scopedItemCount, expectedQuantity);
-        expect(session.scopedCartTotal, expectedTotal);
+        // Shop/Wholesale are selections within the approved combined Cart,
+        // not the former vertical-only carts. Medicine remains isolated.
+        final included = entry.key == BuyV2Destination.medicine
+            ? [product] : products.values.toList();
+        expect(session.cartLines.map((line) => line.product.id),
+            unorderedEquals(included.map((item) => item.id)));
+        expect(session.scopedItemCount,
+            included.fold<int>(0, (count, item) => count + item.minimumOrder));
+        expect(session.scopedCartTotal,
+            included.fold<int>(0, (total, item) => total + item.price * item.minimumOrder));
       }
     });
 

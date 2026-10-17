@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import 'work_publication_data.dart';
+import 'work_order_identity_gateway.dart' show WorkspaceOperationalOrderSnapshot, WorkspaceOrderIdentityRole;
 export 'work_publication_data.dart';
 
 /// Read-only report boundaries; these never authorize a stock or ledger write.
@@ -6549,7 +6550,38 @@ class WorkspaceOrderRecord {
     this.collectionStoreId,
     this.itemSnapshots = const [],
     this.rejectionReason,
+    this.operational,
   });
+
+  /// A lossless projection, not a local sale, payment or Stock reservation.
+  factory WorkspaceOrderRecord.fromOperational(WorkspaceOperationalOrderSnapshot snapshot) {
+    if (snapshot.viewerRole != WorkspaceOrderIdentityRole.seller ||
+        snapshot.customerLabel == null || snapshot.address == null) {
+      throw ArgumentError('A seller-scoped snapshot is required.');
+    }
+    final total = snapshot.original.totals['totalMinor']!;
+    return WorkspaceOrderRecord(
+      id: snapshot.reference.orderId,
+      customer: snapshot.customerLabel!,
+      items: snapshot.original.lines.map((l) => '${l.name} · ${l.packLabel}').join(', '),
+      // Legacy quantities mean whole Stock units. Operational milli-quantities
+      // stay only in the exact typed purchased lines, never in this map.
+      quantities: const {},
+      amount: total ~/ 100, remainderPaise: total % 100,
+      discountMinor: snapshot.original.totals['discountMinor']!,
+      source: 'MoolSocial',
+      fulfilment: snapshot.fulfilment == 'collection' ? 'Customer collection' : 'Delivery',
+      payment: 'Payment status unavailable', address: snapshot.address!,
+      stage: snapshot.stage, needsDelivery: snapshot.fulfilment == 'delivery',
+      createdAt: snapshot.placedAt, actionDeadline: snapshot.acceptanceDeadline,
+      fulfilmentDeadline: snapshot.fulfilmentDeadline,
+      collectionStoreId: snapshot.fulfilment == 'collection' ? snapshot.reference.storeId : null,
+      rejectionReason: snapshot.rejectionReason, operational: snapshot,
+    );
+  }
+
+  final WorkspaceOperationalOrderSnapshot? operational;
+  bool get isOperationalProjection => operational != null;
 
   final WorkspaceBillingDetails billingDetails;
   final String id;
@@ -6560,15 +6592,34 @@ class WorkspaceOrderRecord {
   final int remainderPaise, discountMinor;
   final WorkspaceBillDiscount discount;
   int get payableMinor => amount * 100 + remainderPaise;
-  int get subtotalMinor => payableMinor + discountMinor;
-  bool get validBillAmounts =>
-      amount >= 0 &&
+  int get subtotalMinor => operational?.original.totals['itemsMinor'] ?? payableMinor + discountMinor;
+  bool get validBillAmounts {
+    final exact = operational;
+    if (exact != null) {
+      if (exact.viewerRole != WorkspaceOrderIdentityRole.seller ||
+          exact.customerLabel == null || exact.address == null) {
+        return false;
+      }
+      final expected = WorkspaceOrderRecord.fromOperational(exact);
+      return id == expected.id && customer == expected.customer && items == expected.items &&
+          source == expected.source && payment == expected.payment && address == expected.address &&
+          fulfilment == expected.fulfilment && needsDelivery == expected.needsDelivery &&
+          stage == expected.stage && createdAt == expected.createdAt &&
+          actionDeadline == expected.actionDeadline && fulfilmentDeadline == expected.fulfilmentDeadline &&
+          collectionStoreId == expected.collectionStoreId && rejectionReason == expected.rejectionReason &&
+          amount == expected.amount && remainderPaise == expected.remainderPaise &&
+          discountMinor == expected.discountMinor && discount.isEmpty && extraMinutes == 0 &&
+          !stockReserved && quantities.isEmpty && itemSnapshots.isEmpty &&
+          jsonEncode(billingDetails.toJson()) == jsonEncode(expected.billingDetails.toJson());
+    }
+    return amount >= 0 &&
       remainderPaise >= 0 &&
       remainderPaise < 100 &&
       discountMinor >= 0 &&
       discount.valid &&
       discount.validFor(subtotalMinor) &&
       discount.amountFor(subtotalMinor) == discountMinor;
+  }
   final String source;
   final String fulfilment;
   final String payment;
@@ -6588,7 +6639,11 @@ class WorkspaceOrderRecord {
   final String? rejectionReason;
 
   /// Frozen original bill details for local ledger recovery, not fulfilment authority.
-  Map<String, Object?> toLedgerJson() => {
+  Map<String, Object?> toLedgerJson() {
+    if (isOperationalProjection) {
+      throw StateError('An operational projection is not a local ledger sale.');
+    }
+    return {
     'id': id,
     'customer': customer,
     'billingDetails': billingDetails.toJson(),
@@ -6622,7 +6677,8 @@ class WorkspaceOrderRecord {
           'lineTotalPaise': item.lineTotalPaise,
         },
     ],
-  };
+    };
+  }
 
   static WorkspaceOrderRecord? fromLedgerJson(Object? value) {
     try {
@@ -6711,7 +6767,7 @@ class WorkspaceOrderRecord {
       stage == 'Completed' ||
       (!isCustomerCollection && stage == 'Delivered') ||
       (isCustomerCollection && stage == 'Collected');
-  bool get isClosed => isCompleted || stage == 'Cancelled';
+  bool get isClosed => isCompleted || stage == 'Cancelled' || stage == 'Rejected';
 
   bool get isDeliveryInProgress =>
       !isCustomerCollection &&
@@ -6746,7 +6802,18 @@ class WorkspaceOrderRecord {
     bool? stockReserved,
     List<WorkspaceOrderItemSnapshot>? itemSnapshots,
     String? rejectionReason,
-  }) => WorkspaceOrderRecord(
+  }) {
+    if (isOperationalProjection) {
+      if (customer != null || items != null || quantities != null || amount != null ||
+          source != null || fulfilment != null || payment != null || address != null ||
+          stage != null || needsDelivery != null || actionDeadline != null || clearActionDeadline ||
+          fulfilmentDeadline != null || extraMinutes != null || stockReserved != null ||
+          itemSnapshots != null || rejectionReason != null) {
+        throw StateError('Operational facts must come from a new authenticated snapshot.');
+      }
+      return this;
+    }
+    return WorkspaceOrderRecord(
     id: id,
     customer: customer ?? this.customer,
     billingDetails: billingDetails,
@@ -6774,7 +6841,8 @@ class WorkspaceOrderRecord {
       itemSnapshots ?? this.itemSnapshots,
     ),
     rejectionReason: rejectionReason ?? this.rejectionReason,
-  );
+    );
+  }
 }
 
 class WorkspaceCustomerRecord {
@@ -6889,11 +6957,22 @@ class WorkspacePackingLine {
     required this.label,
     required this.quantity,
     required this.packed,
+    this.quantityScale = 1,
+    this.quantityUnit = '',
   });
 
   final String id;
   final String label;
   final int quantity;
+  /// Explicitly scaled purchased quantities; never local inventory deltas.
+  final int quantityScale;
+  final String quantityUnit;
+  String get quantityLabel {
+    final whole = quantity ~/ quantityScale;
+    final remainder = quantity % quantityScale;
+    final fraction = remainder == 0 ? '' : '.${remainder.toString().padLeft(3, '0').replaceFirst(RegExp(r'0+$'), '')}';
+    return '$whole$fraction${quantityUnit.isEmpty ? '' : ' $quantityUnit'}';
+  }
   final bool packed;
 }
 
@@ -8380,10 +8459,10 @@ class WorkspaceProductImport {
         );
         continue;
       }
-      final purchase = int.tryParse(value('purchasePrice'));
-      final selling = int.tryParse(value('sellingPrice'));
+      final purchase = workspacePriceMinorFromInput(value('purchasePrice'), maximumMinor: 9007199254740991);
+      final selling = workspacePriceMinorFromInput(value('sellingPrice'), maximumMinor: 9007199254740991);
       final stock = int.tryParse(value('stock'));
-      final mrp = int.tryParse(value('mrp'));
+      final mrp = workspacePriceMinorFromInput(value('mrp'), maximumMinor: 9007199254740991);
       final minimum = value('minimumOrder').isEmpty
           ? 1
           : int.tryParse(value('minimumOrder'));
@@ -8412,22 +8491,20 @@ class WorkspaceProductImport {
       }
       if (value('mrp').isNotEmpty && mrp == null) {
         result.add(
-          blocked('Enter MRP as a whole-rupee amount.', fields: ['mrp']),
+          blocked('Enter MRP with at most two decimal places.', fields: ['mrp']),
         );
         continue;
       }
-      final oversized = {
-        'purchasePrice': purchase!,
-        'sellingPrice': selling!,
-        'stock': stock!,
-        'mrp': mrp ?? 0,
-        'minimumOrder': minimum!,
-        'lowStockThreshold': low!,
-      }.entries.where((e) => e.value > 2147483647).map((e) => e.key).toList();
+      final oversized = [
+        ...{'purchasePrice': purchase!, 'sellingPrice': selling!, 'mrp': mrp ?? 0}
+            .entries.where((e) => e.value > 214748364700).map((e) => e.key),
+        ...{'stock': stock!, 'minimumOrder': minimum!, 'lowStockThreshold': low!}
+            .entries.where((e) => e.value > 2147483647).map((e) => e.key),
+      ];
       if (oversized.isNotEmpty) {
         result.add(
           blocked(
-            'Use a whole number no greater than 2147483647.',
+            'Prices cannot exceed ₹2147483647; quantities must be whole numbers no greater than 2147483647.',
             fields: oversized,
           ),
         );
@@ -8501,6 +8578,8 @@ class WorkspaceProductImport {
         continue;
       }
       final matched = candidates.firstOrNull;
+      final exact = matched?.usesMinorAmounts == true || purchase % 100 != 0 ||
+          selling % 100 != 0 || mrp != null && mrp % 100 != 0;
       final id = matched?.id ?? 'import-$stamp-$index';
       final sku = value('sku').isNotEmpty
           ? value('sku')
@@ -8555,8 +8634,10 @@ class WorkspaceProductImport {
             pack: value('pack'),
             sku: sku,
             barcode: barcode,
-            purchasePrice: purchase,
-            sellingPrice: selling,
+            purchasePrice: exact ? null : purchase ~/ 100,
+            sellingPrice: exact ? null : selling ~/ 100,
+            purchasePriceMinor: exact ? purchase : null,
+            sellingPriceMinor: exact ? selling : null,
             unitPrice: '',
             stock: stock,
             deliveryPromise: 'Store pickup or local delivery',
@@ -8636,17 +8717,20 @@ class WorkspaceProductImport {
         compliance: base.compliance == null && !packFactsChanged
             ? null
             : WorkspaceProductCompliance.fromJson(packFacts),
-        purchasePrice: purchase,
-        sellingPrice: selling,
+        purchasePrice: exact ? null : purchase ~/ 100,
+        sellingPrice: exact ? null : selling ~/ 100,
+        purchasePriceMinor: exact ? purchase : null,
+        sellingPriceMinor: exact ? selling : null,
         stock: stock,
-        mrp: mrp ?? base.mrp,
+        mrp: exact ? null : mrp == null ? base.mrp : mrp ~/ 100,
+        mrpMinor: exact ? mrp ?? base.mrpMinor : null,
         // An omitted override keeps the exact SKU's existing order rule.
         minimumOrder: value('minimumOrder').isEmpty
             ? base.minimumOrder
             : minimum,
         lowStockThreshold: low,
         unitPrice: value('unitPrice').isEmpty
-            ? '₹$selling/${base.pack}'
+            ? '₹${workspacePriceInputFromMinor(selling)}/${base.pack}'
             : value('unitPrice'),
         deliveryPromise: value('deliveryPromise').isEmpty
             ? base.deliveryPromise
@@ -8679,8 +8763,8 @@ class WorkspaceProductImport {
             contentChanged,
       );
       if (product.wholesaleOffer?.enabled == true &&
-          product.mrp != null &&
-          product.wholesaleOffer!.priceRupees > product.mrp!) {
+          product.mrpMinor != null &&
+          product.wholesaleOffer!.priceMinor > product.mrpMinor!) {
         result.add(
           blocked(
             'Wholesale price cannot exceed the pack MRP.',
@@ -8689,11 +8773,11 @@ class WorkspaceProductImport {
         );
         continue;
       }
-      if (product.mrp != null && product.mrp! < selling) {
+      if (product.mrpMinor != null && product.mrpMinor! < selling) {
         result.add(
           blocked(
             value('mrp').isEmpty
-                ? 'Customer price exceeds the catalogue MRP of ₹${product.mrp}. Correct the selling price or check the pack MRP.'
+                ? 'Customer price exceeds the catalogue MRP of ₹${workspacePriceInputFromMinor(product.mrpMinor!)}. Correct the selling price or check the pack MRP.'
                 : 'MRP cannot be lower than the customer price.',
             fields: value('mrp').isEmpty
                 ? ['sellingPrice']
@@ -9725,34 +9809,47 @@ class WorkspaceStockEntry {
     required this.pack,
     required this.stockMode,
     required this.quantity,
-    required this.purchasePriceRupees,
+    int? purchasePriceRupees,
+    int? purchasePriceMinor,
     required this.recordedAt,
     required this.stockAsOf,
     this.packMeasure,
-  });
+  }) : _legacyPurchasePriceRupees = purchasePriceRupees,
+       _purchaseMinor = purchasePriceMinor;
 
   final WorkspaceStockEntryMethod method;
   final String productId, sku, pack;
   final WorkspaceStockMode stockMode;
   // Availability-only has no counted quantity; never use its placeholder count.
   final int? quantity;
-  final int purchasePriceRupees;
+  final int? _legacyPurchasePriceRupees, _purchaseMinor;
+  bool get usesMinorAmounts => _purchaseMinor != null;
+  int get purchasePriceMinor => buyV2ExactMinorAmount(
+    minor: _purchaseMinor, legacyRupees: _legacyPurchasePriceRupees);
+  int get purchasePriceRupees => _purchaseMinor == null &&
+      _legacyPurchasePriceRupees != null ? _legacyPurchasePriceRupees
+      : buyV2WholeRupees(purchasePriceMinor);
   final DateTime recordedAt, stockAsOf;
   final WorkspacePackMeasure? packMeasure;
 
-  bool get valid =>
+  bool get valid {
+    final int price;
+    try { price = purchasePriceMinor; } on FormatException { return false; }
+    return
       [productId, sku, pack].every((s) => s.trim().isNotEmpty && s.length <= 16000) &&
-      purchasePriceRupees > 0 && purchasePriceRupees <= 2147483647 &&
+      price > 0 && price <= 214748364700 &&
       !stockAsOf.isAfter(recordedAt) &&
       (stockMode == WorkspaceStockMode.availabilityOnly
           ? quantity == null
           : quantity != null && quantity! >= 0 && quantity! <= 2147483647) &&
       (packMeasure == null || packMeasure!.valid);
+  }
 
   Map<String, Object?> toJson() => {
-    'version': 1, 'method': method.name, 'productId': productId, 'sku': sku,
+    'version': usesMinorAmounts ? 2 : 1, 'method': method.name, 'productId': productId, 'sku': sku,
     'pack': pack, 'stockMode': stockMode.name, 'quantity': quantity,
-    'purchasePriceRupees': purchasePriceRupees,
+    if (usesMinorAmounts) 'purchasePriceMinor': purchasePriceMinor
+    else 'purchasePriceRupees': purchasePriceRupees,
     'recordedAt': recordedAt.toUtc().toIso8601String(),
     'stockAsOf': stockAsOf.toUtc().toIso8601String(),
     'packMeasure': packMeasure?.toJson(),
@@ -9764,7 +9861,14 @@ class WorkspaceStockEntry {
     if (raw == null) return null;
     const invalid = FormatException('Original stock-entry details need recovery.');
     try {
-      if (raw is! Map || raw['version'] != 1) throw invalid;
+      if (raw is! Map || (raw['version'] != 1 && raw['version'] != 2)) throw invalid;
+      final exact = raw['version'] == 2;
+      if (exact
+          ? !raw.containsKey('purchasePriceMinor') || raw['purchasePriceMinor'] is! int ||
+              raw.containsKey('purchasePriceRupees')
+          : raw.containsKey('purchasePriceMinor')) {
+        throw invalid;
+      }
       final measure = WorkspacePackMeasure.fromJson(raw['packMeasure']);
       if (raw['packMeasure'] != null && measure == null) throw invalid;
       final entry = WorkspaceStockEntry(
@@ -9773,7 +9877,8 @@ class WorkspaceStockEntry {
         pack: raw['pack'] as String,
         stockMode: WorkspaceStockMode.values.byName(raw['stockMode'] as String),
         quantity: raw['quantity'] as int?,
-        purchasePriceRupees: raw['purchasePriceRupees'] as int,
+        purchasePriceRupees: exact ? null : raw['purchasePriceRupees'] as int,
+        purchasePriceMinor: exact ? raw['purchasePriceMinor'] as int : null,
         recordedAt: DateTime.parse(raw['recordedAt'] as String),
         stockAsOf: DateTime.parse(raw['stockAsOf'] as String), packMeasure: measure,
       );
@@ -9810,7 +9915,8 @@ class WorkspaceSavedInventory {
   final int? manualReceiptCheckpointRevision;
 
   Map<String, Object?> toJson() => {
-    'version': products.any((p) => p.stockEntry != null) ? 2 : 1,
+    'version': products.any((p) => p.usesMinorAmounts) ? 3
+        : products.any((p) => p.stockEntry != null) ? 2 : 1,
     'account': account,
     'store': store,
     'qa': qa,
@@ -9841,7 +9947,7 @@ class WorkspaceSavedInventory {
     );
     try {
       if (raw is! Map ||
-          !const [1, 2].contains(raw['version']) ||
+          !const [1, 2, 3].contains(raw['version']) ||
           raw['products'] is! List ||
           raw['movements'] is! List) {
         throw invalid;
@@ -9882,7 +9988,8 @@ class WorkspaceSavedInventory {
       final ids = <String>{};
       final movements = <String>{};
       if (result.account.trim().isEmpty ||
-          raw['version'] != (result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
+          raw['version'] != (result.products.any((p) => p.usesMinorAmounts) ? 3
+              : result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
           (raw.containsKey('manualReceiptCheckpointRevision') &&
@@ -10013,15 +10120,18 @@ class WorkspaceCatalogueItem {
     required this.pack,
     required this.sku,
     required this.barcode,
-    required this.purchasePrice,
-    required this.sellingPrice,
+    int? purchasePrice,
+    int? sellingPrice,
+    int? purchasePriceMinor,
+    int? sellingPriceMinor,
     required this.unitPrice,
     required this.stock,
     required this.deliveryPromise,
     required this.origin,
     required this.visualLabel,
     required this.visualKind,
-    this.mrp,
+    int? mrp,
+    int? mrpMinor,
     this.minimumOrder = 1,
     this.returnPolicy,
     this.requiresPrescription = false,
@@ -10041,7 +10151,13 @@ class WorkspaceCatalogueItem {
     this.retailEnabled = true,
     this.content = const WorkspaceProductContent(),
     this.stockEntry,
-  });
+  }) : assert(purchasePrice != null || purchasePriceMinor != null),
+       assert(sellingPrice != null || sellingPriceMinor != null),
+       _legacyPurchasePrice = purchasePrice, _legacySellingPrice = sellingPrice,
+       _legacyMrp = mrp, _purchaseMinor = purchasePriceMinor,
+       // Preserve the public mrpMinor argument rather than expose a private name.
+       // ignore: prefer_initializing_formals
+       _sellingMinor = sellingPriceMinor, _mrpMinor = mrpMinor;
 
   final String id;
   final String canonicalId;
@@ -10052,15 +10168,29 @@ class WorkspaceCatalogueItem {
   final String pack;
   final String sku;
   final String barcode;
-  final int purchasePrice;
-  final int sellingPrice;
+  final int? _legacyPurchasePrice, _legacySellingPrice, _legacyMrp;
+  final int? _purchaseMinor, _sellingMinor, _mrpMinor;
+  bool get usesMinorAmounts =>
+      _purchaseMinor != null || _sellingMinor != null || _mrpMinor != null;
+  int get purchasePriceMinor => buyV2ExactMinorAmount(
+      minor: _purchaseMinor, legacyRupees: _legacyPurchasePrice);
+  int get sellingPriceMinor => buyV2ExactMinorAmount(
+      minor: _sellingMinor, legacyRupees: _legacySellingPrice);
+  int? get mrpMinor => _mrpMinor == null && _legacyMrp == null ? null
+      : buyV2ExactMinorAmount(minor: _mrpMinor, legacyRupees: _legacyMrp);
+  // Legacy access is never a fractional-price fallback. Old raw values remain
+  // unchanged; exact records require migrated consumers rather than rounding.
+  int get purchasePrice => _purchaseMinor == null && _legacyPurchasePrice != null
+      ? _legacyPurchasePrice : buyV2WholeRupees(purchasePriceMinor);
+  int get sellingPrice => _sellingMinor == null && _legacySellingPrice != null
+      ? _legacySellingPrice : buyV2WholeRupees(sellingPriceMinor);
   final String unitPrice;
   final int stock;
   final String deliveryPromise;
   final String origin;
   final String visualLabel;
   final String visualKind;
-  final int? mrp;
+  int? get mrp => _mrpMinor == null ? _legacyMrp : buyV2WholeRupees(mrpMinor!);
   final int minimumOrder;
   final String? returnPolicy;
   final bool requiresPrescription;
@@ -10166,14 +10296,14 @@ class WorkspaceCatalogueItem {
         origin,
       ].every((value) => value.trim().isNotEmpty) &&
       (channel == BuyV2Destination.shop
-          ? sellingPrice > 0 &&
-                sellingPrice <= 999999999 &&
+          ? sellingPriceMinor > 0 &&
+                sellingPriceMinor <= 99999999900 &&
                 minimumOrder > 0 &&
-                (mrp == null || mrp! >= sellingPrice)
+                (mrpMinor == null || mrpMinor! >= sellingPriceMinor)
           : channel == BuyV2Destination.wholesale &&
                 wholesaleOffer?.enabled == true &&
                 wholesaleOffer!.valid &&
-                (mrp == null || mrp! >= wholesaleOffer!.priceRupees));
+                (mrpMinor == null || mrpMinor! >= wholesaleOffer!.priceMinor));
 
   // A legacy photo-less record may remain private stock, never a public listing.
   bool get _photoAllowsPublication =>
@@ -10236,9 +10366,9 @@ class WorkspaceCatalogueItem {
     }
     final expected = <int, int>{};
     if (offer != null && offer.tiers.isNotEmpty) {
-      expected[offer.minimumPacks] = offer.priceRupees;
+      expected[offer.minimumPacks] = offer.priceMinor;
       for (final tier in offer.tiers) {
-        expected[tier.minimumPacks] = tier.packPriceMinor ~/ 100;
+        expected[tier.minimumPacks] = tier.packPriceMinor;
       }
     }
     if (terms.priceTiers.length != expected.length) {
@@ -10247,13 +10377,13 @@ class WorkspaceCatalogueItem {
     final entries = expected.entries.toList();
     for (var i = 0; i < entries.length; i++) {
       if (terms.priceTiers[i].minimumPacks != entries[i].key ||
-          terms.priceTiers[i].price != entries[i].value) {
+          terms.priceTiers[i].priceMinor != entries[i].value) {
         return 'The confirmed quantity prices do not match the saved prices.';
       }
     }
-    final price = offer?.priceAt(offer.minimumPacks) ?? sellingPrice;
+    final price = offer == null ? sellingPriceMinor : offer.priceAtMinor(offer.minimumPacks);
     final expectedUnit = measure?.valid == true
-        ? measure!.pricePerUnit(price) : unitPrice;
+        ? measure!.pricePerUnitMinor(price) : unitPrice;
     if (terms.unitPriceLabel != null && terms.unitPriceLabel != expectedUnit) {
       return 'The confirmed unit price does not match this selling pack.';
     }
@@ -10287,7 +10417,7 @@ class WorkspaceCatalogueItem {
     );
     if (termsIssue != null) throw StateError(termsIssue);
     final channelPrice = wholesale
-        ? offer!.priceAt(offer.minimumPacks) : sellingPrice;
+        ? offer!.priceAtMinor(offer.minimumPacks) : sellingPriceMinor;
     final channelMinimum = wholesale ? offer!.minimumPacks : minimumOrder;
     final product = BuyV2Product(
       id: id,
@@ -10299,14 +10429,14 @@ class WorkspaceCatalogueItem {
       title: title,
       variant: variant,
       pack: pack,
-      price: channelPrice,
+      priceMinor: channelPrice,
       unitPrice:
           publicPackTerms != null
           ? publicPackTerms.unitPriceLabel ?? ''
           : packMeasure?.valid == true &&
               channelPrice >= 0 &&
-              channelPrice <= 999999999
-          ? packMeasure!.pricePerUnit(channelPrice)
+              channelPrice <= 99999999900
+          ? packMeasure!.pricePerUnitMinor(channelPrice)
           : unitPrice,
       badge: badge,
       seller: storeName,
@@ -10316,7 +10446,7 @@ class WorkspaceCatalogueItem {
       confirmedOn: confirmedOn,
       visualLabel: visualLabel,
       visualKind: visualKind,
-      mrp: mrp,
+      mrpMinor: mrpMinor,
       requiresPrescription: requiresPrescription,
       composition: composition,
       regulatoryNote: regulatoryNote,
@@ -10388,7 +10518,7 @@ class WorkspaceCatalogueItem {
         acceptingOrders;
     return BuyV2ProductFactsSnapshot(
       productId: id,
-      price: sellingPrice,
+      priceMinor: sellingPriceMinor,
       deliveryPromise: deliveryPromise,
       partner: storeName,
       orderabilityLabel: orderable
@@ -10423,7 +10553,7 @@ class WorkspaceCatalogueItem {
   /// Keep QA/production and account/Store identity in the enclosing checkpoint.
   Map<String, Object?> toInventoryJson() => {
     // Old readers reject this version instead of silently dropping provenance.
-    'version': stockEntry == null ? 1 : 2,
+    'version': usesMinorAmounts ? 3 : stockEntry == null ? 1 : 2,
     if (stockEntry != null) 'stockEntry': stockEntry!.toJson(),
     'id': id,
     'canonicalId': canonicalId,
@@ -10434,15 +10564,21 @@ class WorkspaceCatalogueItem {
     'pack': pack,
     'sku': sku,
     'barcode': barcode,
-    'purchasePrice': purchasePrice,
-    'sellingPrice': sellingPrice,
+    if (usesMinorAmounts) ...{
+      'purchasePriceMinor': purchasePriceMinor,
+      'sellingPriceMinor': sellingPriceMinor,
+      'mrpMinor': mrpMinor,
+    } else ...{
+      'purchasePrice': purchasePrice,
+      'sellingPrice': sellingPrice,
+    },
     'unitPrice': unitPrice,
     'stock': stock,
     'deliveryPromise': deliveryPromise,
     'origin': origin,
     'visualLabel': visualLabel,
     'visualKind': visualKind,
-    'mrp': mrp,
+    if (!usesMinorAmounts) 'mrp': mrp,
     'minimumOrder': minimumOrder,
     'returnPolicy': returnPolicy,
     'requiresPrescription': requiresPrescription,
@@ -10467,10 +10603,23 @@ class WorkspaceCatalogueItem {
     const invalid = FormatException(
       'Saved product needs recovery. Its data has been kept.',
     );
-    if (raw is! Map || !const [1, 2].contains(raw['version']) ||
+    if (raw is! Map || !const [1, 2, 3].contains(raw['version']) ||
         (raw['version'] == 2 && raw['stockEntry'] == null) ||
         (raw['version'] == 1 && raw['stockEntry'] != null)) {
       throw invalid;
+    }
+    final exact = raw['version'] == 3;
+    const minorKeys = ['purchasePriceMinor', 'sellingPriceMinor', 'mrpMinor'];
+    const legacyKeys = ['purchasePrice', 'sellingPrice', 'mrp'];
+    if (exact
+        ? legacyKeys.any(raw.containsKey) || !minorKeys.every(raw.containsKey)
+        : minorKeys.any(raw.containsKey)) {
+      throw invalid;
+    }
+    int amount(String key) {
+      final value = raw[key];
+      if (value is! int) throw invalid;
+      return buyV2ExactMinorAmount(minor: value);
     }
     String text(String key, {bool required = false}) {
       final value = raw[key];
@@ -10535,15 +10684,18 @@ class WorkspaceCatalogueItem {
         pack: text('pack', required: true),
         sku: text('sku'),
         barcode: text('barcode'),
-        purchasePrice: number('purchasePrice'),
-        sellingPrice: number('sellingPrice'),
+        purchasePrice: exact ? null : number('purchasePrice'),
+        sellingPrice: exact ? null : number('sellingPrice'),
+        purchasePriceMinor: exact ? amount('purchasePriceMinor') : null,
+        sellingPriceMinor: exact ? amount('sellingPriceMinor') : null,
         unitPrice: text('unitPrice'),
         stock: number('stock'),
         deliveryPromise: text('deliveryPromise'),
         origin: text('origin'),
         visualLabel: text('visualLabel'),
         visualKind: text('visualKind'),
-        mrp: raw['mrp'] == null ? null : number('mrp'),
+        mrp: exact || raw['mrp'] == null ? null : number('mrp'),
+        mrpMinor: exact && raw['mrpMinor'] != null ? amount('mrpMinor') : null,
         minimumOrder: number('minimumOrder', minimum: 1),
         returnPolicy: optionalText('returnPolicy'),
         requiresPrescription: flag('requiresPrescription'),
@@ -10592,6 +10744,8 @@ class WorkspaceCatalogueItem {
     String? barcode,
     int? purchasePrice,
     int? sellingPrice,
+    int? purchasePriceMinor,
+    int? sellingPriceMinor,
     String? unitPrice,
     int? stock,
     String? deliveryPromise,
@@ -10599,6 +10753,8 @@ class WorkspaceCatalogueItem {
     String? visualLabel,
     String? visualKind,
     int? mrp,
+    int? mrpMinor,
+    bool clearMrp = false,
     int? minimumOrder,
     String? returnPolicy,
     bool? requiresPrescription,
@@ -10632,15 +10788,18 @@ class WorkspaceCatalogueItem {
     pack: pack ?? this.pack,
     sku: sku ?? this.sku,
     barcode: barcode ?? this.barcode,
-    purchasePrice: purchasePrice ?? this.purchasePrice,
-    sellingPrice: sellingPrice ?? this.sellingPrice,
+    purchasePrice: purchasePrice ?? (purchasePriceMinor == null ? _legacyPurchasePrice : null),
+    sellingPrice: sellingPrice ?? (sellingPriceMinor == null ? _legacySellingPrice : null),
+    purchasePriceMinor: purchasePriceMinor ?? (purchasePrice == null ? _purchaseMinor : null),
+    sellingPriceMinor: sellingPriceMinor ?? (sellingPrice == null ? _sellingMinor : null),
     unitPrice: unitPrice ?? this.unitPrice,
     stock: stock ?? this.stock,
     deliveryPromise: deliveryPromise ?? this.deliveryPromise,
     origin: origin ?? this.origin,
     visualLabel: visualLabel ?? this.visualLabel,
     visualKind: visualKind ?? this.visualKind,
-    mrp: mrp ?? this.mrp,
+    mrp: clearMrp ? null : mrp ?? (mrpMinor == null ? _legacyMrp : null),
+    mrpMinor: clearMrp ? null : mrpMinor ?? (mrp == null ? _mrpMinor : null),
     minimumOrder: minimumOrder ?? this.minimumOrder,
     returnPolicy: returnPolicy ?? this.returnPolicy,
     requiresPrescription: requiresPrescription ?? this.requiresPrescription,

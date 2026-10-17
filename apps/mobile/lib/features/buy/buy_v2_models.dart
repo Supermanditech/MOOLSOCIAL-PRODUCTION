@@ -1,5 +1,42 @@
 import 'buy_v2_catalogue_data.dart';
 
+/// Canonical INR paise. A present minor amount never falls back to legacy
+/// whole rupees. BigInt intermediates prevent native multiplication overflow.
+int buyV2ExactMinorAmount({int? minor, int? legacyRupees}) {
+  final amount = minor == null
+      ? legacyRupees == null ? null : BigInt.from(legacyRupees) * BigInt.from(100)
+      : BigInt.from(minor);
+  if (amount == null || amount < BigInt.zero || amount > BigInt.from(9007199254740991) ||
+      minor != null && legacyRupees != null && amount != BigInt.from(legacyRupees) * BigInt.from(100)) {
+    throw const FormatException('Invalid or conflicting exact price');
+  }
+  return amount.toInt();
+}
+
+/// Compatibility access only; fractional money must use the exact accessor.
+/// Never truncate a new public price into a plausible legacy whole-rupee price.
+int buyV2WholeRupees(int minor) {
+  buyV2ExactMinorAmount(minor: minor);
+  if (minor % 100 != 0) throw const FormatException('Exact paise amount requires a minor-unit consumer');
+  return minor ~/ 100;
+}
+
+int buyV2MultiplyMinor(int minor, int quantity) {
+  buyV2ExactMinorAmount(minor: minor);
+  final result = BigInt.from(minor) * BigInt.from(quantity);
+  if (quantity < 0 || result > BigInt.from(9007199254740991)) {
+    throw const FormatException('Amount exceeds the exact money range');
+  }
+  return result.toInt();
+}
+
+int buyV2SumMinor(Iterable<int> amounts) {
+  final total = amounts.fold<BigInt>(BigInt.zero,
+    (sum, amount) => sum + BigInt.from(buyV2ExactMinorAmount(minor: amount)));
+  if (total > BigInt.from(9007199254740991)) throw const FormatException('Amount exceeds the exact money range');
+  return total.toInt();
+}
+
 enum BuyV2Destination { shop, wholesale, medicine, orders }
 
 enum BuyV2ShoppingIntent {
@@ -433,12 +470,18 @@ class BuyV2VariantAttribute {
 /// Provider definition of one sellable SKU, independent of order quantity.
 /// Net content describes each contained unit, never the entire outer case.
 class BuyV2PackPriceTier {
-  const BuyV2PackPriceTier({required this.minimumPacks, required this.price});
+  const BuyV2PackPriceTier({required this.minimumPacks, int? price, int? priceMinor})
+    // Public named arguments must not become private initializing formals.
+    // ignore: prefer_initializing_formals
+    : _legacyPrice = price, _priceMinor = priceMinor;
 
   final int minimumPacks;
 
-  /// Uses the same currency unit as BuyV2Product.price.
-  final int price;
+  final int? _legacyPrice, _priceMinor;
+  int get priceMinor => buyV2ExactMinorAmount(minor: _priceMinor, legacyRupees: _legacyPrice);
+  int get price => _priceMinor == null
+      ? _legacyPrice ?? (throw const FormatException('Price is missing'))
+      : buyV2WholeRupees(priceMinor);
 }
 
 class BuyV2PackTerms {
@@ -446,6 +489,7 @@ class BuyV2PackTerms {
     required this.skuId,
     required this.revision,
     required this.sellUnit,
+    this.sourceLabel,
     this.containedUnits = 1,
     this.netContentMilli,
     this.contentUnit,
@@ -463,6 +507,9 @@ class BuyV2PackTerms {
   final String skuId;
   final String revision;
   final String sellUnit;
+  /// Exact reviewed selling-pack label; structured quantities remain separate.
+  /// Only a product with a matching server listing identity may use this.
+  final String? sourceLabel;
   final int containedUnits;
   final int? netContentMilli;
   final String? contentUnit;
@@ -476,8 +523,8 @@ class BuyV2PackTerms {
   final bool? pricesIncludeTax;
   final bool? pricesIncludeFreight;
 
-  bool validPricingFor(String? storeId, int minimumOrder) {
-    if (priceTiers.isEmpty) {
+  bool validPricingFor(String? storeId, int minimumOrder, {bool requireSourceMetadata = false}) {
+    if (priceTiers.isEmpty && !requireSourceMetadata) {
       return pricingStoreId == null &&
           priceObservedAt == null &&
           priceValidUntil == null &&
@@ -493,30 +540,33 @@ class BuyV2PackTerms {
         priceObservedAt == null ||
         priceValidUntil == null ||
         !priceValidUntil!.isAfter(priceObservedAt!) ||
-        priceTiers.first.minimumPacks != minimumOrder) {
+        (priceTiers.isNotEmpty && priceTiers.first.minimumPacks != minimumOrder)) {
       return false;
     }
     var previousMinimum = 0;
     int? previousPrice;
     for (final tier in priceTiers) {
+      final int price;
+      try { price = tier.priceMinor; } on FormatException { return false; }
       if (tier.minimumPacks <= previousMinimum ||
           tier.minimumPacks > 9007199254740991 ||
-          tier.price < 0 ||
-          tier.price > 9007199254740991 ||
-          (previousPrice != null && tier.price > previousPrice)) {
+          (previousPrice != null && price > previousPrice)) {
         return false;
       }
       previousMinimum = tier.minimumPacks;
-      previousPrice = tier.price;
+      previousPrice = price;
     }
     return true;
   }
 
   bool pricingCurrentAt(DateTime now) =>
-      priceTiers.isEmpty ||
+      (priceTiers.isEmpty && pricingStoreId == null && priceObservedAt == null &&
+          priceValidUntil == null && pricesIncludeTax == null && pricesIncludeFreight == null) ||
       (priceObservedAt != null &&
+          pricingStoreId != null && pricingStoreId!.trim().isNotEmpty &&
           !priceObservedAt!.isAfter(now) &&
           priceValidUntil != null &&
+          priceValidUntil!.isAfter(priceObservedAt!) &&
           now.isBefore(priceValidUntil!));
 
   int priceForQuantity(int quantity, int fallback) {
@@ -524,6 +574,15 @@ class BuyV2PackTerms {
     for (final tier in priceTiers) {
       if (quantity < tier.minimumPacks) break;
       result = tier.price;
+    }
+    return result;
+  }
+
+  int priceMinorForQuantity(int quantity, int fallbackMinor) {
+    var result = buyV2ExactMinorAmount(minor: fallbackMinor);
+    for (final tier in priceTiers) {
+      if (quantity < tier.minimumPacks) break;
+      result = tier.priceMinor;
     }
     return result;
   }
@@ -539,6 +598,8 @@ class BuyV2PackTerms {
       quantityStep > 0 &&
       containedUnits <= 9007199254740991 &&
       quantityStep <= 9007199254740991 &&
+      (sourceLabel == null || (sourceLabel!.trim().isNotEmpty &&
+          sourceLabel!.trim() == sourceLabel && sourceLabel!.length <= 240)) &&
       ((netContentMilli == null && contentUnit == null) ||
           (netContentMilli != null &&
               netContentMilli! > 0 &&
@@ -560,6 +621,7 @@ class BuyV2PackTerms {
               unitPriceLabel!.trim() == unitPriceLabel));
 
   String get label {
+    if (sourceLabel != null) return sourceLabel!;
     final amount = netContentMilli;
     if (amount == null) {
       return containedUnits == 1
@@ -576,6 +638,48 @@ class BuyV2PackTerms {
   }
 }
 
+/// Server-issued public listing identity. It does not grant Stock, delivery,
+/// consent, payment or order authority; the original Store SKU is kept intact.
+class BuyV2PublicListingIdentity {
+  const BuyV2PublicListingIdentity({required this.listingId, required this.realm,
+    required this.storeId, required this.skuId, required this.canonicalProductId,
+    required this.verifiedPackId, required this.channel});
+  final String listingId, realm, storeId, skuId, canonicalProductId, verifiedPackId;
+  final BuyV2OfferClass channel;
+  bool get valid => listingId == listingId.trim() && RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(listingId) &&
+      const {'evaluation', 'production'}.contains(realm) &&
+      [storeId, skuId, canonicalProductId, verifiedPackId].every(
+        (value) => value == value.trim() && RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(value));
+  bool matches(BuyV2Product product) => valid && listingId == product.id &&
+      storeId == product.storeId && canonicalProductId == product.canonicalId &&
+      channel == product.offerClass && product.destination ==
+        (channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale);
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'realm': realm, 'listingId': listingId,
+    'storeId': storeId, 'skuId': skuId, 'canonicalProductId': canonicalProductId,
+    'verifiedPackId': verifiedPackId, 'channel': channel.name};
+  static BuyV2PublicListingIdentity? fromJson(Object? value) {
+    const keys = {'schemaVersion', 'realm', 'listingId', 'storeId', 'skuId',
+      'canonicalProductId', 'verifiedPackId', 'channel'};
+    if (value is! Map || value.length != keys.length || value['schemaVersion'] is! int || value['schemaVersion'] != 1 ||
+        value.keys.any((key) => !keys.contains(key)) ||
+        keys.where((key) => key != 'schemaVersion').any((key) => value[key] is! String)) { return null; }
+    final channels = BuyV2OfferClass.values.where((channel) => channel.name == value['channel']);
+    if (channels.length != 1) return null;
+    final result = BuyV2PublicListingIdentity(listingId: value['listingId'] as String,
+      realm: value['realm'] as String, storeId: value['storeId'] as String,
+      skuId: value['skuId'] as String, canonicalProductId: value['canonicalProductId'] as String,
+      verifiedPackId: value['verifiedPackId'] as String, channel: channels.single);
+    return result.valid ? result : null;
+  }
+  @override
+  bool operator ==(Object other) => other is BuyV2PublicListingIdentity &&
+      listingId == other.listingId && realm == other.realm && storeId == other.storeId &&
+      skuId == other.skuId && canonicalProductId == other.canonicalProductId &&
+      verifiedPackId == other.verifiedPackId && channel == other.channel;
+  @override
+  int get hashCode => Object.hash(listingId, realm, storeId, skuId, canonicalProductId, verifiedPackId, channel);
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -586,7 +690,8 @@ class BuyV2Product {
     required this.title,
     required this.variant,
     required this.pack,
-    required this.price,
+    int? price,
+    int? priceMinor,
     required this.unitPrice,
     required this.badge,
     required this.seller,
@@ -601,7 +706,9 @@ class BuyV2Product {
     this.mediaAssets = const [],
     this.variantAttributes = const [],
     this.storeId,
-    this.mrp,
+    this.publicListingIdentity,
+    int? mrp,
+    int? mrpMinor,
     this.requiresPrescription = false,
     this.composition,
     this.regulatoryNote,
@@ -615,13 +722,21 @@ class BuyV2Product {
     this.freightIncluded = false,
     this.manufacturerVerified = false,
     this.catalogueListing = true,
-  }) : canonicalId = canonicalId ?? id;
+  }) : canonicalId = canonicalId ?? id,
+       // Keep public named compatibility arguments and private backing amounts.
+       // ignore: prefer_initializing_formals
+       _legacyPrice = price, _priceMinor = priceMinor,
+       // ignore: prefer_initializing_formals
+       _legacyMrp = mrp, _mrpMinor = mrpMinor;
 
   final String id;
   final String canonicalId;
 
   /// Stable branch identity from the catalogue source; never a seller label.
   final String? storeId;
+  final BuyV2PublicListingIdentity? publicListingIdentity;
+  String get sourceSkuId => publicListingIdentity?.skuId ?? id;
+  bool get hasValidPublicListingIdentity => publicListingIdentity == null || publicListingIdentity!.matches(this);
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
@@ -684,7 +799,10 @@ class BuyV2Product {
   bool get hasValidPackTerms =>
       packTerms == null ||
       (packTerms!.isValidFor(id) &&
-          packTerms!.validPricingFor(storeId, minimumOrder) &&
+          (packTerms!.sourceLabel == null ||
+              (publicListingIdentity != null && hasValidPublicListingIdentity)) &&
+          packTerms!.validPricingFor(storeId, minimumOrder,
+            requireSourceMetadata: publicListingIdentity != null) &&
           pack == packTerms!.label &&
           unitPrice == (packTerms!.unitPriceLabel ?? ''));
   int get quantityStep => packTerms?.quantityStep ?? 1;
@@ -694,7 +812,22 @@ class BuyV2Product {
                 currentPrice
           : currentPrice) *
       minimumOrder;
-  final int price;
+  final int? _legacyPrice, _priceMinor, _legacyMrp, _mrpMinor;
+  bool get hasExplicitPriceMinor => _priceMinor != null;
+  bool get hasExplicitMrpMinor => _mrpMinor != null;
+  int get priceMinor => buyV2ExactMinorAmount(minor: _priceMinor, legacyRupees: _legacyPrice);
+  int? get mrpMinor => _mrpMinor == null && _legacyMrp == null ? null
+      : buyV2ExactMinorAmount(minor: _mrpMinor, legacyRupees: _legacyMrp);
+  bool get hasValidMoney {
+    try { priceMinor; mrpMinor; return true; } on FormatException { return false; }
+  }
+  int minimumOrderTotalMinor([int? currentPriceMinor]) => buyV2MultiplyMinor(
+    hasValidPackTerms ? packTerms?.priceMinorForQuantity(minimumOrder, currentPriceMinor ?? priceMinor)
+      ?? currentPriceMinor ?? priceMinor : currentPriceMinor ?? priceMinor, minimumOrder);
+  /// Legacy whole-rupee access remains exact or throws; it never rounds paise.
+  int get price => _priceMinor == null
+      ? _legacyPrice ?? (throw const FormatException('Price is missing'))
+      : buyV2WholeRupees(priceMinor);
   final String unitPrice;
   final String badge;
   final String seller;
@@ -704,7 +837,7 @@ class BuyV2Product {
   final String confirmedOn;
   final String visualLabel;
   final String visualKind;
-  final int? mrp;
+  int? get mrp => _mrpMinor == null ? _legacyMrp : buyV2WholeRupees(mrpMinor!);
   final bool requiresPrescription;
   final String? composition;
   final String? regulatoryNote;
@@ -726,6 +859,7 @@ class BuyV2Product {
     String? id,
     String? canonicalId,
     String? storeId,
+    BuyV2PublicListingIdentity? publicListingIdentity,
     String? brand,
     String? merchandisingLabel,
     BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
@@ -736,6 +870,9 @@ class BuyV2Product {
     String? variant,
     String? pack,
     int? price,
+    int? priceMinor,
+    int? mrp,
+    int? mrpMinor,
     String? unitPrice,
     String? badge,
     String? deliveryPromise,
@@ -753,6 +890,7 @@ class BuyV2Product {
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
     storeId: storeId ?? this.storeId,
+    publicListingIdentity: publicListingIdentity ?? this.publicListingIdentity,
     destination: destination,
     categoryId: categoryId,
     brand: brand ?? this.brand,
@@ -765,7 +903,8 @@ class BuyV2Product {
     variant: variant ?? this.variant,
     pack: packTerms?.label ?? pack ?? this.pack,
     packTerms: packTerms ?? this.packTerms,
-    price: price ?? this.price,
+    price: price ?? (priceMinor == null ? _legacyPrice : null),
+    priceMinor: priceMinor ?? (price == null ? _priceMinor : null),
     unitPrice: packTerms != null
         ? packTerms.unitPriceLabel ?? ''
         : unitPrice ?? this.unitPrice,
@@ -777,7 +916,8 @@ class BuyV2Product {
     confirmedOn: confirmedOn ?? this.confirmedOn,
     visualLabel: visualLabel,
     visualKind: visualKind,
-    mrp: mrp,
+    mrp: mrp ?? (mrpMinor == null ? _legacyMrp : null),
+    mrpMinor: mrpMinor ?? (mrp == null ? _mrpMinor : null),
     requiresPrescription: requiresPrescription,
     composition: composition,
     regulatoryNote: regulatoryNote,
@@ -845,6 +985,7 @@ class BuyV2CartLine {
   final int quantity;
 
   int get total => product.price * quantity;
+  int get totalMinor => buyV2MultiplyMinor(product.priceMinor, quantity);
 
   BuyV2CartLine copyWith({BuyV2Product? product, int? quantity}) =>
       BuyV2CartLine(
@@ -891,6 +1032,7 @@ class BuyV2FulfilmentGroup {
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
   int get total => lines.fold(0, (total, line) => total + line.total);
+  int get totalMinor => buyV2SumMinor(lines.map((line) => line.totalMinor));
 
   String get key => groupKey;
 
@@ -1120,7 +1262,7 @@ class BuyV2OrderSupplyProgress {
   final String currency;
 
   bool matchesOrder(BuyV2Order order) {
-    if (order.destination != BuyV2Destination.shop ||
+    if (!order.hasValidMoney || order.destination != BuyV2Destination.shop ||
         order.collection != null ||
         orderId != order.id ||
         purchaseId.trim().isEmpty ||
@@ -1186,7 +1328,7 @@ class BuyV2OrderSupplyProgress {
           offer.revision <= 0 ||
           offer.lines.isEmpty ||
           offer.deliveryCommitment.trim().isEmpty ||
-          offer.customerTotalMinor != (order.totalMinor ?? order.total * 100)) {
+          offer.customerTotalMinor != order.payableTotalMinor) {
         return false;
       }
       final replaced = <int>{};
@@ -1213,13 +1355,13 @@ class BuyV2OrderSupplyProgress {
       final amount = refundAmountMinor;
       if (amount == null ||
           amount <= 0 ||
-          amount > (order.totalMinor ?? order.total * 100) ||
+          amount > order.payableTotalMinor ||
           refundRoute?.trim().isNotEmpty != true) {
         return false;
       }
       if (refundState == BuyV2SupplyRefundState.refunded &&
-          (order.amountPaidNow == null ||
-              amount > order.amountPaidNow! * 100 ||
+          (order.amountPaidNowMinor == null ||
+              amount > order.amountPaidNowMinor! ||
               refundReference?.trim().isNotEmpty != true)) {
         return false;
       }
@@ -1272,7 +1414,7 @@ class BuyV2Order {
     required this.destination,
     required this.title,
     required this.itemSummary,
-    required this.total,
+    required int total,
     required this.partner,
     required this.partnerType,
     required this.promise,
@@ -1291,19 +1433,19 @@ class BuyV2Order {
     this.recipient,
     this.addressLine,
     this.deliveryInstruction,
-    this.tip = 0,
-    this.discount = 0,
+    int tip = 0,
+    int discount = 0,
     this.paymentTermLabel,
-    this.amountPaidNow,
-    this.balanceDue = 0,
+    int? amountPaidNow,
+    int balanceDue = 0,
     this.balanceDueLabel,
     this.paymentStatusLabel,
     this.buyerName,
     this.buyerType,
-    this.tax = 0,
-    this.freight = 0,
-    this.deliveryFee = 0,
-    this.paymentCharge = 0,
+    int tax = 0,
+    int freight = 0,
+    int deliveryFee = 0,
+    int paymentCharge = 0,
     this.dispatchPromise,
     this.deliveryPartnerName,
     this.deliveryPartnerType,
@@ -1316,7 +1458,78 @@ class BuyV2Order {
     this.invoiceAvailable = true,
     this.receiptReference,
     this.supplyProgress,
-  });
+    // Preserve the original required-int constructor and raw legacy values.
+    // ignore: prefer_initializing_formals
+  }) : _legacyTotal = total, _legacyTip = tip, _legacyDiscount = discount,
+       // ignore: prefer_initializing_formals
+       _legacyPaidNow = amountPaidNow, _legacyBalance = balanceDue,
+       // ignore: prefer_initializing_formals
+       _legacyTax = tax, _legacyFreight = freight,
+       // ignore: prefer_initializing_formals
+       _legacyDeliveryFee = deliveryFee, _legacyPaymentCharge = paymentCharge,
+       _minorTip = null, _minorDiscount = null, _minorPaidNow = null, _minorBalance = null,
+       _minorTax = null, _minorFreight = null, _minorDeliveryFee = null, _minorPaymentCharge = null;
+
+  const BuyV2Order.minor({
+    required this.id,
+    required this.destination,
+    required this.title,
+    required this.itemSummary,
+    required int totalMinor,
+    required this.partner,
+    required this.partnerType,
+    required this.promise,
+    required this.destinationLabel,
+    required this.progress,
+    required this.status,
+    this.collection,
+    this.purchaseId,
+    this.promisedByLabel,
+    this.updatedDeliveryEstimate,
+    this.productIds = const [],
+    this.lines = const [],
+    this.paymentMethod,
+    this.purchaseOrderReference,
+    this.recipient,
+    this.addressLine,
+    this.deliveryInstruction,
+    int tipMinor = 0,
+    int discountMinor = 0,
+    this.paymentTermLabel,
+    int? amountPaidNowMinor,
+    int balanceDueMinor = 0,
+    this.balanceDueLabel,
+    this.paymentStatusLabel,
+    this.buyerName,
+    this.buyerType,
+    int taxMinor = 0,
+    int freightMinor = 0,
+    int deliveryFeeMinor = 0,
+    int paymentChargeMinor = 0,
+    this.dispatchPromise,
+    this.deliveryPartnerName,
+    this.deliveryPartnerType,
+    this.trackingReference,
+    this.deliveryServiceLevel,
+    this.proofOfDeliveryStatus,
+    this.taxInvoiceState,
+    this.taxInvoiceDetails,
+    this.platformTaxInvoiceDetails,
+    this.invoiceAvailable = true,
+    this.receiptReference,
+    this.supplyProgress,
+    // An exact order never manufactures the old collection compatibility total.
+    // ignore: prefer_initializing_formals
+  }) : totalMinor = totalMinor, _minorTip = tipMinor, _minorDiscount = discountMinor,
+       // ignore: prefer_initializing_formals
+       _minorPaidNow = amountPaidNowMinor, _minorBalance = balanceDueMinor,
+       // ignore: prefer_initializing_formals
+       _minorTax = taxMinor, _minorFreight = freightMinor,
+       // ignore: prefer_initializing_formals
+       _minorDeliveryFee = deliveryFeeMinor, _minorPaymentCharge = paymentChargeMinor,
+       _legacyTotal = null, _legacyTip = null, _legacyDiscount = null, _legacyPaidNow = null,
+       _legacyBalance = null, _legacyTax = null, _legacyFreight = null,
+       _legacyDeliveryFee = null, _legacyPaymentCharge = null;
 
   final String id;
   final BuyV2Destination destination;
@@ -1325,8 +1538,44 @@ class BuyV2Order {
 
   /// Legacy whole-rupee compatibility value. Collection amounts are exact in
   /// totalMinor and validated against the authenticated collection snapshot.
-  final int total;
+  final int? _legacyTotal, _legacyTip, _legacyDiscount, _legacyPaidNow, _legacyBalance,
+      _legacyTax, _legacyFreight, _legacyDeliveryFee, _legacyPaymentCharge,
+      _minorTip, _minorDiscount, _minorPaidNow, _minorBalance,
+      _minorTax, _minorFreight, _minorDeliveryFee, _minorPaymentCharge;
   final int? totalMinor;
+  bool get usesMinorAmounts => _legacyTotal == null;
+
+  /// The historical optional override is intentionally independent of the old
+  /// collection floor in total. Do not populate an absent override on migration.
+  int get payableTotalMinor => totalMinor != null
+      ? buyV2ExactMinorAmount(minor: totalMinor)
+      : buyV2ExactMinorAmount(legacyRupees: _legacyTotal);
+  int get total => _legacyTotal ?? buyV2WholeRupees(payableTotalMinor);
+  int get tipMinor => buyV2ExactMinorAmount(minor: _minorTip, legacyRupees: _legacyTip);
+  int get discountMinor => buyV2ExactMinorAmount(minor: _minorDiscount, legacyRupees: _legacyDiscount);
+  int? get amountPaidNowMinor => _minorPaidNow == null && _legacyPaidNow == null ? null :
+      buyV2ExactMinorAmount(minor: _minorPaidNow, legacyRupees: _legacyPaidNow);
+  int get balanceDueMinor => buyV2ExactMinorAmount(minor: _minorBalance, legacyRupees: _legacyBalance);
+  int get taxMinor => buyV2ExactMinorAmount(minor: _minorTax, legacyRupees: _legacyTax);
+  int get freightMinor => buyV2ExactMinorAmount(minor: _minorFreight, legacyRupees: _legacyFreight);
+  int get deliveryFeeMinor => buyV2ExactMinorAmount(minor: _minorDeliveryFee, legacyRupees: _legacyDeliveryFee);
+  int get paymentChargeMinor => buyV2ExactMinorAmount(minor: _minorPaymentCharge, legacyRupees: _legacyPaymentCharge);
+  int get tip => _legacyTip ?? buyV2WholeRupees(tipMinor);
+  int get discount => _legacyDiscount ?? buyV2WholeRupees(discountMinor);
+  int? get amountPaidNow => amountPaidNowMinor == null ? null : _legacyPaidNow ?? buyV2WholeRupees(amountPaidNowMinor!);
+  int get balanceDue => _legacyBalance ?? buyV2WholeRupees(balanceDueMinor);
+  int get tax => _legacyTax ?? buyV2WholeRupees(taxMinor);
+  int get freight => _legacyFreight ?? buyV2WholeRupees(freightMinor);
+  int get deliveryFee => _legacyDeliveryFee ?? buyV2WholeRupees(deliveryFeeMinor);
+  int get paymentCharge => _legacyPaymentCharge ?? buyV2WholeRupees(paymentChargeMinor);
+  bool get hasValidMoney {
+    try {
+      payableTotalMinor; tipMinor; discountMinor; amountPaidNowMinor; balanceDueMinor;
+      taxMinor; freightMinor; deliveryFeeMinor; paymentChargeMinor;
+      if (_legacyTotal != null) buyV2ExactMinorAmount(legacyRupees: _legacyTotal);
+      return true;
+    } on FormatException { return false; }
+  }
   final String partner;
   final String partnerType;
   final String promise;
@@ -1344,19 +1593,11 @@ class BuyV2Order {
   final String? recipient;
   final String? addressLine;
   final String? deliveryInstruction;
-  final int tip;
-  final int discount;
   final String? paymentTermLabel;
-  final int? amountPaidNow;
-  final int balanceDue;
   final String? balanceDueLabel;
   final String? paymentStatusLabel;
   final String? buyerName;
   final String? buyerType;
-  final int tax;
-  final int freight;
-  final int deliveryFee;
-  final int paymentCharge;
   final String? dispatchPromise;
   final String? deliveryPartnerName;
   final String? deliveryPartnerType;

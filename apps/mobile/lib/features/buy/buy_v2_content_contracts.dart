@@ -706,7 +706,8 @@ BuyV2FulfilmentMode buyV2CatalogueFulfilmentModeFor(BuyV2Product product) {
 class BuyV2ProductFactsSnapshot {
   const BuyV2ProductFactsSnapshot({
     required this.productId,
-    required this.price,
+    int? price,
+    int? priceMinor,
     required this.deliveryPromise,
     required this.partner,
     required this.orderabilityLabel,
@@ -724,13 +725,28 @@ class BuyV2ProductFactsSnapshot {
     this.deliveryFeeLabel,
     this.observedAt,
     this.stale = false,
-  }) : assert(
+  }) : _legacyPrice = price,
+       // Preserve the public argument while keeping representation private.
+       // ignore: prefer_initializing_formals
+       _priceMinor = priceMinor,
+       assert(
          observedAt == null || sourceId != '',
          'Changing product facts require a named source.',
        );
 
   final String productId;
-  final int price;
+  final int? _legacyPrice, _priceMinor;
+  int get priceMinor => buyV2ExactMinorAmount(minor: _priceMinor, legacyRupees: _legacyPrice);
+  int get price => _priceMinor == null
+      ? _legacyPrice ?? (throw const FormatException('Product price is missing'))
+      : buyV2WholeRupees(priceMinor);
+  bool get hasValidMoney {
+    try { priceMinor; return true; } on FormatException { return false; }
+  }
+  Object get _priceIdentity {
+    try { return (minor: priceMinor); }
+    on FormatException { return (invalidLegacy: _legacyPrice, invalidMinor: _priceMinor); }
+  }
   final String deliveryPromise;
   final String partner;
   final String orderabilityLabel;
@@ -753,6 +769,7 @@ class BuyV2ProductFactsSnapshot {
 
   BuyV2ProductFactsSnapshot copyWith({
     int? price,
+    int? priceMinor,
     String? deliveryPromise,
     String? partner,
     String? orderabilityLabel,
@@ -775,7 +792,8 @@ class BuyV2ProductFactsSnapshot {
   }) {
     return BuyV2ProductFactsSnapshot(
       productId: productId,
-      price: price ?? this.price,
+      price: price ?? (priceMinor == null ? _legacyPrice : null),
+      priceMinor: priceMinor ?? (price == null ? _priceMinor : null),
       deliveryPromise: deliveryPromise ?? this.deliveryPromise,
       partner: partner ?? this.partner,
       orderabilityLabel: orderabilityLabel ?? this.orderabilityLabel,
@@ -802,7 +820,7 @@ class BuyV2ProductFactsSnapshot {
   bool operator ==(Object other) {
     return other is BuyV2ProductFactsSnapshot &&
         other.productId == productId &&
-        other.price == price &&
+        other._priceIdentity == _priceIdentity &&
         other.deliveryPromise == deliveryPromise &&
         other.partner == partner &&
         other.orderabilityLabel == orderabilityLabel &&
@@ -825,7 +843,7 @@ class BuyV2ProductFactsSnapshot {
   @override
   int get hashCode => Object.hash(
     productId,
-    price,
+    _priceIdentity,
     deliveryPromise,
     partner,
     orderabilityLabel,
@@ -1121,7 +1139,7 @@ abstract final class BuyV2SupplierMediaPolicy {
     BuyV2ProductMediaAsset asset,
   ) {
     final binding = asset.binding;
-    if (!_identity(asset.id) ||
+    if (!product.hasValidPublicListingIdentity || !_identity(asset.id) ||
         asset.label.trim().isEmpty ||
         asset.semanticLabel.trim().isEmpty ||
         binding == null ||
@@ -1132,7 +1150,7 @@ abstract final class BuyV2SupplierMediaPolicy {
         !_identity(binding.productId) ||
         !_identity(binding.skuId) ||
         binding.productId != product.canonicalId ||
-        binding.skuId != product.id) {
+        binding.skuId != product.sourceSkuId) {
       return 'This supplier photo or video could not be matched to the selected pack.';
     }
     final supplier = product.procurementSupplierGrant;
@@ -1285,6 +1303,7 @@ class BuyV2SupplierPolicy {
     required Set<String> productIds,
     required this.requiresAcceptance,
     this.validUntil,
+    this.sourceRealm,
   }) : productIds = Set.unmodifiable(productIds);
 
   final String id;
@@ -1295,19 +1314,25 @@ class BuyV2SupplierPolicy {
   final Set<String> productIds;
   final bool requiresAcceptance;
   final DateTime? validUntil;
+  /// Only supplied by a verified public binding/readback. Legacy receipts retain
+  /// their original scope; new realm-bound receipts cannot adopt them silently.
+  final String? sourceRealm;
 
   bool appliesTo(BuyV2Product product, DateTime now) =>
       id.trim().isNotEmpty &&
       revision.trim().isNotEmpty &&
       storeId.trim().isNotEmpty &&
       storeId == product.storeId &&
-      productIds.contains(product.id) &&
+      product.hasValidPublicListingIdentity &&
+      (sourceRealm == null ? product.publicListingIdentity == null :
+        sourceRealm == product.publicListingIdentity?.realm) &&
+      productIds.contains(product.sourceSkuId) &&
       productIds.every((id) => id.trim().isNotEmpty) &&
       title.trim().isNotEmpty &&
       body.trim().isNotEmpty &&
       (validUntil == null || validUntil!.isAfter(now));
 
-  String get receiptKey => jsonEncode([storeId, id]);
+  String get receiptKey => jsonEncode([if (sourceRealm != null) sourceRealm, storeId, id]);
 
   // Content and applicability are bound too: reusing an ID/revision while
   // changing the actual policy cannot silently reuse a previous acceptance.
@@ -1316,6 +1341,7 @@ class BuyV2SupplierPolicy {
         utf8.encode(
           jsonEncode([
             ownerScope,
+            if (sourceRealm != null) sourceRealm,
             storeId,
             id,
             revision,
@@ -1348,6 +1374,8 @@ class BuyV2ProductContentSnapshot {
     this.priceHistory,
     this.supplierPolicy,
     this.supplierPolicyAcceptanceRequired,
+    this.supplierPolicyObservedAt,
+    this.supplierPolicyResolutionPending = false,
     this.retryable = false,
   });
 
@@ -1393,6 +1421,12 @@ class BuyV2ProductContentSnapshot {
   /// Publication can require consent while the policy body is unavailable.
   /// Null means this producer has not supplied the decision, not new consent.
   final bool? supplierPolicyAcceptanceRequired;
+  /// Policy readback freshness, independent of locally maintained product copy.
+  /// Legacy single-source adapters may continue supplying [observedAt].
+  final DateTime? supplierPolicyObservedAt;
+  /// A configured source could not resolve its requirement. This is a purchase
+  /// hold, not evidence that acceptance is required or has been given.
+  final bool supplierPolicyResolutionPending;
   final bool retryable;
 }
 
@@ -1533,10 +1567,44 @@ abstract interface class BuyV2CollectionPendingStore {
 @immutable
 class BuyV2CollectionBasket {
   BuyV2CollectionBasket({
+    required BuyV2CollectionIdentity identity,
+    required BuyV2StoreListing store,
+    required Iterable<BuyV2CartLine> lines,
+    required String paymentMethod,
+    String? purchaseOrderRequestId,
+    String? purchaseOrderRevision,
+    String? purchaseOrderReference,
+  }) : this._(
+         identity: identity, store: store, lines: lines,
+         paymentMethod: paymentMethod, usesMinorAmounts: false,
+         purchaseOrderRequestId: purchaseOrderRequestId,
+         purchaseOrderRevision: purchaseOrderRevision,
+         purchaseOrderReference: purchaseOrderReference,
+       );
+
+  /// An explicitly tagged exact-price basket. Never retag a retained intent.
+  BuyV2CollectionBasket.minor({
+    required BuyV2CollectionIdentity identity,
+    required BuyV2StoreListing store,
+    required Iterable<BuyV2CartLine> lines,
+    required String paymentMethod,
+    String? purchaseOrderRequestId,
+    String? purchaseOrderRevision,
+    String? purchaseOrderReference,
+  }) : this._(
+         identity: identity, store: store, lines: lines,
+         paymentMethod: paymentMethod, usesMinorAmounts: true,
+         purchaseOrderRequestId: purchaseOrderRequestId,
+         purchaseOrderRevision: purchaseOrderRevision,
+         purchaseOrderReference: purchaseOrderReference,
+       );
+
+  BuyV2CollectionBasket._({
     required this.identity,
     required this.store,
     required Iterable<BuyV2CartLine> lines,
     required this.paymentMethod,
+    required this.usesMinorAmounts,
     this.purchaseOrderRequestId,
     this.purchaseOrderRevision,
     this.purchaseOrderReference,
@@ -1565,13 +1633,12 @@ class BuyV2CollectionBasket {
               !_collectionText(product.canonicalId) ||
               product.pack.trim().isEmpty ||
               product.title.trim().isEmpty ||
-              product.price < 0 ||
+              (!usesMinorAmounts && product.priceMinor % 100 != 0) ||
               product.minimumOrder < 1 ||
               line.quantity < 1 ||
               line.quantity < product.minimumOrder ||
-              BigInt.from(product.price) *
-                      BigInt.from(line.quantity) *
-                      BigInt.from(100) >
+              BigInt.from(product.priceMinor) *
+                      BigInt.from(line.quantity) >
                   BigInt.from(9007199254740991) ||
               product.requiresPrescription ||
               (product.destination != BuyV2Destination.shop &&
@@ -1585,6 +1652,7 @@ class BuyV2CollectionBasket {
   final BuyV2StoreListing store;
   final List<BuyV2CartLine> lines;
   final String paymentMethod;
+  final bool usesMinorAmounts;
   final String? purchaseOrderRequestId;
   final String? purchaseOrderRevision;
 
@@ -1601,7 +1669,9 @@ class BuyV2CollectionBasket {
         .convert(
           utf8.encode(
             jsonEncode([
-              'buy-collection-checkout-v1',
+              usesMinorAmounts
+                  ? 'buy-collection-checkout-v2'
+                  : 'buy-collection-checkout-v1',
               identity.accountId,
               identity.sessionId,
               store.id,
@@ -1618,7 +1688,7 @@ class BuyV2CollectionBasket {
                   line.product.destination.name,
                   line.product.pack,
                   line.product.variant,
-                  line.product.price,
+                  usesMinorAmounts ? line.product.priceMinor : line.product.price,
                   line.quantity,
                 ],
             ]),
@@ -1668,11 +1738,11 @@ class BuyV2CollectionCheckoutQuote {
       issuedAt.isBefore(validUntil) &&
       lineAmountsMinor.length == basket.lines.length &&
       basket.lines.every(
-        (line) => lineAmountsMinor[line.product.id] == line.total * 100,
+        (line) => lineAmountsMinor[line.product.id] == line.totalMinor,
       ) &&
-      taxMinor >= 0 &&
-      paymentChargeMinor >= 0 &&
-      discountMinor >= 0 &&
+      [taxMinor, paymentChargeMinor, discountMinor].every(
+        (amount) => amount >= 0 && amount <= 9007199254740991,
+      ) &&
       totalMinor > 0 &&
       totalMinor <= 9007199254740991 &&
       BigInt.from(totalMinor) ==
@@ -1833,6 +1903,15 @@ abstract interface class BuyV2CollectionCheckoutGateway {
     BuyV2CollectionPurchaseIntent intent,
   );
   Future<BuyV2CollectionPurchaseResult> reconcile(
+    BuyV2CollectionPurchaseIntent intent,
+  );
+}
+
+/// Explicit opt-in for fresh exact-price collection requests. Original-intent
+/// reconciliation stays on the base gateway and retains its stored version.
+abstract interface class BuyV2MinorCollectionCheckoutGateway {
+  Future<BuyV2CollectionCheckoutQuote> quoteMinor(BuyV2CollectionBasket basket);
+  Future<BuyV2CollectionPurchaseResult> placeMinor(
     BuyV2CollectionPurchaseIntent intent,
   );
 }
@@ -2076,8 +2155,8 @@ class BuyV2OrderPlacementRequest {
     required this.lines,
     required this.address,
     required this.paymentMethod,
-    required this.total,
-    required this.amountDueNow,
+    required int total,
+    required int amountDueNow,
     required this.idempotencyKey,
     this.useUpiQr = false,
     this.commercialPaymentTermIds = const {},
@@ -2088,7 +2167,32 @@ class BuyV2OrderPlacementRequest {
     this.procurementContext,
     this.checkoutAttemptId,
     this.paymentGroupId,
-  });
+    // Preserve the public legacy constructor's required int argument types.
+    // ignore: prefer_initializing_formals
+  }) : _total = total, _amountDueNow = amountDueNow,
+       _totalMinor = null, _amountDueNowMinor = null;
+
+  const BuyV2OrderPlacementRequest.minor({
+    required this.lines,
+    required this.address,
+    required this.paymentMethod,
+    required int totalMinor,
+    required int amountDueNowMinor,
+    required this.idempotencyKey,
+    this.useUpiQr = false,
+    this.commercialPaymentTermIds = const {},
+    this.deliveryInstructionsByProductId = const {},
+    this.checkoutQuoteId,
+    this.purchaseOrderRequestId,
+    this.purchaseOrderRevision,
+    this.procurementContext,
+    this.checkoutAttemptId,
+    this.paymentGroupId,
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _total = null, _totalMinor = totalMinor,
+       // ignore: prefer_initializing_formals
+       _amountDueNow = null, _amountDueNowMinor = amountDueNowMinor;
 
   final List<BuyV2CartLine> lines;
 
@@ -2099,8 +2203,17 @@ class BuyV2OrderPlacementRequest {
   final Map<String, String> deliveryInstructionsByProductId;
   final BuyV2Address address;
   final String paymentMethod;
-  final int total;
-  final int amountDueNow;
+  final int? _total, _totalMinor, _amountDueNow, _amountDueNowMinor;
+  int get totalMinor => buyV2ExactMinorAmount(minor: _totalMinor, legacyRupees: _total);
+  int get amountDueNowMinor => buyV2ExactMinorAmount(minor: _amountDueNowMinor, legacyRupees: _amountDueNow);
+  /// Legacy API units remain whole rupees, never rounded from an exact request.
+  int get total => buyV2WholeRupees(totalMinor);
+  int get amountDueNow => buyV2WholeRupees(amountDueNowMinor);
+  bool get usesMinorAmounts => _totalMinor != null || _amountDueNowMinor != null;
+  bool get hasValidMoney {
+    try { return amountDueNowMinor <= totalMinor; }
+    on FormatException { return false; }
+  }
   final String idempotencyKey;
 
   /// Same UPI method and idempotent order; QR is a transport, not another charge.
@@ -2462,36 +2575,83 @@ class BuyV2CommercialPaymentTerm {
     required this.destination,
     required this.supplierName,
     required this.kind,
-    required this.orderTotal,
-    required this.amountDueNow,
-    required this.balanceDue,
+    required int orderTotal,
+    required int amountDueNow,
+    required int balanceDue,
     required this.balanceDueLabel,
     required this.sourceId,
     this.supplierIsMicroOrSmall = false,
     this.advancePercent,
-    this.upiTransactionLimit,
+    int? upiTransactionLimit,
     this.acceptedPaymentMethods = const {},
     this.netDays,
     this.financierName,
     this.annualPercentageRate,
     this.keyFactsUri,
-  });
+    // ignore: prefer_initializing_formals
+  }) : _orderTotal = orderTotal, _amountDueNow = amountDueNow,
+       // ignore: prefer_initializing_formals
+       _balanceDue = balanceDue, _upiTransactionLimit = upiTransactionLimit,
+       _orderTotalMinor = null, _amountDueNowMinor = null,
+       _balanceDueMinor = null, _upiTransactionLimitMinor = null;
+
+  const BuyV2CommercialPaymentTerm.minor({
+    required this.id,
+    required this.fulfilmentKey,
+    required this.destination,
+    required this.supplierName,
+    required this.kind,
+    required int orderTotalMinor,
+    required int amountDueNowMinor,
+    required int balanceDueMinor,
+    required this.balanceDueLabel,
+    required this.sourceId,
+    this.supplierIsMicroOrSmall = false,
+    this.advancePercent,
+    int? upiTransactionLimitMinor,
+    this.acceptedPaymentMethods = const {},
+    this.netDays,
+    this.financierName,
+    this.annualPercentageRate,
+    this.keyFactsUri,
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _orderTotal = null, _orderTotalMinor = orderTotalMinor,
+       // ignore: prefer_initializing_formals
+       _amountDueNow = null, _amountDueNowMinor = amountDueNowMinor,
+       // ignore: prefer_initializing_formals
+       _balanceDue = null, _balanceDueMinor = balanceDueMinor,
+       // ignore: prefer_initializing_formals
+       _upiTransactionLimit = null, _upiTransactionLimitMinor = upiTransactionLimitMinor;
 
   final String id;
   final String fulfilmentKey;
   final BuyV2Destination destination;
   final String supplierName;
   final BuyV2CommercialPaymentTermKind kind;
-  final int orderTotal;
-  final int amountDueNow;
-  final int balanceDue;
+  final int? _orderTotal, _orderTotalMinor, _amountDueNow, _amountDueNowMinor,
+      _balanceDue, _balanceDueMinor, _upiTransactionLimit, _upiTransactionLimitMinor;
+  int get orderTotalMinor => buyV2ExactMinorAmount(minor: _orderTotalMinor, legacyRupees: _orderTotal);
+  int get amountDueNowMinor => buyV2ExactMinorAmount(minor: _amountDueNowMinor, legacyRupees: _amountDueNow);
+  int get balanceDueMinor => buyV2ExactMinorAmount(minor: _balanceDueMinor, legacyRupees: _balanceDue);
+  int get orderTotal => buyV2WholeRupees(orderTotalMinor);
+  int get amountDueNow => buyV2WholeRupees(amountDueNowMinor);
+  int get balanceDue => buyV2WholeRupees(balanceDueMinor);
   final String balanceDueLabel;
   final String sourceId;
   final bool supplierIsMicroOrSmall;
   final int? advancePercent;
 
-  /// Current bank/provider-approved limit in the same units as amountDueNow.
-  final int? upiTransactionLimit;
+  /// Current bank/provider-approved limit; legacy getter remains whole rupees.
+  int? get upiTransactionLimitMinor => _upiTransactionLimitMinor == null && _upiTransactionLimit == null ? null :
+      buyV2ExactMinorAmount(minor: _upiTransactionLimitMinor, legacyRupees: _upiTransactionLimit);
+  int? get upiTransactionLimit => upiTransactionLimitMinor == null ? null : buyV2WholeRupees(upiTransactionLimitMinor!);
+  bool get hasValidMoney {
+    try {
+      upiTransactionLimitMinor;
+      return buyV2SumMinor([amountDueNowMinor, balanceDueMinor]) == orderTotalMinor;
+    } on FormatException { return false; }
+  }
   final Set<String> acceptedPaymentMethods;
   final int? netDays;
   final String? financierName;
@@ -2522,29 +2682,80 @@ abstract interface class BuyV2CommercialPaymentTermsAdapter {
   });
 }
 
+/// Explicit amount capability; the existing loadTerms map stays whole rupees.
+abstract interface class BuyV2MinorCommercialPaymentTermsAdapter
+    implements BuyV2CommercialPaymentTermsAdapter {
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTermsMinor({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsMinorByFulfilmentKey,
+  });
+}
+
 @immutable
 class BuyV2CheckoutQuoteLine {
   const BuyV2CheckoutQuoteLine({
     required this.fulfilmentKey,
-    required this.itemSubtotal,
-    required this.couponSaving,
-    required this.tax,
-    required this.freight,
-    required this.deliveryFee,
-    required this.tip,
-    required this.paymentCharge,
-    required this.total,
-  });
+    required int itemSubtotal, required int couponSaving,
+    required int tax, required int freight, required int deliveryFee,
+    required int tip, required int paymentCharge, required int total,
+    // ignore: prefer_initializing_formals
+  }) : _itemSubtotal = itemSubtotal, _couponSaving = couponSaving,
+       // ignore: prefer_initializing_formals
+       _tax = tax, _freight = freight, _deliveryFee = deliveryFee,
+       // ignore: prefer_initializing_formals
+       _tip = tip, _paymentCharge = paymentCharge, _total = total,
+       _itemSubtotalMinor = null, _couponSavingMinor = null, _taxMinor = null,
+       _freightMinor = null, _deliveryFeeMinor = null, _tipMinor = null,
+       _paymentChargeMinor = null, _totalMinor = null;
+
+  const BuyV2CheckoutQuoteLine.minor({
+    required this.fulfilmentKey,
+    required int itemSubtotalMinor, required int couponSavingMinor,
+    required int taxMinor, required int freightMinor, required int deliveryFeeMinor,
+    required int tipMinor, required int paymentChargeMinor, required int totalMinor,
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _itemSubtotal = null, _itemSubtotalMinor = itemSubtotalMinor,
+       // ignore: prefer_initializing_formals
+       _couponSaving = null, _couponSavingMinor = couponSavingMinor,
+       // ignore: prefer_initializing_formals
+       _tax = null, _taxMinor = taxMinor, _freight = null, _freightMinor = freightMinor,
+       // ignore: prefer_initializing_formals
+       _deliveryFee = null, _deliveryFeeMinor = deliveryFeeMinor,
+       // ignore: prefer_initializing_formals
+       _tip = null, _tipMinor = tipMinor, _paymentCharge = null, _paymentChargeMinor = paymentChargeMinor,
+       // ignore: prefer_initializing_formals
+       _total = null, _totalMinor = totalMinor;
 
   final String fulfilmentKey;
-  final int itemSubtotal;
-  final int couponSaving;
-  final int tax;
-  final int freight;
-  final int deliveryFee;
-  final int tip;
-  final int paymentCharge;
-  final int total;
+  final int? _itemSubtotal, _itemSubtotalMinor, _couponSaving, _couponSavingMinor,
+      _tax, _taxMinor, _freight, _freightMinor, _deliveryFee, _deliveryFeeMinor,
+      _tip, _tipMinor, _paymentCharge, _paymentChargeMinor, _total, _totalMinor;
+  int get itemSubtotalMinor => buyV2ExactMinorAmount(minor: _itemSubtotalMinor, legacyRupees: _itemSubtotal);
+  int get couponSavingMinor => buyV2ExactMinorAmount(minor: _couponSavingMinor, legacyRupees: _couponSaving);
+  int get taxMinor => buyV2ExactMinorAmount(minor: _taxMinor, legacyRupees: _tax);
+  int get freightMinor => buyV2ExactMinorAmount(minor: _freightMinor, legacyRupees: _freight);
+  int get deliveryFeeMinor => buyV2ExactMinorAmount(minor: _deliveryFeeMinor, legacyRupees: _deliveryFee);
+  int get tipMinor => buyV2ExactMinorAmount(minor: _tipMinor, legacyRupees: _tip);
+  int get paymentChargeMinor => buyV2ExactMinorAmount(minor: _paymentChargeMinor, legacyRupees: _paymentCharge);
+  int get totalMinor => buyV2ExactMinorAmount(minor: _totalMinor, legacyRupees: _total);
+  int get itemSubtotal => buyV2WholeRupees(itemSubtotalMinor);
+  int get couponSaving => buyV2WholeRupees(couponSavingMinor);
+  int get tax => buyV2WholeRupees(taxMinor);
+  int get freight => buyV2WholeRupees(freightMinor);
+  int get deliveryFee => buyV2WholeRupees(deliveryFeeMinor);
+  int get tip => buyV2WholeRupees(tipMinor);
+  int get paymentCharge => buyV2WholeRupees(paymentChargeMinor);
+  int get total => buyV2WholeRupees(totalMinor);
+  bool get hasValidMoney {
+    try {
+      final gross = [itemSubtotalMinor, taxMinor, freightMinor, deliveryFeeMinor, tipMinor, paymentChargeMinor]
+          .fold(BigInt.zero, (sum, amount) => sum + BigInt.from(amount));
+      return couponSavingMinor <= itemSubtotalMinor &&
+          gross - BigInt.from(couponSavingMinor) == BigInt.from(totalMinor);
+    } on FormatException { return false; }
+  }
 }
 
 enum BuyV2CheckoutSubmissionState {
@@ -2565,16 +2776,37 @@ class BuyV2CheckoutPaymentGroup {
     required this.id,
     required this.fulfilmentKeys,
     required this.paymentMethod,
-    required this.total,
-    required this.amountDueNow,
+    required int total,
+    required int amountDueNow,
     this.currency = 'INR',
-  });
+    // ignore: prefer_initializing_formals
+  }) : _total = total, _amountDueNow = amountDueNow,
+       _totalMinor = null, _amountDueNowMinor = null;
+
+  const BuyV2CheckoutPaymentGroup.minor({
+    required this.id,
+    required this.fulfilmentKeys,
+    required this.paymentMethod,
+    required int totalMinor, required int amountDueNowMinor,
+    this.currency = 'INR',
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _total = null, _totalMinor = totalMinor,
+       // ignore: prefer_initializing_formals
+       _amountDueNow = null, _amountDueNowMinor = amountDueNowMinor;
 
   final String id;
   final Set<String> fulfilmentKeys;
   final String paymentMethod;
-  final int total;
-  final int amountDueNow;
+  final int? _total, _totalMinor, _amountDueNow, _amountDueNowMinor;
+  int get totalMinor => buyV2ExactMinorAmount(minor: _totalMinor, legacyRupees: _total);
+  int get amountDueNowMinor => buyV2ExactMinorAmount(minor: _amountDueNowMinor, legacyRupees: _amountDueNow);
+  int get total => buyV2WholeRupees(totalMinor);
+  int get amountDueNow => buyV2WholeRupees(amountDueNowMinor);
+  bool get hasValidMoney {
+    try { return amountDueNowMinor <= totalMinor; }
+    on FormatException { return false; }
+  }
   final String currency;
 }
 
@@ -2621,7 +2853,7 @@ class BuyV2CheckoutGroupAttempt {
   bool get hasValidObligations {
     final scopes = <String>{};
     final products = <String>{};
-    return obligations.isNotEmpty &&
+    try { return request.hasValidMoney && obligations.isNotEmpty &&
         obligations.every(
           (value) =>
               scopes.add(value.fulfilmentKey) &&
@@ -2636,10 +2868,9 @@ class BuyV2CheckoutGroupAttempt {
           products,
           request.lines.map((line) => line.product.id).toSet(),
         ) &&
-        obligations.fold<int>(0, (sum, value) => sum + value.totalMinor) ==
-            request.total * 100 &&
-        obligations.fold<int>(0, (sum, value) => sum + value.dueNowMinor) ==
-            request.amountDueNow * 100;
+        buyV2SumMinor(obligations.map((value) => value.totalMinor)) == request.totalMinor &&
+        buyV2SumMinor(obligations.map((value) => value.dueNowMinor)) == request.amountDueNowMinor;
+    } on FormatException { return false; }
   }
 }
 
@@ -2684,16 +2915,31 @@ class BuyV2CheckoutQuote {
     required this.evaluatedAt,
     required this.validUntil,
     required this.lines,
-    required this.total,
+    required int total,
     this.paymentGroups,
-  });
+    // ignore: prefer_initializing_formals
+  }) : _total = total, _totalMinor = null;
+
+  const BuyV2CheckoutQuote.minor({
+    required this.id,
+    required this.sourceId,
+    required this.evaluatedAt,
+    required this.validUntil,
+    required this.lines,
+    required int totalMinor,
+    this.paymentGroups,
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _total = null, _totalMinor = totalMinor;
 
   final String id;
   final String sourceId;
   final DateTime evaluatedAt;
   final DateTime validUntil;
   final List<BuyV2CheckoutQuoteLine> lines;
-  final int total;
+  final int? _total, _totalMinor;
+  int get totalMinor => buyV2ExactMinorAmount(minor: _totalMinor, legacyRupees: _total);
+  int get total => buyV2WholeRupees(totalMinor);
 
   /// Authenticated compatible obligations, allocated from this exact quote.
   /// Null retains legacy whole-basket placement. Empty/invalid is a hold.
@@ -2726,6 +2972,18 @@ abstract interface class BuyV2CheckoutQuoteAdapter {
   });
 }
 
+/// An exact provider opts into this method; legacy tip-map units never change.
+abstract interface class BuyV2MinorCheckoutQuoteAdapter
+    implements BuyV2CheckoutQuoteAdapter {
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuoteMinor({
+    required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address,
+    required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits,
+    required Map<String, int> tipAmountsMinorByFulfilmentKey,
+  });
+}
+
 enum BuyV2BalancePaymentState {
   upcoming,
   due,
@@ -2742,15 +3000,29 @@ enum BuyV2BalancePaymentState {
 class BuyV2BalancePaymentResult {
   const BuyV2BalancePaymentResult({
     required this.state,
-    required this.amountDue,
+    required int amountDue,
     required this.dueLabel,
     required this.customerMessage,
     this.paymentReference,
     this.paymentActionUri,
-  });
+    // ignore: prefer_initializing_formals
+  }) : _amountDue = amountDue, _amountDueMinor = null;
+
+  const BuyV2BalancePaymentResult.minor({
+    required this.state,
+    required int amountDueMinor,
+    required this.dueLabel,
+    required this.customerMessage,
+    this.paymentReference,
+    this.paymentActionUri,
+  // Public argument names are retained for existing provider callers.
+  // ignore: prefer_initializing_formals
+  }) : _amountDue = null, _amountDueMinor = amountDueMinor;
 
   final BuyV2BalancePaymentState state;
-  final int amountDue;
+  final int? _amountDue, _amountDueMinor;
+  int get amountDueMinor => buyV2ExactMinorAmount(minor: _amountDueMinor, legacyRupees: _amountDue);
+  int get amountDue => buyV2WholeRupees(amountDueMinor);
   final String dueLabel;
   final String customerMessage;
   final String? paymentReference;
@@ -2771,6 +3043,16 @@ abstract interface class BuyV2BalancePaymentAdapter {
   Future<BuyV2BalancePaymentResult> reconcilePayment({
     required String orderId,
     required String paymentReference,
+  });
+}
+
+/// Explicit start capability beside the existing ID-only read/reconcile methods.
+/// Returning a minor result alone never opts a legacy provider into paise input.
+abstract interface class BuyV2MinorBalancePaymentAdapter {
+  Future<BuyV2BalancePaymentResult> startPaymentMinor({
+    required String orderId,
+    required int amountDueMinor,
+    required String idempotencyKey,
   });
 }
 
@@ -3092,6 +3374,18 @@ abstract interface class BuyV2GroupedOrderPlacementAdapter {
   );
 }
 
+/// Explicit exact-paise dispatch capability; legacy commerce adapters do not
+/// inherit it. Recovery still uses the original key/reference operations.
+abstract interface class BuyV2MinorOrderPlacementAdapter {
+  Future<BuyV2OrderPlacementResult> placeOrderMinor(BuyV2OrderPlacementRequest request);
+}
+
+/// Separate from single-order support: each immutable payment group must be
+/// supported explicitly, without downgrading its frozen request on retry.
+abstract interface class BuyV2MinorGroupedOrderPlacementAdapter {
+  Future<BuyV2OrderPlacementResult> placePaymentGroupMinor(BuyV2OrderPlacementRequest request);
+}
+
 abstract interface class BuyV2CommerceAdapter {
   const BuyV2CommerceAdapter();
 
@@ -3134,12 +3428,13 @@ final class BuyV2CatalogueProductFactsAdapter
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
     final closedForReview = product.seller == 'Pet Family Store';
     final noProductsForReview = product.seller == 'Beauty Supply';
+    final validMoney = product.hasValidMoney;
     return BuyV2ProductFactsSnapshot(
       productId: product.id,
-      price: product.price,
+      priceMinor: validMoney ? product.priceMinor : null,
       deliveryPromise: product.deliveryPromise,
       partner: product.seller,
-      orderabilityLabel: closedForReview
+      orderabilityLabel: !validMoney ? 'Unavailable' : closedForReview
           ? 'Store closed'
           : noProductsForReview
           ? 'Products unavailable'
@@ -3147,6 +3442,7 @@ final class BuyV2CatalogueProductFactsAdapter
           ? 'Prescription required'
           : 'Available to add',
       sourceId: 'approved-buy-catalogue',
+      stale: !validMoney,
       fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
       storeOperatingState:
           product.destination == BuyV2Destination.shop ||

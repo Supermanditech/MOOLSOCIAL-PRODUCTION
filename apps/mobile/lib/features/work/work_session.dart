@@ -5,11 +5,16 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import '../buy/buy_v2_content_contracts.dart' show BuyV2StoreListing;
+import '../buy/buy_v2_models.dart' show buyV2WholeRupees, buyV2ExactMinorAmount;
 
 import 'work_models.dart';
 import 'work_publication.dart';
 import 'work_services.dart';
 import 'work_customer_feedback.dart';
+import 'work_catalogue_gateway.dart';
+import 'work_supplier_policy.dart';
+import 'work_product_promotions.dart';
+import 'work_order_identity_gateway.dart';
 import 'scan_and_pick_contract.dart';
 
 /// Receipt authority and its recoverable Stock projection are distinct.
@@ -364,11 +369,18 @@ class _StoreOperationalData {
   final Map<String, WorkspacePurchaseRecord> purchaseLastRecords = {};
   String? focusedPurchaseId;
   WorkOrderOperations? orderOperations;
+  Object? operationalFeedToken;
+  Future<bool>? operationalFeedLoad;
+  AuthenticatedWorkspaceOrderIdentityGateway? operationalFeedReader;
+  int? operationalFeedNavigation;
+  String? operationalFeedError, operationalFeedCursor;
+  final Set<String> operationalFeedCursors = {};
   final Map<String, int> projectedOrderRevisions = {};
   bool retailerProductAdded = false;
   int retailerQuantity = 0;
   int retailerBuyPrice = 0;
   int retailerSellPrice = 0;
+  int? retailerBuyMinor, retailerSellMinor;
   bool retailerHomeDelivery = false;
   bool retailerStoreCollection = false;
   bool retailerPublishAfterSetup = false;
@@ -475,9 +487,11 @@ class _StoreOperationalData {
       <String, DateTime>{};
 
   int pendingOperationalRequests = 0;
+  int operationalSyncRevision = 0;
   final Map<String, _OwnerInputRecovery> pickupPreferences = {};
   String? pickupPreferencesOwner;
   final Map<String, _OwnerInputRecovery> publicationPreferences = {};
+  final Map<(String, String), _OwnerInputRecovery> customerTermsPreferences = {};
   String? publicationPreferencesOwner;
   final Map<String, _OwnerInputRecovery> tradingPreferences = {};
   String? tradingPreferencesOwner;
@@ -494,6 +508,7 @@ class _StoreOperationalData {
 
 class _OwnerInputRecovery {
   bool loaded = false, saved = false;
+  bool confirmedAbsent = false;
   int? recordVersion;
   Map<String, Object?>? sessionFields;
   int pendingWrites = 0;
@@ -596,8 +611,22 @@ class WorkSession extends ChangeNotifier {
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
+    this.customerTermsStoreFactory,
     this.tradingPreferencesStoreFactory,
     this.customerFeedbackAdapter,
+    this.customerFeedbackPendingStoreFactory,
+    this.catalogueGateway,
+    this.publicDetailsGateway,
+    this.publicDetailsRealm,
+    this.publicDetailsJournalFactory,
+    this.catalogueBindingPendingStoreFactory,
+    this.supplierPolicyGateway,
+    this.supplierPolicyRealm,
+    this.supplierPolicyJournalFactory,
+    this.operationalPendingStoreFactory,
+    this.productPromotionGateway,
+    this.productPromotionRealm,
+    this.productPromotionPendingStoreFactory,
   }) : _productionSession = false,
        gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
@@ -646,9 +675,24 @@ class WorkSession extends ChangeNotifier {
     this.offerDraftStoreFactory,
     this.pickupPreferencesStoreFactory,
     this.publicationPreferencesStoreFactory,
+    this.customerTermsStoreFactory,
     this.tradingPreferencesStoreFactory,
     this.customerFeedbackAdapter,
+    this.customerFeedbackPendingStoreFactory,
+    this.operationalPendingStoreFactory,
+    WorkspaceCatalogueGateway? catalogueGateway,
+    this.publicDetailsGateway,
+    this.publicDetailsRealm,
+    this.publicDetailsJournalFactory,
+    this.catalogueBindingPendingStoreFactory,
+    this.supplierPolicyGateway,
+    this.supplierPolicyRealm,
+    this.supplierPolicyJournalFactory,
+    this.productPromotionGateway,
+    this.productPromotionRealm,
+    this.productPromotionPendingStoreFactory,
   }) : _productionSession = true,
+       catalogueGateway = catalogueGateway ?? buildWorkspaceCatalogueGateway(),
        gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -663,7 +707,559 @@ class WorkSession extends ChangeNotifier {
        proofPicker = proofPicker ?? NativeWorkProofPicker();
 
   final WorkGateway gateway;
+  final WorkOrderPendingStore Function(String account, String store)? operationalPendingStoreFactory;
+  AuthenticatedWorkspaceOrderIdentityGateway? _originalPurchaseReader;
+  String originalPurchaseRealm = '';
+  AuthenticatedWorkspaceOrderIdentityGateway? get originalPurchaseReader =>
+      !_disposed && _originalPurchaseReader?.isCurrent == true ? _originalPurchaseReader : null;
+  void bindOriginalPurchaseReader(AuthenticatedWorkspaceOrderIdentityGateway? reader, String realm) {
+    if (_disposed || identical(reader, _originalPurchaseReader) && realm == originalPurchaseRealm) return;
+    for (final data in {..._storeDataById.values, _storeData}) {
+      final operations = data.orderOperations;
+      if (operations?.gateway is WorkspaceOperationalOrderCommandGateway) {
+        if (!operations!.isDisposed) operations.dispose();
+        data.orderOperations = null;
+      }
+      data.operationalFeedToken = Object(); data.operationalFeedLoad = null;
+      data.operationalFeedReader = null; data.operationalFeedNavigation = null;
+      data.operationalFeedError = null; data.operationalFeedCursor = null;
+      data.operationalFeedCursors.clear();
+      final ids = data.workspaceOrders.where((o) => o.isOperationalProjection).map((o) => o.id).toSet();
+      data.workspaceOrders.removeWhere((o) => ids.contains(o.id));
+      for (final id in ids) {
+        data.projectedOrderRevisions.remove(id);
+        data._packingByOrder.removeWhere((key, _) => key.endsWith('::$id'));
+        data._packingContentsByOrder.removeWhere((key, _) => key.endsWith('::$id'));
+        data._deliveryByOrder.removeWhere((key, _) => key.endsWith('::$id'));
+      }
+      if (ids.contains(data.currentWorkspaceOrderId)) {
+        data.currentWorkspaceOrderId = null;
+        data.workspaceOrderCustomer = ''; data.workspaceOrderItems = ''; data.workspaceOrderAmount = '';
+        data.workspaceOrderQuantities.clear(); data.workspacePackedProductIds.clear();
+        data.workspaceOrderSource = 'Counter'; data.workspaceOrderFulfilment = 'At the shop';
+        data.workspaceOrderPayment = 'Cash'; data.workspaceOrderAddress = '';
+        data.workspaceOrderBillingDetails = const WorkspaceBillingDetails(); data.workspaceOrderBillingCustomer = '';
+        data.counterDiscount = const WorkspaceBillDiscount.none(); data.workspaceOrderStage = 'No order';
+        data.workspaceOrderNeedsDelivery = false; data.workspaceOrderActionDeadline = null; data.workspaceOrderExtraMinutes = 0;
+      }
+    }
+    _originalPurchaseReader = reader; originalPurchaseRealm = realm;
+    notifyListeners();
+  }
+
+  bool get workspaceOperationalFeedAvailable => originalPurchaseReader != null &&
+      originalPurchaseReader!.accountUserId == _contactAccountScope && activeWorkspace != null &&
+      const ['evaluation', 'production'].contains(originalPurchaseRealm);
+  bool get workspaceOperationalFeedBusy => _storeData.operationalFeedLoad != null;
+  String? get workspaceOperationalFeedError => _storeData.operationalFeedError;
+  bool get workspaceOperationalFeedHasMore => _storeData.operationalFeedCursor != null;
+  bool get workspaceOperationalPending => _scopedOrderOperations?.pendingCommands.any((c) => c.purchaseReference != null) == true;
+
+  /// Indexed original references are partial discovery, not all online orders.
+  /// Restore uncertainty first; empty/failed pages never erase known orders.
+  Future<bool> loadWorkspaceOperationalOrders({bool more = false}) {
+    final reader = originalPurchaseReader, account = _contactAccountScope, store = activeWorkspace?.id;
+    if (!workspaceOperationalFeedAvailable || reader == null || account == null || store == null) return Future.value(false);
+    final data = _storeData, navigation = navigationScopeRevision, realm = originalPurchaseRealm;
+    if (data.operationalFeedLoad != null && identical(data.operationalFeedReader, reader) && data.operationalFeedNavigation == navigation) {
+      return data.operationalFeedLoad!;
+    }
+    if (more && data.operationalFeedCursor == null) return Future.value(false);
+    final token = Object(); data.operationalFeedToken = token;
+    data.operationalFeedReader = reader; data.operationalFeedNavigation = navigation;
+    bool current() => !_disposed && identical(data.operationalFeedToken, token) &&
+        identical(originalPurchaseReader, reader) && originalPurchaseRealm == realm &&
+        navigationScopeRevision == navigation && _contactAccountScope == account &&
+        activeWorkspace?.id == store && identical(_storeData, data);
+    final task = () async {
+      await Future<void>.value();
+      if (!current()) return false;
+      data.operationalFeedError = null;
+      try {
+        var operations = data.orderOperations;
+        if (operations != null && (operations.isDisposed || operations.gateway is! WorkspaceOperationalOrderCommandGateway ||
+            !identical((operations.gateway as WorkspaceOperationalOrderCommandGateway).gateway.identity, reader))) {
+          throw const WorkGatewayException('Online orders need their current Store session.');
+        }
+        if (operations == null) {
+          final bridge = WorkspaceOperationalOrderCommandGateway(gateway: AuthenticatedWorkspaceOrderOperationsGateway(reader),
+            realm: realm, accountScope: account, workspaceId: store);
+          final candidate = WorkOrderOperations(accountScope: account, workspaceId: store, gateway: bridge,
+            pendingStore: operationalPendingStoreFactory?.call(account, store) ?? SecureWorkOrderPendingStore());
+          if (!await candidate.restore() || !current() || !bindWorkspaceOrderOperations(candidate)) {
+            candidate.dispose();
+            throw const WorkGatewayException('Saved order recovery is not ready. Retry before changing orders.');
+          }
+          operations = candidate;
+        }
+        if (!current()) return false;
+        final cursor = more ? data.operationalFeedCursor : null;
+        final page = await reader.listPurchaseReferences(role: WorkspaceOrderIdentityRole.seller,
+          realm: realm, storeId: store, cursor: cursor);
+        if (!current()) return false;
+        if (page == null || page.nextCursor != null &&
+            (page.nextCursor == cursor || (more && data.operationalFeedCursors.contains(page.nextCursor)))) {
+          throw const WorkGatewayException('Online order updates unavailable. Previously loaded orders are kept.');
+        }
+        var completePage = true;
+        final bridge = operations.gateway as WorkspaceOperationalOrderCommandGateway;
+        for (final reference in page.references) {
+          final reply = await bridge.read(reference);
+          if (!current()) return false;
+          final existing = data.workspaceOrders.where((o) => o.id == reference.orderId).firstOrNull;
+          if (reply == null || existing != null && !existing.isOperationalProjection) {
+            completePage = false; continue;
+          }
+          final previous = operations.order(reference.orderId);
+          if (!operations.observe(reply) && (previous == null || previous.revision != reply.revision ||
+              previous.order?.operational?.stage != reply.order?.operational?.stage ||
+              previous.order?.operational?.reference.originalFingerprint != reference.originalFingerprint)) {
+            completePage = false;
+          }
+        }
+        if (!current()) return false;
+        if (!more) data.operationalFeedCursors.clear();
+        if (cursor != null) data.operationalFeedCursors.add(cursor);
+        data.operationalFeedCursor = page.nextCursor;
+        data.operationalFeedError = completePage ? null : 'Some order updates are unavailable. Previously loaded orders are kept.';
+        return completePage;
+      } on Object catch (error) {
+        if (current()) data.operationalFeedError = error is WorkGatewayException ? error.message : 'Online order updates unavailable. Previously loaded orders are kept.';
+        return false;
+      } finally {
+        if (identical(data.operationalFeedToken, token)) {
+          data.operationalFeedLoad = null;
+          if (current()) notifyListeners();
+        }
+      }
+    }();
+    data.operationalFeedLoad = task;
+    notifyListeners();
+    return task;
+  }
+
+  Future<void> reconcileWorkspacePendingOrders() async {
+    final operations = _scopedOrderOperations;
+    if (operations == null || operations.gateway is! WorkspaceOperationalOrderCommandGateway) return;
+    for (final pending in operations.pendingCommands) {
+      if (!identical(operations, _scopedOrderOperations)) return;
+      if (pending.purchaseReference != null) await operations.retry(pending.orderId);
+    }
+  }
+  final WorkspaceCatalogueGateway? catalogueGateway;
+  final WorkspacePublicDetailsOwnerGateway? publicDetailsGateway;
+  final String? publicDetailsRealm;
+  final WorkspacePublicDetailsJournal Function(WorkspacePublicDetailsScope scope)? publicDetailsJournalFactory;
+  final Map<WorkspacePublicDetailsScope, WorkspacePublicDetailsController> _publicDetailsPublishers = {};
+  WorkspacePublicDetailsController? get workspacePublicDetailsPublisher {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null ||
+        activeWorkspace?.profileId?.startsWith('retailer-') != true) {
+      return null;
+    }
+    WorkspacePublicDetailsOwnerGateway? connection = publicDetailsGateway;
+    String? realm = publicDetailsRealm;
+    if (connection is AuthenticatedWorkspaceCatalogueGateway) realm ??= connection.realm;
+    if (source is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway) {
+      realm ??= source.realm;
+      connection ??= source.forOwnerAccount(account);
+    }
+    if (connection == null || !{'evaluation', 'production'}.contains(realm)) return null;
+    final scope = (account: account, store: store, realm: realm!);
+    final existing = _publicDetailsPublishers[scope];
+    if (existing?.active == true) return existing;
+    existing?.dispose();
+    return _publicDetailsPublishers[scope] = WorkspacePublicDetailsController(scope: scope, gateway: connection,
+      journal: publicDetailsJournalFactory?.call(scope) ?? SecureWorkPublicDetailsJournal(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
+        ? null : publicationPreferencesContext);
+  }
+  /// Read saved inputs once; neither recovery path replaces current editor text.
+  Future<bool> loadWorkspacePublicDetailsInputs() async {
+    final owner = publicationPreferencesContext, store = activeWorkspace?.id;
+    if (store == null || !publicationPreferencesPersistenceAvailable) {
+      return false;
+    }
+    if (!await loadWorkspacePublicationPreferences(expectedStoreId: store) || owner != publicationPreferencesContext) {
+      return false;
+    }
+    if (tradingPreferencesPersistenceAvailable &&
+        (!await loadWorkspaceTradingPreferences(expectedStoreId: store) || owner != publicationPreferencesContext)) {
+      return false;
+    }
+    return true;
+  }
+  WorkspacePublicDetailsFields? get workspacePublicDetailsFieldsForPublishing {
+    if (_disposed || !publicationPreferencesPersistenceAvailable || !_publicationRecovery.loaded ||
+        !workspacePublicationPreferencesSaved || workspacePublicationPreferencesSaving ||
+        _storeData.publicationPreferencesOwner != _contactAccountScope ||
+        tradingPreferencesPersistenceAvailable && (!_tradingRecovery.loaded || workspaceTradingPreferencesSaving ||
+          (!workspaceTradingPreferencesSaved && !_tradingRecovery.confirmedAbsent) ||
+          _storeData.tradingPreferencesOwner != _contactAccountScope)) {
+      return null;
+    }
+    final knownHours = tradingPreferencesPersistenceAvailable && workspaceTradingPreferencesSaved &&
+      _storeData.tradingPreferencesOwner == _contactAccountScope;
+    try {
+      // A trading record which is genuinely absent does not publish the session's
+      // default hours. The owner can save hours in their existing editor later.
+      return WorkspacePublicDetailsFields.fromSettings(WorkspaceStorePublicationDetails.fromJson({
+        ...workspacePublicationDetails.toJson(),
+        'openingTime': knownHours ? workspaceOpeningTime : '',
+        'closingTime': knownHours ? workspaceClosingTime : '',
+      }));
+    } catch (_) { return null; }
+  }
+  Future<WorkspacePublicDetailsWriteResult> publishWorkspacePublicDetails({required bool Function() inputCurrent}) async {
+    final controller = workspacePublicDetailsPublisher, fields = workspacePublicDetailsFieldsForPublishing;
+    if (controller == null || fields == null || !inputCurrent()) {
+      return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
+    }
+    final owner = publicationPreferencesContext, fingerprint = jsonEncode(fields.toJson());
+    return controller.publish(fields, inputCurrent: () => inputCurrent() && owner == publicationPreferencesContext &&
+      jsonEncode(workspacePublicDetailsFieldsForPublishing?.toJson()) == fingerprint);
+  }
+  final StorePromotionGateway? productPromotionGateway;
+  final String? productPromotionRealm;
+  final StorePromotionPendingStore Function(StorePromotionScope scope)? productPromotionPendingStoreFactory;
+  final Map<StorePromotionScope, StorePromotionController> _productPromotions = {};
+  String _promotionSelectionSignature(String skuId) {
+    final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
+    if (item == null) return '';
+    final price = item.sellingPriceMinor, mrp = item.mrpMinor;
+    final exact = price % 100 != 0 || mrp != null && mrp % 100 != 0;
+    final values = [_policySelectionSignature({skuId}), exact ? price : price ~/ 100,
+      mrp == null ? null : exact ? mrp : mrp ~/ 100,
+      item.minimumOrder, item.retailEnabled, item.wholesaleOffer?.toJson(), item.content.toJson(), item.cataloguePhoto?.toJson()];
+    return jsonEncode(exact ? {'version': 2, 'moneyUnit': 'minor', 'values': values} : values);
+  }
+  WorkspaceCatalogueOwnerGateway? _promotionCatalogueOwner() {
+    final account = _contactAccountScope, source = catalogueGateway;
+    if (account == null || account.isEmpty || _disposed) return null;
+    if (source is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway) return source.forOwnerAccount(account);
+    return productPromotionGateway != null && source is WorkspaceCatalogueOwnerGateway ? source as WorkspaceCatalogueOwnerGateway : null;
+  }
+  /// Actual saved mirror only, never a publication or product-availability assertion.
+  Future<WorkspaceCatalogueOwnedSku?> readWorkspacePromotionSource(String skuId, {required String channel}) async {
+    final source = _promotionCatalogueOwner(), store = activeWorkspace?.id, account = _contactAccountScope;
+    if (source == null || store == null || !{'retail', 'wholesale', 'bulk'}.contains(channel)) return null;
+    final owner = publicationPreferencesContext, signature = _promotionSelectionSignature(skuId);
+    bool current() => !_disposed && _contactAccountScope == account && activeWorkspace?.id == store &&
+      publicationPreferencesContext == owner && signature.isNotEmpty && _promotionSelectionSignature(skuId) == signature;
+    try {
+      if (!current()) return null;
+      final saved = await source.readOwnedSku(storeId: store, skuId: skuId, current: current);
+      final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
+      if (!current() || saved == null || saved.realm != source.realm || item == null ||
+          !_listingMirrorIdentityMatches(saved, item) || !_listingMirrorMatches(saved, item) || saved.input['publicListing'] != true ||
+          !(saved.input['channels'] as List).any((raw) => (raw as Map)['kind'] == channel)) {
+        return null;
+      }
+      return saved;
+    } on Object {return null;}
+  }
+  StorePromotionController? get workspaceProductPromotions {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null ||
+        activeWorkspace?.profileId?.startsWith('retailer-') != true) {
+      return null;
+    }
+    StorePromotionGateway? connection = productPromotionGateway;
+    String? realm = productPromotionRealm;
+    if (connection is AuthenticatedStorePromotionGateway) realm ??= connection.realm;
+    if (source is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway) {
+      realm ??= source.realm;
+      connection ??= AuthenticatedStorePromotionGateway(endpoint: source.endpoint, credentials: source.credentials,
+        transport: source.transport, ownerAccountId: account, realm: source.realm);
+    }
+    if (connection == null || !{'evaluation', 'production'}.contains(realm)) return null;
+    final scope = (account: account, store: store, realm: realm!);
+    final existing = _productPromotions[scope];
+    if (existing?.active == true) return existing;
+    existing?.dispose();
+    return _productPromotions[scope] = StorePromotionController(scope: scope, gateway: connection,
+      pendingStore: productPromotionPendingStoreFactory?.call(scope) ?? SecureStorePromotionPendingStore(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ? null : publicationPreferencesContext,
+      validateSelection: (input, current) async {
+        final saved = await readWorkspacePromotionSource(input.skuId, channel: input.channel);
+        return current() && saved?.realm == scope.realm && saved?.revision == input.skuRevision;
+      });
+  }
+  Future<StorePromotionResult> submitWorkspaceProductPromotion(String placementId, StorePromotionInput input) {
+    final state = workspaceProductPromotions;
+    if (state == null) return Future.value(const StorePromotionResult(StorePromotionResultState.notSent));
+    final signature = _promotionSelectionSignature(input.skuId);
+    return state.submit(placementId, input, inputCurrent: () => !input.active ||
+      signature.isNotEmpty && _promotionSelectionSignature(input.skuId) == signature);
+  }
+  final StorePolicyGateway? supplierPolicyGateway;
+  final String? supplierPolicyRealm;
+  final StorePolicyJournal Function(StorePolicyScope scope)? supplierPolicyJournalFactory;
+  final Map<StorePolicyScope, StorePolicyController> _supplierPolicies = {};
+  String _policySelectionSignature(Set<String> ids) => jsonEncode([for (final id in ids.toList()..sort())
+    for (final item in workspaceCatalogueItems.where((p) => p.id == id))
+      [item.id, item.canonicalId, item.sku, item.title, item.brand, item.variant, item.pack,
+        item.packMeasure?.toJson(), item.stockEntry?.productId, item.stockEntry?.method.name]]);
+  StorePolicyController? get workspaceSupplierPolicy {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null) return null;
+    StorePolicyGateway? ownerSource = supplierPolicyGateway;
+    String? realm = supplierPolicyRealm;
+    if (ownerSource is AuthenticatedStorePolicyGateway) realm ??= ownerSource.realm;
+    if (source is AuthenticatedWorkspaceCatalogueGateway && gateway is! ReviewWorkGateway) {
+      realm ??= source.realm;
+      ownerSource ??= AuthenticatedStorePolicyGateway(endpoint: source.endpoint, credentials: source.credentials,
+        transport: source.transport, ownerAccountId: account, realm: source.realm);
+    }
+    if (ownerSource == null || !{'evaluation', 'production'}.contains(realm)) return null;
+    final scope = (account: account, store: store, realm: realm!);
+    final existing = _supplierPolicies[scope];
+    if (existing?.active == true) return existing;
+    existing?.dispose();
+    final WorkspaceCatalogueOwnerGateway? catalogue = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(account) : source is WorkspaceCatalogueOwnerGateway ? source as WorkspaceCatalogueOwnerGateway : null;
+    return _supplierPolicies[scope] = StorePolicyController(scope: scope, gateway: ownerSource,
+      journal: supplierPolicyJournalFactory?.call(scope) ?? SecureStorePolicyJournal(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
+          ? null : publicationPreferencesContext,
+      validateSelection: (draft, current) async {
+        if (catalogue == null || catalogue.realm != scope.realm) return false;
+        final selected = [for (final id in draft.productIds)
+          workspaceCatalogueItems.where((p) => p.id == id).firstOrNull];
+        if (selected.any((p) => p == null)) return false;
+        final signature = _policySelectionSignature(draft.productIds);
+        bool unchanged() => current() && _policySelectionSignature(draft.productIds) == signature;
+        for (var index = 0; index < selected.length; index += 8) {
+          final batch = selected.skip(index).take(8);
+          final matches = await Future.wait(batch.map((value) async {
+            final item = value!, measure = value.packMeasure;
+            if (measure?.valid != true || !unchanged()) return false;
+            final owned = await catalogue.readOwnedSku(storeId: store, skuId: item.id, current: unchanged);
+            if (!unchanged() || owned == null || owned.realm != scope.realm || !_listingMirrorIdentityMatches(owned, item)) return false;
+            final content = owned.input['content'] as Map, pack = owned.input['pack'] as Map;
+            return content['title'] == item.title && content['brand'] == item.brand && content['variant'] == item.variant &&
+              owned.input['sku'] == item.sku && pack['label'] == item.pack && pack['quantityMilli'] == measure!.quantityMilli &&
+              pack['unitsPerCase'] == measure.unitsPerCase && pack['unit'] ==
+                switch (measure.unit.name) {'kilogram' => 'kg', 'litre' => 'L', 'count' => 'count', _ => ''};
+          }));
+          if (!unchanged() || matches.any((match) => !match)) return false;
+        }
+        return unchanged();
+      });
+  }
+  Future<StorePolicyResult> publishWorkspaceSupplierPolicy(StorePolicyDraft draft) async {
+    final controller = workspaceSupplierPolicy;
+    if (controller == null) return const StorePolicyResult(StorePolicyResultState.notSent);
+    final signature = _policySelectionSignature(draft.productIds);
+    return controller.publish(draft, inputCurrent: () => _policySelectionSignature(draft.productIds) == signature &&
+      draft.productIds.every((id) => workspaceCatalogueItems.any((p) => p.id == id)));
+  }
+  final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
+  final Map<WorkspaceCatalogueBindingScope, WorkspaceCatalogueListingController> _catalogueListings = {};
+  final Set<WorkspaceCatalogueBindingScope> _catalogueListingLoads = {};
+  WorkspaceCatalogueListingController? get _catalogueListingController {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null ||
+        source is! WorkspaceCatalogueOwnerGateway ||
+        source is AuthenticatedWorkspaceCatalogueGateway && gateway is ReviewWorkGateway) {
+      return null;
+    }
+    final WorkspaceCatalogueOwnerGateway ownerSource = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(account) : source as WorkspaceCatalogueOwnerGateway;
+    final scope = (account: account, store: store, realm: ownerSource.realm);
+    return _catalogueListings.putIfAbsent(scope, () => WorkspaceCatalogueListingController(
+      scope: scope, gateway: ownerSource,
+      pendingStore: catalogueBindingPendingStoreFactory?.call(scope) ?? SecureWorkCatalogueBindingPendingStore(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
+        ? null : publicationPreferencesContext)..addListener(notifyListeners));
+  }
+  bool get workspaceCatalogueListingPending => _catalogueListingController?.pending != null;
+  bool get workspaceCatalogueListingConnectionConfigured => _catalogueListingController != null;
+  bool get workspaceCatalogueListingReady => _catalogueListingController?.ready ?? true;
+  bool get workspaceCatalogueListingBusy {
+    final controller = _catalogueListingController;
+    return controller != null && (controller.busy || _catalogueListingLoads.contains(controller.scope));
+  }
+
+  String _listingInput(WorkspaceCatalogueItem item) => jsonEncode(item.toInventoryJson());
+  /// Opening an editor restores only its journal, never a provider command.
+  Future<bool> restoreWorkspaceCatalogueListing() async {
+    final controller = _catalogueListingController;
+    if (controller == null) return true;
+    final owner = publicationPreferencesContext;
+    _catalogueListingLoads.add(controller.scope);
+    notifyListeners();
+    try {
+      return await controller.restore() && !_disposed &&
+          publicationPreferencesContext == owner;
+    } finally {
+      _catalogueListingLoads.remove(controller.scope);
+      if (!_disposed && publicationPreferencesContext == owner) notifyListeners();
+    }
+  }
+  /// Deliberately cannot create a new intent or change local product preferences.
+  Future<bool> reconcileWorkspaceCatalogueListing() async {
+    final controller = _catalogueListingController;
+    if (controller == null || workspaceCatalogueListingBusy) return false;
+    final owner = publicationPreferencesContext;
+    bool current() => !_disposed && publicationPreferencesContext == owner;
+    _catalogueListingLoads.add(controller.scope);
+    notifyListeners();
+    try {
+      if (!await controller.restore() || !current()) return false;
+      if (controller.pending == null) {
+        showNotice('No saved listing update is waiting to be checked.');
+        return true;
+      }
+      final result = await controller.reconcile();
+      if (!current()) return false;
+      showNotice(result.state == WorkspaceCatalogueBindingState.saved
+          ? 'Saved listing update checked. Public visibility still needs confirmation.'
+          : controller.error ?? 'Listing update is not confirmed. Your original request is kept.');
+      return result.state == WorkspaceCatalogueBindingState.saved;
+    } finally {
+      _catalogueListingLoads.remove(controller.scope);
+      if (current()) notifyListeners();
+    }
+  }
+  bool _listingMirrorIdentityMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
+    final origin = item.stockEntry;
+    return owned.storeId == activeWorkspace?.id && owned.skuId == item.id && owned.canonicalProductId == item.canonicalId &&
+      origin != null && origin.valid && origin.productId == item.id &&
+      _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
+  }
+  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
+    final value = owned.input, origin = item.stockEntry, measure = item.packMeasure;
+    if (owned.storeId != activeWorkspace?.id || owned.skuId != item.id || owned.canonicalProductId != item.canonicalId ||
+        value['sku'] != item.sku || origin == null || !origin.valid || measure?.valid != true ||
+        !_ownerInputValuesEqual(value['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId}) ||
+        !_ownerInputValuesEqual(value['pack'], {'label': item.pack, 'quantityMilli': measure!.quantityMilli,
+          'unit': switch (measure.unit.name) {'kilogram' => 'kg', 'litre' => 'L', 'count' => 'count', _ => ''},
+          'unitsPerCase': measure.unitsPerCase})) {
+      return false;
+    }
+    final content = item.toBuyPublicContent(storeId: owned.storeId, sourceId: 'Store product');
+    final media = <Map<String, Object?>>[];
+    for (final asset in content.media) {
+      final binding = asset.binding, file = asset.binding?.file;
+      if (binding == null || file == null) return false;
+      media.add({'id': asset.id, 'revision': binding.assetRevision, 'url': asset.source,
+        'storeId': binding.storeId, 'skuId': binding.skuId, 'canonicalProductId': binding.productId,
+        'publisherWorkspaceId': binding.supplierWorkspaceId, 'file': {'mimeType': file.mimeType,
+          'byteLength': file.byteLength, 'width': file.width, 'height': file.height, 'normalized': file.normalized,
+          if (file.frameCount != null) 'frameCount': file.frameCount}});
+    }
+    if (!_ownerInputValuesEqual(value['content'], {'title': item.title, 'brand': item.brand,
+      'variant': item.variant, 'categoryId': item.categoryId, 'description': item.content.description,
+      'highlights': item.content.highlights, 'specifications': [for (final spec in item.content.specifications.entries)
+        {'label': spec.key, 'value': spec.value}], 'media': media})) {
+      return false;
+    }
+    final expected = <String, Map<String, Object?>>{};
+    if (item.retailEnabled) {
+      expected['retail'] = {'kind': 'retail', 'priceMinor': item.sellingPriceMinor,
+      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[]};
+    }
+    final trade = item.wholesaleOffer;
+    if (trade?.enabled == true) {
+      if (!trade!.valid || trade.saleType == null) return false;
+      final prices = {if (trade.tiers.isNotEmpty) trade.minimumPacks: trade.priceAtMinor(trade.minimumPacks),
+        for (final tier in trade.tiers) tier.minimumPacks: tier.packPriceMinor};
+      expected[trade.saleType!.name] = {'kind': trade.saleType!.name, 'priceMinor': trade.priceAtMinor(trade.minimumPacks),
+        'mrpMinor': item.mrpMinor, 'minimumOrder': trade.minimumPacks,
+        'quantityStep': trade.incrementPacks, 'tiers': [for (final price in prices.entries)
+          {'minimumQuantity': price.key, 'unitPriceMinor': price.value}]};
+    }
+    final channels = value['channels'] as List;
+    return channels.length == expected.length && channels.every((raw) {
+      final channel = Map<String, dynamic>.from(raw as Map)..remove('offerId');
+      return _ownerInputValuesEqual(channel, expected[channel['kind']]);
+    });
+  }
+
+  /// Explicit owner listing intent only; ordinary editor/CSV/inventory saves never upload.
+  Future<bool> toggleWorkspaceProductListing(String productId) async {
+    final item = workspaceCatalogueItems.where((p) => p.id == productId).firstOrNull;
+    if (item == null) return false;
+    return requestWorkspaceProductListing(productId, listed: !item.publicListing);
+  }
+  Future<bool> requestWorkspaceProductListing(String productId, {required bool listed}) async {
+    final item = workspaceCatalogueItems.where((p) => p.id == productId).firstOrNull;
+    if (item == null || workspaceCatalogueListingBusy) return false;
+    final inputContext = publicationPreferencesContext, originalInput = _listingInput(item);
+    bool current() => !_disposed && publicationPreferencesContext == inputContext;
+    bool unchanged() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == originalInput);
+    final controller = _catalogueListingController;
+    if (controller == null) {
+      if (!_stockEditAvailable()) return false;
+      if (listed && !item.matchesMasterCatalogueIdentity) {
+        showError('This product stays private until its details are reviewed.'); return false;
+      }
+      if (listed && (item.sellingPriceMinor <= 0 || !item.available)) {
+        showError('Add a customer price and make this product available before requesting listing.'); return false;
+      }
+      return item.publicListing == listed || addOrUpdateWorkspaceProduct(item.copyWith(publicListing: listed));
+    }
+    _catalogueListingLoads.add(controller.scope); notifyListeners();
+    try {
+      if (!await controller.restore() || !current()) {
+        if (current()) showError(controller.error ?? 'Saved listing update could not be opened.'); return false;
+      }
+      if (controller.pending != null) {
+        final result = await controller.reconcile();
+        if (!current()) return false;
+        showNotice(result.state == WorkspaceCatalogueBindingState.saved
+          ? 'Saved listing update checked. Public visibility still needs confirmation.'
+          : controller.error ?? 'Listing update is not confirmed. Your original request is kept.');
+        return result.state == WorkspaceCatalogueBindingState.saved;
+      }
+      if (!_stockEditAvailable() || localInventoryEnabled && !await workspaceInventorySaved || !unchanged()) return false;
+      final owned = await controller.gateway.readOwnedSku(storeId: controller.scope.store,
+        skuId: productId, current: unchanged);
+      if (!unchanged()) return false;
+      if (owned == null || owned.realm != controller.scope.realm ||
+          !(listed ? _listingMirrorIdentityMatches(owned, item) && _listingMirrorMatches(owned, item)
+            : _listingMirrorIdentityMatches(owned, item))) {
+        showError('This product needs matching reviewed details before its listing can be updated. Store stock is unchanged.'); return false;
+      }
+      if (listed && (item.sellingPriceMinor <= 0 || !item.available)) {
+        showError('Add a customer price and make this product available before requesting listing.'); return false;
+      }
+      // This is the owner's explicit preference, never data copied from an acknowledgement.
+      if (item.publicListing != listed && !addOrUpdateWorkspaceProduct(item.copyWith(publicListing: listed))) return false;
+      final selectedInput = _listingInput(workspaceCatalogueItems.firstWhere((p) => p.id == productId));
+      bool selectedCurrent() => current() && workspaceCatalogueItems.any((p) => p.id == productId && _listingInput(p) == selectedInput);
+      if (localInventoryEnabled && !await workspaceInventorySaved || !selectedCurrent()) return false;
+      final original = owned.listingIntent(accountId: controller.scope.account,
+        idempotencyKey: _newCounterIdentity('catalogue-listing'), listed: listed);
+      final result = await controller.submit(original, inputCurrent: selectedCurrent);
+      if (!current()) return false;
+      showNotice(switch (result.state) {
+        WorkspaceCatalogueBindingState.saved => 'Listing preference saved. Public visibility still needs confirmation.',
+        WorkspaceCatalogueBindingState.rejected => 'Listing update was not accepted. Review the product before trying again.',
+        WorkspaceCatalogueBindingState.notSent => 'Product changed before the listing update was sent. Review it and try again.',
+        WorkspaceCatalogueBindingState.unknown => controller.error ?? 'Listing update is not confirmed. Your original request is kept.',
+      });
+      return result.state == WorkspaceCatalogueBindingState.saved;
+    } on Object {
+      if (current()) showError('Listing update could not be confirmed. Your Store data is kept.');
+      return false;
+    } finally { _catalogueListingLoads.remove(controller.scope); if (current()) notifyListeners(); }
+  }
+  final Map<(String, String), WorkspaceCatalogueReadback> _catalogueReadbacks = {};
+
+  /// Server readback only; this never uploads local/evaluation inventory.
+  WorkspaceCatalogueReadback? get workspaceCatalogueReadback {
+    final account = _contactAccountScope, store = activeWorkspace?.id;
+    final source = catalogueGateway;
+    if (_disposed || source == null || account == null || account.isEmpty || store == null) return null;
+    return _catalogueReadbacks.putIfAbsent((account, store), () => WorkspaceCatalogueReadback(
+      gateway: source,
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
+        ? null : publicationPreferencesContext));
+  }
   final StoreFeedbackAdapter? customerFeedbackAdapter;
+  final StoreFeedbackPendingStore Function(StoreFeedbackScope scope)? customerFeedbackPendingStoreFactory;
   final Map<StoreFeedbackScope, StoreFeedbackController> _customerFeedback = {};
 
   StoreFeedbackController? get workspaceCustomerFeedback {
@@ -673,6 +1269,7 @@ class WorkSession extends ChangeNotifier {
     final scope = (account: account, store: store);
     return _customerFeedback.putIfAbsent(scope, () => StoreFeedbackController(
       scope: scope, adapter: customerFeedbackAdapter,
+      pendingStore: customerFeedbackPendingStoreFactory?.call(scope) ?? SecureStoreFeedbackPendingStore(),
       context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
           ? null : publicationPreferencesContext,
     ));
@@ -680,6 +1277,7 @@ class WorkSession extends ChangeNotifier {
   final WorkPendingProofStore Function(String storeId)? offerDraftStoreFactory;
   final WorkPendingProofStore Function(String storeId)? pickupPreferencesStoreFactory;
   final WorkPendingProofStore Function(String storeId)? publicationPreferencesStoreFactory;
+  final WorkPendingProofStore Function(String storeId, String customerId)? customerTermsStoreFactory;
   final WorkPendingProofStore Function(String storeId)? tradingPreferencesStoreFactory;
   /// Read-only integration seam. No tracking, posting or local analytics seed.
   final WorkspaceAnalyticsReader? analyticsReader;
@@ -2234,7 +2832,7 @@ class WorkSession extends ChangeNotifier {
                 (saved.manualReceiptCheckpointRevision == null ||
                  journal!.inventory!.movements.any((m) => movements[m.id]?.contentIdentity != m.contentIdentity));
           }
-          retailerProductAdded = saved.products.isNotEmpty;
+          _syncRetailerProductSummary();
         }
         data.inventoryLoaded = true;
         data.inventoryError = data.inventoryReceiptRecoveryPending
@@ -2778,7 +3376,9 @@ class WorkSession extends ChangeNotifier {
       for (final product in workspaceCatalogueItems) product.id: product,
     };
     final ids = workspaceOrderQuantities.keys.toList()..sort();
+    final exact = ids.any((id) => catalogue[id]?.usesMinorAmounts == true);
     return jsonEncode([
+      if (exact) 'counter-bill-minor-v1',
       _contactAccountScope,
       activeWorkspace?.id,
       currentWorkspaceOrderId,
@@ -2792,7 +3392,7 @@ class WorkSession extends ChangeNotifier {
           workspaceOrderQuantities[id],
           catalogue[id]?.title,
           catalogue[id]?.pack,
-          catalogue[id]?.sellingPrice,
+          exact ? catalogue[id]?.sellingPriceMinor : catalogue[id]?.sellingPrice,
           catalogue[id]?.available,
           catalogue[id] == null
               ? false
@@ -2813,8 +3413,7 @@ class WorkSession extends ChangeNotifier {
           product.available &&
           product.title == line.name &&
           product.pack == line.pack &&
-          product.sellingPrice == line.unitPricePaise ~/ 100 &&
-          line.unitPricePaise % 100 == 0 &&
+          product.sellingPriceMinor == line.unitPricePaise &&
           (product.stockMode == WorkspaceStockMode.availabilityOnly ||
               product.stock >= line.quantity);
     });
@@ -2949,13 +3548,15 @@ class WorkSession extends ChangeNotifier {
     var totalPaise = BigInt.zero;
     for (final quantity in workspaceOrderQuantities.entries) {
       final item = catalogue[quantity.key];
-      if (item == null ||
-          quantity.value <= 0 ||
-          item.sellingPrice < 0 ||
-          item.sellingPrice > 92233720368547758) {
+      if (item == null || quantity.value <= 0) {
         return null;
       }
-      final price = item.sellingPrice * 100;
+      final int price;
+      try {
+        price = item.sellingPriceMinor;
+      } on FormatException {
+        return null;
+      }
       if (price > 0 && quantity.value > 9223372036854775807 ~/ price) {
         return null;
       }
@@ -3100,7 +3701,19 @@ class WorkSession extends ChangeNotifier {
 
   WorkspaceBillDiscount get workspaceCounterDiscount =>
       _storeData.counterDiscount;
-  int get workspaceCounterSubtotalMinor => workspaceOrderTotal * 100;
+  int get workspaceCounterSubtotalMinor {
+    var total = BigInt.zero;
+    for (final product in workspaceCatalogueItems) {
+      final quantity = workspaceOrderQuantities[product.id] ?? 0;
+      if (quantity <= 0) continue;
+      total += BigInt.from(product.sellingPriceMinor) * BigInt.from(quantity);
+      // Retain the Counter draft/ledger's existing signed64-bit amount bound.
+      if (total > BigInt.from(9223372036854775807)) {
+        throw const FormatException('Bill amount exceeds the supported range.');
+      }
+    }
+    return total.toInt();
+  }
   int get workspaceCounterDiscountMinor =>
       workspaceCounterDiscount.amountFor(workspaceCounterSubtotalMinor);
   int get workspaceCounterPayableMinor =>
@@ -3542,6 +4155,13 @@ class WorkSession extends ChangeNotifier {
   /// Keep operational/wire state intact; derive the visible label using the
   /// same scoped, current authority that protects the central Hand Over action.
   String workspaceOrderStageLabel(WorkspaceOrderRecord order) {
+    if (order.isOperationalProjection) {
+      return switch (order.stage) {
+        'Confirmed' => 'Awaiting acceptance',
+        'Rejected' => 'Not accepted',
+        _ => order.stage,
+      };
+    }
     if (!order.isCustomerCollection) return order.stage;
     if ({'Matched', 'Customer confirmed'}.contains(order.stage)) {
       final current = currentCollection;
@@ -7589,10 +8209,15 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool hasScopedWorkspaceOrder(String orderId) =>
-      _storeData.projectedOrderRevisions.containsKey(orderId);
+      _storeData.projectedOrderRevisions.containsKey(orderId) ||
+      workspaceOrders.any((order) => order.id == orderId && order.isOperationalProjection);
 
   WorkOrderOperationState? workspaceOrderOperationState(String orderId) =>
       _scopedOrderOperations?.state(orderId);
+  bool workspaceOrderCanAct(String orderId, WorkOrderAction action) =>
+      !_disposed && !busy && !workspaceOperationsSyncing && !workspaceHandoverBusy &&
+      !hasPendingOrderTime && _collection?.needsReconciliation != true &&
+      _scopedOrderOperations?.canAct(orderId, action) == true;
 
   bool workspaceOrderHasTimeRequest(String orderId) =>
       _scopedOrderOperations?.pending(orderId)?.action ==
@@ -7628,13 +8253,14 @@ class WorkSession extends ChangeNotifier {
       if (snapshot != null &&
           snapshot.revision > (data.projectedOrderRevisions[orderId] ?? -1)) {
         final order = snapshot.order!;
-        // Collection authorisation stays with the collection controller.
-        if (order.isCustomerCollection) return;
+        // Typed collection facts are readable, never collection authority.
+        if (order.isCustomerCollection && !order.isOperationalProjection) return;
         final index = data.workspaceOrders.indexWhere(
           (item) => item.id == orderId,
         );
         if (index >= 0) {
-          if (data.workspaceOrders[index].isCustomerCollection) return;
+          if (data.workspaceOrders[index].isCustomerCollection && !data.workspaceOrders[index].isOperationalProjection) return;
+          if (data.workspaceOrders[index].isOperationalProjection != order.isOperationalProjection) return;
           data.workspaceOrders[index] = order;
         } else {
           data.workspaceOrders.insert(0, order);
@@ -7980,10 +8606,20 @@ class WorkSession extends ChangeNotifier {
       _storeData.retailerProductAdded = value;
   int get retailerQuantity => _storeData.retailerQuantity;
   set retailerQuantity(int value) => _storeData.retailerQuantity = value;
-  int get retailerBuyPrice => _storeData.retailerBuyPrice;
-  set retailerBuyPrice(int value) => _storeData.retailerBuyPrice = value;
-  int get retailerSellPrice => _storeData.retailerSellPrice;
-  set retailerSellPrice(int value) => _storeData.retailerSellPrice = value;
+  int get retailerBuyPriceMinor => _storeData.retailerBuyMinor ?? _storeData.retailerBuyPrice * 100;
+  int get retailerSellPriceMinor => _storeData.retailerSellMinor ?? _storeData.retailerSellPrice * 100;
+  int get retailerBuyPrice => _storeData.retailerBuyMinor == null
+      ? _storeData.retailerBuyPrice : buyV2WholeRupees(retailerBuyPriceMinor);
+  set retailerBuyPrice(int value) {
+    _storeData.retailerBuyMinor = null;
+    _storeData.retailerBuyPrice = value;
+  }
+  int get retailerSellPrice => _storeData.retailerSellMinor == null
+      ? _storeData.retailerSellPrice : buyV2WholeRupees(retailerSellPriceMinor);
+  set retailerSellPrice(int value) {
+    _storeData.retailerSellMinor = null;
+    _storeData.retailerSellPrice = value;
+  }
   bool get retailerHomeDelivery => _storeData.retailerHomeDelivery;
   set retailerHomeDelivery(bool value) =>
       _storeData.retailerHomeDelivery = value;
@@ -8299,6 +8935,13 @@ class WorkSession extends ChangeNotifier {
         !workspaceCustomerBook.any((c) => c.id == customerId)) {
       return false;
     }
+    final durable = workspaceCustomerTermsRecoveryAvailable(customerId);
+    final recovery = _customerTermsRecovery(customerId);
+    if (durable && (!recovery.loaded || recovery.pendingWrites > 0 ||
+        recovery.sessionFields == null ||
+        !_customerTermsAnchorMatches(customerId, recovery.sessionFields!))) {
+      return false;
+    }
     final current = workspacePublicationDetails;
     final overrides = Map<String, List<WorkspacePaymentTerm>>.of(
       current.customerPaymentTerms,
@@ -8309,19 +8952,175 @@ class WorkSession extends ChangeNotifier {
       overrides[customerId] = terms;
     }
     try {
-      return saveWorkspacePublicationDetails(
-        WorkspaceStorePublicationDetails.fromJson({
+      final updated = WorkspaceStorePublicationDetails.fromJson({
           ...current.toJson(),
           'customerPaymentTerms': {
             for (final e in overrides.entries)
               e.key: e.value.map((t) => t.toJson()).toList(),
           },
-        }),
-        expectedStoreId: expectedStoreId,
-      );
+        });
+      if (updated.inputErrors.isNotEmpty) return false;
+      // Private device preference: do not send it through the broad legacy
+      // Store-settings writer or imply publication/customer quote eligibility.
+      _storeData.publicationDetails = updated;
+      if (durable) _saveCustomerTerms(customerId, recovery);
+      notifyListeners();
+      return true;
     } on FormatException {
       return false;
     }
+  }
+
+  // Private owner preference, NOT an authenticated buyer ID or credit grant.
+  // A contact-only customer-book row cannot authorize restart restoration.
+  Map<String, Object?>? _customerTermsAnchor(String customerId, [String? invoiceId]) {
+    final data = _storeData, finance = workspaceFinance;
+    if (!data.ledgerRecovered || data.ledgerRecoveryError != null ||
+        data.ledgerCheckpointRevision == null || finance == null || !finance.valid) { return null; }
+    final ledgers = finance.customerLedgers.where((l) => l.customerId == customerId).toList();
+    if (ledgers.length != 1) return null;
+    final ledger = ledgers.single;
+    final keys = data.ledgerBilledInvoices.keys.toList()..sort();
+    for (final key in keys) {
+      if (invoiceId != null && invoiceId != key) continue;
+      final invoice = data.ledgerBilledInvoices[key]!, order = data.ledgerBilledOrders[key];
+      if (order == null || order.isOperationalProjection || invoice.id != key ||
+          invoice.orderId != order.id || invoice.payableMinor != order.payableMinor) { continue; }
+      final payments = finance.payments.where((p) => p.invoiceId == key && p.orderId == order.id &&
+          p.customerId == customerId && p.amountMinor == invoice.payableMinor);
+      final entries = ledger.entries.where((e) => e.invoiceId == key && e.orderId == order.id &&
+          e.kind == WorkspaceLedgerEntryKind.invoice && e.state == WorkspaceLedgerPostingState.posted &&
+          e.amountMinor == invoice.payableMinor).toList();
+      if (payments.length != 1 || entries.length != 1) continue;
+      final entry = entries.single;
+      return {'invoiceId': key, 'orderId': order.id, 'entryId': entry.id, 'sequence': entry.sequence,
+        'operationId': entry.operationId, 'amountMinor': invoice.payableMinor,
+        'issuedAt': invoice.issuedAt.toUtc().toIso8601String(),
+        'occurredAt': entry.occurredAt.toUtc().toIso8601String()};
+    }
+    return null;
+  }
+
+  bool _customerTermsAnchorMatches(String id, Map<String, Object?> anchor) =>
+      anchor['invoiceId'] is String && _ownerInputValuesEqual(anchor,
+          _customerTermsAnchor(id, anchor['invoiceId'] as String));
+  _OwnerInputRecovery _customerTermsRecovery(String id) => _storeData.customerTermsPreferences
+      .putIfAbsent((_contactAccountScope ?? '', id), _OwnerInputRecovery.new);
+  WorkPendingProofStore? _customerTermsStore(String store, String customer) {
+    if (customerTermsStoreFactory != null) return customerTermsStoreFactory!(store, customer);
+    final contact = contactDraftStore;
+    return contact is SecureWorkPendingProofStore
+        ? SecureWorkPendingProofStore.customerPaymentTerms(store, customer, reviewOnly: contact.reviewOnly) : null;
+  }
+  bool workspaceCustomerTermsRecoveryAvailable(String customer) => _contactAccountScope != null &&
+      (customerTermsStoreFactory != null || contactDraftStore is SecureWorkPendingProofStore) &&
+      _customerTermsAnchor(customer) != null;
+  bool workspaceCustomerTermsReady(String customer) =>
+      !workspaceCustomerTermsRecoveryAvailable(customer) ||
+      (_customerTermsRecovery(customer).loaded && _customerTermsRecovery(customer).sessionFields != null &&
+       _customerTermsAnchorMatches(customer, _customerTermsRecovery(customer).sessionFields!));
+  bool workspaceCustomerTermsSaving(String customer) => _customerTermsRecovery(customer).pendingWrites > 0;
+  bool workspaceCustomerTermsSaved(String customer) => workspaceCustomerTermsRecoveryAvailable(customer) &&
+      _customerTermsRecovery(customer).saved && _customerTermsRecovery(customer).sessionFields != null &&
+      _customerTermsAnchorMatches(customer, _customerTermsRecovery(customer).sessionFields!);
+  String? workspaceCustomerTermsError(String customer) => _customerTermsRecovery(customer).error;
+  Future<bool> workspaceCustomerTermsWrite(String customer) => _customerTermsRecovery(customer).writes;
+  Object? _customerTermsValue(String customer) => workspacePublicationDetails.customerPaymentTerms[customer]
+      ?.map((t) => t.toJson()).toList();
+  void _applyCustomerTermsValue(String customer, Object? terms) {
+    final values = {...workspacePublicationDetails.customerPaymentTerms};
+    final encoded = <String, Object?>{for (final e in values.entries) e.key: e.value.map((t) => t.toJson()).toList()};
+    if (terms == null) { encoded.remove(customer); } else { encoded[customer] = terms as List; }
+    _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
+      ...workspacePublicationDetails.toJson(), 'customerPaymentTerms': encoded});
+  }
+  Future<bool> loadWorkspaceCustomerPaymentTerms({required String expectedStoreId, required String customerId}) {
+    if (_disposed || activeWorkspace?.id != expectedStoreId) return Future.value(false);
+    if (!workspaceCustomerTermsRecoveryAvailable(customerId)) return Future.value(true);
+    final recovery = _customerTermsRecovery(customerId);
+    if (recovery.loaded && recovery.sessionFields != null &&
+        _customerTermsAnchorMatches(customerId, recovery.sessionFields!)) { return Future.value(true); }
+    recovery.loaded = false;
+    recovery.saved = false;
+    return recovery.loading ??= _readCustomerTerms(expectedStoreId, customerId, recovery)
+        .whenComplete(() { recovery.loading = null; });
+  }
+  Future<bool> _readCustomerTerms(String storeId, String customer, _OwnerInputRecovery recovery) async {
+    final account = _contactAccountScope!, context = publicationPreferencesContext;
+    final data = _storeData, before = _customerTermsValue(customer);
+    var retired = false;
+    bool current() => !_disposed && !retired && publicationPreferencesContext == context &&
+        _isStoreScopeCurrent(data, storeId, account);
+    void watch() { if (!current()) retired = true; }
+    addListener(watch);
+    try {
+      await recovery.writes;
+      final store = _customerTermsStore(storeId, customer);
+      if (!current() || store == null || store.accountScope != account) return false;
+      final saved = await store.read(account).timeout(const Duration(seconds: 12));
+      if (!current()) return false;
+      Map<String, Object?>? anchor;
+      if (saved != null) {
+        if (saved.length != 6 || saved['schemaVersion'] != 1 || saved['accountScope'] != account ||
+            saved['storeId'] != storeId || saved['customerId'] != customer || saved['anchor'] is! Map ||
+            !(saved['terms'] == null || saved['terms'] is List)) { throw const FormatException('Invalid private terms'); }
+        anchor = Map<String, Object?>.from(saved['anchor'] as Map);
+        final terms = saved['terms'];
+        final typed = WorkspaceStorePublicationDetails.fromJson({'customerPaymentTerms':
+            {customer: ?terms}});
+        if (typed.inputErrors.isNotEmpty || !_ownerInputValuesEqual(terms,
+            typed.customerPaymentTerms[customer]?.map((t) => t.toJson()).toList()) ||
+            !_customerTermsAnchorMatches(customer, anchor)) { throw const FormatException('Original customer changed'); }
+        if (_ownerInputValuesEqual(before, _customerTermsValue(customer))) {
+          _applyCustomerTermsValue(customer, terms);
+          recovery.saved = true;
+        }
+      } else { anchor = _customerTermsAnchor(customer); }
+      if (anchor == null) throw const FormatException('Original bill unavailable');
+      recovery.sessionFields = anchor;
+      recovery.loaded = true;
+      recovery.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (current()) {
+        recovery.error = 'Saved customer preferences could not be confirmed. Entries are kept; reopen the saved ledger and retry.';
+        notifyListeners();
+      }
+      return false;
+    } finally { removeListener(watch); }
+  }
+  void _saveCustomerTerms(String customer, _OwnerInputRecovery recovery) {
+    final account = _contactAccountScope!, storeId = activeWorkspace!.id;
+    final data = _storeData, context = publicationPreferencesContext, terms = _customerTermsValue(customer);
+    final anchor = Map<String, Object?>.from(recovery.sessionFields!);
+    recovery.pendingWrites++;
+    recovery.saved = false;
+    recovery.error = null;
+    var retired = false;
+    bool current() => !_disposed && !retired && publicationPreferencesContext == context &&
+        _isStoreScopeCurrent(data, storeId, account);
+    void watch() { if (!current()) retired = true; }
+    addListener(watch);
+    recovery.writes = recovery.writes.then((_) async {
+      try {
+        final store = _customerTermsStore(storeId, customer);
+        if (!current() || store == null || store.accountScope != account ||
+            !_customerTermsAnchorMatches(customer, anchor)) { return false; }
+        await store.save(account, {'schemaVersion': 1, 'accountScope': account, 'storeId': storeId,
+          'customerId': customer, 'anchor': anchor, 'terms': terms}).timeout(const Duration(seconds: 12));
+        if (!current() || !_customerTermsAnchorMatches(customer, anchor)) return false;
+        recovery.saved = _ownerInputValuesEqual(terms, _customerTermsValue(customer));
+        return recovery.saved;
+      } catch (_) {
+        if (current()) recovery.error = 'Device save not confirmed. Your customer preferences are kept; try again.';
+        return false;
+      } finally {
+        recovery.pendingWrites--;
+        removeListener(watch);
+        if (current()) notifyListeners();
+      }
+    });
   }
 
   List<WorkspaceStockMovement> get workspaceStockMovements =>
@@ -8728,11 +9527,14 @@ class WorkSession extends ChangeNotifier {
     return total > 0 ? total : summary.split(',').length;
   }
 
-  int get workspaceOrderTotal =>
-      workspaceCatalogueItems.fold(0, (total, product) {
-        return total +
-            product.sellingPrice * (workspaceOrderQuantities[product.id] ?? 0);
-      });
+  /// Legacy rupee-only access; exact callers use workspaceCounterSubtotalMinor.
+  int get workspaceOrderTotal {
+    final minor = workspaceCounterSubtotalMinor;
+    if (minor % 100 != 0) {
+      throw const FormatException('Bill amount requires a minor-unit consumer.');
+    }
+    return minor ~/ 100;
+  }
 
   Iterable<WorkspaceCatalogueItem> get workspaceLowStockProducts =>
       workspaceCatalogueItems.where(
@@ -8982,7 +9784,7 @@ class WorkSession extends ChangeNotifier {
   List<WorkspaceCustomerRecord> get workspaceCustomerBook {
     final grouped = <String, List<WorkspaceOrderRecord>>{};
     for (final order in visibleWorkspaceOrders.where(
-      (order) => order.stage != 'Cancelled',
+      (order) => !order.isOperationalProjection && order.stage != 'Cancelled',
     )) {
       final id =
           workspacePaymentFor(order.id)?.customerId ??
@@ -9136,6 +9938,13 @@ class WorkSession extends ChangeNotifier {
     Set<String> packedIds,
   ) {
     if (order != null && !_packingContentsMatch(order)) packedIds = const {};
+    if (order?.operational case final exact?) {
+      return [for (final line in exact.original.lines) WorkspacePackingLine(
+        id: line.lineId, label: '${line.name} · ${line.packLabel}',
+        quantity: line.quantityMilli, quantityScale: 1000, quantityUnit: line.quantityUnit,
+        packed: packedIds.contains(line.lineId),
+      )];
+    }
     if (order != null && order.quantities.isNotEmpty) {
       return order.quantities.entries
           .map((entry) {
@@ -9381,8 +10190,8 @@ class WorkSession extends ChangeNotifier {
   bool get retailerReady =>
       retailerProductAdded &&
       retailerQuantity > 0 &&
-      retailerBuyPrice > 0 &&
-      retailerSellPrice > retailerBuyPrice &&
+      retailerBuyPriceMinor > 0 &&
+      retailerSellPriceMinor > retailerBuyPriceMinor &&
       (retailerHomeDelivery || retailerStoreCollection);
 
   void clearMessages() {
@@ -9735,9 +10544,16 @@ class WorkSession extends ChangeNotifier {
   };
 
   void _persistOperationalState(String reason) {
-    if (_storeData.orderOperations != null) {
+    final data = _storeData;
+    // Even a refused new write supersedes replies about an older snapshot.
+    final revision = ++data.operationalSyncRevision;
+    if (_storeData.orderOperations != null ||
+        workspaceOrders.any((order) => order.isOperationalProjection) ||
+        workspaceCatalogueItems.any((product) => product.usesMinorAmounts ||
+            product.wholesaleOffer?.usesExplicitMinor == true)) {
       // Never send a legacy whole-Store overwrite over authoritative per-order
-      // data. Other operational domains require their scoped adapters first.
+      // data or exact-price records. This transport has no minor-unit contract;
+      // retain the local inventory/draft/ledger, never round for a legacy sync.
       workspaceOperationsSyncError =
           'These changes remain on this device. Store sync is not available yet.';
       notifyListeners();
@@ -9745,7 +10561,6 @@ class WorkSession extends ChangeNotifier {
     }
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty) return;
-    final data = _storeData;
     final scope = _contactAccountScope;
     final snapshot = _operationalState();
     data.pendingOperationalRequests++;
@@ -9764,11 +10579,17 @@ class WorkSession extends ChangeNotifier {
             ),
           )
           .then((_) {
-            if (!_isStoreScopeCurrent(data, id, scope)) return;
+            if (!_isStoreScopeCurrent(data, id, scope) ||
+                revision != data.operationalSyncRevision) {
+              return;
+            }
             workspaceOperationsSyncError = null;
           })
           .catchError((Object error) {
-            if (!_isStoreScopeCurrent(data, id, scope)) return;
+            if (!_isStoreScopeCurrent(data, id, scope) ||
+                revision != data.operationalSyncRevision) {
+              return;
+            }
             workspaceOperationsSyncError = error is WorkGatewayException
                 ? error.message
                 : 'Store changes could not sync. Your draft remains on this device.';
@@ -9986,6 +10807,7 @@ class WorkSession extends ChangeNotifier {
       if (store == null || store.accountScope != account) throw StateError('Storage unavailable');
       final saved = await store.read(account!).timeout(const Duration(seconds: 12));
       if (!current()) return false;
+      recovery.confirmedAbsent = saved == null;
       if (saved != null) {
         final fields = saved['fields'];
         const keys = {'openingTime', 'closingTime', 'maximumActiveOrders', 'alertSound', 'alertVibration'};
@@ -10037,6 +10859,7 @@ class WorkSession extends ChangeNotifier {
     bool inputsUnchanged() => mapEquals(fields, _tradingFields()) &&
         mapEquals(defaults, workspaceProductDefaults.toJson()) &&
         mapEquals(beforeReadiness, _readinessFields());
+    recovery.confirmedAbsent = false;
     recovery.saved = false;
     recovery.pendingWrites++;
     recovery.error = null;
@@ -10110,7 +10933,7 @@ class WorkSession extends ChangeNotifier {
   bool _packingContentsMatch(WorkspaceOrderRecord order) {
     final contents = _packingContentsByOrder[_orderScope(order.id)];
     return contents == null ||
-        (contents.items == order.items &&
+        (contents.items == (order.operational?.reference.originalFingerprint ?? order.items) &&
             mapEquals(contents.quantities, order.quantities));
   }
 
@@ -10120,7 +10943,7 @@ class WorkSession extends ChangeNotifier {
   ) {
     if (!_packingContentsMatch(order)) packedIds.clear();
     _packingContentsByOrder[_orderScope(order.id)] = (
-      items: order.items,
+      items: order.operational?.reference.originalFingerprint ?? order.items,
       quantities: Map.of(order.quantities),
     );
   }
@@ -10131,6 +10954,7 @@ class WorkSession extends ChangeNotifier {
     required String lineId,
     required int quantity,
     required bool packed,
+    WorkspaceOperationalOrderSnapshot? expectedOperational,
   }) {
     if (storeId != (activeWorkspace?.id ?? workspaceId) ||
         busy ||
@@ -10150,6 +10974,15 @@ class WorkSession extends ChangeNotifier {
           order,
         ).any((line) => line.id == lineId && line.quantity == quantity)) {
       return false;
+    }
+    if (order.operational case final exact?) {
+      final operations = _scopedOrderOperations;
+      if (!identical(expectedOperational, exact) ||
+          !identical(operations?.order(orderId)?.order?.operational, exact) ||
+          operations?.gateway is! WorkspaceOperationalOrderCommandGateway ||
+          !(operations!.gateway as WorkspaceOperationalOrderCommandGateway).isCurrent) {
+        return false;
+      }
     }
     final packedIds = isSelectedWorkspaceOrder(order)
         ? workspacePackedProductIds
@@ -10508,6 +11341,9 @@ class WorkSession extends ChangeNotifier {
   }
 
   WorkspaceCustomerInvoice _createInvoice(WorkspaceOrderRecord order) {
+    if (order.isOperationalProjection) {
+      throw StateError('Issued online-order documents require their authoritative service.');
+    }
     final existing = workspaceInvoices
         .where((invoice) => invoice.orderId == order.id)
         .firstOrNull;
@@ -10650,6 +11486,8 @@ class WorkSession extends ChangeNotifier {
       _counterPurchasedItems();
 
   List<WorkspaceOrderItemSnapshot> _counterPurchasedItems() {
+    // Validate the sum before narrowing any line multiplication to native int.
+    final subtotalMinor = workspaceCounterSubtotalMinor;
     final lines = <WorkspaceOrderItemSnapshot>[
       for (final product in workspaceCatalogueItems)
         if ((workspaceOrderQuantities[product.id] ?? 0) > 0)
@@ -10658,10 +11496,9 @@ class WorkSession extends ChangeNotifier {
             name: product.title,
             pack: product.pack,
             quantity: workspaceOrderQuantities[product.id]!,
-            unitPricePaise: product.sellingPrice * 100,
+            unitPricePaise: product.sellingPriceMinor,
             lineTotalPaise:
-                product.sellingPrice *
-                100 *
+                product.sellingPriceMinor *
                 workspaceOrderQuantities[product.id]!,
           ),
     ];
@@ -10669,7 +11506,7 @@ class WorkSession extends ChangeNotifier {
         workspaceCounterDiscountError != null) {
       return List.unmodifiable(lines);
     }
-    final subtotal = BigInt.from(workspaceCounterSubtotalMinor);
+    final subtotal = BigInt.from(subtotalMinor);
     final discount = BigInt.from(workspaceCounterDiscountMinor);
     var cumulative = BigInt.zero;
     var allocated = 0;
@@ -10801,7 +11638,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (order == null) return true;
-    if (order.source == 'App' || order.isCustomerCollection) {
+    if (order.isOperationalProjection || order.source == 'App' || order.isCustomerCollection) {
       showError(
         'Use this order’s actions. Start a new bill for a counter sale.',
       );
@@ -10823,6 +11660,9 @@ class WorkSession extends ChangeNotifier {
 
   WorkspaceOrderRecord _ensureCurrentOrderRecord() {
     final existing = currentWorkspaceOrder;
+    if (existing?.isOperationalProjection == true) {
+      throw StateError('An online order cannot become a local manual bill.');
+    }
     if (existing != null) return existing;
     final id =
         currentWorkspaceOrderId ??
@@ -10856,6 +11696,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool _reserveOrderStock(WorkspaceOrderRecord order) {
+    if (order.isOperationalProjection) {
+      showError('Online-order Stock confirmation is not available from this action.');
+      return false;
+    }
     if (!_stockEditAvailable()) return false;
     for (final entry in order.quantities.entries) {
       final product = workspaceCatalogueItems
@@ -10899,6 +11743,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void _releaseOrderStock(WorkspaceOrderRecord order) {
+    if (order.isOperationalProjection) return;
     for (final entry in order.quantities.entries) {
       final index = workspaceCatalogueItems.indexWhere(
         (item) => item.id == entry.key,
@@ -11031,7 +11876,7 @@ class WorkSession extends ChangeNotifier {
     WorkspaceOrderRecord order, {
     required String activity,
   }) {
-    if (order.isCustomerCollection) {
+    if (order.isOperationalProjection || order.isCustomerCollection) {
       throw StateError('Customer collection requires authoritative completion');
     }
     final existing = workspaceInvoices
@@ -11557,6 +12402,7 @@ class WorkSession extends ChangeNotifier {
     WorkspaceStockEntryMethod? stockEntryMethod,
   }) {
     if (!_stockEditAvailable()) return false;
+    _checkProductMoney(product);
     final index = workspaceCatalogueItems.indexWhere(
       (item) => item.id == product.id,
     );
@@ -11587,13 +12433,7 @@ class WorkSession extends ChangeNotifier {
         reason: stockReason,
       );
     }
-    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
-    if (workspaceCatalogueItems.isNotEmpty) {
-      final first = workspaceCatalogueItems.first;
-      retailerQuantity = first.stock;
-      retailerBuyPrice = first.purchasePrice;
-      retailerSellPrice = first.sellingPrice;
-    }
+    _syncRetailerProductSummary();
     showNotice(
       product.publicListing
           ? '${product.title} saved. Publication checks are still required.'
@@ -11610,6 +12450,11 @@ class WorkSession extends ChangeNotifier {
     WorkspaceStockEntryMethod? stockEntryMethod,
   }) {
     if (!_stockEditAvailable()) return false;
+    // Resolve every explicit money field before any row, activity or movement
+    // is committed. Generic import must not admit an invalid final row either.
+    for (final product in products) {
+      _checkProductMoney(product);
+    }
     if (addOnly) {
       // Validate the complete local batch before recording any inventory or
       // movement. CSV Add products must never act as an implicit stock update.
@@ -11631,10 +12476,10 @@ class WorkSession extends ChangeNotifier {
           pack: product.pack.trim(),
           category: product.categoryId.trim(),
           sku: product.sku.trim(),
-          purchase: product.purchasePrice,
-          selling: product.sellingPrice,
+          purchase: product.purchasePriceMinor,
+          selling: product.sellingPriceMinor,
           stock: product.stock,
-          mrp: product.mrp,
+          mrp: product.mrpMinor,
           lowStockThreshold: product.lowStockThreshold,
           minimumOrder: product.minimumOrder,
           delivery: product.deliveryPromise.trim(),
@@ -11720,7 +12565,7 @@ class WorkSession extends ChangeNotifier {
         );
       }
     }
-    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    _syncRetailerProductSummary();
     _recordWorkspaceActivity('${products.length} catalogue products imported.');
     showNotice('${products.length} products imported into your catalogue.');
     _persistOperationalState('catalogue-imported');
@@ -11744,7 +12589,8 @@ class WorkSession extends ChangeNotifier {
       stockMode: product.stockMode,
       quantity: product.stockMode == WorkspaceStockMode.exactQuantity
           ? product.stock : null,
-      purchasePriceRupees: product.purchasePrice,
+      purchasePriceRupees: product.usesMinorAmounts ? null : product.purchasePrice,
+      purchasePriceMinor: product.usesMinorAmounts ? product.purchasePriceMinor : null,
       recordedAt: at, stockAsOf: at,
       packMeasure: product.packMeasure,
     );
@@ -11752,6 +12598,28 @@ class WorkSession extends ChangeNotifier {
       throw const FormatException('Review the original stock quantity and purchase price.');
     }
     return product.copyWith(stockEntry: entry);
+  }
+
+  void _checkProductMoney(WorkspaceCatalogueItem product) {
+    if (!product.usesMinorAmounts) return;
+    // Canonical access validates unit ambiguity and supported integer bounds.
+    product.purchasePriceMinor;
+    product.sellingPriceMinor;
+    product.mrpMinor;
+  }
+
+  void _syncRetailerProductSummary() {
+    retailerProductAdded = workspaceCatalogueItems.isNotEmpty;
+    if (!retailerProductAdded) return;
+    final first = workspaceCatalogueItems.first;
+    retailerQuantity = first.stock;
+    if (first.usesMinorAmounts) {
+      _storeData.retailerBuyMinor = first.purchasePriceMinor;
+      _storeData.retailerSellMinor = first.sellingPriceMinor;
+    } else {
+      retailerBuyPrice = first.purchasePrice;
+      retailerSellPrice = first.sellingPrice;
+    }
   }
 
   bool retireWorkspaceProduct(String productId) {
@@ -11883,6 +12751,16 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    for (final publisher in _publicDetailsPublishers.values) { publisher.dispose(); }
+    _publicDetailsPublishers.clear();
+    for (final policy in _supplierPolicies.values) { policy.dispose(); }
+    _supplierPolicies.clear();
+    for (final listing in _catalogueListings.values) { listing.dispose(); }
+    _catalogueListings.clear();
+    for (final reader in _catalogueReadbacks.values) { reader.dispose(); }
+    _catalogueReadbacks.clear();
+    for (final promotion in _productPromotions.values) { promotion.dispose(); }
+    _productPromotions.clear();
     for (final feedback in _customerFeedback.values) { feedback.dispose(); }
     _customerFeedback.clear();
     _counterDraftRecovery.clear();
@@ -13898,24 +14776,45 @@ class WorkSession extends ChangeNotifier {
 
   void saveRetailerProduct({
     required int quantity,
-    required int buyPrice,
-    required int sellPrice,
+    int? buyPrice,
+    int? sellPrice,
+    int? buyPriceMinor,
+    int? sellPriceMinor,
     bool updateCatalogue = true,
   }) {
     if (!_stockEditAvailable()) return;
+    final exact = buyPriceMinor != null || sellPriceMinor != null;
+    // Resolve explicit inputs before touching either the draft or saved SKU.
+    final purchaseMinor = exact
+        ? buyV2ExactMinorAmount(minor: buyPriceMinor, legacyRupees: buyPrice) : null;
+    final sellingMinor = exact
+        ? buyV2ExactMinorAmount(minor: sellPriceMinor, legacyRupees: sellPrice) : null;
+    if (!exact && (buyPrice == null || sellPrice == null)) {
+      throw const FormatException('Enter purchase and selling prices.');
+    }
     retailerQuantity = quantity;
-    retailerBuyPrice = buyPrice;
-    retailerSellPrice = sellPrice;
-    if (updateCatalogue &&
+    if (exact) {
+      _storeData.retailerBuyMinor = purchaseMinor;
+      _storeData.retailerSellMinor = sellingMinor;
+    } else {
+      retailerBuyPrice = buyPrice!;
+      retailerSellPrice = sellPrice!;
+    }
+    // Invalid setup input is an editable draft, never replacement saved Stock.
+    final validProduct = quantity > 0 && retailerBuyPriceMinor > 0 &&
+        retailerSellPriceMinor > retailerBuyPriceMinor;
+    if (updateCatalogue && validProduct &&
         retailerProductAdded &&
         workspaceCatalogueItems.isNotEmpty) {
-      workspaceCatalogueItems[0] = workspaceCatalogueItems.first.copyWith(
+      addOrUpdateWorkspaceProduct(workspaceCatalogueItems.first.copyWith(
         stock: quantity,
-        purchasePrice: buyPrice,
-        sellingPrice: sellPrice,
-        unitPrice: '₹$sellPrice/${workspaceCatalogueItems.first.pack}',
+        purchasePrice: exact ? null : buyPrice,
+        sellingPrice: exact ? null : sellPrice,
+        purchasePriceMinor: purchaseMinor,
+        sellingPriceMinor: sellingMinor,
+        unitPrice: '₹${exact ? workspacePriceInputFromMinor(sellingMinor!) : sellPrice}/${workspaceCatalogueItems.first.pack}',
         available: quantity > 0,
-      );
+      ), stockReason: 'Product setup quantity updated');
     }
     clearMessages();
     notifyListeners();
@@ -14106,6 +15005,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> finishRetailerSetup() async {
+    if (busy || !_stockEditAvailable()) return false;
     if (retailerPublishAfterSetup && !workspacePublicationReport.ready) {
       showError(
         'Store not published. Complete Publication requirements, or save setup without publishing.',
@@ -14122,12 +15022,12 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (retailerBuyPrice <= 0) {
+    if (retailerBuyPriceMinor <= 0) {
       errorMessage = 'Enter the purchase price for margin checking.';
       notifyListeners();
       return false;
     }
-    if (retailerSellPrice <= retailerBuyPrice) {
+    if (retailerSellPriceMinor <= retailerBuyPriceMinor) {
       errorMessage =
           'Enter a selling price above the purchase price, or correct the purchase cost.';
       notifyListeners();
@@ -14139,20 +15039,43 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (retailerSetupSaved) {
-      noticeMessage = 'Shop setup is already complete.';
-      errorMessage = null;
-      notifyListeners();
-      return true;
-    }
-    return _runBool(
-      () async {
-        final approvedWorkspaceId = workspaceId;
-        if (approvedWorkspaceId == null) {
-          throw const WorkGatewayException(
-            'Wait for Workspace approval before finishing setup.',
-          );
+    final data = _storeData, account = _contactAccountScope;
+    final store = activeWorkspace?.id, approvedWorkspaceId = workspaceId;
+    Object input() => (retailerQuantity, retailerBuyPriceMinor, retailerSellPriceMinor,
+      retailerHomeDelivery, retailerStoreCollection, retailerPublishAfterSetup,
+      retailerSetupSaved);
+    final original = input();
+    var inventoryGeneration = data.inventoryMutations;
+    bool current() => !_disposed && identical(data, _storeData) &&
+        account == _contactAccountScope && activeWorkspace?.id == store &&
+        workspaceId == approvedWorkspaceId && input() == original &&
+        data.inventoryMutations == inventoryGeneration;
+    final token = _beginBusyStoreOperation();
+    clearMessages(); notifyListeners();
+    try {
+      if (localInventoryEnabled) {
+        final retry = data.inventoryError != null;
+        // An explicit Finish retry resumes the existing failed save sequence.
+        if (retry) inventoryGeneration++;
+        final saved = retry ? await retryWorkspaceInventorySave() : await data.inventoryWrites;
+        if (!current()) return false;
+        if (!saved || data.inventoryError != null) {
+          showError('Stock changes are not saved. Your setup entries are kept; retry before finishing.');
+          return false;
         }
+      }
+      if (!current()) return false;
+      if (retailerSetupSaved) {
+        showNotice('Shop setup is already complete.');
+        return true;
+      }
+      if (retailerBuyPriceMinor % 100 != 0 || retailerSellPriceMinor % 100 != 0) {
+        showError('Your prices are kept. Setup sync does not support paise yet.');
+        return false;
+      }
+      if (approvedWorkspaceId == null) {
+        throw const WorkGatewayException('Wait for Workspace approval before finishing setup.');
+      }
         await gateway.finishSetup(
           workspaceId: approvedWorkspaceId,
           quantity: retailerQuantity,
@@ -14161,6 +15084,7 @@ class WorkSession extends ChangeNotifier {
           homeDelivery: retailerHomeDelivery,
           storeCollection: retailerStoreCollection,
         );
+        if (!current()) return false;
         retailerSetupSaved = true;
         reviewStage = WorkReviewStage.live;
         if (retailerPublishAfterSetup && workspaceCatalogueItems.isNotEmpty) {
@@ -14179,11 +15103,16 @@ class WorkSession extends ChangeNotifier {
               ? 'Store setup completed and opened for customers.'
               : 'Store setup completed and kept off.',
         );
-      },
-      success: retailerPublishAfterSetup
+      showNotice(retailerPublishAfterSetup
           ? 'Shop setup complete. Your available products are open for customers.'
-          : 'Shop setup complete. Your store remains off until you choose Open.',
-    );
+          : 'Shop setup complete. Your store remains off until you choose Open.');
+      return true;
+    } on WorkGatewayException catch (error) {
+      if (current()) showError(error.message);
+      return false;
+    } finally {
+      _finishBusyStoreOperation(token);
+    }
   }
 
   bool get _reviewStoreRecoveryEnabled =>

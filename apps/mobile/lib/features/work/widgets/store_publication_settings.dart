@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/design/mool_colors.dart';
+import '../work_catalogue_gateway.dart';
 import '../work_models.dart';
 import '../work_session.dart';
 import 'store_settings_widgets.dart';
@@ -21,6 +23,8 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
   late final Object _ownerContext;
   late Future<bool> _load;
   bool _initialized = false;
+  WorkspacePublicDetailsController? _publisher;
+  static const _publicKeys = ['street', 'city', 'state', 'pinCode', 'publicContactPhone'];
   @override
   void initState() {
     super.initState();
@@ -49,6 +53,9 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     _initial = widget.session.workspacePublicationDetails;
     for (final key in _labels.keys) {
       _fields[key] = TextEditingController(text: '${_initial.toJson()[key] ?? ''}');
+      if (_publicKeys.contains(key)) {
+        _fields[key]!.addListener(() { if (mounted) setState(() {}); });
+      }
     }
     _initialized = true;
   }
@@ -92,6 +99,74 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
       return false;
     }
     return !widget.session.workspacePublicationPreferencesSaving;
+  }
+
+  bool get _publicEditsUnsaved {
+    final saved = widget.session.workspacePublicationDetails.toJson();
+    return _publicKeys.any((key) => _fields[key]!.text.trim() != '${saved[key] ?? ''}');
+  }
+  Future<void> _preparePublisher(WorkspacePublicDetailsController publisher) async {
+    if (!mounted || !_contextCurrent || !identical(publisher, _publisher)) return;
+    await widget.session.loadWorkspacePublicDetailsInputs();
+    if (!mounted || !_contextCurrent || !identical(publisher, _publisher)) return;
+    if (await publisher.restore() && publisher.pending == null) await publisher.refresh();
+  }
+  Future<void> _retryPublicOriginal(WorkspacePublicDetailsController publisher) async {
+    final original = publisher.pending?.fingerprint;
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Retry the original update?'),
+      content: const Text('This sends the address, contact and hours saved in the earlier request—not your current edits. '
+        'Its result is still unconfirmed. It will not start a different update.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Retry original'))]));
+    if (confirmed == true && mounted && _contextCurrent && publisher.canRetryOriginal &&
+        publisher.pending?.fingerprint == original && identical(publisher, _publisher)) {
+      await publisher.retryOriginal();
+    }
+  }
+  Widget _publicUpdateActions() {
+    final publisher = widget.session.workspacePublicDetailsPublisher;
+    if (publisher == null) return const SizedBox.shrink();
+    if (!identical(publisher, _publisher)) {
+      _publisher = publisher;
+      // Read-only preparation after the current build; never dispatch a save.
+      unawaited(Future<void>.microtask(() => _preparePublisher(publisher)));
+    }
+    return AnimatedBuilder(animation: publisher, builder: (context, _) {
+      final savedInputs = widget.session.workspacePublicDetailsFieldsForPublishing;
+      final pending = publisher.pending != null;
+      return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
+        key: const Key('work-publication-public-update'), crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Public address, contact & hours', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(publisher.message ?? 'Check current public details before updating.', style: const TextStyle(fontSize: 12)),
+          if (_publicEditsUnsaved) const Text('Apply Store details first. Unsaved entries are not sent publicly.',
+            style: TextStyle(fontSize: 12)),
+          if (!pending && !_publicEditsUnsaved && savedInputs == null)
+            const Text('Save valid Store details and any changed hours on this device first.', style: TextStyle(fontSize: 12)),
+          Wrap(spacing: 8, runSpacing: 4, children: [
+            TextButton(key: const Key('work-publication-check-public'),
+              onPressed: publisher.busy || !_contextCurrent ? null : () async {
+                if (publisher.pending != null) { await publisher.reconcile(); }
+                else {
+                  await widget.session.loadWorkspacePublicDetailsInputs();
+                  if (mounted && _contextCurrent) await publisher.refresh();
+                }
+              }, child: Text(publisher.busy ? 'Checking…' : pending ? 'Check original update' : 'Check public details')),
+            if (!pending) FilledButton(key: const Key('work-publication-update-public'),
+              onPressed: !publisher.canPublish || savedInputs == null || _publicEditsUnsaved || !_contextCurrent
+                ? null : () async {
+                  await widget.session.publishWorkspacePublicDetails(inputCurrent: () => mounted &&
+                    _contextCurrent && !_publicEditsUnsaved && identical(publisher, _publisher));
+                }, child: const Text('Update public details')),
+            if (publisher.canRetryOriginal) OutlinedButton(key: const Key('work-publication-retry-public-original'),
+              onPressed: _contextCurrent ? () => _retryPublicOriginal(publisher) : null,
+              child: const Text('Retry original update')),
+          ]),
+          const Text('Only these public details are updated. Online availability and location-based services need separate confirmation.',
+            style: TextStyle(fontSize: 12)),
+        ]));
+    });
   }
 
   void _applyBusiness({String? type, bool? retail, bool? wholesale}) {
@@ -297,7 +372,9 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
             padding: const EdgeInsets.only(bottom: 8), child: Text(
               widget.session.workspacePublicationPreferencesError ??
                 (widget.session.workspacePublicationPreferencesSaving ? 'Saving Store defaults on this device…' :
-                 widget.session.workspacePublicationPreferencesSaved ? 'Saved on this device. Public synchronization is pending.' :
+                 widget.session.workspacePublicationPreferencesSaved ?
+                   widget.session.workspacePublicDetailsPublisher == null ? 'Saved on this device. Public synchronization is pending.' :
+                   'Saved on this device. Public details are updated separately below.' :
                  'Save these inputs on this device. Public synchronization is pending.'),
               key: const Key('work-publication-device-status'), style: const TextStyle(fontSize: 12))),
           AbsorbPointer(absorbing: widget.session.workspacePublicationPreferencesSaving, child: _editor(context)),
@@ -425,7 +502,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                     Text(
                       widget.session.workspacePublicationDetails.shoppingArea ==
                               null
-                          ? 'Location confirmation is still required before publication.'
+                          ? 'Location-based services need a confirmed Store location.'
                           : 'Location linked · ${widget.session.workspacePublicationDetails.shoppingArea!.label}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
@@ -433,6 +510,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                       'Leave the registered address blank to use the Store address.',
                       style: TextStyle(fontSize: 12),
                     ),
+                    _publicUpdateActions(),
                   ],
                 ),
               ),
@@ -516,6 +594,9 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                 saveEnabled: !widget.session.workspacePublicationPreferencesSaving,
                 onSave: () => _apply(address: false),
               ),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: StoreSupplierPolicyPanel(session: widget.session,
+                  key: ValueKey(('supplier-policy', _storeId, _scopeRevision)))),
             ],
           ),
         ),

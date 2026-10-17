@@ -6,15 +6,279 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 import 'package:moolsocial/features/work/widgets/store_settings_widgets.dart';
+import 'package:moolsocial/features/work/widgets/store_payment_terms.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_catalogue_gateway.dart';
 import 'fixtures/store_public_handoff_v1.dart';
+import 'work_catalogue_gateway_test.dart' show PublicDetailsHostGateway, PublicDetailsHostJournal;
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('public update reuses saved fields not dirty text at 320px scale $scale', (tester) async {
+      final f = _Lf18Storage(), authority = PublicDetailsHostGateway(), journal = PublicDetailsHostJournal();
+      final work = _metadataWork(f, authority, journal); addTearDown(work.dispose);
+      await work.loadWorkspacePublicDetailsInputs();
+      work.saveWorkspacePublicationDetails(_lf18Details()); await work.workspacePublicationPreferencesWrite;
+      tester.view.physicalSize = const Size(320, 850); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(session: work)))));
+      await tester.pumpAndSettle();
+      final section = find.byKey(const PageStorageKey('work-publication-address-section'));
+      await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+      final update = find.byKey(const Key('work-publication-update-public'));
+      expect(tester.widget<FilledButton>(update).onPressed, isNotNull);
+      expect(authority.sent, isEmpty, reason: 'Opening settings must never publish');
+      final street = find.byKey(const Key('work-publication-street'));
+      await tester.ensureVisible(street); await tester.enterText(street, 'Unsaved street'); await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(update).onPressed, isNull);
+      expect(work.workspacePublicationDetails.street, 'Host default lane');
+      await tester.enterText(street, 'Host default lane'); await tester.pumpAndSettle();
+      await tester.ensureVisible(update); await tester.tap(update); await tester.pumpAndSettle();
+      expect(authority.sent.length, 1); expect(authority.sent.single.original.details.street, 'Host default lane');
+      expect(authority.sent.single.original.details.openingTime, isEmpty);
+      expect(authority.sent.single.original.toJson().toString(), isNot(contains('pan')));
+      expect(find.byKey(const Key('work-publication-update-public')), findsNothing);
+      expect(find.byKey(const Key('work-publication-check-public')), findsOneWidget);
+      expect(journal.original, isNotNull); expect(tester.takeException(), isNull);
+    });
+  }
+  testWidgets('public original retry is explicit and never replaced by current form text', (tester) async {
+    final f = _Lf18Storage(), authority = PublicDetailsHostGateway(), journal = PublicDetailsHostJournal();
+    final work = _metadataWork(f, authority, journal); addTearDown(work.dispose);
+    await work.loadWorkspacePublicDetailsInputs(); work.saveWorkspacePublicationDetails(_lf18Details());
+    await work.workspacePublicationPreferencesWrite;
+    final fields = work.workspacePublicDetailsFieldsForPublishing!;
+    final original = WorkspacePublicDetailsIntent(ownerAccountId: f.account, realm: 'production', storeId: 'lf18-a',
+      expectedRevision: 0, idempotencyKey: 'host-retained-original', details: fields);
+    journal.original = original; authority.outcome = WorkspacePublicDetailsWriteState.notFound;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(session: work)))));
+    await tester.pumpAndSettle();
+    final section = find.byKey(const PageStorageKey('work-publication-address-section'));
+    await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+    final check = find.byKey(const Key('work-publication-check-public'));
+    await tester.ensureVisible(check); await tester.tap(check); await tester.pumpAndSettle();
+    expect(authority.sent.length, 1); expect(authority.sent.single.reconcile, isTrue);
+    final retry = find.byKey(const Key('work-publication-retry-public-original'));
+    await tester.ensureVisible(retry); await tester.tap(retry); await tester.pumpAndSettle();
+    expect(find.text('Retry the original update?'), findsOneWidget); expect(authority.sent.length, 1);
+    await tester.tap(find.text('Not now')); await tester.pumpAndSettle(); expect(authority.sent.length, 1);
+    await tester.tap(retry); await tester.pumpAndSettle();
+    authority.outcome = WorkspacePublicDetailsWriteState.unknown;
+    await tester.tap(find.text('Retry original')); await tester.pumpAndSettle();
+    expect(authority.sent.length, 2); expect(authority.sent.last.reconcile, isFalse);
+    expect(authority.sent.last.original.fingerprint, original.fingerprint);
+    expect(work.workspacePublicationDetails.street, fields.street); expect(journal.original, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+  test('public hours distinguish genuine absence from an unconfirmed device save', () async {
+    final f = _Lf18Storage();
+    final work = WorkSession(gateway: ReviewWorkGateway(),
+      contactDraftStore: _Lf18ContactStore(f),
+      publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, 'public:$id'),
+      tradingPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, 'hours:$id'))
+      ..activeWorkspace = _lf16Store('lf18-a');
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspacePublicDetailsInputs(), isTrue);
+    expect(work.saveWorkspacePublicationDetails(_lf18Details()), isTrue);
+    expect(await work.workspacePublicationPreferencesWrite, isTrue);
+    // A successful read proving no trading record must not publish session defaults.
+    expect(work.workspacePublicDetailsFieldsForPublishing!.openingTime, isEmpty);
+    expect(_lf20Save(work), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(work.workspacePublicDetailsFieldsForPublishing!.openingTime, '21:30');
+    f.failWrite = true;
+    expect(_lf20Save(work, opening: '22:00'), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isFalse);
+    expect(work.workspacePublicDetailsFieldsForPublishing, isNull,
+      reason: 'An uncertain save cannot convert edited hours into public deletion');
+    f.failWrite = false;
+    expect(_lf20Save(work, opening: '22:00'), isTrue);
+    expect(await work.workspaceTradingPreferencesWrite, isTrue);
+    expect(work.workspacePublicDetailsFieldsForPublishing!.openingTime, '22:00');
+  });
+  test('LF25 durable private terms recover only original ledger customer and explicit inheritance', () async {
+    final f = _Lf25TermsStorage();
+    final first = await f.open();
+    expect(await first.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer), isTrue);
+    expect(f.apply(first), isTrue);
+    expect(await first.workspaceCustomerTermsWrite(f.customer), isTrue);
+    expect(first.workspaceCustomerTermsSaved(f.customer), isTrue);
+    final saved = f.rows[f.termsKey]!;
+    expect(saved, isNot(contains('customerName')));
+    first.dispose();
+    final next = await f.open();
+    expect(next.workspacePublicationDetails.customerPaymentTerms, isEmpty);
+    expect(await next.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer), isTrue);
+    expect(next.workspacePublicationDetails.customerPaymentTerms[f.customer]!.single.advancePercent, 25);
+    expect(next.workspacePublicStoreDetails?.toString(), isNot(contains(f.customer)));
+    expect(next.saveWorkspaceCustomerPaymentTerms(expectedContext: next.publicationPreferencesContext,
+      expectedStoreId: f.store, customerId: f.customer, terms: null), isTrue);
+    expect(await next.workspaceCustomerTermsWrite(f.customer), isTrue);
+    next.dispose();
+    final inherited = await f.open();
+    addTearDown(inherited.dispose);
+    expect(await inherited.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer), isTrue);
+    expect(inherited.workspacePublicationDetails.customerPaymentTerms.containsKey(f.customer), isFalse);
+    expect((jsonDecode(f.rows[f.termsKey]!) as Map)['terms'], isNull);
+  });
+  test('LF25 contact-only and in-memory finance never qualify as saved customer identity', () async {
+    final f = _Lf25TermsStorage();
+    final work = await f.open(emptyCheckpoint: true);
+    addTearDown(work.dispose);
+    work.workspaceOrders.add(f.checkpoint().billedOrders.values.single);
+    expect(work.applyWorkspaceFinance(f.checkpoint().finance), isTrue);
+    expect(work.workspaceCustomerTermsRecoveryAvailable(f.customer), isFalse);
+    expect(f.apply(work), isTrue);
+    expect(work.workspacePublicationDetails.customerPaymentTerms[f.customer], isNotEmpty);
+    expect(f.rows.containsKey(f.termsKey), isFalse);
+  });
+  for (final field in ['anchor', 'store', 'customer', 'account', 'invalid terms']) {
+    test('LF25 held private record cannot silently rebind $field', () async {
+      final f = _Lf25TermsStorage();
+      final first = await f.open();
+      await first.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      f.apply(first); await first.workspaceCustomerTermsWrite(f.customer); first.dispose();
+      final raw = jsonDecode(f.rows[f.termsKey]!) as Map;
+      switch (field) {
+        case 'anchor': (raw['anchor'] as Map)['orderId'] = 'foreign-order';
+        case 'store': raw['storeId'] = 'foreign-store';
+        case 'customer': raw['customerId'] = 'foreign-customer';
+        case 'account': raw['accountScope'] = 'foreign-owner';
+        case 'invalid terms': raw['terms'] = [{'kind': 'not-a-term'}];
+      }
+      f.rows[f.termsKey] = jsonEncode(raw);
+      final held = await f.open(); addTearDown(held.dispose);
+      expect(await held.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer), isFalse);
+      expect(held.workspacePublicationDetails.customerPaymentTerms, isEmpty);
+      expect(f.apply(held), isFalse);
+      expect(jsonDecode(f.rows[f.termsKey]!), raw, reason: 'Held original is not deleted or overwritten.');
+    });
+  }
+  test('LF25 failed device write retains input and same-value retry', () async {
+    final f = _Lf25TermsStorage(); final work = await f.open(); addTearDown(work.dispose);
+    await work.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+    f.failWrite = true;
+    expect(f.apply(work), isTrue);
+    expect(await work.workspaceCustomerTermsWrite(f.customer), isFalse);
+    expect(work.workspaceCustomerTermsSaved(f.customer), isFalse);
+    expect(work.workspaceCustomerTermsError(f.customer), isNotNull);
+    expect(work.workspacePublicationDetails.customerPaymentTerms[f.customer]!.single.advancePercent, 25);
+    f.failWrite = false;
+    expect(f.apply(work), isTrue);
+    expect(await work.workspaceCustomerTermsWrite(f.customer), isTrue);
+  });
+  for (final change in ['original operation', 'customer association', 'missing bill', 'balance only']) {
+    test('LF25 original identity survives only legitimate $change', () async {
+      final f = _Lf25TermsStorage(); final first = await f.open();
+      await first.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      f.apply(first); await first.workspaceCustomerTermsWrite(f.customer); first.dispose();
+      final originalBytes = f.rows[f.termsKey];
+      if (change == 'original operation') f.operationId = 'changed-operation';
+      if (change == 'customer association') f.ledgerCustomer = 'other-ledger-customer';
+      if (change == 'missing bill') f.omitOriginalBill = true;
+      if (change == 'balance only') f.paidMinor = 500;
+      final next = await f.open(); addTearDown(next.dispose);
+      await next.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      expect(next.workspacePublicationDetails.customerPaymentTerms.containsKey(f.customer), change == 'balance only');
+      expect(f.rows[f.termsKey], originalBytes);
+    });
+  }
+  testWidgets('LF25 retry preserves unsaved editor input after a read failure', (tester) async {
+    final f = _Lf25TermsStorage()..failRead = true;
+    final work = await f.open(); addTearDown(work.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child:
+      StoreCustomerPaymentTerms(session: work, storeId: f.store, customerId: f.customer)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wholesale payment terms')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-customer-terms-inherit'))); await tester.pumpAndSettle();
+    tester.widget<StorePaymentTermsEditor>(find.byType(StorePaymentTermsEditor)).onChanged(const [
+      WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery, advancePercent: 35)]);
+    f.failRead = false;
+    await tester.tap(find.text('Retry saved preferences')); await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('work-customer-terms-inherit'))).value, isFalse);
+    final apply = find.byKey(const Key('work-customer-terms-save'));
+    await tester.ensureVisible(apply); await tester.tap(apply); await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.customerPaymentTerms[f.customer]!.single.advancePercent, 35);
+  });
+  testWidgets('LF25 newer editor input is never acknowledged by an older pending save', (tester) async {
+    final f = _Lf25TermsStorage(); final work = await f.open(); addTearDown(work.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child:
+      StoreCustomerPaymentTerms(session: work, storeId: f.store, customerId: f.customer)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Wholesale payment terms')); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-customer-terms-inherit'))); await tester.pumpAndSettle();
+    void edit(int percent) => tester.widget<StorePaymentTermsEditor>(find.byType(StorePaymentTermsEditor))
+      .onChanged([WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery, advancePercent: percent)]);
+    edit(25); f.writeGate = Completer<void>();
+    final button = find.byKey(const Key('work-customer-terms-save'));
+    await tester.ensureVisible(button); await tester.tap(button); await tester.pump();
+    edit(35); f.writeGate!.complete(); await tester.pumpAndSettle();
+    expect(find.text('Your latest edits have not been applied.'), findsOneWidget);
+    expect(((jsonDecode(f.rows[f.termsKey]!) as Map)['terms'] as List).single['advancePercent'], 25);
+    await tester.tap(button); await tester.pumpAndSettle();
+    expect(work.workspacePublicationDetails.customerPaymentTerms[f.customer]!.single.advancePercent, 35);
+  });
+  for (final boundary in ['account ABA', 'Store ABA', 'disposed']) {
+    test('LF25 delayed private read rejects $boundary', () async {
+      final f = _Lf25TermsStorage(); final first = await f.open();
+      await first.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      f.apply(first); await first.workspaceCustomerTermsWrite(f.customer); first.dispose();
+      final work = await f.open();
+      f.readGate = Completer<void>();
+      final pending = work.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      await Future<void>.delayed(Duration.zero);
+      if (boundary == 'account ABA') {
+        f.account = 'other-owner'; work.showNotice('Host owner change');
+        f.account = 'lf16-host'; work.showNotice('Host owner return');
+      } else if (boundary == 'Store ABA') {
+        work.activeWorkspace = _lf16Store('other-store'); work.activeWorkspace = _lf16Store(f.store);
+      } else { work.dispose(); }
+      f.readGate!.complete();
+      expect(await pending, isFalse);
+      expect(work.workspacePublicationDetails.customerPaymentTerms, isEmpty);
+      if (boundary != 'disposed') work.dispose();
+    });
+  }
+  test('LF25 delayed save has no stale acknowledgement and no duplicate mutation', () async {
+    final f = _Lf25TermsStorage(); final work = await f.open(); addTearDown(work.dispose);
+    await work.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+    f.writeGate = Completer<void>();
+    expect(f.apply(work), isTrue); await Future<void>.delayed(Duration.zero);
+    expect(work.workspaceCustomerTermsSaving(f.customer), isTrue);
+    expect(f.apply(work), isFalse);
+    work.activeWorkspace = _lf16Store('other-store'); work.activeWorkspace = _lf16Store(f.store);
+    f.writeGate!.complete();
+    expect(await work.workspaceCustomerTermsWrite(f.customer), isFalse);
+    expect(work.workspaceCustomerTermsSaved(f.customer), isFalse);
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF25 recovered private editor is readable and truthful at $scale', (tester) async {
+      final f = _Lf25TermsStorage(); final first = await f.open();
+      await first.loadWorkspaceCustomerPaymentTerms(expectedStoreId: f.store, customerId: f.customer);
+      f.apply(first); await first.workspaceCustomerTermsWrite(f.customer); first.dispose();
+      final work = await f.open(); addTearDown(work.dispose);
+      tester.view.physicalSize = const Size(320, 750); tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: StoreCustomerPaymentTerms(
+          session: work, storeId: f.store, customerId: f.customer)))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Wholesale payment terms')); await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('work-customer-terms-inherit'))).value, isFalse);
+      final button = find.byKey(const Key('work-customer-terms-save'));
+      await tester.ensureVisible(button); await tester.tap(button); await tester.pumpAndSettle();
+      expect(find.text('Private preferences saved on this device. Not synced to customer checkout.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   test('LF23 private preparation and fulfilment survive a fresh session', () async {
     final f = _Lf20Storage();
     final first = f.work();
@@ -593,6 +857,21 @@ void main() {
     expect(writes, 2);
   });
 
+  // Register after the channel-level LF16 test: setMockInitialValues replaces
+  // the platform singleton and otherwise intercepts its real method-channel seam.
+  testWidgets('LF25 secure namespace isolates owner Store customer and public defaults', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final a = _Lf25SecureTerms('store/a', 'customer/a', 'owner/a');
+    final b = _Lf25SecureTerms('store/a', 'customer/b', 'owner/a');
+    final c = _Lf25SecureTerms('store/b', 'customer/a', 'owner/a');
+    final d = _Lf25SecureTerms('store/a', 'customer/a', 'owner/b');
+    await a.save('owner/a', {'hostPreference': 25});
+    expect(await _Lf25SecureTerms('store/a', 'customer/a', 'owner/a').read('owner/a'), {'hostPreference': 25});
+    expect(await b.read('owner/a'), isNull); expect(await c.read('owner/a'), isNull);
+    expect(await d.read('owner/b'), isNull);
+    final all = await const FlutterSecureStorage().readAll();
+    expect(all.keys.single, 'moolsocial.workspace.customer-payment-terms.v1.owner%2Fa/store%2Fa/customer%2Fa');
+  });
   test('LF20 actual encrypted preference key restores and leaves other purposes intact', () async {
     FlutterSecureStorage.setMockInitialValues({}); // Host platform plugin only.
     final pickup = _Lf16SecurePrefsStore('lf20-encrypted');
@@ -1873,6 +2152,13 @@ class _Lf16SecurePrefsStore extends SecureWorkPendingProofStore {
 WorkWorkspace _lf16Store(String id) => WorkWorkspace(id: id, name: 'Host Store',
   profileId: 'retailer-grocery', profileLabel: 'Grocery', area: 'Pune', verified: true);
 
+WorkSession _metadataWork(_Lf18Storage f, PublicDetailsHostGateway authority, PublicDetailsHostJournal journal) =>
+  WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _Lf18ContactStore(f),
+    publicDetailsGateway: authority, publicDetailsRealm: 'production', publicDetailsJournalFactory: (_) => journal,
+    publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, 'public:$id'),
+    tradingPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, 'hours:$id'))
+    ..activeWorkspace = _lf16Store('lf18-a');
+
 class _Lf16Storage {
   String account = 'lf16-host';
   final rows = <String, String>{};
@@ -2013,3 +2299,74 @@ WorkSession _lf19JournalWork(_Lf18Storage f) => WorkSession(gateway: ReviewWorkG
   publicationPreferencesStoreFactory: (id) => _Lf16MemoryStore(f, id),
   counterDraftStore: SecureWorkCounterDraftStore(accountScope: () => f.account))
     ..activeWorkspace = _lf16Store('lf18-a');
+
+// Host-only original invoice/ledger fixture. Never native acceptance data.
+class _Lf25TermsStorage extends _Lf16Storage {
+  final store = 'lf25-private-store', customer = 'ledger-customer-1';
+  String operationId = 'host-original-issue';
+  String? ledgerCustomer;
+  bool omitOriginalBill = false;
+  int paidMinor = 0;
+  String get termsKey => key('private:$store:$customer');
+  bool apply(WorkSession work) => work.saveWorkspaceCustomerPaymentTerms(
+    expectedContext: work.publicationPreferencesContext, expectedStoreId: store, customerId: customer,
+    terms: const [WorkspacePaymentTerm(BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery, advancePercent: 25)]);
+  WorkspaceLedgerCheckpoint checkpoint() {
+    final at = DateTime.utc(2026, 10, 17);
+    final order = WorkspaceOrderRecord(id: 'host-original-order', customer: 'Host buyer · 9000091991',
+      items: 'Host item × 1', quantities: const {'host-sku': 1}, amount: 20, source: 'Counter',
+      fulfilment: 'At the shop', payment: 'Payment due', address: '', stage: 'Completed', needsDelivery: false,
+      createdAt: at, itemSnapshots: const [WorkspaceOrderItemSnapshot(productId: 'host-sku',
+        name: 'Host item', pack: '1 kg', quantity: 1, unitPricePaise: 2000, lineTotalPaise: 2000)]);
+    final invoice = WorkspaceCustomerInvoice(id: 'host-original-invoice', orderId: order.id,
+      customer: order.customer, items: order.items, amount: 20, payment: order.payment, issuedAt: at);
+    final ledger = WorkspaceCustomerLedger(accountScope: account, workspaceId: store, customerId: ledgerCustomer ?? customer,
+      customerName: 'Host buyer', revision: 1, asOf: at, openingBalanceMinor: 0, historyComplete: true,
+      entries: [WorkspaceCustomerLedgerEntry(id: 'host-invoice-entry', operationId: operationId,
+        invoiceId: invoice.id, orderId: order.id, sequence: 1, occurredAt: at,
+        kind: WorkspaceLedgerEntryKind.invoice, state: WorkspaceLedgerPostingState.posted, amountMinor: 2000),
+        if (paidMinor > 0) WorkspaceCustomerLedgerEntry(id: 'host-collection', operationId: 'host-collection',
+          invoiceId: invoice.id, orderId: order.id, sequence: 2, occurredAt: at,
+          kind: WorkspaceLedgerEntryKind.collection, state: WorkspaceLedgerPostingState.posted,
+          amountMinor: paidMinor, channel: WorkspacePaymentChannel.cash)]);
+    final finance = WorkspaceFinanceSnapshot(accountScope: account, workspaceId: store, revision: 1,
+      asOf: at, salesTodayMinor: 2000, duesMinor: 2000 - paidMinor, availableMinor: 0, heldMinor: 0, requestedMinor: 0,
+      paidOutMinor: 0, feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0,
+      payouts: const [], customerLedgers: [ledger], historyComplete: true,
+      payments: [WorkspacePaymentRecord(orderId: order.id, invoiceId: invoice.id, customerId: customer,
+        customerName: 'Host buyer', revision: 1, updatedAt: at, amountMinor: 2000, paidMinor: paidMinor,
+        dueMinor: 2000 - paidMinor, refundedMinor: 0,
+        state: paidMinor > 0 ? WorkspacePaymentState.partPaid : WorkspacePaymentState.unpaid,
+        channel: WorkspacePaymentChannel.unknown)]);
+    return WorkspaceLedgerCheckpoint(revision: 1, finance: finance,
+      billedOrders: {if (!omitOriginalBill) invoice.id: order},
+      billedInvoices: {if (!omitOriginalBill) invoice.id: invoice});
+  }
+  Future<WorkSession> open({bool emptyCheckpoint = false}) async {
+    final work = WorkSession(gateway: ReviewWorkGateway(), contactDraftStore: _Lf16MemoryStore(this, 'contact'),
+      customerTermsStoreFactory: (store, customer) => _Lf16MemoryStore(this, 'private:$store:$customer'))
+        ..activeWorkspace = _lf16Store(store);
+    final saved = checkpoint();
+    expect(saved.valid, isTrue, reason: 'Host setup must satisfy the real checkpoint validator.');
+    expect(work.bindCustomerCollectionGateway(accountScope: account, storeId: store,
+      adapter: StoreReviewCustomerCollectionGateway(saved.finance),
+      checkpointStore: _Lf25Checkpoint(emptyCheckpoint ? null : saved)), isTrue);
+    expect(await work.recoverCustomerLedger(), isTrue);
+    return work;
+  }
+}
+class _Lf25Checkpoint implements WorkLedgerCheckpointStore {
+  _Lf25Checkpoint(this.value);
+  final WorkspaceLedgerCheckpoint? value;
+  @override
+  Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async => value;
+  @override
+  Future<void> save(WorkspaceLedgerCheckpoint checkpoint, {required int? expectedRevision}) async =>
+      throw StateError('Private preference recovery must not post to the ledger.');
+}
+class _Lf25SecureTerms extends SecureWorkPendingProofStore {
+  _Lf25SecureTerms(super.storeId, super.customerId, this.owner) : super.customerPaymentTerms();
+  final String owner;
+  @override
+  String get accountScope => owner;
+}

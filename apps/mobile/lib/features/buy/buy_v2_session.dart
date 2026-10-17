@@ -5,8 +5,10 @@ import 'dart:math' as math;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show StringCharacters;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../work/scan_and_pick_contract.dart';
+import '../work/work_order_identity_gateway.dart';
 import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
@@ -45,6 +47,7 @@ String _buyV2ProductIdentityKey(BuyV2Product product) {
   final pack = product.packTerms;
   return jsonEncode([
     product.storeId,
+    if (product.publicListingIdentity case final identity?) identity.toJson(),
     product.canonicalId,
     product.destination.name,
     for (final option in options)
@@ -149,8 +152,8 @@ typedef BuyV2DeliveryPromiseChange = ({
 typedef BuyV2PriceChange = ({
   String productId,
   String title,
-  int previousPrice,
-  int currentPrice,
+  int previousPriceMinor,
+  int currentPriceMinor,
 });
 
 typedef BuyV2CheckoutAvailabilityIssue = ({
@@ -1979,12 +1982,13 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
   }
 
   /// An outstanding durable purchase takes precedence over the new basket.
-  Future<bool> prepare(BuyV2CollectionBasket requested) async {
+  Future<bool> prepare(BuyV2CollectionBasket? requested) async {
     if (_busy || _disposed) return false;
     final original = identity.value;
     if (original == null ||
-        original.accountId != requested.identity.accountId ||
-        original.sessionId != requested.identity.sessionId) {
+        (requested != null &&
+            (original.accountId != requested.identity.accountId ||
+                original.sessionId != requested.identity.sessionId))) {
       return false;
     }
     final epoch = _epoch;
@@ -2016,12 +2020,23 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
         quote = retained.quote;
         return await _reconcile(epoch, original);
       }
+      if (requested == null ||
+          (requested.usesMinorAmounts &&
+              gateway is! BuyV2MinorCollectionCheckoutGateway)) {
+        phase = BuyV2CollectionCheckoutPhase.blocked;
+        message =
+            'The collection total could not be checked. Your Cart has not changed.';
+        return false;
+      }
       if (!requested.collectionAvailableAt(now())) {
         phase = BuyV2CollectionCheckoutPhase.blocked;
         message = 'Check this store’s collection availability to continue.';
         return false;
       }
-      final received = await gateway!.quote(requested).timeout(timeout);
+      final received = await (requested.usesMinorAmounts
+              ? (gateway as BuyV2MinorCollectionCheckoutGateway).quoteMinor(requested)
+              : gateway!.quote(requested))
+          .timeout(timeout);
       if (!_current(epoch, original)) return false;
       final receivedAt = now();
       if (!received.isCurrentFor(requested, receivedAt)) {
@@ -2057,6 +2072,8 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
     return !_busy &&
         !_disposed &&
         available &&
+        (!currentBasket.usesMinorAmounts ||
+            gateway is BuyV2MinorCollectionCheckoutGateway) &&
         !unresolved &&
         phase == BuyV2CollectionCheckoutPhase.ready &&
         received != null &&
@@ -2102,7 +2119,10 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
         _unknown();
         return false;
       }
-      final received = await gateway!.place(reserved).timeout(timeout);
+      final received = await (currentBasket.usesMinorAmounts
+              ? (gateway as BuyV2MinorCollectionCheckoutGateway).placeMinor(reserved)
+              : gateway!.place(reserved))
+          .timeout(timeout);
       if (!_current(epoch, original)) return false;
       return await _accept(received, epoch, original);
     } on Object {
@@ -3303,9 +3323,96 @@ class BuyV2ProductAcceptanceController extends ChangeNotifier {
   }
 }
 
+typedef BuyV2AccountPersistenceIdentity = ({String environment, String projectId,
+  String? tenantId, String userId});
+
+/// One app-root lifetime, not a commerce authority or a second customer ledger.
+/// Retired account snapshots remain reachable until their same-owner successor
+/// has restored them. Guest/review state is never adopted by an account.
+class BuyV2RootSessions {
+  BuyV2RootSessions({required this.core, required this.currentIdentity,
+    this.preserveReview = false, this.accountStoreFactory, this.accountSessionFactory,
+    this.purchaseReaderFactory, this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
+  }) : guest = BuyV2Session(core: core, reviewDataEnabled: preserveReview ? null : false),
+       unavailable = BuyV2Session(core: core, reviewDataEnabled: false) {
+    current = guest;
+  }
+
+  final BuySession core;
+  final String purchaseRealm;
+  final AuthenticatedWorkspaceOrderIdentityGateway? Function(BuyV2AccountPersistenceIdentity, bool Function())? purchaseReaderFactory;
+  final BuyV2AccountPersistenceIdentity? Function() currentIdentity;
+  final bool preserveReview;
+  final BuyV2CustomerStateStore Function(BuyV2AccountPersistenceIdentity,
+    bool Function())? accountStoreFactory;
+  final BuyV2Session Function(BuyV2CustomerStateStore,
+    Future<BuyV2CustomerStateSnapshot?>?)? accountSessionFactory;
+  final BuyV2Session guest, unavailable;
+  late BuyV2Session current;
+  BuyV2AccountPersistenceIdentity? _identity;
+  VoidCallback? _retireLifetime;
+  final Map<BuyV2AccountPersistenceIdentity, BuyV2Session> _retired = {};
+  bool _disposed = false;
+
+  bool synchronize({required bool accountRequired}) {
+    if (_disposed || preserveReview) return false;
+    BuyV2AccountPersistenceIdentity? identity;
+    try { identity = currentIdentity(); } on Object { identity = null; }
+    if (identity == _identity && identity != null) return false;
+    final fallback = accountRequired ? unavailable : guest;
+    if (identity == null && identical(current, fallback)) return false;
+    if (_identity case final previous?) {
+      _retireLifetime?.call();
+      current.dispose();
+      _retired[previous] = current;
+      _retireLifetime = null;
+    }
+    _identity = identity;
+    if (identity == null) {
+      current = fallback;
+      return true;
+    }
+    var alive = true;
+    final store = accountStoreFactory?.call(identity, () => alive && !_disposed) ??
+      BuyV2SharedPreferencesCustomerStateStore.forAccount(SharedPreferencesAsync(),
+        identity: identity, currentIdentity: currentIdentity,
+        isSessionCurrent: () => alive && !_disposed);
+    final pending = _retired[identity]?.retainedAccountState();
+    final next = accountSessionFactory?.call(store, pending) ??
+      BuyV2Session(core: core, reviewDataEnabled: false,
+        customerStateStore: store, pendingAccountState: pending,
+        purchaseRealm: purchaseRealm,
+        purchaseReader: purchaseReaderFactory != null
+          ? purchaseReaderFactory!(identity, () => alive && !_disposed && currentIdentity() == identity)
+          : configuredWorkspacePurchaseReader(environment: identity.environment, projectId: identity.projectId,
+            tenantId: identity.tenantId, accountUserId: identity.userId,
+            lifetime: () => alive && !_disposed && currentIdentity() == identity ? identity : null));
+    // No edits/payment before even the first owner restore has completed.
+    next._customerStateRecoveryOwnerScope = store.ownerScope;
+    next._customerStateSnapshotLoaded = false;
+    current = next;
+    _retireLifetime = () => alive = false;
+    _retired.remove(identity);
+    return true;
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _retireLifetime?.call();
+    if (_identity != null) current.dispose();
+    guest.dispose();
+    unavailable.dispose();
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
+  final AuthenticatedWorkspaceOrderIdentityGateway? purchaseReader;
+  final String purchaseRealm;
   BuyV2Session({
     required this.core,
+    this.purchaseReader,
+    this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
     BuyV2ProductContentAdapter? productContentAdapter,
     BuyV2ComparisonSource? comparisonSource,
@@ -3317,6 +3424,7 @@ class BuyV2Session extends ChangeNotifier {
     this.savedProductsStore,
     this.procurementIdentity,
     BuyV2CustomerStateStore? customerStateStore,
+    this.pendingAccountState,
     BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore,
     this.commercialPaymentTermsAdapter,
     this.checkoutQuoteAdapter,
@@ -3599,7 +3707,8 @@ class BuyV2Session extends ChangeNotifier {
             retainedProduct.pack != product.pack ||
             retained.workspaceId !=
                 product.procurementSupplierGrant?.workspaceId ||
-            retainedProduct.price != product.price)) {
+            !retainedProduct.hasValidMoney || !product.hasValidMoney ||
+            retainedProduct.priceMinor != product.priceMinor)) {
       return BuyV2ProcurementEligibility.offerChanged;
     }
     return buyV2ProcurementEligibility(
@@ -4203,12 +4312,14 @@ class BuyV2Session extends ChangeNotifier {
         storeId.trim() != storeId ||
         product.destination != query.destination ||
         (query.storeId != null && storeId != query.storeId) ||
-        product.price <= 0 ||
+        !product.hasValidMoney || product.priceMinor <= 0 ||
         product.title.trim().isEmpty ||
         product.pack.trim().isEmpty ||
         product.minimumOrder < 1 ||
+        !product.hasValidPublicListingIdentity ||
         !product.hasValidPackTerms ||
-        (previous != null && previous.storeId != storeId)) {
+        (previous != null && (previous.storeId != storeId ||
+          previous.publicListingIdentity != product.publicListingIdentity))) {
       throw const FormatException('Catalogue listing identity mismatch');
     }
     if (!reviewDataEnabled && !isStoreProcurement) {
@@ -4238,12 +4349,13 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _validateStore(BuyV2StoreListing store, BuyV2CatalogueQuery query) {
+    final exactStore = query.storeId == store.id && query.areaScope == BuyV2CatalogueAreaScope.allAreas;
     if (store.id.trim().isEmpty ||
         store.id.trim() != store.id ||
         store.name.trim().isEmpty ||
         store.area.trim().isEmpty ||
         store.address.trim().isEmpty ||
-        store.regionId.trim().isEmpty ||
+        (store.regionId.trim().isEmpty && !exactStore) ||
         (query.storeId != null && store.id != query.storeId) ||
         (store.distanceMeters != null && store.distanceMeters! < 0) ||
         (store.collection != null && store.collection!.storeId != store.id)) {
@@ -5109,6 +5221,17 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2TipPolicy tipPolicy;
   final BuyV2SavedProductsStore? savedProductsStore;
   final BuyV2CustomerStateStore? customerStateStore;
+  final Future<BuyV2CustomerStateSnapshot?>? pendingAccountState;
+  bool _pendingAccountStateImported = false;
+
+  /// Preserve the whole original-owner snapshot, including inherited recovery.
+  /// Disposal is not proof that an already-dispatched business attempt stopped.
+  Future<BuyV2CustomerStateSnapshot?> retainedAccountState() async {
+    final inherited = _pendingAccountStateImported ? null : await pendingAccountState;
+    await _consumerStateWrites;
+    return _consumerPendingSnapshot ??
+      (_pendingAccountStateImported ? null : inherited);
+  }
   final BuyV2GstInvoiceProfileStore? gstInvoiceProfileStore;
 
   /// Review data is discarded at identity transitions. Real account storage
@@ -5157,7 +5280,8 @@ class BuyV2Session extends ChangeNotifier {
           doc.lines.any(
             (line) =>
                 lines[line.productId]?.quantity != line.quantity ||
-                lines[line.productId]!.product.price * 100 !=
+                !lines[line.productId]!.product.hasValidMoney ||
+                lines[line.productId]!.product.priceMinor !=
                     line.unitPriceMinor,
           ),
     );
@@ -5326,9 +5450,9 @@ class BuyV2Session extends ChangeNotifier {
           quote?.isCurrentFor(basket, catalogueNow()) == true) {
         return quote!.totalMinor;
       }
-      return checkoutLines.fold(0, (total, line) => total + line.total * 100);
+      return buyV2SumMinor(checkoutLines.map((line) => line.totalMinor));
     }
-    return checkoutPaymentActionAmount * 100;
+    return checkoutPaymentActionAmountMinor;
   }
 
   BuyV2PaymentEligibility paymentEligibilityFor(String method) {
@@ -5489,45 +5613,46 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get checkoutHasGroupedCommitment => currentCheckoutPaymentGroup != null;
 
-  int get checkoutPaymentActionAmount {
+  int get checkoutPaymentActionAmountMinor {
     if (legacyCheckoutAttempt case final attempt?) {
-      return attempt.payment.request.amountDueNow;
+      return attempt.payment.request.amountDueNowMinor;
     }
     final current = currentCheckoutPaymentGroup;
     if (current != null) {
-      if (current.request.amountDueNow > 0 ||
+      if (current.request.amountDueNowMinor > 0 ||
           current.state != BuyV2CheckoutSubmissionState.idle) {
-        return current.request.amountDueNow;
+        return current.request.amountDueNowMinor;
       }
       return checkoutPaymentAttempt!.groups
               .where(
                 (group) =>
                     group.state != BuyV2CheckoutSubmissionState.confirmed &&
-                    group.request.amountDueNow > 0,
+                    group.request.amountDueNowMinor > 0,
               )
               .firstOrNull
               ?.request
-              .amountDueNow ??
+              .amountDueNowMinor ??
           0;
     }
     return checkoutPaymentGroups
-            .where((group) => group.amountDueNow > 0)
+            .where((group) => group.amountDueNowMinor > 0)
             .firstOrNull
-            ?.amountDueNow ??
-        checkoutAmountDueNow;
+            ?.amountDueNowMinor ??
+        checkoutAmountDueNowMinor;
   }
+  int get checkoutPaymentActionAmount => buyV2WholeRupees(checkoutPaymentActionAmountMinor);
 
   List<BuyV2CheckoutPaymentGroup> get checkoutPaymentGroups {
     final attempt = checkoutPaymentAttempt;
     if (attempt != null) {
       return List.unmodifiable([
         for (final group in attempt.groups)
-          BuyV2CheckoutPaymentGroup(
+          BuyV2CheckoutPaymentGroup.minor(
             id: group.request.paymentGroupId!,
             fulfilmentKeys: group.fulfilmentKeys,
             paymentMethod: group.request.paymentMethod,
-            total: group.request.total,
-            amountDueNow: group.request.amountDueNow,
+            totalMinor: group.request.totalMinor,
+            amountDueNowMinor: group.request.amountDueNowMinor,
           ),
       ]);
     }
@@ -5537,14 +5662,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   int get checkoutPaymentCount => checkoutPaymentGroups.isEmpty
-      ? (checkoutAmountDueNow > 0 ? 1 : 0)
-      : checkoutPaymentGroups.where((group) => group.amountDueNow > 0).length;
+      ? (checkoutAmountDueNowMinor > 0 ? 1 : 0)
+      : checkoutPaymentGroups.where((group) => group.amountDueNowMinor > 0).length;
 
   int get checkoutPaymentNumber =>
       (checkoutPaymentAttempt?.groups
               .where(
                 (group) =>
-                    group.request.amountDueNow > 0 &&
+                    group.request.amountDueNowMinor > 0 &&
                     group.state == BuyV2CheckoutSubmissionState.confirmed,
               )
               .length ??
@@ -5566,7 +5691,8 @@ class BuyV2Session extends ChangeNotifier {
         plan.length > 100 ||
         isStoreProcurement ||
         collectionCheckoutSelected ||
-        commerceAdapter is! BuyV2GroupedOrderPlacementAdapter ||
+        (commerceAdapter is! BuyV2GroupedOrderPlacementAdapter &&
+            commerceAdapter is! BuyV2MinorGroupedOrderPlacementAdapter) ||
         checkoutQuoteReviewRequired ||
         checkoutPaymentTermsReviewRequired) {
       return false;
@@ -5574,62 +5700,65 @@ class BuyV2Session extends ChangeNotifier {
     final quoted = {for (final line in quote.lines) line.fulfilmentKey: line};
     final seen = <String>{};
     final ids = <String>{};
-    var total = 0;
-    var due = 0;
+    final totals = <int>[];
+    final dues = <int>[];
+    try {
     for (final group in plan) {
       if (group.id.trim().isEmpty ||
           group.id.length > 128 ||
           !ids.add(group.id) ||
           group.currency != 'INR' ||
           group.fulfilmentKeys.isEmpty ||
-          group.total < group.amountDueNow ||
-          group.amountDueNow < 0 ||
-          group.total > 90071992547409 ||
+          !group.hasValidMoney ||
           group.paymentMethod != selectedPayment) {
         return false;
       }
-      var expectedTotal = 0;
-      var expectedDue = 0;
+      final expectedTotals = <int>[];
+      final expectedDues = <int>[];
       for (final key in group.fulfilmentKeys) {
         final line = quoted[key];
         if (line == null || !seen.add(key)) {
           return false;
         }
-        expectedTotal += line.total;
-        expectedDue += commercialPaymentTermsEnabled
-            ? selectedCommercialPaymentTermFor(key)!.amountDueNow
-            : line.total;
+        expectedTotals.add(line.totalMinor);
+        final term = selectedCommercialPaymentTermFor(key);
+        if (commercialPaymentTermsEnabled && term == null) return false;
+        expectedDues.add(commercialPaymentTermsEnabled ? term!.amountDueNowMinor : line.totalMinor);
       }
-      if (group.total != expectedTotal ||
-          group.amountDueNow != expectedDue ||
-          (group.amountDueNow > 0 &&
+      if (group.totalMinor != buyV2SumMinor(expectedTotals) ||
+          group.amountDueNowMinor != buyV2SumMinor(expectedDues) ||
+          (group.amountDueNowMinor > 0 &&
               !_evaluatePayment(
                 group.paymentMethod,
-                group.amountDueNow * 100,
+                group.amountDueNowMinor,
               ).selectable)) {
         return false;
       }
-      total += group.total;
-      due += group.amountDueNow;
+      totals.add(group.totalMinor);
+      dues.add(group.amountDueNowMinor);
     }
     return seen.length == quoted.length &&
-        total == quote.total &&
-        due == checkoutAmountDueNow;
+        buyV2SumMinor(totals) == quote.totalMinor &&
+        buyV2SumMinor(dues) == checkoutAmountDueNowMinor;
+    } on FormatException { return false; }
   }
 
-  String? _checkoutPaymentPlanConsent() => _checkoutQuote?.paymentGroups == null
-      ? null
-      : jsonEncode([
-          for (final group in _checkoutQuote!.paymentGroups!)
+  String? _checkoutPaymentPlanConsent() {
+    final groups = _checkoutQuote?.paymentGroups;
+    // An invalid published plan remains held by checkoutPaymentGroupReviewRequired.
+    if (groups == null || groups.any((group) => !group.hasValidMoney)) return null;
+    return jsonEncode([
+          for (final group in groups)
             [
               group.id,
               (group.fulfilmentKeys.toList()..sort()),
               group.paymentMethod,
               group.currency,
-              group.total,
-              group.amountDueNow,
+              group.totalMinor,
+              group.amountDueNowMinor,
             ],
         ]);
+  }
   String? _paymentReference;
   Uri? _paymentActionUri;
   bool upiQrAvailable = false;
@@ -5639,7 +5768,7 @@ class BuyV2Session extends ChangeNotifier {
       !isStoreProcurement &&
       !collectionCheckoutSelected &&
       upiQrAvailable &&
-      checkoutAmountDueNow > 0 &&
+      checkoutAmountDueNowMinor > 0 &&
       selectedPayment == 'UPI';
   BuyV2UpiQrAction? get upiQrAction {
     final qr = _upiQrAction;
@@ -5648,7 +5777,7 @@ class BuyV2Session extends ChangeNotifier {
             qr != null &&
             qr.validFor(
               reference: _paymentReference,
-              amountMinor: checkoutPaymentActionAmount * 100,
+              amountMinor: checkoutPaymentActionAmountMinor,
               now: catalogueNow(),
             )
         ? qr
@@ -6089,6 +6218,9 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, String> _supplierPolicyAcceptances = {};
   Map<String, String>? _supplierPolicyAcceptancesInFlight;
   final Set<String> _requiredSupplierPolicyProducts = {};
+  final Set<String> _unresolvedSupplierPolicyProducts = {};
+  // Media cache eviction must not erase newer policy evidence for this owner.
+  final Map<String, DateTime> _supplierPolicyObservations = {};
   String? _supplierPolicyOwnerScope;
   BuyV2SupplierPolicyAddIntent? _pendingSupplierPolicyAdd;
   bool _supplierPolicyConsentBusy = false;
@@ -6224,6 +6356,8 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2Order> _orderResolutionOrders = {};
   (String?, String?, String?, int, int)? _orderResolutionScope;
   final Set<String> _orderResolutionUnconfirmed = {};
+  final Map<String, BuyV2OrderResolutionHold> _orderResolutionHolds = {};
+  final Set<String> _orderResolutionKnownUnsent = {};
   List<BuyV2ShoppingAlert> _shoppingAlerts = [];
   BuyV2ShoppingAlertsState shoppingAlertsState =
       BuyV2ShoppingAlertsState.loading;
@@ -6231,7 +6365,7 @@ class BuyV2Session extends ChangeNotifier {
   bool shoppingAlertsBusy = false;
   final Map<String, BuyV2BalancePaymentResult> _balancePaymentResults = {};
   final Map<String, Object> _balancePaymentOperations = {};
-  final Map<String, ({String key, int amount, bool dispatched})>
+  final Map<String, ({String key, int amountMinor, bool minorDispatch, bool dispatched})>
       _balancePaymentRequests = {};
   final Map<String, BuyV2BalancePaymentHold> _balancePaymentHolds = {};
   String? _balanceHoldsLoadedOwner;
@@ -6285,9 +6419,19 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, String> _productBenefitMessages = {};
   final Map<String, int> _productBenefitRequestSequences = {};
   int _productBenefitRequestSequence = 0;
-  BuyV2CartBenefitsLoadState cartBenefitsLoadState =
+  BuyV2CartBenefitsLoadState _cartBenefitsLoadState =
       BuyV2CartBenefitsLoadState.ready;
-  String? cartBenefitsMessage;
+  String? _cartBenefitsMessage;
+  bool _supportsBenefitAmount(int minor) => liveCartBenefitsEnabled ||
+      cartBenefitsAdapter is BuyV2MinorCartBenefitsAdapter || minor % 100 == 0;
+  bool get _unsupportedCartBenefitAmount => !_supportsBenefitAmount(scopedCartTotalMinor) ||
+      cartLines.map((line) => line.product.destination).toSet().any((d) => !_supportsBenefitAmount(totalMinorForDestination(d)));
+  static const _unsupportedBenefitsMessage = 'Coupons and offers could not be checked. Your Cart is kept unchanged.';
+  BuyV2CartBenefitsLoadState get cartBenefitsLoadState => _unsupportedCartBenefitAmount
+      ? BuyV2CartBenefitsLoadState.unavailable : _cartBenefitsLoadState;
+  set cartBenefitsLoadState(BuyV2CartBenefitsLoadState value) { _cartBenefitsLoadState = value; }
+  String? get cartBenefitsMessage => _unsupportedCartBenefitAmount ? _unsupportedBenefitsMessage : _cartBenefitsMessage;
+  set cartBenefitsMessage(String? value) { _cartBenefitsMessage = value; }
   List<BuyV2CommercialPaymentTerm> _commercialPaymentTerms = [];
   final Map<String, ({String id, String agreement})>
   _acceptedCommercialPaymentTerms = {};
@@ -6336,9 +6480,9 @@ class BuyV2Session extends ChangeNotifier {
   String? _confirmedPurchaseId;
   int _confirmedProductCount = 0;
   int _confirmedItemCount = 0;
-  int _confirmedTotal = 0;
-  int _confirmedAmountPaidNow = 0;
-  int _confirmedBalanceDue = 0;
+  int _confirmedTotalMinor = 0;
+  int _confirmedAmountPaidNowMinor = 0;
+  int _confirmedBalanceDueMinor = 0;
   int _orderSequence = 1;
   int _purchaseSequence = 1;
 
@@ -6584,8 +6728,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!progress.matchesOrder(incoming)) return false;
     if (original != null &&
         (!progress.matchesOrder(original) ||
-            (incoming.totalMinor ?? incoming.total * 100) !=
-                (original.totalMinor ?? original.total * 100))) {
+            incoming.payableTotalMinor != original.payableTotalMinor)) {
       return false;
     }
     final previous =
@@ -6782,7 +6925,7 @@ class BuyV2Session extends ChangeNotifier {
           refreshed.id == orderId &&
           refreshed.purchaseId == original.purchaseId &&
           refreshed.destination == original.destination &&
-          refreshed.total >= 0 &&
+          (refreshed.usesMinorAmounts ? refreshed.hasValidMoney : refreshed.total >= 0) &&
           refreshed.progress >= 0 &&
           refreshed.progress <= 1 &&
           refreshed.partner.trim().isNotEmpty &&
@@ -6862,7 +7005,15 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
     }
-    return details.totalTax == order.tax;
+    try {
+      // Issued invoice DTOs retain their legacy rupee units. A fractional tax
+      // unsupported by that contract is a mismatch, not a connection failure.
+      return buyV2SumMinor([for (final line in details.lines)
+        for (final amount in [line.cgst, line.sgst, line.igst, line.cess])
+          buyV2ExactMinorAmount(legacyRupees: amount)]) == order.taxMinor;
+    } on FormatException {
+      return false;
+    }
   }
 
   (String?, String?, String?, int, int) get _currentCustomerOrderScope => (
@@ -6891,15 +7042,21 @@ class BuyV2Session extends ChangeNotifier {
 
   bool _balanceHoldMatches(BuyV2Order order) {
     final hold = _balanceHoldFor(order.id);
-    return hold == null ||
-        hold.orderIdentity == BuyV2BalancePaymentHold.identityOf(order);
+    if (hold == null) return true;
+    try {
+      return hold.amountDueMinor > 0 && order.hasValidMoney &&
+          hold.orderIdentity == BuyV2BalancePaymentHold.identityOf(order);
+    } on FormatException { return false; }
   }
 
   bool _balanceKnownUnsent(String orderId) {
     final request = _balancePaymentRequests[orderId];
     final hold = _balanceHoldFor(orderId);
-    return request?.dispatched == false && hold != null &&
-        hold.paymentReference == null && request!.key == hold.idempotencyKey;
+    try {
+      return request?.dispatched == false && hold != null &&
+          hold.paymentReference == null && request!.key == hold.idempotencyKey &&
+          request.minorDispatch == hold.usesMinorAmounts && request.amountMinor == hold.amountDueMinor;
+    } on FormatException { return false; }
   }
 
   Future<bool> _balanceRecoveryReady() async {
@@ -6930,13 +7087,13 @@ class BuyV2Session extends ChangeNotifier {
       if (order == null || !_balanceHoldMatches(order)) return null;
       final knownUnsent = _balanceKnownUnsent(orderId);
       _balancePaymentRequests.putIfAbsent(orderId, () =>
-          (key: hold.idempotencyKey, amount: hold.amountDue, dispatched: true));
+          (key: hold.idempotencyKey, amountMinor: hold.amountDueMinor, minorDispatch: hold.usesMinorAmounts, dispatched: true));
       if (!knownUnsent) {
         _balancePaymentResults.putIfAbsent(
           orderId,
-          () => BuyV2BalancePaymentResult(
+          () => BuyV2BalancePaymentResult.minor(
             state: BuyV2BalancePaymentState.unknown,
-            amountDue: hold.amountDue,
+            amountDueMinor: hold.amountDueMinor,
             dueLabel: order.balanceDueLabel ?? 'Needs checking',
             customerMessage:
                 'The original balance payment needs checking. Do not pay again. Get order help.',
@@ -6965,11 +7122,10 @@ class BuyV2Session extends ChangeNotifier {
       }
       final latest = _orders.where((o) => o.id == order.id).firstOrNull;
       // Bind immutable purchase identity, not a mutable outstanding balance.
-      return latest != null &&
-          latest.purchaseId == order.purchaseId &&
-          latest.destination == order.destination &&
-          latest.total == order.total &&
-          latest.partner == order.partner;
+      if (latest == null || !latest.hasValidMoney || !order.hasValidMoney) return false;
+      try {
+        return BuyV2BalancePaymentHold.identityOf(latest) == BuyV2BalancePaymentHold.identityOf(order);
+      } on FormatException { return false; }
     }
 
     void finish() {
@@ -7018,7 +7174,7 @@ class BuyV2Session extends ChangeNotifier {
           BuyV2BalancePaymentState.paid,
         }.contains(next.state) &&
         (next.state == BuyV2BalancePaymentState.paid ||
-            next.amountDue == previous.amountDue);
+            next.amountDueMinor == previous.amountDueMinor);
   }
 
   void _holdUnknownBalanceStart(
@@ -7026,15 +7182,27 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2BalancePaymentResult previous,
     {String? reference}
   ) {
-    _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+    _balancePaymentResults[orderId] = BuyV2BalancePaymentResult.minor(
       state: BuyV2BalancePaymentState.unknown,
-      amountDue: previous.amountDue,
+      amountDueMinor: previous.amountDueMinor,
       dueLabel: previous.dueLabel,
       customerMessage:
           'The original balance payment needs checking. Do not pay again. Get order help.',
       paymentReference: reference ?? previous.paymentReference ??
           _balanceHoldFor(orderId)?.paymentReference,
     );
+  }
+
+  Future<bool> _persistBalanceAction(String orderId, BuyV2BalancePaymentResult result) async {
+    final hold = _balanceHoldFor(orderId);
+    if (hold == null || result.state != BuyV2BalancePaymentState.paymentActionRequired) return true;
+    // A reference held only in memory must never authorize another handoff.
+    if (hold.paymentReference != result.paymentReference) return false;
+    try {
+      return await (_persistCustomerState() ?? Future.value(false));
+    } on Object {
+      return false;
+    }
   }
 
   Future<bool> restoreBalancePayment(String orderId) async {
@@ -7045,7 +7213,7 @@ class BuyV2Session extends ChangeNotifier {
         !procurementScopeCurrent ||
         adapter == null ||
         order == null ||
-        order.balanceDue <= 0 || !_balanceHoldMatches(order)) {
+        !order.hasValidMoney || order.balanceDueMinor <= 0 || !_balanceHoldMatches(order)) {
       return false;
     }
     final previous = balancePaymentFor(orderId);
@@ -7066,6 +7234,12 @@ class BuyV2Session extends ChangeNotifier {
           !_balanceReplyPreservesAttempt(order, previous, result)) {
         return false;
       }
+      final saved = await _persistBalanceAction(orderId, result);
+      if (!current()) return false;
+      if (!saved) {
+        _holdUnknownBalanceStart(orderId, result);
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return true;
     } on Object {
@@ -7077,9 +7251,9 @@ class BuyV2Session extends ChangeNotifier {
             BuyV2BalancePaymentState.paymentPending,
             BuyV2BalancePaymentState.unknown,
           }.contains(previous.state)) {
-        _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+        _balancePaymentResults[orderId] = BuyV2BalancePaymentResult.minor(
           state: BuyV2BalancePaymentState.offline,
-          amountDue: order.balanceDue,
+          amountDueMinor: order.balanceDueMinor,
           dueLabel: order.balanceDueLabel ?? 'Due later',
           customerMessage: 'Balance status could not be checked. Try again.',
         );
@@ -7103,11 +7277,19 @@ class BuyV2Session extends ChangeNotifier {
         !_balanceHoldMatches(order) ||
         (priorHold != null && !knownUnsent) ||
         (_balancePaymentRequests.containsKey(orderId) && !knownUnsent) ||
-        (knownUnsent && priorHold!.amountDue != previous.amountDue) ||
+        (knownUnsent && priorHold!.amountDueMinor != previous.amountDueMinor) ||
         !const {
           BuyV2BalancePaymentState.due,
           BuyV2BalancePaymentState.overdue,
         }.contains(previous.state)) {
+      return false;
+    }
+    final minorDispatch = knownUnsent ? _balancePaymentRequests[orderId]!.minorDispatch
+        : adapter is BuyV2MinorBalancePaymentAdapter;
+    if ((minorDispatch && adapter is! BuyV2MinorBalancePaymentAdapter) ||
+        (!minorDispatch && previous.amountDueMinor % 100 != 0)) {
+      notice = 'This balance payment method cannot accept the exact amount. Do not round it.';
+      notifyListeners();
       return false;
     }
     final operation = _beginBalancePaymentOperation(order);
@@ -7116,19 +7298,23 @@ class BuyV2Session extends ChangeNotifier {
     final request = knownUnsent ? _balancePaymentRequests[orderId]! : (
       key:
           'balance-${orderId.toLowerCase()}-${_balancePaymentAttemptSequence++}',
-      amount: previous.amountDue,
+      amountMinor: previous.amountDueMinor,
+      minorDispatch: minorDispatch,
       dispatched: false,
     );
     // This hold is not permission to retry after restart. A crash after this
     // save cannot prove whether the external dispatch below happened.
-    final hold = priorHold ?? BuyV2BalancePaymentHold(
+    final hold = priorHold ?? (request.minorDispatch ? BuyV2BalancePaymentHold.minor(
+      ownerScope: customerStateStore!.ownerScope!, accountId: collectionIdentity?.value?.accountId,
+      orderId: order.id, orderIdentity: BuyV2BalancePaymentHold.identityOf(order),
+      idempotencyKey: request.key, amountDueMinor: request.amountMinor) : BuyV2BalancePaymentHold(
       ownerScope: customerStateStore!.ownerScope!,
       accountId: collectionIdentity?.value?.accountId,
       orderId: order.id,
       orderIdentity: BuyV2BalancePaymentHold.identityOf(order),
       idempotencyKey: request.key,
-      amountDue: request.amount,
-    );
+      amountDue: buyV2WholeRupees(request.amountMinor),
+    ));
     _balancePaymentRequests[orderId] = request;
     _balancePaymentHolds[hold.storageKey] = hold;
     var dispatched = false;
@@ -7144,10 +7330,11 @@ class BuyV2Session extends ChangeNotifier {
       }
       dispatched = true;
       _balancePaymentRequests[orderId] =
-          (key: request.key, amount: request.amount, dispatched: true);
-      final result = await adapter.startPayment(
+          (key: request.key, amountMinor: request.amountMinor, minorDispatch: request.minorDispatch, dispatched: true);
+      final result = request.minorDispatch ? await (adapter as BuyV2MinorBalancePaymentAdapter).startPaymentMinor(
+        orderId: orderId, amountDueMinor: request.amountMinor, idempotencyKey: request.key) : await adapter.startPayment(
         orderId: orderId,
-        amountDue: request.amount,
+        amountDue: buyV2WholeRupees(request.amountMinor),
         idempotencyKey: request.key,
       );
       if (!current()) return false;
@@ -7163,7 +7350,7 @@ class BuyV2Session extends ChangeNotifier {
           }.contains(result.state) &&
           result.paymentReference?.trim().isNotEmpty == true &&
           (result.state == BuyV2BalancePaymentState.paid ||
-              result.amountDue == request.amount);
+              result.amountDueMinor == request.amountMinor);
       if (!accepted) {
         _holdUnknownBalanceStart(orderId, previous);
         return false;
@@ -7211,6 +7398,12 @@ class BuyV2Session extends ChangeNotifier {
     if (operation == null) return false;
     final current = operation.current;
     try {
+      final saved = await _persistBalanceAction(orderId, previous);
+      if (!current()) return false;
+      if (!saved) {
+        _holdUnknownBalanceStart(orderId, previous);
+        return false;
+      }
       var opened = false;
       try {
         opened = await handoff(uri);
@@ -7218,11 +7411,11 @@ class BuyV2Session extends ChangeNotifier {
         opened = false;
       }
       if (!current()) return false;
-      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult.minor(
         state: opened
             ? BuyV2BalancePaymentState.paymentPending
             : BuyV2BalancePaymentState.unknown,
-        amountDue: previous.amountDue,
+        amountDueMinor: previous.amountDueMinor,
         dueLabel: previous.dueLabel,
         customerMessage: opened
             ? 'Return here after payment to check the balance.'
@@ -7265,13 +7458,19 @@ class BuyV2Session extends ChangeNotifier {
           !_balanceReplyPreservesAttempt(order, previous, result)) {
         return false;
       }
+      final saved = await _persistBalanceAction(orderId, result);
+      if (!current()) return false;
+      if (!saved) {
+        _holdUnknownBalanceStart(orderId, result);
+        return false;
+      }
       _balancePaymentResults[orderId] = result;
       return result.state == BuyV2BalancePaymentState.paid;
     } on Object {
       if (!current()) return false;
-      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult(
+      _balancePaymentResults[orderId] = BuyV2BalancePaymentResult.minor(
         state: BuyV2BalancePaymentState.unknown,
-        amountDue: previous.amountDue,
+        amountDueMinor: previous.amountDueMinor,
         dueLabel: previous.dueLabel,
         customerMessage:
             'Balance payment is still being checked. Do not pay again.',
@@ -7287,15 +7486,17 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Order order,
     BuyV2BalancePaymentResult result,
   ) {
-    if (result.amountDue < 0 ||
-        result.amountDue > order.balanceDue ||
+    if (!order.hasValidMoney) return false;
+    int amountMinor;
+    try { amountMinor = result.amountDueMinor; } on FormatException { return false; }
+    if (amountMinor > order.balanceDueMinor ||
         result.dueLabel.trim().isEmpty ||
         result.customerMessage.trim().isEmpty) {
       return false;
     }
     return switch (result.state) {
       BuyV2BalancePaymentState.paymentActionRequired =>
-        result.amountDue > 0 &&
+        amountMinor > 0 &&
             result.paymentReference?.trim().isNotEmpty == true &&
             result.paymentActionUri != null &&
             (result.paymentActionUri!.scheme == 'upi' ||
@@ -7304,12 +7505,12 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2BalancePaymentState.paymentPending ||
       BuyV2BalancePaymentState.unknown =>
         result.paymentReference?.trim().isNotEmpty == true,
-      BuyV2BalancePaymentState.paid => result.amountDue == 0,
+      BuyV2BalancePaymentState.paid => amountMinor == 0,
       BuyV2BalancePaymentState.upcoming ||
       BuyV2BalancePaymentState.due ||
       BuyV2BalancePaymentState.overdue ||
       BuyV2BalancePaymentState.offline ||
-      BuyV2BalancePaymentState.unavailable => result.amountDue > 0,
+      BuyV2BalancePaymentState.unavailable => amountMinor > 0,
     };
   }
 
@@ -7582,15 +7783,25 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get liveDeliveryAvailable => liveDeliveryAdapter != null;
 
-  bool _sameLiveDeliveryOrder(BuyV2Order original, BuyV2Order? latest) =>
-      latest != null &&
-      original.id == latest.id &&
-      original.purchaseId == latest.purchaseId &&
-      original.destination == latest.destination &&
-      original.total == latest.total &&
-      original.totalMinor == latest.totalMinor &&
-      original.partner == latest.partner &&
-      original.trackingReference == latest.trackingReference;
+  bool _sameLiveDeliveryOrder(BuyV2Order original, BuyV2Order? latest) {
+    if (latest == null || !original.hasValidMoney || !latest.hasValidMoney ||
+        original.id != latest.id || original.purchaseId != latest.purchaseId ||
+        original.destination != latest.destination || original.partner != latest.partner ||
+        original.trackingReference != latest.trackingReference) {
+      return false;
+    }
+    if (!original.usesMinorAmounts && !latest.usesMinorAmounts) {
+      // Historical raw total and nullable override are distinct identity facts.
+      return original.total == latest.total && original.totalMinor == latest.totalMinor;
+    }
+    try {
+      return original.usesMinorAmounts == latest.usesMinorAmounts &&
+          original.payableTotalMinor == latest.payableTotalMinor &&
+          BuyV2BalancePaymentHold.identityOf(original) == BuyV2BalancePaymentHold.identityOf(latest);
+    } on FormatException {
+      return false;
+    }
+  }
 
   BuyV2Order? _prepareLiveDeliveryOrder(String orderId) {
     if (_collectionDisposed || !procurementScopeCurrent) return null;
@@ -7792,6 +8003,7 @@ class BuyV2Session extends ChangeNotifier {
   String? get selectedAddressId => _selectedAddressId;
 
   Future<void> restoreCommerce() async {
+    if (_collectionDisposed) return;
     if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) {
       _invalidateOrderRefreshes();
     }
@@ -8215,7 +8427,7 @@ class BuyV2Session extends ChangeNotifier {
           choices.brands.isEmpty || choices.brands.contains(product.brand);
       final matchesPrice =
           choices.maximumPrice == null ||
-          productFactsFor(product).price <= choices.maximumPrice!;
+          BigInt.from(productFactsFor(product).priceMinor) <= BigInt.from(choices.maximumPrice!) * BigInt.from(100);
       final matchesPack =
           choices.pack == null || packFilterFor(product) == choices.pack;
       final matchesFulfilment =
@@ -8241,13 +8453,13 @@ class BuyV2Session extends ChangeNotifier {
         products.sort(
           (left, right) => productFactsFor(
             left,
-          ).price.compareTo(productFactsFor(right).price),
+          ).priceMinor.compareTo(productFactsFor(right).priceMinor),
         );
       case BuyV2ProductSort.priceHighToLow:
         products.sort(
           (left, right) => productFactsFor(
             right,
-          ).price.compareTo(productFactsFor(left).price),
+          ).priceMinor.compareTo(productFactsFor(left).priceMinor),
         );
       case BuyV2ProductSort.deliveryFastest:
         int priority(BuyV2Product product) =>
@@ -8261,7 +8473,7 @@ class BuyV2Session extends ChangeNotifier {
           if (fulfilment != 0) return fulfilment;
           return productFactsFor(
             left,
-          ).price.compareTo(productFactsFor(right).price);
+          ).priceMinor.compareTo(productFactsFor(right).priceMinor);
         });
     }
     if (limit &&
@@ -8547,7 +8759,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<void> restoreCustomerState({bool restoreBrowsing = true}) async {
-    if (!procurementScopeCurrent) return;
+    if (_collectionDisposed || !procurementScopeCurrent) return;
     final store = customerStateStore;
     final ownerScope = store?.ownerScope;
     if (store == null ||
@@ -8569,6 +8781,15 @@ class BuyV2Session extends ChangeNotifier {
     }
     try {
       if (!isStoreProcurement) {
+        if (!_pendingAccountStateImported) {
+          final inherited = await pendingAccountState;
+          if (_collectionDisposed || store.ownerScope != ownerScope) return;
+          if (inherited != null && _consumerPendingSnapshot == null) {
+            _consumerPendingSnapshot = inherited;
+            _consumerPendingSnapshotOwnerScope = ownerScope;
+          }
+          _pendingAccountStateImported = true;
+        }
         await _consumerStateWrites;
         if (_collectionDisposed ||
             customerStateStore?.ownerScope != ownerScope) {
@@ -8577,7 +8798,14 @@ class BuyV2Session extends ChangeNotifier {
         final pending = _consumerPendingSnapshot;
         if (pending != null &&
             _consumerPendingSnapshotOwnerScope == ownerScope) {
-          if (!await store.write(pending)) {
+          // A successor must wait for this recovery write too, not just edits.
+          // Otherwise a retired restore could overwrite its newer Cart later.
+          _consumerStateWritesPending++;
+          final retaining = Future<bool>.sync(() => store.write(pending));
+          _consumerStateWrites = retaining.then<void>(
+            (_) { _consumerStateWritesPending--; },
+            onError: (Object _, StackTrace _) { _consumerStateWritesPending--; });
+          if (!await retaining) {
             throw StateError('Customer choices still need to be retained');
           }
           if (identical(_consumerPendingSnapshot, pending)) {
@@ -8726,7 +8954,16 @@ class BuyV2Session extends ChangeNotifier {
     bool retainUnknownProducts = false,
   }) {
     final owner = customerStateStore?.ownerScope;
-    if (owner == null || snapshot.balancePaymentHolds.any(
+    if (owner == null || snapshot.orderResolutionHolds.any(
+      (h) => !h.valid || h.ownerScope != owner,
+    ) || snapshot.orderResolutionHolds.map((h) => h.storageKey).toSet().length !=
+        snapshot.orderResolutionHolds.length) {
+      throw const FormatException('Order request recovery needs checking.');
+    }
+    for (final hold in snapshot.orderResolutionHolds) {
+      _orderResolutionHolds[hold.storageKey] = hold;
+    }
+    if (snapshot.balancePaymentHolds.any(
       (hold) => !hold.valid || hold.ownerScope != owner,
     ) || snapshot.balancePaymentHolds.map((h) => h.storageKey).toSet().length !=
         snapshot.balancePaymentHolds.length) {
@@ -8743,6 +8980,9 @@ class BuyV2Session extends ChangeNotifier {
     _requiredSupplierPolicyProducts
       ..clear()
       ..addAll(snapshot.supplierPolicyRequiredProductKeys);
+    _unresolvedSupplierPolicyProducts
+      ..clear()
+      ..addAll(snapshot.supplierPolicyUnresolvedProductKeys);
     if (_shoppingAreaRevision == 0) {
       final region = snapshot.shoppingRegionId;
       final place = snapshot.shoppingGooglePlaceId;
@@ -8807,7 +9047,7 @@ class BuyV2Session extends ChangeNotifier {
           order.collection == null &&
           order.destination != BuyV2Destination.orders &&
           order.id.trim().isNotEmpty &&
-          order.total >= 0 &&
+          (order.usesMinorAmounts ? order.hasValidMoney : order.total >= 0) &&
           order.progress.isFinite &&
           order.progress >= 0 &&
           order.progress <= 1 &&
@@ -9117,7 +9357,7 @@ class BuyV2Session extends ChangeNotifier {
   Future<bool>? _persistCustomerState({
     Map<String, String>? supplierPolicyAcceptances,
   }) {
-    if (!procurementScopeCurrent ||
+    if (_collectionDisposed || !procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
                 !_customerStateRestoreInFlight))) {
@@ -9145,6 +9385,7 @@ class BuyV2Session extends ChangeNotifier {
       supplierPolicyRequiredProductKeys: Set.unmodifiable(
         _requiredSupplierPolicyProducts,
       ),
+      supplierPolicyUnresolvedProductKeys: Set.unmodifiable(_unresolvedSupplierPolicyProducts),
       shoppingRegionId: _catalogueRegionId,
       shoppingGooglePlaceId: _shoppingGooglePlaceId,
       shoppingAreaScope: _catalogueAreaScope.name,
@@ -9216,6 +9457,9 @@ class BuyV2Session extends ChangeNotifier {
       ),
       paymentRecoveryIncomplete: _paymentRecoveryIncomplete,
       balancePaymentHolds: List.unmodifiable(_balancePaymentHolds.values.where(
+        (hold) => hold.ownerScope == store.ownerScope,
+      )),
+      orderResolutionHolds: List.unmodifiable(_orderResolutionHolds.values.where(
         (hold) => hold.ownerScope == store.ownerScope,
       )),
       paymentReference: _paymentReference,
@@ -9462,7 +9706,10 @@ class BuyV2Session extends ChangeNotifier {
       return null;
     }
     try {
-      return BuyV2CollectionBasket(
+      final createBasket = collectionCheckout?.gateway is BuyV2MinorCollectionCheckoutGateway
+          ? BuyV2CollectionBasket.minor
+          : BuyV2CollectionBasket.new;
+      return createBasket(
         identity: buyer,
         store: store,
         lines: checkoutLines,
@@ -9488,29 +9735,32 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> prepareCollectionCheckout() async {
-    if (!_checkoutEligibilityCurrent()) return false;
     if (view != BuyV2View.checkout ||
         checkoutBusy ||
         !collectionCheckoutSelected) {
       return false;
     }
-    final basket = currentCollectionBasket;
     final controller = collectionCheckout;
-    if (basket == null ||
-        controller == null ||
-        !availablePaymentMethods.contains(selectedPayment)) {
+    if (controller == null) {
       notice =
           collectionCheckoutMessage ??
           'Choose an available payment method to continue.';
       notifyListeners();
       return false;
     }
+    // Fresh Cart eligibility must not hide an original durable payment. A null
+    // candidate permits recovery only; the controller never quotes it.
+    final basket = _checkoutEligibilityCurrent() &&
+            availablePaymentMethods.contains(selectedPayment)
+        ? currentCollectionBasket
+        : null;
     final ready = await controller.prepare(basket);
     if (_collectionDisposed) return false;
     if (controller.phase == BuyV2CollectionCheckoutPhase.paid) {
       return _completeCollectionPurchase();
     }
     if (ready &&
+        basket != null &&
         view == BuyV2View.checkout &&
         collectionCheckoutSelected &&
         currentCollectionBasket?.fingerprint == basket.fingerprint) {
@@ -9599,13 +9849,16 @@ class BuyV2Session extends ChangeNotifier {
       final lines = intent.basket.lines;
       _orders.insert(
         0,
-        BuyV2Order(
+        BuyV2Order.minor(
           id: snapshot.orderId,
           destination: lines.first.product.destination,
           title: snapshot.storeName,
           itemSummary: '${lines.length} products',
-          total: snapshot.totalMinor ~/ 100,
           totalMinor: snapshot.totalMinor,
+          taxMinor: intent.quote.taxMinor,
+          paymentChargeMinor: intent.quote.paymentChargeMinor,
+          discountMinor: intent.quote.discountMinor,
+          amountPaidNowMinor: snapshot.totalMinor,
           partner: snapshot.storeName,
           partnerType: lines.first.product.partnerRole,
           promise: 'Collect at store',
@@ -9677,43 +9930,47 @@ class BuyV2Session extends ChangeNotifier {
   int productCountForDestination(BuyV2Destination value) =>
       _cart.values.where((line) => line.product.destination == value).length;
 
-  int totalForDestination(BuyV2Destination value) => _cart.values
+  int totalMinorForDestination(BuyV2Destination value) => buyV2SumMinor(_cart.values
       .where((line) => line.product.destination == value)
-      .fold(0, (total, line) => total + line.total);
+      .map((line) => line.totalMinor));
+  int totalForDestination(BuyV2Destination value) => buyV2WholeRupees(totalMinorForDestination(value));
 
   int get itemCount =>
       _cart.values.fold(0, (total, line) => total + line.quantity);
 
-  int get cartTotal =>
-      _cart.values.fold(0, (total, line) => total + line.total);
+  int get cartTotalMinor => buyV2SumMinor(_cart.values.map((line) => line.totalMinor));
+  int get cartTotal => buyV2WholeRupees(cartTotalMinor);
 
   int get scopedItemCount =>
       cartLines.fold(0, (total, line) => total + line.quantity);
 
-  int get scopedCartTotal =>
-      cartLines.fold(0, (total, line) => total + line.total);
+  int get scopedCartTotalMinor => buyV2SumMinor(cartLines.map((line) => line.totalMinor));
+  int get scopedCartTotal => buyV2WholeRupees(scopedCartTotalMinor);
 
-  int get scopedCartListPriceTotal => cartLines.fold(0, (total, line) {
+  int get scopedCartListPriceTotalMinor => buyV2SumMinor(cartLines.map((line) {
     final product = line.product;
-    final listPrice = product.mrp != null && product.mrp! > product.price
-        ? product.mrp!
-        : product.price;
-    return total + (listPrice * line.quantity);
-  });
+    final listPrice = product.mrpMinor != null && product.mrpMinor! > product.priceMinor
+        ? product.mrpMinor! : product.priceMinor;
+    return buyV2MultiplyMinor(listPrice, line.quantity);
+  }));
+  int get scopedCartListPriceTotal => buyV2WholeRupees(scopedCartListPriceTotalMinor);
 
-  int get scopedCartSavings => scopedCartListPriceTotal - scopedCartTotal;
+  int get scopedCartSavingsMinor => scopedCartListPriceTotalMinor - scopedCartTotalMinor;
+  int get scopedCartSavings => buyV2WholeRupees(scopedCartSavingsMinor);
 
-  Map<BuyV2Destination, int> get scopedCartFamilyTotals => Map.unmodifiable({
+  Map<BuyV2Destination, int> get scopedCartFamilyTotalsMinor => Map.unmodifiable({
     for (final destination in const [
       BuyV2Destination.shop,
       BuyV2Destination.wholesale,
       BuyV2Destination.medicine,
     ])
       if (cartLines.any((line) => line.product.destination == destination))
-        destination: cartLines
+        destination: buyV2SumMinor(cartLines
             .where((line) => line.product.destination == destination)
-            .fold(0, (total, line) => total + line.total),
+            .map((line) => line.totalMinor)),
   });
+  Map<BuyV2Destination, int> get scopedCartFamilyTotals => Map.unmodifiable(
+    scopedCartFamilyTotalsMinor.map((key, minor) => MapEntry(key, buyV2WholeRupees(minor))));
 
   Set<BuyV2Destination> get cartDestinations => Set.unmodifiable(
     _cart.values.map((line) => line.product.destination).toSet(),
@@ -9726,8 +9983,8 @@ class BuyV2Session extends ChangeNotifier {
   int get checkoutItemCount =>
       checkoutLines.fold(0, (total, line) => total + line.quantity);
 
-  int get checkoutTotal =>
-      checkoutLines.fold(0, (total, line) => total + line.total);
+  int get checkoutTotalMinor => buyV2SumMinor(checkoutLines.map((line) => line.totalMinor));
+  int get checkoutTotal => buyV2WholeRupees(checkoutTotalMinor);
 
   List<BuyV2FulfilmentGroup> get scopedCartFulfilmentGroups =>
       _fulfilmentGroupsFor(cartLines);
@@ -9849,32 +10106,35 @@ class BuyV2Session extends ChangeNotifier {
     (total, group) => total + tipForGroup(group),
   );
 
-  int couponSavingForDestination(BuyV2Destination destination) {
+  int couponSavingMinorForDestination(BuyV2Destination destination) {
     final coupon = selectedCartBenefit(
       kind: BuyV2CartBenefitKind.coupon,
       destination: destination,
     );
     if (coupon == null) return 0;
-    return coupon.savingAmount.clamp(0, _benefitTotal(coupon, cartLines));
+    return coupon.savingAmountMinor.clamp(0, _benefitTotalMinor(coupon, cartLines));
   }
+  int couponSavingForDestination(BuyV2Destination destination) => buyV2WholeRupees(couponSavingMinorForDestination(destination));
 
-  int get scopedCouponSaving => cartLines
+  int get scopedCouponSavingMinor => cartLines
       .map((line) => line.product.destination)
       .toSet()
       .fold(
         0,
-        (total, destination) => total + couponSavingForDestination(destination),
+        (total, destination) => total + couponSavingMinorForDestination(destination),
       );
+  int get scopedCouponSaving => buyV2WholeRupees(scopedCouponSavingMinor);
 
-  int get checkoutCouponSaving => checkoutDestinations.fold(
+  int get checkoutCouponSavingMinor => checkoutDestinations.fold(
     0,
-    (total, destination) => total + couponSavingForDestination(destination),
+    (total, destination) => total + couponSavingMinorForDestination(destination),
   );
+  int get checkoutCouponSaving => buyV2WholeRupees(checkoutCouponSavingMinor);
 
-  Map<String, int> _checkoutGroupCouponSavings() {
+  Map<String, int> _checkoutGroupCouponSavingsMinor() {
     final remainingDiscount = {
       for (final destination in checkoutDestinations)
-        destination: couponSavingForDestination(destination),
+        destination: couponSavingMinorForDestination(destination),
     };
     return Map.unmodifiable({
       for (final group in checkoutFulfilmentGroups)
@@ -9886,7 +10146,7 @@ class BuyV2Session extends ChangeNotifier {
           );
           final eligibleTotal = coupon == null
               ? 0
-              : _benefitTotal(coupon, group.lines);
+              : _benefitTotalMinor(coupon, group.lines);
           final discount = available > eligibleTotal
               ? eligibleTotal
               : available;
@@ -9896,42 +10156,51 @@ class BuyV2Session extends ChangeNotifier {
     });
   }
 
-  Map<String, int> _checkoutGroupPayables() {
+  // Compatibility bridge for quote/placement contracts not migrated yet.
+  Map<String, int> _checkoutGroupCouponSavings() => _checkoutGroupCouponSavingsMinor()
+      .map((key, minor) => MapEntry(key, buyV2WholeRupees(minor)));
+  Map<String, int> _checkoutGroupPayablesMinor() {
     if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready &&
         _checkoutQuote != null) {
       return Map.unmodifiable({
         for (final line in _checkoutQuote!.lines)
-          line.fulfilmentKey: line.total,
+          line.fulfilmentKey: line.totalMinor,
       });
     }
-    final discountByKey = _checkoutGroupCouponSavings();
+    final discountByKey = _checkoutGroupCouponSavingsMinor();
     return Map.unmodifiable({
       for (final group in checkoutFulfilmentGroups)
         group.key:
-            group.total + tipForGroup(group) - (discountByKey[group.key] ?? 0),
+            buyV2SumMinor([group.totalMinor, buyV2ExactMinorAmount(legacyRupees: tipForGroup(group))]) - (discountByKey[group.key] ?? 0),
     });
   }
 
-  int get scopedPayableTotal =>
-      (scopedCartTotal + scopedTipTotal - scopedCouponSaving).clamp(
-        0,
-        scopedCartTotal + scopedTipTotal,
-      );
+  int get scopedPayableTotalMinor {
+    final base = buyV2SumMinor([scopedCartTotalMinor, buyV2ExactMinorAmount(legacyRupees: scopedTipTotal)]);
+    return (base - scopedCouponSavingMinor).clamp(0, base);
+  }
+  int get scopedPayableTotal => buyV2WholeRupees(scopedPayableTotalMinor);
 
-  int get calculatedCheckoutPayableTotal =>
-      (checkoutTotal + checkoutTipTotal - checkoutCouponSaving).clamp(
-        0,
-        checkoutTotal + checkoutTipTotal,
-      );
+  int get calculatedCheckoutPayableTotalMinor {
+    final base = buyV2SumMinor([checkoutTotalMinor, buyV2ExactMinorAmount(legacyRupees: checkoutTipTotal)]);
+    return (base - checkoutCouponSavingMinor).clamp(0, base);
+  }
+  int get calculatedCheckoutPayableTotal => buyV2WholeRupees(calculatedCheckoutPayableTotalMinor);
 
   BuyV2CheckoutQuote? get checkoutQuote => _checkoutQuote;
 
-  int get checkoutPayableTotal =>
-      legacyCheckoutAttempt?.payment.request.total ??
-      (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready &&
-              _checkoutQuote != null
-          ? _checkoutQuote!.total
-          : calculatedCheckoutPayableTotal);
+  int get checkoutPayableTotalMinor {
+    final retained = legacyCheckoutAttempt?.payment.request;
+    if (retained != null) return retained.totalMinor;
+    if (checkoutPaymentAttempt case final original?) {
+      return buyV2SumMinor(original.groups.map((group) => group.request.totalMinor));
+    }
+    if (checkoutQuoteLoadState == BuyV2CommerceLoadState.ready && _checkoutQuote != null) {
+      return _checkoutQuote!.totalMinor;
+    }
+    return calculatedCheckoutPayableTotalMinor;
+  }
+  int get checkoutPayableTotal => buyV2WholeRupees(checkoutPayableTotalMinor);
 
   List<BuyV2TipOption> tipOptionsFor(BuyV2Destination destination) =>
       List.unmodifiable(tipPolicy.optionsFor(destination));
@@ -10118,15 +10387,35 @@ class BuyV2Session extends ChangeNotifier {
   bool get cartBenefitsBusy =>
       cartBenefitsLoadState == BuyV2CartBenefitsLoadState.loading;
 
+  int? _productBenefitAmountMinor(BuyV2Product product) {
+    final facts = productFactsFor(product);
+    if (!facts.hasValidMoney) return null;
+    try { return buyV2MultiplyMinor(facts.priceMinor, product.minimumOrder); }
+    on FormatException { return null; }
+  }
+  List<BuyV2CartBenefit> _requestLocalBenefits(BuyV2CartBenefitKind kind, Set<BuyV2Destination> destinations, int minor) {
+    final adapter = cartBenefitsAdapter;
+    if (adapter is BuyV2MinorCartBenefitsAdapter) {
+      return adapter.benefitsForMinor(kind: kind, destinations: destinations, itemTotalMinor: minor);
+    }
+    return adapter.benefitsFor(kind: kind, destinations: destinations, itemTotal: buyV2WholeRupees(minor));
+  }
+
   BuyV2CartBenefitsLoadState productBenefitsStateFor(BuyV2Product product) {
+    final minor = _productBenefitAmountMinor(product);
+    if (minor == null || !_supportsBenefitAmount(minor)) return BuyV2CartBenefitsLoadState.unavailable;
     if (!liveCartBenefitsEnabled) return BuyV2CartBenefitsLoadState.ready;
     return _productBenefitStates[product.id] ?? BuyV2CartBenefitsLoadState.idle;
   }
 
-  String? productBenefitsMessageFor(BuyV2Product product) =>
-      _productBenefitMessages[product.id];
+  String? productBenefitsMessageFor(BuyV2Product product) {
+    final minor = _productBenefitAmountMinor(product);
+    return minor == null || !_supportsBenefitAmount(minor) ? _unsupportedBenefitsMessage : _productBenefitMessages[product.id];
+  }
 
   List<BuyV2CartBenefit> productBenefitsFor(BuyV2Product product) {
+    final total = _productBenefitAmountMinor(product);
+    if (total == null || !_supportsBenefitAmount(total)) return const [];
     if (liveCartBenefitsEnabled) {
       return _validatedProductBenefits(
         product,
@@ -10137,14 +10426,9 @@ class BuyV2Session extends ChangeNotifier {
         ),
       );
     }
-    final total = productFactsFor(product).price * product.minimumOrder;
     final candidates = [
       for (final kind in BuyV2CartBenefitKind.values)
-        ...cartBenefitsAdapter.benefitsFor(
-          kind: kind,
-          destinations: {product.destination},
-          itemTotal: total,
-        ),
+        ..._requestLocalBenefits(kind, {product.destination}, total),
     ];
     return _validatedProductBenefits(
       product,
@@ -10160,13 +10444,21 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (_productBenefitAmountMinor(product) == null) {
+      _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.unavailable;
+      _productBenefitMessages[product.id] = _unsupportedBenefitsMessage;
+      notifyListeners();
+      return false;
+    }
     final adapter = cartBenefitsAdapter;
     if (adapter is! BuyV2LiveCartBenefitsAdapter) {
       _productBenefits[product.id] = productBenefitsFor(product);
-      _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.ready;
-      _productBenefitMessages.remove(product.id);
+      final minor = _productBenefitAmountMinor(product);
+      final supported = minor != null && _supportsBenefitAmount(minor);
+      _productBenefitStates[product.id] = supported ? BuyV2CartBenefitsLoadState.ready : BuyV2CartBenefitsLoadState.unavailable;
+      if (supported) _productBenefitMessages.remove(product.id);
       notifyListeners();
-      return true;
+      return supported;
     }
     final sequence = ++_productBenefitRequestSequence;
     _productBenefitRequestSequences[product.id] = sequence;
@@ -10185,8 +10477,13 @@ class BuyV2Session extends ChangeNotifier {
         ),
       );
       if (_collectionDisposed ||
-          _productBenefitRequestSequences[product.id] != sequence ||
-          _productBenefitFingerprint(product) != fingerprint) {
+          _productBenefitRequestSequences[product.id] != sequence) {
+        return false;
+      }
+      if (_productBenefitFingerprint(product) != fingerprint) {
+        _productBenefitStates[product.id] = BuyV2CartBenefitsLoadState.unavailable;
+        _productBenefitMessages[product.id] = 'Prices or choices changed. Check offers again.';
+        notifyListeners();
         return false;
       }
       _productBenefitStates[product.id] = snapshot.state;
@@ -10225,7 +10522,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String _productBenefitFingerprint(BuyV2Product product) =>
-      '${product.id}:${product.storeId}:${product.minimumOrder}:${productFactsFor(product).price}:'
+      '${product.id}:${product.storeId}:${product.minimumOrder}:${productFactsFor(product).priceMinor}:'
       '$selectedPayment';
 
   List<BuyV2CartBenefit> _validatedProductBenefits(
@@ -10233,7 +10530,8 @@ class BuyV2Session extends ChangeNotifier {
     List<BuyV2CartBenefit> benefits, {
     required DateTime evaluatedAt,
   }) {
-    final total = productFactsFor(product).price * product.minimumOrder;
+    final total = _productBenefitAmountMinor(product);
+    if (total == null) return const [];
     final ids = <String>{};
     return List.unmodifiable([
       for (final benefit in benefits)
@@ -10243,14 +10541,14 @@ class BuyV2Session extends ChangeNotifier {
             benefit.detail.trim().isNotEmpty &&
             benefit.sourceId.trim().isNotEmpty &&
             benefit.sponsorName.trim().isNotEmpty &&
-            benefit.savingAmount >= 0 &&
-            benefit.savingAmount <= total &&
+            benefit.savingAmountMinor >= 0 &&
+            benefit.savingAmountMinor <= total &&
             (benefit.kind == BuyV2CartBenefitKind.coupon ||
-                benefit.savingAmount == 0) &&
+                benefit.savingAmountMinor == 0) &&
             _liveBenefitMatchesStrategy(
               benefit,
               evaluatedAt: evaluatedAt,
-              destinationTotal: total,
+              destinationTotalMinor: total,
               destinationQuantity: product.minimumOrder,
             ) &&
             ids.add('${benefit.kind.name}|${benefit.id}'))
@@ -10261,14 +10559,14 @@ class BuyV2Session extends ChangeNotifier {
   String _cartBenefitsFingerprint() => _cart.values
       .map(
         (line) =>
-            '${line.product.id}:${line.product.storeId}:${line.quantity}:${line.product.price}',
+            '${line.product.id}:${line.product.storeId}:${line.quantity}:${line.product.priceMinor}',
       )
       .followedBy([selectedPayment])
       .join('|');
 
   Future<bool> refreshCartBenefits() async {
     final adapter = cartBenefitsAdapter;
-    if (adapter is! BuyV2LiveCartBenefitsAdapter) return true;
+    if (adapter is! BuyV2LiveCartBenefitsAdapter) return !_unsupportedCartBenefitAmount;
     if (_cart.isEmpty) {
       _liveCartBenefits = [];
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.ready;
@@ -10289,8 +10587,14 @@ class BuyV2Session extends ChangeNotifier {
           selectedPaymentMethod: selectedPayment,
         ),
       );
-      if (requestSequence != _cartBenefitsRequestSequence ||
-          fingerprint != _cartBenefitsFingerprint()) {
+      if (requestSequence != _cartBenefitsRequestSequence) {
+        return false;
+      }
+      if (fingerprint != _cartBenefitsFingerprint()) {
+        _liveCartBenefits = [];
+        cartBenefitsLoadState = BuyV2CartBenefitsLoadState.unavailable;
+        cartBenefitsMessage = 'Prices or choices changed. Check offers again.';
+        notifyListeners();
         return false;
       }
       _cartBenefitServerTime = snapshot.evaluatedAt;
@@ -10333,22 +10637,22 @@ class BuyV2Session extends ChangeNotifier {
       for (final benefit in snapshot.benefits)
         if (destinations.contains(benefit.destination) &&
             benefit.validScope &&
-            _benefitTotal(benefit, cartLines) > 0 &&
+            _benefitTotalMinor(benefit, cartLines) > 0 &&
             benefit.id.trim().isNotEmpty &&
             benefit.title.trim().isNotEmpty &&
             benefit.detail.trim().isNotEmpty &&
             benefit.sourceId.trim().isNotEmpty &&
             benefit.sponsorName.trim().isNotEmpty &&
-            benefit.savingAmount >= 0 &&
-            (benefit.savingAmount <= _benefitTotal(benefit, cartLines) ||
+            benefit.savingAmountMinor >= 0 &&
+            (benefit.savingAmountMinor <= _benefitTotalMinor(benefit, cartLines) ||
                 (benefit.kind == BuyV2CartBenefitKind.coupon &&
-                    benefit.savingAmount <= (benefit.minimumSpend ?? 0))) &&
+                    benefit.savingAmountMinor <= (benefit.minimumSpendMinor ?? 0))) &&
             (benefit.kind == BuyV2CartBenefitKind.coupon ||
-                benefit.savingAmount == 0) &&
+                benefit.savingAmountMinor == 0) &&
             _liveBenefitMatchesStrategy(
               benefit,
               evaluatedAt: snapshot.evaluatedAt,
-              destinationTotal: _benefitTotal(benefit, cartLines),
+              destinationTotalMinor: _benefitTotalMinor(benefit, cartLines),
               destinationQuantity: _benefitQuantity(benefit, cartLines),
               allowUnmetSpend: benefit.kind == BuyV2CartBenefitKind.coupon,
             ) &&
@@ -10362,7 +10666,7 @@ class BuyV2Session extends ChangeNotifier {
   bool _liveBenefitMatchesStrategy(
     BuyV2CartBenefit benefit, {
     required DateTime evaluatedAt,
-    required int destinationTotal,
+    required int destinationTotalMinor,
     required int destinationQuantity,
     bool allowUnmetSpend = false,
   }) {
@@ -10374,9 +10678,10 @@ class BuyV2Session extends ChangeNotifier {
         when !evaluatedAt.isBefore(validUntil)) {
       return false;
     }
-    if (benefit.minimumSpend case final minimumSpend?
+    if (!benefit.hasValidMoney) return false;
+    if (benefit.minimumSpendMinor case final minimumSpend?
         when minimumSpend <= 0 ||
-            (!allowUnmetSpend && destinationTotal < minimumSpend)) {
+            (!allowUnmetSpend && destinationTotalMinor < minimumSpend)) {
       return false;
     }
     if (benefit.minimumQuantity case final minimumQuantity?
@@ -10388,7 +10693,7 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CartBenefitStrategy.publishedOffer =>
         benefit.offerId?.trim().isNotEmpty ?? false,
       BuyV2CartBenefitStrategy.minimumOrder =>
-        benefit.minimumSpend != null || benefit.minimumQuantity != null,
+        benefit.minimumSpendMinor != null || benefit.minimumQuantity != null,
       BuyV2CartBenefitStrategy.loadBased => benefit.minimumQuantity != null,
       BuyV2CartBenefitStrategy.financialProduct =>
         (benefit.sponsor == BuyV2CartBenefitSponsor.bank ||
@@ -10450,36 +10755,40 @@ class BuyV2Session extends ChangeNotifier {
         _checkoutQuoteFingerprint != _currentCheckoutQuoteFingerprint();
   }
 
-  int get checkoutQuotedTax =>
-      _checkoutQuote?.lines.fold<int>(0, (total, line) => total + line.tax) ??
-      0;
+  int get checkoutQuotedTaxMinor => buyV2SumMinor(_checkoutQuote?.lines.map((line) => line.taxMinor) ?? const <int>[]);
+  int get checkoutQuotedFreightMinor => buyV2SumMinor(_checkoutQuote?.lines.map((line) => line.freightMinor) ?? const <int>[]);
+  int get checkoutQuotedDeliveryFeeMinor => buyV2SumMinor(_checkoutQuote?.lines.map((line) => line.deliveryFeeMinor) ?? const <int>[]);
+  int get checkoutQuotedPaymentChargeMinor => buyV2SumMinor(_checkoutQuote?.lines.map((line) => line.paymentChargeMinor) ?? const <int>[]);
+  int get checkoutQuotedTax => buyV2WholeRupees(checkoutQuotedTaxMinor);
+  int get checkoutQuotedFreight => buyV2WholeRupees(checkoutQuotedFreightMinor);
+  int get checkoutQuotedDeliveryFee => buyV2WholeRupees(checkoutQuotedDeliveryFeeMinor);
+  int get checkoutQuotedPaymentCharge => buyV2WholeRupees(checkoutQuotedPaymentChargeMinor);
 
-  int get checkoutQuotedFreight =>
-      _checkoutQuote?.lines.fold<int>(
-        0,
-        (total, line) => total + line.freight,
-      ) ??
-      0;
-
-  int get checkoutQuotedDeliveryFee =>
-      _checkoutQuote?.lines.fold<int>(
-        0,
-        (total, line) => total + line.deliveryFee,
-      ) ??
-      0;
-
-  int get checkoutQuotedPaymentCharge =>
-      _checkoutQuote?.lines.fold<int>(
-        0,
-        (total, line) => total + line.paymentCharge,
-      ) ??
-      0;
+  bool _legacyCommercialPayloadRepresentable(List<BuyV2FulfilmentGroup> groups,
+      {List<BuyV2CartBenefit> benefits = const [], Iterable<int> payablesMinor = const []}) {
+    try {
+      return groups.every((group) => group.totalMinor % 100 == 0 && group.lines.every((line) {
+        final product = line.product;
+        return product.priceMinor % 100 == 0 && (product.mrpMinor == null || product.mrpMinor! % 100 == 0) &&
+          (product.packTerms?.priceTiers.every((tier) => tier.priceMinor % 100 == 0) ?? true);
+      })) && benefits.every((benefit) => benefit.hasValidMoney && benefit.savingAmountMinor % 100 == 0 &&
+        (benefit.minimumSpendMinor == null || benefit.minimumSpendMinor! % 100 == 0)) &&
+        payablesMinor.every((minor) => minor % 100 == 0);
+    } on FormatException { return false; }
+  }
 
   Future<bool> refreshCheckoutQuote() async {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
     final adapter = checkoutQuoteAdapter;
     final address = selectedAddressOrNull;
     final groups = checkoutFulfilmentGroups;
     if (adapter == null) return true;
+    final requestSequence = ++_checkoutQuoteRequestSequence;
+    void unavailable(String message) {
+      _checkoutQuote = null; _checkoutQuoteFingerprint = null;
+      checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+      checkoutQuoteMessage = message; _invalidateCommercialPaymentTerms(); notifyListeners();
+    }
     if (address == null || groups.isEmpty) {
       _checkoutQuote = null;
       _checkoutQuoteFingerprint = null;
@@ -10488,27 +10797,48 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final requestSequence = ++_checkoutQuoteRequestSequence;
-    final fingerprint = _currentCheckoutQuoteFingerprint();
+    late final String fingerprint;
+    try { fingerprint = _currentCheckoutQuoteFingerprint(); }
+    on FormatException { unavailable('The current total could not be verified.'); return false; }
+    final owner = _currentCustomerOrderScope;
+    bool currentContext() =>
+        !_collectionDisposed && procurementScopeCurrent &&
+        owner == _currentCustomerOrderScope &&
+        requestSequence == _checkoutQuoteRequestSequence;
+    bool currentInputs() {
+      try { return fingerprint == _currentCheckoutQuoteFingerprint(); }
+      on FormatException { return false; }
+    }
+    final benefits = selectedCartBenefitsFor(cartDestinations);
+    if (adapter is! BuyV2MinorCheckoutQuoteAdapter &&
+        !_legacyCommercialPayloadRepresentable(groups, benefits: benefits)) {
+      unavailable('The current total could not be verified. Your Cart is unchanged.'); return false;
+    }
     _checkoutQuote = null;
     _checkoutQuoteFingerprint = null;
     checkoutQuoteLoadState = BuyV2CommerceLoadState.loading;
     checkoutQuoteMessage = null;
     notifyListeners();
     try {
-      final snapshot = await adapter.loadQuote(
+      // A synchronous loading listener may retire this owner or start a successor.
+      if (!currentContext()) return false;
+      if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
+      final snapshot = adapter is BuyV2MinorCheckoutQuoteAdapter ? await adapter.loadQuoteMinor(
+        groups: List.unmodifiable(groups), address: address, selectedPaymentMethod: selectedPayment,
+        selectedBenefits: List.unmodifiable(benefits), tipAmountsMinorByFulfilmentKey: Map.unmodifiable({
+          for (final group in groups) group.key: buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
+        }),
+      ) : await adapter.loadQuote(
         groups: List.unmodifiable(groups),
         address: address,
         selectedPaymentMethod: selectedPayment,
-        selectedBenefits: selectedCartBenefitsFor(cartDestinations),
+        selectedBenefits: List.unmodifiable(benefits),
         tipAmountsByFulfilmentKey: {
           for (final group in groups) group.key: tipForGroup(group),
         },
       );
-      if (requestSequence != _checkoutQuoteRequestSequence ||
-          fingerprint != _currentCheckoutQuoteFingerprint()) {
-        return false;
-      }
+      if (!currentContext()) return false;
+      if (!currentInputs()) { unavailable('Prices or choices changed. Check the total again.'); return false; }
       checkoutQuoteLoadState = snapshot.state;
       checkoutQuoteMessage = snapshot.customerMessage;
       final quote = snapshot.quote;
@@ -10534,7 +10864,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     } on Object {
-      if (requestSequence != _checkoutQuoteRequestSequence) return false;
+      if (!currentContext()) return false;
       _checkoutQuote = null;
       _checkoutQuoteFingerprint = null;
       checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
@@ -10557,47 +10887,38 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final groupByKey = {for (final group in groups) group.key: group};
-    final expectedCouponSaving = _checkoutGroupCouponSavings();
+    final expectedCouponSaving = _checkoutGroupCouponSavingsMinor();
     final seen = <String>{};
-    var total = 0;
+    final totals = <int>[];
+    try {
     for (final line in quote.lines) {
       final group = groupByKey[line.fulfilmentKey];
       if (group == null ||
           !seen.add(line.fulfilmentKey) ||
-          line.itemSubtotal != group.total ||
-          line.couponSaving !=
+          !line.hasValidMoney ||
+          line.itemSubtotalMinor != group.totalMinor ||
+          line.couponSavingMinor !=
               (expectedCouponSaving[line.fulfilmentKey] ?? 0) ||
-          line.tip != tipForGroup(group) ||
-          line.tax < 0 ||
-          line.freight < 0 ||
-          line.deliveryFee < 0 ||
-          line.paymentCharge < 0 ||
-          line.total !=
-              line.itemSubtotal -
-                  line.couponSaving +
-                  line.tax +
-                  line.freight +
-                  line.deliveryFee +
-                  line.tip +
-                  line.paymentCharge) {
+          line.tipMinor != buyV2ExactMinorAmount(legacyRupees: tipForGroup(group))) {
         return false;
       }
-      total += line.total;
+      totals.add(line.totalMinor);
     }
-    return total == quote.total;
+    return buyV2SumMinor(totals) == quote.totalMinor;
+    } on FormatException { return false; }
   }
 
   String _currentCheckoutQuoteFingerprint() {
     final address = selectedAddressOrNull;
-    final couponSavings = _checkoutGroupCouponSavings();
+    final couponSavings = _checkoutGroupCouponSavingsMinor();
     // Stable grouping is not a quote for a changed delivery plan. Bind both
     // retained and in-flight quotes to the actual connector request context.
     return jsonEncode([
       for (final group in checkoutFulfilmentGroups)
         [
           group.key,
-          group.total,
-          tipForGroup(group),
+          group.totalMinor,
+          buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
           couponSavings[group.key] ?? 0,
           group.promise,
           group.promisedByLabel,
@@ -10605,7 +10926,7 @@ class BuyV2Session extends ChangeNotifier {
           group.deliveryProviderName,
           group.deliveryServiceLevel,
           for (final line in group.lines)
-            [line.product.id, line.quantity, line.product.price],
+            [line.product.id, line.quantity, line.product.priceMinor],
         ],
       if (address != null)
         [
@@ -10681,37 +11002,48 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
-  int get checkoutAmountDueNow {
+  int get checkoutAmountDueNowMinor {
     if (legacyCheckoutAttempt case final attempt?) {
-      return attempt.payment.request.amountDueNow;
+      return attempt.payment.request.amountDueNowMinor;
     }
-    if (!commercialPaymentTermsEnabled) return checkoutPayableTotal;
+    if (checkoutPaymentAttempt case final original?) {
+      return buyV2SumMinor(original.groups.map((group) => group.request.amountDueNowMinor));
+    }
+    if (!commercialPaymentTermsEnabled) return checkoutPayableTotalMinor;
     final selected = [
       for (final group in checkoutFulfilmentGroups)
         selectedCommercialPaymentTermFor(group.key),
     ];
-    if (selected.any((term) => term == null)) return checkoutPayableTotal;
-    return selected.whereType<BuyV2CommercialPaymentTerm>().fold(
-      0,
-      (total, term) => total + term.amountDueNow,
-    );
+    if (selected.any((term) => term == null)) return checkoutPayableTotalMinor;
+    return buyV2SumMinor(selected.whereType<BuyV2CommercialPaymentTerm>().map((term) => term.amountDueNowMinor));
   }
+  int get checkoutAmountDueNow => buyV2WholeRupees(checkoutAmountDueNowMinor);
 
-  int get checkoutBalanceDue {
+  int get checkoutBalanceDueMinor {
     if (legacyCheckoutAttempt case final attempt?) {
-      return attempt.payment.request.total -
-          attempt.payment.request.amountDueNow;
+      return attempt.payment.request.totalMinor - attempt.payment.request.amountDueNowMinor;
+    }
+    if (checkoutPaymentAttempt case final original?) {
+      return buyV2SumMinor(original.groups.map((group) => group.request.totalMinor - group.request.amountDueNowMinor));
     }
     if (!commercialPaymentTermsEnabled) return 0;
-    return checkoutFulfilmentGroups
+    return buyV2SumMinor(checkoutFulfilmentGroups
         .map((group) => selectedCommercialPaymentTermFor(group.key))
         .whereType<BuyV2CommercialPaymentTerm>()
-        .fold(0, (total, term) => total + term.balanceDue);
+        .map((term) => term.balanceDueMinor));
   }
+  int get checkoutBalanceDue => buyV2WholeRupees(checkoutBalanceDueMinor);
 
   Future<bool> refreshCommercialPaymentTerms() async {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
     final adapter = commercialPaymentTermsAdapter;
     if (adapter == null) return true;
+    final requestSequence = ++_commercialPaymentTermsRequestSequence;
+    void unavailable(String message) {
+      _commercialPaymentTerms = []; _acceptedCommercialPaymentTerms.clear();
+      commercialPaymentTermsLoadState = BuyV2CommerceLoadState.unavailable;
+      commercialPaymentTermsMessage = message; notifyListeners();
+    }
     final groups = checkoutFulfilmentGroups;
     if (groups.isEmpty) {
       _commercialPaymentTerms = [];
@@ -10721,21 +11053,48 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-    final requestSequence = ++_commercialPaymentTermsRequestSequence;
-    final fingerprint = _commercialPaymentTermsFingerprint(groups);
+    late final Map<String, int> payablesMinor;
+    late final String fingerprint;
+    try {
+      if (checkoutQuoteEnabled && checkoutQuoteReviewRequired) {
+        unavailable('Check the current total before choosing payment terms.'); return false;
+      }
+      payablesMinor = Map.unmodifiable(_checkoutGroupPayablesMinor());
+      fingerprint = _commercialPaymentTermsFingerprint(groups, payablesMinor: payablesMinor);
+    } on FormatException {
+      unavailable('Payment terms could not be checked. Your Cart is unchanged.'); return false;
+    }
+    final owner = _currentCustomerOrderScope;
+    bool currentContext() =>
+        !_collectionDisposed && procurementScopeCurrent &&
+        owner == _currentCustomerOrderScope &&
+        requestSequence == _commercialPaymentTermsRequestSequence;
+    bool currentInputs() {
+      try {
+        return (!checkoutQuoteEnabled || !checkoutQuoteReviewRequired) &&
+          fingerprint == _commercialPaymentTermsFingerprint(checkoutFulfilmentGroups);
+      } on FormatException { return false; }
+    }
+    if (adapter is! BuyV2MinorCommercialPaymentTermsAdapter &&
+        !_legacyCommercialPayloadRepresentable(groups, payablesMinor: payablesMinor.values)) {
+      unavailable('Payment terms could not be checked. Your Cart is unchanged.'); return false;
+    }
     commercialPaymentTermsLoadState = BuyV2CommerceLoadState.loading;
     commercialPaymentTermsMessage = null;
     notifyListeners();
     try {
-      final snapshot = await adapter.loadTerms(
+      if (!currentContext()) return false;
+      if (!currentInputs()) { unavailable('The total or choices changed. Check payment terms again.'); return false; }
+      final snapshot = adapter is BuyV2MinorCommercialPaymentTermsAdapter ? await adapter.loadTermsMinor(
+        groups: List.unmodifiable(groups), selectedPaymentMethod: selectedPayment,
+        quotedTotalsMinorByFulfilmentKey: payablesMinor,
+      ) : await adapter.loadTerms(
         groups: List.unmodifiable(groups),
         selectedPaymentMethod: selectedPayment,
-        quotedTotalsByFulfilmentKey: _checkoutGroupPayables(),
+        quotedTotalsByFulfilmentKey: Map.unmodifiable(payablesMinor.map((key, minor) => MapEntry(key, buyV2WholeRupees(minor)))),
       );
-      if (requestSequence != _commercialPaymentTermsRequestSequence ||
-          fingerprint != _commercialPaymentTermsFingerprint(groups)) {
-        return false;
-      }
+      if (!currentContext()) return false;
+      if (!currentInputs()) { unavailable('The total or choices changed. Check payment terms again.'); return false; }
       commercialPaymentTermsLoadState = snapshot.state;
       commercialPaymentTermsMessage = snapshot.customerMessage;
       if (snapshot.state != BuyV2CommerceLoadState.ready) {
@@ -10746,6 +11105,7 @@ class BuyV2Session extends ChangeNotifier {
       _commercialPaymentTerms = _validatedCommercialPaymentTerms(
         snapshot.terms,
         groups,
+        payablesMinor,
       );
       _acceptedCommercialPaymentTerms.removeWhere(
         (groupKey, accepted) => !_commercialPaymentTerms.any(
@@ -10778,9 +11138,7 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return !checkoutPaymentTermsReviewRequired;
     } on Object {
-      if (requestSequence != _commercialPaymentTermsRequestSequence) {
-        return false;
-      }
+      if (!currentContext()) return false;
       _commercialPaymentTerms = [];
       commercialPaymentTermsLoadState = BuyV2CommerceLoadState.unavailable;
       commercialPaymentTermsMessage =
@@ -10791,29 +11149,31 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String _commercialPaymentTermsFingerprint(
-    List<BuyV2FulfilmentGroup> groups,
-  ) => groups
-      .map(
-        (group) =>
-            '${group.key}:${group.total}:${tipForGroup(group)}:'
-            '${couponSavingForDestination(group.destination)}',
-      )
-      .followedBy([selectedPayment])
-      .join('|');
+    List<BuyV2FulfilmentGroup> groups, {Map<String, int>? payablesMinor}
+  ) {
+    final payables = payablesMinor ?? _checkoutGroupPayablesMinor();
+    return jsonEncode([
+      selectedPayment, _checkoutQuote?.id, _checkoutQuote?.sourceId,
+      _checkoutQuote?.evaluatedAt.toIso8601String(), _checkoutQuote?.validUntil.toIso8601String(),
+      for (final group in groups) [group.key, group.totalMinor, payables[group.key],
+        buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
+        for (final line in group.lines) [line.product.id, line.quantity, line.product.priceMinor]],
+    ]);
+  }
 
   List<BuyV2CommercialPaymentTerm> _validatedCommercialPaymentTerms(
     List<BuyV2CommercialPaymentTerm> terms,
     List<BuyV2FulfilmentGroup> groups,
+    Map<String, int> payableByKey,
   ) {
     final groupByKey = {for (final group in groups) group.key: group};
-    final payableByKey = _checkoutGroupPayables();
     final identities = <String>{};
     return List.unmodifiable([
       for (final term in terms)
         if (_validCommercialPaymentTerm(
               term,
               group: groupByKey[term.fulfilmentKey],
-              expectedTotal: payableByKey[term.fulfilmentKey],
+              expectedTotalMinor: payableByKey[term.fulfilmentKey],
             ) &&
             identities.add('${term.fulfilmentKey}|${term.id}'))
           term,
@@ -10823,20 +11183,18 @@ class BuyV2Session extends ChangeNotifier {
   bool _validCommercialPaymentTerm(
     BuyV2CommercialPaymentTerm term, {
     required BuyV2FulfilmentGroup? group,
-    required int? expectedTotal,
+    required int? expectedTotalMinor,
   }) {
     if (group == null ||
-        expectedTotal == null ||
+        expectedTotalMinor == null ||
+        !term.hasValidMoney ||
         term.id.trim().isEmpty ||
         term.sourceId.trim().isEmpty ||
         term.supplierName.trim().isEmpty ||
         term.fulfilmentKey != group.key ||
         term.destination != group.destination ||
         term.supplierName != group.partner ||
-        term.orderTotal != expectedTotal ||
-        term.amountDueNow < 0 ||
-        term.balanceDue < 0 ||
-        term.amountDueNow + term.balanceDue != expectedTotal ||
+        term.orderTotalMinor != expectedTotalMinor ||
         term.balanceDueLabel.trim().isEmpty ||
         (term.acceptedPaymentMethods.isNotEmpty &&
             !term.acceptedPaymentMethods.contains(selectedPayment))) {
@@ -10857,47 +11215,48 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       if (selectedPayment == 'UPI' &&
-          term.amountDueNow > 0 &&
-          (term.upiTransactionLimit == null ||
-              term.upiTransactionLimit! <= 0 ||
-              term.amountDueNow > term.upiTransactionLimit!)) {
+          term.amountDueNowMinor > 0 &&
+          (term.upiTransactionLimitMinor == null ||
+              term.upiTransactionLimitMinor! <= 0 ||
+              term.amountDueNowMinor > term.upiTransactionLimitMinor!)) {
         return false;
       }
       if (selectedPayment == 'RTGS' &&
-          term.amountDueNow > 0 &&
-          term.amountDueNow < 200000) {
+          term.amountDueNowMinor > 0 &&
+          term.amountDueNowMinor < 20000000) {
         return false;
       }
       final percent = term.advancePercent;
       if (term.kind ==
               BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery ||
           (term.kind == BuyV2CommercialPaymentTermKind.supplierCredit &&
-              term.amountDueNow > 0)) {
+              term.amountDueNowMinor > 0)) {
         if (!const {5, 10, 15, 20, 25}.contains(percent) ||
-            term.amountDueNow != (expectedTotal * percent! + 99) ~/ 100) {
+            BigInt.from(term.amountDueNowMinor) !=
+              ((BigInt.from(expectedTotalMinor) * BigInt.from(percent!) + BigInt.from(9999)) ~/ BigInt.from(10000)) * BigInt.from(100)) {
           return false;
         }
       } else if (percent != null &&
-          percent != (term.amountDueNow == expectedTotal ? 100 : 0)) {
+          percent != (term.amountDueNowMinor == expectedTotalMinor ? 100 : 0)) {
         return false;
       }
     }
     if (group.destination != BuyV2Destination.wholesale) {
       return term.kind == BuyV2CommercialPaymentTermKind.retailAdvance &&
-          term.amountDueNow == expectedTotal &&
-          term.balanceDue == 0;
+          term.amountDueNowMinor == expectedTotalMinor &&
+          term.balanceDueMinor == 0;
     }
     return switch (term.kind) {
       BuyV2CommercialPaymentTermKind.retailAdvance => false,
       BuyV2CommercialPaymentTermKind.wholesaleAdvance =>
-        term.amountDueNow == expectedTotal && term.balanceDue == 0,
+        term.amountDueNowMinor == expectedTotalMinor && term.balanceDueMinor == 0,
       BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
       BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
-        term.amountDueNow > 0 && term.balanceDue > 0,
+        term.amountDueNowMinor > 0 && term.balanceDueMinor > 0,
       BuyV2CommercialPaymentTermKind.paymentOnDelivery =>
         isStoreProcurement &&
-            term.amountDueNow == 0 &&
-            term.balanceDue == expectedTotal &&
+            term.amountDueNowMinor == 0 &&
+            term.balanceDueMinor == expectedTotalMinor &&
             term.netDays == null,
       BuyV2CommercialPaymentTermKind.supplierCredit =>
         term.netDays != null &&
@@ -10924,14 +11283,14 @@ class BuyV2Session extends ChangeNotifier {
         term.destination.name,
         term.supplierName,
         term.kind.name,
-        term.orderTotal,
-        term.amountDueNow,
-        term.balanceDue,
+        term.orderTotalMinor,
+        term.amountDueNowMinor,
+        term.balanceDueMinor,
         term.balanceDueLabel,
         term.sourceId,
         term.supplierIsMicroOrSmall,
         term.advancePercent,
-        term.upiTransactionLimit,
+        term.upiTransactionLimitMinor,
         term.acceptedPaymentMethods.toList()..sort(),
         term.netDays,
         term.financierName,
@@ -10941,6 +11300,9 @@ class BuyV2Session extends ChangeNotifier {
 
   bool chooseCommercialPaymentTerm(BuyV2CommercialPaymentTerm term) {
     if (_holdCartForPaymentResolution()) return false;
+    if (!term.hasValidMoney) {
+      notice = 'This payment term is no longer available.'; notifyListeners(); return false;
+    }
     final agreement = _commercialPaymentAgreement(term);
     final current = commercialPaymentTermsFor(term.fulfilmentKey)
         .where(
@@ -11009,10 +11371,10 @@ class BuyV2Session extends ChangeNotifier {
     (benefit.productIds.toList()..sort()),
   ]);
 
-  int _benefitTotal(BuyV2CartBenefit benefit, Iterable<BuyV2CartLine> lines) =>
-      lines
+  int _benefitTotalMinor(BuyV2CartBenefit benefit, Iterable<BuyV2CartLine> lines) =>
+      buyV2SumMinor(lines
           .where((line) => benefit.appliesTo(line.product))
-          .fold(0, (total, line) => total + line.product.price * line.quantity);
+          .map((line) => line.totalMinor));
 
   int _benefitQuantity(
     BuyV2CartBenefit benefit,
@@ -11025,6 +11387,9 @@ class BuyV2Session extends ChangeNotifier {
     required BuyV2CartBenefitKind kind,
     BuyV2Destination? destination,
   }) {
+    if (_unsupportedCartBenefitAmount) {
+      return const [];
+    }
     final destinations = destination == null
         ? cartLines.map((line) => line.product.destination).toSet()
         : {destination};
@@ -11034,13 +11399,8 @@ class BuyV2Session extends ChangeNotifier {
     }
     final raw = liveCartBenefitsEnabled
         ? _liveCartBenefits
-        : cartBenefitsAdapter.benefitsFor(
-            kind: kind,
-            destinations: destinations,
-            itemTotal: destination == null
-                ? scopedCartTotal
-                : totalForDestination(destination),
-          );
+        : _requestLocalBenefits(kind, destinations, destination == null
+                ? scopedCartTotalMinor : totalMinorForDestination(destination));
     final valid = <BuyV2CartBenefit>[];
     final ids = <String>{};
     final evaluatedAt = _benefitEvaluationTime(
@@ -11053,13 +11413,13 @@ class BuyV2Session extends ChangeNotifier {
               evaluatedAt.isBefore(benefit.validFrom!)) ||
           (benefit.validUntil != null &&
               !evaluatedAt.isBefore(benefit.validUntil!)) ||
-          _benefitTotal(benefit, cartLines) <= 0 ||
-          benefit.savingAmount > _benefitTotal(benefit, cartLines) ||
+          _benefitTotalMinor(benefit, cartLines) <= 0 ||
+          benefit.savingAmountMinor > _benefitTotalMinor(benefit, cartLines) ||
           (liveCartBenefitsEnabled &&
               !_liveBenefitMatchesStrategy(
                 benefit,
                 evaluatedAt: evaluatedAt,
-                destinationTotal: _benefitTotal(benefit, cartLines),
+                destinationTotalMinor: _benefitTotalMinor(benefit, cartLines),
                 destinationQuantity: _benefitQuantity(benefit, cartLines),
               )) ||
           benefit.kind != kind ||
@@ -11069,11 +11429,11 @@ class BuyV2Session extends ChangeNotifier {
           benefit.detail.trim().isEmpty ||
           benefit.sourceId.trim().isEmpty ||
           benefit.sponsorName.trim().isEmpty ||
-          benefit.savingAmount < 0 ||
+          benefit.savingAmountMinor < 0 ||
           (benefit.kind == BuyV2CartBenefitKind.coupon &&
-              benefit.minimumSpend != null &&
-              (benefit.minimumSpend! <= 0 ||
-                  _benefitTotal(benefit, cartLines) < benefit.minimumSpend!)) ||
+              benefit.minimumSpendMinor != null &&
+              (benefit.minimumSpendMinor! <= 0 ||
+                  _benefitTotalMinor(benefit, cartLines) < benefit.minimumSpendMinor!)) ||
           (benefit.kind == BuyV2CartBenefitKind.coupon &&
               benefit.minimumQuantity != null &&
               (benefit.minimumQuantity! <= 0 ||
@@ -11088,7 +11448,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   /// A published spend opportunity is information, never an applied coupon.
-  ({BuyV2CartBenefit benefit, int remainingSpend})? cartOfferOpportunity({
+  ({BuyV2CartBenefit benefit, int remainingSpendMinor})? cartOfferOpportunity({
     BuyV2Destination? destination,
   }) {
     if (!liveCartBenefitsEnabled ||
@@ -11096,17 +11456,17 @@ class BuyV2Session extends ChangeNotifier {
         scopedProcurementPricesUnavailable) {
       return null;
     }
-    final opportunities = <({BuyV2CartBenefit benefit, int remainingSpend})>[];
+    final opportunities = <({BuyV2CartBenefit benefit, int remainingSpendMinor})>[];
     for (final benefit in _liveCartBenefits) {
-      final total = _benefitTotal(benefit, cartLines);
-      final minimumSpend = benefit.minimumSpend;
+      final total = _benefitTotalMinor(benefit, cartLines);
+      final minimumSpend = benefit.minimumSpendMinor;
       if (benefit.kind != BuyV2CartBenefitKind.coupon ||
           (destination != null && benefit.destination != destination) ||
           total <= 0 ||
           minimumSpend == null ||
           minimumSpend <= total ||
-          benefit.savingAmount <= 0 ||
-          benefit.savingAmount > minimumSpend ||
+          benefit.savingAmountMinor <= 0 ||
+          benefit.savingAmountMinor > minimumSpend ||
           benefit.freeDelivery ||
           benefit.strategy == BuyV2CartBenefitStrategy.freeDelivery ||
           (benefit.eligiblePaymentMethods.isNotEmpty &&
@@ -11122,7 +11482,7 @@ class BuyV2Session extends ChangeNotifier {
               _cartBenefitServerTime,
               _cartBenefitReceivedTime,
             ),
-            destinationTotal: total,
+            destinationTotalMinor: total,
             destinationQuantity: _benefitQuantity(benefit, cartLines),
             allowUnmetSpend: true,
           )) {
@@ -11130,13 +11490,13 @@ class BuyV2Session extends ChangeNotifier {
       }
       opportunities.add((
         benefit: benefit,
-        remainingSpend: minimumSpend - total,
+        remainingSpendMinor: minimumSpend - total,
       ));
     }
     opportunities.sort((a, b) {
-      final remaining = a.remainingSpend.compareTo(b.remainingSpend);
+      final remaining = a.remainingSpendMinor.compareTo(b.remainingSpendMinor);
       if (remaining != 0) return remaining;
-      final saving = b.benefit.savingAmount.compareTo(a.benefit.savingAmount);
+      final saving = b.benefit.savingAmountMinor.compareTo(a.benefit.savingAmountMinor);
       return saving != 0 ? saving : a.benefit.id.compareTo(b.benefit.id);
     });
     return opportunities.firstOrNull;
@@ -11219,7 +11579,7 @@ class BuyV2Session extends ChangeNotifier {
     );
     _invalidateAndRefreshCheckoutPricingContracts();
     notice =
-        current.kind == BuyV2CartBenefitKind.coupon && current.savingAmount > 0
+        current.kind == BuyV2CartBenefitKind.coupon && current.savingAmountMinor > 0
         ? '${current.title} applied. Your total now includes the saving.'
         : '${current.title} selected for Checkout review.';
     notifyListeners();
@@ -11278,9 +11638,9 @@ class BuyV2Session extends ChangeNotifier {
       return null;
     }
     final quantity = math.max(product.minimumOrder, quantityFor(product.id));
-    final price = productFactsFor(product).price;
+    final price = productFactsFor(product).priceMinor;
     for (final tier in terms.priceTiers) {
-      if (tier.minimumPacks <= quantity || tier.price >= price) continue;
+      if (tier.minimumPacks <= quantity || tier.priceMinor >= price) continue;
       final target =
           product.minimumOrder +
           ((tier.minimumPacks -
@@ -11290,11 +11650,11 @@ class BuyV2Session extends ChangeNotifier {
                   product.quantityStep) *
               product.quantityStep;
       if (target > 9007199254740991) return null;
-      final targetPrice = terms.priceForQuantity(target, price);
+      final targetPrice = terms.priceMinorForQuantity(target, price);
       if (targetPrice < price) {
         if (BigInt.from(target) *
                 BigInt.from(targetPrice) *
-                BigInt.from(10000) >
+                BigInt.from(100) >
             BigInt.from(9007199254740991)) {
           return null;
         }
@@ -11303,7 +11663,7 @@ class BuyV2Session extends ChangeNotifier {
                 cartQuantityError(product.id, '$target') != null)) {
           return null;
         }
-        return BuyV2PackPriceTier(minimumPacks: target, price: targetPrice);
+        return BuyV2PackPriceTier(minimumPacks: target, priceMinor: targetPrice);
       }
     }
     return null;
@@ -11311,7 +11671,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool hasCartStoreDeal(BuyV2Product product) =>
       _cartDealSourceCurrent(product) &&
-      ((product.mrp != null && product.mrp! > productFactsFor(product).price) ||
+      ((product.mrpMinor != null && product.mrpMinor! > productFactsFor(product).priceMinor) ||
           nextCartDealTierFor(product) != null);
 
   List<BuyV2Product> cartRecommendationsFor(
@@ -11333,8 +11693,8 @@ class BuyV2Session extends ChangeNotifier {
         .map((product) => product.categoryId)
         .toSet();
     bool hasOffer(BuyV2Product product) {
-      final price = productFactsFor(product).price;
-      return product.mrp != null && product.mrp! > price;
+      final price = productFactsFor(product).priceMinor;
+      return product.mrpMinor != null && product.mrpMinor! > price;
     }
 
     int score(BuyV2Product product) {
@@ -11368,7 +11728,7 @@ class BuyV2Session extends ChangeNotifier {
       if (scoreOrder != 0) return scoreOrder;
       final priceOrder = productFactsFor(
         left,
-      ).price.compareTo(productFactsFor(right).price);
+      ).priceMinor.compareTo(productFactsFor(right).priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11394,11 +11754,11 @@ class BuyV2Session extends ChangeNotifier {
           left.minimumOrder == right.minimumOrder &&
           left.offerClass == right.offerClass &&
           left.freightIncluded == right.freightIncluded &&
-          left.mrp == right.mrp &&
+          left.mrpMinor == right.mrpMinor &&
           left.requiresPrescription == right.requiresPrescription &&
           left.returnPolicy == right.returnPolicy &&
           left.purchaseProtection == right.purchaseProtection &&
-          leftFacts.price == rightFacts.price &&
+          leftFacts.priceMinor == rightFacts.priceMinor &&
           leftFacts.deliveryPromise == rightFacts.deliveryPromise &&
           leftFacts.deliveryFeeLabel == rightFacts.deliveryFeeLabel;
     }
@@ -11740,7 +12100,7 @@ class BuyV2Session extends ChangeNotifier {
     candidates.sort((left, right) {
       final scoreOrder = score(right).compareTo(score(left));
       if (scoreOrder != 0) return scoreOrder;
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = left.priceMinor.compareTo(right.priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11772,7 +12132,7 @@ class BuyV2Session extends ChangeNotifier {
         )
         .toList(growable: false);
     candidates.sort((left, right) {
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = left.priceMinor.compareTo(right.priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11806,7 +12166,7 @@ class BuyV2Session extends ChangeNotifier {
         )
         .toList(growable: false);
     candidates.sort((left, right) {
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = left.priceMinor.compareTo(right.priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11890,7 +12250,7 @@ class BuyV2Session extends ChangeNotifier {
       if (right.id == current.id) return 1;
       final categoryOrder = left.categoryId.compareTo(right.categoryId);
       if (categoryOrder != 0) return categoryOrder;
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = left.priceMinor.compareTo(right.priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11919,7 +12279,7 @@ class BuyV2Session extends ChangeNotifier {
       if (right.id == current.id) return 1;
       final sellerOrder = left.seller.compareTo(right.seller);
       if (sellerOrder != 0) return sellerOrder;
-      final priceOrder = left.price.compareTo(right.price);
+      final priceOrder = left.priceMinor.compareTo(right.priceMinor);
       if (priceOrder != 0) return priceOrder;
       return left.id.compareTo(right.id);
     });
@@ -11975,11 +12335,37 @@ class BuyV2Session extends ChangeNotifier {
 
   int get confirmedItemCount => _confirmedItemCount;
 
-  int get confirmedTotal => _confirmedTotal;
+  int get confirmedTotalMinor => _confirmedTotalMinor;
+  int get confirmedTotal => buyV2WholeRupees(confirmedTotalMinor);
 
-  int get confirmedAmountPaidNow => _confirmedAmountPaidNow;
+  int get confirmedAmountPaidNowMinor => _confirmedAmountPaidNowMinor;
+  int get confirmedAmountPaidNow => buyV2WholeRupees(confirmedAmountPaidNowMinor);
 
-  int get confirmedBalanceDue => _confirmedBalanceDue;
+  int get confirmedBalanceDueMinor => _confirmedBalanceDueMinor;
+  int get confirmedBalanceDue => buyV2WholeRupees(confirmedBalanceDueMinor);
+
+  BuyV2CheckoutPaymentAttempt? get _confirmedGroupedAttempt =>
+      _retainedCheckoutPaymentAttempts.where((attempt) =>
+        attempt.id == _confirmedPurchaseId && attempt.groups.isNotEmpty &&
+        attempt.groups.every((group) => group.state == BuyV2CheckoutSubmissionState.confirmed)).firstOrNull;
+
+  String? get confirmedCheckoutAttemptId => _confirmedGroupedAttempt?.id;
+
+  bool get confirmedOrderReferencesMatch {
+    final reference = _confirmedPurchaseId;
+    if (reference == null || reference.trim().isEmpty || _confirmedOrders.isEmpty ||
+        _confirmedOrders.any((order) => order.id.trim().isEmpty || order.purchaseId?.trim().isNotEmpty != true)) {
+      return false;
+    }
+    if (_confirmedOrders.every((order) => order.purchaseId == reference)) return true;
+    // A checkout attempt can have different server purchase references per
+    // payment group. Only its already-confirmed, retained order IDs qualify.
+    final attempt = _confirmedGroupedAttempt;
+    if (attempt == null) return false;
+    final ids = attempt.groups.expand((group) => group.confirmedOrderIds).toList(growable: false);
+    return ids.length == _confirmedOrders.length && ids.toSet().length == ids.length &&
+        setEquals(ids.toSet(), _confirmedOrders.map((order) => order.id).toSet());
+  }
 
   List<BuyV2Order> get visibleOrders => visibleOrderHistory
       .where(
@@ -12097,6 +12483,8 @@ class BuyV2Session extends ChangeNotifier {
             );
     });
     if (variantWithdrawn(product) ||
+        !product.hasValidMoney || !cached.hasValidMoney ||
+        !product.hasValidPublicListingIdentity ||
         !_matchesRetainedProductIdentity(product) ||
         !product.hasValidPackTerms ||
         product.packTerms?.pricingCurrentAt(catalogueNow()) == false ||
@@ -12110,9 +12498,9 @@ class BuyV2Session extends ChangeNotifier {
     final terms = product.packTerms;
     if (terms != null && terms.priceTiers.isNotEmpty) {
       cached = cached.copyWith(
-        price: terms.priceForQuantity(
+        priceMinor: terms.priceMinorForQuantity(
           math.max(product.minimumOrder, quantityFor(product.id)),
-          cached.price,
+          cached.priceMinor,
         ),
       );
     }
@@ -12181,7 +12569,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ProductFactsSnapshot snapshot,
   ) {
     return snapshot.productId == product.id &&
-        snapshot.price > 0 &&
+        snapshot.hasValidMoney && snapshot.priceMinor > 0 &&
         snapshot.deliveryPromise.trim().isNotEmpty &&
         snapshot.partner.trim().isNotEmpty &&
         snapshot.orderabilityLabel.trim().isNotEmpty &&
@@ -12204,6 +12592,7 @@ class BuyV2Session extends ChangeNotifier {
 
   List<Object?> _productContentInput(BuyV2Product product) => [
     product.storeId,
+    product.publicListingIdentity,
     product.canonicalId,
     product.destination,
     product.categoryId,
@@ -12212,6 +12601,7 @@ class BuyV2Session extends ChangeNotifier {
   ];
 
   BuyV2ProductContentSnapshot productContentFor(BuyV2Product product) {
+    _ensureSupplierPolicyOwner();
     final input = _productContentInput(product);
     if (!listEquals(_productContentMediaInputs[product.id], input)) {
       _productContent.remove(product.id);
@@ -12219,7 +12609,8 @@ class BuyV2Session extends ChangeNotifier {
     }
     return _productContent.putIfAbsent(product.id, () {
       final next = productContentAdapter.snapshotFor(product);
-      return _validProductContent(product, next)
+      return _validProductContent(product, next) &&
+              _admitSupplierPolicyFreshness(product, next)
           ? next
           : BuyV2ProductContentSnapshot(
               productId: product.id,
@@ -12249,6 +12640,7 @@ class BuyV2Session extends ChangeNotifier {
         next.observedAt!.isBefore(previous!.observedAt!)) {
       return false;
     }
+    if (!_admitSupplierPolicyFreshness(product, next)) return false;
     _productContent[product.id] = next;
     _productContentMediaInputs[product.id] = _productContentInput(product);
     if (!identical(previous, next)) notifyListeners();
@@ -12259,7 +12651,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2Product product,
     BuyV2ProductContentSnapshot snapshot,
   ) {
-    if (snapshot.productId != product.id ||
+    if (!product.hasValidPublicListingIdentity || snapshot.productId != product.id ||
         snapshot.sourceId.trim().isEmpty ||
         (snapshot.categoryFacts != null &&
             !snapshot.categoryFacts!.isValidFor(product))) {
@@ -13332,7 +13724,11 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2OrderResolutionSnapshot? orderResolutionFor(String orderId) {
     if (_prepareOrderResolution(orderId) == null) return null;
-    if (_orderResolutionUnconfirmed.contains(orderId)) {
+    final holdKey = jsonEncode([customerStateStore?.ownerScope,
+      collectionIdentity?.value?.accountId, orderId]);
+    if (_orderResolutionUnconfirmed.contains(orderId) ||
+        (_orderResolutionHolds.containsKey(holdKey) &&
+          !_orderResolutionKnownUnsent.contains(holdKey))) {
       return BuyV2OrderResolutionSnapshot(
         orderId: orderId, state: BuyV2OrderResolutionState.unavailable,
         sourceId: 'unconfirmed-request',
@@ -13505,6 +13901,13 @@ class BuyV2Session extends ChangeNotifier {
     required String reason,
     Map<String, int> itemQuantities = const {},
   }) async {
+    // Capture caller-owned selection before even recovery loading can yield.
+    // Validation and dispatch must refer to the same purchased quantities.
+    final quantities = Map<String, int>.unmodifiable(itemQuantities);
+    // Load retained uncertainty before evaluating eligibility for a new request.
+    // Legacy/review consumers without storage retain their in-session contract;
+    // those consumers cannot claim durable command recovery.
+    if (customerStateStore != null && !await _balanceRecoveryReady()) return false;
     final cleanReason = reason.trim();
     final order = _prepareOrderResolution(orderId);
     if (order == null) return false;
@@ -13523,7 +13926,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!orderResolutionItemsAllowed(
       orderId: orderId,
       kind: kind,
-      itemQuantities: itemQuantities,
+      itemQuantities: quantities,
     )) {
       notice =
           'Choose eligible purchased quantities. Check eligibility again or contact support.';
@@ -13535,15 +13938,44 @@ class BuyV2Session extends ChangeNotifier {
     _orderResolutionOperations[orderId] = operation;
     _orderResolutionOrders[orderId] = order;
     bool current() => _orderResolutionCurrent(orderId, order, scope, operation);
+    BuyV2OrderResolutionHold? hold;
     try {
       notifyListeners();
       if (!current()) return false;
+      if (customerStateStore?.ownerScope case final owner?) {
+        hold = BuyV2OrderResolutionHold(ownerScope: owner,
+          accountId: collectionIdentity?.value?.accountId, orderId: orderId,
+          orderIdentity: BuyV2BalancePaymentHold.identityOf(order));
+        _orderResolutionHolds[hold.storageKey] = hold;
+        _orderResolutionKnownUnsent.add(hold.storageKey);
+        final saved = await (_persistCustomerState() ?? Future.value(false));
+        if (!current()) return false;
+        if (!saved) {
+          notice = 'Your request could not be safely retained. Nothing was sent. Try again.';
+          return false;
+        }
+      }
+      // A native write may outlast the purchased-item policy window. Keep the
+      // hold known-unsent until final validation, rather than hiding eligibility
+      // behind the uncertainty placeholder before any request was dispatched.
+      final latest = orderResolutionFor(orderId);
+      if (latest?.state != BuyV2OrderResolutionState.ready ||
+          latest?.sourceId != snapshot?.sourceId ||
+          !latest!.options.any((candidate) => candidate.kind == kind &&
+              candidate.reasons.contains(cleanReason)) ||
+          !orderResolutionItemsAllowed(orderId: orderId, kind: kind,
+              itemQuantities: quantities)) {
+        notice = 'Request eligibility changed or expired. Nothing was sent. Check eligibility again.';
+        return false;
+      }
+      if (!current()) return false;
+      if (hold != null) _orderResolutionKnownUnsent.remove(hold.storageKey);
       final result = await orderResolutionAdapter.submit(
         BuyV2OrderResolutionRequest(
           orderId: orderId,
           kind: kind,
           reason: cleanReason,
-          itemQuantities: Map.unmodifiable(itemQuantities),
+          itemQuantities: quantities,
           eligibilitySourceId: snapshot!.sourceId,
         ),
       );
@@ -13556,10 +13988,24 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       _orderResolutionResults[orderId] = result;
+      if (hold != null && identical(_orderResolutionHolds[hold.storageKey], hold)) {
+        _orderResolutionHolds.remove(hold.storageKey);
+        try {
+          final cleared = await (_persistCustomerState() ?? Future.value(false));
+          if (!cleared) _orderResolutionHolds[hold.storageKey] = hold;
+        } on Object {
+          _orderResolutionHolds[hold.storageKey] = hold;
+        }
+        if (!current()) return false;
+      }
       notice = result.accepted ? result.customerMessage : null;
       return result.accepted;
     } on Object {
       if (!current()) return false;
+      if (hold != null && _orderResolutionKnownUnsent.contains(hold.storageKey)) {
+        notice = 'Your request could not be safely retained. Nothing was sent. Try again.';
+        return false;
+      }
       _holdUnconfirmedOrderResolution(orderId);
       return false;
     } finally {
@@ -14675,7 +15121,7 @@ class BuyV2Session extends ChangeNotifier {
       return product;
     }
     return product.copyWith(
-      price: terms.priceForQuantity(quantity, product.price),
+      priceMinor: terms.priceMinorForQuantity(quantity, product.priceMinor),
     );
   }
 
@@ -14686,6 +15132,8 @@ class BuyV2Session extends ChangeNotifier {
     _supplierPolicyAcceptances.clear();
     _supplierPolicyAcceptancesInFlight = null;
     _requiredSupplierPolicyProducts.clear();
+    _unresolvedSupplierPolicyProducts.clear();
+    _supplierPolicyObservations.clear();
     _pendingSupplierPolicyAdd = null;
     _supplierPolicyConsentBusy = false;
     _supplierPolicyConsentSequence++;
@@ -14698,10 +15146,48 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get supplierPolicyConsentBusy => _supplierPolicyConsentBusy;
 
+  bool _admitSupplierPolicyFreshness(
+    BuyV2Product product, BuyV2ProductContentSnapshot snapshot,
+  ) {
+    _ensureSupplierPolicyOwner();
+    final identity = _buyV2ProductIdentityKey(product);
+    if (snapshot.supplierPolicyResolutionPending) {
+      _unresolvedSupplierPolicyProducts.add(identity);
+      // Refresh may display an unavailable/offline state. It does not resolve
+      // policy or permit Add/Checkout; action paths check the independent hold.
+      return snapshot.state != BuyV2ProductContentState.ready;
+    }
+    if (snapshot.state != BuyV2ProductContentState.ready) return true;
+    final policy = snapshot.supplierPolicy;
+    final decision = snapshot.supplierPolicyAcceptanceRequired;
+    if (policy != null &&
+        (!policy.appliesTo(product, catalogueNow()) ||
+            (decision != null && decision != policy.requiresAcceptance))) {
+      return false;
+    }
+    final sourceIdentity = product.publicListingIdentity;
+    final key = sourceIdentity == null ? jsonEncode([product.id, _buyV2ProductIdentityKey(product)]) :
+      jsonEncode([sourceIdentity.realm, product.storeId, product.sourceSkuId]);
+    final latest = _supplierPolicyObservations[key];
+    final observed = snapshot.supplierPolicyObservedAt ??
+        (policy != null || decision != null ? snapshot.observedAt : null);
+    if (observed?.isAfter(catalogueNow()) == true ||
+        (latest != null && (observed == null || observed.isBefore(latest)))) {
+      return false;
+    }
+    if (observed != null) _supplierPolicyObservations[key] = observed;
+    if (policy != null || decision != null) _unresolvedSupplierPolicyProducts.remove(identity);
+    if (policy?.requiresAcceptance == true || decision == true) {
+      _requiredSupplierPolicyProducts.add(_buyV2ProductIdentityKey(product));
+    }
+    return true;
+  }
+
   BuyV2SupplierPolicy? publishedSupplierPolicyFor(BuyV2Product product) {
     final content = productContentFor(product);
     final policy = content.supplierPolicy;
     return content.state == BuyV2ProductContentState.ready &&
+            !_unresolvedSupplierPolicyProducts.contains(_buyV2ProductIdentityKey(product)) &&
             policy?.appliesTo(product, catalogueNow()) == true
         ? policy
         : null;
@@ -14718,6 +15204,10 @@ class BuyV2Session extends ChangeNotifier {
         _requiredSupplierPolicyProducts.add(identity);
       }
       final next = productContentAdapter.snapshotFor(product);
+      if (next.supplierPolicyResolutionPending) {
+        _unresolvedSupplierPolicyProducts.add(identity);
+        return null;
+      }
       if (next.supplierPolicy?.requiresAcceptance == true ||
           next.supplierPolicyAcceptanceRequired == true) {
         _requiredSupplierPolicyProducts.add(identity);
@@ -14733,6 +15223,7 @@ class BuyV2Session extends ChangeNotifier {
               next.observedAt!.isBefore(previous.observedAt!))) {
         return null;
       }
+      if (!_admitSupplierPolicyFreshness(product, next)) return null;
       _productContent[product.id] = next;
       _productContentMediaInputs[product.id] = _productContentInput(product);
       if ((next.supplierPolicy?.appliesTo(product, catalogueNow()) == true &&
@@ -14765,6 +15256,12 @@ class BuyV2Session extends ChangeNotifier {
       final item = line.product;
       final content = _freshSupplierPolicyContent(item);
       final identity = _buyV2ProductIdentityKey(item);
+      if (_unresolvedSupplierPolicyProducts.contains(identity)) {
+        _persistCustomerState();
+        notice = 'Store policy could not be confirmed. Refresh this product.';
+        notifyListeners();
+        return false;
+      }
       if (!_requiredSupplierPolicyProducts.contains(identity)) continue;
       final policy = content?.supplierPolicy;
       if (policy?.appliesTo(item, catalogueNow()) != true) {
@@ -14903,7 +15400,7 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!_allowProcurementProduct(item)) return false;
-    if (!item.hasValidPackTerms ||
+    if (!item.hasValidMoney || !item.hasValidPackTerms ||
         item.packTerms?.pricingCurrentAt(catalogueNow()) == false ||
         item.packTerms?.requiresMeasurement == true) {
       notice = item.packTerms?.requiresMeasurement == true
@@ -14968,10 +15465,11 @@ class BuyV2Session extends ChangeNotifier {
               BigInt.zero,
               (sum, line) =>
                   sum +
-                  BigInt.from(line.product.price) * BigInt.from(line.quantity),
+                  BigInt.from(line.product.priceMinor) * BigInt.from(line.quantity),
             ) +
-        BigInt.from(pricedItem.price) * BigInt.from(proposedQuantity);
-    if (nextTotal * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+        BigInt.from(pricedItem.priceMinor) * BigInt.from(proposedQuantity);
+    if (BigInt.from(proposedQuantity) > BigInt.from(9007199254740991) ||
+        nextTotal * BigInt.from(100) > BigInt.from(9007199254740991)) {
       notice =
           'This quantity is too large to calculate. Enter a smaller quantity.';
       notifyListeners();
@@ -14987,6 +15485,12 @@ class BuyV2Session extends ChangeNotifier {
     final content = _freshSupplierPolicyContent(item);
     final policy = content?.supplierPolicy;
     final identity = _buyV2ProductIdentityKey(item);
+    if (_unresolvedSupplierPolicyProducts.contains(identity)) {
+      _persistCustomerState();
+      notice = 'Store policy could not be confirmed. Refresh this product.';
+      notifyListeners();
+      return false;
+    }
     if (_requiredSupplierPolicyProducts.contains(identity)) {
       if (policy?.appliesTo(item, catalogueNow()) != true) {
         notice = 'Store policy could not be confirmed. Refresh this product.';
@@ -15128,7 +15632,7 @@ class BuyV2Session extends ChangeNotifier {
     final item = isStoreProcurement
         ? findProduct(id) ?? line.product
         : line.product;
-    if (!item.hasValidPackTerms) {
+    if (!item.hasValidMoney || !item.hasValidPackTerms) {
       return 'Pack information could not be confirmed. Refresh this product.';
     }
     if (item.packTerms?.pricingCurrentAt(catalogueNow()) == false) {
@@ -15153,14 +15657,14 @@ class BuyV2Session extends ChangeNotifier {
       return sum +
           BigInt.from(
                 entry.product.id == id
-                    ? item.packTerms?.priceForQuantity(quantity, item.price) ??
-                          item.price
-                    : entry.product.price,
+                    ? item.packTerms?.priceMinorForQuantity(quantity, item.priceMinor) ??
+                          item.priceMinor
+                    : entry.product.priceMinor,
               ) *
               BigInt.from(entry.product.id == id ? quantity : entry.quantity);
     });
     if (BigInt.from(quantity) > BigInt.from(9007199254740991) ||
-        total * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+        total * BigInt.from(100) > BigInt.from(9007199254740991)) {
       return 'This quantity is too large to calculate. Enter a smaller quantity.';
     }
     if (quantity > line.quantity) {
@@ -15528,10 +16032,10 @@ class BuyV2Session extends ChangeNotifier {
 
   bool _requirePaymentEligible() {
     final group = currentCheckoutPaymentGroup;
-    if (group?.request.amountDueNow == 0 ||
+    if (group?.request.amountDueNowMinor == 0 ||
         (group == null &&
             checkoutPaymentGroups.isNotEmpty &&
-            checkoutPaymentGroups.every((group) => group.amountDueNow == 0))) {
+            checkoutPaymentGroups.every((group) => group.amountDueNowMinor == 0))) {
       return true;
     }
     final eligibility = _evaluatePayment(
@@ -15796,16 +16300,16 @@ class BuyV2Session extends ChangeNotifier {
         openRecovery(BuyV2RecoveryKind.stockUnavailable);
         return false;
       }
-      if (next.price != product.price) {
+      if (next.priceMinor != product.priceMinor) {
         priceChanges.add((
           productId: product.id,
           title: product.title,
-          previousPrice: product.price,
-          currentPrice: next.price,
+          previousPriceMinor: product.priceMinor,
+          currentPriceMinor: next.priceMinor,
         ));
       }
       final updatedProduct = product.copyWith(
-        price: next.price,
+        priceMinor: next.priceMinor,
         deliveryPromise: next.deliveryPromise,
         seller: next.partner,
         confirmedOn: 'Checked now',
@@ -16006,12 +16510,12 @@ class BuyV2Session extends ChangeNotifier {
     if (!isStoreProcurement) {
       _publicDeliveryInstruction = publicDeliveryInstruction ?? '';
     }
-    final request = BuyV2OrderPlacementRequest(
+    final request = _placementRequestForAdapter(BuyV2OrderPlacementRequest.minor(
       lines: List.unmodifiable(lines),
       address: address,
       paymentMethod: selectedPayment,
-      total: checkoutPayableTotal,
-      amountDueNow: checkoutAmountDueNow,
+      totalMinor: checkoutPayableTotalMinor,
+      amountDueNowMinor: checkoutAmountDueNowMinor,
       idempotencyKey: key,
       useUpiQr: canChooseUpiQr && useUpiQr,
       deliveryInstructionsByProductId: Map.unmodifiable({
@@ -16029,8 +16533,13 @@ class BuyV2Session extends ChangeNotifier {
       purchaseOrderRequestId: _pendingPurchaseOrderRequestId,
       purchaseOrderRevision: _pendingPurchaseOrderRevision,
       procurementContext: procurementContext,
-    );
-    final discounts = _checkoutGroupCouponSavings();
+    ), groups);
+    if (request == null) {
+      notice = 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
+      notifyListeners();
+      return false;
+    }
+    final discounts = _checkoutGroupCouponSavingsMinor();
     final quoteLines = {
       for (final line
           in _checkoutQuote?.lines ?? const <BuyV2CheckoutQuoteLine>[])
@@ -16043,15 +16552,17 @@ class BuyV2Session extends ChangeNotifier {
       obligations: List.unmodifiable([
         for (final group in groups)
           () {
-            final total =
-                quoteLines[group.key]?.total ??
-                group.total + tipForGroup(group) - (discounts[group.key] ?? 0);
+            final totalMinor =
+                quoteLines[group.key]?.totalMinor ??
+                buyV2ExactMinorAmount(minor: (BigInt.from(group.totalMinor) +
+                  BigInt.from(buyV2ExactMinorAmount(legacyRupees: tipForGroup(group))) -
+                  BigInt.from(discounts[group.key] ?? 0)).toInt());
             final term = selectedCommercialPaymentTermFor(group.key);
             return BuyV2CheckoutFulfilmentObligation(
               fulfilmentKey: group.key,
               productIds: Set.unmodifiable(group.productIds),
-              totalMinor: total * 100,
-              dueNowMinor: (term?.amountDueNow ?? total) * 100,
+              totalMinor: totalMinor,
+              dueNowMinor: term?.amountDueNowMinor ?? totalMinor,
             );
           }(),
       ]),
@@ -16104,7 +16615,9 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2OrderPlacementResult placement;
     var timedOut = false;
     try {
-      final placementFuture = commerceAdapter.placeOrder(request);
+      final placementFuture = request.usesMinorAmounts
+          ? (commerceAdapter as BuyV2MinorOrderPlacementAdapter).placeOrderMinor(request)
+          : commerceAdapter.placeOrder(request);
       unawaited(
         placementFuture.then<void>((result) async {
           if (timedOut) {
@@ -16155,6 +16668,50 @@ class BuyV2Session extends ChangeNotifier {
       groups: groups,
       address: request.address,
     );
+  }
+
+  BuyV2OrderPlacementRequest? _placementRequestForAdapter(
+    BuyV2OrderPlacementRequest exact, List<BuyV2FulfilmentGroup> groups, {bool grouped = false}) {
+    if (!exact.hasValidMoney) return null;
+    if (grouped ? commerceAdapter is BuyV2MinorGroupedOrderPlacementAdapter
+        : commerceAdapter is BuyV2MinorOrderPlacementAdapter) {
+      return exact;
+    }
+    if (grouped && commerceAdapter is! BuyV2GroupedOrderPlacementAdapter) return null;
+    final keys = groups.map((group) => group.key).toSet();
+    try {
+      if (!_legacyCommercialPayloadRepresentable(groups,
+        benefits: selectedCartBenefitsFor(cartDestinations), payablesMinor: [exact.totalMinor, exact.amountDueNowMinor,
+          for (final group in groups) buyV2ExactMinorAmount(legacyRupees: tipForGroup(group)),
+          for (final quote in _checkoutQuote?.lines ?? const <BuyV2CheckoutQuoteLine>[])
+            if (keys.contains(quote.fulfilmentKey)) ...[quote.itemSubtotalMinor, quote.couponSavingMinor,
+              quote.taxMinor, quote.freightMinor, quote.deliveryFeeMinor, quote.tipMinor, quote.paymentChargeMinor, quote.totalMinor],
+          for (final group in groups)
+            if (selectedCommercialPaymentTermFor(group.key) case final term?)
+              ...[term.orderTotalMinor, term.amountDueNowMinor, term.balanceDueMinor],
+        ])) {
+        return null;
+      }
+      return BuyV2OrderPlacementRequest(lines: exact.lines, address: exact.address, paymentMethod: exact.paymentMethod,
+        total: buyV2WholeRupees(exact.totalMinor), amountDueNow: buyV2WholeRupees(exact.amountDueNowMinor),
+        idempotencyKey: exact.idempotencyKey, useUpiQr: exact.useUpiQr, commercialPaymentTermIds: exact.commercialPaymentTermIds,
+        deliveryInstructionsByProductId: exact.deliveryInstructionsByProductId, checkoutQuoteId: exact.checkoutQuoteId,
+        purchaseOrderRequestId: exact.purchaseOrderRequestId, purchaseOrderRevision: exact.purchaseOrderRevision,
+        procurementContext: exact.procurementContext, checkoutAttemptId: exact.checkoutAttemptId, paymentGroupId: exact.paymentGroupId);
+    } on FormatException { return null; }
+  }
+
+  bool _placementDispatchSupported(BuyV2OrderPlacementRequest request, {required bool grouped}) {
+    if (!request.hasValidMoney) return false;
+    if (request.usesMinorAmounts) {
+      return grouped ? commerceAdapter is BuyV2MinorGroupedOrderPlacementAdapter : commerceAdapter is BuyV2MinorOrderPlacementAdapter;
+    }
+    try {
+      return (!grouped || commerceAdapter is BuyV2GroupedOrderPlacementAdapter) && request.lines.every((line) =>
+        line.product.hasValidMoney && line.product.priceMinor % 100 == 0 &&
+        (line.product.mrpMinor == null || line.product.mrpMinor! % 100 == 0) &&
+        (line.product.packTerms?.priceTiers.every((tier) => tier.priceMinor % 100 == 0) ?? true));
+    } on FormatException { return false; }
   }
 
   Future<bool> _awaitPaymentWrite(Future<bool>? write) async {
@@ -16289,9 +16846,29 @@ class BuyV2Session extends ChangeNotifier {
     // Zero-due obligations belong to the explicit initial commitment. They
     // submit once before the first payment; paid groups still require one tap each.
     final ordered = [
-      ...plan.where((group) => group.amountDueNow == 0),
-      ...plan.where((group) => group.amountDueNow > 0),
+      ...plan.where((group) => group.amountDueNowMinor == 0),
+      ...plan.where((group) => group.amountDueNowMinor > 0),
     ];
+    final requests = <String, BuyV2OrderPlacementRequest>{};
+    for (final group in ordered) {
+      final selected = fulfilments.where((value) => group.fulfilmentKeys.contains(value.key)).toList(growable: false);
+      final request = _placementRequestForAdapter(BuyV2OrderPlacementRequest.minor(
+        lines: List.unmodifiable(selected.expand((value) => value.lines)), address: address,
+        paymentMethod: group.paymentMethod, totalMinor: group.totalMinor, amountDueNowMinor: group.amountDueNowMinor,
+        idempotencyKey: '$id:${Uri.encodeComponent(group.id)}', checkoutAttemptId: id, paymentGroupId: group.id,
+        checkoutQuoteId: quote.id, useUpiQr: group.amountDueNowMinor > 0 && useUpiQr,
+        commercialPaymentTermIds: Map.unmodifiable({for (final key in group.fulfilmentKeys)
+          if (selectedCommercialPaymentTermFor(key) case final term?) key: term.id}),
+        deliveryInstructionsByProductId: Map.unmodifiable({for (final line in selected.expand((value) => value.lines))
+          line.product.id: ?deliveryInstructionTextFor(line.product.destination)}),
+        purchaseOrderRequestId: _pendingPurchaseOrderRequestId, purchaseOrderRevision: _pendingPurchaseOrderRevision,
+      ), selected, grouped: true);
+      if (request == null) {
+        notice = 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
+        notifyListeners(); return false;
+      }
+      requests[group.id] = request;
+    }
     _checkoutPaymentAttempt = BuyV2CheckoutPaymentAttempt(
       id: id,
       ownerScope: owner,
@@ -16311,56 +16888,21 @@ class BuyV2Session extends ChangeNotifier {
                             .singleWhere(
                               (line) => line.fulfilmentKey == fulfilment.key,
                             )
-                            .total *
-                        100,
+                            .totalMinor,
                     dueNowMinor:
                         (commercialPaymentTermsEnabled
                             ? selectedCommercialPaymentTermFor(
                                 fulfilment.key,
-                              )!.amountDueNow
+                              )!.amountDueNowMinor
                             : quote.lines
                                   .singleWhere(
                                     (line) =>
                                         line.fulfilmentKey == fulfilment.key,
                                   )
-                                  .total) *
-                        100,
+                                  .totalMinor),
                   ),
             ]),
-            request: BuyV2OrderPlacementRequest(
-              lines: List.unmodifiable(
-                fulfilments
-                    .where((value) => group.fulfilmentKeys.contains(value.key))
-                    .expand((value) => value.lines),
-              ),
-              address: address,
-              paymentMethod: group.paymentMethod,
-              total: group.total,
-              amountDueNow: group.amountDueNow,
-              idempotencyKey: '$id:${Uri.encodeComponent(group.id)}',
-              checkoutAttemptId: id,
-              paymentGroupId: group.id,
-              checkoutQuoteId: quote.id,
-              useUpiQr: group.amountDueNow > 0 && useUpiQr,
-              commercialPaymentTermIds: Map.unmodifiable({
-                for (final key in group.fulfilmentKeys)
-                  if (selectedCommercialPaymentTermFor(key) case final term?)
-                    key: term.id,
-              }),
-              deliveryInstructionsByProductId: Map.unmodifiable({
-                for (final line
-                    in fulfilments
-                        .where(
-                          (value) => group.fulfilmentKeys.contains(value.key),
-                        )
-                        .expand((value) => value.lines))
-                  line.product.id: ?deliveryInstructionTextFor(
-                    line.product.destination,
-                  ),
-              }),
-              purchaseOrderRequestId: _pendingPurchaseOrderRequestId,
-              purchaseOrderRevision: _pendingPurchaseOrderRevision,
-            ),
+            request: requests[group.id]!,
           ),
       ]),
     );
@@ -16513,7 +17055,7 @@ class BuyV2Session extends ChangeNotifier {
             live.product.storeId == line.product.storeId &&
             live.product.variant == line.product.variant &&
             live.product.pack == line.product.pack &&
-            live.product.price == line.product.price;
+            live.product.hasValidMoney && line.product.hasValidMoney && live.product.priceMinor == line.product.priceMinor;
       });
       final address = selectedAddressOrNull;
       if (!group.hasValidObligations ||
@@ -16543,7 +17085,7 @@ class BuyV2Session extends ChangeNotifier {
             (entry) =>
                 selectedCommercialPaymentTermFor(entry.key)?.id != entry.value,
           ) ||
-          commerceAdapter is! BuyV2GroupedOrderPlacementAdapter) {
+          !_placementDispatchSupported(request, grouped: true)) {
         notice =
             'The remaining checkout needs review. Completed orders are kept.';
         notifyListeners();
@@ -16586,8 +17128,9 @@ class BuyV2Session extends ChangeNotifier {
       var timedOut = false;
       final submittedGroup = group;
       try {
-        final future = (commerceAdapter as BuyV2GroupedOrderPlacementAdapter)
-            .placePaymentGroup(request);
+        final future = request.usesMinorAmounts
+            ? (commerceAdapter as BuyV2MinorGroupedOrderPlacementAdapter).placePaymentGroupMinor(request)
+            : (commerceAdapter as BuyV2GroupedOrderPlacementAdapter).placePaymentGroup(request);
         unawaited(
           future.then<void>((value) async {
             if (timedOut) {
@@ -16625,7 +17168,7 @@ class BuyV2Session extends ChangeNotifier {
         return false;
       }
       if (!confirmed ||
-          request.amountDueNow > 0 ||
+          request.amountDueNowMinor > 0 ||
           !checkoutHasGroupedCommitment) {
         return confirmed && !checkoutHasGroupedCommitment;
       }
@@ -16643,21 +17186,27 @@ class BuyV2Session extends ChangeNotifier {
     final expected = {for (final line in request.lines) line.product.id: line};
     final seen = <String>{};
     final orderIds = <String>{};
+    if (!request.hasValidMoney ||
+        request.lines.any((line) => !line.product.hasValidMoney) ||
+        result.orders.any((order) => !order.hasValidMoney || order.amountPaidNowMinor == null)) {
+      return false;
+    }
+    int paidMinor, balanceMinor, totalMinor;
+    try {
+      paidMinor = buyV2SumMinor(result.orders.map((order) => order.amountPaidNowMinor!));
+      balanceMinor = buyV2SumMinor(result.orders.map((order) => order.balanceDueMinor));
+      totalMinor = buyV2SumMinor(result.orders.map((order) => order.payableTotalMinor));
+    } on FormatException {
+      return false;
+    }
     if (!group.hasValidObligations ||
         result.orders.length != group.obligations.length ||
         reference == null ||
         reference.trim().isEmpty ||
         result.orders.isEmpty ||
-        result.orders.any((order) => order.amountPaidNow == null) ||
-        result.orders.fold<int>(
-              0,
-              (sum, order) => sum + (order.amountPaidNow ?? 0),
-            ) !=
-            request.amountDueNow ||
-        result.orders.fold<int>(0, (sum, order) => sum + order.balanceDue) !=
-            request.total - request.amountDueNow ||
-        result.orders.fold<int>(0, (sum, order) => sum + order.total) !=
-            request.total) {
+        paidMinor != request.amountDueNowMinor ||
+        balanceMinor != request.totalMinor - request.amountDueNowMinor ||
+        totalMinor != request.totalMinor) {
       return false;
     }
     for (final order in result.orders) {
@@ -16668,17 +17217,18 @@ class BuyV2Session extends ChangeNotifier {
           .firstOrNull;
       if (order.id.trim().isEmpty ||
           obligation == null ||
-          order.total * 100 != obligation.totalMinor ||
-          order.amountPaidNow! * 100 != obligation.dueNowMinor ||
+          order.payableTotalMinor != obligation.totalMinor ||
+          order.amountPaidNowMinor != obligation.dueNowMinor ||
           !orderIds.add(order.id) ||
           _orders.any(
             (existing) =>
                 existing.id == order.id &&
                 (!group.confirmedOrderIds.contains(order.id) ||
                     existing.purchaseId != reference ||
-                    existing.total != order.total ||
-                    existing.amountPaidNow != order.amountPaidNow ||
-                    existing.balanceDue != order.balanceDue),
+                    !existing.hasValidMoney ||
+                    existing.payableTotalMinor != order.payableTotalMinor ||
+                    existing.amountPaidNowMinor != order.amountPaidNowMinor ||
+                    existing.balanceDueMinor != order.balanceDueMinor),
           ) ||
           order.purchaseId != reference ||
           order.destinationLabel != request.address.shortLine ||
@@ -16687,10 +17237,9 @@ class BuyV2Session extends ChangeNotifier {
               order.addressLine !=
                   '${request.address.line}, ${request.address.area} ${request.address.pinCode}') ||
           order.paymentMethod != request.paymentMethod ||
-          order.amountPaidNow! < 0 ||
-          order.balanceDue < 0 ||
-          (order.totalMinor != null && order.totalMinor != order.total * 100) ||
-          order.amountPaidNow! + order.balanceDue != order.total ||
+          (!order.usesMinorAmounts && order.totalMinor != null &&
+              order.totalMinor != buyV2ExactMinorAmount(legacyRupees: order.total)) ||
+          BigInt.from(order.amountPaidNowMinor!) + BigInt.from(order.balanceDueMinor) != BigInt.from(order.payableTotalMinor) ||
           order.lines.isEmpty ||
           !setEquals(
             order.productIds.toSet(),
@@ -16699,7 +17248,7 @@ class BuyV2Session extends ChangeNotifier {
           order.productIds.length != order.lines.length ||
           order.lines.any((line) {
             final original = expected[line.product.id];
-            return original == null ||
+            return original == null || !line.product.hasValidMoney ||
                 order.destination != line.product.destination ||
                 !seen.add(line.product.id) ||
                 line.quantity != original.quantity ||
@@ -16708,7 +17257,7 @@ class BuyV2Session extends ChangeNotifier {
                 line.product.destination != original.product.destination ||
                 line.product.variant != original.product.variant ||
                 line.product.pack != original.product.pack ||
-                line.product.price != original.product.price;
+                line.product.priceMinor != original.product.priceMinor;
           })) {
         return false;
       }
@@ -16718,7 +17267,7 @@ class BuyV2Session extends ChangeNotifier {
             _purchaseOrderConfirmationMatches(
               result,
               request.lines,
-              expectedTotal: request.total,
+              expectedTotalMinor: request.totalMinor,
             ));
   }
 
@@ -16833,7 +17382,7 @@ class BuyV2Session extends ChangeNotifier {
         request.useUpiQr &&
             qr?.validFor(
                   reference: _paymentReference,
-                  amountMinor: request.amountDueNow * 100,
+                  amountMinor: request.amountDueNowMinor,
                   now: catalogueNow(),
                 ) ==
                 true
@@ -16931,15 +17480,9 @@ class BuyV2Session extends ChangeNotifier {
             (count, line) => count + line.quantity,
           ),
     );
-    _confirmedTotal = attempt.groups.fold(
-      0,
-      (sum, group) => sum + group.request.total,
-    );
-    _confirmedAmountPaidNow = attempt.groups.fold(
-      0,
-      (sum, group) => sum + group.request.amountDueNow,
-    );
-    _confirmedBalanceDue = _confirmedTotal - _confirmedAmountPaidNow;
+    _confirmedTotalMinor = buyV2SumMinor(attempt.groups.map((group) => group.request.totalMinor));
+    _confirmedAmountPaidNowMinor = buyV2SumMinor(attempt.groups.map((group) => group.request.amountDueNowMinor));
+    _confirmedBalanceDueMinor = _confirmedTotalMinor - _confirmedAmountPaidNowMinor;
     _retainedCheckoutPaymentAttempts.add(checkoutPaymentAttempt!);
     _checkoutPaymentAttempt = null;
     cartScope = BuyV2CartScope.all;
@@ -16960,10 +17503,20 @@ class BuyV2Session extends ChangeNotifier {
   bool _purchaseOrderConfirmationMatches(
     BuyV2OrderPlacementResult placement,
     List<BuyV2CartLine> purchased, {
-    int? expectedTotal,
+    required int expectedTotalMinor,
   }) {
     final approval = _pendingPurchaseOrderApproval ?? purchaseOrder?.review;
     final purchaseId = placement.purchaseReference;
+    if (placement.orders.any((order) => !order.hasValidMoney) ||
+        purchased.any((line) => !line.product.hasValidMoney)) {
+      return false;
+    }
+    int confirmedTotalMinor;
+    try {
+      confirmedTotalMinor = buyV2SumMinor(placement.orders.map((order) => order.payableTotalMinor));
+    } on FormatException {
+      return false;
+    }
     if (approval == null ||
         approval.buyerAccountId != collectionIdentity?.value?.accountId ||
         approval.documents.any(
@@ -16972,8 +17525,7 @@ class BuyV2Session extends ChangeNotifier {
         purchaseId == null ||
         purchaseId.trim().isEmpty ||
         placement.orders.isEmpty ||
-        placement.orders.fold<int>(0, (sum, order) => sum + order.total) !=
-            (expectedTotal ?? checkoutPayableTotal)) {
+        confirmedTotalMinor != expectedTotalMinor) {
       return false;
     }
     final expected = {for (final line in purchased) line.product.id: line};
@@ -16985,7 +17537,6 @@ class BuyV2Session extends ChangeNotifier {
       if (order.id.trim().isEmpty ||
           !orderIds.add(order.id) ||
           order.purchaseId != purchaseId ||
-          order.total < 0 ||
           order.lines.isEmpty ||
           _orders.any(
             (existing) =>
@@ -16996,14 +17547,14 @@ class BuyV2Session extends ChangeNotifier {
       final lineIds = <String>{};
       for (final line in order.lines) {
         final original = expected[line.product.id];
-        if (original == null ||
+        if (original == null || !line.product.hasValidMoney ||
             !lineIds.add(line.product.id) ||
             line.quantity <= 0 ||
             line.product.storeId != original.product.storeId ||
             line.product.canonicalId != original.product.canonicalId ||
             line.product.variant != original.product.variant ||
             line.product.pack != original.product.pack ||
-            line.product.price != original.product.price ||
+            line.product.priceMinor != original.product.priceMinor ||
             line.product.destination != original.product.destination ||
             order.destination != line.product.destination) {
           return false;
@@ -17082,7 +17633,7 @@ class BuyV2Session extends ChangeNotifier {
         request.useUpiQr &&
         qr?.validFor(
               reference: _paymentReference,
-              amountMinor: request.amountDueNow * 100,
+              amountMinor: request.amountDueNowMinor,
               now: catalogueNow(),
             ) ==
             true;
@@ -17396,7 +17947,8 @@ class BuyV2Session extends ChangeNotifier {
               .firstOrNull;
           if (purchased == null ||
               purchased.quantity != approved.quantity ||
-              purchased.product.price * 100 != approved.unitPriceMinor) {
+              !purchased.product.hasValidMoney ||
+              purchased.product.priceMinor != approved.unitPriceMinor) {
             return false;
           }
         }
@@ -17674,11 +18226,11 @@ class BuyV2Session extends ChangeNotifier {
       0,
       (sum, line) => sum + line.quantity,
     );
-    _confirmedTotal = request?.total ?? checkoutPayableTotal;
-    _confirmedAmountPaidNow = request?.amountDueNow ?? checkoutAmountDueNow;
-    _confirmedBalanceDue = request == null
-        ? checkoutBalanceDue
-        : request.total - request.amountDueNow;
+    _confirmedTotalMinor = request?.totalMinor ?? checkoutPayableTotalMinor;
+    _confirmedAmountPaidNowMinor = request?.amountDueNowMinor ?? checkoutAmountDueNowMinor;
+    _confirmedBalanceDueMinor = request == null
+        ? checkoutBalanceDueMinor
+        : request.totalMinor - request.amountDueNowMinor;
     _legacyCheckoutAttempt = null;
     _removeSubmittedCartLines(lines);
     _pruneCartSelections();
@@ -17991,7 +18543,7 @@ class BuyV2Session extends ChangeNotifier {
           (current != null && product.packTerms != null
               ? product.quantityStep
               : product.minimumOrder);
-      if (product.packTerms != null &&
+      if (!product.hasValidMoney || product.packTerms != null &&
           (!product.hasValidPackTerms ||
               !product.packTerms!.pricingCurrentAt(catalogueNow()) ||
               product.packTerms!.requiresMeasurement ||
@@ -18016,9 +18568,10 @@ class BuyV2Session extends ChangeNotifier {
     final total = {..._cart, ...plan}.values.fold<BigInt>(
       BigInt.zero,
       (sum, line) =>
-          sum + BigInt.from(line.product.price) * BigInt.from(line.quantity),
+          sum + BigInt.from(line.product.priceMinor) * BigInt.from(line.quantity),
     );
-    if (total * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+    if (plan.values.any((line) => line.quantity > 9007199254740991) ||
+        total * BigInt.from(100) > BigInt.from(9007199254740991)) {
       notice =
           'This quantity is too large to calculate. Enter a smaller quantity.';
       notifyListeners();
@@ -18112,7 +18665,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     final previous = _navigationSurfaceIdentity;
     final updatedProduct = product.copyWith(
-      price: next.price,
+      priceMinor: next.priceMinor,
       deliveryPromise: next.deliveryPromise,
       seller: next.partner,
       confirmedOn: 'Checked now',
@@ -18130,19 +18683,19 @@ class BuyV2Session extends ChangeNotifier {
       );
     }
     _productFacts[product.id] = next;
-    if (next.price != product.price) {
+    if (next.priceMinor != product.priceMinor) {
       _checkoutPriceChanges = [
         (
           productId: product.id,
           title: product.title,
-          previousPrice: product.price,
-          currentPrice: next.price,
+          previousPriceMinor: product.priceMinor,
+          currentPriceMinor: next.priceMinor,
         ),
       ];
     }
     _checkoutAvailabilityIssue = null;
     _restoreRecoveryOrigin(notify: false);
-    notice = next.price == product.price
+    notice = next.priceMinor == product.priceMinor
         ? '${product.title} is available. Review Checkout to continue.'
         : 'The current price changed. Review the updated total to continue.';
     _persistCustomerState();

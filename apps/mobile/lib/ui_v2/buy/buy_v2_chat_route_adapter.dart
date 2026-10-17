@@ -57,6 +57,10 @@ class BuyV2ChatRouteAdapter {
     if (normalizedOrderId.isEmpty) {
       throw ArgumentError.value(orderId, 'orderId', 'Order ID is required.');
     }
+    final payable = order?.payableTotalMinor;
+    if (order != null && !order.hasValidMoney) throw const FormatException('Order money is unavailable.');
+    final legacyTotal = order == null ? null : !order.usesMinorAmounts
+        ? order.total : payable! % 100 == 0 ? payable ~/ 100 : null;
     return Uri(
       path: order == null
           ? '/app/chat/thread/shop-assist'
@@ -91,7 +95,9 @@ class BuyV2ChatRouteAdapter {
           'supplierType': order.partnerType,
           'orderId': order.id,
           'purchaseId': ?_clean(order.purchaseId),
-          'orderTotal': order.total.toString(),
+          if (legacyTotal != null) 'orderTotal': legacyTotal.toString(),
+          if (legacyTotal == null || BigInt.from(legacyTotal) * BigInt.from(100) != BigInt.from(payable!))
+            'orderTotalMinor': payable.toString(),
           'productIds': order.productIds.join(','),
           'skuIds': order.lines.map((line) => line.product.id).join(','),
           'quantities': order.lines
@@ -104,7 +110,7 @@ class BuyV2ChatRouteAdapter {
                     (line) => {
                       ..._productSnapshot(line.product),
                       'quantity': line.quantity,
-                      'lineTotal': line.product.price * line.quantity,
+                      ..._snapshotMoney('lineTotal', line.totalMinor),
                     },
                   )
                   .toList(growable: false),
@@ -192,9 +198,9 @@ class BuyV2ChatRouteAdapter {
         'categoryId': product.categoryId,
         'variant': product.customerVariant,
         'pack': product.pack,
-        'price': product.price.toString(),
+        ..._queryMoney('price', product.priceMinor),
         'unitPrice': product.unitPrice,
-        'mrp': ?product.mrp?.toString(),
+        if (product.mrpMinor case final mrp?) ..._queryMoney('mrp', mrp),
         'quantity': requestedQuantity.toString(),
         'minimumOrder': product.minimumOrder.toString(),
         'delivery': product.deliveryPromise,
@@ -244,9 +250,9 @@ class BuyV2ChatRouteAdapter {
       'categoryId': product.categoryId,
       'variant': product.customerVariant,
       'pack': product.pack,
-      'price': product.price,
+      ..._snapshotMoney('price', product.priceMinor),
       'unitPrice': product.unitPrice,
-      'mrp': product.mrp,
+      ..._snapshotMoney('mrp', product.mrpMinor),
       'supplier': product.customerSeller(product.seller),
       'supplierType': product.sellerType,
       'supplierRole': product.partnerRole,
@@ -300,9 +306,9 @@ class BuyV2ChatRouteAdapter {
         'Variant: ${product.customerVariant}',
       'Pack: ${product.pack}',
       'Quantity: $quantity',
-      'Price: ${buyV2Money(product.price)}',
+      'Price: ${buyV2MoneyMinor(product.priceMinor)}',
       'Unit price: ${product.unitPrice}',
-      if (product.mrp case final mrp?) 'MRP: ${buyV2Money(mrp)}',
+      if (product.mrpMinor case final mrp?) 'MRP: ${buyV2MoneyMinor(mrp)}',
       'Delivery: ${product.deliveryPromise}',
       'Product link: ${_productLink(product)}',
       if (_clean(compliance?.genericName) case final value?)
@@ -326,6 +332,19 @@ class BuyV2ChatRouteAdapter {
 
   String _productLink(BuyV2Product product) =>
       buyV2SharedProductUri(product).toString();
+
+  // Editable conversation facts only, never price/payment authority. Keep old
+  // whole-rupee fields literal and never put paise in their legacy keys.
+  Map<String, String> _queryMoney(String key, int minor) {
+    buyV2ExactMinorAmount(minor: minor);
+    return minor % 100 == 0 ? {key: '${minor ~/ 100}'} : {'${key}Minor': '$minor'};
+  }
+
+  Map<String, Object?> _snapshotMoney(String key, int? minor) {
+    if (minor == null) return {key: null};
+    buyV2ExactMinorAmount(minor: minor);
+    return minor % 100 == 0 ? {key: minor ~/ 100} : {'${key}Minor': minor};
+  }
 
   String _orderHelpDraft(BuyV2Order order, {String? deliverySummary}) {
     // Structured order facts already travel with the conversation context.

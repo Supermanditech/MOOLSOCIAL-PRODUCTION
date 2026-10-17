@@ -4576,15 +4576,14 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
         : '${widget.session.retailerQuantity}',
   );
   late final TextEditingController _buy = TextEditingController(
-    text: widget.session.retailerBuyPrice == 0
-        ? ''
-        : '${widget.session.retailerBuyPrice}',
+    text: _priceText(widget.session.retailerBuyPriceMinor),
   );
   late final TextEditingController _sell = TextEditingController(
-    text: widget.session.retailerSellPrice == 0
-        ? ''
-        : '${widget.session.retailerSellPrice}',
+    text: _priceText(widget.session.retailerSellPriceMinor),
   );
+  String _priceText(int minor) => minor == 0 ? ''
+      // Retain an invalid legacy whole-rupee draft for correction, not a crash.
+      : minor < 0 ? '${minor ~/ 100}' : workspacePriceInputFromMinor(minor);
   @override
   void dispose() {
     _quantity.dispose();
@@ -4593,13 +4592,25 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
     super.dispose();
   }
 
-  void _saveFields({bool updateCatalogue = true}) =>
-      widget.session.saveRetailerProduct(
-        quantity: int.tryParse(_quantity.text) ?? 0,
-        buyPrice: int.tryParse(_buy.text) ?? 0,
-        sellPrice: int.tryParse(_sell.text) ?? 0,
-        updateCatalogue: updateCatalogue,
-      );
+  bool _saveFields({bool updateCatalogue = true}) {
+    final purchase = _buy.text.trim().isEmpty ? 0 : workspacePriceMinorFromInput(_buy.text);
+    final selling = _sell.text.trim().isEmpty ? 0 : workspacePriceMinorFromInput(_sell.text);
+    if (purchase == null || selling == null) {
+      widget.session.showError('Enter cost and selling prices with up to 2 decimal places.');
+      return false;
+    }
+    final exact = widget.session.workspaceCatalogueItems.firstOrNull?.usesMinorAmounts == true ||
+        purchase % 100 != 0 || selling % 100 != 0;
+    widget.session.saveRetailerProduct(
+      quantity: int.tryParse(_quantity.text) ?? 0,
+      buyPrice: exact ? null : purchase ~/ 100,
+      sellPrice: exact ? null : selling ~/ 100,
+      buyPriceMinor: exact ? purchase : null,
+      sellPriceMinor: exact ? selling : null,
+      updateCatalogue: updateCatalogue,
+    );
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -4611,7 +4622,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
           workspaceMasterCatalogue.first;
       void openSection(String section) {
         FocusManager.instance.primaryFocus?.unfocus();
-        _saveFields(updateCatalogue: false);
+        if (!_saveFields(updateCatalogue: false)) return;
         context.go('/app/work/workspace/dashboard?section=$section');
       }
 
@@ -4649,7 +4660,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                 busy: session.busy,
                 onPressed: () async {
                   FocusManager.instance.primaryFocus?.unfocus();
-                  _saveFields();
+                  if (!_saveFields()) return;
                   final saved = await session.finishRetailerSetup();
                   if (saved && context.mounted) {
                     context.go('/app/work/workspace/dashboard');
@@ -4716,6 +4727,7 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
             TextField(
               key: const Key('retailer-product-quantity'),
               controller: _quantity,
+              readOnly: session.busy,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
@@ -4731,7 +4743,8 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                   child: TextField(
                     key: const Key('retailer-product-buy-price'),
                     controller: _buy,
-                    keyboardType: TextInputType.number,
+                    readOnly: session.busy,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'Cost price',
@@ -4746,7 +4759,8 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
                   child: TextField(
                     key: const Key('retailer-product-sell-price'),
                     controller: _sell,
-                    keyboardType: TextInputType.number,
+                    readOnly: session.busy,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
                       labelText: 'Sell price',

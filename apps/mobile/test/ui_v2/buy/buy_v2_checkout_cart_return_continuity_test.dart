@@ -23,6 +23,7 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_session_test.dart' show prepaidCommerceFixture;
+import 'buy_v2_qualified_provider_fixture.dart' show TestLegacyRecoveryCommerce;
 
 // These protected checkout images explicitly include two current deliveries.
 // Ordinary seed history remains inactive; provenance is tested independently.
@@ -76,6 +77,8 @@ class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
 }
 
 class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
+  Completer<void>? gate;
+  int calls = 0;
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   String? customerMessage;
   BuyV2CommercialPaymentTerm Function(BuyV2CommercialPaymentTerm)? amend;
@@ -86,6 +89,8 @@ class _PaymentTermsAdapter implements BuyV2CommercialPaymentTermsAdapter {
     required String selectedPaymentMethod,
     required Map<String, int> quotedTotalsByFulfilmentKey,
   }) async {
+    calls++;
+    if (gate != null) await gate!.future;
     if (state != BuyV2CommerceLoadState.ready) {
       return BuyV2CommercialPaymentTermsSnapshot(
         state: state,
@@ -219,6 +224,7 @@ BuyV2CommercialPaymentTerm _amendPaymentTerm(
 );
 
 class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
+  Completer<void>? gate;
   BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
   String? customerMessage;
   String? changedGroup;
@@ -234,6 +240,7 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
     required Map<String, int> tipAmountsByFulfilmentKey,
   }) async {
     lastAddress = address;
+    if (gate != null) await gate!.future;
     if (state != BuyV2CommerceLoadState.ready) {
       return BuyV2CheckoutQuoteSnapshot(
         state: state,
@@ -609,12 +616,13 @@ class _ChangingCheckoutCommitFixture extends BuyV2Session {
   int handoffs = 0;
 
   @override
-  int get checkoutAmountDueNow => updatedAmount ?? super.checkoutAmountDueNow;
+  int get checkoutAmountDueNowMinor => updatedAmount ?? super.checkoutAmountDueNowMinor;
 
   @override
   Future<bool> submitOrder() async {
     await Future<void>.delayed(Duration.zero);
-    if (change == 'amount') updatedAmount = checkoutAmountDueNow + 1;
+    if (change == 'amount') updatedAmount = checkoutAmountDueNowMinor + 100;
+    if (change == 'paise') updatedAmount = checkoutAmountDueNowMinor + 1;
     if (change == 'method') selectedPayment = 'Card';
     if (change == 'surface') view = BuyV2View.cart;
     checkoutSubmissionState =
@@ -647,6 +655,95 @@ class _T08OrderSummarySession extends BuyV2Session {
 }
 
 void main() {
+  for (final throwsReply in [false, true]) {
+    test('LF mapped consumers ignore retired quote reply error=$throwsReply', () async {
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final quote = _CheckoutQuoteAdapter()..gate = Completer<void>();
+      final terms = _PaymentTermsAdapter();
+      final session = BuyV2Session(
+        core: core,
+        checkoutQuoteAdapter: quote,
+        commercialPaymentTermsAdapter: terms,
+      );
+      await session.restoreCommerce();
+      expect(session.addProduct('s-milk'), isTrue);
+      session.openCart();
+      quote.lastAddress = null;
+      final pending = session.refreshCheckoutQuote();
+      expect(quote.lastAddress, isNotNull);
+      final termCalls = terms.calls;
+      session.dispose();
+      if (throwsReply) {
+        quote.gate!.completeError(StateError('isolated late quote failure'));
+      } else {
+        quote.gate!.complete();
+      }
+      expect(await pending, isFalse);
+      expect(session.checkoutQuote, isNull);
+      expect(terms.calls, termCalls);
+      expect(await session.refreshCheckoutQuote(), isFalse);
+    });
+    test('LF mapped consumers ignore retired terms reply error=$throwsReply', () async {
+      final core = BuySession();
+      addTearDown(core.dispose);
+      final terms = _PaymentTermsAdapter();
+      final session = BuyV2Session(core: core, commercialPaymentTermsAdapter: terms);
+      await session.restoreCommerce();
+      expect(session.addProduct('s-milk'), isTrue);
+      session.openCart();
+      await Future<void>.delayed(Duration.zero);
+      terms.gate = Completer<void>();
+      final previousCalls = terms.calls;
+      final pending = session.refreshCommercialPaymentTerms();
+      final calls = terms.calls;
+      expect(calls, previousCalls + 1);
+      session.dispose();
+      if (throwsReply) {
+        terms.gate!.completeError(StateError('isolated late terms failure'));
+      } else {
+        terms.gate!.complete();
+      }
+      expect(await pending, isFalse);
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(terms.calls, calls);
+    });
+  }
+  for (final useQuote in [true, false]) {
+    for (final throwsReply in [true, false]) {
+      test('LF mapped consumers reject account A-B-A quote=$useQuote error=$throwsReply', () async {
+        final core = BuySession();
+        addTearDown(core.dispose);
+        final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+          const BuyV2CollectionIdentity(accountId: 'a', sessionId: 'first-a'),
+        );
+        addTearDown(identity.dispose);
+        final quote = _CheckoutQuoteAdapter();
+        final terms = _PaymentTermsAdapter();
+        final session = BuyV2Session(core: core, collectionIdentity: identity,
+          checkoutQuoteAdapter: useQuote ? quote : null,
+          commercialPaymentTermsAdapter: useQuote ? null : terms);
+        addTearDown(session.dispose);
+        await session.restoreCommerce();
+        expect(session.addProduct('s-milk'), isTrue);
+        session.openCart();
+        await Future<void>.delayed(Duration.zero);
+        final gate = Completer<void>();
+        if (useQuote) { quote.gate = gate; } else { terms.gate = gate; }
+        final pending = useQuote ? session.refreshCheckoutQuote()
+            : session.refreshCommercialPaymentTerms();
+        identity.value = const BuyV2CollectionIdentity(accountId: 'b', sessionId: 'b');
+        identity.value = const BuyV2CollectionIdentity(accountId: 'a', sessionId: 'second-a');
+        if (throwsReply) { gate.completeError(StateError('isolated retired reply')); }
+        else { gate.complete(); }
+        expect(await pending, isFalse);
+        expect(session.checkoutQuote, isNull);
+        expect(session.itemCount, 1);
+        expect(useQuote ? session.checkoutQuoteLoadState
+            : session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.loading);
+      });
+    }
+  }
   Future<
     (
       BuyV2Session,
@@ -773,6 +870,19 @@ void main() {
     expect(await session.startBalancePayment(order.id), isTrue);
     expect(adapter.startCalls, 1);
     expect(adapter.keys.single, originalKey);
+  });
+
+  test('LF22 thrown reference persistence during continuation retains unknown without handoff', () async {
+    final (session, adapter, owner, _, order) = await lf09Fixture();
+    expect(await session.startBalancePayment(order.id), isTrue);
+    owner.writeError = StateError('Host reference write failed');
+    var handoffs = 0;
+    expect(await session.continueBalancePayment(order.id, (_) async { handoffs++; return true; }), isFalse);
+    expect(handoffs, 0);
+    expect(session.balancePaymentFor(order.id)?.state, BuyV2BalancePaymentState.unknown);
+    expect(session.balancePaymentFor(order.id)?.paymentReference, 'BALANCE-PAY-1');
+    expect(session.balancePaymentFor(order.id)?.amountDue, order.balanceDue);
+    expect(adapter.keys, hasLength(1));
   });
 
   for (final drift in ['owner', 'dispose']) {
@@ -2077,7 +2187,7 @@ void main() {
     );
   }
 
-  for (final change in ['amount', 'method', 'surface']) {
+  for (final change in ['amount', 'paise', 'method', 'surface']) {
     testWidgets('T02 changed $change never automatically opens payment', (
       tester,
     ) async {
@@ -4939,16 +5049,21 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final balanceAdapter = _BalancePaymentAdapter();
+    // Isolated host recovery storage; never a runtime/provider fixture.
+    final owner = _R66OrderCustomerStore();
     final core = BuySession();
     final session = BuyV2Session(
       commerceAdapter: prepaidCommerceFixture(),
       core: core,
+      customerStateStore: owner,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
       balancePaymentAdapter: balanceAdapter,
       productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    expect(session.customerStateRecoveryPending, isFalse);
     expect(
       session.addProduct(productFor(BuyV2Destination.wholesale).id),
       isTrue,
@@ -4976,6 +5091,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(balanceAdapter.startCalls, 1);
+    expect(owner.snapshot?.balancePaymentHolds, hasLength(1));
     expect(find.text('Balance payment unavailable'), findsOneWidget);
     expect(find.text('Ready for payment'), findsNothing);
     expect(
@@ -4997,14 +5113,20 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final balanceAdapter = _BalancePaymentAdapter();
+      final owner = _R66OrderCustomerStore();
+      final core = BuySession();
       final session = BuyV2Session(
         commerceAdapter: prepaidCommerceFixture(),
-        core: BuySession(),
+        core: core,
+        customerStateStore: owner,
         commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
         balancePaymentAdapter: balanceAdapter,
         productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
       addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isFalse);
       final product = productFor(BuyV2Destination.wholesale);
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.wholesale);
@@ -5042,6 +5164,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(balanceAdapter.startCalls, 1);
+      expect(owner.snapshot?.balancePaymentHolds, hasLength(1));
       expect(await session.startBalancePayment(order.id), isFalse);
 
       await tester.tap(
@@ -6104,9 +6227,10 @@ void main() {
 }
 
 class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
-  final product = BuyV2Catalogue.products
+  _PurchaseOrderFixture({BuyV2Product? productOverride}) : product = productOverride ?? BuyV2Catalogue.products
       .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
       .copyWith(storeId: 'po-store');
+  final BuyV2Product product;
   final now = DateTime.utc(2026, 9, 24);
   static const address = BuyV2Address(
     id: 'po-address',
@@ -6132,7 +6256,7 @@ class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
   Completer<BuyV2PurchaseOrderReview>? pending;
   String? approvedRevision;
   BuyV2PurchaseOrderReview snapshot() {
-    final subtotal = product.price * 100 * quantity;
+    final subtotal = product.priceMinor * quantity;
     return BuyV2PurchaseOrderReview(
       requestId: 'request-a',
       revision: 'review-2',
@@ -6159,7 +6283,7 @@ class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
               pack: product.pack,
               quantity: quantity,
               requestedQuantity: basketQuantity,
-              unitPriceMinor: product.price * 100,
+              unitPriceMinor: product.priceMinor,
             ),
           ],
           itemSubtotalMinor: subtotal,
@@ -6203,6 +6327,55 @@ class _PurchaseOrderFixture implements BuyV2PurchaseOrderAdapter {
 }
 
 void _purchaseOrderControllerCases() {
+  test('LF-PAISE fresh accepted PO gate uses exact purchased price and retains quantity guard', () async {
+    final source = _PurchaseOrderFixture(productOverride: _PurchaseOrderFixture().product.copyWith(priceMinor: 1025))
+      ..state = BuyV2PurchaseOrderState.accepted;
+    final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+      const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'session-a'));
+    final session = _PurchaseOrderPanelSession(source, identity);
+    addTearDown(session.dispose); addTearDown(identity.dispose);
+    expect(await session.reviewPurchaseOrder(), isTrue);
+    expect(session.purchaseOrderReviewRequired, isFalse);
+    expect(session.purchaseOrder!.review!.documents.single.totalMinor, 2050);
+    source.basketQuantity = 3;
+    expect(session.purchaseOrderReviewRequired, isTrue); expect(source.issueCalls, 0);
+  });
+  for (final mismatch in [false, true]) {
+    test('LF-PAISE original PO exact price reaches reconciliation only when matching mismatch=$mismatch', () async {
+      final value = _PurchaseOrderFixture().product.copyWith(priceMinor: 1025);
+      final source = _PurchaseOrderFixture(productOverride: value)..state = BuyV2PurchaseOrderState.accepted;
+      final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+        const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'session-a'));
+      final purchased = value.copyWith(priceMinor: mismatch ? 1026 : 1025);
+      final request = BuyV2OrderPlacementRequest.minor(lines: [BuyV2CartLine(product: purchased, quantity: 2)],
+        address: _PurchaseOrderFixture.address, paymentMethod: 'UPI', totalMinor: mismatch ? 2052 : 2050,
+        amountDueNowMinor: mismatch ? 2052 : 2050, idempotencyKey: 'host-exact-po-key',
+        purchaseOrderRequestId: 'request-a', purchaseOrderRevision: 'review-2');
+      final store = _R66OrderCustomerStore();
+      store.snapshot = BuyV2CustomerStateSnapshot(
+        legacyCheckoutAttempt: BuyV2LegacyCheckoutAttempt(ownerScope: store.ownerScope, purchaseOrderAccountId: 'buyer-a',
+          payment: BuyV2CheckoutGroupAttempt(request: request, fulfilmentKeys: const {'host-exact-po-fulfilment'},
+            obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'host-exact-po-fulfilment',
+              productIds: {value.id}, totalMinor: request.totalMinor, dueNowMinor: request.amountDueNowMinor)],
+            state: BuyV2CheckoutSubmissionState.paymentPending, paymentReference: 'host-exact-po-reference')),
+        checkoutIdempotencyKey: request.idempotencyKey, paymentReference: 'host-exact-po-reference',
+        checkoutSubmissionState: BuyV2CheckoutSubmissionState.paymentPending.name,
+        pendingPurchaseOrderAccountId: 'buyer-a', pendingPurchaseOrderRequestId: 'request-a', pendingPurchaseOrderRevision: 'review-2');
+      final commerce = TestLegacyRecoveryCommerce()..originalRequests[request.idempotencyKey] = request;
+      commerce.onReconcile = (_) => BuyV2OrderPlacementResult(outcome: BuyV2OrderPlacementOutcome.paymentPending,
+        customerMessage: 'Host original pending', paymentReference: 'host-exact-po-reference', idempotencyKey: request.idempotencyKey);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, customerStateStore: store, collectionIdentity: identity,
+        purchaseOrderAdapter: source, commerceAdapter: commerce);
+      addTearDown(core.dispose); addTearDown(session.dispose); addTearDown(identity.dispose);
+      await session.restoreCustomerState();
+      expect(await session.reconcilePayment(), isFalse);
+      expect(commerce.reconciledKeys, mismatch ? isEmpty : ['host-exact-po-key']);
+      expect(commerce.requests, isEmpty); expect(source.issueCalls, 0);
+      expect(session.legacyCheckoutAttempt!.payment.request.idempotencyKey, 'host-exact-po-key');
+      expect(session.legacyCheckoutAttempt!.payment.request.totalMinor, mismatch ? 2052 : 2050);
+    });
+  }
   group('R6633 D17 PO controller', () {
     late _PurchaseOrderFixture source;
     late ValueNotifier<BuyV2CollectionIdentity?> identity;
