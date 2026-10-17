@@ -3413,7 +3413,7 @@ class BuyV2Session extends ChangeNotifier {
     required this.core,
     this.purchaseReader,
     this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
-    this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
+    BuyV2ProductFactsAdapter? productFactsAdapter,
     BuyV2ProductContentAdapter? productContentAdapter,
     BuyV2ComparisonSource? comparisonSource,
     this.marketplaceTrustAdapter =
@@ -3450,7 +3450,9 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2ShoppingAlertsAdapter? shoppingAlertsAdapter,
     BuyV2CommerceAdapter? commerceAdapter,
     bool? reviewDataEnabled,
-  }) : purchaseOrderAdapter =
+  }) : productFactsAdapter = productFactsAdapter ?? BuyV2CatalogueProductFactsAdapter(
+         includeReviewFixtures: reviewDataEnabled ?? (kDebugMode || buyV2DeviceReviewBenefitSeedsEnabled)),
+       purchaseOrderAdapter =
            purchaseOrderAdapter ??
            (purchaseOrderReviewFixtureEnabled &&
                    kDebugMode &&
@@ -5403,7 +5405,7 @@ class BuyV2Session extends ChangeNotifier {
 
   static const bool sponsoredContentActivationApproved = false;
   static const BuyV2CatalogueProductFactsAdapter _catalogueFactsFallback =
-      BuyV2CatalogueProductFactsAdapter();
+      BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false);
   static const BuyV2CatalogueMarketplaceTrustAdapter _catalogueTrustFallback =
       BuyV2CatalogueMarketplaceTrustAdapter();
 
@@ -8218,7 +8220,7 @@ class BuyV2Session extends ChangeNotifier {
         allowReviewFixture: reviewDataEnabled,
       );
     }
-    return reviewDataEnabled ? product.reviewDeliveryOptions : const {};
+    return reviewDataEnabled && product.publicListingIdentity == null ? product.reviewDeliveryOptions : const {};
   }
 
   bool _matchesShopChannel(BuyV2Product product, BuyV2ShopSaleType channel) =>
@@ -12518,6 +12520,7 @@ class BuyV2Session extends ChangeNotifier {
         orderabilityLabel: 'Unavailable',
         stale: true,
         clearEligibility: true,
+        clearOperationalReadiness: true,
       );
     }
     final terms = product.packTerms;
@@ -12533,6 +12536,7 @@ class BuyV2Session extends ChangeNotifier {
         product.destination == BuyV2Destination.medicine) {
       return cached;
     }
+    if (cached.stale) return cached.copyWith(clearOperationalReadiness: true);
     final eligibility = cached.eligibility;
     final options =
         eligibility?.availableFor(
@@ -12541,11 +12545,14 @@ class BuyV2Session extends ChangeNotifier {
           now: catalogueNow(),
           allowReviewFixture: reviewDataEnabled,
         ) ??
-        (reviewDataEnabled
+        (reviewDataEnabled && product.publicListingIdentity == null
             ? product.reviewDeliveryOptions
             : const <BuyV2DeliveryOption>{});
     final unavailable =
-        options.isEmpty && (eligibility != null || !reviewDataEnabled);
+        options.isEmpty && (eligibility != null || !reviewDataEnabled || product.publicListingIdentity != null);
+    if (options.isEmpty) {
+      return cached.copyWith(orderabilityLabel: unavailable ? 'Eligibility unavailable' : cached.orderabilityLabel);
+    }
     final mode = options.contains(BuyV2DeliveryOption.quick)
         ? BuyV2FulfilmentMode.quickLocal
         : options.contains(BuyV2DeliveryOption.freight)
@@ -12574,6 +12581,9 @@ class BuyV2Session extends ChangeNotifier {
         _productFacts[product.id] = previous.copyWith(
           clearStoreCollection: true,
           clearEligibility: true,
+          clearOperationalReadiness: true,
+          orderabilityLabel: 'Availability unconfirmed',
+          deliveryPromise: 'Delivery availability unconfirmed',
           stale: true,
         );
       }
@@ -16144,7 +16154,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     for (final product in lines.map((line) => line.product).toSet()) {
       final next = productFactsAdapter.snapshotFor(product);
-      if (!_validProductFacts(product, next)) {
+      if (!_validProductFacts(product, next) || next.stale) {
         notice = 'Delivery times could not be confirmed. Try again.';
         notifyListeners();
         return false;

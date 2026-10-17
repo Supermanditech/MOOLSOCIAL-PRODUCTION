@@ -917,6 +917,13 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
       product.destination == BuyV2Destination.shop ||
       product.destination == BuyV2Destination.wholesale;
 
+  // Invalid prices are unavailable, not merely old operational facts. In
+  // particular, an invalid first pack must not hide a valid similar-family SKU.
+  if (!product.hasValidMoney || !facts.hasValidMoney || product.priceMinor <= 0 || facts.priceMinor <= 0) {
+    return const BuyV2ProductOfferDecision(state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Price unavailable', detail: 'Check the current price before adding this product.');
+  }
+
   if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
     final nextOpening = facts.nextOpeningLabel?.trim();
     return BuyV2ProductOfferDecision(
@@ -958,10 +965,6 @@ BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
   final packQuantity = quantity < product.minimumOrder
       ? product.minimumOrder
       : quantity;
-  if (!product.hasValidMoney || !facts.hasValidMoney) {
-    return const BuyV2ProductOfferDecision(state: BuyV2ProductOfferDecisionState.unavailable,
-      statusLabel: 'Price unavailable', detail: 'Check the current price before adding this product.');
-  }
   final expectedPriceMinor = product.hasValidPackTerms
       ? product.packTerms?.priceMinorForQuantity(packQuantity, product.priceMinor) ??
             product.priceMinor

@@ -2034,6 +2034,10 @@ void main() {
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       await session.restoreCommerce();
+      expect(session.productFactsFor(available).stale, isFalse,
+        reason: 'Configured similar-product fixture must supply valid current facts: '
+          '${facts.snapshotFor(available).deliveryPromise}/${facts.snapshotFor(available).sourceId}/'
+          '${session.productFactsFor(available).orderabilityLabel}');
       await mountReferenceGallery(tester, session, current.id);
       final rail = find.byKey(
         ValueKey('buy-product-continuations-${current.id}'),
@@ -3034,6 +3038,7 @@ void main() {
       final initialNow = now;
       final session = BuyV2Session(
         core: core,
+        productFactsAdapter: _PricingFactsAdapter(),
         productContentAdapter: adapter,
         commerceAdapter: _SingleProductCommerceAdapter(product),
         reviewDataEnabled: false,

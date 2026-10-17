@@ -809,6 +809,7 @@ class BuyV2ProductFactsSnapshot {
     String? deliveryFeeLabel,
     DateTime? observedAt,
     bool? stale,
+    bool clearOperationalReadiness = false,
   }) {
     return BuyV2ProductFactsSnapshot(
       productId: productId,
@@ -818,19 +819,19 @@ class BuyV2ProductFactsSnapshot {
       partner: partner ?? this.partner,
       orderabilityLabel: orderabilityLabel ?? this.orderabilityLabel,
       sourceId: sourceId ?? this.sourceId,
-      promisedByLabel: promisedByLabel ?? this.promisedByLabel,
-      dispatchPromise: dispatchPromise ?? this.dispatchPromise,
-      deliveryProviderName: deliveryProviderName ?? this.deliveryProviderName,
-      deliveryServiceLevel: deliveryServiceLevel ?? this.deliveryServiceLevel,
-      fulfilmentMode: fulfilmentMode ?? this.fulfilmentMode,
-      eligibility: clearEligibility ? null : eligibility ?? this.eligibility,
-      storeOperatingState: storeOperatingState ?? this.storeOperatingState,
-      storeCollection: clearStoreCollection
+      promisedByLabel: clearOperationalReadiness ? null : promisedByLabel ?? this.promisedByLabel,
+      dispatchPromise: clearOperationalReadiness ? null : dispatchPromise ?? this.dispatchPromise,
+      deliveryProviderName: clearOperationalReadiness ? null : deliveryProviderName ?? this.deliveryProviderName,
+      deliveryServiceLevel: clearOperationalReadiness ? null : deliveryServiceLevel ?? this.deliveryServiceLevel,
+      fulfilmentMode: clearOperationalReadiness ? null : fulfilmentMode ?? this.fulfilmentMode,
+      eligibility: clearOperationalReadiness || clearEligibility ? null : eligibility ?? this.eligibility,
+      storeOperatingState: clearOperationalReadiness ? BuyV2StoreOperatingState.unknown : storeOperatingState ?? this.storeOperatingState,
+      storeCollection: clearOperationalReadiness || clearStoreCollection
           ? null
           : storeCollection ?? this.storeCollection,
-      nextOpeningLabel: nextOpeningLabel ?? this.nextOpeningLabel,
-      orderCutoffLabel: orderCutoffLabel ?? this.orderCutoffLabel,
-      deliveryFeeLabel: deliveryFeeLabel ?? this.deliveryFeeLabel,
+      nextOpeningLabel: clearOperationalReadiness ? null : nextOpeningLabel ?? this.nextOpeningLabel,
+      orderCutoffLabel: clearOperationalReadiness ? null : orderCutoffLabel ?? this.orderCutoffLabel,
+      deliveryFeeLabel: clearOperationalReadiness ? null : deliveryFeeLabel ?? this.deliveryFeeLabel,
       observedAt: observedAt ?? this.observedAt,
       stale: stale ?? this.stale,
     );
@@ -3442,13 +3443,23 @@ abstract interface class BuyV2CommerceAdapter {
 
 final class BuyV2CatalogueProductFactsAdapter
     implements BuyV2ProductFactsAdapter {
-  const BuyV2CatalogueProductFactsAdapter();
+  // Legacy direct callers are review fixtures. Sessions explicitly choose their
+  // mode; genuine public bindings never inherit review operations.
+  const BuyV2CatalogueProductFactsAdapter({this.includeReviewFixtures = true});
+  final bool includeReviewFixtures;
 
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final validMoney = product.hasValidMoney;
+    if (!includeReviewFixtures || product.publicListingIdentity != null) {
+      return BuyV2ProductFactsSnapshot(productId: product.id,
+        priceMinor: validMoney ? product.priceMinor : null,
+        deliveryPromise: 'Delivery availability unconfirmed', partner: product.seller,
+        orderabilityLabel: validMoney ? 'Availability unconfirmed' : 'Unavailable',
+        sourceId: 'catalogue-information-only', stale: true);
+    }
     final closedForReview = product.seller == 'Pet Family Store';
     final noProductsForReview = product.seller == 'Beauty Supply';
-    final validMoney = product.hasValidMoney;
     return BuyV2ProductFactsSnapshot(
       productId: product.id,
       priceMinor: validMoney ? product.priceMinor : null,

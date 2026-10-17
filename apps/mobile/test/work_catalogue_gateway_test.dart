@@ -57,6 +57,12 @@ class _HostOptionalProductContent implements BuyV2ProductContentAdapter {
     description: description, specifications: specifications, highlightFields: highlights,
     categoryFacts: categoryFacts, retryable: state == BuyV2ProductContentState.offline);
 }
+class _HostOperationalFacts implements BuyV2ProductFactsAdapter {
+  _HostOperationalFacts(this.reply);
+  BuyV2ProductFactsSnapshot Function(BuyV2Product) reply;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) => reply(product);
+}
 class _HostExactOrderCommerce implements BuyV2CommerceAdapter {
   List<BuyV2Order> records = [];
   BuyV2Order? refreshedOrder;
@@ -1204,6 +1210,147 @@ void main() {
     expiry = null; omit = true; expect(await read(), isNull, reason: 'absence is not a standalone assertion');
     omit = false; expect((await read())!.product.variantAttributes.single.optionId, 'blue');
   });
+  Future<BuyV2Session> readinessSession(BuyV2Product selected,
+    {bool review = false, BuyV2ProductFactsAdapter? facts}) async {
+    final core = BuySession(), catalogue = _ExactMoneyHostCatalogue()..rows.add(selected);
+    final session = BuyV2Session(core: core, cataloguePageSource: catalogue, reviewDataEnabled: review,
+      productFactsAdapter: facts ?? const BuyV2CatalogueProductFactsAdapter(), catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final pager = session.acquireCatalogueProducts('host-readiness');
+    addTearDown(() => session.releaseCatalogueProducts('host-readiness'));
+    await pager.open(BuyV2CatalogueQuery(destination: selected.destination, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas));
+    return session;
+  }
+  for (final trade in [false, true]) {
+    for (final review in [false, true]) {
+      for (final seller in ['Host Store', 'Pet Family Store', 'Beauty Supply']) {
+        test('LF03 READINESS published identity cannot infer review status trade=$trade review=$review seller=$seller', () async {
+          final data = publicPage(trade: trade);
+          (data['publicStore'] as Map)['name'] = seller;
+          final selected = factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail).product;
+          final session = await readinessSession(selected, review: review);
+          for (final facts in [session.productFactsAdapter.snapshotFor(selected), session.productFactsFor(selected)]) {
+            expect(facts.storeOperatingState, BuyV2StoreOperatingState.unknown);
+            expect(facts.nextOpeningLabel, isNull); expect(facts.fulfilmentMode, isNull);
+            expect(facts.deliveryProviderName, isNull); expect(facts.eligibility, isNull);
+            expect(facts.deliveryPromise.toLowerCase(), contains('unconfirmed'));
+            expect(facts.orderabilityLabel, isNot('Available to add'));
+            expect(facts.orderabilityLabel, isNot('Store closed'));
+            expect(facts.orderabilityLabel, isNot('Products unavailable'));
+            expect(facts.priceMinor, selected.priceMinor); expect(facts.stale, isTrue);
+          }
+          expect(session.addProduct(selected.id), isFalse); expect(session.cartLines, isEmpty);
+        });
+      }
+    }
+  }
+  test('LF03 READINESS production default is neutral while explicit review fixtures remain unchanged', () {
+    final value = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+    final core = BuySession(), production = BuyV2Session(core: BuySession(), reviewDataEnabled: false);
+    final review = BuyV2Session(core: core, reviewDataEnabled: true);
+    addTearDown(core.dispose); addTearDown(review.dispose);
+    addTearDown(production.core.dispose); addTearDown(production.dispose);
+    final live = production.productFactsAdapter.snapshotFor(value);
+    expect(live.storeOperatingState, BuyV2StoreOperatingState.unknown); expect(live.stale, isTrue);
+    final original = review.productFactsFor(value);
+    expect(original.storeOperatingState, BuyV2StoreOperatingState.open);
+    expect(original.orderabilityLabel, 'Available to add');
+    expect(review.refreshProductFacts(value.id), isTrue);
+    expect(review.productFactsFor(value), original);
+  });
+  for (final review in [false, true]) {
+    test('LF03 READINESS invalid adapter cannot revive review status review=$review', () async {
+      final selected = factoryEntry(publicPage()).product;
+      final adapter = _HostOperationalFacts((p) => BuyV2ProductFactsSnapshot(productId: 'wrong-listing',
+        priceMinor: p.priceMinor, deliveryPromise: 'Invented delivery', partner: p.seller,
+        orderabilityLabel: 'Available to add', sourceId: 'host-invalid-source',
+        storeOperatingState: BuyV2StoreOperatingState.open));
+      final session = await readinessSession(selected, review: review, facts: adapter);
+      final current = session.productFactsFor(selected);
+      expect(current.storeOperatingState, BuyV2StoreOperatingState.unknown);
+      expect(current.stale, isTrue); expect(current.fulfilmentMode, isNull);
+      expect(current.deliveryPromise, isNot('Invented delivery'));
+      expect(current.priceMinor, selected.priceMinor); expect(session.addProduct(selected.id), isFalse);
+    });
+  }
+  test('LF03 READINESS supplied provider state is preserved and invalid refresh retires readiness not last paise', () async {
+    final selected = factoryEntry(publicPage()).product;
+    final adapter = _HostOperationalFacts((p) => BuyV2ProductFactsSnapshot(productId: p.id,
+      priceMinor: 26025, deliveryPromise: 'Host confirmed delivery', partner: p.seller,
+      orderabilityLabel: 'Store closed', sourceId: 'host-confirmed-source', observedAt: at,
+      storeOperatingState: BuyV2StoreOperatingState.closed, nextOpeningLabel: 'Host confirmed opening',
+      fulfilmentMode: BuyV2FulfilmentMode.quickLocal, dispatchPromise: 'Host confirmed dispatch',
+      deliveryProviderName: 'Host actual provider', deliveryServiceLevel: 'Host actual service',
+      orderCutoffLabel: 'Host actual cutoff', deliveryFeeLabel: 'Host actual fee'));
+    final session = await readinessSession(selected, facts: adapter);
+    final known = session.productFactsFor(selected);
+    expect(known.storeOperatingState, BuyV2StoreOperatingState.closed);
+    expect(known.nextOpeningLabel, 'Host confirmed opening'); expect(known.priceMinor, 26025);
+    adapter.reply = (p) => BuyV2ProductFactsSnapshot(productId: 'retired-product', priceMinor: 1,
+      deliveryPromise: 'Wrong refresh', partner: p.seller, orderabilityLabel: 'Available to add', sourceId: 'host-invalid');
+    expect(session.refreshProductFacts(selected.id), isFalse);
+    final unavailable = session.productFactsFor(selected);
+    expect(unavailable.priceMinor, 26025, reason: 'failed refresh must retain the original last-known paise');
+    expect(unavailable.storeOperatingState, BuyV2StoreOperatingState.unknown);
+    expect(unavailable.stale, isTrue); expect(unavailable.nextOpeningLabel, isNull);
+    expect(unavailable.fulfilmentMode, isNull); expect(unavailable.dispatchPromise, isNull);
+    expect(unavailable.deliveryProviderName, isNull); expect(unavailable.deliveryServiceLevel, isNull);
+    expect(unavailable.orderCutoffLabel, isNull); expect(unavailable.deliveryFeeLabel, isNull);
+    expect(session.addProduct(selected.id), isFalse); expect(session.cartLines, isEmpty);
+  });
+  test('LF03 READINESS bound listing with review delivery options cannot restore cleared mode', () async {
+    final selected = factoryEntry(publicPage()).product.copyWith(reviewDeliveryOptions: {BuyV2DeliveryOption.quick});
+    final session = await readinessSession(selected, review: true);
+    expect(session.productFactsFor(selected).fulfilmentMode, isNull);
+    expect(session.deliveryOptionsFor(selected), isEmpty);
+  });
+  test('LF03 READINESS invalid price is unavailable rather than a stale similar-family placeholder', () {
+    const adapter = BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false);
+    final selected = factoryEntry(publicPage()).product, invalid = selected.copyWith(priceMinor: 0);
+    expect(buyV2ResolveProductOfferDecision(product: invalid, facts: adapter.snapshotFor(invalid)).state,
+      BuyV2ProductOfferDecisionState.unavailable);
+    expect(buyV2ResolveProductOfferDecision(product: selected, facts: adapter.snapshotFor(selected)).state,
+      BuyV2ProductOfferDecisionState.stale, reason: 'unknown readiness is not verified out-of-stock');
+  });
+  test('LF03 READINESS genuine configured eligibility and provider fields remain available', () async {
+    final selected = factoryEntry(publicPage()).product;
+    final adapter = _HostOperationalFacts((p) => const BuyV2CatalogueProductFactsAdapter(includeReviewFixtures: false).snapshotFor(p));
+    final session = await readinessSession(selected, facts: adapter);
+    final eligibility = BuyV2OfferEligibility(productId: selected.id, storeId: selected.storeId!,
+      sourceRevision: 'host-live-revision', customerLocationKey: session.eligibilityLocationKey,
+      observedAt: at, expiresAt: at.add(const Duration(minutes: 15)), offerClass: selected.offerClass!,
+      channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
+      options: {BuyV2DeliveryOption.quick});
+    adapter.reply = (p) => BuyV2ProductFactsSnapshot(productId: p.id, priceMinor: 26025,
+      deliveryPromise: 'Host source-confirmed delivery', partner: p.seller, orderabilityLabel: 'Available to add',
+      sourceId: 'host-real-provider-contract', observedAt: at, storeOperatingState: BuyV2StoreOperatingState.open,
+      eligibility: eligibility, deliveryProviderName: 'Host supplied provider');
+    expect(session.refreshProductFacts(selected.id), isTrue);
+    final facts = session.productFactsFor(selected);
+    expect(facts.eligibility, same(eligibility)); expect(facts.stale, isFalse);
+    expect(facts.storeOperatingState, BuyV2StoreOperatingState.open);
+    expect(facts.deliveryProviderName, 'Host supplied provider'); expect(facts.priceMinor, 26025);
+    expect(session.deliveryOptionsFor(selected), {BuyV2DeliveryOption.quick});
+    expect(facts.fulfilmentMode, BuyV2FulfilmentMode.quickLocal);
+  });
+  test('LF03 READINESS review confirmation rejects a newly stale reply before creating an order', () {
+    final core = BuySession(); var stale = false, reads = 0;
+    final adapter = _HostOperationalFacts((p) {
+      reads++;
+      return const BuyV2CatalogueProductFactsAdapter().snapshotFor(p).copyWith(stale: stale);
+    });
+    final session = BuyV2Session(core: core, reviewDataEnabled: true, productFactsAdapter: adapter);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    session.openCart(); expect(session.openCheckout(), isTrue);
+    final previousReads = reads, orders = session.orders.length, cart = session.itemCount;
+    stale = true;
+    expect(session.confirmOrder(), isFalse);
+    expect(reads, greaterThan(previousReads), reason: 'must reach fresh facts, not an unrelated earlier guard');
+    expect(session.orders.length, orders); expect(session.itemCount, cart);
+    expect(session.notice, contains('could not be confirmed'));
+  });
   // Both rows are isolated reviewed-source fixtures, not private Store records.
   Map<String, dynamic> siblingPage() {
     final data = publicPage(), value = row(data);
@@ -1937,6 +2084,30 @@ void main() {
     await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
       of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
     await tester.ensureVisible(control); await tester.pumpAndSettle();
+  }
+  for (final trade in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF03 READINESS public product labels do not promise unsourced delivery trade=$trade scale=$scale', (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+        final selected = factoryEntry(publicPage(trade: trade),
+          channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail).product;
+        final session = await readinessSession(selected);
+        expect(session.openProduct(selected.id), isTrue);
+        await mountOptionalDetails(tester, session, scale);
+        expect(find.bySemanticsLabel(RegExp('Add minimum order of.*MoolSocial Courier Delivery')), findsNothing);
+        final delivery = find.byKey(ValueKey('buy-automatic-fulfilment-${selected.id}'));
+        await revealOptionalDetails(tester, selected, delivery);
+        expect(find.text('Open for orders'), findsNothing); expect(find.textContaining('tomorrow at 8'), findsNothing);
+        expect(find.descendant(of: delivery, matching: find.text('Check delivery availability')), findsOneWidget);
+        expect(find.descendant(of: delivery, matching: find.text('Method')), findsNothing);
+        expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
   }
   for (final trade in [false, true]) {
     for (final scale in [1.0, 2.0]) {
