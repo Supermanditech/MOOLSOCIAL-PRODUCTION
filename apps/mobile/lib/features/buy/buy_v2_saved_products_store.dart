@@ -475,6 +475,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
+    if (snapshot.orders.any((o) => o.lines.any((l) => !l.product.hasValidVariantFamilyIdentity)) ||
+        (snapshot.procurementDraft?.cartProducts.values.any(
+          (p) => !p.hasValidVariantFamilyIdentity) ?? false)) { return false; }
     if (snapshot.orders.any((order) => order.usesMinorAmounts && !_validExactOrderStorage(order))) return false;
     if (snapshot.orders.any((order) => order.totalMinor != null &&
         (order.totalMinor! < 0 || order.totalMinor! > 9007199254740991))) {
@@ -1158,8 +1161,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   Map<String, Object?> _encodeProcurementDraft(
     BuyV2ProcurementDraftSnapshot draft,
-  ) => {
-    'version': draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1,
+  ) {
+    final hasFamilies = draft.cartProducts.values.any((p) => p.variantFamilyId != null);
+    return {
+    'version': hasFamilies ? 3
+        : draft.cartProducts.values.any(_hasExactProductMoney) ? 2 : 1,
     'ownerScope': draft.ownerScope,
     if (draft.navigation case final navigation?)
       'navigation': _encodeProcurementNavigation(navigation),
@@ -1168,6 +1174,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         entry.key: {
           'id': entry.value.id,
           'canonicalId': entry.value.canonicalId,
+          if (hasFamilies) 'variantFamilyId': entry.value.variantFamilyId,
           if (entry.value.publicListingIdentity case final identity?) 'publicListingIdentity': identity.toJson(),
           'storeId': entry.value.storeId,
           'categoryId': entry.value.categoryId,
@@ -1188,27 +1195,37 @@ final class BuyV2SharedPreferencesCustomerStateStore
           'offerRevision': entry.value.procurementSupplierGrant?.offerRevision,
         },
     },
-  };
+    };
+  }
 
   BuyV2ProcurementDraftSnapshot? _decodeProcurementDraft(Object? value) {
     if (value is! Map) return null;
     final source = _objectMap(value);
     final scope = _string(source['ownerScope']);
-    if (source['version'] is! int || !const {1, 2}.contains(source['version']) || scope == null || scope != ownerScope) {
+    if (source['version'] is! int || !const {1, 2, 3}.contains(source['version']) || scope == null || scope != ownerScope) {
       return null;
     }
     final products = <String, BuyV2Product>{};
     for (final entry in _objectMap(source['cartProducts']).entries) {
       final item = _objectMap(entry.value);
+      if (!_validRetainedFamily(item, source['version'], allowLegacyMember: true)) {
+        throw const FormatException('Saved product family needs checking.');
+      }
       final id = _string(item['id']);
       final minimum = item['minimumOrder'];
       final publicIdentity = BuyV2PublicListingIdentity.fromJson(item['publicListingIdentity']);
-      if (item.containsKey('publicListingIdentity') && publicIdentity == null) continue;
+      if (item.containsKey('publicListingIdentity') && publicIdentity == null) {
+        if (source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
+        continue;
+      }
       if (id != entry.key ||
           id == null ||
-          !_validRetainedProductMoney(item, allowMinor: source['version'] == 2) ||
+          !_validRetainedProductMoney(item, allowMinor: source['version'] != 1) ||
           minimum is! int ||
           minimum < 1) {
+        if (source['version'] == 3) {
+          throw const FormatException('Saved product family needs checking.');
+        }
         continue;
       }
       final identity = BuyV2ProcurementSupplierGrant(
@@ -1227,6 +1244,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       products[id] = BuyV2Product(
         id: id,
         canonicalId: _string(item['canonicalId']),
+        variantFamilyId: item['variantFamilyId'] as String?,
         publicListingIdentity: publicIdentity,
         offerClass: publicIdentity?.channel,
         variantAttributes: _decodeVariantAttributes(item['variantAttributes']),
@@ -1254,7 +1272,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
         procurementSupplierGrant: identity,
         catalogueListing: false,
       );
-      if (!products[id]!.hasValidPublicListingIdentity) products.remove(id);
+      if (!products[id]!.hasValidPublicListingIdentity) {
+        if (source['version'] == 3) throw const FormatException('Saved product identity needs checking.');
+        products.remove(id);
+      }
     }
     return BuyV2ProcurementDraftSnapshot(
       ownerScope: scope,
@@ -1782,9 +1803,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
     } on FormatException { return false; }
   }
   static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
-    'version': _hasExactProductMoney(product) ? 2 : 1,
+    'version': product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
     'id': product.id,
     'canonicalId': product.canonicalId,
+    'variantFamilyId': ?product.variantFamilyId,
     if (product.publicListingIdentity case final identity?) 'publicListingIdentity': identity.toJson(),
     'storeId': product.storeId,
     'destination': product.destination.name,
@@ -1807,6 +1829,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   static BuyV2Product? _decodePurchasedProduct(Object? value) {
     final source = _objectMap(value);
+    if (!_validRetainedFamily(source, source['version'])) {
+      throw const FormatException('Saved purchased family needs checking.');
+    }
     final id = _string(source['id']);
     final canonicalId = _string(source['canonicalId']);
     final destination = _destination(_string(source['destination']));
@@ -1823,22 +1848,24 @@ final class BuyV2SharedPreferencesCustomerStateStore
       'sellerType',
       'origin',
     ];
-    if (source['version'] is! int || !const {1, 2}.contains(source['version']) ||
+    if (source['version'] is! int || !const {1, 2, 3}.contains(source['version']) ||
         (source.containsKey('publicListingIdentity') && publicIdentity == null) ||
         id == null ||
         canonicalId == null ||
         destination == null ||
         title == null ||
-        !_validRetainedProductMoney(source, allowMinor: source['version'] == 2) ||
+        !_validRetainedProductMoney(source, allowMinor: source['version'] != 1) ||
         minimumOrder is! int ||
         minimumOrder < 1 ||
         source['requiresPrescription'] is! bool ||
         textFields.any((key) => source[key] is! String)) {
+      if (source['version'] == 3) throw const FormatException('Saved purchased identity needs checking.');
       return null;
     }
     final product = BuyV2Product(
       id: id,
       canonicalId: canonicalId,
+      variantFamilyId: source['variantFamilyId'] as String?,
       publicListingIdentity: publicIdentity,
       offerClass: publicIdentity?.channel,
       variantAttributes: _decodeVariantAttributes(source['variantAttributes']),
@@ -1868,7 +1895,26 @@ final class BuyV2SharedPreferencesCustomerStateStore
       visualKind: 'unavailable',
       catalogueListing: false,
     );
+    if (!product.hasValidPublicListingIdentity && source['version'] == 3) {
+      throw const FormatException('Saved purchased identity needs checking.');
+    }
     return product.hasValidPublicListingIdentity ? product : null;
+  }
+
+  // Reject corruption as an unreadable original, never silently lose a line or
+  // migrate unversioned family membership into legacy canonical grouping.
+  static bool _validRetainedFamily(Map<String, Object?> source, Object? version,
+      {bool allowLegacyMember = false}) {
+    if (version != 3 || version is! int) return !source.containsKey('variantFamilyId');
+    if (!source.containsKey('variantFamilyId')) return false;
+    final family = source['variantFamilyId'];
+    if (family == null) return allowLegacyMember;
+    final store = source['storeId'];
+    final raw = source['variantAttributes'];
+    return family is String &&
+        family.isNotEmpty && family == family.trim() && store is String &&
+        store.isNotEmpty && store == store.trim() && raw is List && raw.isNotEmpty &&
+        _decodeVariantAttributes(raw).length == raw.length;
   }
 
   static List<Map<String, Object?>> _encodeVariantAttributes(

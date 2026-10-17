@@ -337,6 +337,10 @@ class BuyV2VariantFamilySnapshot {
   BuyV2VariantFamilySnapshot({
     required this.productId,
     required this.canonicalId,
+    this.variantFamilyId,
+    this.categoryId,
+    this.offerClass,
+    this.realm,
     required this.storeId,
     required this.destination,
     required this.queryKey,
@@ -353,6 +357,10 @@ class BuyV2VariantFamilySnapshot {
 
   final String productId;
   final String canonicalId;
+  final String? variantFamilyId;
+  final String? categoryId;
+  final BuyV2OfferClass? offerClass;
+  final String? realm;
   final String storeId;
   final BuyV2Destination destination;
   final String queryKey;
@@ -368,6 +376,16 @@ class BuyV2VariantFamilySnapshot {
   final List<BuyV2VariantAttribute> options;
   final List<BuyV2Product> candidates;
 
+  /// Group membership only. isValidFor still binds the exact selected SKU.
+  bool matchesFamilyOf(BuyV2Product product) =>
+      product.hasValidVariantFamilyIdentity &&
+      storeId == product.storeId && destination == product.destination &&
+      (variantFamilyId == null && product.variantFamilyId == null
+        ? canonicalId == product.canonicalId
+        : variantFamilyId != null && variantFamilyId == product.variantFamilyId &&
+            categoryId == product.categoryId && offerClass == product.offerClass &&
+            realm == product.publicListingIdentity?.realm);
+
   bool isValidFor(
     BuyV2Product selected,
     BuyV2CatalogueQuery context,
@@ -382,6 +400,7 @@ class BuyV2VariantFamilySnapshot {
         !identity(storeId) ||
         productId != selected.id ||
         canonicalId != selected.canonicalId ||
+        !matchesFamilyOf(selected) ||
         storeId != selected.storeId ||
         destination != selected.destination ||
         context.storeId != storeId ||
@@ -420,7 +439,8 @@ class BuyV2VariantFamilySnapshot {
           !candidate.hasStructuredVariants ||
           !candidate.isFromSameStoreAs(selected) ||
           candidate.destination != destination ||
-          candidate.canonicalId != canonicalId ||
+          !candidate.isInSameVariantFamilyAs(selected) ||
+          (candidate.id == selected.id && candidate.canonicalId != canonicalId) ||
           candidate.categoryId != selected.categoryId ||
           candidate.offerClass != selected.offerClass ||
           !candidate.catalogueListing ||

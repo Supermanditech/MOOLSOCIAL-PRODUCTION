@@ -705,6 +705,7 @@ class BuyV2Product {
     this.procurementSupplierGrant,
     this.mediaAssets = const [],
     this.variantAttributes = const [],
+    this.variantFamilyId,
     this.storeId,
     this.publicListingIdentity,
     int? mrp,
@@ -732,6 +733,10 @@ class BuyV2Product {
   final String id;
   final String canonicalId;
 
+  /// Provider-supplied family membership, not the exact canonical SKU identity.
+  /// Absent on legacy records; never inferred from product or seller text.
+  final String? variantFamilyId;
+
   /// Stable branch identity from the catalogue source; never a seller label.
   final String? storeId;
   final BuyV2PublicListingIdentity? publicListingIdentity;
@@ -756,6 +761,27 @@ class BuyV2Product {
               .length ==
           variantAttributes.length;
 
+  bool get hasValidVariantFamilyIdentity => variantFamilyId == null ||
+      (variantFamilyId!.trim().isNotEmpty && variantFamilyId == variantFamilyId!.trim() &&
+          storeId != null && storeId!.isNotEmpty && storeId == storeId!.trim() &&
+          hasStructuredVariants);
+
+  /// Family grouping never replaces exact SKU/pack/publication validation.
+  /// Explicit families require branch identity, not the legacy seller fallback.
+  bool isInSameVariantFamilyAs(BuyV2Product other) {
+    if (destination != other.destination || categoryId != other.categoryId ||
+        !isFromSameStoreAs(other) || !hasValidVariantFamilyIdentity ||
+        !other.hasValidVariantFamilyIdentity) { return false; }
+    if (variantFamilyId == null && other.variantFamilyId == null) {
+      return canonicalId == other.canonicalId;
+    }
+    return variantFamilyId != null && variantFamilyId == other.variantFamilyId &&
+        offerClass == other.offerClass && hasValidPublicListingIdentity &&
+        other.hasValidPublicListingIdentity &&
+        (publicListingIdentity == null) == (other.publicListingIdentity == null) &&
+        publicListingIdentity?.realm == other.publicListingIdentity?.realm;
+  }
+
   /// Resolve a unique SKU without silently changing the other selected options.
   BuyV2Product? resolveVariantOption(
     Iterable<BuyV2Product> family,
@@ -769,7 +795,7 @@ class BuyV2Product {
     final matches = family
         .where(
           (candidate) =>
-              candidate.canonicalId == canonicalId &&
+              candidate.isInSameVariantFamilyAs(this) &&
               candidate.destination == destination &&
               candidate.isFromSameStoreAs(this) &&
               candidate.hasStructuredVariants &&
@@ -858,6 +884,7 @@ class BuyV2Product {
   BuyV2Product copyWith({
     String? id,
     String? canonicalId,
+    String? variantFamilyId,
     String? storeId,
     BuyV2PublicListingIdentity? publicListingIdentity,
     String? brand,
@@ -889,6 +916,7 @@ class BuyV2Product {
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
+    variantFamilyId: variantFamilyId ?? this.variantFamilyId,
     storeId: storeId ?? this.storeId,
     publicListingIdentity: publicListingIdentity ?? this.publicListingIdentity,
     destination: destination,

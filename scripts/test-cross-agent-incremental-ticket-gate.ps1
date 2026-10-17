@@ -189,6 +189,25 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Facts scope widened beyond its exact existing service.'
     $cases++
   }
+  if ($null -ne $continuation.PSObject.Properties['batch02Variants']) {
+    foreach($owner in $continuation.batch02Variants.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 variant owner rejected.'
+      $cases++
+    }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Variants.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 variants missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Variants.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 variants changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch02Variants.owners+= 'backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Variant prerequisite widened into backend.'
+    $cases++
+  }
   Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."
   return
 }

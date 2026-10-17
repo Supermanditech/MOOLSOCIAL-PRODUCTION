@@ -7990,6 +7990,23 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($facts.owners|Sort-Object) -join '|') -cne (@($factsOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners+= $factsOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch02Variants']) {
+    $variants=$Continuation.batch02Variants
+    $variantOwners=@('apps/mobile/lib/features/buy/buy_v2_models.dart',
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart')
+    if ($null -eq $variants -or $variants -isnot [pscustomobject]) { return $false }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if($null -eq $variants.PSObject.Properties[$key]) { return $false }
+    }
+    if ($variants.ticket -cne 'LF-03-C01' -or $variants.batch -ne 2 -or
+        $variants.sourceCheckpoint -cne '48528cc5b89beccb6138a68a9750655830cfdd46' -or
+        $variants.state -cne 'founder_authorized_frontend_variant_identity' -or
+        (@($variants.owners|Sort-Object) -join '|') -cne (@($variantOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners+= $variantOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0
@@ -8198,6 +8215,7 @@ function Invoke-Lf01Admission {
       'apps/mobile/test/ui_v2/universal/mool_single_home_launcher_shell_c23c_test.dart',
       'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_cold_launch_social_default_c10a_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_session_coverage_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart')
     $owners += @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
       'apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart',

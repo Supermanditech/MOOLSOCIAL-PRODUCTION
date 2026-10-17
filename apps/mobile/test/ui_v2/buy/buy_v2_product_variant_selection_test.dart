@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
@@ -57,7 +58,7 @@ final class _MediaHttpClient extends Fake implements HttpClient {
 
 final class _MediaCommerce extends Fake implements BuyV2CommerceAdapter {
   _MediaCommerce(this.product, {this.otherProducts = const []});
-  final BuyV2Product product;
+  BuyV2Product product;
   final List<BuyV2Product> otherProducts;
   @override
   Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
@@ -218,6 +219,16 @@ Future<void> capturePack(WidgetTester tester, String label) async {
   }
 }
 
+final class _VariantStringPreferences implements SharedPreferencesAsync {
+  final values = <String, String>{};
+  @override
+  Future<String?> getString(String key) async => values[key];
+  @override
+  Future<void> setString(String key, String value) async => values[key] = value;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
   _VariantFamilyAdapter(this.products);
   final List<BuyV2Product> products;
@@ -268,6 +279,10 @@ final class _VariantFamilyAdapter implements BuyV2VariantFamilySource {
     return BuyV2VariantFamilySnapshot(
       productId: current.id,
       canonicalId: current.canonicalId,
+      variantFamilyId: current.variantFamilyId,
+      categoryId: fault == 'category' ? 'foreign-category' : current.categoryId,
+      offerClass: current.offerClass,
+      realm: fault == 'realm' ? 'foreign-realm' : current.publicListingIdentity?.realm,
       storeId: current.storeId!,
       destination: current.destination,
       queryKey: fault == 'context' ? 'wrong-context' : context.key,
@@ -1236,6 +1251,251 @@ void main() {
             ],
           ),
     ];
+  }
+
+  // Explicitly labelled host fixtures, not owner-created or published inventory.
+  List<BuyV2Product> ownerFamily() => [
+    for (final product in structuredFamily()) product.copyWith(
+      canonicalId: 'exact-${product.id}', variantFamilyId: 'owner-phone-family'),
+  ];
+
+  List<BuyV2Product> boundOwnerFamily() => [
+    for (final (index, product) in ownerFamily().indexed)
+      product.copyWith(id: 'listing-${'${index + 1}' * 64}',
+        publicListingIdentity: BuyV2PublicListingIdentity(
+          listingId: 'listing-${'${index + 1}' * 64}', realm: 'evaluation',
+          storeId: product.storeId!, skuId: product.id,
+          canonicalProductId: product.canonicalId, verifiedPackId: 'host-pack',
+          channel: BuyV2OfferClass.retail)),
+  ];
+
+  test('LF03 explicit family selects a different exact canonical SKU', () {
+    final family = ownerFamily();
+    final first = family.first;
+    final next = first.resolveVariantOption(family, 'storage', '256');
+    expect(next?.id, family[1].id);
+    expect(next?.canonicalId, 'exact-${family[1].id}');
+    expect(next?.priceMinor, family[1].priceMinor);
+    expect(first.canonicalId, 'exact-${first.id}');
+  });
+
+  test('LF03 explicit families never join legacy malformed or foreign scope', () {
+    final first = ownerFamily().first;
+    final legacy = structuredFamily()[1].copyWith(canonicalId: first.canonicalId);
+    final sibling = ownerFamily()[1].copyWith(canonicalId: first.canonicalId);
+    for (final candidate in [legacy,
+      sibling.copyWith(variantFamilyId: ''),
+      sibling.copyWith(variantFamilyId: ' other '),
+      sibling.copyWith(variantFamilyId: 'different-family'),
+      sibling.copyWith(storeId: 'other-store'),
+      sibling.copyWith(offerClass: BuyV2OfferClass.bulk),
+    ]) {
+      expect(first.resolveVariantOption([first, candidate], 'storage', '256'),
+        isNull, reason: '${candidate.variantFamilyId}/${candidate.storeId}/${candidate.offerClass}');
+    }
+    expect(legacy.resolveVariantOption([first], 'storage', '128'), isNull);
+  });
+
+  test('LF03 explicit family needs real Store and matching publication realm', () {
+    final raw = BuyV2Catalogue.products.first.copyWith(
+      variantFamilyId: 'family', variantAttributes: ownerFamily().first.variantAttributes);
+    expect(raw.storeId, isNull);
+    expect(raw.resolveVariantOption([raw], 'storage', '128'), isNull);
+    BuyV2Product bound(BuyV2Product p, String realm, String suffix) {
+      final id = 'listing-${suffix * 64}';
+      return p.copyWith(id: id, publicListingIdentity: BuyV2PublicListingIdentity(
+        listingId: id, realm: realm, storeId: p.storeId!, skuId: p.id,
+        canonicalProductId: p.canonicalId, verifiedPackId: 'host-pack',
+        channel: BuyV2OfferClass.retail));
+    }
+    final first = bound(ownerFamily().first, 'evaluation', 'a');
+    final sibling = bound(ownerFamily()[1], 'production', 'b');
+    expect(first.resolveVariantOption([first, sibling], 'storage', '256'), isNull);
+  });
+
+  test('LF03 explicit family snapshot and session retain exact selected identity', () async {
+    final family = ownerFamily();
+    final adapter = _VariantFamilyAdapter(family);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, variantFamilySource: adapter,
+      commerceAdapter: _MediaCommerce(family.first), reviewDataEnabled: false,
+      productFactsAdapter: QualifiedTestProductFacts(family.map((p) => p.id).toSet()));
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    expect(session.openProduct(family.first.id), isTrue);
+    expect(await session.refreshVariantFamily(family.first), isTrue);
+    final snapshot = session.variantFamilyFor(family.first)!;
+    expect(snapshot.canonicalId, family.first.canonicalId);
+    expect(snapshot.variantFamilyId, 'owner-phone-family');
+    expect(snapshot.candidates.map((p) => p.canonicalId).toSet().length, 3);
+    final target = family[1];
+    expect(session.selectProductVariant(target.id), isTrue);
+    expect(session.selectedProduct!.canonicalId, target.canonicalId);
+    expect(session.variantOptionsFor(target), isNotEmpty);
+    expect(await session.refreshVariantFamily(target), isTrue);
+    for (final fault in ['category', 'realm', 'duplicate', 'ambiguous', 'foreign', 'expired']) {
+      adapter.fault = fault;
+      expect(await session.refreshVariantFamily(target), isFalse, reason: fault);
+      expect(session.selectedProduct!.canonicalId, target.canonicalId);
+    }
+  });
+
+  for (final change in ['family', 'options', 'binding']) {
+  test('LF03 late family response cannot overwrite same SKU changed $change', () async {
+    final family = boundOwnerFamily();
+    final adapter = _VariantFamilyAdapter(family);
+    final response = Completer<BuyV2VariantFamilySnapshot>();
+    BuyV2VariantFamilySnapshot? original;
+    adapter.handler = (product, query) {
+      original = adapter.snapshot(product, query);
+      expect(original!.isValidFor(product, query, DateTime.now()), isTrue);
+      return response.future;
+    };
+    final commerce = _MediaCommerce(family.first);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, variantFamilySource: adapter,
+      commerceAdapter: commerce, reviewDataEnabled: false);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    session.selectedProductId = family.first.id;
+    final pending = session.refreshVariantFamily(family.first);
+    await Future<void>.delayed(Duration.zero);
+    expect(original, isNotNull);
+    final first = family.first;
+    final binding = first.publicListingIdentity!;
+    commerce.product = switch (change) {
+      'family' => first.copyWith(variantFamilyId: 'new-reviewed-family'),
+      'options' => first.copyWith(variantAttributes: family[1].variantAttributes),
+      _ => first.copyWith(publicListingIdentity: BuyV2PublicListingIdentity(
+        listingId: binding.listingId, realm: binding.realm, storeId: binding.storeId,
+        skuId: binding.skuId, canonicalProductId: binding.canonicalProductId,
+        verifiedPackId: 'new-reviewed-pack', channel: binding.channel)),
+    };
+    await session.restoreCommerce();
+    response.complete(original!);
+    expect(await pending, isFalse);
+    expect(identical(session.findProduct(family.first.id), commerce.product), isTrue);
+    expect(session.variantFamilyFor(commerce.product), isNull);
+  });
+  }
+
+  test('LF03 family cannot replace known commerce listing pack binding', () async {
+    final family = boundOwnerFamily();
+    final old = family[1].publicListingIdentity!;
+    final changed = family[1].copyWith(publicListingIdentity: BuyV2PublicListingIdentity(
+      listingId: old.listingId, realm: old.realm, storeId: old.storeId, skuId: old.skuId,
+      canonicalProductId: old.canonicalProductId, verifiedPackId: 'changed-pack', channel: old.channel));
+    final adapter = _VariantFamilyAdapter([family.first, changed, ...family.skip(2)]);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, variantFamilySource: adapter,
+      commerceAdapter: _MediaCommerce(family.first, otherProducts: family.skip(1).toList()),
+      reviewDataEnabled: false);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCommerce();
+    session.selectedProductId = family.first.id;
+    expect(await session.refreshVariantFamily(family.first), isFalse);
+    expect(session.findProduct(family[1].id)!.publicListingIdentity, old);
+  });
+
+  test('LF03 mixed draft requires explicit legacy versus family membership', () async {
+    final prefs = _VariantStringPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-family');
+    final exact = ownerFamily().first;
+    final legacy = structuredFamily()[1];
+    expect(await store.write(BuyV2CustomerStateSnapshot(
+      procurementDraft: BuyV2ProcurementDraftSnapshot(ownerScope: 'host-family',
+        cartProducts: {exact.id: exact, legacy.id: legacy}))), isTrue);
+    final raw = jsonDecode(prefs.values.values.single) as Map<String, dynamic>;
+    expect(raw['procurementDraft']['cartProducts'][legacy.id].containsKey('variantFamilyId'), isTrue);
+    expect(raw['procurementDraft']['cartProducts'][legacy.id]['variantFamilyId'], isNull);
+    expect((await store.read())!.procurementDraft!.cartProducts.length, 2);
+    for (final id in [exact.id, legacy.id]) {
+      final broken = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+      broken['procurementDraft']['cartProducts'][id].remove('variantFamilyId');
+      final bytes = jsonEncode(broken);
+      prefs.values[prefs.values.keys.single] = bytes;
+      await expectLater(store.read(), throwsFormatException);
+      expect(prefs.values.values.single, bytes);
+    }
+  });
+
+  test('LF03 corrupt v3 product inside legacy order never silently drops line', () async {
+    final prefs = _VariantStringPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-family');
+    final product = ownerFamily().first.copyWith(price: 100);
+    final order = BuyV2Order(id: 'host-legacy-order', destination: product.destination,
+      title: 'Host order', itemSummary: 'Host product', total: 100, partner: product.seller,
+      partnerType: 'Host Store', promise: 'Unconfirmed', destinationLabel: 'Host address',
+      progress: 0, status: BuyV2OrderStatus.confirmed, productIds: [product.id],
+      lines: [BuyV2CartLine(product: product, quantity: 1)]);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order])), isTrue);
+    final raw = jsonDecode(prefs.values.values.single) as Map<String, dynamic>;
+    expect(raw['orders'][0].containsKey('moneyVersion'), isFalse);
+    for (final fault in ['money', 'binding', 'canonical', 'missing-family']) {
+      final broken = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+      final product = broken['orders'][0]['lines'][0]['purchasedProduct'];
+      if (fault == 'money') product['price'] = 'unreadable';
+      if (fault == 'binding') product['publicListingIdentity'] = {};
+      if (fault == 'canonical') product['canonicalId'] = null;
+      if (fault == 'missing-family') product.remove('variantFamilyId');
+      broken['checkoutIdempotencyKey'] = 'host-original-unknown-request';
+      final bytes = jsonEncode(broken);
+      prefs.values[prefs.values.keys.single] = bytes;
+      await expectLater(store.read(), throwsFormatException, reason: fault);
+      expect(prefs.values.values.single, bytes);
+    }
+  });
+
+  for (final minor in [false, true]) {
+    test('LF03 retained explicit family keeps whole or paise amounts $minor', () async {
+      final prefs = _VariantStringPreferences();
+      final product = ownerFamily().first.copyWith(
+        price: minor ? null : 100, priceMinor: minor ? 10025 : null);
+      final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-family');
+      final order = BuyV2Order.minor(id: 'host-family-order', destination: product.destination,
+        title: 'Host order', itemSummary: 'Host product', totalMinor: product.priceMinor,
+        partner: product.seller, partnerType: 'Host Store', promise: 'Unconfirmed', destinationLabel: 'Host address',
+        progress: 0, status: BuyV2OrderStatus.confirmed, productIds: [product.id],
+        lines: [BuyV2CartLine(product: product, quantity: 1)]);
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order],
+        procurementDraft: BuyV2ProcurementDraftSnapshot(ownerScope: 'host-family',
+          cartProducts: {product.id: product}))), isTrue);
+      final raw = jsonDecode(prefs.values.values.single) as Map<String, dynamic>;
+      expect(raw['procurementDraft']['version'], 3);
+      expect(raw['orders'][0]['lines'][0]['purchasedProduct']['version'], 3);
+      final restored = await store.read();
+      for (final selected in [restored!.orders.single.lines.single.product,
+        restored.procurementDraft!.cartProducts[product.id]!]) {
+        expect(selected.variantFamilyId, product.variantFamilyId);
+        expect(selected.canonicalId, product.canonicalId);
+        expect(selected.variantAttributes.map((a) => a.optionId),
+          product.variantAttributes.map((a) => a.optionId));
+        expect(selected.priceMinor, product.priceMinor);
+        expect(selected.catalogueListing, isFalse);
+      }
+      final savedKey = prefs.values.keys.single;
+      for (final target in ['order', 'draft']) {
+        for (final fault in ['blank', 'legacy', 'attributes']) {
+          final broken = jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+          final item = target == 'order' ? broken['orders'][0]['lines'][0]['purchasedProduct']
+            : broken['procurementDraft']['cartProducts'][product.id];
+          if (fault == 'blank') item['variantFamilyId'] = ' ';
+          if (fault == 'attributes') item['variantAttributes'] = [{}];
+          if (fault == 'legacy') {
+            if (target == 'order') { item['version'] = 2; }
+            else { broken['procurementDraft']['version'] = 2; }
+          }
+          broken['checkoutIdempotencyKey'] = 'original-unknown-host-request';
+          final bytes = jsonEncode(broken);
+          prefs.values[savedKey] = bytes;
+          await expectLater(store.read(), throwsFormatException, reason: '$target/$fault');
+          expect(prefs.values[savedKey], bytes);
+        }
+      }
+    });
   }
 
   List<BuyV2Product> completeFamily() {

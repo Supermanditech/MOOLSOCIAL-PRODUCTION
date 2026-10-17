@@ -4317,6 +4317,7 @@ class BuyV2Session extends ChangeNotifier {
         product.pack.trim().isEmpty ||
         product.minimumOrder < 1 ||
         !product.hasValidPublicListingIdentity ||
+        !product.hasValidVariantFamilyIdentity ||
         !product.hasValidPackTerms ||
         (previous != null && (previous.storeId != storeId ||
           previous.publicListingIdentity != product.publicListingIdentity))) {
@@ -11792,12 +11793,14 @@ class BuyV2Session extends ChangeNotifier {
   final Set<String> _variantWithdrawnIds = {};
   int _variantFamilyEpoch = 0;
   String? _variantFamilyRequestProductId;
+  BuyV2Product? _variantFamilyRequestProduct;
   String? _variantFamilyContextKey;
   bool _variantFamilyLoading = false;
   String? _variantFamilyMessage;
 
   BuyV2VariantFamilySource? _variantSourceFor(BuyV2Product current) {
-    if (!current.hasStructuredVariants || current.storeId == null) return null;
+    if (!current.hasStructuredVariants || current.storeId == null ||
+        !current.hasValidVariantFamilyIdentity) { return null; }
     if (variantFamilySource != null) return variantFamilySource;
     final source = _sourceForCatalogue(current.destination);
     return source is BuyV2VariantFamilySource
@@ -11826,9 +11829,18 @@ class BuyV2Session extends ChangeNotifier {
         : null;
   }
 
+  bool _sameVariantRequestIdentity(BuyV2Product? next, BuyV2Product original) =>
+      next != null && next.id == original.id && next.canonicalId == original.canonicalId &&
+      next.publicListingIdentity == original.publicListingIdentity &&
+      next.isInSameVariantFamilyAs(original) &&
+      next.variantAttributes.length == original.variantAttributes.length &&
+      original.variantAttributes.every((a) => next.variantAttributes.any((b) =>
+        a.dimensionId == b.dimensionId && a.optionId == b.optionId && a.kind == b.kind));
+
   bool variantFamilyLoadingFor(BuyV2Product current) =>
       _variantFamilyLoading &&
       _variantFamilyRequestProductId == current.id &&
+      _sameVariantRequestIdentity(_variantFamilyRequestProduct, current) &&
       _variantFamilyContextKey == _variantContext(current).key;
 
   /// Retain the validated family's choice labels while the new exact SKU's
@@ -11836,7 +11848,7 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2VariantAttribute> variantOptionsFor(BuyV2Product current) {
     final snapshot = _variantFamily;
     return snapshot != null &&
-            snapshot.canonicalId == current.canonicalId &&
+            snapshot.matchesFamilyOf(current) &&
             snapshot.storeId == current.storeId &&
             snapshot.destination == current.destination &&
             snapshot.queryKey == _variantContext(current).key &&
@@ -11846,7 +11858,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   String? variantFamilyMessageFor(BuyV2Product current) {
-    if (_variantFamilyRequestProductId != current.id) return null;
+    if (!_sameVariantRequestIdentity(_variantFamilyRequestProduct, current)) return null;
     if (_variantFamilyMessage != null) return _variantFamilyMessage;
     final previous = _variantFamily;
     if (previous != null &&
@@ -11880,8 +11892,10 @@ class BuyV2Session extends ChangeNotifier {
         epoch == _variantFamilyEpoch &&
         procurementEpoch == _procurementEpoch &&
         selectedProductId == current.id &&
+        _sameVariantRequestIdentity(selectedProduct, current) &&
         _variantContext(current).key == context.key;
     _variantFamilyRequestProductId = current.id;
+    _variantFamilyRequestProduct = current;
     _variantFamilyContextKey = context.key;
     _variantFamilyLoading = true;
     _variantFamilyMessage = null;
@@ -11897,7 +11911,7 @@ class BuyV2Session extends ChangeNotifier {
       final previous = _variantFamily;
       if (!next.isValidFor(current, context, catalogueNow()) ||
           (previous != null &&
-              previous.canonicalId == next.canonicalId &&
+              previous.matchesFamilyOf(current) &&
               previous.storeId == next.storeId &&
               previous.queryKey == next.queryKey &&
               next.observedAt.isBefore(previous.observedAt))) {
@@ -11910,6 +11924,7 @@ class BuyV2Session extends ChangeNotifier {
         final known = findProduct(candidate.id);
         if (known != null &&
             (known.canonicalId != candidate.canonicalId ||
+                known.publicListingIdentity != candidate.publicListingIdentity ||
                 known.destination != candidate.destination ||
                 !known.isFromSameStoreAs(candidate))) {
           throw const FormatException('Variant listing identity changed');
@@ -11953,6 +11968,7 @@ class BuyV2Session extends ChangeNotifier {
     if (hasVariantFamilySourceFor(current)) {
       return variantFamilyFor(current)?.candidates ?? [current];
     }
+    if (current.variantFamilyId != null) return [current];
     final legacyOptions = <(String, String)>{};
     return List.unmodifiable(
       _knownCatalogueProducts
@@ -11960,7 +11976,7 @@ class BuyV2Session extends ChangeNotifier {
           .where(
             (product) =>
                 product.destination == current.destination &&
-                product.canonicalId == current.canonicalId &&
+                product.isInSameVariantFamilyAs(current) &&
                 product.isFromSameStoreAs(current),
           )
           .where(
@@ -12491,6 +12507,7 @@ class BuyV2Session extends ChangeNotifier {
             );
     });
     if (variantWithdrawn(product) ||
+        !product.hasValidVariantFamilyIdentity ||
         !product.hasValidMoney || !cached.hasValidMoney ||
         !product.hasValidPublicListingIdentity ||
         !_matchesRetainedProductIdentity(product) ||
@@ -13054,8 +13071,11 @@ class BuyV2Session extends ChangeNotifier {
     if (current == null ||
         next == null ||
         next.destination != current.destination ||
-        next.canonicalId != current.canonicalId ||
-        !next.isFromSameStoreAs(current)) {
+        !next.isInSameVariantFamilyAs(current) ||
+        !next.isFromSameStoreAs(current) ||
+        (current.variantFamilyId != null && next.id != current.id &&
+          !(variantFamilyFor(current)?.candidates.any((p) =>
+            _sameVariantRequestIdentity(next, p)) ?? false))) {
       notice = 'This product option is no longer available.';
       notifyListeners();
       return false;
