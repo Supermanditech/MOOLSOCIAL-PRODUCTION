@@ -75879,6 +75879,105 @@ void main() {
   });
   }
 
+  for (final scale in [1.0, 2.0]) {
+  testWidgets('LF03 PUBLIC-FAMILY root Store preview wires reviewed selectors and return scale=$scale', (tester) async {
+    // Labelled host source only. No native provider/evaluation records injected.
+    final observed = DateTime.now().toUtc();
+    late String storeId, privateSku;
+    Map<String, dynamic> publicData(bool sibling) {
+      final data = jsonDecode(jsonEncode(catalogue_fixture.page())) as Map<String, dynamic>, row = catalogue_fixture.row(data);
+      final sku = sibling ? 'host-sibling-sku' : privateSku;
+      data.addAll({'realm': 'production', 'storeId': storeId, 'observedAt': observed.toIso8601String(),
+        'listingReadbackVersion': 1, 'listingCoverage': 'complete', 'mediaReadbackVersion': 1,
+        'publicStore': {'id': storeId, 'name': 'Host public family Store', 'profileId': 'retailer-grocery'}});
+      row.addAll({'skuId': sku, 'canonicalProductId': sibling ? 'canonical-two' : 'canonical-one',
+        'verifiedPackId': sibling ? 'pack-two' : 'pack-one', 'observedAt': observed.toIso8601String(),
+        'listings': [BuyV2PublicListingIdentity(listingId: 'listing-${(sibling ? 'e' : 'd') * 64}', realm: 'production',
+          storeId: storeId, skuId: sku, canonicalProductId: sibling ? 'canonical-two' : 'canonical-one',
+          verifiedPackId: sibling ? 'pack-two' : 'pack-one', channel: BuyV2OfferClass.retail).toJson()],
+        'supplierPolicy': {'schemaVersion': 1, 'realm': 'production', 'storeId': storeId, 'skuId': sku,
+          'observedAt': observed.toIso8601String(), 'state': 'none', 'revision': 0, 'requiresAcceptance': false, 'policy': null}});
+      ((row['channels'] as List).single as Map).addAll(<String, dynamic>{'priceMinor': sibling ? 26125 : 26025,
+        'validUntil': observed.add(const Duration(hours: 1)).toIso8601String()});
+      return data;
+    }
+    BuyV2VariantAttribute option(bool sibling) => BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour',
+      optionId: sibling ? 'blue' : 'pink', optionLabel: sibling ? 'Blue' : 'Pink', kind: BuyV2VariantDimensionKind.colour);
+    final reader = catalogue_fixture.HostReviewedVariantSource(memberships: (entries, current) async => [
+      for (final entry in entries) WorkspaceReviewedVariantMembership(listing: entry.product.publicListingIdentity!,
+        skuRevision: entry.readback.skuRevision!, catalogueVersion: entry.readback.catalogueVersion!,
+        familyId: 'host-root-family', sourceId: 'host-reviewed-root', revision: 1, observedAt: observed,
+        validUntil: observed.add(const Duration(minutes: 30)), attributes: [option(entry.product.sourceSkuId != privateSku)]),
+    ], family: (selected, query, current) async => BuyV2VariantFamilySnapshot(productId: selected.id,
+      canonicalId: selected.canonicalId, variantFamilyId: selected.variantFamilyId, categoryId: selected.categoryId,
+      offerClass: selected.offerClass, realm: 'production', storeId: storeId, destination: selected.destination,
+      queryKey: query.key, sourceId: 'host-reviewed-root', revision: '1', observedAt: observed,
+      validUntil: observed.add(const Duration(minutes: 30)), complete: true, selectedAvailable: true,
+      options: [option(false), option(true)], candidates: [for (final sibling in [false, true])
+        WorkspacePublicCatalogueEntry.fromResponse(publicData(sibling), storeId: storeId, realm: 'production',
+          channel: BuyV2OfferClass.retail, now: observed).product.copyWith(variantFamilyId: 'host-root-family',
+            variantAttributes: [option(sibling)])]));
+    final transport = catalogue_fixture.OwnerTransport((body) async {
+      var data = publicData(body['skuId'] == 'host-sibling-sku');
+      if (body.containsKey('cataloguePageVersion')) {
+        final query = body['query'] as Map, ids = (query['listingIds'] as List).cast<String>();
+        final rows = [if (query['destination'] == 'shop') for (final sibling in [false, true])
+          if (ids.isEmpty || ids.contains('listing-${(sibling ? 'e' : 'd') * 64}'))
+            {'channel': 'retail', 'row': catalogue_fixture.row(publicData(sibling))}];
+        data = {...data, 'cataloguePageVersion': 1, 'query': query, 'items': rows,
+          'page': {'snapshotId': 'f' * 64, 'startIndex': 0, 'totalCount': rows.length,
+            'previousCursor': null, 'nextCursor': null}};
+      }
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final work = WorkSession(catalogueGateway: AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: catalogue_fixture.Credentials(), transport: transport, reviewedVariants: reader, now: () => observed))
+      ..seedVerifiedWorkspace()..retailerSetupSaved = true..reviewStage = WorkReviewStage.live;
+    storeId = work.activeWorkspace!.id; privateSku = work.workspaceCatalogueItems.single.id;
+    final original = work.workspaceCatalogueItems.single;
+    WorkspacePublicCatalogueEntry.fromResponse(publicData(false), storeId: storeId, realm: 'production',
+      channel: BuyV2OfferClass.retail, now: observed);
+    final probe = await (work.catalogueGateway! as AuthenticatedWorkspaceCatalogueGateway).readPublicEntry(
+      storeId: storeId, skuId: privateSku, channel: BuyV2OfferClass.retail, current: () => true);
+    expect(probe, isNotNull, reason: 'configured host family fixture must pass the actual public decoder');
+    await mount(tester, route: '/app/buy?view=product&product=$privateSku&workspaceProduct=$privateSku&return=/app/work/workspace/dashboard',
+      work: work, viewport: const Size(390, 844), textScale: scale);
+    await tester.pumpAndSettle();
+    final consumer = tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session;
+    expect(consumer.findProduct('listing-${'d' * 64}'), isNotNull);
+    expect(consumer.selectedProduct, isNotNull, reason: 'root public product route must open the resolved exact listing');
+    expect(consumer.selectedProduct!.variantFamilyId, 'host-root-family');
+    expect(await consumer.refreshVariantFamily(consumer.selectedProduct!), isTrue);
+    await tester.pumpAndSettle();
+    Future<void> select(String colour) async {
+      final control = find.byKey(ValueKey('buy-product-option-colour-$colour'));
+      await tester.scrollUntilVisible(control, 180, scrollable: find.descendant(
+        of: find.byKey(PageStorageKey('buy-product-${consumer.selectedProductId}')), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(control); await tester.pumpAndSettle();
+      await tester.tap(control); await tester.pumpAndSettle();
+    }
+    await select('blue');
+    expect(consumer.selectedProduct!.canonicalId, 'canonical-two');
+    expect(consumer.selectedProduct!.priceMinor, 26125);
+    await select('pink');
+    expect(consumer.selectedProduct!.canonicalId, 'canonical-one');
+    expect(consumer.selectedProduct!.priceMinor, 26025);
+    expect(work.workspaceCatalogueItems.single, same(original));
+    final back = find.descendant(of: find.byType(BuyV2ProductView),
+      matching: find.byIcon(Icons.chevron_left_rounded));
+    await tester.scrollUntilVisible(back, -250, scrollable: find.descendant(
+      of: find.byKey(PageStorageKey('buy-product-${consumer.selectedProductId}')), matching: find.byType(Scrollable)).first);
+    expect(back, findsOneWidget);
+    await tester.ensureVisible(back); await tester.pumpAndSettle();
+    await tester.tap(back); await tester.pumpAndSettle();
+    expect(consumer.view, BuyV2View.catalogue);
+    await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+    expect(find.byType(WorkWorkspaceDashboardScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  }
+
   testWidgets('Store requirements use outcome-facing accessible fields', (
     tester,
   ) async {

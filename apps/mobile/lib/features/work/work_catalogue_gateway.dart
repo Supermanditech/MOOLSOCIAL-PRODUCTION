@@ -797,9 +797,48 @@ class WorkspacePublicCatalogueEntry {
   }
 }
 
+/// Reviewed association readback only. No owner write, review command or guessed
+/// HTTP operation. A configured source must cover each requested listing, using
+/// an explicit no-family record rather than treating missing data as standalone.
+abstract interface class WorkspacePublicVariantSource {
+  Future<List<WorkspaceReviewedVariantMembership>> readMemberships(
+    List<WorkspacePublicCatalogueEntry> entries, {required bool Function() current});
+  Future<BuyV2VariantFamilySnapshot> readFamily(BuyV2Product selected,
+    BuyV2CatalogueQuery query, {required bool Function() current});
+}
+
+class WorkspaceReviewedVariantMembership {
+  WorkspaceReviewedVariantMembership({required this.listing, required this.skuRevision,
+    required this.catalogueVersion, required this.familyId, required this.sourceId,
+    required this.revision, required this.observedAt, required this.validUntil,
+    required Iterable<BuyV2VariantAttribute> attributes}) : attributes = List.unmodifiable(attributes);
+  final BuyV2PublicListingIdentity listing;
+  final int skuRevision, catalogueVersion, revision;
+  final String? familyId;
+  final String sourceId;
+  final DateTime observedAt, validUntil;
+  final List<BuyV2VariantAttribute> attributes;
+  String get fingerprint {
+    final ordered = attributes.toList()..sort((a, b) => a.dimensionId.compareTo(b.dimensionId));
+    return jsonEncode([sourceId, familyId, for (final a in ordered)
+      [a.dimensionId, a.dimensionLabel, a.optionId, a.optionLabel, a.kind.name, a.swatchArgb]]);
+  }
+  bool validFor(WorkspacePublicCatalogueEntry entry, String realm, DateTime now) {
+    if (!listing.valid || listing.realm != realm || listing != entry.product.publicListingIdentity ||
+        !listing.matches(entry.product) || skuRevision != entry.readback.skuRevision ||
+        catalogueVersion != entry.readback.catalogueVersion || revision < 1 || revision > 1000000000 ||
+        sourceId.isEmpty || sourceId != sourceId.trim() || sourceId.length > 240 ||
+        observedAt.isAfter(now) || !now.isBefore(validUntil) || !observedAt.isBefore(validUntil)) { return false; }
+    if (familyId == null) return attributes.isEmpty && entry.product.variantFamilyId == null;
+    if (familyId!.length > 128 || attributes.length > 8) return false;
+    final product = entry.product.copyWith(variantFamilyId: familyId, variantAttributes: attributes);
+    return product.hasValidVariantFamilyIdentity && product.hasStructuredVariants;
+  }
+}
+
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
-class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
+class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource {
   WorkspaceStoreCatalogueSource({required this.gateway, required this.storeId, required this.current, this.contentReadback});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final String storeId;
@@ -826,16 +865,17 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
   }
 
   Future<BuyV2CataloguePage<BuyV2Product>> _load(BuyV2CatalogueQuery query,
-    {String? cursor, required int pageSize, Set<String> listingIds = const {}}) async {
+    {String? cursor, required int pageSize, Set<String> listingIds = const {}, bool Function()? requestCurrent}) async {
+    bool active() => current() && (requestCurrent?.call() ?? true);
     final request = _query(query, listingIds: listingIds);
     final contentOwner = contentReadback?.context();
-    if (pageSize < 1 || pageSize > 50 || !current()) throw const FormatException();
+    if (pageSize < 1 || pageSize > 50 || !active()) throw const FormatException();
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreCatalogue',
       'storeId': storeId, 'cataloguePageVersion': 1, 'query': request, 'pageSize': pageSize,
       if (gateway.productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
       'storeDetailsReadbackVersion': 1,
-      'cursor': ?cursor}, current, mutation: false);
-    if (!current() || response == null || response.statusCode != 200) throw const FormatException();
+      'cursor': ?cursor}, active, mutation: false);
+    if (!active() || response == null || response.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response.body));
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
@@ -861,7 +901,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
         (rows.isEmpty && (next != null || total != 0)) || data['nextCursor'] != next) {
       throw const FormatException();
     }
-    final entries = rows.map((raw) {
+    final decodedEntries = rows.map((raw) {
       final item = _map(raw);
       _keys(item, ['channel', 'row']);
       final channel = BuyV2OfferClass.values.where((value) => value.name == item['channel']).single;
@@ -877,8 +917,9 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
       }
       return entry;
     }).toList(growable: false);
+    final entries = await gateway._enrichVariants(decodedEntries, active);
     final products = entries.map((entry) => entry.product).toList(growable: false);
-    if (products.map((product) => product.id).toSet().length != products.length || !current()) throw const FormatException();
+    if (products.map((product) => product.id).toSet().length != products.length || !active()) throw const FormatException();
     final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
     if (data['storeDetailsReadbackVersion'] == 1) {
       final metadata = WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc());
@@ -904,6 +945,16 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
     {String? cursor, required int pageSize}) => _load(query, cursor: cursor, pageSize: pageSize);
 
   @override
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(BuyV2Product selected, BuyV2CatalogueQuery context) {
+    if (selected.storeId != storeId || context.storeId != storeId) throw const FormatException();
+    var reading = true;
+    bool active() => reading && current();
+    return gateway._readReviewedFamily(selected, context, active,
+      (ids) => resolveProducts(ids, requestCurrent: active))
+      .timeout(const Duration(seconds: 15)).whenComplete(() => reading = false);
+  }
+
+  @override
   Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query,
     {String? cursor, required int pageSize}) async {
     if (cursor != null || pageSize < 1 || pageSize > 50) throw const FormatException();
@@ -920,18 +971,20 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
   }
 
   @override
-  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async {
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds, {bool Function()? requestCurrent}) async {
     if (productIds.isEmpty) return const [];
     if (productIds.length > 50 || productIds.any((id) => !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id))) {
       throw const FormatException();
     }
     final products = <BuyV2Product>[];
     for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+      if (!current() || requestCurrent?.call() == false) throw const FormatException();
       final page = await _load(BuyV2CatalogueQuery(destination: destination, regionId: null,
-        areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId), pageSize: 50, listingIds: productIds);
+        areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId), pageSize: 50, listingIds: productIds,
+        requestCurrent: requestCurrent);
       products.addAll(page.items);
     }
-    if (!current()) throw const FormatException();
+    if (!current() || requestCurrent?.call() == false) throw const FormatException();
     return List.unmodifiable(products);
   }
 }
@@ -990,6 +1043,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.ownerAccountId,
     this.policyReadbackRequired = false,
     this.productFactsReadbackSupported = false,
+    this.reviewedVariants,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
@@ -1006,6 +1060,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool policyReadbackRequired;
   // Enable only with the matching service contract; do not break strict legacy endpoints.
   final bool productFactsReadbackSupported;
+  final WorkspacePublicVariantSource? reviewedVariants;
+  final Map<String, WorkspaceReviewedVariantMembership> _variantMemberships = {};
+  final Map<String, String> _variantInputs = {};
   bool _policyObserved = false;
   bool get policyResolutionRequired => policyReadbackRequired || _policyObserved;
   final DateTime Function() now;
@@ -1021,8 +1078,119 @@ class AuthenticatedWorkspaceCatalogueGateway
       ownerAccountId: accountId,
       policyReadbackRequired: policyReadbackRequired,
       productFactsReadbackSupported: productFactsReadbackSupported,
+      reviewedVariants: reviewedVariants,
       now: now,
     );
+  }
+
+  Future<List<WorkspacePublicCatalogueEntry>> _enrichVariants(
+      List<WorkspacePublicCatalogueEntry> entries, bool Function() current) async {
+    if (!current()) throw const FormatException();
+    final source = reviewedVariants;
+    if (source == null || entries.isEmpty) return entries;
+    final records = await source.readMemberships(List.unmodifiable(entries), current: current)
+      .timeout(const Duration(seconds: 15));
+    if (!current() || records.length != entries.length) throw const FormatException();
+    final byId = <String, WorkspaceReviewedVariantMembership>{};
+    for (final record in records) {
+      if (byId.containsKey(record.listing.listingId)) throw const FormatException();
+      byId[record.listing.listingId] = record;
+    }
+    final enriched = <WorkspacePublicCatalogueEntry>[];
+    for (final entry in entries) {
+      final record = byId[entry.product.id], previous = _variantMemberships[entry.product.id];
+      if (record == null || !record.validFor(entry, realm, now().toUtc()) || previous != null &&
+          (record.revision < previous.revision || record.observedAt.isBefore(previous.observedAt) ||
+            record.skuRevision < previous.skuRevision || record.catalogueVersion < previous.catalogueVersion ||
+            record.sourceId != previous.sourceId ||
+            record.revision == previous.revision && record.fingerprint != previous.fingerprint)) {
+        throw const FormatException('Product options could not be confirmed.');
+      }
+      enriched.add(WorkspacePublicCatalogueEntry(product: entry.product.copyWith(
+        variantFamilyId: record.familyId, variantAttributes: record.attributes), readback: entry.readback));
+    }
+    if (!current()) throw const FormatException();
+    // Validate the entire batch before admitting any association/high-water mark.
+    final inputs = <String, String>{};
+    for (final entry in enriched) {
+      final input = WorkspaceCatalogueReadback._input(entry.product);
+      if (input == null) throw const FormatException();
+      inputs[entry.product.id] = input;
+    }
+    _variantMemberships.addAll(byId);
+    _variantInputs.addAll(inputs);
+    return List.unmodifiable(enriched);
+  }
+
+  Future<BuyV2VariantFamilySnapshot> _readReviewedFamily(BuyV2Product selected,
+      BuyV2CatalogueQuery query, bool Function() current,
+      Future<List<BuyV2Product>> Function(Set<String>) resolvePublished) async {
+    final source = reviewedVariants, member = _variantMemberships[selected.id];
+    bool active() {
+      final latest = _variantMemberships[selected.id];
+      return current() && latest != null && member != null && latest.revision == member.revision &&
+        latest.sourceId == member.sourceId && latest.fingerprint == member.fingerprint &&
+        latest.skuRevision == member.skuRevision && latest.catalogueVersion == member.catalogueVersion &&
+        now().toUtc().isBefore(latest.validUntil) &&
+        _variantInputs[selected.id] == WorkspaceCatalogueReadback._input(selected);
+    }
+    if (source == null || member == null || !active() || member.familyId == null ||
+        member.familyId != selected.variantFamilyId || !member.listing.matches(selected) ||
+        member.listing.realm != realm || !now().toUtc().isBefore(member.validUntil)) {
+      throw const FormatException('Product options are not connected.');
+    }
+    final snapshot = await source.readFamily(selected, query, current: active).timeout(const Duration(seconds: 15));
+    if (!active() || !snapshot.isValidFor(selected, query, now().toUtc()) ||
+        snapshot.candidates.length > 500 ||
+        snapshot.revision != '${member.revision}' || snapshot.sourceId != member.sourceId ||
+        snapshot.observedAt.isBefore(member.observedAt) || snapshot.validUntil.isAfter(member.validUntil) ||
+        snapshot.candidates.any((p) => p.publicListingIdentity?.valid != true ||
+          p.publicListingIdentity?.realm != realm || !p.publicListingIdentity!.matches(p) ||
+          !p.hasValidPackTerms || p.packTerms == null || !p.packTerms!.pricingCurrentAt(now().toUtc()) ||
+          p.id == selected.id && WorkspaceCatalogueReadback._input(p) != _variantInputs[selected.id] ||
+          p.variantAttributes.any((a) => !snapshot.options.any((o) =>
+            a.dimensionId == o.dimensionId && a.dimensionLabel == o.dimensionLabel &&
+            a.optionId == o.optionId && a.optionLabel == o.optionLabel && a.kind == o.kind && a.swatchArgb == o.swatchArgb)))) {
+      throw const FormatException('Product options changed. Please refresh.');
+    }
+    final candidates = <BuyV2Product>[];
+    final candidateMemberships = <String, WorkspaceReviewedVariantMembership>{};
+    // Existing exact-listing resolution supplies each candidate's real public
+    // product and association. A family/discovery hint cannot mint a sibling.
+    for (var start = 0; start < snapshot.candidates.length; start += 50) {
+      if (!active()) throw const FormatException();
+      final end = min(start + 50, snapshot.candidates.length);
+      final expected = {for (final p in snapshot.candidates.sublist(start, end)) p.id: p};
+      final resolved = await resolvePublished(expected.keys.toSet());
+      if (!active() || resolved.length != expected.length ||
+          resolved.map((p) => p.id).toSet().length != resolved.length || resolved.any((p) {
+            final original = expected[p.id], association = _variantMemberships[p.id];
+            return original == null || association == null || association.familyId != member.familyId ||
+              association.revision != member.revision || association.sourceId != member.sourceId ||
+              WorkspaceCatalogueReadback._input(original) != WorkspaceCatalogueReadback._input(p);
+          })) { throw const FormatException('A product option needs refreshing.'); }
+      candidates.addAll(resolved);
+      for (final product in resolved) {
+        candidateMemberships[product.id] = _variantMemberships[product.id]!;
+      }
+    }
+    final confirmed = BuyV2VariantFamilySnapshot(productId: snapshot.productId, canonicalId: snapshot.canonicalId,
+      variantFamilyId: snapshot.variantFamilyId, categoryId: snapshot.categoryId, offerClass: snapshot.offerClass,
+      realm: snapshot.realm, storeId: snapshot.storeId, destination: snapshot.destination, queryKey: snapshot.queryKey,
+      sourceId: snapshot.sourceId, revision: snapshot.revision, observedAt: snapshot.observedAt,
+      validUntil: snapshot.validUntil, complete: snapshot.complete, selectedAvailable: snapshot.selectedAvailable,
+      options: snapshot.options, candidates: candidates);
+    // A later batch can await while another read advances an earlier sibling.
+    // Revalidate the entire completed result without any intervening await.
+    final completedAt = now().toUtc();
+    if (!active() || !confirmed.isValidFor(selected, query, completedAt) || candidates.any((product) {
+      final original = candidateMemberships[product.id], latest = _variantMemberships[product.id];
+      return original == null || latest == null || latest.revision != original.revision ||
+        latest.skuRevision != original.skuRevision || latest.catalogueVersion != original.catalogueVersion ||
+        latest.fingerprint != original.fingerprint || !completedAt.isBefore(latest.validUntil) ||
+        _variantInputs[product.id] != WorkspaceCatalogueReadback._input(product);
+    })) { throw const FormatException(); }
+    return confirmed;
   }
 
   @override
@@ -1320,7 +1488,9 @@ class AuthenticatedWorkspaceCatalogueGateway
         storeId: storeId, realm: realm, channel: channel, now: now().toUtc());
       // The response is scoped to the requested raw SKU, not merely a same-Store
       // listing. Account/session retirement never admits a delayed product.
-      return current() && entry.product.sourceSkuId == skuId ? entry : null;
+      if (!current() || entry.product.sourceSkuId != skuId) return null;
+      final enriched = await _enrichVariants([entry], current);
+      return current() ? enriched.single : null;
     } catch (_) {
       return null;
     }
@@ -1422,7 +1592,7 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
       jsonEncode([product.storeId, product.id, product.offerClass?.name]);
   String _policyKey(BuyV2Product product) => jsonEncode([product.storeId, product.sourceSkuId,
     if (product.publicListingIdentity case final identity?) identity.realm]);
-  String? _input(BuyV2Product product) {
+  static String? _input(BuyV2Product product) {
     try {
       final price = product.priceMinor, mrp = product.mrpMinor;
       final tiers = [for (final tier in product.packTerms?.priceTiers ?? <BuyV2PackPriceTier>[]) tier.priceMinor];
@@ -1437,6 +1607,9 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
     product.title,
     product.brand,
     product.variant,
+    if (product.variantFamilyId != null) [product.variantFamilyId,
+      for (final a in product.variantAttributes)
+        [a.dimensionId, a.dimensionLabel, a.optionId, a.optionLabel, a.kind.name, a.swatchArgb]],
     product.pack,
     if (!WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty)
       WorkspaceCatalogueProductFacts.fromProduct(product).toJson(),

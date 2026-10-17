@@ -28,6 +28,23 @@ import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen
 
 // Host fixtures only. No upload, device storage or real commerce.
 final at = DateTime.utc(2026, 10, 16, 12);
+// Configured reviewed-source fixture only; never injected into the native app.
+class HostReviewedVariantSource implements WorkspacePublicVariantSource {
+  HostReviewedVariantSource({required this.memberships, this.family});
+  final Future<List<WorkspaceReviewedVariantMembership>> Function(
+    List<WorkspacePublicCatalogueEntry> entries, bool Function() current) memberships;
+  final Future<BuyV2VariantFamilySnapshot> Function(BuyV2Product selected,
+    BuyV2CatalogueQuery query, bool Function() current)? family;
+  @override
+  Future<List<WorkspaceReviewedVariantMembership>> readMemberships(
+    List<WorkspacePublicCatalogueEntry> entries, {required bool Function() current}) => memberships(entries, current);
+  @override
+  Future<BuyV2VariantFamilySnapshot> readFamily(BuyV2Product selected, BuyV2CatalogueQuery query,
+    {required bool Function() current}) {
+    if (family == null) throw StateError('No host family response configured');
+    return family!(selected, query, current);
+  }
+}
 class _HostExactOrderCommerce implements BuyV2CommerceAdapter {
   List<BuyV2Order> records = [];
   BuyV2Order? refreshedOrder;
@@ -1120,6 +1137,274 @@ void main() {
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, now: () => at);
+  WorkspaceReviewedVariantMembership reviewedMember(WorkspacePublicCatalogueEntry entry,
+    {int revision = 1, DateTime? expiry, String? familyId = 'host-reviewed-family', String colour = 'pink'}) =>
+    WorkspaceReviewedVariantMembership(listing: entry.product.publicListingIdentity!,
+      skuRevision: entry.readback.skuRevision!, catalogueVersion: entry.readback.catalogueVersion!,
+      familyId: familyId, sourceId: 'host-reviewed-associations', revision: revision,
+      observedAt: at, validUntil: expiry ?? at.add(const Duration(minutes: 30)), attributes: [
+        if (familyId != null) BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour',
+          optionId: colour, optionLabel: colour, kind: BuyV2VariantDimensionKind.colour),
+      ]);
+  test('LF03 PUBLIC-FAMILY direct page resolve and owner clone use the same reviewed association', () async {
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async =>
+      entries.map((entry) => reviewedMember(entry)).toList());
+    final transport = OwnerTransport((body) async {
+      expect(body['operation'], 'readPublicStoreCatalogue');
+      expect(body.containsKey('variantFamilyReadbackVersion'), isFalse,
+        reason: 'Injected reader must not guess a new HTTP operation or break legacy request shapes');
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+        'data': body.containsKey('cataloguePageVersion')
+          ? pageData(body, empty: (body['query'] as Map)['destination'] == 'wholesale') : publicPage()}));
+    });
+    final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at, reviewedVariants: reader);
+    expect(identical(connection.forOwnerAccount('owner-one').reviewedVariants, reader), isTrue);
+    final direct = await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => true);
+    expect(direct, isNotNull);
+    expect(direct!.product.variantFamilyId, 'host-reviewed-family');
+    expect(direct.product.canonicalId, 'canonical-one');
+    expect(direct.product.priceMinor, 26000);
+    expect(direct.product.pack, '1 L');
+    final source = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one', current: () => true);
+    final page = await source.loadProducts(storeQuery(), pageSize: 40);
+    expect(page.items.single.variantFamilyId, direct.product.variantFamilyId);
+    expect(page.items.single.variantAttributes.single.optionId, 'pink');
+    final restored = await source.resolveProducts({direct.product.id});
+    expect(restored.first.variantFamilyId, direct.product.variantFamilyId);
+  });
+  test('LF03 PUBLIC-FAMILY missing incomplete expired and conflicting membership fails closed', () async {
+    var revision = 2, colour = 'pink', omit = false;
+    DateTime? expiry;
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async => omit ? [] :
+      entries.map((entry) => reviewedMember(entry, revision: revision, colour: colour, expiry: expiry)).toList());
+    final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: Transport(publicPage()), now: () => at, reviewedVariants: reader);
+    Future<WorkspacePublicCatalogueEntry?> read() => connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => true);
+    expect(await read(), isNotNull);
+    colour = 'blue'; expect(await read(), isNull, reason: 'same revision cannot rewrite selected attributes');
+    revision = 1; expect(await read(), isNull, reason: 'older family association cannot return');
+    revision = 3; expiry = at; expect(await read(), isNull);
+    expiry = null; omit = true; expect(await read(), isNull, reason: 'absence is not a standalone assertion');
+    omit = false; expect((await read())!.product.variantAttributes.single.optionId, 'blue');
+  });
+  // Both rows are isolated reviewed-source fixtures, not private Store records.
+  Map<String, dynamic> siblingPage() {
+    final data = publicPage(), value = row(data);
+    value['skuId'] = 'sku-two'; value['canonicalProductId'] = 'canonical-two';
+    value['verifiedPackId'] = 'pack-two'; value['sku'] = 'HOST-TWO';
+    (value['content'] as Map)['variant'] = 'Blue';
+    ((value['channels'] as List).single as Map)['priceMinor'] = 26025;
+    value['listings'] = [BuyV2PublicListingIdentity(listingId: 'listing-${'c' * 64}',
+      realm: 'production', storeId: 'store-one', skuId: 'sku-two', canonicalProductId: 'canonical-two',
+      verifiedPackId: 'pack-two', channel: BuyV2OfferClass.retail).toJson()];
+    value['supplierPolicy'] = {...policyEnvelope(state: 'none', revision: 0), 'skuId': 'sku-two'};
+    return data;
+  }
+  BuyV2Product familyProduct(Map<String, dynamic> data, String colour) {
+    final entry = factoryEntry(data);
+    return entry.product.copyWith(variantFamilyId: 'host-reviewed-family',
+      variantAttributes: reviewedMember(entry, colour: colour).attributes);
+  }
+  BuyV2VariantFamilySnapshot familyReply(BuyV2Product selected, BuyV2CatalogueQuery query,
+    List<BuyV2Product> candidates, {int revision = 1, String sourceId = 'host-reviewed-associations'}) =>
+    BuyV2VariantFamilySnapshot(productId: selected.id, canonicalId: selected.canonicalId,
+      variantFamilyId: selected.variantFamilyId, categoryId: selected.categoryId,
+      offerClass: selected.offerClass, realm: 'production', storeId: 'store-one',
+      destination: selected.destination, queryKey: query.key, sourceId: sourceId,
+      revision: '$revision', observedAt: at, validUntil: at.add(const Duration(minutes: 30)),
+      complete: true, selectedAvailable: true,
+      options: [for (final colour in ['pink', 'blue']) BuyV2VariantAttribute(dimensionId: 'colour',
+        dimensionLabel: 'Colour', optionId: colour, optionLabel: colour, kind: BuyV2VariantDimensionKind.colour)],
+      candidates: candidates);
+  OwnerTransport familyTransport({void Function(Map<String, Object?>)? onRequest}) => OwnerTransport((body) async {
+    onRequest?.call(body);
+    if (!body.containsKey('cataloguePageVersion')) {
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+        'data': body['skuId'] == 'sku-two' ? siblingPage() : publicPage()}));
+    }
+    final query = body['query'] as Map, ids = (query['listingIds'] as List).cast<String>();
+    final rows = <Map<String, dynamic>>[];
+    if (query['destination'] == 'shop') {
+      for (final data in [publicPage(), siblingPage()]) {
+        final value = row(data), id = ((value['listings'] as List).single as Map)['listingId'];
+        // Initial discovery is deliberately partial. Exact resolution can find B.
+        if (ids.isEmpty ? value['skuId'] == 'sku-one' : ids.contains(id)) {
+          rows.add({'channel': 'retail', 'row': value});
+        }
+      }
+    }
+    final data = pageData(body, empty: rows.isEmpty);
+    data['items'] = rows;
+    (data['page'] as Map)['totalCount'] = rows.length;
+    return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+  });
+  AuthenticatedWorkspaceCatalogueGateway familyGateway(WorkspacePublicVariantSource reader,
+    {SocialContentTransport? transport}) => AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport ?? familyTransport(), now: () => at, reviewedVariants: reader);
+  test('LF03 PUBLIC-FAMILY off-page sibling resolves exact source before selection and refresh', () async {
+    final candidates = [familyProduct(publicPage(), 'pink'), familyProduct(siblingPage(), 'blue')];
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async => entries.map((entry) =>
+      reviewedMember(entry, colour: entry.product.sourceSkuId == 'sku-one' ? 'pink' : 'blue')).toList(),
+      family: (selected, query, current) async => familyReply(selected, query, candidates));
+    final requested = <Set<String>>[];
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+      gateway: familyGateway(reader, transport: familyTransport(onRequest: (body) {
+        if (body['query'] case final Map query) requested.add((query['listingIds'] as List).cast<String>().toSet());
+      })));
+    final core = BuySession();
+    final session = BuyV2Session(core: core, cataloguePageSource: source, reviewDataEnabled: false, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final pager = session.acquireCatalogueProducts('host-reviewed-family');
+    await pager.open(storeQuery());
+    expect(pager.page!.items.length, 1);
+    expect(session.findProduct(candidates[1].id), isNull);
+    expect(session.openProduct(candidates[0].id), isTrue);
+    expect(await session.refreshVariantFamily(session.selectedProduct!), isTrue);
+    expect(requested.any((ids) => ids.contains(candidates[1].id)), isTrue);
+    expect(session.selectProductVariant(candidates[1].id), isTrue);
+    final selected = session.selectedProduct!;
+    expect(selected.canonicalId, 'canonical-two'); expect(selected.sourceSkuId, 'sku-two');
+    expect(selected.publicListingIdentity!.verifiedPackId, 'pack-two'); expect(selected.priceMinor, 26025);
+    expect(await session.refreshVariantFamily(selected), isTrue, reason: 'off-page B must have its own admitted readback');
+    expect(session.selectProductVariant(candidates[0].id), isTrue);
+    expect(session.selectedProduct!.canonicalId, 'canonical-one'); expect(session.selectedProduct!.priceMinor, 26000);
+    session.releaseCatalogueProducts('host-reviewed-family');
+  });
+  test('LF03 PUBLIC-FAMILY older neighbour cannot bypass newer admitted association', () async {
+    var revision = 1;
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async => entries.map((entry) =>
+      reviewedMember(entry, revision: revision, colour: entry.product.sourceSkuId == 'sku-one' ? 'pink' : 'blue')).toList(),
+      family: (selected, query, current) async => familyReply(selected, query,
+        [familyProduct(publicPage(), 'pink'), familyProduct(siblingPage(), 'blue')]));
+    final connection = familyGateway(reader);
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: connection);
+    final first = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+    revision = 2;
+    expect(await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-two',
+      channel: BuyV2OfferClass.retail, current: () => true), isNotNull);
+    revision = 1;
+    await expectLater(source.loadVariantFamily(first, storeQuery()), throwsFormatException);
+    expect(await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-two',
+      channel: BuyV2OfferClass.retail, current: () => true), isNull);
+  });
+  for (final fault in ['price', 'pack', 'source', 'option label', 'withdrawn']) {
+    test('LF03 PUBLIC-FAMILY rejects inconsistent family hint $fault', () async {
+      final first = familyProduct(publicPage(), 'pink'), second = familyProduct(siblingPage(), 'blue');
+      final reader = HostReviewedVariantSource(memberships: (entries, current) async => entries.map((entry) =>
+        reviewedMember(entry, colour: entry.product.sourceSkuId == 'sku-one' ? 'pink' : 'blue')).toList(),
+        family: (selected, query, current) async {
+          final changed = switch (fault) {
+            'price' => second.copyWith(priceMinor: 26026),
+            'pack' => second.copyWith(pack: 'Wrong pack'),
+            'option label' => second.copyWith(variantAttributes: [const BuyV2VariantAttribute(
+              dimensionId: 'colour', dimensionLabel: 'Colour', optionId: 'blue', optionLabel: 'Different blue',
+              kind: BuyV2VariantDimensionKind.colour)]),
+            _ => second,
+          };
+          return familyReply(selected, query, [first, changed],
+            revision: fault == 'withdrawn' ? 2 : 1,
+            sourceId: fault == 'source' ? 'unrelated-source' : 'host-reviewed-associations');
+        });
+      final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: familyGateway(reader));
+      final selected = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+      await expectLater(source.loadVariantFamily(selected, storeQuery()), throwsFormatException);
+    });
+  }
+  test('LF03 PUBLIC-FAMILY retired read cannot admit pending membership', () async {
+    var current = true, hold = true;
+    final pending = Completer<List<WorkspaceReviewedVariantMembership>>();
+    final started = Completer<List<WorkspacePublicCatalogueEntry>>();
+    final reader = HostReviewedVariantSource(memberships: (entries, lifetime) {
+      if (hold) { started.complete(entries); return pending.future; }
+      return Future.value(entries.map((entry) => reviewedMember(entry)).toList());
+    });
+    final connection = familyGateway(reader);
+    final read = connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => current);
+    final entries = await started.future;
+    current = false; pending.complete(entries.map((entry) => reviewedMember(entry, revision: 5)).toList());
+    expect(await read, isNull);
+    hold = false; current = true;
+    expect(await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => current), isNotNull,
+      reason: 'discarded revision5 must not poison the new request with a high-water mark');
+  });
+  test('LF03 PUBLIC-FAMILY delayed older SKU and catalogue cannot replace newer source', () async {
+    final older = Completer<SocialContentResponse>(), started = Completer<void>();
+    var calls = 0;
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async =>
+      entries.map((entry) => reviewedMember(entry)).toList());
+    final connection = familyGateway(reader, transport: OwnerTransport((body) async {
+      if (++calls == 1) { started.complete(); return older.future; }
+      final data = publicPage()..['catalogueVersion'] = 2;
+      row(data)['revision'] = 2;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    }));
+    Future<WorkspacePublicCatalogueEntry?> read() => connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-one',
+      channel: BuyV2OfferClass.retail, current: () => true);
+    final pending = read(); await started.future;
+    expect((await read())!.readback.skuRevision, 2);
+    older.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': publicPage()})));
+    expect(await pending, isNull, reason: 'unchanged family revision does not authorize older catalogue facts');
+  });
+  test('LF03 PUBLIC-FAMILY final batch cannot expose a sibling advanced during later resolution', () async {
+    final data = <Map<String, dynamic>>[], candidates = <BuyV2Product>[];
+    for (var i = 0; i < 51; i++) {
+      final item = publicPage(), value = row(item), id = 'listing-${i.toRadixString(16).padLeft(64, '0')}';
+      final sku = 'sku-host-$i';
+      value.addAll({'skuId': sku, 'canonicalProductId': 'canonical-host-$i', 'verifiedPackId': 'pack-host-$i', 'sku': 'HOST-$i',
+        'listings': [BuyV2PublicListingIdentity(listingId: id, realm: 'production', storeId: 'store-one',
+          skuId: sku, canonicalProductId: 'canonical-host-$i', verifiedPackId: 'pack-host-$i',
+          channel: BuyV2OfferClass.retail).toJson()],
+        'supplierPolicy': {...policyEnvelope(state: 'none', revision: 0), 'skuId': sku}});
+      data.add(item);
+      candidates.add(familyProduct(item, 'choice-$i'));
+    }
+    final later = Completer<void>(), started = Completer<void>();
+    var hold = true, revisedSibling = false;
+    final reader = HostReviewedVariantSource(memberships: (entries, current) async => entries.map((entry) {
+      final i = int.parse(entry.product.sourceSkuId.split('-').last);
+      return reviewedMember(entry, revision: revisedSibling && i == 1 ? 2 : 1, colour: 'choice-$i');
+    }).toList(), family: (selected, query, current) async => BuyV2VariantFamilySnapshot(
+      productId: selected.id, canonicalId: selected.canonicalId, variantFamilyId: selected.variantFamilyId,
+      categoryId: selected.categoryId, offerClass: selected.offerClass, realm: 'production', storeId: 'store-one',
+      destination: selected.destination, queryKey: query.key, sourceId: 'host-reviewed-associations', revision: '1',
+      observedAt: at, validUntil: at.add(const Duration(minutes: 30)), complete: true, selectedAvailable: true,
+      options: candidates.map((p) => p.variantAttributes.single), candidates: candidates));
+    final connection = familyGateway(reader, transport: OwnerTransport((body) async {
+      if (!body.containsKey('cataloguePageVersion')) {
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true,
+          'data': data.singleWhere((d) => row(d)['skuId'] == body['skuId'])}));
+      }
+      final query = body['query'] as Map, ids = (query['listingIds'] as List).cast<String>();
+      if (hold && ids.length == 1 && ids.contains(candidates.last.id) && query['destination'] == 'shop') {
+        started.complete(); await later.future;
+      }
+      final rows = query['destination'] == 'wholesale' ? <Map<String, dynamic>>[] : [
+        for (var i = 0; i < data.length; i++)
+          if (ids.isEmpty ? i == 0 : ids.contains(candidates[i].id)) {'channel': 'retail', 'row': row(data[i])},
+      ];
+      final reply = pageData(body, empty: rows.isEmpty)..['items'] = rows;
+      (reply['page'] as Map)['totalCount'] = rows.length;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': reply}));
+    }));
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: connection);
+    final first = (await source.loadProducts(storeQuery(), pageSize: 40)).items.single;
+    final pending = source.loadVariantFamily(first, storeQuery());
+    final expectation = expectLater(pending, throwsFormatException);
+    await started.future;
+    revisedSibling = true;
+    expect(await connection.readPublicEntry(storeId: 'store-one', skuId: 'sku-host-1',
+      channel: BuyV2OfferClass.retail, current: () => true), isNotNull);
+    hold = false; later.complete();
+    await expectation;
+  });
   for (final empty in [false, true]) {
     test('LF-FACTS unsupported version cannot pass a catalogue page empty=$empty', () async {
       final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
