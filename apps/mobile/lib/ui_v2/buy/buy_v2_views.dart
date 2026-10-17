@@ -798,6 +798,11 @@ class BuyV2ProductView extends StatelessWidget {
     final automaticFulfilment =
         product.destination == BuyV2Destination.shop ||
         product.destination == BuyV2Destination.wholesale;
+    // Configuration identifies the selected SKU. Ingredients belong to sourced
+    // details, not an unlabelled substitute for the variant in the hero.
+    final identityDetail = automaticFulfilment
+        ? product.customerVariant
+        : _nonBlankComplianceValue(product.composition) ?? product.customerVariant;
     final sizeChart =
         automaticFulfilment &&
             content.state == BuyV2ProductContentState.ready &&
@@ -1146,15 +1151,16 @@ class BuyV2ProductView extends StatelessWidget {
                                             height: 1.25,
                                           ),
                                         ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          product.composition ??
-                                              product.customerVariant,
-                                          style: context.buyBody.copyWith(
-                                            fontSize: 12,
-                                            height: 1.3,
+                                        if (identityDetail.trim().isNotEmpty) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            identityDetail,
+                                            style: context.buyBody.copyWith(
+                                              fontSize: 12,
+                                              height: 1.3,
+                                            ),
                                           ),
-                                        ),
+                                        ],
                                       ],
                                     );
                                     final purchase = BuyV2CartAvoidanceRegion(
@@ -6838,6 +6844,7 @@ class _CommerceProductDetails extends StatefulWidget {
 class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
   final _tabKeys = List.generate(3, (_) => GlobalKey());
   int _tab = 0;
+  int _renderedTab = 0;
   bool _restored = false;
   String get _storageId => 'buy-details-state-${widget.product.id}';
 
@@ -6863,7 +6870,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
   void _revealSelectedTab() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final tabContext = _tabKeys[_tab].currentContext;
+      final tabContext = _tabKeys[_renderedTab].currentContext;
       final target = tabContext?.findRenderObject();
       if (tabContext == null || target == null) return;
       final scrollable = Scrollable.maybeOf(tabContext, axis: Axis.horizontal);
@@ -6896,7 +6903,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         ? [
             ...content.highlightsFor(product),
             ...content.specificationsFor(product),
-          ].where(legalOwner).toList()
+          ].where(legalOwner).where((field) => field.value.trim().isNotEmpty).toList()
         : <BuyV2ProductSpecification>[];
     String normalized(String value) =>
         value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -6917,6 +6924,22 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         field.attributeId ??
         '${normalized(field.label)}:${normalized(field.value)}';
     final seen = <String>{};
+    // Typed ownership includes unknown/private/omitted values. Do not revive
+    // older product text when a current typed producer owns the same fact.
+    final ownedIds = {
+      for (final field in content.categoryFacts?.fields ?? <BuyV2CategoryAttribute>[]) field.id,
+      for (final field in [...content.highlightFields, ...content.specifications])
+        if (field.attributeId != null) field.attributeId!,
+    };
+    final productDetails = <BuyV2ProductSpecification>[
+      if (ready && (content.categoryFacts == null || content.categoryFacts!.isValidFor(product)))
+        for (final (id, label, raw) in [
+          ('composition', 'Composition or ingredients', product.composition),
+          ('regulatory_note', 'Safety information', product.regulatoryNote),
+        ])
+          if (!ownedIds.contains(id) && _nonBlankComplianceValue(raw) != null)
+            BuyV2ProductSpecification(attributeId: id, label: label, value: raw!.trim()),
+    ];
     final highlights = ready
         ? content
               .highlightsFor(product)
@@ -6925,8 +6948,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
               .toList()
         : <BuyV2ProductSpecification>[];
     final specifications = ready
-        ? content
-              .specificationsFor(product)
+        ? [...content.specificationsFor(product), ...productDetails]
               .where(meaningful)
               .where((field) => seen.add(identity(field)))
               .toList()
@@ -6979,18 +7001,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         specifications.isNotEmpty ||
         description?.isNotEmpty == true ||
         hasCompliance;
-    final hasSuppliedFacts =
-        content.highlights.any((value) => value.trim().isNotEmpty) ||
-        [
-          ...content.highlightsFor(product),
-          ...content.specificationsFor(product),
-        ].any(
-          (field) =>
-              field.label.trim().isNotEmpty && field.value.trim().isNotEmpty,
-        ) ||
-        content.description?.trim().isNotEmpty == true;
     if (ready &&
-        hasSuppliedFacts &&
         !hasDetails &&
         highlights.isEmpty &&
         legacyHighlights.isEmpty) {
@@ -7000,6 +7011,13 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
         ),
       );
     }
+    final tabs = <int, String>{
+      if (specifications.isNotEmpty) 0: 'Specifications',
+      if (description?.trim().isNotEmpty == true) 1: 'Description',
+      if (hasCompliance) 2: 'Manufacturer info',
+    };
+    final activeTab = tabs.containsKey(_tab) ? _tab : tabs.isEmpty ? 0 : tabs.keys.first;
+    _renderedTab = activeTab;
     final visibleHighlights = highlights;
     final enlarged = MediaQuery.textScalerOf(context).scale(14) > 21;
     Widget fieldCell(BuyV2ProductSpecification field) => Padding(
@@ -7067,10 +7085,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
             ),
           const SizedBox(height: 12),
         ],
-        if (!ready ||
-            (!hasDetails &&
-                highlights.isEmpty &&
-                legacyHighlights.isEmpty)) ...[
+        if (!ready) ...[
           empty(
             content.state == BuyV2ProductContentState.loading
                 ? 'Loading product details'
@@ -7126,14 +7141,10 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      for (final (index, label) in [
-                        'Specifications',
-                        'Description',
-                        'Manufacturer info',
-                      ].indexed)
+                      for (final MapEntry(key: index, value: label) in tabs.entries)
                         Semantics(
                           key: _tabKeys[index],
-                          selected: _tab == index,
+                          selected: activeTab == index,
                           child: TextButton(
                             key: ValueKey(
                               'buy-product-details-tab-$index-${product.id}',
@@ -7149,7 +7160,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                               textStyle: Theme.of(context).textTheme.labelLarge
                                   ?.copyWith(
                                     fontSize: 12,
-                                    fontWeight: _tab == index
+                                    fontWeight: activeTab == index
                                         ? FontWeight.w700
                                         : FontWeight.w500,
                                   ),
@@ -7161,7 +7172,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                                 vertical: 8,
                               ),
                               decoration: BuyV2ActionStyle.selectionSurface(
-                                selected: _tab == index,
+                                selected: activeTab == index,
                                 radius: 8,
                               ),
                               child: Text(label),
@@ -7172,9 +7183,7 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                   ),
                 ),
                 const Divider(height: 1),
-                if (_tab == 0) ...[
-                  if (specifications.isEmpty)
-                    empty('No additional specifications available.'),
+                if (activeTab == 0) ...[
                   for (
                     var index = 0;
                     index < specifications.length;
@@ -7229,21 +7238,15 @@ class _CommerceProductDetailsState extends State<_CommerceProductDetails> {
                     const Divider(height: 1),
                   ],
                 ],
-                if (_tab == 1)
-                  empty(
-                    description?.isNotEmpty == true
-                        ? description!
-                        : 'Description unavailable.',
-                  ),
-                if (_tab == 2)
-                  hasCompliance
-                      ? BuyV2ProductCompliancePanel(
+                if (activeTab == 1 && description != null)
+                  empty(description),
+                if (activeTab == 2 && hasCompliance)
+                  BuyV2ProductCompliancePanel(
                           product: product,
                           summaryAlreadyShown: true,
                           inline: true,
                           sourceFields: legalFields,
-                        )
-                      : empty('Manufacturer information unavailable.'),
+                        ),
               ],
             ),
           ),

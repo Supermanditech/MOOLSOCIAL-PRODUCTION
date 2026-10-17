@@ -45,6 +45,18 @@ class HostReviewedVariantSource implements WorkspacePublicVariantSource {
     return family!(selected, query, current);
   }
 }
+// Isolated optional-content responses, never an injected native provider feed.
+class _HostOptionalProductContent implements BuyV2ProductContentAdapter {
+  BuyV2ProductContentState state = BuyV2ProductContentState.ready;
+  String? description;
+  BuyV2CategoryFacts? categoryFacts;
+  List<BuyV2ProductSpecification> specifications = const [], highlights = const [];
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) => BuyV2ProductContentSnapshot(
+    productId: product.id, state: state, sourceId: 'host-optional-details', observedAt: at,
+    description: description, specifications: specifications, highlightFields: highlights,
+    categoryFacts: categoryFacts, retryable: state == BuyV2ProductContentState.offline);
+}
 class _HostExactOrderCommerce implements BuyV2CommerceAdapter {
   List<BuyV2Order> records = [];
   BuyV2Order? refreshedOrder;
@@ -1892,6 +1904,138 @@ void main() {
     expect(pager.page?.items.length, values.length, reason: pager.message);
     return session;
   }
+  Future<BuyV2Session> optionalDetailsSession(BuyV2Product selected, _HostOptionalProductContent content) async {
+    final core = BuySession(), catalogue = _ExactMoneyHostCatalogue()..rows.add(selected);
+    final session = BuyV2Session(core: core, cataloguePageSource: catalogue, productContentAdapter: content,
+      reviewDataEnabled: false, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final pager = session.acquireCatalogueProducts('host-optional-details');
+    addTearDown(() => session.releaseCatalogueProducts('host-optional-details'));
+    await pager.open(BuyV2CatalogueQuery(destination: selected.destination, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas));
+    expect(session.openProduct(selected.id), isTrue);
+    return session;
+  }
+  BuyV2Product optionalDetailsProduct({bool trade = false, bool supplied = true}) {
+    final data = publicPage(trade: trade)..['productFactsReadbackVersion'] = 1;
+    final facts = descriptiveFacts();
+    facts['compliance'] = <String, dynamic>{for (final key in (facts['compliance'] as Map).keys) key as String: null};
+    facts['composition'] = supplied ? 'Host reviewed ingredients' : null;
+    facts['regulatoryNote'] = supplied ? 'Host reviewed safety directions' : null;
+    (row(data)['content'] as Map)['productFacts'] = facts;
+    return factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail).product;
+  }
+  Future<void> mountOptionalDetails(WidgetTester tester, BuyV2Session session, double scale) async {
+    tester.view.physicalSize = const Size(320, 800); tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) =>
+      MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+      home: Scaffold(body: AnimatedBuilder(animation: session, builder: (context, _) => BuyV2ProductView(session: session)))));
+    await tester.pumpAndSettle();
+  }
+  Future<void> revealOptionalDetails(WidgetTester tester, BuyV2Product selected, Finder control) async {
+    await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
+      of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
+    await tester.ensureVisible(control); await tester.pumpAndSettle();
+  }
+  for (final trade in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF03 OPTIONAL reviewed composition safety and changing tabs trade=$trade scale=$scale', (tester) async {
+        final selected = optionalDetailsProduct(trade: trade), content = _HostOptionalProductContent();
+        final session = await optionalDetailsSession(selected, content);
+        await mountOptionalDetails(tester, session, scale);
+        final details = find.byKey(ValueKey('buy-product-content-ready-${selected.id}'));
+        await revealOptionalDetails(tester, selected, details);
+        expect(find.descendant(of: details, matching: find.text('Composition or ingredients')), findsOneWidget);
+        expect(find.descendant(of: details, matching: find.text('Host reviewed ingredients')), findsOneWidget);
+        expect(find.descendant(of: details, matching: find.text('Safety information')), findsOneWidget);
+        expect(find.descendant(of: details, matching: find.text('Host reviewed safety directions')), findsOneWidget);
+        expect(find.byKey(ValueKey('buy-product-details-tab-1-${selected.id}')), findsNothing);
+        expect(find.byKey(ValueKey('buy-product-details-tab-2-${selected.id}')), findsNothing);
+        content.description = 'Host published additional description';
+        session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+        final description = find.byKey(ValueKey('buy-product-details-tab-1-${selected.id}'));
+        await revealOptionalDetails(tester, selected, description); await tester.tap(description); await tester.pumpAndSettle();
+        expect(find.text(content.description!), findsOneWidget);
+        content.description = null;
+        session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+        expect(description, findsNothing);
+        expect(find.descendant(of: details, matching: find.text('Host reviewed ingredients')), findsOneWidget,
+          reason: 'retained missing Description tab must fall back to an actually supplied section');
+        expect(find.text('Description unavailable.'), findsNothing);
+        expect(find.text('Manufacturer information unavailable.'), findsNothing);
+        expect(session.selectedProduct!.publicListingIdentity, selected.publicListingIdentity);
+        expect(session.selectedProduct!.priceMinor, selected.priceMinor);
+        expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+  testWidgets('LF03 OPTIONAL ready empty is omitted but loading and failure remain truthful', (tester) async {
+    final selected = optionalDetailsProduct(supplied: false), content = _HostOptionalProductContent();
+    final session = await optionalDetailsSession(selected, content);
+    await mountOptionalDetails(tester, session, 1);
+    final details = find.byKey(ValueKey('buy-product-content-ready-${selected.id}'));
+    await revealOptionalDetails(tester, selected, details);
+    expect(tester.widget(details), isA<SizedBox>());
+    expect(find.text('Product details unavailable'), findsNothing); expect(find.text('All details'), findsNothing);
+    content.state = BuyV2ProductContentState.loading;
+    session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+    expect(find.text('Loading product details'), findsOneWidget);
+    content.state = BuyV2ProductContentState.offline;
+    session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+    expect(find.text('Product details unavailable'), findsOneWidget);
+    expect(find.byKey(ValueKey('buy-product-content-retry-${selected.id}')), findsOneWidget);
+    content.state = BuyV2ProductContentState.ready;
+    session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+    expect(tester.widget(details), isA<SizedBox>()); expect(session.cartLines, isEmpty);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+  });
+  for (final mode in ['replacement', 'unknown', 'private', 'highlight']) {
+    testWidgets('LF03 OPTIONAL typed ownership prevents duplicated or revived details $mode', (tester) async {
+      final selected = optionalDetailsProduct(), content = _HostOptionalProductContent();
+      if (mode == 'highlight') {
+        content.highlights = const [BuyV2ProductSpecification(attributeId: 'composition', label: 'Current ingredients',
+          value: 'Current published ingredients'), BuyV2ProductSpecification(attributeId: 'regulatory_note',
+          label: 'Current safety', value: 'Current published safety')];
+      } else {
+        content.categoryFacts = BuyV2CategoryFacts(categoryId: selected.categoryId, fields: [
+          for (final id in ['composition', 'regulatory_note']) BuyV2CategoryAttribute(id: id, label: 'Current $id',
+            type: mode == 'unknown' ? BuyV2AttributeType.unknown : BuyV2AttributeType.text,
+            value: mode == 'replacement' ? 'Current published $id' : 'Suppressed $id', isPublic: mode != 'private'),
+        ]);
+      }
+      final session = await optionalDetailsSession(selected, content);
+      await mountOptionalDetails(tester, session, 1);
+      final details = find.byKey(ValueKey('buy-product-content-ready-${selected.id}'));
+      await revealOptionalDetails(tester, selected, details);
+      expect(find.textContaining('Host reviewed ingredients'), findsNothing);
+      expect(find.textContaining('Host reviewed safety directions'), findsNothing);
+      expect(find.textContaining('Suppressed '), findsNothing);
+      if (mode == 'replacement' || mode == 'highlight') {
+        expect(find.textContaining('Current published'), findsNWidgets(2));
+      } else {
+        expect(find.text('All details'), findsNothing);
+        expect(find.text('Product details unavailable'), findsNothing);
+      }
+      expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+  testWidgets('LF03 OPTIONAL malformed blank legal field cannot create empty Manufacturer tab', (tester) async {
+    final selected = optionalDetailsProduct(supplied: false), content = _HostOptionalProductContent()
+      ..specifications = const [BuyV2ProductSpecification(attributeId: 'manufacturer_name',
+        label: 'Manufacturer', value: '   ')];
+    final session = await optionalDetailsSession(selected, content);
+    await mountOptionalDetails(tester, session, 1);
+    expect(session.productContentFor(selected).state, BuyV2ProductContentState.unavailable,
+      reason: 'malformed source data is not a valid ready-empty response');
+    final details = find.byKey(ValueKey('buy-product-content-unavailable-${selected.id}'));
+    await revealOptionalDetails(tester, selected, details);
+    expect(find.text('All details'), findsNothing);
+    expect(find.text('Manufacturer info'), findsNothing);
+    expect(find.text('Product details unavailable'), findsOneWidget);
+    expect(tester.takeException(), isNull); await tester.pumpWidget(const SizedBox.shrink());
+  });
   Future<({BuyV2Session session, _ExactMoneyHostPreferences preferences})> placementFixture(
     _HostPlacement adapter, {bool grouped = false, int price = 1025, int quantity = 1, int fee = 0,
     int? mrp, bool withTerms = false, void Function(String key, String value)? beforeSet}) async {

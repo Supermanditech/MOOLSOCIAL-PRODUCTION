@@ -7984,6 +7984,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if($null -eq $facts.PSObject.Properties[$key]) { return $false }
     }
+    # Optional exact existing test owner; historical records remain compatible.
+    if (@($facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
+      $factsOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
     if ($facts.ticket -cne 'LF-03-C01' -or $facts.batch -ne 2 -or
         $facts.sourceCheckpoint -cne 'd29879a31412d4cc2859c1eb23a8debe959d5786' -or
         $facts.state -cne 'founder_authorized_local_facts_contract_and_frontend' -or
@@ -8310,6 +8314,10 @@ function Invoke-Lf01Admission {
       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard'))) | Sort-Object -Unique
     Assert-Coordination ($ProductionTicketId -ceq 'LF-27' -and
       (Test-Lf27Batch01Continuation $record.frontendContinuation $continuationDelta)) 'Batch01 continuation exceeds its exact tickets, owners or frontend authority.'
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts'] -and
+        @($record.frontendContinuation.batch02Facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Chat']) {
       Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',
         '275ef9cca32f644af366d03316fc74d1c1cd9e0d','HEAD') | Out-Null

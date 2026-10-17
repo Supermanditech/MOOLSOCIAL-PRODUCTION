@@ -4158,9 +4158,15 @@ void main() {
       tester,
     ) async {
       final core = BuySession();
+      final adapter = _ContentAdapter();
+      adapter.specifications = [
+        ...adapter.specifications,
+        const BuyV2ProductSpecification(attributeId: 'manufacturer_name',
+          label: 'Manufacturer', value: 'Host supplied manufacturer'),
+      ];
       final session = BuyV2Session(
         core: core,
-        productContentAdapter: _ContentAdapter(),
+        productContentAdapter: adapter,
       );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
@@ -4402,9 +4408,9 @@ void main() {
       await revealProductControl(
         tester,
         session,
-        find.text('Product details unavailable'),
+        find.byKey(const ValueKey('buy-product-content-ready-s-milk')),
       );
-      expect(find.text('Product details unavailable'), findsOneWidget);
+      expect(find.text('Product details unavailable'), findsNothing);
       expect(find.text('All details'), findsNothing);
       final retry = find.byKey(
         const ValueKey('buy-product-content-retry-s-milk'),
