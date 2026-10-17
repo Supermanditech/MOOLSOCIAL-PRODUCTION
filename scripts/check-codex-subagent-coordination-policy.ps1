@@ -7958,9 +7958,24 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     'scripts/check-codex-subagent-coordination-policy.ps1',
     'scripts/test-cross-agent-incremental-ticket-gate.ps1',
     'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
+  $allowedOwners=@($exactOwners)
+  if ($null -ne $Continuation.PSObject.Properties['batch02Chat']) {
+    $chat=$Continuation.batch02Chat
+    $chatOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart')
+    if ($null -eq $chat -or $chat -isnot [pscustomobject]) { return $false }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if($null -eq $chat.PSObject.Properties[$key]) { return $false }
+    }
+    if($chat.ticket -cne 'LF-03-C01' -or $chat.batch -ne 2 -or
+        $chat.sourceCheckpoint -cne '275ef9cca32f644af366d03316fc74d1c1cd9e0d' -or
+        $chat.state -cne 'founder_authorized_frontend_implementation' -or
+        (@($chat.owners|Sort-Object) -join '|') -cne (@($chatOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners+= $chatOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
-    @($ChangedOwners | Where-Object { $_ -cnotin $exactOwners }).Count -eq 0
+    @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0
 }
 
 function Invoke-Lf01Admission {
@@ -8242,6 +8257,10 @@ function Invoke-Lf01Admission {
       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard'))) | Sort-Object -Unique
     Assert-Coordination ($ProductionTicketId -ceq 'LF-27' -and
       (Test-Lf27Batch01Continuation $record.frontendContinuation $continuationDelta)) 'Batch01 continuation exceeds its exact tickets, owners or frontend authority.'
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Chat']) {
+      Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',
+        '275ef9cca32f644af366d03316fc74d1c1cd9e0d','HEAD') | Out-Null
+    }
   }
   $admission = $record.ticket.frontendAdmission
   Assert-Coordination ($record.ticket.id -ceq $ProductionTicketId -and

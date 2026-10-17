@@ -128,6 +128,7 @@ class BuyV2ChatRouteAdapter {
   }
 
   String storeQuestionLocationFor({required BuyV2Product anchor}) {
+    final storeIdentity = _storeIdentityFor(anchor);
     final returnRoute = Uri(
       path: '/app/buy',
       queryParameters: {
@@ -140,6 +141,7 @@ class BuyV2ChatRouteAdapter {
       path: _supplierThreadPathFor(
         destination: anchor.destination,
         supplier: anchor.seller,
+        storeIdentity: storeIdentity,
       ),
       queryParameters: {
         'draft':
@@ -151,6 +153,8 @@ class BuyV2ChatRouteAdapter {
         'supplier': anchor.customerSeller(anchor.seller),
         'supplierType': anchor.sellerType,
         'supplierRole': anchor.partnerRole,
+        if (storeIdentity != null) 'storeId': anchor.storeId!,
+        'storeRealm': ?anchor.publicListingIdentity?.realm,
         'storeAnchorSku': anchor.id,
         'origin': anchor.origin,
         'adminVisible': 'true',
@@ -165,6 +169,7 @@ class BuyV2ChatRouteAdapter {
     int quantity = 0,
   }) {
     final requestedQuantity = quantity > 0 ? quantity : product.minimumOrder;
+    final storeIdentity = _storeIdentityFor(product);
     final protection = product.purchaseProtection;
     final remedies = _cleanValues(protection?.remedies ?? const []);
     final returnRoute = Uri(
@@ -179,6 +184,7 @@ class BuyV2ChatRouteAdapter {
       path: _supplierThreadPathFor(
         destination: product.destination,
         supplier: product.seller,
+        storeIdentity: storeIdentity,
       ),
       queryParameters: {
         'draft': _productQuestionDraft(product, requestedQuantity),
@@ -191,6 +197,8 @@ class BuyV2ChatRouteAdapter {
         'supplier': product.customerSeller(product.seller),
         'supplierType': product.sellerType,
         'supplierRole': product.partnerRole,
+        if (storeIdentity != null) 'storeId': product.storeId!,
+        'storeRealm': ?product.publicListingIdentity?.realm,
         'productId': product.canonicalId,
         'skuId': product.id,
         'productTitle': product.customerTitle,
@@ -235,7 +243,24 @@ class BuyV2ChatRouteAdapter {
     return _supplierConversationKeyFor(
       destination: product.destination,
       supplier: product.seller,
+      storeIdentity: _storeIdentityFor(product),
     );
+  }
+
+  // Navigation/draft isolation only. A supplied Store ID is not a verified
+  // Chat participant or permission to read/send; the Chat service owns that.
+  // Never alias a name-only historical conversation to an identified Store.
+  String? _storeIdentityFor(BuyV2Product product) {
+    final storeId = product.storeId;
+    if (!product.hasValidPublicListingIdentity || storeId != null &&
+        (storeId != storeId.trim() ||
+         !RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(storeId))) {
+      throw ArgumentError('Store identity is unavailable.');
+    }
+    if (storeId == null) return null;
+    return base64Url.encode(utf8.encode(jsonEncode([
+      product.publicListingIdentity?.realm ?? 'unverified', storeId,
+    ]))).replaceAll('=', '');
   }
 
   Map<String, Object?> _productSnapshot(BuyV2Product product) {
@@ -363,14 +388,24 @@ class BuyV2ChatRouteAdapter {
   String _supplierConversationKeyFor({
     required BuyV2Destination destination,
     required String supplier,
+    String? storeIdentity,
   }) {
+    if (storeIdentity != null) {
+      final domain = destination == BuyV2Destination.medicine ? 'care' : 'shop';
+      return '$domain:store-v1:$storeIdentity';
+    }
     return '${destination.name}:${_supplierSlug(supplier)}';
   }
 
   String _supplierThreadPathFor({
     required BuyV2Destination destination,
     required String supplier,
+    String? storeIdentity,
   }) {
+    if (storeIdentity != null) {
+      final domain = destination == BuyV2Destination.medicine ? 'care' : 'shop';
+      return '/app/chat/thread/$domain-store-v1-$storeIdentity';
+    }
     final slug = _supplierSlug(supplier);
     return switch (destination) {
       BuyV2Destination.medicine => '/app/chat/thread/care-pharmacy-$slug',

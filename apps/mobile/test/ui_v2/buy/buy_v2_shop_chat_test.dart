@@ -18,6 +18,76 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Batch02 Store Chat isolates same-name Stores without migrating legacy history', () {
+    final seed = BuyV2Catalogue.products.first;
+    const adapter = BuyV2ChatRouteAdapter();
+    Uri route(BuyV2Product product) => Uri.parse(
+      adapter.productQuestionLocationFor(product: product),
+    );
+    final first = seed.copyWith(storeId: 'store-A', seller: 'Same Store');
+    final second = seed.copyWith(storeId: 'store-B', seller: 'Same Store');
+    final a = route(first), b = route(second);
+    expect(a.path, isNot(b.path));
+    expect(a.queryParameters['conversationKey'], isNot(b.queryParameters['conversationKey']));
+    expect(a.queryParameters['storeId'], 'store-A');
+    expect(b.queryParameters['storeId'], 'store-B');
+    final renamed = route(first.copyWith(seller: 'Renamed Store'));
+    expect(renamed.path, a.path);
+    expect(renamed.queryParameters['conversationKey'], a.queryParameters['conversationKey']);
+    final storeQuestion = Uri.parse(adapter.storeQuestionLocationFor(anchor: first));
+    expect(storeQuestion.path, a.path);
+    expect(storeQuestion.queryParameters['conversationKey'], a.queryParameters['conversationKey']);
+    expect(Uri.parse(a.queryParameters['return']!).queryParameters['product'], first.id);
+    final legacy = route(seed.copyWith(seller: 'Same Store'));
+    expect(legacy.path, '/app/chat/thread/shop-partner-${seed.destination.name}-same-store');
+    expect(legacy.queryParameters['conversationKey'], '${seed.destination.name}:same-store');
+    expect(legacy.queryParameters.containsKey('storeId'), isFalse);
+    expect(a.path, isNot(legacy.path));
+    final chat = ChatSession();
+    addTearDown(chat.dispose);
+    final aThread = a.pathSegments.last, bThread = b.pathSegments.last;
+    chat.setDraftTextForSession(aThread, 'Store A draft');
+    chat.setDraftTextForSession(bThread, 'Store B draft');
+    expect(chat.draftTextForSession(aThread), 'Store A draft');
+    expect(chat.draftTextForSession(bThread), 'Store B draft');
+  });
+
+  test('Batch02 explicit malformed Store identity cannot fall back to a name', () {
+    final seed = BuyV2Catalogue.products.first;
+    for (final id in ['', ' ', ' store-A', 'store-A ', 'store-A\n', 'store/A', 'store?A']) {
+      final product = seed.copyWith(storeId: id);
+      expect(() => const BuyV2ChatRouteAdapter().productQuestionLocationFor(product: product), throwsArgumentError);
+      expect(() => const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product), throwsArgumentError);
+    }
+  });
+
+  test('Batch02 supplied Store namespaces preserve channel and realm boundaries', () {
+    const adapter = BuyV2ChatRouteAdapter();
+    final shop = BuyV2Catalogue.products.first;
+    final wholesale = BuyV2Catalogue.products.firstWhere((p) => p.destination == BuyV2Destination.wholesale);
+    final care = BuyV2Catalogue.products.firstWhere((p) => p.destination == BuyV2Destination.medicine);
+    Uri route(BuyV2Product product) => Uri.parse(adapter.productQuestionLocationFor(product: product));
+    final unverified = route(shop.copyWith(storeId: 'store-A'));
+    expect(route(wholesale.copyWith(storeId: 'store-A')).path, unverified.path);
+    expect(route(care.copyWith(storeId: 'store-A')).path, isNot(unverified.path));
+    final paths = <String>{unverified.path};
+    final listingId = 'listing-${List.filled(64, '0').join()}';
+    for (final realm in ['evaluation', 'production']) {
+      final product = shop.copyWith(id: listingId, storeId: 'store-A', offerClass: BuyV2OfferClass.retail,
+        publicListingIdentity: BuyV2PublicListingIdentity(listingId: listingId, realm: realm,
+          storeId: 'store-A', skuId: 'sku-A', canonicalProductId: shop.canonicalId,
+          verifiedPackId: 'pack-A', channel: BuyV2OfferClass.retail));
+      expect(product.hasValidPublicListingIdentity, isTrue);
+      final uri = route(product);
+      expect(paths.add(uri.path), isTrue);
+      expect(uri.queryParameters['storeRealm'], realm);
+      expect(Uri.parse(uri.queryParameters['return']!).queryParameters['product'], listingId);
+      final wrongStore = product.copyWith(storeId: 'store-B');
+      expect(() => route(wrongStore), throwsArgumentError);
+      expect(() => adapter.storeQuestionLocationFor(anchor: wrongStore), throwsArgumentError);
+    }
+  });
+
   test('LF-PAISE product Chat preserves exact editable context and return identity', () {
     final product = BuyV2Catalogue.products.first.copyWith(priceMinor: 1025, mrpMinor: 1250);
     final uri = Uri.parse(const BuyV2ChatRouteAdapter().productQuestionLocationFor(product: product, quantity: 3));

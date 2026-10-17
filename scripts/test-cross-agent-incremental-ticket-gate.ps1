@@ -153,6 +153,21 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch01 gained $key."
     $cases++
   }
+  if ($null -ne $continuation.PSObject.Properties['batch02Chat']) {
+    foreach($owner in $continuation.batch02Chat.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 Chat owner rejected.'
+      $cases++
+    }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Chat.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 Chat missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Chat.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 Chat changed $key admitted."
+      $cases+=2
+    }
+  }
   Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."
   return
 }

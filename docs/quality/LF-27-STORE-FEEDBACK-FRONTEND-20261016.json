@@ -327,6 +327,28 @@
     "deviceInstallAuthorized": false,
     "externalServiceWriteAuthorized": false,
     "founderAccepted": false,
+    "founderVisibleReview": {"sourceCommit": "275ef9cca32f644af366d03316fc74d1c1cd9e0d", "accepted": true, "founderReply": "Approve visible checkpoint", "scope": "Batch01 visible Wholesale terms and retained Cart/Stock only. Coupon-provider variants remain host-tested; no live-service, APK or formal publication acceptance."},
+    "batch02Chat": {
+      "ticket": "LF-03-C01",
+      "batch": 2,
+      "sourceCheckpoint": "275ef9cca32f644af366d03316fc74d1c1cd9e0d",
+      "state": "founder_authorized_frontend_implementation",
+      "scope": "Use immutable supplied Store identity for product/Visit Store Chat context and local thread namespace, preventing same-name Store collisions. Preserve legacy name-only history unchanged; never migrate/merge it into an identified Store. These are untrusted navigation contexts, not verified participants, message authorization or a new messaging service. Actual server conversation resolution remains pending.",
+      "owners": ["apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart", "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart"],
+      "compatibility": "Keep exact product/order return context, price paise and existing legacy route bytes; malformed explicit Store/public-listing identity must not fall back to the supplier-name route. No Store/Counter Sale implementation or backend source changes in this slice.",
+      "testPlan": "Two same-name Stores remain distinct; renamed same Store remains stable; product and Store-question routes agree; explicit invalid identity fails closed; legacy route/history remains literal; shared Chat draft isolation and exact Back context. Host fixtures only; applicable existing OPPO Ask/return inspected without sending messages.",
+      "remainingBatch02": "Dedicated reviewed facts/seller metadata, variant/media and discovery/publication work remains open. Existing strict schema1 input/readback and reviewed hashes cannot be silently enriched; unsupported dispatch remains disabled until the agreed facts-extension contract is available. No new screen or automatic publication.",
+      "accepted": false,
+      "technicalCheckpoint": {
+        "status": "implemented_partial_LF03_not_whole_Batch02_complete",
+        "tests": "49 existing/new Shop Chat cases passed, zero failures/skips. After architect review the three focused Batch02 tests passed using extracted thread IDs, matching mounted Chat storage rather than full paths. Analysis clean;99 exact positive/negative continuation checks passed.",
+        "redEvidence": "followup-b02-chat-red-20261017-v2.jsonl reproduced same-name route collision and malformed explicit identity fallback. v1 was only a host-test helper name error, corrected to the existing setDraftTextForSession method; it is not a reproduced app defect.",
+        "nativeEvidence": "Current source hot-reloaded six libraries on OPPO; existing evaluation product Ask manufacturer opened shared Chat with correct product/supplier context, then Back restored the same product and the164-rupee Cart/payment hold. Screenshots inspected. No message/call sent and no evaluation data injected. Populated same-name Store and realm cases are host-tested only.",
+        "evidenceRoot": "C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs",
+        "paths": ["followup-b02-chat-full-20261017-v1.jsonl", "followup-b02-chat-final-20261017-v1.jsonl", "followup-b02-chat-admission-tests-20261017-v1.log", "evidence/followup-b02-ask-manufacturer-20261017-v1.png", "evidence/followup-b02-ask-return-20261017-v1.xml"],
+        "limits": "No authenticated counterparty resolution, message production or historical-conversation migration. Order-help routing is unchanged/name-based and remains part of the order-identity continuation. Product facts/variant/media/discovery/campaign work remains open; no whole LF03, Batch02, provider or APK completion claimed."
+      }
+    },
     "oppoResult": "OPPO 2b3e0f71: current-source full hot restart succeeded; Wholesale product terms visibly show Tax and invoice not confirmed, with original approved layout/actions retained. Screenshots and accessibility readback were inspected. Original 164-rupee Cart/payment-review hold and saved evaluation Stock identities/quantities were checked without saving/transacting. Populated coupon and tax-authority variants remain labelled host-test evidence only. Founder review remains pending; no APK qualification claimed.",
     "taxDisplayDecision": {
       "purpose": "Wholesale product decision, existing Wholesale terms row: explain tax inclusion without promising GST registration or invoice issuance.",
