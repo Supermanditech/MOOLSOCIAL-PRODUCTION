@@ -315,6 +315,18 @@ final class _FixedOffersSource implements BuyV2PublishedOffersSource {
   final List<BuyV2PublishedOffer> publishedOffers;
 }
 
+// Host-only mutable public-copy response, never native provider data.
+class _Lf04SellerCopySession extends BuyV2Session {
+  _Lf04SellerCopySession(BuySession core) : super(core: core);
+  BuyV2Product? _changed;
+  @override
+  BuyV2Product? findProduct(String id) => id == 's-tomato' && _changed != null ? _changed : super.findProduct(id);
+  void renameSeller() {
+    _changed = super.findProduct('s-tomato')!.copyWith(seller: 'Host renamed seller');
+    notifyListeners();
+  }
+}
+
 final class _LiveOffersSource implements BuyV2LivePublishedOffersSource {
   BuyV2PublishedOffersSnapshot snapshot;
   int calls = 0;
@@ -11133,6 +11145,129 @@ void main() {
     },
   );
 
+  test('LF04 COPY publication metadata preserves legacy identities and issuer revisions', () {
+    const legacy = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+      headline: 'Host headline', publicationId: 'host-placement');
+    expect(legacy.identity, 'host-placement'); expect(legacy.hasValidPublicationMetadata, isTrue);
+    BuyV2PublishedOffer source(String issuer, int revision) => BuyV2PublishedOffer(productId: 's-tomato',
+      publisherType: BuyV2OfferPublisherType.retailer, headline: 'Host headline',
+      publicationId: 'host-placement', publisherId: issuer, revision: revision, detail: 'Host source details');
+    expect(source('host-a', 1).identity, isNot(source('host-b', 1).identity));
+    expect(source('host-a', 1).identity, isNot(source('host-a', 2).identity));
+    expect(source('host-a', 0).hasValidPublicationMetadata, isFalse);
+    final now = DateTime.utc(2026, 10, 18), product = BuyV2Catalogue.products.first.copyWith(storeId: 'host-store');
+    BuyV2PublishedCatalogueOffer entry({int? revision, String? detail}) => BuyV2PublishedCatalogueOffer(
+      publicationId: 'host-placement', product: product, publisherType: BuyV2OfferPublisherType.retailer,
+      publisherId: 'host-store', publisherName: 'Host Store', headline: 'Host headline', sourceId: 'host-source',
+      observedAt: now.subtract(const Duration(minutes: 1)), validUntil: now.add(const Duration(minutes: 5)),
+      revision: revision, detail: detail);
+    expect(entry().isCurrent(now: now), isTrue);
+    expect(entry(revision: 1, detail: 'Host details').isCurrent(now: now), isTrue);
+    expect(entry(revision: 0).isCurrent(now: now), isFalse);
+    expect(entry(revision: 1000000001).isCurrent(now: now), isFalse);
+    expect(entry(detail: List.filled(2001, 'x').join()).isCurrent(now: now), isFalse);
+  });
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF04 COPY full offer details product and Back $size scale=$scale', (tester) async {
+        tester.view.devicePixelRatio = 1; tester.view.physicalSize = size; addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        final detail = List.filled(12, 'Host published detail, supplied by this issuer.').join('\n');
+        final placement = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+          publisherId: 'host-store', publisherName: 'Host Store', publicationId: 'host-placement', revision: 3,
+          headline: 'Host scoped promotion', detail: detail);
+        await tester.pumpWidget(app(session, offersSource: _FixedOffersSource([placement]), textScale: scale));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers'))); await tester.pumpAndSettle();
+        final group = find.byKey(const ValueKey('buy-offer-group-suppliers'));
+        await tester.ensureVisible(group); await tester.tap(group); await tester.pumpAndSettle();
+        final button = find.byKey(ValueKey('buy-offer-details-${placement.identity}'));
+        await tester.ensureVisible(button); await tester.pumpAndSettle();
+        final selected = session.selectedProductId, price = session.product('s-tomato').priceMinor,
+          total = session.cartTotalMinor;
+        await tester.tap(button); await tester.pumpAndSettle();
+        expect(find.text(detail), findsOneWidget); expect(find.text('From Host Store'), findsWidgets);
+        expect(session.selectedProductId, selected); expect(session.cartTotalMinor, total);
+        expect(session.product('s-tomato').priceMinor, price);
+        expect(find.text('Viewing this promotion does not apply a discount.'), findsOneWidget);
+        for (final label in ['Close', 'View product']) {
+          final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
+          expect(paragraph.text.style?.fontFamily, 'Inter');
+          expect(paragraph.didExceedMaxLines, isFalse);
+        }
+        await captureR66Visual(tester, 'lf04-offer-copy-${size.width.toInt()}-$scale');
+        await tester.tap(find.byKey(const ValueKey('buy-offer-detail-product'))); await tester.pumpAndSettle();
+        expect(session.selectedProductId, 's-tomato'); expect(session.itemCount, 0);
+        await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+        expect(session.featuredOfferPublicationId, placement.identity);
+        expect(find.text('Host scoped promotion'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  testWidgets('LF04 COPY blank details omitted and two same-SKU placements retained without duplicate grid', (tester) async {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    const first = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+      publisherId: 'host-store', publisherName: 'Host Store', publicationId: 'host-a', revision: 1,
+      headline: 'Host first placement', detail: '  ');
+    const second = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+      publisherId: 'host-store', publisherName: 'Host Store', publicationId: 'host-b', revision: 1,
+      headline: 'Host second placement', detail: 'Host second detail');
+    await tester.pumpWidget(app(session, offersSource: const _FixedOffersSource([first, second])));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers'))); await tester.pumpAndSettle();
+    final group = find.byKey(const ValueKey('buy-offer-group-suppliers'));
+    await tester.ensureVisible(group); await tester.tap(group); await tester.pumpAndSettle();
+    final pages = find.descendant(of: find.byKey(const ValueKey('buy-published-offer-facts')), matching: find.byType(PageView));
+    expect(tester.widget<PageView>(pages).childrenDelegate.estimatedChildCount, 2);
+    expect(find.byKey(ValueKey('buy-offer-details-${first.identity}')), findsNothing);
+    expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsOneWidget);
+    await tester.drag(pages, const Offset(-300, 0)); await tester.pumpAndSettle();
+    final details = find.byKey(ValueKey('buy-offer-details-${second.identity}'));
+    await tester.ensureVisible(details); await tester.tap(details); await tester.pumpAndSettle();
+    expect(find.text('Host second detail'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-offer-detail-close'))); await tester.pumpAndSettle();
+    expect(session.itemCount, 0); expect(tester.takeException(), isNull);
+  });
+  for (final change in ['revision', 'account', 'invalid', 'issuer', 'oversized', 'seller']) {
+    testWidgets('LF04 COPY stale details cannot open after $change change', (tester) async {
+      final core = BuySession();
+      final session = change == 'seller' ? _Lf04SellerCopySession(core) : BuyV2Session(core: core);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      final original = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+        publisherId: 'host-store', publisherName: change == 'seller' ? null : 'Host Store', publicationId: 'host-placement', revision: 1,
+        headline: 'Host promotion', detail: 'Host original detail');
+      await tester.pumpWidget(app(session, offersSource: _FixedOffersSource([original])));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers'))); await tester.pumpAndSettle();
+      final group = find.byKey(const ValueKey('buy-offer-group-suppliers'));
+      await tester.ensureVisible(group); await tester.tap(group); await tester.pumpAndSettle();
+      final detail = find.byKey(ValueKey('buy-offer-details-${original.identity}'));
+      await tester.ensureVisible(detail); await tester.tap(detail); await tester.pumpAndSettle();
+      final next = change == 'account' ? BuyV2Session(core: BuySession()) : session;
+      if (next != session) { addTearDown(next.core.dispose); addTearDown(next.dispose); }
+      if (change == 'seller') (session as _Lf04SellerCopySession).renameSeller();
+      final revised = change == 'seller' ? original : BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
+        publisherId: 'host-store', publisherName: change == 'issuer' ? 'Host renamed Store' : 'Host Store',
+        publicationId: 'host-placement', revision: change == 'invalid' ? 0 :
+          {'issuer', 'oversized'}.contains(change) ? 1 : 2, headline: 'Host promotion',
+        detail: change == 'issuer' ? 'Host original detail' :
+          change == 'oversized' ? List.filled(2001, 'x').join() : 'Host revised detail');
+      await tester.pumpWidget(app(next, offersSource: _FixedOffersSource([revised]))); await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-offer-detail-product'))); await tester.pumpAndSettle();
+      expect(next.selectedProductId, isNull); expect(next.itemCount, 0); expect(session.itemCount, 0);
+      expect(find.text('This offer changed. Close and refresh the offers.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('buy-offer-detail-close'))); await tester.pumpAndSettle();
+      if (change == 'invalid' || change == 'oversized') {
+        expect(find.text('Offer information could not be verified.'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('Offers accepts an ordered published catalogue seam', (
     tester,
   ) async {

@@ -463,6 +463,20 @@
         "founderAccepted": false
       }
     },
+    "batch02Promotions": {
+      "ticket": "LF-04-C01",
+      "batch": 2,
+      "sourceCheckpoint": "8615a63c66940e4414f5701bc88d55e0fc3c1694",
+      "state": "founder_authorized_frontend_promotion_consumer",
+      "owners": ["apps/mobile/lib/features/buy/buy_v2_content_contracts.dart", "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart", "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"],
+      "scope": "First preserve accepted public promotion detail/revision/issuer continuity in existing offer DTO/cards and a readonly detail view, with legacy compatibility and exact product return; no pricing/benefit or new route. The planned same-batch exact-Store reader/VisitStore connection remains unfinished and requires its exact owners before edits. Existing public service cursor pages must never masquerade as global catalogue completeness; actual public listing binding is resolved, not synthesized.",
+      "backendWriteAuthorized": false,
+      "deploymentAuthorized": false,
+      "liveTransactionsAuthorized": false,
+      "buildAuthorized": false,
+      "founderVisualAccepted": false,
+      "qualification": "First copy/metadata slice implemented: optional published detail and revision retain legacy identities, distinguish issuer/revision placements, omit blank copy, preserve separate placements of the same SKU without duplicating its grid and guard stale modal Product actions after account/revision/issuer/seller/invalid-source changes. No pricing, benefit, discount or eligibility authority added. Prior final affected Offers selection passed33 cases with0 failures/skips; final typography-only delta reran all12 LF04 COPY cases with0 failures/skips and explicit Inter/no-truncation label assertions. These runs overlap, not45 distinct cases. Four final host PNGs at320x844 and640x360, normal/2x text, visually inspected under outputs/evidence/lf04-copy-host-20261018-v4. Final three-owner Dart analysis clean,169 exact admission probes and actual147-owner implementation admission passed, UI-reference/device-memory checks passed. Logs: followup-b02-promotion-affected-final-20261018-v1.jsonl and followup-b02-promotion-visual-20261018-v4.jsonl in the task outputs. Existing review Offers->37-rupee exact product->Back checked on OPPO; final latest-source reload1library6482ms, fresh commitable-cart PNG/XML inspected and164-rupee soap/payment-review hold intact. Saved32-product Stock/cost29550 continuity checked earlier in this same slice; no native save, Stock/order/payment/benefit action, runtime provider fixture, deployment or APK. New populated promotion details are host-tested only: native review offers contain no published detail. Architect readonly review found no further copy/metadata must-fix after the effective-issuer fence and explicit readable theme family. Diagnostics retained under existing REG4649 boundary: one fixture constructor compile error corrected; initial title oversized at2x; v2/v3 buttons inherited Ahem because nullable buyBody overrode theme, fixed with actual bodyMedium family and rendered/semantic assertions. A read-only theme search named two nonexistent candidate paths before finding the actual owner; no write followed those guesses. Superseded logs/captures preserved, no false green or retrospective gate claim. Actual exact-Store promotion reader, listing resolution and VisitStore wiring remain unfinished next within LF04, with exact additional owners required before edits. Backend enriched-facts request/global discovery/authoritative publication dependencies remain deferred. Latest founder-directed post-goal omission pass against Downloads/ticket.txt is recorded in existing task inventory/source43; no duplicate parents, founder visual acceptance, live provider acceptance, whole-LF04 or goal completion is claimed."
+    },
     "batch02Facts": {
       "ticket": "LF-03-C01",
       "batch": 2,

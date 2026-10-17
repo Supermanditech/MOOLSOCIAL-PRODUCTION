@@ -489,6 +489,8 @@ class BuyV2PublishedCatalogueOffer {
     required this.sourceId,
     required this.observedAt,
     required this.validUntil,
+    this.detail,
+    this.revision,
   });
 
   final String publicationId;
@@ -500,8 +502,13 @@ class BuyV2PublishedCatalogueOffer {
   final String sourceId;
   final DateTime observedAt;
   final DateTime validUntil;
+  /// Optional legacy-compatible publication copy/version, not benefit authority.
+  final String? detail;
+  final int? revision;
 
   bool isCurrent({required DateTime now}) =>
+      (revision == null || revision! >= 1 && revision! <= 1000000000) &&
+      (detail == null || detail!.length <= 2000) &&
       publicationId.trim().isNotEmpty &&
       publicationId.trim() == publicationId &&
       publisherId.trim().isNotEmpty &&

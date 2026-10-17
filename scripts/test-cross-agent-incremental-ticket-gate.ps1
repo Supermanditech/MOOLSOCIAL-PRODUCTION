@@ -171,6 +171,25 @@ if ($RequireLfPublicationProbes) {
       $cases+=2
     }
   }
+  if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
+    foreach ($owner in $continuation.batch02Promotions.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact promotion owner rejected.'
+      $cases++
+    }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Promotions.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Promotion missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Promotions.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Promotion changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch02Promotions.owners+='backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Promotion frontend gained backend ownership.'
+    $cases++
+  }
   if ($null -ne $continuation.PSObject.Properties['batch02Facts']) {
     foreach($owner in $continuation.batch02Facts.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 facts owner rejected.'

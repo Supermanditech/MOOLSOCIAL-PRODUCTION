@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
@@ -141,6 +142,9 @@ class BuyV2PublishedOffer {
     required this.headline,
     this.publisherName,
     this.publicationId,
+    this.publisherId,
+    this.revision,
+    this.detail,
   });
 
   final String productId;
@@ -148,9 +152,18 @@ class BuyV2PublishedOffer {
   final String headline;
   final String? publisherName;
   final String? publicationId;
+  final String? publisherId, detail;
+  final int? revision;
+
+  bool get hasValidPublicationMetadata => revision == null && publisherId == null ||
+      revision != null && revision! >= 1 && revision! <= 1000000000 &&
+      publisherId?.trim().isNotEmpty == true && publisherId == publisherId!.trim() &&
+      publicationId?.trim().isNotEmpty == true && publicationId == publicationId!.trim();
 
   String get identity =>
-      publicationId ?? '${publisherType.name}:$productId:$headline';
+      revision != null && hasValidPublicationMetadata
+          ? jsonEncode([publisherType.name, publisherId, publicationId, revision])
+          : publicationId ?? '${publisherType.name}:$productId:$headline';
 }
 
 /// Presentation seam for the ordered offer placements published for Buy.
@@ -397,12 +410,19 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
     final publishedOffers = liveSource
         ? snapshot!.offers
         : widget.source.publishedOffers;
+    if (publishedOffers.any((offer) => !offer.hasValidPublicationMetadata || (offer.detail?.length ?? 0) > 2000)) {
+      return _LiveOffersState(snapshot: const BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.unavailable,
+        customerMessage: 'Offer information could not be verified.'), onRetry: () {
+          if (liveSource) { unawaited(_load()); } else { setState(() {}); }
+        });
+    }
     final query = session.query.trim().toLowerCase();
     final allResolved = <({BuyV2PublishedOffer offer, BuyV2Product product})>[];
-    final productIds = <String>{};
+    final publicationIds = <String>{};
     for (final offer in publishedOffers) {
       final product = session.findProduct(offer.productId);
-      if (product == null || !productIds.add(product.id)) continue;
+      if (product == null || !offer.hasValidPublicationMetadata || !publicationIds.add(offer.identity)) continue;
       if (query.isNotEmpty &&
           !_matchesPublishedOffer(query, [
             product.title,
@@ -413,6 +433,7 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
             product.seller,
             product.sellerType,
             offer.headline,
+            offer.detail ?? '',
           ])) {
         continue;
       }
@@ -430,9 +451,9 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
                   entry.product.categoryId == session.finiteOffersCategoryId),
         )
         .toList(growable: false);
-    final products = resolved
-        .map((entry) => entry.product)
-        .toList(growable: false);
+    final productIds = <String>{};
+    final products = [for (final entry in resolved)
+      if (productIds.add(entry.product.id)) entry.product];
 
     return BuyV2VerticalScrollIndicator(
       child: CustomScrollView(
@@ -627,6 +648,9 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
                 publisherType: value.publisherType,
                 headline: value.headline,
                 publisherName: value.publisherName,
+                publisherId: value.revision == null ? null : value.publisherId,
+                revision: value.revision,
+                detail: value.detail,
               ),
               product: value.product,
             ),
@@ -1115,7 +1139,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         11,
                         FontWeight.w500,
                         textWidth,
-                      );
+                      ) + (entry.offer.detail?.trim().isNotEmpty == true ? 48 : 0);
                   final candidate =
                       16 +
                       (contentHeight > 112 ? contentHeight : 112.0) +
@@ -1139,11 +1163,42 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                       final publisher =
                           entry.offer.publisherName ??
                           (_mool ? 'MoolSocial' : product.seller);
+                      final owner = widget.session;
+                      bool current() => mounted && identical(widget.session, owner) && widget.entries.any((e) =>
+                        e.offer.identity == entry.offer.identity && e.product.id == product.id &&
+                        e.offer.publisherId == entry.offer.publisherId && e.offer.publisherName == entry.offer.publisherName &&
+                        e.offer.publisherType == entry.offer.publisherType &&
+                        e.product.customerSeller(e.offer.publisherName ?? (_mool ? 'MoolSocial' : e.product.seller)) ==
+                          product.customerSeller(publisher) &&
+                        e.offer.headline == entry.offer.headline && e.offer.detail == entry.offer.detail);
                       void open() {
+                        if (!current()) return;
                         widget.session.featuredOfferPublicationId =
                             entry.offer.identity;
                         widget.session.openProduct(product.id);
                       }
+                      void details() => showDialog<void>(context: context,
+                        builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
+                          scrollable: true,
+                          title: Text(entry.offer.headline, style: context.buyBody.copyWith(
+                            fontSize: 14, height: 1.25, fontWeight: FontWeight.w700)),
+                          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [Text('From ${product.customerSeller(publisher)}'), const SizedBox(height: 8),
+                              Text(entry.offer.detail!.trim(), key: ValueKey('buy-offer-detail-copy-${entry.offer.identity}')),
+                              const SizedBox(height: 12), const Text('Viewing this promotion does not apply a discount.'),
+                              if (!current()) ...[const SizedBox(height: 8),
+                                const Text('This offer changed. Close and refresh the offers.')]]),
+                          actions: [TextButton(key: const ValueKey('buy-offer-detail-close'),
+                            style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                              textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1.25, fontWeight: FontWeight.w600)),
+                            onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+                            TextButton(key: const ValueKey('buy-offer-detail-product'),
+                            style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                              textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1.25, fontWeight: FontWeight.w600)), onPressed: () {
+                              if (!current()) { update(() {}); return; }
+                              Navigator.pop(dialogContext); open();
+                            }, child: const Text('View product'))],
+                        )));
 
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(8, 0, 4, 0),
@@ -1245,6 +1300,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
+                                        if (entry.offer.detail?.trim().isNotEmpty == true)
+                                          TextButton(key: ValueKey('buy-offer-details-${entry.offer.identity}'),
+                                            onPressed: details,
+                                            style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                                              padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+                                            child: const Text('Offer details', style: TextStyle(fontSize: 11, height: 1.15))),
                                       ],
                                     ),
                                   ),

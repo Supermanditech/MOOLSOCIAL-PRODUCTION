@@ -8035,6 +8035,21 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($ownerVariants.owners|Sort-Object) -join '|') -cne (@($storeVariantOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners+= $storeVariantOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch02Promotions']) {
+    $promotion=$Continuation.batch02Promotions
+    $promotionOwners=@('apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart')
+    if ($null -eq $promotion -or $promotion -isnot [pscustomobject]) { return $false }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if ($null -eq $promotion.PSObject.Properties[$key]) { return $false }
+    }
+    if ($promotion.ticket -cne 'LF-04-C01' -or $promotion.batch -ne 2 -or
+        $promotion.sourceCheckpoint -cne '8615a63c66940e4414f5701bc88d55e0fc3c1694' -or
+        $promotion.state -cne 'founder_authorized_frontend_promotion_consumer' -or
+        (@($promotion.owners|Sort-Object) -join '|') -cne (@($promotionOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $promotionOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0
