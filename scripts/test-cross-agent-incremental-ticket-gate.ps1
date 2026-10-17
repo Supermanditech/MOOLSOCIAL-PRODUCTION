@@ -112,6 +112,47 @@ if ($RequireLfPublicationProbes) {
   Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase handoff -Lane codex_ui -TicketId LF-26 -UiScope last-frontend-retail-facts-consistency -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit $accepted } 'no build/handoff'
   Assert-GateFails { & $gate -RepositoryRoot $sourceRoot -Phase handoff -Lane codex_ui -TicketId LF-27 -UiScope last-frontend-store-feedback-frontend -CandidateVersionName 1.0.0-r67.3 -CandidateVersionCode 2026101303 -PackageId com.moolsocial.app.runtime -AcceptedUiCommit '3c5a454bf8af173d9736c75213cafb88e641765c' } 'no build/handoff'
   $cases+=3
+  $batchPredicate=@($ast.FindAll({param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+      $node.Name -ceq 'Test-Lf27Batch01Continuation'
+  },$true))
+  Assert-Fixture ($batchPredicate.Count -eq 1) 'Batch01 continuation predicate absent/duplicated.'
+  . ([scriptblock]::Create($batchPredicate[0].Extent.Text))
+  $record=Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json') | ConvertFrom-Json
+  $continuation=$record.frontendContinuation
+  Assert-Fixture (-not $record.execution.runtimeWriteAuthorized) 'Historical published execution authority was overwritten.'
+  Assert-Fixture (Test-Lf27Batch01Continuation $continuation @()) 'Exact Batch01 activation rejected.'
+  $cases+=2
+  foreach($owner in $continuation.owners) {
+    Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch01 owner rejected.'
+    $cases++
+  }
+  foreach($owner in @('backend/functions/src/index.ts','config/codex-subagent-coordination-policy.json',
+      'apps/mobile/lib/features/work/work_session.dart','apps/mobile/android/app/build.gradle.kts',
+      'apps/mobile/test/ui_v2/buy/unclaimed_test.dart')) {
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $continuation @($owner))) 'Batch01 admitted an unrelated owner.'
+    $cases++
+  }
+  foreach($key in @('id','state','publishedCheckpoint','batch','classification',
+      'executableTickets','semanticParents','admissionContainer','owners',
+      'runtimeWriteAuthorized','testOrGateWriteAuthorized','backendWriteAuthorized',
+      'deploymentAuthorized','liveTransactionsAuthorized','buildAuthorized',
+      'deviceInstallAuthorized','externalServiceWriteAuthorized')) {
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.PSObject.Properties.Remove($key)
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch01 missing $key admitted."
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.$key='unrelated'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch01 changed $key admitted."
+    $cases+=2
+  }
+  foreach($key in @('backendWriteAuthorized','deploymentAuthorized','liveTransactionsAuthorized',
+      'buildAuthorized','deviceInstallAuthorized','externalServiceWriteAuthorized')) {
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.$key=$true
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch01 gained $key."
+    $cases++
+  }
   Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."
   return
 }

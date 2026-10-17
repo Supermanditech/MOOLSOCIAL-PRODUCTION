@@ -4563,6 +4563,16 @@ class _WholesaleTradeDecisionPanelState
     final decision = widget.decision;
     final fulfilmentMode = widget.session.fulfilmentModeFor(product);
     final minimumTotal = product.minimumOrderTotalMinor(facts.priceMinor);
+    final terms = product.packTerms;
+    final taxIncluded = product.hasValidPackTerms &&
+            product.hasValidPublicListingIdentity &&
+            !facts.stale &&
+            terms?.pricingCurrentAt(widget.session.catalogueNow()) == true
+        ? terms?.pricesIncludeTax
+        : null;
+    final taxAndInvoice = taxIncluded == null
+        ? 'Tax and invoice not confirmed'
+        : '${taxIncluded ? 'Tax included' : 'Tax excluded'} · Invoice not confirmed';
     final showSignal =
         _loading ||
         _failure != null ||
@@ -4623,10 +4633,10 @@ class _WholesaleTradeDecisionPanelState
                     ? 'Included in price'
                     : 'Confirmed before payment',
               ),
-              const _DecisionRow(
+              _DecisionRow(
                 icon: Icons.receipt_long_outlined,
-                label: 'Tax invoice',
-                value: 'GST included · invoice provided',
+                label: 'Tax & invoice',
+                value: taxAndInvoice,
               ),
               _DecisionRow(
                 icon: Icons.event_available_outlined,

@@ -504,6 +504,92 @@ void main() {
       expect(paymentOffers, isEmpty);
     });
 
+    for (final live in [false, true]) {
+      for (final strategy in [
+        BuyV2CartBenefitStrategy.minimumOrder,
+        BuyV2CartBenefitStrategy.publishedOffer,
+        BuyV2CartBenefitStrategy.partnerCampaign,
+      ]) {
+        test(
+          'Batch01 ${live ? 'live' : 'local'} ${strategy.name} respects payment restrictions',
+          () async {
+            final now = DateTime.utc(2026, 10, 17, 10);
+            final restricted = BuyV2CartBenefit(
+              id: 'batch01-upi-only',
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+              title: 'Host fixture UPI coupon',
+              detail: 'Host-only supplied method restriction.',
+              sourceId: 'batch01-host-fixture',
+              strategy: strategy,
+              savingAmountMinor: 100,
+              minimumSpendMinor: 100,
+              offerId: 'batch01-original-offer',
+              eligiblePaymentMethods: const {'UPI'},
+            );
+            const unrestricted = BuyV2CartBenefit(
+              id: 'batch01-unrestricted',
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+              title: 'Host fixture unrestricted coupon',
+              detail: 'Host-only unrestricted comparison.',
+              sourceId: 'batch01-host-fixture',
+              savingAmountMinor: 50,
+            );
+            final snapshot = BuyV2CartBenefitsSnapshot(
+              state: BuyV2CartBenefitsLoadState.ready,
+              evaluatedAt: now,
+              benefits: [restricted, unrestricted],
+            );
+            final session = BuyV2Session(
+              core: BuySession(),
+              catalogueNow: () => now,
+              commerceAdapter: prepaidCommerceFixture(),
+              cartBenefitsAdapter: live
+                  ? _LiveBenefitsAdapter(snapshot)
+                  : _Batch01LocalBenefits(snapshot.benefits),
+            );
+            addTearDown(session.dispose);
+            final product = BuyV2Catalogue.products.firstWhere(
+              (candidate) => candidate.destination == BuyV2Destination.shop,
+            );
+            expect(session.addProduct(product.id), isTrue);
+            if (live) await session.refreshCartBenefits();
+            expect(session.chooseCartBenefit(restricted), isTrue);
+            expect(session.scopedCouponSavingMinor, 100);
+            final originalCartTotal = session.scopedCartTotalMinor;
+
+            expect(session.choosePayment('Card'), isTrue);
+            if (live) await session.refreshCartBenefits();
+            expect(
+              session
+                  .cartBenefits(kind: BuyV2CartBenefitKind.coupon)
+                  .map((benefit) => benefit.id),
+              ['batch01-unrestricted'],
+            );
+            expect(session.chooseCartBenefit(restricted), isFalse);
+            expect(session.scopedCouponSavingMinor, 0);
+            expect(session.scopedCartTotalMinor, originalCartTotal);
+            expect(session.quantityFor(product.id), 1);
+            expect(session.chooseCartBenefit(unrestricted), isTrue);
+            expect(session.scopedCouponSavingMinor, 50);
+
+            // Host-only stale/legacy selection, not permission to offer Cash online.
+            session.selectedPayment = 'Cash';
+            if (live) await session.refreshCartBenefits();
+            expect(session.chooseCartBenefit(restricted), isFalse);
+            expect(
+              session
+                  .cartBenefits(kind: BuyV2CartBenefitKind.coupon)
+                  .map((benefit) => benefit.id),
+              ['batch01-unrestricted'],
+            );
+            expect(session.scopedCartTotalMinor, originalCartTotal);
+          },
+        );
+      }
+    }
+
     test(
       'device-review seeds cover active Buy verticals and stay total-neutral',
       () {
@@ -1296,6 +1382,19 @@ void main() {
       },
     );
   });
+}
+
+class _Batch01LocalBenefits implements BuyV2CartBenefitsAdapter {
+  const _Batch01LocalBenefits(this.benefits);
+
+  final List<BuyV2CartBenefit> benefits;
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => benefits;
 }
 
 class _LiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {

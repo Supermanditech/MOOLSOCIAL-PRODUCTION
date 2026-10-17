@@ -402,6 +402,23 @@ class _Lf07LocationSession extends BuyV2Session {
   BuyV2StoreListing? catalogueStore(String storeId) => location;
 }
 
+// Host-only tax presentation records; not published products or issued invoices.
+class _Batch01TaxSession extends BuyV2Session {
+  _Batch01TaxSession(this.fixture, DateTime now, this.staleFacts)
+    : super(core: BuySession(), catalogueNow: () => now);
+
+  final BuyV2Product fixture;
+  final bool staleFacts;
+
+  @override
+  BuyV2Product? findProduct(String id) =>
+      id == fixture.id ? fixture : super.findProduct(id);
+
+  @override
+  BuyV2ProductFactsSnapshot productFactsFor(BuyV2Product product) =>
+      super.productFactsFor(product).copyWith(stale: staleFacts);
+}
+
 // Isolated address-request fixture; no real links, accounts or provider calls.
 class _Lf08AddressSession extends BuyV2Session {
   _Lf08AddressSession(_CartReturnOwnerStore owner, this.buyerIdentity)
@@ -4820,6 +4837,66 @@ void main() {
       }
     }
   });
+
+  for (final scenario in [
+    'missing', 'included', 'excluded', 'unknown', 'wrong-sku',
+    'wrong-store', 'future', 'expired', 'stale',
+  ]) {
+    for (final scale in [1.0, 1.4]) {
+      testWidgets('Batch01 Wholesale tax $scenario at text $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final now = DateTime.utc(2026, 10, 17, 12);
+        final seed = BuyV2Catalogue.products.firstWhere(
+          (product) => product.destination == BuyV2Destination.wholesale,
+        );
+        final product = seed.copyWith(
+          storeId: 'batch01-store',
+          packTerms: scenario == 'missing' ? null : BuyV2PackTerms(
+            skuId: scenario == 'wrong-sku' ? 'another-sku' : seed.id,
+            revision: 'batch01-host-terms',
+            sellUnit: 'case',
+            pricingStoreId: scenario == 'wrong-store' ? 'another-store' : 'batch01-store',
+            priceObservedAt: scenario == 'future'
+                ? now.add(const Duration(minutes: 1))
+                : now.subtract(const Duration(hours: 1)),
+            priceValidUntil: scenario == 'expired'
+                ? now : now.add(const Duration(hours: 2)),
+            pricesIncludeTax: scenario == 'unknown' ? null : scenario != 'excluded',
+            priceTiers: [BuyV2PackPriceTier(
+              minimumPacks: seed.minimumOrder, priceMinor: seed.priceMinor,
+            )],
+          ),
+        );
+        final session = _Batch01TaxSession(product, now, scenario == 'stale');
+        addTearDown(session.core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(app(session, textScale: scale));
+        session.openProduct(product.id);
+        await tester.pumpAndSettle();
+        final expected = switch (scenario) {
+          'included' => 'Tax included · Invoice not confirmed',
+          'excluded' => 'Tax excluded · Invoice not confirmed',
+          _ => 'Tax and invoice not confirmed',
+        };
+        await tester.scrollUntilVisible(
+          find.text('Wholesale terms'), 180,
+          scrollable: scrollableWithin(PageStorageKey('buy-product-${product.id}')),
+        );
+        expect(find.text('GST included · invoice provided'), findsNothing);
+        expect(find.text('Tax & invoice'), findsOneWidget);
+        expect(find.text(expected), findsOneWidget);
+        await tester.ensureVisible(find.byKey(
+          ValueKey('buy-wholesale-commercial-terms-${product.id}'),
+        ));
+        expect(tester.takeException(), isNull);
+        if (scenario == 'missing') {
+          await captureR66Visual(tester, 'batch01-tax-unconfirmed-$scale');
+        }
+      });
+    }
+  }
 
   testWidgets('product detail exposes purchase decision information', (
     tester,

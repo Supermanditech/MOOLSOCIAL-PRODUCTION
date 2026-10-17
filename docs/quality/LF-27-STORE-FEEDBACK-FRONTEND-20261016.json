@@ -299,6 +299,85 @@
       "apps/mobile/test/workspace_purchase_originals_test.dart"
     ]
   },
+  "frontendContinuation": {
+    "id": "store-public-batch01-20261017",
+    "state": "founder_authorized_implementation",
+    "publishedCheckpoint": "88aae0282aa555ad5c665286907ca6558197342d",
+    "batch": 1,
+    "classification": "mvp_required",
+    "executableTickets": ["LF-05-C01", "LF-08-C01"],
+    "semanticParents": ["LF-05", "LF-08"],
+    "admissionContainer": "LF-27",
+    "founderDirection": "On 17 October 2026 the founder explicitly activated the deduplicated 12-ticket continuation goal, requested Git reconciliation since the previous combined baseline before edits, production Git discipline in every new batch and mandatory OPPO hotreload for applicable changes. This continuation authorizes only Batch01 implementation, not new acceptance or live services. LF27 is the existing admission container, not these tickets' semantic parent.",
+    "minimumCompleteScope": [
+      "LF-05-C01: replace the unconditional Wholesale GST/invoice promise with applicable supplied tax facts or truthful unconfirmed wording; no inferred GST registration or invoice issuance.",
+      "LF-08-C01: enforce supplied payment restrictions for every coupon strategy at display, Apply and editable-selection revalidation; preserve unrestricted coupons, exact amounts, Store/SKU scope and frozen original payment holds."
+    ],
+    "testPlan": [
+      "Reproduce both source gaps in focused existing host tests before runtime corrections; verify missing/stale tax facts and normal/enlarged product fitment.",
+      "Verify incompatible Cash/UPI and unrestricted coupons, method changes, scope, free delivery and retained original payment recovery.",
+      "Run affected analysis/regressions, hotreload current source on OPPO and inspect applicable UI without synthetic runtime data or real commercial actions. Founder review and native populated-provider limits remain explicit."
+    ],
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "deploymentAuthorized": false,
+    "liveTransactionsAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false,
+    "founderAccepted": false,
+    "oppoResult": "OPPO 2b3e0f71: current-source full hot restart succeeded; Wholesale product terms visibly show Tax and invoice not confirmed, with original approved layout/actions retained. Screenshots and accessibility readback were inspected. Original 164-rupee Cart/payment-review hold and saved evaluation Stock identities/quantities were checked without saving/transacting. Populated coupon and tax-authority variants remain labelled host-test evidence only. Founder review remains pending; no APK qualification claimed.",
+    "taxDisplayDecision": {
+      "purpose": "Wholesale product decision, existing Wholesale terms row: explain tax inclusion without promising GST registration or invoice issuance.",
+      "authority": "Founder activated LF-05-C01 after the source audit. This supersedes only the unconditional GST included / invoice provided assertion; approved product layout, actions, prices and neighboring surfaces stay unchanged.",
+      "source": "Reuse existing BuyV2PackTerms.pricesIncludeTax only for valid matching SKU/pack/Store pricing terms, current at session.catalogueNow, with non-stale product facts. Missing, invalid, wrong-Store, future or expired facts remain unconfirmed. No new field/provider engine.",
+      "actions": "Retain existing Add, quantity, seller, freight and price-check controls; no new action, tax calculation or invoice issuer.",
+      "presentation": "Existing single decision row, labelled Tax & invoice; Tax included/excluded only when supported, and Invoice not confirmed in every case because no issued-invoice authority exists here. Otherwise Tax and invoice not confirmed.",
+      "verification": "Labelled host fixtures cover true/false/missing tax, mismatched SKU/Store, future/expired terms and stale facts at normal/enlarged compact sizes; inspect actual OPPO unconfirmed state and retain Cart/Stock. No fabricated phone data or live tax/legal claim."
+    },
+    "hostRegressionFindings": [
+      "Six new ordinary-coupon tests failed before correction and passed after the initial runtime correction; exact authored counts were parsed from preserved JSON output.",
+      "The first complete Cart-relevance run returned23 passed/1 failed: the initial generic filter also hid informational seeded payment offers. Preserve the existing three-offer display expectation and constrain the new uniform restriction to coupons; retain the pre-existing financialProduct rule for live payment offers. This is a detected in-batch regression, not an obsolete test or native acceptance. No Stock, Cart persistence or payment attempt was changed.",
+      "Formatting initially reflowed unrelated session source. It was mechanically removed through apply_patch after verifying only formatting differences from HEAD plus the intended correction. The final runtime delta remains narrowly reviewable. Do not rerun a whole-file formatter on this inherited densely formatted owner.",
+      "Tax regression:18 authored host cases reproduced the unconditional GST/invoice assertion, then18 passed after the bounded existing-terms correction at320x568 normal/1.4 text. Three existing product-decision, compact product-fitment and Account/Chat return tests passed. Actual CSV/catalogue entry, live tax/invoice issuance and production services are not claimed.",
+      "The initial attach after reopening the installed older APK produced a mixed-kernel lookup failure for priceMinor/mrpMinor when the product page mounted. Preserve that failed screenshot, do not treat reload success or one runtime source marker as whole-source parity. A full current-source hot restart loaded the complete program and the same native Wholesale journey then rendered correctly. No model/source workaround or APK install was required."
+    ],
+    "inheritedCheckLimitation": "The unchanged Social protected checker fails expected119/actual242 selected files. Architect read-only review independently confirmed published88aae028 already has the identical242-file inventory and zero protected paths changed by this batch; its broad backend/functions/src root includes previously accepted non-Social producers. Keep the failed check unresolved, do not change its baseline/checker, delete files or report it passed. Current narrow LF27 continuation admission passes. Any later publication step that actually requires this old checker must report the boundary rather than silently bypass it.",
+    "technicalCheckpoint": {
+      "status": "implemented_host_tested_oppo_reviewable_not_founder_accepted",
+      "tests": {"cartRelevance": 24, "taxNormalAndEnlarged": 18, "paymentHoldRestart": 1, "existingProductAndNavigation": 3, "continuationPositiveNegativeChecks": 87},
+      "analysis": "No issues in the two affected runtime owners and two test owners.",
+      "approvedUiLocks": "passed; no reference files changed",
+      "architectReview": "No concrete must-fix found in bounded source review; inherited Social count mismatch independently confirmed. Not independent device/test execution or founder acceptance.",
+      "evidenceRoot": "C:/Users/jisal/Documents/Codex/2026-09-19/restock-testing-in-store/outputs",
+      "hostLogs": ["followup-b01-cart-regressions-20261017-v2.jsonl", "followup-b01-tax-final-20261017-v1.jsonl", "followup-b01-payment-hold-regression-20261017-v1.jsonl", "followup-b01-product-regressions-20261017-v1.jsonl", "followup-b01-tax-visual-20261017-v2.jsonl"],
+      "nativeEvidence": ["evidence/followup-b01-tax-terms-restarted-20261017-v1.png", "evidence/followup-b01-product-return-20261017-v1.xml", "evidence/followup-b01-cart-after-full-restart-20261017-v1.xml", "evidence/followup-b01-retained-stock-20261017-v1.xml"],
+      "failedPartialReload": "evidence/followup-b01-tax-terms-20261017-v1.png",
+      "hostVisualEvidence": "followup-b01-tax-host-visual-20261017-v2; labelled fixtures at320x568 normal and1.4 text, not native large-text or founder acceptance",
+      "runtimeSourcesRawSha256BeforeStaging": {"buy_v2_session.dart": "13D2565DF6C6765409FA7FE9542F28010FACF6C11CA7C3CEBB18367D18C7D607", "buy_v2_views.dart": "358862E1B010A4CC231FC924BA77FEB983C75A5B6FB8AF13D414A4132A2FE97E"},
+      "remaining": "New source is not founder-accepted or published. Batch02-05 and the two parked tickets remain open; live services, APK and broad device qualification are not claimed."
+    },
+    "owners": [
+      "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "apps/mobile/lib/features/buy/buy_v2_session.dart",
+      "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+      "scripts/check-codex-subagent-coordination-policy.ps1",
+      "scripts/test-cross-agent-incremental-ticket-gate.ps1",
+      "docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json"
+    ],
+    "queuedBatches": [
+      {"batch": 2, "tickets": ["LF-03-C01", "LF-04-C01"], "scope": "Applicable product/compliance/variant/media/public source and immutable Chat mapping; campaign publication contracts. Authoritative review, upload and publication remain provider-qualified separately."},
+      {"batch": 3, "tickets": ["LF-08-C02", "LF-10-C01"], "scope": "Resolved terms, benefit definitions/quote/original attribution and immutable per-Store order context. Live eligibility/redemption/final-placement authority remains backend-phase."},
+      {"batch": 4, "tickets": ["LF-11-C01", "LF-12-C01"], "scope": "Initial fulfilment/slot continuity, seller-to-buyer updates, original after-sales and issued-document consumers; no operator workspace or local financial authority."},
+      {"batch": 5, "tickets": ["LF-13-C01", "LF-14-C01"], "scope": "One feedback/readback/rating connection and genuine scoped events/analytics hooks; no fake feeds, trust scores or redesigned analytics."}
+    ],
+    "parkedTickets": ["LF-09-C01", "LF-05-C03"],
+    "preservationEvidence": "Read-only reconciliation: all nine registered worktrees clean, no stashes or hidden active index flags; 44 post-3c5a454b commits and all27 LF records retained. Live origin readbacks equal current88aae028, combined3c5a454b, Store8002e8cd and Cursorf32c17e1. No hand-written ignored source candidate found in inspected app/backend/configuration owners. Existing generated iOS registrant remains generated, not authored work. This is not proof of every intended feature or historical deletion.",
+    "prerequisiteEvidence": "Implementation memory passed with the existing EvidenceArchiveRoot parameter:4623 entries,2557 applicable. The first failure was missing default archive-root coverage, not lost source; the original REG3955 zero-byte preimage was found in the existing archive. REG4649 diagnostic-boundary recurrence: oversized nested-tail and archive-row displays were rejected as complete evidence; subsequent reads used scalar allowlists and exact filename discovery. Registry bytes/policy/acceptance were not rewritten. TASK logs followup-b01-memory-implementation-20261017-v1/v2 and admission/incremental-reconstruction-v1 retain the actual results.",
+    "historicalExecution": "The root execution and original authorization/acceptance fields below remain the closed published checkpoint. Only this separately bound continuation supplies current Batch01 frontend write authority; it does not accept new source or authorize another queued batch's writes."
+  },
   "execution": {
     "referenceWriteAuthorized": false,
     "runtimeWriteAuthorized": false,

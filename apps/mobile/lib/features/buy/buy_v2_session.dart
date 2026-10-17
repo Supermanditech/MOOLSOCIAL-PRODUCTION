@@ -10670,6 +10670,11 @@ class BuyV2Session extends ChangeNotifier {
     required int destinationQuantity,
     bool allowUnmetSpend = false,
   }) {
+    if (benefit.kind == BuyV2CartBenefitKind.coupon &&
+        benefit.eligiblePaymentMethods.isNotEmpty &&
+        !benefit.eligiblePaymentMethods.contains(selectedPayment)) {
+      return false;
+    }
     if (benefit.validFrom case final validFrom?
         when evaluatedAt.isBefore(validFrom)) {
       return false;
@@ -11409,6 +11414,9 @@ class BuyV2Session extends ChangeNotifier {
     );
     for (final benefit in raw) {
       if (!benefit.validScope ||
+          (benefit.kind == BuyV2CartBenefitKind.coupon &&
+              benefit.eligiblePaymentMethods.isNotEmpty &&
+              !benefit.eligiblePaymentMethods.contains(selectedPayment)) ||
           (benefit.validFrom != null &&
               evaluatedAt.isBefore(benefit.validFrom!)) ||
           (benefit.validUntil != null &&

@@ -7927,6 +7927,42 @@ function Test-Lf27PublicationDelta([string]$Head, [string[]]$Parents, [string[]]
   return @($Owners | Where-Object { $_ -cnotin $metadata }).Count -eq 0
 }
 
+function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
+  if ($null -eq $Continuation -or $Continuation -isnot [pscustomobject]) { return $false }
+  foreach ($key in @('id','state','publishedCheckpoint','batch','classification',
+      'executableTickets','semanticParents','admissionContainer','owners',
+      'runtimeWriteAuthorized','testOrGateWriteAuthorized','backendWriteAuthorized',
+      'deploymentAuthorized','liveTransactionsAuthorized','buildAuthorized',
+      'deviceInstallAuthorized','externalServiceWriteAuthorized')) {
+    if ($null -eq $Continuation.PSObject.Properties[$key]) { return $false }
+  }
+  if ($Continuation.id -cne 'store-public-batch01-20261017' -or
+      $Continuation.state -cne 'founder_authorized_implementation' -or
+      $Continuation.publishedCheckpoint -cne '88aae0282aa555ad5c665286907ca6558197342d' -or
+      $Continuation.batch -ne 1 -or $Continuation.classification -cne 'mvp_required' -or
+      $Continuation.admissionContainer -cne 'LF-27' -or
+      (@($Continuation.executableTickets) -join '|') -cne 'LF-05-C01|LF-08-C01' -or
+      (@($Continuation.semanticParents) -join '|') -cne 'LF-05|LF-08') { return $false }
+  foreach ($key in @('runtimeWriteAuthorized','testOrGateWriteAuthorized')) {
+    if ($Continuation.$key -isnot [bool] -or $Continuation.$key -ne $true) { return $false }
+  }
+  foreach ($key in @('backendWriteAuthorized','deploymentAuthorized',
+      'liveTransactionsAuthorized','buildAuthorized','deviceInstallAuthorized',
+      'externalServiceWriteAuthorized')) {
+    if ($Continuation.$key -isnot [bool] -or $Continuation.$key -ne $false) { return $false }
+  }
+  $exactOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
+    'scripts/check-codex-subagent-coordination-policy.ps1',
+    'scripts/test-cross-agent-incremental-ticket-gate.ps1',
+    'docs/quality/LF-27-STORE-FEEDBACK-FRONTEND-20261016.json')
+  return (@($Continuation.owners | Sort-Object) -join '|') -ceq
+      (@($exactOwners | Sort-Object) -join '|') -and
+    @($ChangedOwners | Where-Object { $_ -cnotin $exactOwners }).Count -eq 0
+}
+
 function Invoke-Lf01Admission {
   # Current founder-authorized task admission, not another historical successor.
   # The closed integration path below and its 83 bindings remain unchanged.
@@ -8199,6 +8235,14 @@ function Invoke-Lf01Admission {
     Phase=$ProductionPhase
   })) 'LF-01 requires its exact authorized feature identity; only accepted LF27 publication adds handoff, not build/device/closure.'
   $record = Get-Content -Raw -LiteralPath (Join-Path $root $recordOwner) | ConvertFrom-Json
+  if ($null -ne $record.PSObject.Properties['frontendContinuation']) {
+    $continuationBase='88aae0282aa555ad5c665286907ca6558197342d'
+    Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$continuationBase,'HEAD') | Out-Null
+    $continuationDelta=@(@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$continuationBase)) +
+      @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard'))) | Sort-Object -Unique
+    Assert-Coordination ($ProductionTicketId -ceq 'LF-27' -and
+      (Test-Lf27Batch01Continuation $record.frontendContinuation $continuationDelta)) 'Batch01 continuation exceeds its exact tickets, owners or frontend authority.'
+  }
   $admission = $record.ticket.frontendAdmission
   Assert-Coordination ($record.ticket.id -ceq $ProductionTicketId -and
     $admission.baselineHead -ceq $base -and $admission.branch -ceq $branch[0] -and
