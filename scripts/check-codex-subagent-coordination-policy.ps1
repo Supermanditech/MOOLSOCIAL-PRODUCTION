@@ -8007,6 +8007,23 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($variants.owners|Sort-Object) -join '|') -cne (@($variantOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners+= $variantOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch02OwnerVariants']) {
+    $ownerVariants=$Continuation.batch02OwnerVariants
+    $storeVariantOwners=@('apps/mobile/lib/features/work/work_models.dart',
+      'apps/mobile/lib/features/work/work_session.dart',
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+      'apps/mobile/test/work_product_content_test.dart',
+      'apps/mobile/test/work_workspace_layout_safety_test.dart')
+    if ($null -eq $ownerVariants -or $ownerVariants -isnot [pscustomobject]) { return $false }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if($null -eq $ownerVariants.PSObject.Properties[$key]) { return $false }
+    }
+    if ($ownerVariants.ticket -cne 'LF-03-C01' -or $ownerVariants.batch -ne 2 -or
+        $ownerVariants.sourceCheckpoint -cne '4da07f6cb19705669b13b94fa3f3911084255f8d' -or
+        $ownerVariants.state -cne 'founder_authorized_store_local_family' -or
+        (@($ownerVariants.owners|Sort-Object) -join '|') -cne (@($storeVariantOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners+= $storeVariantOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0

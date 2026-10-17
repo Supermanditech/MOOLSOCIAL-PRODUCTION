@@ -24978,12 +24978,22 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   bool _allowEditorExit = false;
   bool _confirmingEditorExit = false;
   late final Map<String, String> _initialEditValues;
+  late final String _initialVariantState;
+  late WorkspaceVariantFamily? _variantFamily = widget.session.workspaceVariantFamilies
+    .where((f) => f.id == widget.product.variantMembership?.familyId).firstOrNull;
+  late final Map<String, String> _variantSelections = {
+    ...?widget.product.variantMembership?.selections,
+  };
+  final Map<String, Map<String, String>> _siblingVariantSelections = {};
+  late bool _useSharedVariantContent = widget.product.variantMembership?.useSharedContent ?? true;
+  String get _variantState => jsonEncode([_variantFamily?.toJson(), _variantSelections,
+    _siblingVariantSelections, _useSharedVariantContent]);
   bool get _hasUnsavedEdits => !_saved && (
     _importControllers.entries.any(
       (entry) => entry.value.text != _initialEditValues[entry.key]) ||
     _public != widget.product.publicListing ||
     _available != widget.product.available ||
-    _privatePhoto != widget.product.privatePhoto);
+    _privatePhoto != widget.product.privatePhoto || _variantState != _initialVariantState);
   late WorkspacePrivateProductPhoto? _privatePhoto =
       widget.product.privatePhoto;
 
@@ -25302,6 +25312,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     _initialEditValues = {
       for (final entry in _importControllers.entries) entry.key: entry.value.text,
     };
+    _initialVariantState = _variantState;
     if (_listingRecoveryRequired) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_restoreListing());
@@ -25310,6 +25321,246 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   void _refreshIdentity() => setState(() {});
+
+  void _loadVariantFamily(WorkspaceVariantFamily family) {
+    _variantFamily = family;
+    _title.text = family.title;
+    _brand.text = family.brand;
+    _category.text = family.categoryId;
+    if (_useSharedVariantContent) {
+      for (final entry in family.content.inputValues.entries) {
+        _contentFields[entry.key]!.text = entry.value;
+      }
+    }
+    _public = false;
+    // Joining an unreviewed family is not a new provider visibility command.
+    _listingIntentChanged = false;
+    _expanded['variants'] = true;
+  }
+
+  WorkspaceVariantFamily? _variantDefinitionForSave(WorkspaceProductContent content) {
+    final base = _variantFamily;
+    if (base == null) {
+      if (widget.product.variantMembership != null) throw const FormatException('Recover the saved product family before editing.');
+      return null;
+    }
+    final candidate = base.copyWith(title: _title.text.trim(), brand: _brand.text.trim(),
+      categoryId: _category.text.trim(), content: _useSharedVariantContent ? content : base.content);
+    final member = WorkspaceVariantMembership(familyId: base.id, selections: _variantSelections,
+      useSharedContent: _useSharedVariantContent);
+    candidate.attributesFor(member);
+    final current = widget.session.workspaceVariantFamilies.where((f) => f.id == base.id).firstOrNull;
+    if (current == null) return candidate.copyWith(revision: 1);
+    if (jsonEncode(candidate.copyWith(revision: current.revision).toJson()) == jsonEncode(current.toJson())) return current;
+    if (base.revision != current.revision) throw const FormatException('This family changed. Reopen its latest details before saving.');
+    return candidate.copyWith(revision: current.revision + 1);
+  }
+
+  void _updateVariantLabel() {
+    final family = _variantFamily;
+    if (family == null || widget.product.variantMembership != null) return;
+    try {
+      final attributes = family.attributesFor(WorkspaceVariantMembership(familyId: family.id,
+        selections: _variantSelections));
+      _variant.text = attributes.map((a) => a.optionLabel).join(' · ');
+    } on FormatException { /* Keep incomplete choices editable. */ }
+  }
+
+  Widget _variantFamilySection() {
+    final choices = {for (final f in widget.session.workspaceVariantFamilies) f.id: f};
+    final family = _variantFamily;
+    if (family != null) { choices[family.id] = family; }
+    return _section('variants', 'work-product-variant-family-section', 'Variants & options', [
+      DropdownButtonFormField<String>(
+        key: ValueKey('work-product-family-${family?.id ?? 'none'}'),
+        initialValue: family?.id ?? '', isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Product group'),
+        items: [const DropdownMenuItem(value: '', child: Text('Single product')),
+          for (final f in choices.values) DropdownMenuItem(value: f.id,
+            child: Text(f.title, maxLines: 2, overflow: TextOverflow.ellipsis))],
+        onChanged: _savingInventory || widget.product.variantMembership != null ? null : (id) => setState(() {
+          _variantSelections.clear(); _siblingVariantSelections.clear();
+          if (id == '') { _variantFamily = null; }
+          else if (choices[id] case final selected?) { _loadVariantFamily(selected); }
+        }),
+      ),
+      Wrap(spacing: 8, children: [
+        TextButton.icon(key: const Key('work-product-create-family'),
+          onPressed: _savingInventory || widget.product.variantMembership != null ? null : () => _editVariantOptions(create: true),
+          icon: const Icon(Icons.add, size: 18), label: const Text('New product group')),
+        if (family != null) TextButton.icon(key: const Key('work-product-edit-family'),
+          onPressed: _savingInventory ? null : _editVariantOptions,
+          icon: const Icon(Icons.tune, size: 18), label: const Text('Edit options')),
+      ]),
+      if (family != null) ...[
+        const Text('Name, brand and category are shared by this group. Each combination keeps its own SKU, price and Stock.'),
+        for (final dimension in family.dimensionIds) ...[
+          const SizedBox(height: 10),
+          Builder(builder: (_) {
+            final options = family.options.where((a) => a.dimensionId == dimension).toList();
+            final selected = _variantSelections[dimension];
+            return DropdownButtonFormField<String>(
+              key: ValueKey('work-product-option-$dimension-${options.map((o) => o.optionId).join(',')}-$selected'),
+              initialValue: options.any((o) => o.optionId == selected) ? selected : null,
+              isExpanded: true, decoration: InputDecoration(labelText: options.first.dimensionLabel),
+              items: [for (final option in options) DropdownMenuItem(value: option.optionId,
+                child: Text(option.optionLabel, maxLines: 2, overflow: TextOverflow.ellipsis))],
+              onChanged: _savingInventory || widget.product.variantMembership?.selections.containsKey(dimension) == true
+                ? null : (value) => setState(() {
+                  if (value != null) {
+                    _variantSelections[dimension] = value;
+                    _siblingVariantSelections.remove(widget.product.id);
+                  }
+                  _updateVariantLabel();
+                }),
+            );
+          }),
+        ],
+        CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading,
+          key: const Key('work-product-shared-family-content'),
+          title: const Text('Share description, highlights and specifications'),
+          subtitle: const Text('Edits apply to group members using shared content. Untick for this SKU’s exceptions.'),
+          value: _useSharedVariantContent, onChanged: _savingInventory ? null : (value) => setState(() {
+            _useSharedVariantContent = value ?? true;
+            if (_useSharedVariantContent) {
+              for (final entry in family.content.inputValues.entries) {
+                _contentFields[entry.key]!.text = entry.value;
+              }
+            }
+          })),
+        const Text('Options stay private until the product group and each SKU are reviewed.'),
+      ],
+    ], initiallyExpanded: family != null);
+  }
+
+  Future<void> _editVariantOptions({bool create = false}) async {
+    if (_savingInventory || _saved) return;
+    if (_title.text.trim().isEmpty) { _reject('Enter the product name before creating its group.', field: 'title'); return; }
+    final base = create ? null : _variantFamily;
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    var counter = 0;
+    final dimensions = <({String id, String label, BuyV2VariantDimensionKind kind, String values})>[
+      if (base != null) for (final id in base.dimensionIds)
+        (id: id, label: base.options.firstWhere((a) => a.dimensionId == id).dimensionLabel,
+          kind: base.options.firstWhere((a) => a.dimensionId == id).kind,
+          values: base.options.where((a) => a.dimensionId == id).map((a) => a.optionLabel).join('\n')),
+    ];
+    void addDimension() => dimensions.add((id: 'dimension-$stamp-${counter++}', label: '',
+      kind: BuyV2VariantDimensionKind.other, values: ''));
+    if (dimensions.isEmpty) addDimension();
+    final members = [if (base != null) for (final p in widget.session.workspaceCatalogueItems)
+      if (p.variantMembership?.familyId == base.id) p];
+    final staged = <String, Map<String, String>>{
+      for (final member in members) member.id: {
+        ...member.variantMembership!.selections,
+        ...?_siblingVariantSelections[member.id],
+        if (member.id == widget.product.id) ..._variantSelections,
+      },
+    };
+    final assignments = <String, Map<String, String>>{
+      for (final member in members) member.id: {
+        for (final option in base!.options)
+          if (staged[member.id]?[option.dimensionId] == option.optionId)
+            option.dimensionId: option.optionLabel,
+      },
+    };
+    String? error;
+    final result = await showDialog<({WorkspaceVariantFamily family, Map<String, Map<String, String>> selections})>(
+      context: context, builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
+        title: Text(create ? 'New product group' : 'Edit group options'),
+        content: SizedBox(width: 440, child: SingleChildScrollView(child: Column(
+          mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Add dimensions such as Colour, Storage, Size or Flavour. Enter one option per line. Only combinations you save become SKUs.'),
+          for (var i = 0; i < dimensions.length; i++) ...[
+            const SizedBox(height: 16),
+            TextFormField(key: ValueKey('family-dimension-${dimensions[i].id}'),
+              initialValue: dimensions[i].label, decoration: const InputDecoration(labelText: 'Dimension name'),
+              onChanged: (value) { final old = dimensions[i]; dimensions[i] = (id: old.id, label: value, kind: old.kind, values: old.values); }),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<BuyV2VariantDimensionKind>(
+              initialValue: dimensions[i].kind, isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Option type'),
+              items: [for (final kind in BuyV2VariantDimensionKind.values) DropdownMenuItem(
+                value: kind, child: Text(switch (kind) {
+                  BuyV2VariantDimensionKind.colour => 'Colour', BuyV2VariantDimensionKind.size => 'Size',
+                  BuyV2VariantDimensionKind.storage => 'Storage', BuyV2VariantDimensionKind.pack => 'Pack',
+                  BuyV2VariantDimensionKind.other => 'Other',
+                }))],
+              onChanged: (value) { if (value == null) return; final old = dimensions[i];
+                dimensions[i] = (id: old.id, label: old.label, kind: value, values: old.values); }),
+            const SizedBox(height: 8),
+            TextFormField(key: ValueKey('family-options-${dimensions[i].id}'),
+              initialValue: dimensions[i].values, minLines: 2, maxLines: 6,
+              decoration: const InputDecoration(labelText: 'Options — one per line'),
+              onChanged: (value) => update(() { final old = dimensions[i];
+                dimensions[i] = (id: old.id, label: old.label, kind: old.kind, values: value); })),
+            if (base != null)
+              for (final member in members) ...[
+                if (!member.variantMembership!.selections.containsKey(dimensions[i].id)) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('family-assign-${member.id}-${dimensions[i].id}-${dimensions[i].values}'),
+                  initialValue: dimensions[i].values.split('\n').map((s) => s.trim()).contains(assignments[member.id]?[dimensions[i].id])
+                    ? (assignments[member.id]?[dimensions[i].id]) : null,
+                  isExpanded: true, decoration: InputDecoration(labelText: 'Choose for SKU ${member.sku}'),
+                  items: [for (final label in dimensions[i].values.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toSet())
+                    DropdownMenuItem(value: label, child: Text(label, overflow: TextOverflow.ellipsis))],
+                  onChanged: (value) { if (value != null) {
+                    (assignments[member.id] ??= {})[dimensions[i].id] = value;
+                  } }),
+                ],
+              ],
+          ],
+          TextButton.icon(onPressed: dimensions.length >= 8 ? null : () => update(addDimension),
+            icon: const Icon(Icons.add), label: const Text('Add dimension')),
+          if (error != null) Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ]))),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(onPressed: () {
+            try {
+              final options = <BuyV2VariantAttribute>[];
+              for (final dimension in dimensions) {
+                for (final label in dimension.values.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty)) {
+                  final previous = base?.options.where((a) => a.dimensionId == dimension.id &&
+                    a.optionLabel.toLowerCase() == label.toLowerCase()).firstOrNull;
+                  options.add(BuyV2VariantAttribute(dimensionId: dimension.id, dimensionLabel: dimension.label.trim(),
+                    kind: dimension.kind, optionId: previous?.optionId ?? 'option-$stamp-${counter++}',
+                    optionLabel: label, swatchArgb: dimension.kind == BuyV2VariantDimensionKind.colour ? previous?.swatchArgb : null));
+                }
+              }
+              final content = WorkspaceProductContent.parse({for (final e in _contentFields.entries) e.key: e.value.text});
+              final family = WorkspaceVariantFamily(id: base?.id ?? 'family-$stamp', revision: base?.revision ?? 1,
+                title: _title.text.trim(), brand: _brand.text.trim(), categoryId: _category.text.trim(), options: options,
+                content: _useSharedVariantContent ? content : base?.content ?? content);
+              if (!family.valid) throw const FormatException('Use unique dimension names and non-empty, unique options.');
+              final selected = <String, Map<String, String>>{};
+              for (final member in members) {
+                final values = {...member.variantMembership!.selections};
+                for (final dimension in family.dimensionIds.where((id) => !member.variantMembership!.selections.containsKey(id))) {
+                  final label = assignments[member.id]?[dimension];
+                  final option = family.options.where((a) => a.dimensionId == dimension && a.optionLabel == label).firstOrNull;
+                  if (option == null) throw const FormatException('Choose the new option for every saved SKU. Nothing has been saved yet.');
+                  values[dimension] = option.optionId;
+                }
+                family.attributesFor(WorkspaceVariantMembership(familyId: family.id, selections: values));
+                selected[member.id] = values;
+              }
+              Navigator.pop(dialogContext, (family: family, selections: selected));
+            } on FormatException catch (failure) { update(() => error = failure.message); }
+          }, child: const Text('Use these options'))],
+      )));
+    if (!mounted || result == null) return;
+    setState(() {
+      if (create) { _variantSelections.clear(); _siblingVariantSelections.clear(); }
+      _variantFamily = result.family;
+      _siblingVariantSelections.addAll(result.selections);
+      if (result.selections[widget.product.id] case final selected?) {
+        _variantSelections..clear()..addAll(selected);
+      }
+      _loadVariantFamily(result.family);
+      _updateVariantLabel();
+    });
+  }
 
   void _revealImportIssue(String field) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -25839,6 +26090,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
           purchaseMinor > 214748364700 || sellingMinor > 214748364700 ||
           mrp != null && mrp > 214748364700;
       final reviewedProduct = widget.product.copyWith(
+        variantMembership: _variantFamily == null ? null : WorkspaceVariantMembership(
+          familyId: _variantFamily!.id, selections: _variantSelections,
+          useSharedContent: _useSharedVariantContent),
         privatePhoto: _matchingPhoto,
         clearPrivatePhoto: _matchingPhoto == null,
         content: content,
@@ -25875,13 +26129,13 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         composition: _composition.text.trim(),
         regulatoryNote: _regulatory.text.trim(),
         compliance: _packInformation,
-        catalogueFactsRequireReview: _factsNeedReview || measureChanged,
+        catalogueFactsRequireReview: _factsNeedReview || measureChanged || _variantFamily != null,
         available: widget.purchaseScope != null ? false : _stockMode == WorkspaceStockMode.availabilityOnly ||
                 (_wasOwned && !widget.product.available)
             ? _available
             : stock! > 0,
         publicListing:
-            widget.purchaseScope == null && _public &&
+            widget.purchaseScope == null && _variantFamily == null && _public &&
             _catalogueMatched &&
             !_factsNeedReview &&
             !measureChanged &&
@@ -25899,7 +26153,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
         return;
       }
       if (!widget.session.addOrUpdateWorkspaceProduct(
-        reviewedProduct, stockEntryMethod: widget.stockEntryMethod)) {
+        reviewedProduct, stockEntryMethod: widget.stockEntryMethod,
+        variantFamily: _variantDefinitionForSave(content),
+        variantSelections: {
+          ..._siblingVariantSelections,
+          if (_variantFamily != null) widget.product.id: Map.of(_variantSelections),
+        })) {
         _reject('Goods receipt is being saved. Your changes are kept; try again when it finishes.');
         return;
       }
@@ -25937,6 +26196,9 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       } else {
         _finish();
       }
+    } on FormatException catch (error) {
+      if (_variantFamily != null) _expanded['variants'] = true;
+      _reject(error.message);
     } finally {
       if (mounted) setState(() => _savingInventory = false);
     }
@@ -26611,6 +26873,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                           ],
                           initiallyExpanded: widget.product.title.isEmpty,
                         ),
+                        if (widget.importRow == null && widget.purchaseScope == null && widget.onDraftReviewed == null)
+                          _variantFamilySection(),
                         _section(
                           'selling',
                           'work-product-selling-terms',

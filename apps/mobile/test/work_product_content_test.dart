@@ -11,6 +11,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/work/work_models.dart';
+import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'fixtures/store_public_handoff_v1.dart';
 
@@ -53,6 +54,185 @@ class _Lf05ConsentStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  // Local authoring fixtures only; never injected Stock or reviewed public data.
+  WorkspaceVariantFamily ownerFamily({int revision = 1}) => WorkspaceVariantFamily(
+    id: 'host-phone-family', revision: revision, title: 'Host phone', brand: 'Host maker',
+    categoryId: 'other', content: const WorkspaceProductContent(description: 'Host family facts'),
+    options: [for (final colour in ['pink', 'blue']) BuyV2VariantAttribute(
+      dimensionId: 'colour', dimensionLabel: 'Colour', optionId: colour,
+      optionLabel: colour, kind: BuyV2VariantDimensionKind.colour),
+      for (final size in ['128', '256', '512']) BuyV2VariantAttribute(
+        dimensionId: 'storage', dimensionLabel: 'Storage', optionId: size,
+        optionLabel: '$size GB', kind: BuyV2VariantDimensionKind.storage)]);
+  WorkspaceCatalogueItem memberProduct(String id, String colour, String storage,
+      {bool shared = true}) {
+    final product = WorkspaceCatalogueItem.fromInventoryJson({
+      ...workspaceMasterCatalogue.first.toInventoryJson(), 'id': id, 'canonicalId': 'exact-$id',
+      'sku': id, 'barcode': '', 'stock': 0, 'cataloguePhoto': null, 'privatePhoto': null,
+      'publicListing': false});
+    return ownerFamily().applyTo(product.copyWith(variantMembership: WorkspaceVariantMembership(
+      familyId: 'host-phone-family', selections: {'colour': colour, 'storage': storage},
+      useSharedContent: shared)));
+  }
+  WorkspaceSavedInventory familyInventory(List<WorkspaceCatalogueItem> products,
+      {List<WorkspaceVariantFamily>? families}) => WorkspaceSavedInventory(
+    account: 'host-account', store: 'host-store', qa: true, revision: 1,
+    savedAt: DateTime.utc(2026, 10, 17), products: products, movements: const [],
+    variantFamilies: families ?? [ownerFamily()]);
+
+  test('LF03 owner family and exact SKU membership survive one v4 aggregate', () {
+    final first = memberProduct('host-a', 'pink', '128');
+    final second = memberProduct('host-b', 'blue', '512').copyWith(sellingPriceMinor: 10025);
+    final raw = familyInventory([first, second]).toJson();
+    expect(raw['version'], 4);
+    final restored = WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(raw)));
+    expect(restored.variantFamilies.single.id, 'host-phone-family');
+    expect(restored.products.map((p) => p.canonicalId), ['exact-host-a', 'exact-host-b']);
+    expect(restored.products[1].variantMembership!.selections['storage'], '512');
+    expect(restored.products[1].sellingPriceMinor, 10025);
+    expect(restored.products.first.stock, 0);
+    expect(restored.products.first.content.description, 'Host family facts');
+  });
+  test('LF03 owner legacy inventory remains byte-compatible without family fields', () {
+    final item = workspaceMasterCatalogue.first;
+    final raw = WorkspaceSavedInventory(account: 'host-account', store: 'host-store', qa: true,
+      revision: 1, savedAt: DateTime.utc(2026), products: [item], movements: const []).toJson();
+    expect(raw['version'], 1);
+    expect(raw.containsKey('variantFamilies'), isFalse);
+    expect(item.toInventoryJson().containsKey('variantMembership'), isFalse);
+    expect(jsonEncode(WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(raw))).toJson()), jsonEncode(raw));
+  });
+  test('LF03 owner aggregate rejects missing family malformed and duplicate combinations', () {
+    final a = memberProduct('host-a', 'pink', '128');
+    final b = memberProduct('host-b', 'blue', '512');
+    final original = familyInventory([a, b]).toJson();
+    for (final fault in ['missing', 'tuple', 'definition', 'selection', 'version', 'old-member']) {
+      final raw = jsonDecode(jsonEncode(original)) as Map<String, dynamic>;
+      switch (fault) {
+        case 'missing': raw['variantFamilies'] = []; break;
+        case 'tuple': raw['products'][1]['variantMembership'] = raw['products'][0]['variantMembership']; break;
+        case 'definition': raw['variantFamilies'][0]['options'].add(raw['variantFamilies'][0]['options'][0]); break;
+        case 'selection': raw['products'][0]['variantMembership']['selections'].remove('colour'); break;
+        case 'version': raw['version'] = 99; break;
+        case 'old-member': raw['products'][0]['version'] = 1; break;
+      }
+      expect(() => WorkspaceSavedInventory.fromJson(raw), throwsFormatException, reason: fault);
+    }
+  });
+  test('LF03 owner common facts preserve exact money stock and content exceptions', () {
+    final product = memberProduct('host-a', 'pink', '128', shared: false)
+      .copyWith(stock: 8, sellingPriceMinor: 10025,
+        content: const WorkspaceProductContent(description: 'Exact SKU exception'));
+    final family = ownerFamily(revision: 2).copyWith(title: 'Updated common name',
+      content: const WorkspaceProductContent(description: 'Updated common content'));
+    final result = family.applyTo(product);
+    expect(result.id, product.id); expect(result.canonicalId, product.canonicalId);
+    expect(result.stock, 8); expect(result.sellingPriceMinor, 10025);
+    expect(result.title, 'Updated common name');
+    expect(result.content.description, 'Exact SKU exception');
+    expect(family.attributesFor(result.variantMembership!).map((a) => a.optionId), ['pink', '128']);
+  });
+  test('LF03 owner session applies family common edit atomically without quantity movements', () {
+    final session = WorkSession()..seedVerifiedWorkspace();
+    addTearDown(session.dispose);
+    session.workspaceCatalogueItems.clear();
+    final a = memberProduct('host-a', 'pink', '128');
+    final b = memberProduct('host-b', 'blue', '512').copyWith(sellingPriceMinor: 10025);
+    expect(session.addOrUpdateWorkspaceProduct(a, variantFamily: ownerFamily()), isTrue);
+    expect(session.addOrUpdateWorkspaceProduct(b), isTrue);
+    final before = session.workspaceStockMovements.length;
+    final changed = ownerFamily(revision: 2).copyWith(title: 'Changed family name');
+    expect(session.addOrUpdateWorkspaceProduct(a, variantFamily: changed), isTrue);
+    expect(session.workspaceVariantFamilies.single.revision, 2);
+    expect(session.workspaceCatalogueItems.map((p) => p.title).toSet(), {'Changed family name'});
+    expect(session.workspaceCatalogueItems.map((p) => p.canonicalId), ['exact-host-a', 'exact-host-b']);
+    expect(session.workspaceCatalogueItems[1].sellingPriceMinor, 10025);
+    expect(session.workspaceStockMovements.length, before);
+    expect(session.workspaceCatalogueItems.every((p) => p.catalogueFactsRequireReview && !p.publicListing), isTrue);
+    // Same frozen edit retry does not allocate another SKU, family or movement.
+    expect(session.addOrUpdateWorkspaceProduct(a, variantFamily: changed), isTrue);
+    expect(session.workspaceCatalogueItems.length, 2);
+    expect(session.workspaceStockMovements.length, before);
+  });
+  test('LF03 owner duplicate and invalid family edits leave entire session unchanged', () {
+    final session = WorkSession()..seedVerifiedWorkspace();
+    addTearDown(session.dispose);
+    session.workspaceCatalogueItems.clear();
+    final first = memberProduct('host-a', 'pink', '128');
+    expect(session.addOrUpdateWorkspaceProduct(first, variantFamily: ownerFamily()), isTrue);
+    String state() => jsonEncode([session.workspaceVariantFamilies.map((f) => f.toJson()).toList(),
+      session.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(),
+      session.workspaceStockMovements.map((m) => m.contentIdentity).toList()]);
+    final before = state();
+    expect(() => session.addOrUpdateWorkspaceProduct(memberProduct('host-b', 'pink', '128')),
+      throwsFormatException);
+    expect(state(), before);
+    expect(() => session.addOrUpdateWorkspaceProduct(first,
+      variantFamily: ownerFamily(revision: 3).copyWith(title: 'Stale family edit')), throwsFormatException);
+    expect(state(), before);
+    expect(() => session.addOrUpdateWorkspaceProduct(first.copyWith(variantMembership:
+      WorkspaceVariantMembership(familyId: first.variantMembership!.familyId,
+        selections: {'colour': 'blue', 'storage': '128'}))), throwsFormatException);
+    expect(state(), before);
+    expect(() => session.importWorkspaceProducts([memberProduct('host-b', 'pink', '128')]),
+      throwsFormatException);
+    expect(state(), before);
+  });
+
+  test('LF03 owner adding dimensions requires explicit atomic assignments and preserves choices', () {
+    final session = WorkSession()..seedVerifiedWorkspace();
+    addTearDown(session.dispose);
+    session.workspaceCatalogueItems.clear();
+    final a = memberProduct('host-a', 'pink', '128');
+    final b = memberProduct('host-b', 'blue', '512');
+    session.addOrUpdateWorkspaceProduct(a, variantFamily: ownerFamily());
+    session.addOrUpdateWorkspaceProduct(b);
+    final expanded = ownerFamily(revision: 2).copyWith(options: [
+      ...ownerFamily().options,
+      const BuyV2VariantAttribute(dimensionId: 'ram', dimensionLabel: 'RAM',
+        optionId: '8', optionLabel: '8 GB', kind: BuyV2VariantDimensionKind.other),
+      const BuyV2VariantAttribute(dimensionId: 'ram', dimensionLabel: 'RAM',
+        optionId: '16', optionLabel: '16 GB', kind: BuyV2VariantDimensionKind.other),
+    ]);
+    String state() => jsonEncode([session.workspaceVariantFamilies.map((f) => f.toJson()).toList(),
+      session.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList()]);
+    final before = state();
+    expect(() => session.addOrUpdateWorkspaceProduct(a, variantFamily: expanded), throwsFormatException);
+    expect(state(), before);
+    expect(() => session.addOrUpdateWorkspaceProduct(a, variantFamily: expanded, variantSelections: {
+      a.id: {...a.variantMembership!.selections, 'ram': '8'},
+    }), throwsFormatException);
+    expect(state(), before);
+    expect(() => session.addOrUpdateWorkspaceProduct(a, variantFamily: expanded, variantSelections: {
+      a.id: {...a.variantMembership!.selections, 'colour': 'blue', 'ram': '8'},
+      b.id: {...b.variantMembership!.selections, 'ram': '16'},
+    }), throwsFormatException);
+    expect(state(), before);
+    final movements = session.workspaceStockMovements.length;
+    expect(session.addOrUpdateWorkspaceProduct(a, variantFamily: expanded, variantSelections: {
+      a.id: {...a.variantMembership!.selections, 'ram': '8'},
+      b.id: {...b.variantMembership!.selections, 'ram': '16'},
+    }), isTrue);
+    expect(session.workspaceCatalogueItems.map((p) => p.variantMembership!.selections['ram']), ['8', '16']);
+    expect(session.workspaceCatalogueItems.map((p) => p.canonicalId), [a.canonicalId, b.canonicalId]);
+    expect(session.workspaceStockMovements.length, movements);
+    expect(session.workspaceOperationsSyncError, contains('remain on this device'));
+  });
+  test('LF03 owner first family assignment cannot rewrite saved canonical identity', () {
+    final session = WorkSession()..seedVerifiedWorkspace();
+    addTearDown(session.dispose);
+    session.workspaceCatalogueItems.clear();
+    final member = memberProduct('host-a', 'pink', '128');
+    final raw = member.toInventoryJson()..remove('variantMembership')..remove('moneyVersion');
+    raw['version'] = 1;
+    final plain = WorkspaceCatalogueItem.fromInventoryJson(raw);
+    session.addOrUpdateWorkspaceProduct(plain);
+    expect(() => session.addOrUpdateWorkspaceProduct(member.copyWith(canonicalId: 'different'),
+      variantFamily: ownerFamily()), throwsFormatException);
+    expect(session.workspaceVariantFamilies, isEmpty);
+    expect(session.workspaceCatalogueItems.single.canonicalId, plain.canonicalId);
+  });
+
   test('LF-PAISE CSV preserves exact prices tiers source rows and legacy amounts', () {
     // Host import review only; these records never seed a device or provider.
     const csv = 'title,brand,pack,purchasePrice,sellingPrice,mrp,stock,sku,sellingChannels,wholesaleSaleType,wholesalePrice,wholesaleMinimum,wholesaleTiers\n'

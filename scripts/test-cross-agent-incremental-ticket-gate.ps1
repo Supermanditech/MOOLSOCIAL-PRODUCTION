@@ -132,6 +132,7 @@ if ($RequireLfPublicationProbes) {
       'apps/mobile/test/ui_v2/buy/unclaimed_test.dart')) {
     $originalBatch=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $originalBatch.PSObject.Properties.Remove('batch02Facts')
+    $originalBatch.PSObject.Properties.Remove('batch02OwnerVariants')
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $originalBatch @($owner))) 'Batch01 admitted an unrelated owner.'
     $cases++
   }
@@ -206,6 +207,25 @@ if ($RequireLfPublicationProbes) {
     $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $probe.batch02Variants.owners+= 'backend/functions/src/index.ts'
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Variant prerequisite widened into backend.'
+    $cases++
+  }
+  if ($null -ne $continuation.PSObject.Properties['batch02OwnerVariants']) {
+    foreach($owner in $continuation.batch02OwnerVariants.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Store-family owner rejected.'
+      $cases++
+    }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02OwnerVariants.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Store-family missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02OwnerVariants.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Store-family changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch02OwnerVariants.owners+= 'backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Store-family scope widened into backend.'
     $cases++
   }
   Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."

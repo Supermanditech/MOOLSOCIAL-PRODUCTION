@@ -4394,6 +4394,7 @@ void main() {
         ..workspaceVisibleToCustomers = true
         ..workspaceLastUpdatedAt = DateTime(2026, 9, 3, 8, 30);
 
+
   const captureStoreViewV2 = bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2');
   const captureFounderEvidence = bool.fromEnvironment(
     'MOOL_CAPTURE_WORK_STORE_1_40',
@@ -5177,6 +5178,135 @@ void main() {
         );
       }
     }
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03 owner editor retains staged options and unrelated drafts at scale $scale', (tester) async {
+      final work = liveStore();
+      work.workspaceCatalogueItems.clear();
+      final family = WorkspaceVariantFamily(id: 'host-ui-family', revision: 1,
+        title: 'Host group', brand: 'Host', categoryId: 'other',
+        content: const WorkspaceProductContent(description: 'Shared host description'), options: const [
+          BuyV2VariantAttribute(dimensionId: 'colour', dimensionLabel: 'Colour',
+            optionId: 'pink', optionLabel: 'Pink', kind: BuyV2VariantDimensionKind.colour),
+        ]);
+      final raw = {...workspaceMasterCatalogue.first.toInventoryJson(),
+        'id': 'host-ui-sku', 'canonicalId': 'host-exact-ui', 'sku': 'HOST-UI',
+        'stock': 0, 'cataloguePhoto': null, 'privatePhoto': null, 'publicListing': false};
+      final product = family.applyTo(WorkspaceCatalogueItem.fromInventoryJson(raw).copyWith(
+        variantMembership: WorkspaceVariantMembership(familyId: 'host-ui-family',
+          selections: {'colour': 'pink'})));
+      work.addOrUpdateWorkspaceProduct(product, variantFamily: family);
+      final original = jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson());
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work,
+        viewport: const Size(320, 568), textScale: scale, openHomeActions: false);
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-catalogue-edit-host-ui-sku')));
+      await tester.tap(find.byKey(const Key('work-catalogue-edit-host-ui-sku')));
+      await tester.pumpAndSettle();
+      final details = find.byKey(const Key('work-product-details-section'));
+      await tester.ensureVisible(details);
+      await tester.tap(details);
+      await tester.pumpAndSettle();
+      final name = find.byKey(const Key('work-product-title'));
+      await tester.ensureVisible(name);
+      await tester.enterText(name, 'Unsaved group name');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final shared = find.byKey(const Key('work-product-shared-family-content'));
+      await tester.ensureVisible(shared);
+      await tester.tap(shared);
+      await tester.pumpAndSettle();
+      await tester.tap(shared);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(name).controller!.text, 'Unsaved group name');
+      final edit = find.byKey(const Key('work-product-edit-family'));
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Add dimension'));
+      await tester.tap(find.text('Add dimension'));
+      await tester.pumpAndSettle();
+      final dimensionFields = find.byWidgetPredicate((w) => w is TextFormField &&
+        w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('family-dimension-'));
+      final optionFields = find.byWidgetPredicate((w) => w is TextFormField &&
+        w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('family-options-'));
+      await tester.ensureVisible(dimensionFields.last);
+      await tester.enterText(dimensionFields.last, 'Storage');
+      await tester.ensureVisible(optionFields.last);
+      await tester.enterText(optionFields.last, '128 GB\n256 GB');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      final assignment = find.byWidgetPredicate((w) => w is DropdownButtonFormField<String> &&
+        w.key is ValueKey<String> && (w.key! as ValueKey<String>).value.startsWith('family-assign-'));
+      await tester.ensureVisible(assignment);
+      await tester.tap(assignment);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('128 GB').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use these options'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Use these options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose the new option for every saved SKU. Nothing has been saved yet.'), findsNothing);
+      expect(find.text('Edit group options'), findsNothing);
+      expect(tester.takeException(), isNull);
+      expect(jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson()), original);
+      await tester.tap(find.byKey(const Key('work-product-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-unsaved-dialog')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('work-product-discard-edits')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceVariantFamilies.single.options.length, 1);
+      expect(jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson()), original);
+    });
+  }
+
+  test('LF03 owner family failed save retry and scoped restart preserve exact inventory', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final account = _ContactDraftFixtureStore();
+    final storage = _InventoryWriteFailureFixture(
+      SecureWorkInventoryStore(accountScope: () => account.accountScope));
+    const store = WorkWorkspace(id: 'qa-host-family-recovery', name: 'Host evaluation Store',
+      profileLabel: 'Grocery / Kirana Shop', profileId: 'retailer-grocery', area: 'Local QA', verified: true);
+    WorkSession fresh() => WorkSession(contactDraftStore: account, inventoryStore: storage)
+      ..selectedProfile = workProfiles.first..workspaceId = store.id..activeWorkspace = store
+      ..reviewStage = WorkReviewStage.live..initialWorkspaceStateLoaded = true..retailerSetupSaved = true;
+    final work = fresh();
+    addTearDown(work.dispose);
+    expect(await work.loadWorkspaceInventory(), isTrue);
+    final family = WorkspaceVariantFamily(id: 'host-recovery-family', revision: 1,
+      title: 'Host recovery product', brand: 'Host', categoryId: 'other', options: const [
+        BuyV2VariantAttribute(dimensionId: 'flavour', dimensionLabel: 'Flavour', optionId: 'plain',
+          optionLabel: 'Plain', kind: BuyV2VariantDimensionKind.other),
+      ]);
+    final product = family.applyTo(WorkspaceCatalogueItem.fromInventoryJson({
+      ...workspaceMasterCatalogue.first.toInventoryJson(), 'id': 'host-recovery-sku',
+      'canonicalId': 'host-exact-recovery', 'sku': 'HOST-RECOVERY', 'stock': 0,
+      'cataloguePhoto': null, 'privatePhoto': null, 'publicListing': false,
+    }).copyWith(sellingPriceMinor: 10025, variantMembership: WorkspaceVariantMembership(
+      familyId: family.id, selections: const {'flavour': 'plain'})));
+    storage.failSave = true;
+    expect(work.addOrUpdateWorkspaceProduct(product, variantFamily: family,
+      stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+    expect(await work.workspaceInventorySaved, isFalse);
+    expect(await storage.read(account.accountScope, store.id, qa: true), isNull);
+    final retained = jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson());
+    storage.failSave = false;
+    expect(await work.retryWorkspaceInventorySave(), isTrue);
+    expect(jsonEncode(work.workspaceCatalogueItems.single.toInventoryJson()), retained);
+    final restarted = fresh();
+    addTearDown(restarted.dispose);
+    expect(await restarted.loadWorkspaceInventory(), isTrue);
+    expect(restarted.workspaceVariantFamilies.single.toJson(), family.toJson());
+    expect(jsonEncode(restarted.workspaceCatalogueItems.single.toInventoryJson()), retained);
+    expect(restarted.workspaceCatalogueItems.single.sellingPriceMinor, 10025);
+    expect(restarted.workspaceCatalogueItems.single.stockEntry!.method, WorkspaceStockEntryMethod.manual);
+    expect(restarted.workspaceStockMovements, isEmpty);
   });
 
   testWidgets('HOME keeps saved invoices in Sales without deleting history', (

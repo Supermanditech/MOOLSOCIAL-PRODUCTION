@@ -436,6 +436,7 @@ class _StoreOperationalData {
   String workspacePayoutBankName = '';
   String workspacePayoutAccountEnding = '';
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
+  final List<WorkspaceVariantFamily> variantFamilies = [];
   WorkspaceProductDefaults productDefaults = const WorkspaceProductDefaults();
   WorkspaceStorePublicationDetails publicationDetails =
       const WorkspaceStorePublicationDetails();
@@ -1129,6 +1130,9 @@ class WorkSession extends ChangeNotifier {
       _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
   }
   bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
+    // The legacy reviewed reader has no family contract. Never strip options
+    // and publish a different legacy SKU while that connection is pending.
+    if (item.variantMembership != null) return false;
     final value = owned.input, origin = item.stockEntry, measure = item.packMeasure;
     if (owned.storeId != activeWorkspace?.id || owned.skuId != item.id || owned.canonicalProductId != item.canonicalId ||
         value['sku'] != item.sku || origin == null || !origin.valid || measure?.valid != true ||
@@ -1935,6 +1939,7 @@ class WorkSession extends ChangeNotifier {
               }
               projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
                 revision: previous.revision + 1, savedAt: DateTime.now().toUtc(),
+                variantFamilies: previous.variantFamilies,
                 products: products, movements: movements,
                 manualReceiptCheckpointRevision: saved.revision);
               return projected;
@@ -1975,6 +1980,7 @@ class WorkSession extends ChangeNotifier {
           : 'Goods receipt is saved. Stock recovery is pending; reopen this receipt before further stock changes.'));
       }
       data.workspaceCatalogueItems..clear()..addAll(projected!.products);
+      data.variantFamilies..clear()..addAll(projected!.variantFamilies);
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
@@ -2149,6 +2155,7 @@ class WorkSession extends ChangeNotifier {
           } else {
             projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
               revision: previous.revision + 1, savedAt: DateTime.now().toUtc(), products: products,
+              variantFamilies: previous.variantFamilies,
               movements: movements, manualReceiptCheckpointRevision: saved.revision);
           }
           return projected;
@@ -2162,6 +2169,7 @@ class WorkSession extends ChangeNotifier {
           : 'Goods returned are recorded. Recover Stock before making another change.');
       }
       data.workspaceCatalogueItems..clear()..addAll(projected!.products);
+      data.variantFamilies..clear()..addAll(projected!.variantFamilies);
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
@@ -2825,6 +2833,7 @@ class WorkSession extends ChangeNotifier {
           data.workspaceCatalogueItems
             ..clear()
             ..addAll(saved.products);
+          data.variantFamilies..clear()..addAll(saved.variantFamilies);
           data.workspaceStockMovements.addAll(saved.movements);
           data.inventoryRevision = saved.revision;
           data.inventoryReceiptCheckpointRevision = saved.manualReceiptCheckpointRevision;
@@ -2874,6 +2883,7 @@ class WorkSession extends ChangeNotifier {
     data.inventoryMutations++;
     // Freeze caller-owned nested content before an asynchronous write.
     final List<WorkspaceCatalogueItem> frozenProducts;
+    final List<WorkspaceVariantFamily> families;
     try {
       frozenProducts = [
         for (final p in data.workspaceCatalogueItems)
@@ -2881,6 +2891,9 @@ class WorkSession extends ChangeNotifier {
             jsonDecode(jsonEncode(p.toInventoryJson())),
           ),
       ];
+      families = data.variantFamilies.map((f) =>
+        WorkspaceVariantFamily.fromJson(jsonDecode(jsonEncode(f.toJson())))).toList(growable: false);
+      WorkspaceVariantFamily.validateInventory(families, frozenProducts);
     } on Object {
       // Keep the existing write in sequence. A bad new record must neither
       // escape into the editor nor report an earlier valid save as this save.
@@ -2916,6 +2929,7 @@ class WorkSession extends ChangeNotifier {
           data.inventoryLoaded = true;
         }
         final snapshot = WorkspaceSavedInventory(
+          variantFamilies: families,
           account: account,
           store: store,
           qa: !_productionSession,
@@ -8803,6 +8817,8 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspacePayoutAccountEnding = value;
   List<WorkspaceCatalogueItem> get workspaceCatalogueItems =>
       _storeData.workspaceCatalogueItems;
+  List<WorkspaceVariantFamily> get workspaceVariantFamilies =>
+      List.unmodifiable(_storeData.variantFamilies);
 
   bool catalogueManagesProductPhoto(WorkspaceCatalogueItem product) =>
       product.cataloguePhoto != null ||
@@ -10552,9 +10568,9 @@ class WorkSession extends ChangeNotifier {
     final data = _storeData;
     // Even a refused new write supersedes replies about an older snapshot.
     final revision = ++data.operationalSyncRevision;
-    if (_storeData.orderOperations != null ||
+    if (_storeData.variantFamilies.isNotEmpty || _storeData.orderOperations != null ||
         workspaceOrders.any((order) => order.isOperationalProjection) ||
-        workspaceCatalogueItems.any((product) => product.usesMinorAmounts ||
+        workspaceCatalogueItems.any((product) => product.variantMembership != null || product.usesMinorAmounts ||
             product.wholesaleOffer?.usesExplicitMinor == true)) {
       // Never send a legacy whole-Store overwrite over authoritative per-order
       // data or exact-price records. This transport has no minor-unit contract;
@@ -12405,39 +12421,38 @@ class WorkSession extends ChangeNotifier {
     WorkspaceCatalogueItem product, {
     String stockReason = 'Product quantity updated',
     WorkspaceStockEntryMethod? stockEntryMethod,
+    WorkspaceVariantFamily? variantFamily,
+    Map<String, Map<String, String>> variantSelections = const {},
   }) {
     if (!_stockEditAvailable()) return false;
     _checkProductMoney(product);
     final index = workspaceCatalogueItems.indexWhere(
       (item) => item.id == product.id,
     );
-    if (index == -1) {
+    final previous = index < 0 ? null : workspaceCatalogueItems[index];
+    if (previous == null) {
       product = _withOriginalStockEntry(product, stockEntryMethod);
-      workspaceCatalogueItems.add(product);
-      _recordWorkspaceActivity('${product.title} added to your catalogue.');
-      _recordWorkspaceStockMovement(
-        product: product,
-        kind: WorkspaceStockMovementKind.openingStock,
-        quantityDelta: product.stockMode == WorkspaceStockMode.exactQuantity
-            ? product.stock : 0,
-        reason: 'Opening quantity',
-      );
     } else {
-      final previous = workspaceCatalogueItems[index];
+      _checkVariantReassignment(previous, product);
       if (previous.stockEntry != null) {
         product = product.copyWith(stockEntry: previous.stockEntry);
       } else if (product.stockEntry != null) {
         throw const FormatException('Existing stock origin cannot be inferred.');
       }
-      workspaceCatalogueItems[index] = product;
-      _recordWorkspaceActivity('${product.title} price and stock updated.');
-      _recordWorkspaceStockMovement(
-        product: product,
-        kind: WorkspaceStockMovementKind.adjustment,
-        quantityDelta: product.stock - previous.stock,
-        reason: stockReason,
-      );
     }
+    final prepared = _prepareVariantEdit(product, variantFamily, variantSelections);
+    product = prepared.products.firstWhere((p) => p.id == product.id);
+    // All family definitions, selected rows and siblings validated before the
+    // existing inventory/activity/movement boundary is mutated once.
+    workspaceCatalogueItems..clear()..addAll(prepared.products);
+    _storeData.variantFamilies..clear()..addAll(prepared.families);
+    _recordWorkspaceActivity(previous == null ? '${product.title} added to your catalogue.'
+      : '${product.title} price and stock updated.');
+    _recordWorkspaceStockMovement(product: product,
+      kind: previous == null ? WorkspaceStockMovementKind.openingStock : WorkspaceStockMovementKind.adjustment,
+      quantityDelta: previous == null ? product.stockMode == WorkspaceStockMode.exactQuantity ? product.stock : 0
+        : product.stock - previous.stock,
+      reason: previous == null ? 'Opening quantity' : stockReason);
     _syncRetailerProductSummary();
     showNotice(
       product.publicListing
@@ -12447,6 +12462,76 @@ class WorkSession extends ChangeNotifier {
     _persistOperationalState('catalogue-updated');
     _queueInventorySave();
     return true;
+  }
+
+  void _checkVariantReassignment(WorkspaceCatalogueItem previous, WorkspaceCatalogueItem next) {
+    final original = previous.variantMembership, member = next.variantMembership;
+    if ((original != null || member != null) && previous.canonicalId != next.canonicalId) {
+      throw const FormatException('Keep the original catalogue identity when adding product options.');
+    }
+    if (original != null && (member == null || original.familyId != member.familyId ||
+        original.selections.entries.any((e) => member.selections[e.key] != e.value) ||
+        previous.canonicalId != next.canonicalId)) {
+      throw const FormatException('This saved combination has its own SKU. Add a new product for a different combination.');
+    }
+  }
+
+  ({List<WorkspaceCatalogueItem> products, List<WorkspaceVariantFamily> families}) _prepareVariantEdit(
+      WorkspaceCatalogueItem product, WorkspaceVariantFamily? definition,
+      Map<String, Map<String, String>> assignments) {
+    final families = List<WorkspaceVariantFamily>.of(_storeData.variantFamilies);
+    var familyChanged = false;
+    if (definition != null) {
+      final incoming = WorkspaceVariantFamily.fromJson(jsonDecode(jsonEncode(definition.toJson())));
+      if (product.variantMembership?.familyId != incoming.id) {
+        throw const FormatException('Choose this product’s family before saving its options.');
+      }
+      final index = families.indexWhere((f) => f.id == incoming.id);
+      final previous = index < 0 ? null : families[index];
+      familyChanged = previous == null || jsonEncode(previous.toJson()) != jsonEncode(incoming.toJson());
+      if (familyChanged && incoming.revision != (previous?.revision ?? 0) + 1) {
+        throw const FormatException('This family changed. Reopen its latest options before editing.');
+      }
+      if (index < 0) { families.add(incoming); } else { families[index] = incoming; }
+    }
+    final byId = {for (final f in families) f.id: f};
+    final incoming = [for (final p in workspaceCatalogueItems) if (p.id != product.id) p, product];
+    if (assignments.isNotEmpty && (definition == null || assignments.keys.any((id) =>
+        !incoming.any((p) => p.id == id && p.variantMembership?.familyId == definition.id)))) {
+      throw const FormatException('Choose new options only for this family’s saved SKUs.');
+    }
+    final products = <WorkspaceCatalogueItem>[];
+    for (final original in incoming) {
+      var updated = original;
+      if (assignments[original.id] case final selected?) {
+        updated = original.copyWith(variantMembership: WorkspaceVariantMembership(
+          familyId: original.variantMembership!.familyId, selections: selected,
+          useSharedContent: original.variantMembership!.useSharedContent));
+        _checkVariantReassignment(original, updated);
+      }
+      final member = updated.variantMembership;
+      if (member != null) {
+        final family = byId[member.familyId];
+        if (family == null) throw const FormatException('Choose or create the product family before saving.');
+        updated = family.applyTo(updated);
+        final previous = workspaceCatalogueItems.where((p) => p.id == original.id).firstOrNull;
+        final newlyAssigned = previous?.variantMembership == null;
+        if (newlyAssigned || familyChanged && member.familyId == definition?.id ||
+            jsonEncode(updated.toInventoryJson()) != jsonEncode(original.toInventoryJson())) {
+          updated = updated.copyWith(publicListing: false, catalogueFactsRequireReview: true);
+        }
+        // Validate provenance/media/money now, not after mutating the aggregate.
+        updated = WorkspaceCatalogueItem.fromInventoryJson(updated.toInventoryJson());
+      }
+      products.add(updated);
+    }
+    WorkspaceVariantFamily.validateInventory(families, products);
+    // Preserve row order for Stock, drafts and existing scroll anchors.
+    final next = {for (final p in products) p.id: p};
+    return (families: families, products: [
+      for (final p in workspaceCatalogueItems) next[p.id]!,
+      if (!workspaceCatalogueItems.any((p) => p.id == product.id)) next[product.id]!,
+    ]);
   }
 
   bool importWorkspaceProducts(
@@ -12537,6 +12622,16 @@ class WorkSession extends ChangeNotifier {
       }
       prepared.add(product);
     }
+    final finalProducts = List<WorkspaceCatalogueItem>.of(workspaceCatalogueItems);
+    for (final product in prepared) {
+      final index = finalProducts.indexWhere((p) => p.id == product.id || p.sku == product.sku);
+      if (index < 0) { finalProducts.add(product); }
+      else {
+        _checkVariantReassignment(finalProducts[index], product);
+        finalProducts[index] = product;
+      }
+    }
+    WorkspaceVariantFamily.validateInventory(_storeData.variantFamilies, finalProducts);
     for (final product in prepared) {
       final idIndex = byId[product.id], skuIndex = bySku[product.sku];
       final index = idIndex == null

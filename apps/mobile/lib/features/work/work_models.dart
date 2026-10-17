@@ -9890,6 +9890,147 @@ class WorkspaceStockEntry {
   }
 }
 
+/// Private authoring membership. IDs here are not catalogue approval or stock.
+class WorkspaceVariantMembership {
+  WorkspaceVariantMembership({required this.familyId, required Map<String, String> selections,
+    this.useSharedContent = true}) : selections = Map.unmodifiable(selections);
+  final String familyId;
+  final Map<String, String> selections;
+  final bool useSharedContent;
+  Map<String, Object?> toJson() => {'version': 1, 'familyId': familyId,
+    'selections': selections, 'useSharedContent': useSharedContent};
+  static WorkspaceVariantMembership? fromJson(Object? raw) {
+    if (raw == null) return null;
+    const keys = {'version', 'familyId', 'selections', 'useSharedContent'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k)) ||
+        raw['version'] is! int || raw['version'] != 1 || raw['familyId'] is! String ||
+        raw['useSharedContent'] is! bool || raw['selections'] is! Map) {
+      throw const FormatException('Product options need recovery.');
+    }
+    final selected = raw['selections'] as Map;
+    bool identifier(Object? v) => v is String && v.isNotEmpty && v == v.trim() && v.length <= 128;
+    if (!identifier(raw['familyId']) || selected.isEmpty || selected.length > 8 ||
+        selected.entries.any((e) => !identifier(e.key) || !identifier(e.value))) {
+      throw const FormatException('Product options need recovery.');
+    }
+    return WorkspaceVariantMembership(familyId: raw['familyId'] as String,
+      selections: Map<String, String>.from(selected), useSharedContent: raw['useSharedContent'] as bool);
+  }
+}
+
+/// One family definition per Store inventory, never repeated per sales channel.
+/// Only these descriptive fields are shared; pack, photos, composition and money
+/// remain with the exact SKU. A local revision is not a reviewed public revision.
+class WorkspaceVariantFamily {
+  WorkspaceVariantFamily({required this.id, required this.revision, required this.title,
+    required this.brand, required this.categoryId, required Iterable<BuyV2VariantAttribute> options,
+    WorkspaceProductContent content = const WorkspaceProductContent()}) : options = List.unmodifiable(options),
+      content = WorkspaceProductContent(description: content.description,
+        highlights: List.unmodifiable(content.highlights), specifications: Map.unmodifiable(content.specifications));
+  final String id, title, brand, categoryId;
+  final int revision;
+  final WorkspaceProductContent content;
+  final List<BuyV2VariantAttribute> options;
+  List<String> get dimensionIds => options.map((a) => a.dimensionId).toSet().toList();
+  bool get valid {
+    bool text(String s, int max) => s.isNotEmpty && s == s.trim() && s.length <= max;
+    if (!text(id, 128) || !text(title, 240) || brand != brand.trim() || brand.length > 240 ||
+        !text(categoryId, 128) || revision < 1 || revision > 2147483647 ||
+        options.isEmpty || options.length > 128 || dimensionIds.length > 8) { return false; }
+    final tuples = <(String, String)>{}, labels = <(String, String)>{};
+    final dimensions = <String, BuyV2VariantAttribute>{};
+    for (final option in options) {
+      if (!option.isValid || !text(option.dimensionId, 128) || !text(option.optionId, 128) ||
+          !text(option.dimensionLabel, 120) || !text(option.optionLabel, 120) ||
+          !tuples.add((option.dimensionId, option.optionId)) ||
+          !labels.add((option.dimensionId, option.optionLabel.toLowerCase()))) { return false; }
+      final previous = dimensions[option.dimensionId];
+      if (previous != null && (previous.kind != option.kind ||
+          previous.dimensionLabel != option.dimensionLabel)) { return false; }
+      dimensions[option.dimensionId] = option;
+    }
+    if (dimensions.values.map((d) => d.dimensionLabel.toLowerCase()).toSet().length != dimensions.length) return false;
+    try { WorkspaceProductContent.parse(content.inputValues); return true; }
+    on FormatException { return false; }
+  }
+  List<BuyV2VariantAttribute> attributesFor(WorkspaceVariantMembership member) {
+    if (!valid || member.familyId != id || member.selections.length != dimensionIds.length ||
+        dimensionIds.any((d) => !options.any((o) => o.dimensionId == d &&
+          o.optionId == member.selections[d]))) {
+      throw const FormatException('Choose one valid option for every product dimension.');
+    }
+    return List.unmodifiable(options.where((a) => member.selections[a.dimensionId] == a.optionId));
+  }
+  WorkspaceCatalogueItem applyTo(WorkspaceCatalogueItem product) {
+    final member = product.variantMembership;
+    if (member == null || member.familyId != id) return product;
+    attributesFor(member);
+    return product.copyWith(title: title, brand: brand, categoryId: categoryId,
+      content: member.useSharedContent ? content : product.content);
+  }
+  WorkspaceVariantFamily copyWith({int? revision, String? title, String? brand,
+    String? categoryId, WorkspaceProductContent? content, Iterable<BuyV2VariantAttribute>? options}) =>
+      WorkspaceVariantFamily(id: id, revision: revision ?? this.revision, title: title ?? this.title,
+        brand: brand ?? this.brand, categoryId: categoryId ?? this.categoryId,
+        content: content ?? this.content, options: options ?? this.options);
+  Map<String, Object?> toJson() => {'version': 1, 'id': id, 'revision': revision,
+    'title': title, 'brand': brand, 'categoryId': categoryId, 'content': content.toJson(),
+    'options': [for (final a in options) {'dimensionId': a.dimensionId, 'dimensionLabel': a.dimensionLabel,
+      'optionId': a.optionId, 'optionLabel': a.optionLabel, 'kind': a.kind.name, 'swatchArgb': a.swatchArgb}]};
+  static WorkspaceVariantFamily fromJson(Object? raw) {
+    const invalid = FormatException('Saved product family needs recovery. Its data has been kept.');
+    try {
+      const keys = {'version', 'id', 'revision', 'title', 'brand', 'categoryId', 'content', 'options'};
+      if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k)) ||
+          raw['version'] is! int || raw['version'] != 1 || raw['options'] is! List) { throw invalid; }
+      final contents = raw['content'] as Map;
+      final result = WorkspaceVariantFamily(id: raw['id'] as String, revision: raw['revision'] as int,
+        title: raw['title'] as String, brand: raw['brand'] as String, categoryId: raw['categoryId'] as String,
+        content: WorkspaceProductContent(description: contents['description'] as String,
+          highlights: List<String>.from(contents['highlights'] as List),
+          specifications: Map<String, String>.from(contents['specifications'] as Map)),
+        options: [for (final value in raw['options'] as List) _option(value)]);
+      if (!result.valid) throw invalid;
+      return result;
+    } on FormatException { rethrow; }
+      on TypeError { throw invalid; }
+      on ArgumentError { throw invalid; }
+  }
+  static BuyV2VariantAttribute _option(Object? raw) {
+    const keys = {'dimensionId', 'dimensionLabel', 'optionId', 'optionLabel', 'kind', 'swatchArgb'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((k) => !keys.contains(k))) {
+      throw const FormatException('Saved family options need recovery.');
+    }
+    return BuyV2VariantAttribute(dimensionId: raw['dimensionId'] as String,
+      dimensionLabel: raw['dimensionLabel'] as String, optionId: raw['optionId'] as String,
+      optionLabel: raw['optionLabel'] as String, kind: BuyV2VariantDimensionKind.values.byName(raw['kind'] as String),
+      swatchArgb: raw['swatchArgb'] as int?);
+  }
+  static void validateInventory(Iterable<WorkspaceVariantFamily> families, Iterable<WorkspaceCatalogueItem> products) {
+    final byId = <String, WorkspaceVariantFamily>{};
+    for (final family in families) {
+      if (!family.valid || byId.containsKey(family.id)) {
+        throw const FormatException('Review the product family and its options.');
+      }
+      byId[family.id] = family;
+    }
+    final combinations = <String>{};
+    for (final product in products) {
+      final member = product.variantMembership;
+      if (member == null) continue;
+      final family = byId[member.familyId];
+      if (family == null) throw const FormatException('The product family is missing. Your records are kept.');
+      final attributes = family.attributesFor(member).toList()..sort((a, b) => a.dimensionId.compareTo(b.dimensionId));
+      final tuple = jsonEncode([family.id, for (final a in attributes) [a.dimensionId, a.optionId]]);
+      if (!combinations.add(tuple)) throw const FormatException('This option combination already has a Store SKU. Edit that SKU instead.');
+      if (product.title != family.title || product.brand != family.brand || product.categoryId != family.categoryId ||
+          (member.useSharedContent && jsonEncode(product.content.toJson()) != jsonEncode(family.content.toJson()))) {
+        throw const FormatException('Shared family details do not match. Review the family before saving.');
+      }
+    }
+  }
+}
+
 /// Device-owned inventory only. QA data cannot be restored into production.
 /// This checkpoint carries no invoice, payment, publication or backend authority.
 class WorkspaceSavedInventory {
@@ -9901,8 +10042,10 @@ class WorkspaceSavedInventory {
     required this.savedAt,
     required List<WorkspaceCatalogueItem> products,
     required List<WorkspaceStockMovement> movements,
+    List<WorkspaceVariantFamily> variantFamilies = const [],
     this.manualReceiptCheckpointRevision,
-  }) : products = List.unmodifiable(products),
+  }) : variantFamilies = List.unmodifiable(variantFamilies),
+       products = List.unmodifiable(products),
        movements = List.unmodifiable(movements);
   final String account, store;
   final bool qa;
@@ -9910,13 +10053,15 @@ class WorkspaceSavedInventory {
   final DateTime savedAt;
   final List<WorkspaceCatalogueItem> products;
   final List<WorkspaceStockMovement> movements;
+  final List<WorkspaceVariantFamily> variantFamilies;
   /// Last authoritative manual-receipt checkpoint projected here. Retained even
   /// when all goods were already in Stock or damaged and no movement was added.
   final int? manualReceiptCheckpointRevision;
 
   Map<String, Object?> toJson() => {
-    'version': products.any((p) => p.usesMinorAmounts) ? 3
+    'version': variantFamilies.isNotEmpty ? 4 : products.any((p) => p.usesMinorAmounts) ? 3
         : products.any((p) => p.stockEntry != null) ? 2 : 1,
+    if (variantFamilies.isNotEmpty) 'variantFamilies': variantFamilies.map((f) => f.toJson()).toList(),
     'account': account,
     'store': store,
     'qa': qa,
@@ -9947,13 +10092,17 @@ class WorkspaceSavedInventory {
     );
     try {
       if (raw is! Map ||
-          !const [1, 2, 3].contains(raw['version']) ||
+          !const [1, 2, 3, 4].contains(raw['version']) ||
           raw['products'] is! List ||
-          raw['movements'] is! List) {
+          raw['movements'] is! List ||
+          (raw['version'] == 4 ? raw['version'] is! int || raw['variantFamilies'] is! List
+            : raw.containsKey('variantFamilies'))) {
         throw invalid;
       }
       if ((raw['products'] as List).length > 10000) throw invalid;
       final result = WorkspaceSavedInventory(
+        variantFamilies: raw['version'] == 4
+          ? [for (final f in raw['variantFamilies'] as List) WorkspaceVariantFamily.fromJson(f)] : const [],
         account: raw['account'] as String,
         store: raw['store'] as String,
         qa: raw['qa'] as bool,
@@ -9988,7 +10137,7 @@ class WorkspaceSavedInventory {
       final ids = <String>{};
       final movements = <String>{};
       if (result.account.trim().isEmpty ||
-          raw['version'] != (result.products.any((p) => p.usesMinorAmounts) ? 3
+          raw['version'] != (result.variantFamilies.isNotEmpty ? 4 : result.products.any((p) => p.usesMinorAmounts) ? 3
               : result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
@@ -10018,6 +10167,7 @@ class WorkspaceSavedInventory {
           )) {
         throw invalid;
       }
+      WorkspaceVariantFamily.validateInventory(result.variantFamilies, result.products);
       return result;
     } on FormatException {
       rethrow;
@@ -10151,6 +10301,7 @@ class WorkspaceCatalogueItem {
     this.retailEnabled = true,
     this.content = const WorkspaceProductContent(),
     this.stockEntry,
+    this.variantMembership,
   }) : assert(purchasePrice != null || purchasePriceMinor != null),
        assert(sellingPrice != null || sellingPriceMinor != null),
        _legacyPurchasePrice = purchasePrice, _legacySellingPrice = sellingPrice,
@@ -10211,6 +10362,7 @@ class WorkspaceCatalogueItem {
   final bool retailEnabled;
   final WorkspaceProductContent content;
   final WorkspaceStockEntry? stockEntry;
+  final WorkspaceVariantMembership? variantMembership;
 
   /// Projection only; callers still need publication authority and a content
   /// source revision. Does not create a preview route or publish the product.
@@ -10553,7 +10705,10 @@ class WorkspaceCatalogueItem {
   /// Keep QA/production and account/Store identity in the enclosing checkpoint.
   Map<String, Object?> toInventoryJson() => {
     // Old readers reject this version instead of silently dropping provenance.
-    'version': usesMinorAmounts ? 3 : stockEntry == null ? 1 : 2,
+    'version': variantMembership != null ? 4 : usesMinorAmounts ? 3 : stockEntry == null ? 1 : 2,
+    if (variantMembership != null) ...{
+      'variantMembership': variantMembership!.toJson(), 'moneyVersion': usesMinorAmounts ? 2 : 1,
+    },
     if (stockEntry != null) 'stockEntry': stockEntry!.toJson(),
     'id': id,
     'canonicalId': canonicalId,
@@ -10603,12 +10758,15 @@ class WorkspaceCatalogueItem {
     const invalid = FormatException(
       'Saved product needs recovery. Its data has been kept.',
     );
-    if (raw is! Map || !const [1, 2, 3].contains(raw['version']) ||
+    if (raw is! Map || !const [1, 2, 3, 4].contains(raw['version']) ||
         (raw['version'] == 2 && raw['stockEntry'] == null) ||
-        (raw['version'] == 1 && raw['stockEntry'] != null)) {
+        (raw['version'] == 1 && raw['stockEntry'] != null) ||
+        (raw['version'] == 4 ? raw['version'] is! int || raw['variantMembership'] == null ||
+          raw['moneyVersion'] is! int || !const {1, 2}.contains(raw['moneyVersion'])
+          : raw.containsKey('variantMembership') || raw.containsKey('moneyVersion'))) {
       throw invalid;
     }
-    final exact = raw['version'] == 3;
+    final exact = raw['version'] == 3 || raw['version'] == 4 && raw['moneyVersion'] == 2;
     const minorKeys = ['purchasePriceMinor', 'sellingPriceMinor', 'mrpMinor'];
     const legacyKeys = ['purchasePrice', 'sellingPrice', 'mrp'];
     if (exact
@@ -10674,6 +10832,7 @@ class WorkspaceCatalogueItem {
       );
       WorkspaceProductContent.parse(content.inputValues);
       final product = WorkspaceCatalogueItem(
+        variantMembership: WorkspaceVariantMembership.fromJson(raw['variantMembership']),
         stockEntry: WorkspaceStockEntry.fromJson(raw['stockEntry']),
         id: text('id', required: true),
         canonicalId: text('canonicalId', required: true),
@@ -10733,6 +10892,7 @@ class WorkspaceCatalogueItem {
 
   WorkspaceCatalogueItem copyWith({
     WorkspaceStockEntry? stockEntry,
+    WorkspaceVariantMembership? variantMembership,
     WorkspaceProductContent? content,
     String? canonicalId,
     String? categoryId,
@@ -10779,6 +10939,7 @@ class WorkspaceCatalogueItem {
   }) => WorkspaceCatalogueItem(
     id: id,
     stockEntry: stockEntry ?? this.stockEntry,
+    variantMembership: variantMembership ?? this.variantMembership,
     content: content ?? this.content,
     canonicalId: canonicalId ?? this.canonicalId,
     categoryId: categoryId ?? this.categoryId,
