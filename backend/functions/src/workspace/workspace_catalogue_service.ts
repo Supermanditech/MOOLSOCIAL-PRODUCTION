@@ -12,9 +12,18 @@ export interface StoreSkuContent {
   title: string; brand: string; variant: string; categoryId: string;
   description: string; highlights: string[];
   specifications: Array<{label: string; value: string}>;
+  productFacts?: StoreSkuProductFacts;
   media: Array<{id: string; revision: string; url: string; storeId: string;
     skuId: string; canonicalProductId: string; publisherWorkspaceId: string;
     file: {mimeType: string; byteLength: number; width: number; height: number; normalized: boolean; frameCount?: number}}>;
+}
+/** Reviewed descriptive facts only; not regulatory approval or dispensing authority. */
+export interface StoreSkuProductFacts {
+  schemaVersion: 1;
+  compliance: Record<"genericName" | "netQuantity" | "manufacturerName" | "manufacturerAddress" |
+    "packerName" | "packerAddress" | "importerName" | "importerAddress" | "countryOfOrigin" |
+    "manufacturedOrPackedOn" | "bestBeforeOrUseBy" | "fssaiLicenseNumber" | "consumerCare", string | null>;
+  composition: string | null; regulatoryNote: string | null; requiresPrescription: boolean;
 }
 export interface StoreSkuPack {
   label: string; quantityMilli: number; unit: "kg" | "L" | "count"; unitsPerCase: number;
@@ -373,6 +382,9 @@ export class WorkspaceCatalogueService {
 
   async listSkus(ownerUserId: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const factsRequested = queryBody.productFactsReadbackVersion === 1;
+    if (queryBody.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
+    delete queryBody.productFactsReadbackVersion;
     const mediaRequested = queryBody.mediaReadbackVersion === 1;
     if (queryBody.mediaReadbackVersion !== undefined && !mediaRequested) invalid();
     delete queryBody.mediaReadbackVersion;
@@ -380,18 +392,24 @@ export class WorkspaceCatalogueService {
     const profile = requireStore(await this.repository.store(query.storeId), query.storeId, ownerUserId);
     const records = await this.repository.page(profile, ownerUserId, query.after, query.limit, query.skuId);
     const items = records.map(r => normalizeRecord(r, query.storeId));
+    if (!factsRequested && items.some(item => item.content.productFacts !== undefined)) {
+      throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these saved product details. Saved data is unchanged.", 409);
+    }
     if (!mediaRequested && items.some(item => item.content.media.some(media => Object.hasOwn(media.file, "frameCount")))) {
       // An editable source must remain exact; never strip reviewed input facts
       // to satisfy an older decoder or silently omit its record from the page.
       throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these saved photo details. Saved data is unchanged.", 409);
     }
     return {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, items,
+      ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
       nextCursor: !query.skuId && items.length === query.limit ? items.at(-1)!.skuId : null};
   }
 
   private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion"]);
+    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion"]);
+    const factsRequested = body.productFactsReadbackVersion === 1;
+    if (body.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
     const detailsRequested = body.storeDetailsReadbackVersion === 1;
     if (body.storeDetailsReadbackVersion !== undefined && !detailsRequested) invalid();
     if (body.cataloguePageVersion !== 1) invalid();
@@ -405,6 +423,7 @@ export class WorkspaceCatalogueService {
     }
     const sourceHash = cataloguePayloadHash(source);
     const data = await this.publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       policyReadbackVersion: 1, mediaReadbackVersion: 1}, source) as Record<string, unknown>;
     if (data.state !== "ready" || data.listingCoverage !== "complete") {
@@ -464,6 +483,7 @@ export class WorkspaceCatalogueService {
     // of ALL candidates, including offers which were not active on the first pass.
     const finalProjection = await new WorkspaceCatalogueService(this.repository, this.identity,
       () => new Date(responseAt), this.policyReader).publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       policyReadbackVersion: 1, mediaReadbackVersion: 1}, current) as Record<string, unknown>;
     if (cataloguePayloadHash(stablePublicProjection(finalProjection)) !== cataloguePayloadHash(stableRows)) {
@@ -481,6 +501,9 @@ export class WorkspaceCatalogueService {
   async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
     if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const factsRequested = queryBody.productFactsReadbackVersion === 1;
+    if (queryBody.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
+    delete queryBody.productFactsReadbackVersion;
     const policyRequested = queryBody.policyReadbackVersion === 1;
     if (queryBody.policyReadbackVersion !== undefined && !policyRequested) invalid();
     delete queryBody.policyReadbackVersion;
@@ -499,6 +522,7 @@ export class WorkspaceCatalogueService {
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, observedAt,
       orderingAvailable: false, coverage: "verified_public_only",
+      ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
       ...(listingsRequested ? {listingReadbackVersion: 1, listingCoverage: "unavailable"} : {})};
@@ -540,6 +564,10 @@ export class WorkspaceCatalogueService {
       // A saved trade type cannot silently become another channel or partial offer.
       if (terms.some(t => t === null)) return [];
       const publicContent = structuredClone(record.content);
+      if (!factsRequested && publicContent.productFacts !== undefined) {
+        // Never omit reviewed descriptive facts to make an older client decode.
+        throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these product details.", 409);
+      }
       // Compatibility projection only, after full reviewed-content validation.
       // Original source, immutable receipts and hashes are never edited here.
       if (!mediaRequested) for (const media of publicContent.media) delete media.file.frameCount;
@@ -700,7 +728,7 @@ export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
   const v = exact(value, ["skuId", "canonicalProductId", "verifiedPackId", "sku", "publicListing",
     "content", "pack", "channels", "provenance"]);
   const skuId = id(v.skuId), canonicalProductId = id(v.canonicalProductId);
-  const c = exact(v.content, ["title", "brand", "variant", "categoryId", "description", "highlights", "specifications", "media"]);
+  const c = exact(v.content, ["title", "brand", "variant", "categoryId", "description", "highlights", "specifications", "media"], ["productFacts"]);
   const p = exact(v.pack, ["label", "quantityMilli", "unit", "unitsPerCase"]);
   if (!["kg", "L", "count"].includes(String(p.unit))) invalid();
   const provenance = exact(v.provenance, ["entryMethod", "sourceRecordId"]);
@@ -746,11 +774,25 @@ export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
       highlights: list(c.highlights, 20).map(h => text(h, 500)),
       specifications: list(c.specifications, 40).map(s => {
         const row = exact(s, ["label", "value"]); return {label: text(row.label), value: text(row.value, 1000)};
-      }), media},
+      }), media, ...(Object.hasOwn(c, "productFacts") ? {productFacts: normalizeProductFacts(c.productFacts)} : {})},
     pack: {label: text(p.label), quantityMilli: integer(p.quantityMilli), unit: p.unit as StoreSkuPack["unit"],
       unitsPerCase: integer(p.unitsPerCase)}, channels,
     provenance: {entryMethod: provenance.entryMethod as StoreSkuInput["provenance"]["entryMethod"],
       sourceRecordId: id(provenance.sourceRecordId)}};
+}
+
+function normalizeProductFacts(value: unknown): StoreSkuProductFacts {
+  const facts = exact(value, ["schemaVersion", "compliance", "composition", "regulatoryNote", "requiresPrescription"]);
+  if (facts.schemaVersion !== 1) invalid();
+  const keys = ["genericName", "netQuantity", "manufacturerName", "manufacturerAddress", "packerName", "packerAddress",
+    "importerName", "importerAddress", "countryOfOrigin", "manufacturedOrPackedOn", "bestBeforeOrUseBy",
+    "fssaiLicenseNumber", "consumerCare"];
+  const compliance = exact(facts.compliance, keys);
+  const optionalText = (raw: unknown, maximum: number) => raw === null ? null : text(raw, maximum);
+  return {schemaVersion: 1,
+    compliance: Object.fromEntries(keys.map(key => [key, optionalText(compliance[key], 1000)])) as StoreSkuProductFacts["compliance"],
+    composition: optionalText(facts.composition, 4000), regulatoryNote: optionalText(facts.regulatoryNote, 4000),
+    requiresPrescription: boolean(facts.requiresPrescription)};
 }
 
 function normalizeRecord(value: unknown, storeId: string): StoreSkuRecord {

@@ -470,6 +470,11 @@ AuthenticatedWorkspaceCatalogueGateway gateway(
   now: () => at,
 );
 
+AuthenticatedWorkspaceCatalogueGateway factsGateway(SocialContentTransport transport) =>
+    AuthenticatedWorkspaceCatalogueGateway(
+      endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at, productFactsReadbackSupported: true);
+
 class HoldingGateway implements WorkspaceCatalogueGateway {
   final response = Completer<WorkspaceCatalogueContentResult>();
   int calls = 0;
@@ -819,6 +824,133 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
+  Map<String, dynamic> descriptiveFacts() => {
+    'schemaVersion': 1,
+    'compliance': {
+      'genericName': 'Host oil', 'netQuantity': '1 L', 'manufacturerName': 'Host maker',
+      'manufacturerAddress': 'Host manufacturer address', 'packerName': null, 'packerAddress': null,
+      'importerName': null, 'importerAddress': null, 'countryOfOrigin': 'India',
+      'manufacturedOrPackedOn': 'See pack', 'bestBeforeOrUseBy': 'See pack',
+      'fssaiLicenseNumber': 'Host descriptive licence', 'consumerCare': 'Host care details',
+    },
+    'composition': 'Host ingredients', 'regulatoryNote': 'Host pack directions', 'requiresPrescription': false,
+  };
+  test('LF-FACTS exact public factory carries reviewed dedicated facts without losing pack or money', () {
+    final data = publicPage()..['productFactsReadbackVersion'] = 1;
+    (row(data)['content'] as Map)['productFacts'] = descriptiveFacts();
+    final entry = WorkspacePublicCatalogueEntry.fromResponse(data,
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+    expect(entry.product.compliance?.manufacturerName, 'Host maker');
+    expect(entry.product.compliance?.manufacturerAddress, 'Host manufacturer address');
+    expect(entry.product.compliance?.countryOfOrigin, 'India');
+    expect(entry.product.compliance?.manufacturedOrPackedOnLabel, 'See pack');
+    expect(entry.product.composition, 'Host ingredients');
+    expect(entry.product.regulatoryNote, 'Host pack directions');
+    expect(entry.product.priceMinor, 26000);
+    expect(entry.product.sourceSkuId, 'sku-one');
+    expect(entry.product.hasValidPackTerms, isTrue);
+    expect(entry.readback.content.state, BuyV2ProductContentState.ready);
+  });
+  test('LF-FACTS owner record retains the exact reviewed extension through serialization', () {
+    final original = ownerRow();
+    (original['content'] as Map)['productFacts'] = descriptiveFacts();
+    final owned = WorkspaceCatalogueOwnedSku.decode(original,
+      storeId: 'store-one', skuId: 'sku-one', realm: 'production', now: at);
+    expect((owned.input['content'] as Map)['productFacts'], descriptiveFacts());
+  });
+  test('LF-FACTS configured owner connection retains negotiated support across account binding', () async {
+    final transport = OwnerTransport((body) async {
+      expect(body['productFactsReadbackVersion'], 1);
+      final record = ownerRow();
+      (record['content'] as Map)['productFacts'] = descriptiveFacts();
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': {
+        'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+        'productFactsReadbackVersion': 1, 'items': [record], 'nextCursor': null}}));
+    });
+    final owner = factsGateway(transport).forOwnerAccount('owner-one');
+    expect(owner.productFactsReadbackSupported, isTrue);
+    final result = await owner.readOwnedSku(storeId: 'store-one', skuId: 'sku-one', current: () => true);
+    expect((result!.input['content'] as Map)['productFacts'], descriptiveFacts());
+  });
+  for (final version in [2, 1.0, '1', null]) {
+    test('LF-FACTS unsupported advertised version rejects even absent facts $version ${version.runtimeType}', () async {
+      final data = publicPage()..['productFactsReadbackVersion'] = version;
+      expect(() => WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException);
+      expect((await gateway(Transport(data)).read(publicProduct())).content.state, BuyV2ProductContentState.unavailable);
+      final owner = ownerGateway(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+          'items': [ownerRow()], 'nextCursor': null, 'productFactsReadbackVersion': version}}))));
+      expect(await owner.readOwnedSku(storeId: 'store-one', skuId: 'sku-one', current: () => true), isNull);
+    });
+  }
+  test('LF-FACTS cache does not reuse content after known facts change or disappear', () async {
+    final data = publicPage()..['productFactsReadbackVersion'] = 1;
+    (row(data)['content'] as Map)['productFacts'] = descriptiveFacts();
+    final entry = WorkspacePublicCatalogueEntry.fromResponse(data,
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+    final transport = Transport(data), cache = WorkspaceCatalogueReadback(
+      gateway: factsGateway(Transport(data)), context: () => 'host-facts-owner', now: () => at);
+    addTearDown(cache.dispose);
+    await cache.refresh(entry.product);
+    expect(cache.snapshotFor(entry.product).state, BuyV2ProductContentState.ready);
+    final changedData = jsonDecode(jsonEncode(data)) as Map<String, dynamic>;
+    ((row(changedData)['content'] as Map)['productFacts'] as Map)['composition'] = 'Changed host ingredients';
+    final changed = WorkspacePublicCatalogueEntry.fromResponse(changedData,
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product;
+    expect(cache.snapshotFor(changed).state, BuyV2ProductContentState.unavailable);
+    expect((await factsGateway(transport).read(changed)).content.state, BuyV2ProductContentState.unavailable);
+    (row(transport.data)['content'] as Map).remove('productFacts');
+    expect((await factsGateway(transport).read(entry.product)).content.state, BuyV2ProductContentState.unavailable);
+    transport.sent = null;
+    expect((await gateway(transport).read(entry.product)).content.state, BuyV2ProductContentState.unavailable);
+    expect(transport.sent, isNull, reason: 'Known enriched facts must not silently downgrade to a legacy request.');
+  });
+  for (final sourceFacts in ['matching', 'missing', 'changed']) {
+    test('LF-FACTS Store listing checks exact dedicated facts $sourceFacts without changing Stock', () async {
+      final source = SessionCatalogue(), work = listingSession(source, BindingStore());
+      addTearDown(work.dispose);
+      final facts = descriptiveFacts();
+      work.workspaceCatalogueItems[0] = listingItem().copyWith(
+        compliance: WorkspaceProductCompliance.fromJson(facts['compliance']),
+        composition: facts['composition'] as String?, regulatoryNote: facts['regulatoryNote'] as String?);
+      final original = (await source.ownerRead())!.toJson();
+      if (sourceFacts != 'missing') {
+        if (sourceFacts == 'changed') facts['composition'] = 'Different reviewed ingredients';
+        (original['content'] as Map)['productFacts'] = facts;
+      }
+      source.ownerRead = () async => WorkspaceCatalogueOwnedSku.decode(original,
+        storeId: 'store-one', skuId: 'sku-one', realm: 'production', now: at);
+      source.write = (intent, current) async => listingSaved(intent);
+      final before = work.workspaceCatalogueItems.single.toInventoryJson();
+      expect(await work.toggleWorkspaceProductListing('sku-one'), sourceFacts == 'matching');
+      expect(source.submitted, sourceFacts == 'matching' ? 1 : 0);
+      expect(work.workspaceCatalogueItems.single.stock, 7);
+      expect(work.workspaceStockMovements, isEmpty);
+      if (sourceFacts != 'matching') expect(work.workspaceCatalogueItems.single.toInventoryJson(), before);
+    });
+  }
+  test('LF-FACTS legacy public constructor leaves absent dedicated facts unknown', () {
+    final entry = WorkspacePublicCatalogueEntry.fromResponse(publicPage(),
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+    expect(entry.product.compliance, isNull);
+    expect(entry.product.composition, isNull);
+    expect(entry.product.regulatoryNote, isNull);
+  });
+  for (final malformed in ['unnegotiated', 'version', 'extra', 'boolean', 'private']) {
+    test('LF-FACTS public constructor rejects malformed descriptive extension $malformed', () {
+      final data = publicPage()..['productFactsReadbackVersion'] = 1;
+      final facts = descriptiveFacts();
+      if (malformed == 'unnegotiated') data.remove('productFactsReadbackVersion');
+      if (malformed == 'version') facts['schemaVersion'] = 2;
+      if (malformed == 'extra') facts['other'] = 'unknown';
+      if (malformed == 'boolean') facts['requiresPrescription'] = 'false';
+      if (malformed == 'private') (facts['compliance'] as Map)['purchaseCost'] = '20';
+      (row(data)['content'] as Map)['productFacts'] = facts;
+      expect(() => WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException);
+    });
+  }
   test('LF-LISTING source binding roundtrip and copy preserve legacy identities without authority', () {
     final identity = publicIdentity(), selected = publicProduct();
     expect(BuyV2PublicListingIdentity.fromJson(identity.toJson()), identity);
@@ -988,6 +1120,18 @@ void main() {
     AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
       'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
       credentials: Credentials(), transport: transport, now: () => at);
+  for (final empty in [false, true]) {
+    test('LF-FACTS unsupported version cannot pass a catalogue page empty=$empty', () async {
+      final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+        gateway: pageGateway(OwnerTransport((body) async {
+          expect(body.containsKey('productFactsReadbackVersion'), isFalse,
+            reason: 'Legacy strict endpoint must retain its original request shape.');
+          final data = pageData(body, empty: empty)..['productFactsReadbackVersion'] = 2;
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+        })));
+      await expectLater(source.loadProducts(storeQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
   test('LF-PAGER client source enters existing Buy pager with exact source product and no ordering authority', () async {
     final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
       body: jsonEncode({'ok': true, 'data': pageData(body)})));

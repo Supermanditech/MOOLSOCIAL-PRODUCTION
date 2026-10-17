@@ -1149,10 +1149,15 @@ class WorkSession extends ChangeNotifier {
           'byteLength': file.byteLength, 'width': file.width, 'height': file.height, 'normalized': file.normalized,
           if (file.frameCount != null) 'frameCount': file.frameCount}});
     }
+    final facts = WorkspaceCatalogueProductFacts(compliance: item.compliance?.toBuyPublicCompliance(),
+      composition: item.composition, regulatoryNote: item.regulatoryNote,
+      requiresPrescription: item.requiresPrescription);
+    final reviewedContent = value['content'] as Map;
     if (!_ownerInputValuesEqual(value['content'], {'title': item.title, 'brand': item.brand,
       'variant': item.variant, 'categoryId': item.categoryId, 'description': item.content.description,
       'highlights': item.content.highlights, 'specifications': [for (final spec in item.content.specifications.entries)
-        {'label': spec.key, 'value': spec.value}], 'media': media})) {
+        {'label': spec.key, 'value': spec.value}], 'media': media,
+      if (!facts.isEmpty || reviewedContent.containsKey('productFacts')) 'productFacts': facts.toJson()})) {
       return false;
     }
     final expected = <String, Map<String, Object?>>{};

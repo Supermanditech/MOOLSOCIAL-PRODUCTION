@@ -663,6 +663,62 @@ class WorkspaceCatalogueContentResult {
 
 /// One channel of an exact-SKU public read. Never construct public products
 /// from private owner records or infer delivery/Stock eligibility from this.
+/// Versioned reviewed descriptive fields, not approval, eligibility or tax facts.
+class WorkspaceCatalogueProductFacts {
+  const WorkspaceCatalogueProductFacts({this.compliance, this.composition,
+    this.regulatoryNote, this.requiresPrescription = false});
+  final BuyV2ProductCompliance? compliance;
+  final String? composition, regulatoryNote;
+  final bool requiresPrescription;
+  Map<String, Object?> get _compliance => {
+    'genericName': compliance?.genericName, 'netQuantity': compliance?.netQuantity,
+    'manufacturerName': compliance?.manufacturerName, 'manufacturerAddress': compliance?.manufacturerAddress,
+    'packerName': compliance?.packerName, 'packerAddress': compliance?.packerAddress,
+    'importerName': compliance?.importerName, 'importerAddress': compliance?.importerAddress,
+    'countryOfOrigin': compliance?.countryOfOrigin, 'manufacturedOrPackedOn': compliance?.manufacturedOrPackedOnLabel,
+    'bestBeforeOrUseBy': compliance?.bestBeforeOrUseByLabel, 'fssaiLicenseNumber': compliance?.fssaiLicenseNumber,
+    'consumerCare': compliance?.consumerCare,
+  };
+  bool get isEmpty => !requiresPrescription && composition?.isNotEmpty != true && regulatoryNote?.isNotEmpty != true &&
+      _compliance.values.every((value) => value == null);
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'compliance': _compliance,
+    'composition': composition?.isNotEmpty == true ? composition : null,
+    'regulatoryNote': regulatoryNote?.isNotEmpty == true ? regulatoryNote : null,
+    'requiresPrescription': requiresPrescription};
+  factory WorkspaceCatalogueProductFacts.fromProduct(BuyV2Product product) => WorkspaceCatalogueProductFacts(
+    compliance: product.compliance, composition: product.composition,
+    regulatoryNote: product.regulatoryNote, requiresPrescription: product.requiresPrescription);
+  factory WorkspaceCatalogueProductFacts.fromJson(Object? raw) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'compliance', 'composition', 'regulatoryNote', 'requiresPrescription']);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['requiresPrescription'] is! bool) {
+      throw const FormatException();
+    }
+    final fields = _map(value['compliance']);
+    _keys(fields, const WorkspaceCatalogueProductFacts()._compliance.keys.toList());
+    String? text(Object? raw, [int maximum = 1000]) => raw == null ? null : _string(raw, maximum);
+    for (final raw in fields.values) { text(raw); }
+    final compliance = fields.values.every((value) => value == null) ? null : BuyV2ProductCompliance(
+      genericName: text(fields['genericName']), netQuantity: text(fields['netQuantity']),
+      manufacturerName: text(fields['manufacturerName']), manufacturerAddress: text(fields['manufacturerAddress']),
+      packerName: text(fields['packerName']), packerAddress: text(fields['packerAddress']),
+      importerName: text(fields['importerName']), importerAddress: text(fields['importerAddress']),
+      countryOfOrigin: text(fields['countryOfOrigin']), manufacturedOrPackedOnLabel: text(fields['manufacturedOrPackedOn']),
+      bestBeforeOrUseByLabel: text(fields['bestBeforeOrUseBy']), fssaiLicenseNumber: text(fields['fssaiLicenseNumber']),
+      consumerCare: text(fields['consumerCare']));
+    return WorkspaceCatalogueProductFacts(compliance: compliance,
+      composition: text(value['composition'], 4000), regulatoryNote: text(value['regulatoryNote'], 4000),
+      requiresPrescription: value['requiresPrescription'] as bool);
+  }
+}
+
+void _checkProductFactsReadbackVersion(Map<String, dynamic> data) {
+  if (data.containsKey('productFactsReadbackVersion') &&
+      (data['productFactsReadbackVersion'] is! int || data['productFactsReadbackVersion'] != 1)) {
+    throw const FormatException();
+  }
+}
+
 class WorkspacePublicCatalogueEntry {
   const WorkspacePublicCatalogueEntry({required this.product, required this.readback});
   final BuyV2Product product;
@@ -678,6 +734,7 @@ class WorkspacePublicCatalogueEntry {
     required BuyV2OfferClass channel,
     required DateTime now,
   }) {
+    _checkProductFactsReadbackVersion(data);
     if (!{'production', 'evaluation'}.contains(realm) ||
         data['realm'] != realm || data['storeId'] != storeId ||
         data['state'] != 'ready' || data['listingCoverage'] != 'complete' ||
@@ -687,6 +744,9 @@ class WorkspacePublicCatalogueEntry {
     final rows = _list(data['items'], 1);
     if (rows.length != 1) throw const FormatException();
     final row = _map(rows.single), content = _map(row['content']), pack = _map(row['pack']);
+    final facts = content.containsKey('productFacts')
+        ? WorkspaceCatalogueProductFacts.fromJson(content['productFacts']) : null;
+    if (facts != null && data['productFactsReadbackVersion'] != 1) throw const FormatException();
     final store = _publicStore(data, storeId, realm, now);
     final bindings = _list(row['listings'], 2).map(BuyV2PublicListingIdentity.fromJson)
       .whereType<BuyV2PublicListingIdentity>().where((value) => value.channel == channel).toList();
@@ -720,6 +780,8 @@ class WorkspacePublicCatalogueEntry {
       destination: channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale,
       categoryId: _id(content['categoryId']), brand: _string(content['brand']),
       title: _string(content['title']), variant: _string(content['variant'], 240, true),
+      compliance: facts?.compliance, composition: facts?.composition,
+      regulatoryNote: facts?.regulatoryNote, requiresPrescription: facts?.requiresPrescription ?? false,
       pack: label, packTerms: packTerms, priceMinor: _int(terms['priceMinor']),
       mrpMinor: terms['mrpMinor'] == null ? null : _int(terms['mrpMinor']),
       unitPrice: '', badge: '', seller: _string(store['name'], 240), sellerType: '',
@@ -770,12 +832,14 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource {
     if (pageSize < 1 || pageSize > 50 || !current()) throw const FormatException();
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreCatalogue',
       'storeId': storeId, 'cataloguePageVersion': 1, 'query': request, 'pageSize': pageSize,
+      if (gateway.productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
       'storeDetailsReadbackVersion': 1,
       'cursor': ?cursor}, current, mutation: false);
     if (!current() || response == null || response.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response.body));
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
+    _checkProductFactsReadbackVersion(data);
     if (data['cataloguePageVersion'] != 1 || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
         data['storeId'] != storeId || data['state'] != 'ready' || data['listingReadbackVersion'] != 1 ||
         data['mediaReadbackVersion'] != 1 || data['listingCoverage'] != 'complete' ||
@@ -903,6 +967,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     credentials: FirebaseSocialContentCredentials(),
     transport: IoSocialContentTransport(),
     policyReadbackRequired: true,
+    productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
   );
 }
 
@@ -924,6 +989,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.realm = 'production',
     this.ownerAccountId,
     this.policyReadbackRequired = false,
+    this.productFactsReadbackSupported = false,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
@@ -938,6 +1004,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final String realm;
   final String? ownerAccountId;
   final bool policyReadbackRequired;
+  // Enable only with the matching service contract; do not break strict legacy endpoints.
+  final bool productFactsReadbackSupported;
   bool _policyObserved = false;
   bool get policyResolutionRequired => policyReadbackRequired || _policyObserved;
   final DateTime Function() now;
@@ -952,6 +1020,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       realm: realm,
       ownerAccountId: accountId,
       policyReadbackRequired: policyReadbackRequired,
+      productFactsReadbackSupported: productFactsReadbackSupported,
       now: now,
     );
   }
@@ -970,6 +1039,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         {
           'operation': 'listStoreCatalogueSkus',
           'mediaReadbackVersion': 1,
+          if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
           'storeId': storeId,
           'skuId': skuId,
         },
@@ -984,8 +1054,9 @@ class AuthenticatedWorkspaceCatalogueGateway
         return null;
       }
       final data = _map(envelope['data']);
-      _keys(Map<String, dynamic>.of(data)..remove('mediaReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
+      _keys(Map<String, dynamic>.of(data)..remove('mediaReadbackVersion')..remove('productFactsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'items', 'nextCursor']);
       if (data.containsKey('mediaReadbackVersion') && data['mediaReadbackVersion'] != 1) throw const FormatException();
+      _checkProductFactsReadbackVersion(data);
       if (data['schemaVersion'] != 1 ||
           data['realm'] != realm ||
           data['storeId'] != storeId ||
@@ -1004,6 +1075,7 @@ class AuthenticatedWorkspaceCatalogueGateway
         realm: realm,
       );
       final content = _map(owned.input['content']);
+      if (content.containsKey('productFacts') && data['productFactsReadbackVersion'] != 1) return null;
       if (_list(content['media'], 10).any((raw) => _map(_map(raw)['file']).containsKey('frameCount')) &&
           data['mediaReadbackVersion'] != 1) { return null; }
       return owned;
@@ -1175,6 +1247,9 @@ class AuthenticatedWorkspaceCatalogueGateway
   Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) async {
     final policyRequired = policyResolutionRequired || product.publicListingIdentity != null;
     try {
+      if (!productFactsReadbackSupported && !WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty) {
+        throw const FormatException();
+      }
       if (!product.hasValidPublicListingIdentity ||
           product.publicListingIdentity != null && product.publicListingIdentity!.realm != realm) {
         throw const FormatException();
@@ -1201,6 +1276,7 @@ class AuthenticatedWorkspaceCatalogueGateway
             body: {
               'operation': 'readPublicStoreCatalogue',
               'mediaReadbackVersion': 1,
+              if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
               if (policyRequired) 'policyReadbackVersion': 1,
               if (product.publicListingIdentity != null) 'listingReadbackVersion': 1,
               'storeId': product.storeId,
@@ -1234,6 +1310,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       final response = await _ownerRequest({
         'operation': 'readPublicStoreCatalogue', 'storeId': storeId, 'skuId': skuId,
         'listingReadbackVersion': 1, 'mediaReadbackVersion': 1, 'policyReadbackVersion': 1,
+        if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
         'storeDetailsReadbackVersion': 1,
       }, current, mutation: false);
       if (!current() || response == null || response.statusCode != 200) return null;
@@ -1361,6 +1438,8 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
     product.brand,
     product.variant,
     product.pack,
+    if (!WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty)
+      WorkspaceCatalogueProductFacts.fromProduct(product).toJson(),
     exact ? price : price ~/ 100,
     mrp == null ? null : exact ? mrp : mrp ~/ 100,
     product.minimumOrder,
@@ -1592,7 +1671,7 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
   }
   _id(provenance['sourceRecordId']);
   final content = _map(sku['content']);
-  _keys(content, [
+  _keys(Map<String, dynamic>.of(content)..remove('productFacts'), [
     'title',
     'brand',
     'variant',
@@ -1606,6 +1685,7 @@ void _ownerSkuInput(Map<String, dynamic> sku, String storeId) {
   _string(content['brand']);
   _string(content['variant'], 240, true);
   _id(content['categoryId']);
+  if (content.containsKey('productFacts')) WorkspaceCatalogueProductFacts.fromJson(content['productFacts']);
   _string(content['description'], 4000, true);
   for (final value in _list(content['highlights'], 20)) {
     _string(value, 500);
@@ -1714,6 +1794,7 @@ WorkspaceCatalogueContentResult _decode(
   DateTime now, {
   bool policyRequired = false,
 }) {
+  _checkProductFactsReadbackVersion(data);
   if (data['schemaVersion'] != 1 ||
       data['realm'] != realm ||
       data['storeId'] != product.storeId ||
@@ -1767,7 +1848,7 @@ WorkspaceCatalogueContentResult _decode(
   _string(row['sku'], 80);
   final revision = _int(row['revision'], 1, 1000000001),
       content = _map(row['content']);
-  _keys(content, [
+  _keys(Map<String, dynamic>.of(content)..remove('productFacts'), [
     'title',
     'brand',
     'variant',
@@ -1781,6 +1862,17 @@ WorkspaceCatalogueContentResult _decode(
       content['brand'] != product.brand ||
       content['variant'] != product.variant ||
       content['categoryId'] != product.categoryId) {
+    throw const FormatException();
+  }
+  if (content.containsKey('productFacts')) {
+    final facts = WorkspaceCatalogueProductFacts.fromJson(content['productFacts']);
+    if (data['productFactsReadbackVersion'] != 1 ||
+        jsonEncode(_sorted(facts.toJson())) !=
+        jsonEncode(_sorted(WorkspaceCatalogueProductFacts.fromProduct(product).toJson()))) {
+      throw const FormatException();
+    }
+  } else if (!WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty) {
+    // Do not silently drop known reviewed facts when a source is downgraded.
     throw const FormatException();
   }
   final pack = _map(row['pack']);

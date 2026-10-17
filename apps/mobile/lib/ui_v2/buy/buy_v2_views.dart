@@ -18896,7 +18896,7 @@ class BuyV2AccountView extends StatelessWidget {
           icon: Icons.storefront_outlined,
           title: 'Wholesale business profile',
           detail: session.businessVerified
-              ? 'Shree Balaji Retail · Business profile complete'
+              ? 'Business verification confirmed'
               : 'Business profile required',
           onTap: session.openWholesaleFromAccount,
         ),

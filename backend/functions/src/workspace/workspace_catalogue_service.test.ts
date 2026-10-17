@@ -3,7 +3,7 @@ import test from "node:test";
 import {randomUUID} from "node:crypto";
 import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
-import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave,
+import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave, normalizeSku,
   planCatalogueProduction, planReviewedCatalogueSave, type CatalogueProducerAuthority,
   type CatalogueProductionReceipt, type CatalogueSave, type StoreSkuInput, type StoreSkuContent,
   FirestoreWorkspaceCatalogueRepository, type StoreSkuRecord, type WorkspaceCatalogueRepository, type PublicCatalogueSource,
@@ -278,6 +278,64 @@ function subject(repository: Memory) {
   return new WorkspaceCatalogueService(repository,
     {catalogueId: "catalogue-one", tenantId: "tenant-one"}, () => new Date(at));
 }
+function descriptiveFacts() {
+  return {schemaVersion: 1, compliance: {
+    genericName: "Host oil", netQuantity: "1 L", manufacturerName: "Host maker",
+    manufacturerAddress: "Host manufacturer address", packerName: null, packerAddress: null,
+    importerName: null, importerAddress: null, countryOfOrigin: "India",
+    manufacturedOrPackedOn: "See pack", bestBeforeOrUseBy: "See pack",
+    fssaiLicenseNumber: "Host descriptive licence", consumerCare: "Host care details"},
+  composition: "Host ingredients", regulatoryNote: "Host pack directions", requiresPrescription: false};
+}
+test("LF-FACTS legacy absence preserves exact input and hash", () => {
+  const legacy = input(), original = structuredClone(legacy), hash = cataloguePayloadHash(legacy);
+  assert.deepEqual(normalizeSku(legacy, "store-one"), original);
+  assert.equal(cataloguePayloadHash(normalizeSku(legacy, "store-one")), hash);
+  assert.equal(Object.hasOwn(normalizeSku(legacy, "store-one").content, "productFacts"), false);
+});
+test("LF-FACTS strict versioned descriptive facts survive normalization", () => {
+  const value = input(), facts = descriptiveFacts();
+  Object.assign(value.content, {productFacts: facts});
+  const normalized = normalizeSku(value, "store-one");
+  assert.deepEqual((normalized.content as unknown as Record<string, unknown>).productFacts, facts);
+  assert.equal(cataloguePayloadHash(normalized), cataloguePayloadHash(value));
+});
+test("LF-FACTS malformed versions unknown fields and coercions are rejected", () => {
+  const facts = descriptiveFacts();
+  for (const bad of [null, {...facts, schemaVersion: 2}, {...facts, extra: true},
+    {...facts, requiresPrescription: "false"}, {...facts, compliance: {...facts.compliance, countryOfOrigin: 9}},
+    {...facts, compliance: {...facts.compliance, manufacturerName: " Host maker"}},
+    {...facts, composition: "x".repeat(4001)}]) {
+    const value = input(); Object.assign(value.content, {productFacts: bad});
+    assert.throws(() => normalizeSku(value, "store-one"), {code: "invalid_input"});
+  }
+});
+test("LF-FACTS public and owner readback negotiate exact facts without altering legacy records", async () => {
+  const repository = new Memory(), value = input(), facts = descriptiveFacts();
+  Object.assign(value.content, {productFacts: facts});
+  repository.aggregate = produceAll(value).aggregate;
+  await subject(repository).saveSku("owner-one", save(value));
+  await assert.rejects(subject(repository).listSkus("owner-one", {storeId: "store-one"}), {code: "unsupported_version"});
+  await assert.rejects(subject(repository).publicCatalogue({storeId: "store-one"}), {code: "unsupported_version"});
+  const owned = await subject(repository).listSkus("owner-one", {storeId: "store-one", productFactsReadbackVersion: 1}) as
+    {items: Array<{content: Record<string, unknown>}>};
+  const published = await subject(repository).publicCatalogue({storeId: "store-one", productFactsReadbackVersion: 1}) as
+    {items: Array<{content: Record<string, unknown>}>; orderingAvailable: boolean};
+  assert.deepEqual(owned.items[0]!.content.productFacts, facts);
+  assert.deepEqual(published.items[0]!.content.productFacts, facts);
+  assert.equal(published.orderingAvailable, false);
+  const stored = repository.records.get("store-one/sku-one")!;
+  assert.deepEqual(stored.content, value.content);
+});
+test("LF-FACTS changed facts cannot reuse the prior reviewed content hash", async () => {
+  const repository = new Memory(), value = input();
+  repository.aggregate = produceAll(value).aggregate;
+  Object.assign(value.content, {productFacts: descriptiveFacts()});
+  await subject(repository).saveSku("owner-one", save(value));
+  const response = await subject(repository).publicCatalogue({storeId: "store-one", productFactsReadbackVersion: 1}) as
+    {items: unknown[]};
+  assert.deepEqual(response.items, []);
+});
 function save(sku = input(), extra: Record<string, unknown> = {}) {
   return {storeId: "store-one", sku, expectedRevision: 0,
     idempotencyKey: `save-${sku.skuId}`, ...extra};
@@ -370,6 +428,30 @@ class ViewMemory extends BoundMemory {
 }
 const viewQuery = {destination: 'shop', search: '', categoryId: 'all', sort: 'relevance',
   brands: [], maximumPriceMinor: null, tradeType: null, listingIds: []};
+test('LF-FACTS paged readback carries the same reviewed extension and snapshot identity', async () => {
+  const repository = new ViewMemory(), value = input(), facts = descriptiveFacts();
+  Object.assign(value.content, {productFacts: facts});
+  repository.aggregate = produceAll(value).aggregate;
+  await subject(repository).saveSku('owner-one', save(value));
+  const request = {storeId: 'store-one', cataloguePageVersion: 1, query: viewQuery, pageSize: 10,
+    productFactsReadbackVersion: 1};
+  const response = await subject(repository).publicCatalogue(request) as
+    {productFactsReadbackVersion: number; items: Array<{row: {content: StoreSkuContent}}>};
+  assert.equal(response.productFactsReadbackVersion, 1);
+  assert.deepEqual(response.items[0]!.row.content.productFacts, facts);
+  await assert.rejects(subject(repository).publicCatalogue({...request, productFactsReadbackVersion: 2}), {code: 'invalid_input'});
+});
+test('LF-FACTS retry retains original facts and rejects changed payload with the same key', async () => {
+  const repository = new Memory(), value = input(), facts = descriptiveFacts();
+  Object.assign(value.content, {productFacts: facts});
+  const service = subject(repository), request = save(value);
+  const original = await service.saveSku('owner-one', request);
+  const replay = await service.saveSku('owner-one', structuredClone(request));
+  assert.deepEqual(replay, original);
+  facts.composition = 'Changed after original dispatch';
+  await assert.rejects(service.saveSku('owner-one', request), {code: 'conflict'});
+  assert.equal(repository.records.get('store-one/sku-one')!.content.productFacts!.composition, 'Host ingredients');
+});
 test('LF-PAGER public opt-in supplies stable query snapshot and listing counts', async () => {
   const repository = new ViewMemory(), value = input();
   repository.aggregate = produceAll(value).aggregate;

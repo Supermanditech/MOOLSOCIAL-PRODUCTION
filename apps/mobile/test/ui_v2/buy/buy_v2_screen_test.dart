@@ -6051,6 +6051,26 @@ void main() {
     expect(session.selectedOrder.id, 'MS-240782');
   });
 
+  for (final verified in [false, true]) {
+    testWidgets('LF08 account business status never invents a business identity $verified', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session, textScale: 1.4));
+      await tester.pumpAndSettle();
+      session.businessVerified = verified;
+      session.openAccount();
+      await tester.pumpAndSettle();
+      final action = find.byKey(const ValueKey('buy-account-workspace'));
+      await tester.ensureVisible(action);
+      expect(find.descendant(of: action, matching: find.textContaining('Shree Balaji')), findsNothing);
+      expect(find.descendant(of: action, matching: find.text(
+        verified ? 'Business verification confirmed' : 'Business profile required')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Account Orders and Wholesale actions complete and return', (
     tester,
   ) async {

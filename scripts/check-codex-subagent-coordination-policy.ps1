@@ -7973,6 +7973,23 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($chat.owners|Sort-Object) -join '|') -cne (@($chatOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners+= $chatOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch02Facts']) {
+    $facts=$Continuation.batch02Facts
+    $factsOwners=@('backend/functions/src/workspace/workspace_catalogue_service.ts',
+      'backend/functions/src/workspace/workspace_catalogue_service.test.ts',
+      'apps/mobile/lib/features/work/work_catalogue_gateway.dart',
+      'apps/mobile/lib/features/work/work_session.dart',
+      'apps/mobile/test/work_catalogue_gateway_test.dart')
+    if ($null -eq $facts -or $facts -isnot [pscustomobject]) { return $false }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if($null -eq $facts.PSObject.Properties[$key]) { return $false }
+    }
+    if ($facts.ticket -cne 'LF-03-C01' -or $facts.batch -ne 2 -or
+        $facts.sourceCheckpoint -cne 'd29879a31412d4cc2859c1eb23a8debe959d5786' -or
+        $facts.state -cne 'founder_authorized_local_facts_contract_and_frontend' -or
+        (@($facts.owners|Sort-Object) -join '|') -cne (@($factsOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners+= $factsOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0

@@ -130,7 +130,9 @@ if ($RequireLfPublicationProbes) {
   foreach($owner in @('backend/functions/src/index.ts','config/codex-subagent-coordination-policy.json',
       'apps/mobile/lib/features/work/work_session.dart','apps/mobile/android/app/build.gradle.kts',
       'apps/mobile/test/ui_v2/buy/unclaimed_test.dart')) {
-    Assert-Fixture (-not (Test-Lf27Batch01Continuation $continuation @($owner))) 'Batch01 admitted an unrelated owner.'
+    $originalBatch=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $originalBatch.PSObject.Properties.Remove('batch02Facts')
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $originalBatch @($owner))) 'Batch01 admitted an unrelated owner.'
     $cases++
   }
   foreach($key in @('id','state','publishedCheckpoint','batch','classification',
@@ -167,6 +169,25 @@ if ($RequireLfPublicationProbes) {
       Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 Chat changed $key admitted."
       $cases+=2
     }
+  }
+  if ($null -ne $continuation.PSObject.Properties['batch02Facts']) {
+    foreach($owner in $continuation.batch02Facts.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact Batch02 facts owner rejected.'
+      $cases++
+    }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Facts.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 facts missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch02Facts.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Batch02 facts changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch02Facts.owners+= 'backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Facts scope widened beyond its exact existing service.'
+    $cases++
   }
   Write-Output "LF27 publication: $cases focused checks passed; no app/provider/APK acceptance."
   return
