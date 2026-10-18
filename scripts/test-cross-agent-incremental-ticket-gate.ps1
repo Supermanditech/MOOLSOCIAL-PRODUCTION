@@ -171,6 +171,29 @@ if ($RequireLfPublicationProbes) {
       $cases+=2
     }
   }
+  if ($null -ne $continuation.PSObject.Properties['batch04DocumentExport']) {
+    foreach ($owner in $continuation.batch04DocumentExport.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact document export owner rejected.'
+      $cases++
+    }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch04DocumentExport.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Export missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch04DocumentExport.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Export changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch04DocumentExport.owners+='backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Export widened into backend.'
+    $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacy.PSObject.Properties.Remove('batch04DocumentExport')
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical export-absent continuation rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'))) 'Unclaimed export fixture admitted.'
+    $cases+=3
+  }
   if ($null -ne $continuation.PSObject.Properties['batch03PolicyRecovery']) {
     foreach ($owner in $continuation.batch03PolicyRecovery.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-policy recovery owner rejected.'

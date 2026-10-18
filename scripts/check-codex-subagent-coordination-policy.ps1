@@ -8053,6 +8053,20 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($promotion.owners|Sort-Object) -join '|') -cne (@($promotionOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners += $promotionOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch04DocumentExport']) {
+    $export=$Continuation.batch04DocumentExport
+    $exportOwners=@('apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart')
+    if ($null -eq $export -or $export -isnot [pscustomobject]) { return $false }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if ($null -eq $export.PSObject.Properties[$key]) { return $false }
+    }
+    if ($export.ticket -cne 'LF-12-C01' -or $export.batch -ne 4 -or
+        $export.sourceCheckpoint -cne 'aa482783bb83d67d02397462e36745ff17cdc07a' -or
+        $export.state -cne 'founder_authorized_frontend_lossless_document_export' -or
+        (@($export.owners|Sort-Object) -join '|') -cne (@($exportOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $exportOwners
+  }
   if ($null -ne $Continuation.PSObject.Properties['batch03PolicyRecovery']) {
     $recovery=$Continuation.batch03PolicyRecovery
     $recoveryOwners=@('apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
@@ -8359,6 +8373,9 @@ function Invoke-Lf01Admission {
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch03PolicyRecovery']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch04DocumentExport']) {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Chat']) {
       Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',

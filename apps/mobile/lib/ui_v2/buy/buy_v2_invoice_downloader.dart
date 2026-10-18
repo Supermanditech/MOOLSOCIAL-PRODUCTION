@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'buy_v2_design.dart' show buyV2HistoricalOrderEstimate;
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_customer_copy.dart';
@@ -49,7 +50,14 @@ Future<BuyV2InvoiceDownloadOutcome> saveBuyV2InvoiceWithChannel(
 Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
   final order = invoice.order;
   final subtotal = buyV2SumMinor(order.lines.map((line) => line.totalMinor));
-  final lines = <String>[
+  return <String, Object>{
+    'fileName': _safeInvoiceFileName(invoice.suggestedFileName),
+    'lines': _boundedInvoiceLines(_invoiceLogicalLines(order, subtotal)),
+  };
+}
+
+Iterable<String> _invoiceLogicalLines(BuyV2Order order, int subtotal) sync* {
+  yield* <String>[
     'MoolSocial order invoice',
     'Order ID: ${_invoiceText(order.id)}',
     if (order.taxInvoiceDetails case final taxInvoice?) ...[
@@ -113,20 +121,24 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
       'Delivery instruction: ${_invoiceText(value)}',
     '',
     'Items placed',
-    for (final line in order.lines)
-      '${line.quantity} x ${_invoiceText(line.product.customerTitle)} '
-          '(${_invoiceText(line.product.pack)}) - INR ${_invoiceMinorNumber(line.totalMinor)}',
-    if (order.taxInvoiceDetails case final taxInvoice?) ...[
-      '',
-      'Tax breakdown',
-      for (final line in taxInvoice.lines)
-        '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
+  ];
+  for (final line in order.lines) {
+    yield '${line.quantity} x ${_invoiceText(line.product.customerTitle)} '
+          '(${_invoiceText(line.product.pack)}) - INR ${_invoiceMinorNumber(line.totalMinor)}';
+  }
+  if (order.taxInvoiceDetails case final taxInvoice?) {
+    yield '';
+    yield 'Tax breakdown';
+    for (final line in taxInvoice.lines) {
+      yield '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
             '${line.quantity == null ? '' : 'Quantity ${line.quantity}${line.unit == null ? '' : ' ${_invoiceText(line.unit!)}'} | '}'
             '${line.unitPrice == null ? '' : 'Unit INR ${line.unitPrice} | '}'
             'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
-            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',
-    ],
-    if (order.platformTaxInvoiceDetails case final platformTax?) ...[
+            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}';
+    }
+  }
+  if (order.platformTaxInvoiceDetails case final platformTax?) {
+    yield* <String>[
       '',
       'MoolSocial service tax invoice',
       'Invoice number: ${_invoiceText(platformTax.invoiceNumber)}',
@@ -140,11 +152,14 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
         'Buyer GSTIN: ${_invoiceText(value)}',
       'Place of supply: ${_invoiceText(platformTax.placeOfSupply)}',
       'Reverse charge: ${platformTax.reverseCharge ? 'Yes' : 'No'}',
-      for (final line in platformTax.lines)
-        '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
+    ];
+    for (final line in platformTax.lines) {
+      yield '${_invoiceText(line.description)} | HSN/SAC ${_invoiceText(line.hsnSac)} | '
             'Taxable INR ${line.taxableValue} | GST ${line.gstRate.toStringAsFixed(2)}% | '
-            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}',
-    ],
+            'CGST ${line.cgst} | SGST ${line.sgst} | IGST ${line.igst} | Cess ${line.cess}';
+    }
+  }
+  yield* <String>[
     '',
     'Items subtotal: INR ${_invoiceMinorNumber(subtotal)}',
     if (order.tipMinor > 0)
@@ -161,10 +176,33 @@ Map<String, Object> _platformInvoicePayload(BuyV2InvoiceDocument invoice) {
       'Payment charge: INR ${_invoiceMinorNumber(order.paymentChargeMinor)}',
     'Order total: INR ${_invoiceMinorNumber(order.payableTotalMinor)}',
   ];
-  return <String, Object>{
-    'fileName': _safeInvoiceFileName(invoice.suggestedFileName),
-    'lines': lines,
-  };
+}
+
+// Match the existing native transport limits without silently losing document
+// content. Build lazily and reject before invoking the channel, never export a
+// partial first200. Kotlin and Dart both measure these limits in UTF-16 units.
+List<String> _boundedInvoiceLines(Iterable<String> logicalLines) {
+  final output = <String>[];
+  void add(String line) {
+    if (output.length >= 200) throw const FormatException('Invoice exceeds the complete export limit.');
+    output.add(line);
+  }
+  for (final line in logicalLines) {
+    if (line.isEmpty) { add(''); continue; }
+    final chunk = StringBuffer();
+    var units = 0;
+    for (final grapheme in line.characters) {
+      if (grapheme.length > 500) {
+        throw const FormatException('Invoice text cannot fit a complete native line.');
+      }
+      if (units + grapheme.length > 500) {
+        add(chunk.toString()); chunk.clear(); units = 0;
+      }
+      chunk.write(grapheme); units += grapheme.length;
+    }
+    if (units > 0) add(chunk.toString());
+  }
+  return output;
 }
 
 String _invoiceMinorNumber(int minor) {
@@ -180,8 +218,7 @@ String _invoiceText(String value) {
       .replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
-  final safe = normalized.isEmpty ? 'Not provided' : normalized;
-  return safe.length <= 240 ? safe : safe.substring(0, 240);
+  return normalized.isEmpty ? 'Not provided' : normalized;
 }
 
 String _destinationLabel(BuyV2Destination destination) => switch (destination) {

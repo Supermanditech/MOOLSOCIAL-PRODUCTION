@@ -120,6 +120,7 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_coverage_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart",
@@ -495,6 +496,20 @@
         "implementation": "Both-side optional descriptive guidance and SKU-dependent private-entry slice implemented; supported workflow qualification recorded above. Remaining PF/category/provider work stays partially open; not a second content engine or whole-category completion.",
         "founderAccepted": false
       }
+    },
+    "batch04DocumentExport": {
+      "ticket": "LF-12-C01", "batch": 4,
+      "sourceCheckpoint": "aa482783bb83d67d02397462e36745ff17cdc07a",
+      "state": "founder_authorized_frontend_lossless_document_export",
+      "owners": ["apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart", "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart"],
+      "scope": "Correct silent240-character truncation of supplied invoice text in existing Android channel export. Preserve normalized complete assembled lines through lossless <=500UTF16 chunks/max200lines. Reject unrepresentable documents before channel invocation, no partial saved success; keep native limits/renderer, money, source parties and outcomes. No backend issuance, native change/build, actual order creation or new PDF engine.",
+      "qualification": "Supported transport-preservation slice verified, not issued-document/native-PDF completion. Seven true-red channel tests reproduced240char loss. Initial code-unit splitter then passed11of13 but2new cases proved Hindi combining split and oversized grapheme incorrectly accepted; corrected using the existing Flutter widgets StringCharacters export, no dependency addition. Final downloader14 plus affected invoice regulatory/inset/Android-source10:24 unique pass0fail0skip. Includes complete suffix/reconstruction, assembled500/501/1501 boundaries, Unicode pairs/Hindi clusters, empty lines/normalization, exact200 versus201 with failed plus zero native calls, and seller/platform tax sections/correction text/money. Two-owner analysis clean.203 bounded positive/negative scope probes and actual149-owner implementation passed; only existing two source/test paths registered, no config/registry/new phase/framework or weakened flags.",
+      "implementation": "Existing logical invoice generator yields item/tax rows lazily. All values retain previous control/space normalization but no240 cap. Assembled lines are split into complete graphemes with <=500UTF16 per chunk, blank logical lines retained, max200 chunks; indivisible >500 cluster or overflow throws inside existing failure handler before invokeMethod, never exports first200 partially. Exact paise, source parties/tax, filename bound and saved/cancelled/unavailable/failure outcomes unchanged. Fixed header lists still normalize finite supplied strings eagerly: bounded output accumulation, not a blanket input-memory bound. Native renderer/pagination/limits unchanged.",
+      "logs": ["followup-b04-document-text-red-20261018-v1.jsonl", "followup-b04-document-unicode-red-20261018-v1.jsonl", "followup-b04-document-text-final-20261018-v1.jsonl", "followup-b04-document-affected-20261018-v1.jsonl", "followup-b04-document-analysis-20261018-v1.log"],
+      "native": "Owned OPPO hotreload6libraries4846ms. Existing Orders is explicitly labelled Review data. Its existing MS-NEW-01 Invoice action truthfully showed Invoice details missing rather than fabricating line facts; Back and Cart return checked. Final fresh Cart PNG preserves164soap, original payment-review hold and1item. No new order/invoice/save/export/Stock/payment, runtime data injection, deployment, APK or native source change. No genuine populated long-document was available for native PDF export; no such acceptance claimed.",
+      "nativeEvidence": ["followup-b04-document-reloaded-20261018-v1.png", "followup-b04-document-orders-20261018-v1.png", "followup-b04-document-invoice-view-20261018-v1.png", "followup-b04-document-final-cart-20261018-v1.png"],
+      "reviewAndLimits": "Readonly architect exact diff review found no remaining transport must-fix, did not independently run tests/device. Complete normalized text/graphemes reaching the channel does not prove native Paint.breakText wrapping/glyph correctness. End-to-end Indian-language PDF rendering and authoritative issued-document retrieval/access/source remain unverified/deferred under existing LF12, not closed by mocked channel success or local PDF creation. No new founder visual/issued-document/APK acceptance inferred.",
+      "diagnostics": "One readonly rg wildcard argument was invalid in PowerShell; exact discovered test owners used afterward, no mutation followed failed search. Initial surrogate-only helper had one style info; grapheme correction removed it and final analysis is clean. Existing REG4649-linked record only. No failed/intermediate log marked final pass or extra unique count."
     },
     "batch04ScheduledQuoteContext": {
       "ticket": "LF-11-C01", "consumer": "LF-08-C02", "batch": 4,
