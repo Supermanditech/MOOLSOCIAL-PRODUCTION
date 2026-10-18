@@ -6761,7 +6761,7 @@ class BuyV2Session extends ChangeNotifier {
       ? _orderRefreshMessages[orderId]
       : null;
 
-  void _invalidateOrderRefreshes() {
+  void _invalidateOrderRefreshes({bool preserveSupply = false}) {
     _cartOrderReturnOrigin = null;
     for (final controller in _productAcceptance.values) {
       controller.dispose();
@@ -6776,7 +6776,8 @@ class BuyV2Session extends ChangeNotifier {
     _replacementRequests.clear();
     _replacementResults.clear();
     _replacementMessages.clear();
-    _lastSupplySnapshots.clear();
+    _supplyCacheRestoredOwner = null;
+    if (!preserveSupply) _lastSupplySnapshots.clear();
   }
 
   final Map<String, Object> _replacementOperations = {};
@@ -6784,6 +6785,73 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2ReplacementConsentResult> _replacementResults = {};
   final Map<String, String> _replacementMessages = {};
   final Map<String, BuyV2OrderSupplyProgress> _lastSupplySnapshots = {};
+  String? _supplyCacheRestoredOwner;
+
+  void _persistSupplyCache() {
+    // Network-first startup must not overwrite an unread retained Cart/attempt.
+    if (!isStoreProcurement && _supplyCacheRestoredOwner != null &&
+        _supplyCacheRestoredOwner == customerStateStore?.ownerScope &&
+        !customerStateRecoveryPending && _lastSupplySnapshots.isNotEmpty) {
+      _persistCustomerState();
+    }
+  }
+
+  bool _supplyAtLeast(BuyV2OrderSupplyProgress next, BuyV2OrderSupplyProgress previous) =>
+      next.orderId == previous.orderId && next.purchaseId == previous.purchaseId &&
+      next.sourceId == previous.sourceId && next.revision >= previous.revision &&
+      (next.revision != previous.revision || buyV2SupplyProgressKey(next) == buyV2SupplyProgressKey(previous));
+
+  bool _sameSupplyPurchase(BuyV2Order a, BuyV2Order b) => a.id == b.id &&
+      a.purchaseId == b.purchaseId && a.destination == b.destination &&
+      a.collection == null && b.collection == null && a.payableTotalMinor == b.payableTotalMinor &&
+      a.lines.length == b.lines.length && a.lines.every((line) => b.lines.where((other) =>
+        other.quantity == line.quantity && other.product.id == line.product.id &&
+        other.product.canonicalId == line.product.canonicalId && other.product.storeId == line.product.storeId &&
+        other.product.publicListingIdentity == line.product.publicListingIdentity &&
+        other.product.variant == line.product.variant && other.product.pack == line.product.pack &&
+        other.product.priceMinor == line.product.priceMinor &&
+        other.scheduledFulfilment == line.scheduledFulfilment).length == 1);
+
+  void _restoreSupplyCache(BuyV2CustomerStateSnapshot snapshot) {
+    final heads = {..._lastSupplySnapshots};
+    final rollback = <int, BuyV2Order>{};
+    for (final key in snapshot.orderSupplyCheckpoints.keys) {
+      if (snapshot.orders.where((order) => order.id == key).length != 1) {
+        throw const FormatException('Saved supply order needs checking');
+      }
+    }
+    for (final cached in snapshot.orders) {
+      var head = snapshot.orderSupplyCheckpoints[cached.id] ?? cached.supplyProgress;
+      if (head == null) continue;
+      if (!head.matchesOrder(cached) || cached.supplyProgress != null &&
+          !_supplyAtLeast(head, cached.supplyProgress!)) {
+        throw const FormatException('Saved supply revision needs checking');
+      }
+      final currentIndex = _orders.indexWhere((order) => order.id == cached.id);
+      if (currentIndex >= 0 && !_sameSupplyPurchase(cached, _orders[currentIndex])) {
+        throw const FormatException('Original supply purchase changed');
+      }
+      final observed = heads[cached.id];
+      if (observed != null) {
+        if (!observed.matchesOrder(cached)) throw const FormatException('Original supply lines changed');
+        if (_supplyAtLeast(observed, head)) head = observed;
+      }
+      heads[cached.id] = head;
+      if (currentIndex >= 0) {
+        final visible = _orders[currentIndex].supplyProgress;
+        if (visible != null && !_supplyAtLeast(visible, head)) rollback[currentIndex] = cached;
+      }
+    }
+    // Validate the whole merge before changing Cart, order visibility or guards.
+    _lastSupplySnapshots..clear()..addAll(heads);
+    for (final entry in rollback.entries) {
+      final order = entry.value;
+      _orders[entry.key] = order;
+      _currentDeliveryOrderIds.remove(order.id);
+      _orderRefreshStates[order.id] = BuyV2CommerceLoadState.unavailable;
+      _orderRefreshMessages[order.id] = 'Order update could not be verified. Last known details are still shown.';
+    }
+  }
 
   BuyV2OrderSupplyProgress? orderSupplyProgressFor(String orderId) {
     if (_orderRefreshOwnerScope != customerStateStore?.ownerScope) return null;
@@ -6836,15 +6904,11 @@ class BuyV2Session extends ChangeNotifier {
             incoming.payableTotalMinor != original.payableTotalMinor)) {
       return false;
     }
-    final previous =
-        original?.supplyProgress ?? _lastSupplySnapshots[incoming.id];
-    if (previous == null) return true;
-    return progress.purchaseId == previous.purchaseId &&
-        progress.sourceId == previous.sourceId &&
-        progress.revision >= previous.revision &&
-        (progress.revision != previous.revision ||
-            buyV2SupplyProgressKey(progress) ==
-                buyV2SupplyProgressKey(previous));
+    // The original captured before an await may predate cache restoration.
+    for (final previous in [original?.supplyProgress, _lastSupplySnapshots[incoming.id]]) {
+      if (previous != null && !_supplyAtLeast(progress, previous)) return false;
+    }
+    return true;
   }
 
   Future<bool> decideOrderReplacement({
@@ -7054,6 +7118,7 @@ class BuyV2Session extends ChangeNotifier {
       if (refreshed.supplyProgress case final progress?) {
         _lastSupplySnapshots[orderId] = progress;
       }
+      _persistSupplyCache();
       if (!reviewDataEnabled) _currentDeliveryOrderIds.add(refreshed.id);
       _orderRefreshStates[orderId] = BuyV2CommerceLoadState.ready;
       _orderRefreshMessages[orderId] = result.customerMessage;
@@ -8255,6 +8320,7 @@ class BuyV2Session extends ChangeNotifier {
       }
       commerceLoadState = snapshot.state;
       commerceMessage = snapshot.customerMessage;
+      _persistSupplyCache();
     } on Object {
       if (refreshSequence != _commerceRefreshSequence ||
           _collectionDisposed ||
@@ -8874,7 +8940,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     _customerStateOwnerScope = ownerScope;
     _balanceHoldsLoadedOwner = null;
-    _invalidateOrderRefreshes();
+    _invalidateOrderRefreshes(preserveSupply: _orderRefreshOwnerScope == ownerScope);
     final mutationRevision = _customerStateMutationRevision;
     final browseRevision = _procurementBrowseRevision;
     if (!isStoreProcurement) {
@@ -8938,6 +9004,8 @@ class BuyV2Session extends ChangeNotifier {
           notifyListeners();
         }
         _procurementBrowseReady = true;
+        _supplyCacheRestoredOwner = ownerScope;
+        _persistSupplyCache();
         notifyListeners();
         return;
       }
@@ -9021,6 +9089,12 @@ class BuyV2Session extends ChangeNotifier {
         notice = null;
       }
       _procurementBrowseReady = true;
+      _supplyCacheRestoredOwner = ownerScope;
+      _persistSupplyCache();
+      if (_orderRefreshStates.values.contains(BuyV2CommerceLoadState.unavailable)) {
+        commerceLoadState = BuyV2CommerceLoadState.unavailable;
+        commerceMessage = 'Some order updates could not be verified. Last known details are still shown.';
+      }
       if (_shoppingAreaRevision > 0) _persistCustomerState();
       notifyListeners();
       unawaited(_refreshShoppingAreaLabel());
@@ -9082,14 +9156,15 @@ class BuyV2Session extends ChangeNotifier {
         snapshot.orderResolutionHolds.length) {
       throw const FormatException('Order request recovery needs checking.');
     }
-    for (final hold in snapshot.orderResolutionHolds) {
-      _orderResolutionHolds[hold.storageKey] = hold;
-    }
     if (snapshot.balancePaymentHolds.any(
       (hold) => !hold.valid || hold.ownerScope != owner,
     ) || snapshot.balancePaymentHolds.map((h) => h.storageKey).toSet().length !=
         snapshot.balancePaymentHolds.length) {
       throw const FormatException('Balance payment recovery needs checking.');
+    }
+    _restoreSupplyCache(snapshot);
+    for (final hold in snapshot.orderResolutionHolds) {
+      _orderResolutionHolds[hold.storageKey] = hold;
     }
     for (final hold in snapshot.balancePaymentHolds) {
       _balancePaymentHolds[hold.storageKey] = hold;
@@ -9631,6 +9706,11 @@ class BuyV2Session extends ChangeNotifier {
                   order.id.contains('-NEW-')),
         ),
       ),
+      orderSupplyCheckpoints: Map.unmodifiable({
+        for (final order in _orders.where((order) => order.collection == null &&
+            (order.purchaseId?.trim().isNotEmpty == true || order.id.contains('-NEW-'))))
+          order.id: ?_lastSupplySnapshots[order.id],
+      }),
     );
     if (!isStoreProcurement) {
       _retainedProductIdentityKeys

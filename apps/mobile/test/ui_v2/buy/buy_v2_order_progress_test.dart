@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
@@ -24,6 +26,29 @@ class _R669TrackingOwnerStore implements BuyV2CustomerStateStore {
   Future<BuyV2CustomerStateSnapshot?> read() async => null;
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
+// Host-only preferences exercise the real codec, never a native order feed.
+class _SupplyCachePreferences implements SharedPreferencesAsync {
+  final values = <String, String>{};
+  final controls = <String, Object?>{};
+  Completer<void>? get readGate => controls['readGate'] as Completer<void>?;
+  set readGate(Completer<void>? value) => controls['readGate'] = value;
+  bool get rejectWrite => controls['rejectWrite'] == true;
+  set rejectWrite(bool value) => controls['rejectWrite'] = value;
+  @override
+  Future<String?> getString(String key) async {
+    final value = values[key];
+    await readGate?.future;
+    return value;
+  }
+  @override
+  Future<void> setString(String key, String value) async {
+    if (rejectWrite) throw StateError('Host persistence failure');
+    values[key] = value;
+  }
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError('Unexpected supply-cache operation');
 }
 
 class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
@@ -501,6 +526,13 @@ class _T12SupplyCommerce extends _R669DeliveryCommerce {
   }
 }
 
+class _SupplyCacheCommerce extends _T12SupplyCommerce {
+  Completer<BuyV2OrderRefreshResult>? pending;
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) =>
+    pending?.future ?? super.refreshOrder(orderId: orderId);
+}
+
 BuyV2OrderSupplyProgress _t12Progress({
   String orderId = 'supply-1',
   String purchaseId = 'purchase-1',
@@ -621,6 +653,249 @@ Future<void> _t12Capture(
 }
 
 void _t12SupplyCases() {
+  for (final networkFirst in [false, true]) {
+    for (final withdrawn in [false, true]) {
+      test('LF10 supply restart revision guard networkFirst=$networkFirst withdrawn=$withdrawn', () async {
+        final preferences = _SupplyCachePreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+        final commerce = _T12SupplyCommerce(), latest = _t12Progress(revision: 7);
+        final retained = commerce.orderWith(withdrawn ? null : latest);
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [retained],
+          orderSupplyCheckpoints: {'supply-1': latest})), isTrue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce,
+          customerStateStore: store, reviewDataEnabled: false);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        commerce.supply(networkFirst && !withdrawn ? _t12Progress(revision: 6) : null);
+        if (networkFirst) await session.restoreCommerce();
+        await session.restoreCustomerState();
+        if (networkFirst && !withdrawn) {
+          expect(session.orderSupplyProgressFor('supply-1')?.revision, 7,
+            reason: 'An older network result must not replace the retained higher revision');
+        } else if (withdrawn || networkFirst) {
+          expect(session.orderSupplyProgressFor('supply-1'), isNull,
+            reason: 'A guard-only checkpoint never resurrects explicitly missing progress');
+        }
+        commerce.supply(_t12Progress(revision: 6));
+        await session.restoreCommerce();
+        expect(session.commerceLoadState, BuyV2CommerceLoadState.unavailable);
+        commerce.supply(_t12Progress(revision: 8));
+        await session.restoreCommerce();
+        expect(session.orderSupplyProgressFor('supply-1')?.revision, 8);
+        await session.retainedAccountState();
+        expect((await store.read())!.orderSupplyCheckpoints['supply-1']?.revision, 8);
+      });
+    }
+  }
+  test('LF10 supply refresh returning during cache restoration cannot lower guard', () async {
+    final preferences = _SupplyCachePreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+    final commerce = _SupplyCacheCommerce();
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(_t12Progress(revision: 7))])), isTrue);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: commerce, customerStateStore: store, reviewDataEnabled: false);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    commerce.supply(_t12Progress(revision: 3)); await session.restoreCommerce();
+    final originalBytes = preferences.values.values.single;
+    expect((jsonDecode(originalBytes) as Map)['orders'][0]['supplyProgress']['revision'], 7,
+      reason: 'A network-first read must not write before same-owner cache restoration');
+    preferences.readGate = Completer<void>();
+    final restoring = session.restoreCustomerState();
+    await Future<void>.delayed(Duration.zero);
+    commerce.pending = Completer<BuyV2OrderRefreshResult>();
+    final refreshing = session.refreshOrder('supply-1');
+    preferences.readGate!.complete(); await restoring;
+    commerce.pending!.complete(BuyV2OrderRefreshResult(state: BuyV2CommerceLoadState.ready, customerMessage: '',
+      order: commerce.orderWith(_t12Progress(revision: 6))));
+    expect(await refreshing, isFalse);
+    expect(session.orderSupplyProgressFor('supply-1')?.revision, 7);
+  });
+  for (final exact in [false, true]) {
+    for (final refunded in [false, true]) {
+      test('LF10 supply codec retains original detail exact=$exact refunded=$refunded', () async {
+        final progress = _t12Progress(revision: 7,
+          refund: refunded ? BuyV2SupplyRefundState.refunded : null,
+          refundAmount: refunded ? 3000 : null, route: refunded ? 'Original UPI' : null,
+          reference: refunded ? 'host-refund-reference' : null);
+        final original = _T12SupplyCommerce().orderWith(progress);
+        final order = exact ? BuyV2Order.minor(id: original.id, purchaseId: original.purchaseId,
+          destination: original.destination, title: original.title, itemSummary: original.itemSummary,
+          totalMinor: original.payableTotalMinor, amountPaidNowMinor: original.amountPaidNowMinor,
+          partner: original.partner, partnerType: original.partnerType, promise: original.promise,
+          destinationLabel: original.destinationLabel, progress: original.progress, status: original.status,
+          productIds: original.productIds, lines: original.lines, supplyProgress: progress) : original;
+        expect(progress.matchesOrder(order), isTrue);
+        final preferences = _SupplyCachePreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order])), isTrue);
+        final restored = (await store.read())!.orders.single;
+        expect(restored.supplyProgress, isNotNull, reason: 'Supplied allocation/replacement/refund detail must survive restart');
+        expect(buyV2SupplyProgressKey(restored.supplyProgress!), buyV2SupplyProgressKey(progress));
+        expect(restored.supplyProgress!.replacementOffer!.expiresAt, progress.replacementOffer!.expiresAt);
+        expect(restored.supplyProgress!.matchesOrder(restored), isTrue);
+        expect(restored.usesMinorAmounts, order.usesMinorAmounts);
+        final bytes = preferences.values.values.single;
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [restored])), isTrue);
+        expect(preferences.values.values.single, bytes);
+      });
+    }
+  }
+  for (final context in ['visible', 'guard', 'malformed guard']) {
+    test('LF10 supply invalid procurement draft cannot erase $context recovery', () async {
+      final preferences = _SupplyCachePreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+      final progress = _t12Progress(revision: 7);
+      expect(await store.write(BuyV2CustomerStateSnapshot(
+        orders: [_T12SupplyCommerce().orderWith(context == 'visible' ? progress : null)],
+        orderSupplyCheckpoints: context == 'visible' ? const {} : {'supply-1': progress})), isTrue);
+      final key = preferences.values.keys.single, raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      raw['procurementDraft'] = {'invalid': true};
+      for (final field in ['productReportStates', 'checkoutIdempotencyKey', 'legacyCheckoutAttempt',
+          'checkoutPaymentAttempt', 'balancePaymentHolds', 'orderResolutionHolds']) { raw.remove(field); }
+      if (context == 'malformed guard') raw['orderSupplyCheckpoints'] = null;
+      preferences.values[key] = jsonEncode(raw);
+      final bytes = preferences.values[key];
+      await expectLater(store.read(), throwsFormatException);
+      expect(preferences.values[key], bytes);
+    });
+  }
+  for (final omitted in [false, true]) {
+    test('LF10 supply cache merge holds changed original Scheduled selection omitted=$omitted', () async {
+      final listing = BuyV2PublicListingIdentity(listingId: 'listing-${'a' * 64}', realm: 'evaluation',
+        storeId: 'host-store', skuId: 'host-sku', canonicalProductId: 'host-canonical',
+        verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail);
+      final product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato').copyWith(
+        id: listing.listingId, canonicalId: listing.canonicalProductId, storeId: listing.storeId,
+        publicListingIdentity: listing, offerClass: BuyV2OfferClass.retail);
+      BuyV2ScheduledFulfilment slot(String id) => BuyV2ScheduledFulfilment(listing: listing,
+        sourceRevision: 'host-eligibility', locationKey: 'host-area', slotId: id,
+        startsAt: DateTime.utc(2020, 1, 1, 9), endsAt: DateTime.utc(2020, 1, 1, 10));
+      BuyV2Order order(int revision, BuyV2ScheduledFulfilment? selected) => BuyV2Order(
+        id: 'supply-1', purchaseId: 'purchase-1', destination: product.destination,
+        title: 'Host Scheduled order', itemSummary: '3 packs', total: product.price * 3,
+        partner: product.seller, partnerType: product.sellerType, promise: 'Host window',
+        destinationLabel: 'Host address', progress: .4, status: BuyV2OrderStatus.preparing,
+        productIds: [product.id], lines: [BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: selected)],
+        supplyProgress: BuyV2OrderSupplyProgress(orderId: 'supply-1', purchaseId: 'purchase-1',
+          sourceId: 'host-supply', revision: revision, state: BuyV2SupplyState.partiallyAvailable,
+          lines: [BuyV2SupplyLine(productId: product.id, variant: product.variant, pack: product.pack,
+            orderedQuantity: 3, availableQuantity: 1, unavailableQuantity: 2, supplierId: 'host-store', supplierName: 'Host Store')]));
+      final preferences = _SupplyCachePreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order(7, slot('A'))])), isTrue);
+      final bytes = preferences.values.values.single;
+      final currentSlot = omitted ? null : slot('B');
+      final commerce = _T12SupplyCommerce()..records = [order(6, currentSlot)];
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: commerce, customerStateStore: store, reviewDataEnabled: false);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isTrue,
+        reason: 'Same order ID does not permit replacing a different original selected delivery window');
+      expect(session.orders.single.lines.single.scheduledFulfilment, currentSlot);
+      expect(preferences.values.values.single, bytes);
+    });
+  }
+  final corruptSupply = <String, void Function(Map<String, dynamic>)>{
+    'version': (data) => data['version'] = 2,
+    'missing source': (data) => data.remove('sourceId'),
+    'unknown state': (data) => data['state'] = 'delivered',
+    'wrong purchase': (data) => data['purchaseId'] = 'other-purchase',
+    'fractional quantity': (data) => data['lines'][0]['orderedQuantity'] = 3.5,
+    'excess unavailable': (data) => data['lines'][0]['unavailableQuantity'] = 5,
+    'unsafe price': (data) => data['replacementOffer']['lines'][0]['unitPriceMinor'] = 9007199254740992,
+    'bad expiry': (data) => data['replacementOffer']['expiresAt'] = 'yesterday',
+    'unknown refund': (data) => data['refundState'] = 'paid',
+    'orphan refund': (data) => data['refundRoute'] = 'UPI',
+    'extra key': (data) => data['verified'] = true,
+  };
+  for (final entry in corruptSupply.entries) {
+    test('LF10 supply corrupted context preserves retained bytes ${entry.key}', () async {
+      final preferences = _SupplyCachePreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [_T12SupplyCommerce().orderWith(_t12Progress())])), isTrue);
+      final key = preferences.values.keys.single, raw = jsonDecode(preferences.values[key]!) as Map<String, dynamic>;
+      entry.value(raw['orders'][0]['supplyProgress'] as Map<String, dynamic>);
+      preferences.values[key] = jsonEncode(raw);
+      final bytes = preferences.values[key];
+      await expectLater(store.read(), throwsFormatException);
+      expect(preferences.values[key], bytes);
+    });
+  }
+  test('LF10 supply invalid write and absent legacy fields preserve original cache', () async {
+    final preferences = _SupplyCachePreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+    final commerce = _T12SupplyCommerce();
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(null)])), isTrue);
+    final bytes = preferences.values.values.single, raw = jsonDecode(bytes) as Map;
+    expect(raw.containsKey('orderSupplyCheckpoints'), isFalse);
+    expect((raw['orders'][0] as Map).containsKey('supplyProgress'), isFalse);
+    final restored = (await store.read())!;
+    expect(restored.orders.single.supplyProgress, isNull);
+    expect(restored.orderSupplyCheckpoints, isEmpty);
+    expect(await store.write(restored), isTrue);
+    expect(preferences.values.values.single, bytes);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(_t12Progress(price: -1))])), isFalse);
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(null)],
+      orderSupplyCheckpoints: {'other-order': _t12Progress()})), isFalse);
+    expect(preferences.values.values.single, bytes);
+    expect(await BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'other-buyer').read(), isNull);
+  });
+  test('LF10 supply failed persistence keeps latest observation and retries original cache safely', () async {
+    final preferences = _SupplyCachePreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+    final commerce = _T12SupplyCommerce();
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(_t12Progress(revision: 7))])), isTrue);
+    final core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: commerce,
+      customerStateStore: store, reviewDataEnabled: false);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    await session.restoreCustomerState(); await session.retainedAccountState();
+    final previous = preferences.values.values.single;
+    preferences.rejectWrite = true;
+    commerce.supply(_t12Progress(revision: 8));
+    expect(await session.refreshOrder('supply-1'), isTrue);
+    await session.retainedAccountState(); await Future<void>.delayed(Duration.zero);
+    expect(session.orderSupplyProgressFor('supply-1')?.revision, 8);
+    expect(preferences.values.values.single, previous);
+    expect(session.notice, contains('could not be retained'));
+    preferences.rejectWrite = false;
+    expect(await session.refreshOrder('supply-1'), isTrue);
+    await session.retainedAccountState();
+    expect((await store.read())!.orderSupplyCheckpoints['supply-1']?.revision, 8);
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF10 supply restored historical disclosure is not fresh consent scale=$scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(320, 700);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final preferences = _SupplyCachePreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-supply-buyer');
+      final progress = _t12Progress(expiresAt: DateTime.utc(2020), refund: BuyV2SupplyRefundState.refunded,
+        refundAmount: 3000, route: 'Original UPI', reference: 'host-refund-original');
+      final commerce = _T12SupplyCommerce()..state = BuyV2CommerceLoadState.offline;
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [commerce.orderWith(progress)])), isTrue);
+      final core = BuySession(), adapter = _T12ConsentAdapter();
+      final session = BuyV2Session(core: core, commerceAdapter: commerce,
+        customerStateStore: store, orderResolutionAdapter: adapter, reviewDataEnabled: false);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCustomerState(); session.openTracking('supply-1');
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(
+        body: BuyV2TrackingView(session: session, onOpenOrderHelp: (_) {}))));
+      await tester.pumpAndSettle();
+      final supply = find.byKey(const ValueKey('buy-order-supply-supply-1'));
+      await tester.scrollUntilVisible(supply, 200, scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Unavailable: 2'), findsOneWidget);
+      expect(find.text('₹30.00 · Original UPI'), findsOneWidget);
+      expect(find.text('Reference: host-refund-original'), findsOneWidget);
+      expect(await session.decideOrderReplacement(orderId: 'supply-1',
+        reviewedKey: buyV2ReplacementReviewKey(progress), reviewedScopeKey: session.replacementReviewScopeKey,
+        accept: true), isFalse);
+      expect(adapter.requests, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
   Future<
     ({
       BuyV2Session session,

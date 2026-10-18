@@ -326,6 +326,7 @@ class BuyV2CustomerStateSnapshot {
     this.recentlyViewedProductIds = const [],
     this.recentSearches = const {},
     this.orders = const [],
+    this.orderSupplyCheckpoints = const {},
   });
 
   final Map<String, int> cartQuantities;
@@ -398,6 +399,8 @@ class BuyV2CustomerStateSnapshot {
   final List<String> recentlyViewedProductIds;
   final Map<BuyV2Destination, List<String>> recentSearches;
   final List<BuyV2Order> orders;
+  /// Historical revision guards only; never current replacement/consent facts.
+  final Map<String, BuyV2OrderSupplyProgress> orderSupplyCheckpoints;
 }
 
 abstract interface class BuyV2CustomerStateStore {
@@ -479,9 +482,12 @@ final class BuyV2SharedPreferencesCustomerStateStore
       }
       final invalidDraft = decoded.containsKey('procurementDraft') &&
           _decodeProcurementDraft(decoded['procurementDraft']) == null;
-      if (invalidDraft && decoded.containsKey('productReportStates')) {
-        // Neither the draft nor report history may become an empty account.
-        throw const FormatException('Saved purchase and report recovery need checking.');
+      final hasSupplyRecovery = decoded.containsKey('orderSupplyCheckpoints') ||
+          decoded['orders'] is List && (decoded['orders'] as List).any(
+            (order) => order is Map && order.containsKey('supplyProgress'));
+      if (invalidDraft && (decoded.containsKey('productReportStates') || hasSupplyRecovery)) {
+        // An unreadable draft cannot discard supplied order/report recovery.
+        throw const FormatException('Saved purchase and order recovery need checking.');
       }
       if (invalidDraft &&
           decoded['checkoutIdempotencyKey'] == null &&
@@ -491,7 +497,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
           !decoded.containsKey('orderResolutionHolds')) {
         return null;
       }
-      return _decodeSnapshot(decoded);
+      final snapshot = _decodeSnapshot(decoded);
+      if (!_validSupplyCache(snapshot)) throw const FormatException('Saved order supply details need checking.');
+      return snapshot;
     } on Object {
       // An unreadable retained payment hold is not proof of no earlier attempt.
       rethrow;
@@ -502,6 +510,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
     if (!snapshot.hasValidProductReportStates) return false;
+    if (!_validSupplyCache(snapshot)) return false;
     try {
       for (final order in snapshot.orders.where(_hasInvoiceContext)) {
         _decodeInvoiceContext(_encodeInvoiceContext(order));
@@ -645,6 +654,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
         entry.key.name: entry.value,
     },
     'orders': [for (final order in snapshot.orders) _encodeOrder(order)],
+    if (snapshot.orderSupplyCheckpoints.isNotEmpty)
+      'orderSupplyCheckpoints': {'version': 1, 'records': {
+        for (final entry in snapshot.orderSupplyCheckpoints.entries)
+          entry.key: _encodeSupplyProgress(entry.value),
+      }},
   };
 
   Map<String, BuyV2ProductReviewDraft> _decodeReviewDrafts(Object? value) {
@@ -778,6 +792,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
     orders: _objectList(
       source['orders'],
     ).map(_decodeOrder).whereType<BuyV2Order>().toList(growable: false),
+    orderSupplyCheckpoints: source.containsKey('orderSupplyCheckpoints')
+        ? _decodeSupplyCheckpoints(source['orderSupplyCheckpoints']) : const {},
   );
 
   static Map<String, BuyV2ScheduledFulfilment> _decodeCartScheduledFulfilments(Map<String, Object?> source) {
@@ -1650,6 +1666,119 @@ final class BuyV2SharedPreferencesCustomerStateStore
       supplyStatement: raw['supplyStatement'] as String?);
   }
 
+  Map<String, Object?> _encodeSupplyProgress(BuyV2OrderSupplyProgress progress) => {
+    'version': 1, 'orderId': progress.orderId, 'purchaseId': progress.purchaseId,
+    'sourceId': progress.sourceId, 'revision': progress.revision, 'state': progress.state.name,
+    'currency': progress.currency, 'refundState': progress.refundState?.name,
+    'refundAmountMinor': progress.refundAmountMinor, 'refundRoute': progress.refundRoute,
+    'refundReference': progress.refundReference,
+    'lines': [for (final line in progress.lines) {
+      'productId': line.productId, 'variant': line.variant, 'pack': line.pack,
+      'orderedQuantity': line.orderedQuantity, 'availableQuantity': line.availableQuantity,
+      'unavailableQuantity': line.unavailableQuantity, 'supplierId': line.supplierId,
+      'supplierName': line.supplierName,
+    }],
+    'replacementOffer': progress.replacementOffer == null ? null : {
+      'id': progress.replacementOffer!.id, 'revision': progress.replacementOffer!.revision,
+      'customerTotalMinor': progress.replacementOffer!.customerTotalMinor,
+      'deliveryCommitment': progress.replacementOffer!.deliveryCommitment,
+      'expiresAt': progress.replacementOffer!.expiresAt.toUtc().toIso8601String(),
+      'lines': [for (final line in progress.replacementOffer!.lines) {
+        'originalProductId': line.originalProductId, 'originalVariant': line.originalVariant,
+        'originalPack': line.originalPack, 'originalQuantity': line.originalQuantity,
+        'productTitle': line.productTitle, 'pack': line.pack, 'quantity': line.quantity,
+        'unitPriceMinor': line.unitPriceMinor,
+      }],
+    },
+  };
+
+  BuyV2OrderSupplyProgress _decodeSupplyProgress(Object? raw) {
+    Never invalid() => throw const FormatException('Saved order supply details need checking.');
+    Map exact(Object? value, List<String> keys) {
+      if (value is! Map || value.length != keys.length || !keys.every(value.containsKey)) invalid();
+      return value;
+    }
+    String text(Object? value) { if (value is! String) invalid(); return value; }
+    String? optionalText(Object? value) => value == null ? null : text(value);
+    int integer(Object? value) {
+      if (value is! int || value < 0 || value > 9007199254740991) invalid();
+      return value;
+    }
+    List sequence(Object? value) { if (value is! List) invalid(); return value; }
+    final data = exact(raw, ['version', 'orderId', 'purchaseId', 'sourceId', 'revision', 'state',
+      'currency', 'refundState', 'refundAmountMinor', 'refundRoute', 'refundReference', 'lines', 'replacementOffer']);
+    if (data['version'] is! int || data['version'] != 1) invalid();
+    final state = _enumByName(BuyV2SupplyState.values, text(data['state']));
+    final refund = data['refundState'] == null ? null :
+      _enumByName(BuyV2SupplyRefundState.values, text(data['refundState']));
+    if (state == null || data['refundState'] != null && refund == null) invalid();
+    final lines = <BuyV2SupplyLine>[];
+    for (final rawLine in sequence(data['lines'])) {
+      final line = exact(rawLine, ['productId', 'variant', 'pack', 'orderedQuantity',
+        'availableQuantity', 'unavailableQuantity', 'supplierId', 'supplierName']);
+      lines.add(BuyV2SupplyLine(productId: text(line['productId']), variant: text(line['variant']),
+        pack: text(line['pack']), orderedQuantity: integer(line['orderedQuantity']),
+        availableQuantity: integer(line['availableQuantity']), unavailableQuantity: integer(line['unavailableQuantity']),
+        supplierId: optionalText(line['supplierId']), supplierName: optionalText(line['supplierName'])));
+    }
+    BuyV2ReplacementOffer? offer;
+    if (data['replacementOffer'] != null) {
+      final item = exact(data['replacementOffer'], ['id', 'revision', 'customerTotalMinor',
+        'deliveryCommitment', 'expiresAt', 'lines']);
+      final expiry = DateTime.tryParse(text(item['expiresAt']));
+      if (expiry == null || expiry.toUtc().toIso8601String() != item['expiresAt']) invalid();
+      final replacements = <BuyV2ReplacementLine>[];
+      for (final rawLine in sequence(item['lines'])) {
+        final line = exact(rawLine, ['originalProductId', 'originalVariant', 'originalPack',
+          'originalQuantity', 'productTitle', 'pack', 'quantity', 'unitPriceMinor']);
+        replacements.add(BuyV2ReplacementLine(originalProductId: text(line['originalProductId']),
+          originalVariant: text(line['originalVariant']), originalPack: text(line['originalPack']),
+          originalQuantity: integer(line['originalQuantity']), productTitle: text(line['productTitle']),
+          pack: text(line['pack']), quantity: integer(line['quantity']), unitPriceMinor: integer(line['unitPriceMinor'])));
+      }
+      offer = BuyV2ReplacementOffer(id: text(item['id']), revision: integer(item['revision']),
+        lines: replacements, customerTotalMinor: integer(item['customerTotalMinor']),
+        deliveryCommitment: text(item['deliveryCommitment']), expiresAt: expiry);
+    }
+    return BuyV2OrderSupplyProgress(orderId: text(data['orderId']), purchaseId: text(data['purchaseId']),
+      sourceId: text(data['sourceId']), revision: integer(data['revision']), state: state, lines: lines,
+      currency: text(data['currency']), replacementOffer: offer, refundState: refund,
+      refundAmountMinor: data['refundAmountMinor'] == null ? null : integer(data['refundAmountMinor']),
+      refundRoute: optionalText(data['refundRoute']), refundReference: optionalText(data['refundReference']));
+  }
+
+  Map<String, BuyV2OrderSupplyProgress> _decodeSupplyCheckpoints(Object? raw) {
+    if (raw is! Map || raw.length != 2 || raw['version'] is! int || raw['version'] != 1 || raw['records'] is! Map) {
+      throw const FormatException('Saved supply revision checks need checking.');
+    }
+    return Map.unmodifiable((raw['records'] as Map).map((key, value) {
+      if (key is! String) throw const FormatException('Saved supply order needs checking.');
+      return MapEntry(key, _decodeSupplyProgress(value));
+    }));
+  }
+
+  bool _validSupplyCache(BuyV2CustomerStateSnapshot snapshot) {
+    try {
+      for (final order in snapshot.orders) {
+        if (order.supplyProgress case final progress?) {
+          if (!_decodeSupplyProgress(_encodeSupplyProgress(progress)).matchesOrder(order)) return false;
+        }
+      }
+      for (final entry in snapshot.orderSupplyCheckpoints.entries) {
+        final orders = snapshot.orders.where((order) => order.id == entry.key).toList();
+        if (orders.length != 1) return false;
+        final checkpoint = _decodeSupplyProgress(_encodeSupplyProgress(entry.value));
+        if (!checkpoint.matchesOrder(orders.single)) return false;
+        final visible = orders.single.supplyProgress;
+        if (visible != null && (visible.sourceId != checkpoint.sourceId || visible.revision != checkpoint.revision ||
+            buyV2SupplyProgressKey(visible) != buyV2SupplyProgressKey(checkpoint))) {
+          return false;
+        }
+      }
+      return true;
+    } on FormatException { return false; }
+  }
+
   Map<String, Object?> _encodeOrder(BuyV2Order order) => {
     'id': order.id,
     'destination': order.destination.name,
@@ -1703,11 +1832,13 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'invoiceAvailable': order.invoiceAvailable,
     if (_hasInvoiceContext(order)) 'invoiceContext': _encodeInvoiceContext(order),
     'receiptReference': order.receiptReference,
+    if (order.supplyProgress case final progress?) 'supplyProgress': _encodeSupplyProgress(progress),
   };
 
   BuyV2Order? _decodeOrder(Map<String, Object?> source) {
     final invoice = source.containsKey('invoiceContext') ? _decodeInvoiceContext(source['invoiceContext'])
         : (state: null, seller: null, platform: null);
+    final supply = source.containsKey('supplyProgress') ? _decodeSupplyProgress(source['supplyProgress']) : null;
     const components = ['tipMinor', 'discountMinor', 'balanceDueMinor', 'taxMinor',
       'freightMinor', 'deliveryFeeMinor', 'paymentChargeMinor'];
     const legacyMoney = ['total', 'tip', 'discount', 'amountPaidNow', 'balanceDue',
@@ -1750,7 +1881,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         requiredStrings.any((value) => value == null) ||
         (!exact && total == null) ||
         progress is! num) {
-      if (exact) throw const FormatException('Saved exact order identity needs checking');
+      if (exact || supply != null) throw const FormatException('Saved order identity needs checking');
       return null;
     }
     if (exact) {
@@ -1801,6 +1932,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         deliveryPartnerType: _string(source['deliveryPartnerType']), trackingReference: _string(source['trackingReference']),
         deliveryServiceLevel: _string(source['deliveryServiceLevel']), proofOfDeliveryStatus: _string(source['proofOfDeliveryStatus']),
         taxInvoiceState: invoice.state, taxInvoiceDetails: invoice.seller, platformTaxInvoiceDetails: invoice.platform,
+        supplyProgress: supply,
         invoiceAvailable: source['invoiceAvailable'] != false, receiptReference: _string(source['receiptReference']));
       if (!_validExactOrderStorage(order)) throw const FormatException('Saved exact order facts need checking');
       return order;
@@ -1855,6 +1987,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
       platformTaxInvoiceDetails: invoice.platform,
       invoiceAvailable: source['invoiceAvailable'] != false,
       receiptReference: _string(source['receiptReference']),
+      supplyProgress: supply,
     );
   }
 

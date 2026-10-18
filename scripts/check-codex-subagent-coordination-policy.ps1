@@ -8075,6 +8075,11 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     $recoveryOwners=@('apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
       'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart')
+    if ($null -ne $recovery -and $recovery -is [pscustomobject] -and
+        $null -ne $recovery.PSObject.Properties['owners'] -and
+        @($recovery.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart') {
+      $recoveryOwners += 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'
+    }
     if ($null -eq $recovery -or $recovery -isnot [pscustomobject]) { return $false }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $recovery.PSObject.Properties[$key]) { return $false }
@@ -8389,6 +8394,9 @@ function Invoke-Lf01Admission {
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch03PolicyRecovery']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'
+      if (@($record.frontendContinuation.batch03PolicyRecovery.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart') {
+        $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'
+      }
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch04DocumentExport']) {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'

@@ -237,6 +237,11 @@ if ($RequireLfPublicationProbes) {
     $legacy.PSObject.Properties.Remove('batch03PolicyRecovery')
     Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical continuation rejected.'
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'))) 'Unclaimed recovery fixture admitted.'
+    $withoutProgress=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $withoutProgress.batch03PolicyRecovery.owners=@($withoutProgress.batch03PolicyRecovery.owners | Where-Object { $_ -cne 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart' })
+    Assert-Fixture (Test-Lf27Batch01Continuation $withoutProgress @()) 'Historical recovery without progress test rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $withoutProgress @('apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'))) 'Unclaimed progress test admitted.'
+    $cases+=2
     $cases+=3
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
