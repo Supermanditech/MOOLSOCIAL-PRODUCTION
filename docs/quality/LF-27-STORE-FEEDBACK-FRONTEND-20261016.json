@@ -496,6 +496,18 @@
         "founderAccepted": false
       }
     },
+    "batch04ScheduledQuoteContext": {
+      "ticket": "LF-11-C01", "consumer": "LF-08-C02", "batch": 4,
+      "sourceCheckpoint": "3eab7e08b4551f1d5838ad8a22f461915a76816f",
+      "status": "supported_frontend_quote_freshness_correction_verified_not_full_selected_slot_continuity",
+      "scope": "Existing quote fingerprint now binds each supplied Scheduled eligibility's exact product/Store/class, source revision, location key, slot ID and UTC window plus effective Scheduled availability. Stable labels/price/group key cannot disguise changed slot facts. Existing ready-quote review and in-flight currentInputs fence are reused; no new refresh engine, service selection, reservation, DTO writer, provider or screen.",
+      "compatibility": "No raw object identity/observedAt/expiresAt in fingerprint. Renewing otherwise identical still-valid context retains quote; Scheduled-absent Quick/Courier behavior remains. Effective deliveryOptionsFor includes stale/closed/scope/expiry protections. A product offering both Quick and Scheduled conservatively re-reviews if its Scheduled context changes; without a selected-service contract this is not evidence the buyer chose Scheduled. Existing submitted attempts/payment holds and persisted schemas unchanged.",
+      "qualification": "True red14 cases reproduced ready/in-flight slot/window/revision/location/withdrawal/expiry changes leaving old quote current. Final16 focused passed, including unchanged-semantic renewal and Scheduled-absent controls. Full affected session/policy-screen691 passed0fail0skip;16 overlap691, not extra unique counts. Two-owner analysis clean. Current-source OPPO hotreload25libraries5805ms; actual Store/Stock and Cart continuity checked, no new data or native fixture injection. New populated slot behavior remains host-only, not live-provider/native placement acceptance.",
+      "logs": ["followup-b04-scheduled-quote-red-20261018-v1.jsonl", "followup-b04-scheduled-quote-focused-20261018-v2.jsonl", "followup-b04-scheduled-quote-affected-20261018-v1.jsonl", "followup-b04-scheduled-quote-analysis-20261018-v1.log"],
+      "nativeEvidence": ["followup-b04-scheduled-reloaded-20261018-v1.png", "followup-b04-scheduled-stock-20261018-v1.png", "followup-b04-scheduled-cart-20261018-v1.png"],
+      "diagnostics": "One fresh UI dump during reload returned null before writing a capture or sending input; waited for verified reload then fresh capture succeeded. No app implementation failures or new guard/policy/registry changes. Readonly architect found no must-fix, reported tests not independently run.",
+      "remaining": "Existing initial Scheduled selection/source contract, explicit placement/accepted-original slot transmission and producer wiring remain unfinished under LF11/LF10. Eligibility is not a reservation or customer selection. Full fulfilment, provider/APK and founder acceptance not claimed; other original tickets remain open."
+    },
     "batch03PolicyRecovery": {
       "ticket": "LF-08-C02", "batch": 3,
       "sourceCheckpoint": "50498accdb1362b96192eb78c3aff1360e9ad36f",

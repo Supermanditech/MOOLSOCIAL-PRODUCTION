@@ -11004,7 +11004,8 @@ class BuyV2Session extends ChangeNotifier {
           group.deliveryProviderName,
           group.deliveryServiceLevel,
           for (final line in group.lines)
-            [line.product.id, line.quantity, line.product.priceMinor],
+            [line.product.id, line.quantity, line.product.priceMinor,
+              _scheduledQuoteContext(line.product)],
         ],
       if (address != null)
         [
@@ -11030,6 +11031,18 @@ class BuyV2Session extends ChangeNotifier {
           (benefit.productIds.toList()..sort()),
         ],
     ]);
+  }
+
+  // A supplied slot can change without changing its display promise or price.
+  // This binds quote review only; it is not a customer selection/reservation.
+  List<Object?>? _scheduledQuoteContext(BuyV2Product product) {
+    final eligibility = productFactsFor(product).eligibility;
+    if (eligibility == null || !eligibility.options.contains(BuyV2DeliveryOption.scheduled)) return null;
+    return [eligibility.productId, eligibility.storeId, eligibility.offerClass.name,
+      eligibility.sourceRevision, eligibility.customerLocationKey, eligibility.scheduledSlotId,
+      eligibility.scheduledStart?.toUtc().toIso8601String(),
+      eligibility.scheduledEnd?.toUtc().toIso8601String(),
+      deliveryOptionsFor(product).contains(BuyV2DeliveryOption.scheduled)];
   }
 
   void _invalidateCheckoutQuote() {

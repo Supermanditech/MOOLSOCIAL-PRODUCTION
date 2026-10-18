@@ -581,6 +581,27 @@ final class _AssignedDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   }
 }
 
+// Fixed, isolated provider-shaped slot facts. Never installed on a device.
+final class _Lf11ScheduledFacts implements BuyV2ProductFactsAdapter {
+  _Lf11ScheduledFacts(this.instant);
+  final DateTime instant;
+  String slot = 'host-slot-A', revision = 'host-source-A', location = '||0';
+  Duration start = const Duration(hours: 3), end = const Duration(hours: 4);
+  Duration renewal = Duration.zero;
+  bool scheduled = true;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+    const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+      sourceId: 'host-slot-facts', observedAt: instant.add(renewal), deliveryPromise: 'Host same delivery label',
+      promisedByLabel: 'Host same window label', eligibility: BuyV2OfferEligibility(
+        productId: product.id, storeId: product.storeId!, sourceRevision: revision,
+        customerLocationKey: location, observedAt: instant.add(renewal).subtract(const Duration(seconds: 1)),
+        expiresAt: instant.add(const Duration(hours: 2)).add(renewal), offerClass: product.offerClass!,
+        channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
+        options: {BuyV2DeliveryOption.courier, if (scheduled) BuyV2DeliveryOption.scheduled},
+        scheduledSlotId: slot, scheduledStart: instant.add(start), scheduledEnd: instant.add(end)));
+}
+
 final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
   int? price;
   int? priceMinor;
@@ -4231,6 +4252,65 @@ void main() {
     return (session, commerce);
   }
 
+  for (final pending in [false, true]) {
+    for (final change in ['slot', 'start', 'end', 'revision', 'location', 'withdrawn', 'expired']) {
+      test('LF11 supplied Scheduled context retires quote pending=$pending change=$change', () async {
+        var now = DateTime.now().toUtc();
+        final facts = _Lf11ScheduledFacts(now), quote = TestPaymentQuote();
+        final commerce = TestPaymentCommerce()..snapshot = testPaymentSnapshot(null, addresses: [_instructionAddress]);
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: commerce, productFactsAdapter: facts,
+          reviewDataEnabled: false, checkoutQuoteAdapter: quote, catalogueNow: () => now);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(session.addProduct('s-tomato'), isTrue, reason: session.notice);
+        session.openCart(); expect(session.openCheckout(), isTrue);
+        expect(await session.refreshCheckoutQuote(), isTrue);
+        expect(session.checkoutQuoteReviewRequired, isFalse);
+        final before = session.checkoutFulfilmentGroups.single;
+        final completer = Completer<void>();
+        if (pending) quote.gate = completer;
+        final waiting = pending ? session.refreshCheckoutQuote() : null;
+        switch (change) {
+          case 'slot': facts.slot = 'host-slot-B';
+          case 'start': facts.start = const Duration(hours: 3, minutes: 15);
+          case 'end': facts.end = const Duration(hours: 4, minutes: 15);
+          case 'revision': facts.revision = 'host-source-B';
+          case 'location': facts.location = 'host-other-location';
+          case 'withdrawn': facts.scheduled = false;
+          case 'expired': now = now.add(const Duration(hours: 2));
+        }
+        expect(session.refreshProductFacts('s-tomato'), isTrue);
+        final after = session.checkoutFulfilmentGroups.single;
+        expect(after.key, before.key); expect(after.totalMinor, before.totalMinor);
+        expect(after.promise, before.promise); expect(after.promisedByLabel, before.promisedByLabel);
+        if (pending) { completer.complete(); expect(await waiting, isFalse); }
+        expect(session.checkoutQuoteReviewRequired, isTrue);
+        expect(commerce.requests, isEmpty); expect(session.quantityFor('s-tomato'), 1);
+      });
+    }
+  }
+  for (final scheduled in [true, false]) {
+    test('LF11 supplied Scheduled quote keeps unchanged semantic context scheduled=$scheduled', () async {
+      var now = DateTime.now().toUtc();
+      final facts = _Lf11ScheduledFacts(now)..scheduled = scheduled;
+      final quote = TestPaymentQuote();
+      final commerce = TestPaymentCommerce()..snapshot = testPaymentSnapshot(null, addresses: [_instructionAddress]);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: commerce, productFactsAdapter: facts,
+        reviewDataEnabled: false, checkoutQuoteAdapter: quote, catalogueNow: () => now);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); expect(session.addProduct('s-tomato'), isTrue);
+      session.openCart(); expect(session.openCheckout(), isTrue);
+      expect(await session.refreshCheckoutQuote(), isTrue);
+      now = now.add(const Duration(minutes: 1)); facts.renewal = const Duration(minutes: 1);
+      if (!scheduled) { facts.slot = 'irrelevant'; facts.start = const Duration(hours: 4); facts.revision = 'host-new-unscheduled'; }
+      expect(session.refreshProductFacts('s-tomato'), isTrue);
+      expect(session.checkoutQuoteReviewRequired, isFalse,
+        reason: 'Renewed observations and Scheduled-absent metadata do not change the quoted agreement');
+      expect(commerce.requests, isEmpty); expect(session.quantityFor('s-tomato'), 1);
+    });
+  }
   test('T06 group publication needs explicit connector opt-in', () async {
     final quote = TestPaymentQuote()
       ..groupsFor = (lines, method) => [
