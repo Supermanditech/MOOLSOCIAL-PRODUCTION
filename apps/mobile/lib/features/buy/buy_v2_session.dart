@@ -6527,7 +6527,7 @@ class BuyV2Session extends ChangeNotifier {
   String? _customerStateRecoveryOwnerScope;
   bool _customerStateRestoreInFlight = false;
   bool _customerStateSnapshotLoaded = false;
-  final Map<String, int> _unresolvedCustomerCart = {};
+  final Map<String, ({int quantity, BuyV2ScheduledFulfilment? scheduledFulfilment})> _unresolvedCustomerCart = {};
   final Map<String, String> _retainedProductIdentityKeys = {};
 
   bool _matchesRetainedProductIdentity(BuyV2Product product) =>
@@ -8939,7 +8939,8 @@ class BuyV2Session extends ChangeNotifier {
           ..addEntries(
             snapshot.cartQuantities.entries.where(
               (entry) => findProduct(entry.key) == null && entry.value > 0,
-            ),
+            ).map((entry) => MapEntry(entry.key,
+              (quantity: entry.value, scheduledFulfilment: snapshot.cartScheduledFulfilments[entry.key]))),
           );
         _applyCustomerStateSnapshot(snapshot, retainUnknownProducts: true);
         _customerStateSnapshotLoaded = true;
@@ -9027,6 +9028,16 @@ class BuyV2Session extends ChangeNotifier {
     bool retainUnknownProducts = false,
   }) {
     final owner = customerStateStore?.ownerScope;
+    // Validate every resolved binding before replacing any live Cart state.
+    for (final entry in snapshot.cartScheduledFulfilments.entries) {
+      final product = findProduct(entry.key), quantity = snapshot.cartQuantities[entry.key];
+      if (!entry.value.valid || entry.key != entry.value.listing.listingId ||
+          quantity == null || quantity < 1 || quantity > 9007199254740991 ||
+          (product != null && (!entry.value.matches(product) || quantity < product.minimumOrder)) ||
+          (!retainUnknownProducts && product == null)) {
+        throw const FormatException('Saved Cart delivery choices need checking.');
+      }
+    }
     if (owner == null || snapshot.orderResolutionHolds.any(
       (h) => !h.valid || h.ownerScope != owner,
     ) || snapshot.orderResolutionHolds.map((h) => h.storageKey).toSet().length !=
@@ -9113,6 +9124,7 @@ class BuyV2Session extends ChangeNotifier {
       _cart[entry.key] = BuyV2CartLine(
         product: _productAtPackQuantity(product, entry.value),
         quantity: entry.value,
+        scheduledFulfilment: snapshot.cartScheduledFulfilments[entry.key],
       );
     }
     for (final order in snapshot.orders.reversed) {
@@ -9477,8 +9489,16 @@ class BuyV2Session extends ChangeNotifier {
             )
           : null,
       cartQuantities: Map.unmodifiable({
-        if (customerStateRecoveryPending) ..._unresolvedCustomerCart,
+        if (customerStateRecoveryPending)
+          for (final entry in _unresolvedCustomerCart.entries) entry.key: entry.value.quantity,
         for (final line in _cart.values) line.product.id: line.quantity,
+      }),
+      cartScheduledFulfilments: Map.unmodifiable({
+        if (customerStateRecoveryPending)
+          for (final entry in _unresolvedCustomerCart.entries)
+            entry.key: ?entry.value.scheduledFulfilment,
+        for (final line in _cart.values)
+          line.product.id: ?line.scheduledFulfilment,
       }),
       excludedCartProductIds: Set.unmodifiable(
         _excludedCartProductIds.where(
@@ -15644,6 +15664,7 @@ class BuyV2Session extends ChangeNotifier {
     _cart[id] = BuyV2CartLine(
       product: pricedItem,
       quantity: (current?.quantity ?? 0) + addedQuantity,
+      scheduledFulfilment: current?.scheduledFulfilment,
     );
     // A fresh addition from discovery should reveal the basket, not a saved
     // recommendation offset. In-cart edits retain their current viewport.

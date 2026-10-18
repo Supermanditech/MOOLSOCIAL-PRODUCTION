@@ -756,6 +756,7 @@ class _PagingRecoverySource extends BuyV2DevelopmentCatalogueSource {
   bool failResolution = false;
   bool wrongResolution = false;
   Completer<void>? resolutionGate;
+  Map<String, BuyV2Product>? resolutionProducts;
   final resolutionRequests = <Set<String>>[];
   bool holdProducts = false;
   bool wrongBranch = false;
@@ -814,6 +815,9 @@ class _PagingRecoverySource extends BuyV2DevelopmentCatalogueSource {
     resolutionRequests.add(Set.of(productIds));
     if (resolutionGate != null) await resolutionGate!.future;
     if (failResolution) throw StateError('Products could not restore');
+    if (resolutionProducts case final products?) {
+      return [for (final id in productIds) ?products[id]];
+    }
     return super.resolveProducts(
       wrongResolution ? {productIdAt(999, 7)} : productIds,
     );
@@ -5977,6 +5981,160 @@ void main() {
       listing: product.publicListingIdentity!, sourceRevision: 'host-eligibility-A',
       locationKey: 'host-region|host-place|1', slotId: 'host-slot-A',
       startsAt: DateTime.utc(2020, 1, 1, 9), endsAt: DateTime.utc(2020, 1, 1, 10));
+    for (final trade in [false, true]) {
+      test('LF11 selected Cart choice survives restart and removal trade=$trade', () async {
+        final preferences = _R669StringPreferences(), product = publicListing(trade);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-cart-owner');
+        final selected = desiredSchedule(product), quantity = trade ? 12 : 3;
+        expect(await store.write(BuyV2CustomerStateSnapshot(cartQuantities: {product.id: quantity},
+          cartScheduledFulfilments: {product.id: selected})), isTrue);
+        expect((await store.read())!.cartScheduledFulfilments, {product.id: selected});
+        final core = BuySession();
+        final commerce = _R669ProcurementCommerce(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready, products: [product]));
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, commerceAdapter: commerce, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCommerce(); await session.restoreCustomerState();
+        expect(session.customerStateRecoveryPending, isFalse, reason: session.notice);
+        expect(session.cartLines.single.scheduledFulfilment, selected);
+        expect(session.quantityFor(product.id), quantity);
+        expect(session.setCartQuantity(product.id, trade ? '10' : '2'), isTrue);
+        expect(session.cartLines.single.scheduledFulfilment, selected);
+        session.setAvailableProductsOnly(true);
+        await Future<void>.delayed(Duration.zero);
+        expect((await store.read())!.cartScheduledFulfilments, {product.id: selected});
+        session.remove(product.id);
+        await Future<void>.delayed(Duration.zero);
+        final cleared = (await store.read())!;
+        expect(cleared.cartQuantities, isEmpty); expect(cleared.cartScheduledFulfilments, isEmpty);
+        expect(jsonDecode(preferences.values.values.single).containsKey('cartScheduledFulfilments'), isFalse);
+        expect(commerce.placements, isEmpty);
+      });
+    }
+    test('LF11 selected Cart missing catalogue retains quantity and selection together', () async {
+      final product = publicListing(false), selected = desiredSchedule(publicListing(false));
+      final store = _MemoryCustomerStateStore('host-missing-catalogue')..snapshot = BuyV2CustomerStateSnapshot(
+        cartQuantities: {product.id: 3}, cartScheduledFulfilments: {product.id: selected});
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isTrue);
+      session.setAvailableProductsOnly(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.snapshot!.cartQuantities, {product.id: 3});
+      expect(store.snapshot!.cartScheduledFulfilments, {product.id: selected});
+      expect(session.cartLines, isEmpty);
+    });
+    test('LF11 selected Cart exact resolved identity mismatch holds untouched snapshot', () async {
+      final product = publicListing(false), selected = desiredSchedule(publicListing(false));
+      final foreign = BuyV2PublicListingIdentity(listingId: product.id, realm: 'evaluation', storeId: 'host-store',
+        skuId: 'host-other-sku', canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail);
+      final original = BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 3}, cartScheduledFulfilments: {product.id: selected});
+      final store = _MemoryCustomerStateStore('host-mismatched-catalogue')..snapshot = original;
+      final commerce = _R669ProcurementCommerce(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        products: [product.copyWith(publicListingIdentity: foreign)]));
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store, commerceAdapter: commerce);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isTrue);
+      expect(session.cartLines, isEmpty);
+      session.setAvailableProductsOnly(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(store.snapshot, same(original)); expect(store.writeCalls, 0);
+    });
+    test('LF11 selected Cart raised minimum preserves saved choice behind recovery', () async {
+      final preferences = _R669StringPreferences(), product = publicListing(false);
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-raised-minimum');
+      final selected = desiredSchedule(product);
+      await store.write(BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 3}, cartScheduledFulfilments: {product.id: selected}));
+      final bytes = preferences.values.values.single, writes = preferences.writesStarted;
+      final commerce = _R669ProcurementCommerce(BuyV2CommerceSnapshot(state: BuyV2CommerceLoadState.ready,
+        products: [product.copyWith(minimumOrder: 5)]));
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, commerceAdapter: commerce, customerStateStore: store);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isTrue);
+      expect(session.cartLines, isEmpty, reason: 'Do not silently increase or drop a retained selected quantity.');
+      session.setAvailableProductsOnly(true);
+      await Future<void>.delayed(Duration.zero);
+      expect(preferences.values.values.single, bytes); expect(preferences.writesStarted, writes);
+      final saved = (await store.read())!;
+      expect(saved.cartQuantities, {product.id: 3}); expect(saved.cartScheduledFulfilments, {product.id: selected});
+    });
+    for (final failedWrite in [false, true]) {
+      test('LF11 selected Cart delayed resolution preserves choice with newer local edits failedWrite=$failedWrite', () async {
+        final product = publicListing(false), selected = desiredSchedule(publicListing(false));
+        final source = _PagingRecoverySource()..resolutionGate = Completer<void>()
+          ..resolutionProducts = {product.id: product};
+        final store = _MemoryCustomerStateStore('host-delayed-catalogue')..snapshot = BuyV2CustomerStateSnapshot(
+          cartQuantities: {product.id: 3}, cartScheduledFulfilments: {product.id: selected});
+        final core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: true, cataloguePageSource: source, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        final restoring = session.restoreCustomerState();
+        await Future<void>.delayed(Duration.zero);
+        expect(source.resolutionRequests, hasLength(1));
+        store.rejectWrites = failedWrite;
+        final localId = BuyV2Catalogue.products.first.id;
+        expect(session.addProduct(localId), isTrue, reason: session.notice);
+        await Future<void>.delayed(Duration.zero);
+        source.resolutionGate!.complete(); await restoring;
+        expect(session.customerStateRecoveryPending, isTrue);
+        expect(session.quantityFor(localId), 1); expect(session.quantityFor(product.id), 0);
+        store.rejectWrites = false;
+        await session.retryCommerce();
+        expect(session.customerStateRecoveryPending, isFalse, reason: session.notice);
+        expect(session.cartLines.firstWhere((line) => line.product.id == product.id).scheduledFulfilment, selected);
+        expect(session.quantityFor(product.id), 3); expect(session.quantityFor(localId), 1);
+        session.setAvailableProductsOnly(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(store.snapshot!.cartScheduledFulfilments, {product.id: selected});
+        expect(store.snapshot!.cartQuantities, {product.id: 3, localId: 1});
+        session.remove(product.id);
+        await Future<void>.delayed(Duration.zero);
+        expect(store.snapshot!.cartScheduledFulfilments, isEmpty);
+        expect(store.snapshot!.cartQuantities, {localId: 1});
+      });
+    }
+    for (final corruption in ['null map', 'wrong map', 'null value', 'orphan', 'zero quantity', 'wrong quantity', 'foreign key']) {
+      test('LF11 selected Cart corrupt snapshot blocks automatic overwrite $corruption', () async {
+        final preferences = _R669StringPreferences(), product = publicListing(false);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-cart-owner');
+        await store.write(BuyV2CustomerStateSnapshot(cartQuantities: {product.id: 3}));
+        final key = preferences.values.keys.single, raw = jsonDecode(preferences.values.values.single);
+        raw['cartScheduledFulfilments'] = <String, Object?>{product.id: desiredSchedule(product).toJson()};
+        switch (corruption) {
+          case 'null map': raw['cartScheduledFulfilments'] = null;
+          case 'wrong map': raw['cartScheduledFulfilments'] = [];
+          case 'null value': raw['cartScheduledFulfilments'][product.id] = null;
+          case 'orphan': raw['cartQuantities'] = {};
+          case 'zero quantity': raw['cartQuantities'][product.id] = 0;
+          case 'wrong quantity': raw['cartQuantities'][product.id] = 2.5;
+          case 'foreign key': raw['cartScheduledFulfilments'] = {'foreign-key': desiredSchedule(product).toJson()};
+        }
+        final bytes = jsonEncode(raw); preferences.values[key] = bytes;
+        await expectLater(store.read(), throwsFormatException);
+        final writes = preferences.writesStarted, core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCustomerState(); session.setAvailableProductsOnly(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(session.customerStateRecoveryPending, isTrue);
+        expect(preferences.writesStarted, writes); expect(preferences.values[key], bytes);
+      });
+    }
+    test('LF11 selected Cart refuses orphaned writes before storage and preserves legacy absence', () async {
+      final preferences = _R669StringPreferences(), product = publicListing(false);
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-cart-owner');
+      expect(await store.write(const BuyV2CustomerStateSnapshot()), isTrue);
+      final original = preferences.values.values.single;
+      expect(jsonDecode(original).containsKey('cartScheduledFulfilments'), isFalse);
+      final writes = preferences.writesStarted;
+      expect(await store.write(BuyV2CustomerStateSnapshot(cartScheduledFulfilments: {product.id: desiredSchedule(product)})), isFalse);
+      expect(preferences.values.values.single, original); expect(preferences.writesStarted, writes);
+    });
     for (final trade in [false, true]) {
       test('LF11 selected fulfilment original order retains historical choice trade=$trade', () async {
         final preferences = _R669StringPreferences(), product = publicListing(trade);

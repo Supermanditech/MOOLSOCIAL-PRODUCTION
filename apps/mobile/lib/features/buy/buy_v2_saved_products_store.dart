@@ -284,6 +284,7 @@ class BuyV2CustomerStateSnapshot {
     this.shoppingGooglePlaceId,
     this.shoppingAreaScope,
     this.cartQuantities = const {},
+    this.cartScheduledFulfilments = const {},
     this.excludedCartProductIds = const {},
     this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
@@ -327,6 +328,8 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+  /// Desired choices only, scoped to an existing retained Cart quantity.
+  final Map<String, BuyV2ScheduledFulfilment> cartScheduledFulfilments;
   final Set<String> excludedCartProductIds;
 
   /// Retained identity constraints only, never listing or purchase authority.
@@ -475,6 +478,12 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
+    if (snapshot.cartScheduledFulfilments.entries.any((entry) =>
+        !entry.value.valid || entry.key != entry.value.listing.listingId ||
+        (snapshot.cartQuantities[entry.key] ?? 0) < 1 ||
+        snapshot.cartQuantities[entry.key]! > 9007199254740991)) {
+      return false;
+    }
     if (snapshot.orders.any((o) => o.lines.any((l) => !l.product.hasValidVariantFamilyIdentity)) ||
         (snapshot.procurementDraft?.cartProducts.values.any(
           (p) => !p.hasValidVariantFamilyIdentity) ?? false)) { return false; }
@@ -523,6 +532,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
     'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
+    if (snapshot.cartScheduledFulfilments.isNotEmpty)
+      'cartScheduledFulfilments': {
+        for (final entry in snapshot.cartScheduledFulfilments.entries)
+          entry.key: entry.value.toJson(),
+      },
     'excludedCartProductIds': snapshot.excludedCartProductIds.toList(
       growable: false,
     ),
@@ -656,6 +670,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
     shoppingAreaScope: _string(source['shoppingAreaScope']),
     cartQuantities: _stringIntMap(source['cartQuantities']),
+    cartScheduledFulfilments: _decodeCartScheduledFulfilments(source),
     excludedCartProductIds: _stringList(
       source['excludedCartProductIds'],
     ).toSet(),
@@ -731,6 +746,25 @@ final class BuyV2SharedPreferencesCustomerStateStore
       source['orders'],
     ).map(_decodeOrder).whereType<BuyV2Order>().toList(growable: false),
   );
+
+  static Map<String, BuyV2ScheduledFulfilment> _decodeCartScheduledFulfilments(Map<String, Object?> source) {
+    if (!source.containsKey('cartScheduledFulfilments')) return const {};
+    final raw = source['cartScheduledFulfilments'], quantities = source['cartQuantities'];
+    if (raw is! Map || quantities is! Map) {
+      throw const FormatException('Saved Cart delivery choices need checking.');
+    }
+    final result = <String, BuyV2ScheduledFulfilment>{};
+    for (final entry in raw.entries) {
+      final selection = BuyV2ScheduledFulfilment.fromJson(entry.value);
+      final quantity = quantities[entry.key];
+      if (entry.key is! String || entry.key != selection.listing.listingId ||
+          quantity is! int || quantity < 1 || quantity > 9007199254740991) {
+        throw const FormatException('Saved Cart delivery choices need checking.');
+      }
+      result[entry.key as String] = selection;
+    }
+    return Map.unmodifiable(result);
+  }
 
   Map<String, Object?> _encodePaymentAttempt(
     BuyV2CheckoutPaymentAttempt attempt,
