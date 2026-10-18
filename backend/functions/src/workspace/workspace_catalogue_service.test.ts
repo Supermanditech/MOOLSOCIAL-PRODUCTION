@@ -317,6 +317,11 @@ test('LF03-REVISION emulator approved updates preserve another Store original an
       await service().bindReviewedSku('owner-one', save(second, {storeId: 'store-two'}));
       await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
       const updated = input(); updated.content.description = 'Independently reviewed updated product details';
+      // Explicit host source copy only; no manufacturer entitlement or live data.
+      updated.content.specifications = Object.entries({'Warranty issuer': 'Host manufacturer', 'Warranty duration': '12 months',
+        'Warranty start basis': 'From original invoice', 'Warranty coverage': 'Manufacturing faults',
+        'Warranty exclusions': 'Accidental damage', 'Warranty service': 'Use the manufacturer service process',
+        'Warranty contact': 'Public warranty support', 'Warranty reference': 'Warranty sheet PF07'}).map(([label, value]) => ({label, value}));
       const previousContentSha256 = cataloguePayloadHash(input().content), contentSha256 = cataloguePayloadHash(updated.content);
       const proposal = {type: 'propose_product_revision', commandId: 'actual-content-update', expectedVersion: 7,
         productId: updated.canonicalProductId, previousContentSha256, contentSha256};
@@ -340,6 +345,10 @@ test('LF03-REVISION emulator approved updates preserve another Store original an
         description: (item.listing.items[0] as unknown as {content: StoreSkuContent}).content.description}));
       assert.deepEqual(descriptions, [{storeId: 'store-two', description: input().content.description},
         {storeId: 'store-one', description: updated.content.description}]);
+      const projectedSpecs = page.items.map(item => ({storeId: item.listing.storeId,
+        specifications: (item.listing.items[0] as unknown as {content: StoreSkuContent}).content.specifications}));
+      assert.deepEqual(projectedSpecs, [{storeId: 'store-two', specifications: []},
+        {storeId: 'store-one', specifications: updated.content.specifications}]);
       console.log(`LF_REVISION_PROJECTION=${JSON.stringify(page)}`); // Actual isolated emulator output, never native data.
       const replay = await service().bindReviewedSku('owner-one', save()) as {saved: StoreSkuRecord};
       assert.deepEqual(replay.saved, original.saved);

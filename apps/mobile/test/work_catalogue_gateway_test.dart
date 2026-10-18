@@ -1323,6 +1323,95 @@ void main() {
       });
     }
   }
+  const warrantyDetails = {'Warranty issuer': 'Host manufacturer', 'Warranty duration': '12 months',
+    'Warranty start basis': 'From original invoice', 'Warranty coverage': 'Manufacturing faults',
+    'Warranty exclusions': 'Accidental damage', 'Warranty service': 'Use the manufacturer service process',
+    'Warranty contact': 'Public warranty support', 'Warranty reference': 'Warranty sheet PF07'};
+  test('PF07 optional warranty prompts retain exact source copy, casing, saved identity and CSV', () {
+    expect(WorkspaceProductContent.warrantyGuideLabels, warrantyDetails.keys);
+    for (final label in warrantyDetails.keys) { expect(WorkspaceProductContent.guidedHintForLabel(label), isNot('Optional')); }
+    final original = WorkspaceProductContent.parse({'specifications': 'warranty issuer: Older source\nCustom detail: Keep'});
+    final content = original.withGuidedDetails(warrantyDetails);
+    expect(content.specifications['warranty issuer'], warrantyDetails['Warranty issuer']);
+    expect(content.specifications.containsKey('Warranty issuer'), isFalse); expect(content.specifications['Custom detail'], 'Keep');
+    final item = listingItem().copyWith(content: content, categoryId: 'other');
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(jsonDecode(jsonEncode(item.toInventoryJson())));
+    expect(restored.content.toJson(), content.toJson()); expect(restored.id, item.id); expect(restored.stockEntry!.toJson(), item.stockEntry!.toJson());
+    expect(WorkspaceProductSubmissionInput.fromSaved(restored).toJson()['content']['specifications'],
+      [for (final entry in content.specifications.entries) {'label': entry.key, 'value': entry.value}]);
+    expect(restored.toBuyPublicProduct(storeName: '').purchaseProtection, isNull);
+    final raw = {'title': item.title, 'brand': item.brand, 'variant': item.variant, 'pack': item.pack, 'canonicalId': item.canonicalId,
+      'purchasePrice': '230', 'sellingPrice': '260', 'stock': '0', ...content.inputValues};
+    String quoted(String value) => '"${value.replaceAll('"', '""')}"';
+    for (final json in [false, true]) {
+      final data = json ? jsonEncode([raw]) : '${raw.keys.map(quoted).join(',')}\n${raw.values.map(quoted).join(',')}';
+      final row = WorkspaceProductImport.parse(data, json: json, catalogue: [item], owned: []).rows.single;
+      expect(row.issue, isNull); expect(row.product!.content.specifications, content.specifications); expect(row.product!.publicListing, isFalse);
+    }
+    expect(const WorkspaceProductContent().withGuidedDetails({for (final label in warrantyDetails.keys) label: ' '}).isEmpty, isTrue);
+    final cleared = content.withGuidedDetails({'Warranty issuer': ''});
+    expect(cleared.specifications.containsKey('warranty issuer'), isFalse); expect(cleared.specifications['Custom detail'], 'Keep');
+    final full = WorkspaceProductContent(specifications: {for (var index = 0; index < 30; index++) 'Field $index': 'Keep'});
+    expect(() => full.withGuidedDetails({'Warranty issuer': 'Additional'}), throwsFormatException); expect(full.specifications.length, 30);
+  });
+  testWidgets('PF07 optional Warranty guide is offered without changing saved product', (tester) async {
+    final work = productSession(_ProductOwner(), _ProductJournal());
+    work.workspaceCatalogueItems[0] = listingItem().copyWith(categoryId: 'other');
+    final before = work.workspaceCatalogueItems.single.toInventoryJson();
+    await openListingEditor(tester, work, theme: MoolTheme.light());
+    final section = find.byKey(const Key('work-product-customer-facts-section'));
+    await tester.ensureVisible(section); await tester.tap(section); await tester.pumpAndSettle();
+    final guide = find.byKey(const Key('work-product-guided-details'));
+    await tester.ensureVisible(guide); await tester.tap(guide); await tester.pumpAndSettle();
+    expect(find.text('Saved details stay in Specifications. Choose Electronics or Appliances for guided fields.'), findsNothing);
+    await tester.tap(find.byKey(const Key('work-product-detail-guide'))); await tester.pumpAndSettle();
+    expect(find.text('Warranty'), findsOneWidget);
+    expect(work.workspaceCatalogueItems.single.toInventoryJson(), before);
+  });
+  for (final apply in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('PF07 warranty guide switching and ${apply ? 'Apply' : 'Cancel'} at $scale', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale; addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final work = productSession(_ProductOwner(), _ProductJournal());
+        work.workspaceCatalogueItems[0] = listingItem().copyWith(categoryId: 'other');
+        final before = work.workspaceCatalogueItems.single.toInventoryJson();
+        await openListingEditor(tester, work, theme: MoolTheme.light());
+        Future<void> show(Finder finder) async {
+          FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+          await Scrollable.ensureVisible(tester.element(finder), alignment: .15); await tester.pumpAndSettle();
+        }
+        final section = find.byKey(const Key('work-product-customer-facts-section'));
+        await show(section); await tester.tap(section); await tester.pumpAndSettle();
+        final guide = find.byKey(const Key('work-product-guided-details'));
+        await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+        Future<void> choose(String label) async {
+          final choice = find.byKey(const Key('work-product-detail-guide'));
+          await show(choice); await tester.tap(choice); await tester.pumpAndSettle();
+          await tester.tap(find.text(label).last); await tester.pumpAndSettle();
+        }
+        await choose('Warranty');
+        expect(find.textContaining('manufacturer or seller warranty'), findsOneWidget);
+        for (final entry in warrantyDetails.entries) {
+          final field = find.byKey(Key('work-product-guided-${entry.key}'));
+          await show(field); await tester.enterText(field, entry.value); await tester.pumpAndSettle();
+        }
+        await choose('Electronics');
+        final model = find.byKey(const Key('work-product-guided-Model code'));
+        await show(model); await tester.enterText(model, 'Host model'); await tester.pumpAndSettle();
+        await choose('Warranty');
+        expect(tester.widget<TextField>(find.byKey(const Key('work-product-guided-Warranty issuer'))).controller!.text, warrantyDetails['Warranty issuer']);
+        final action = find.byKey(Key('work-product-guided-${apply ? 'apply' : 'cancel'}'));
+        await show(action); await tester.tap(action); await tester.pumpAndSettle();
+        final text = tester.widget<TextField>(find.byKey(const Key('work-product-specifications'))).controller!.text;
+        final content = WorkspaceProductContent.parse({'specifications': text});
+        if (apply) {
+          for (final entry in warrantyDetails.entries) { expect(content.specifications[entry.key], entry.value); }
+          expect(content.specifications['Model code'], 'Host model');
+        } else { expect(content.specifications, listingItem().content.specifications); }
+        expect(work.workspaceCatalogueItems.single.toInventoryJson(), before); expect(tester.takeException(), isNull);
+      });
+    }
+  }
   const familyScope = (account: 'owner-one', store: 'store-one', realm: 'production', family: 'family-one');
   WorkspaceVariantFamilySubmissionInput ownerFamilyInput() => WorkspaceVariantFamilySubmissionInput.fromJson({
     'familyId': familyScope.family, 'localRevision': 1, 'title': 'Host option product', 'brand': 'Host fixture',
@@ -3498,6 +3587,64 @@ void main() {
     await tester.scrollUntilVisible(control, 220, scrollable: find.descendant(
       of: find.byKey(PageStorageKey('buy-product-${selected.id}')), matching: find.byType(Scrollable)).first);
     await tester.ensureVisible(control); await tester.pumpAndSettle();
+  }
+  for (final trade in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('PF07 public supplied warranty facts remain separate from entitlement trade=$trade scale=$scale', (tester) async {
+        final selected = optionalDetailsProduct(trade: trade, supplied: false), content = _HostOptionalProductContent()
+          ..specifications = [for (final entry in warrantyDetails.entries) BuyV2ProductSpecification(label: entry.key, value: entry.value)];
+        final session = await optionalDetailsSession(selected, content);
+        await mountOptionalDetails(tester, session, scale);
+        final details = find.byKey(ValueKey('buy-product-content-ready-${selected.id}'));
+        await revealOptionalDetails(tester, selected, details);
+        for (final entry in warrantyDetails.entries) {
+          expect(find.descendant(of: details, matching: find.text(entry.key)), findsOneWidget);
+          expect(find.descendant(of: details, matching: find.text(entry.value)), findsOneWidget);
+        }
+        expect(selected.purchaseProtection, isNull); expect(session.cartLines, isEmpty);
+        content.specifications = []; session.refreshProductContent(selected.id); await tester.pumpAndSettle();
+        expect(find.text('Warranty issuer'), findsNothing); expect(find.text('Warranty duration'), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  if (revisionLog != null) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('PF07 actual reviewed service warranty values reach public page at $scale', (tester) async {
+        const marker = 'LF_REVISION_PROJECTION=';
+        final captures = File(revisionLog).readAsLinesSync().where((line) => line.contains(marker)).toList();
+        expect(captures, hasLength(1));
+        final actual = jsonDecode(captures.single.split(marker).last) as Map<String, dynamic>;
+        final source = WorkspacePublicDiscoverySource(current: () => true,
+          gateway: discoveryGateway(OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+            body: jsonEncode({'ok': true, 'data': actual}))), realm: 'evaluation'));
+        final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+          cataloguePageSource: source, productContentAdapter: source, catalogueNow: () => at);
+        final pager = session.acquireCatalogueProducts('pf07-actual-service');
+        try {
+          await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+            areaScope: BuyV2CatalogueAreaScope.allAreas, sort: BuyV2ProductSort.priceLowToHigh));
+          final selected = pager.page!.items.singleWhere((p) => p.storeId == 'store-one');
+          final original = pager.page!.items.singleWhere((p) => p.storeId == 'store-two');
+          expect(source.snapshotFor(original).specifications, isEmpty);
+          expect(session.openProduct(selected.id), isTrue);
+          await mountOptionalDetails(tester, session, scale);
+          final details = find.byKey(ValueKey('buy-product-content-ready-${selected.id}'));
+          await revealOptionalDetails(tester, selected, details);
+          for (final entry in warrantyDetails.entries) {
+            expect(find.descendant(of: details, matching: find.text(entry.value)), findsOneWidget);
+          }
+          expect(selected.purchaseProtection, isNull); expect(selected.priceMinor, 26000);
+          expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
+        } finally {
+          // Widget invariants run before package:test addTearDown callbacks.
+          // Release real content-expiry timers, never disable or advance them.
+          await tester.pumpWidget(const SizedBox.shrink());
+          session.releaseCatalogueProducts('pf07-actual-service');
+          session.dispose(); core.dispose(); source.dispose();
+        }
+      });
+    }
   }
   for (final trade in [false, true]) {
     for (final scale in [1.0, 2.0]) {

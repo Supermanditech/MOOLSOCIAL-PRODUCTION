@@ -50,6 +50,11 @@ class WorkspaceProductContent {
     'Electrical supply', 'Energy label', 'Certification reference',
     'Installation requirements', 'In the box',
   ];
+  /// Descriptive source facts only; never an accepted entitlement or return policy.
+  static const warrantyGuideLabels = [
+    'Warranty issuer', 'Warranty duration', 'Warranty start basis', 'Warranty coverage',
+    'Warranty exclusions', 'Warranty service', 'Warranty contact', 'Warranty reference',
+  ];
 
   static List<String> guidedLabelsForCategory(String categoryId) {
     if (const {'surface-cleaners', 'laundry-dishwash'}.contains(categoryId)) {
@@ -112,6 +117,14 @@ class WorkspaceProductContent {
     'Energy label' => 'Copy supplied energy-rating details and their rating period; do not estimate.',
     'Certification reference' => 'Copy the supplied certification name or reference. This does not verify it.',
     'Installation requirements' => 'Copy installation requirements, not a promise of an installation service.',
+    'Warranty issuer' => 'Copy the company or seller named on the warranty.',
+    'Warranty duration' => 'Copy the stated duration and unit. Do not assume the product has a warranty.',
+    'Warranty start basis' => 'Copy what starts the warranty, such as purchase or installation. Do not enter customer dates.',
+    'Warranty coverage' => 'Copy what is covered. Do not add services that are not stated.',
+    'Warranty exclusions' => 'Copy the stated exclusions or limitations.',
+    'Warranty service' => 'Copy how the customer can request warranty service.',
+    'Warranty contact' => 'Use public warranty support contact details, not customer details.',
+    'Warranty reference' => 'Copy the supplied public policy or document reference, not private invoice or customer numbers.',
     _ => 'Optional',
   };
 

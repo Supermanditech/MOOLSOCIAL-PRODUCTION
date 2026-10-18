@@ -24951,7 +24951,8 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     with WidgetsBindingObserver {
   late final _allLabels = {...widget.labels,
     if (widget.allowProductGuides) ...WorkspaceProductContent.electronicsGuideLabels,
-    if (widget.allowProductGuides) ...WorkspaceProductContent.applianceGuideLabels};
+    if (widget.allowProductGuides) ...WorkspaceProductContent.applianceGuideLabels,
+    if (widget.allowProductGuides) ...WorkspaceProductContent.warrantyGuideLabels};
   late final _controllers = {for (final label in _allLabels) label: TextEditingController(text:
     widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
   late final _focusNodes = {for (final label in _allLabels) label: FocusNode()};
@@ -24961,6 +24962,7 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
   List<String> get _visibleLabels => switch (_guide) {
     'electronics' => WorkspaceProductContent.electronicsGuideLabels,
     'appliances' => WorkspaceProductContent.applianceGuideLabels,
+    'warranty' => WorkspaceProductContent.warrantyGuideLabels,
     _ => widget.labels,
   };
   String? _error;
@@ -25006,7 +25008,9 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     scrollable: true,
     title: Text(widget.allowProductGuides ? 'Product details' : 'Category details', style: Theme.of(context).textTheme.titleMedium),
     content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('Optional details from the product label or manufacturer information. Blank fields are omitted from public pages.'),
+      Text(_guide == 'warranty'
+        ? 'Optional manufacturer or seller warranty details. Blank fields stay hidden. Returns, refunds and claim approval are separate.'
+        : 'Optional details from the product label or manufacturer information. Blank fields are omitted from public pages.'),
       if (widget.allowProductGuides) ...[
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(key: const Key('work-product-detail-guide'),
@@ -25014,14 +25018,15 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
           decoration: const InputDecoration(labelText: 'Detail guide'),
           items: const [DropdownMenuItem(value: 'general', child: Text('General')),
             DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
-            DropdownMenuItem(value: 'appliances', child: Text('Appliances'))],
+            DropdownMenuItem(value: 'appliances', child: Text('Appliances')),
+            DropdownMenuItem(value: 'warranty', child: Text('Warranty'))],
           onChanged: (value) {
             if (value == null) return;
             FocusScope.of(context).unfocus();
             setState(() { _guide = value; _error = null; });
           }),
         if (_guide == 'general') const Padding(padding: EdgeInsets.only(top: 8),
-          child: Text('Saved details stay in Specifications. Choose Electronics or Appliances for guided fields.')),
+          child: Text('Choose a guide above to add optional product details. Existing specifications are kept.')),
       ],
       for (final label in _visibleLabels) ...[
         const SizedBox(height: 16),
