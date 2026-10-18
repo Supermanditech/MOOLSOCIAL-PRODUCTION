@@ -194,6 +194,28 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart'))) 'Unclaimed export fixture admitted.'
     $cases+=3
   }
+  if ($null -ne $continuation.PSObject.Properties['batch05ProductReportRecovery']) {
+    $reportOwner='apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart'
+    Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($reportOwner)) 'Exact report fixture rejected.'
+    $cases++
+    foreach ($key in @('ticket','parentCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch05ProductReportRecovery.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Report recovery missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch05ProductReportRecovery.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Report recovery changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch05ProductReportRecovery.owners+='backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Report fixture widened into backend.'
+    $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacy.PSObject.Properties.Remove('batch05ProductReportRecovery')
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Report-absent historical continuation rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @($reportOwner))) 'Unclaimed report fixture admitted.'
+    $cases+=3
+  }
   if ($null -ne $continuation.PSObject.Properties['batch03PolicyRecovery']) {
     foreach ($owner in $continuation.batch03PolicyRecovery.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-policy recovery owner rejected.'

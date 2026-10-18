@@ -1978,6 +1978,7 @@ class BuyV2ProductView extends StatelessWidget {
                                   )
                                 : null,
                             reported: session.hasReportedProduct(product.id),
+                            reportMessage: session.productReportRetentionMessage(product.id),
                           ),
                           if (!automaticFulfilment) ...[
                             const SizedBox(height: 10),
@@ -7817,6 +7818,7 @@ class _ProductReviewsPanel extends StatelessWidget {
     required this.onReview,
     required this.onReport,
     required this.reported,
+    this.reportMessage,
   });
 
   final BuyV2Product product;
@@ -7824,6 +7826,7 @@ class _ProductReviewsPanel extends StatelessWidget {
   final VoidCallback? onReview;
   final VoidCallback? onReport;
   final bool reported;
+  final String? reportMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -7959,6 +7962,10 @@ class _ProductReviewsPanel extends StatelessWidget {
                 'Reviews and product reports will be available after Shop reconnects.',
                 style: context.buyMeta.copyWith(fontSize: 11, height: 1.4),
               ),
+            if (reportMessage case final message?)
+              Padding(padding: const EdgeInsets.only(top: 6),
+                child: Text(message, key: ValueKey('buy-product-report-retention-${product.id}'),
+                  style: context.buyMeta.copyWith(fontSize: 11, height: 1.4))),
           ],
         ),
       ),

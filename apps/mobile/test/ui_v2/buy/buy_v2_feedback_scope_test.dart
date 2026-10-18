@@ -38,6 +38,7 @@ void main() {
     addTearDown(identity.dispose);
     if (!manualDispose) addTearDown(session.dispose);
     await session.restoreCommerce();
+    await session.restoreCustomerState();
     expect(session.canReviewProduct('s-milk'), isTrue);
     return (session, adapter, owner, identity);
   }
@@ -50,6 +51,13 @@ void main() {
           targetId: 'host-target',
         )
       : session.reportProductOnline(productId: 's-milk', reason: 'Host report');
+
+  Future<void> dispatched(_FeedbackAdapter adapter, int count) async {
+    for (var i = 0; i < 30 && adapter.calls < count; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    expect(adapter.calls, count);
+  }
 
   test('LF13 same-account new login keeps the saved review draft', () async {
     final (session, _, _, identity) = await fixture();
@@ -156,6 +164,7 @@ void main() {
             );
             final gate = adapter.pending = Completer<void>();
             final request = submit(session, action);
+            await dispatched(adapter, 1);
             final originalNotice = session.notice;
             switch (drift) {
               case 'owner':
@@ -191,10 +200,13 @@ void main() {
       final (session, adapter, owner, _) = await fixture();
       final first = adapter.pending = Completer<void>();
       final old = submit(session, action);
+      await dispatched(adapter, 1);
       owner.scope = adapter.owner = 'owner-b';
       await session.restoreCommerce();
+      await session.restoreCustomerState();
       final second = adapter.pending = Completer<void>();
       final next = submit(session, action);
+      await dispatched(adapter, 2);
       expect(adapter.calls, 2);
       first.complete();
       expect(await old, isFalse);

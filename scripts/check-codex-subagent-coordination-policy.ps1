@@ -8082,6 +8082,19 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($recovery.owners|Sort-Object) -join '|') -cne (@($recoveryOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners += $recoveryOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch05ProductReportRecovery']) {
+    $reports=$Continuation.batch05ProductReportRecovery
+    $reportOwner='apps/mobile/test/ui_v2/buy/buy_v2_feedback_scope_test.dart'
+    if ($null -eq $reports -or $reports -isnot [pscustomobject]) { return $false }
+    foreach ($key in @('ticket','parentCheckpoint','state','owners')) {
+      if ($null -eq $reports.PSObject.Properties[$key]) { return $false }
+    }
+    if ($reports.ticket -cne 'LF-13-C01' -or
+        $reports.parentCheckpoint -cne 'b6cc919b2d4671bb32dfb4023030b8c7c41576cb' -or
+        $reports.state -cne 'local_original_owner_report_recovery_qualified_live_provider_pending' -or
+        (@($reports.owners) -join '|') -cne $reportOwner) { return $false }
+    $allowedOwners += $reportOwner
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0

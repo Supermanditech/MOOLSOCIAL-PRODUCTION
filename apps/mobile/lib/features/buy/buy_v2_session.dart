@@ -5996,8 +5996,22 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final product = findProduct(productId);
-    return product != null && _productReportsAvailable &&
-        !_unconfirmedProductReports.contains(_productReportKey(product));
+    return product != null && _productReportsAvailable && (reviewDataEnabled ||
+        (!customerStateRecoveryPending && _productReportJournalLoadedOwner != null &&
+          _productReportJournalLoadedOwner == customerStateStore?.ownerScope &&
+          product.storeId?.trim().isNotEmpty == true && product.hasValidPublicListingIdentity &&
+          !_productReportStates.containsKey(_productReportKey(product))));
+  }
+
+  String? productReportRetentionMessage(String productId) {
+    if (!_prepareProductFeedbackScope()) return null;
+    final product = findProduct(productId);
+    if (product == null) return null;
+    return switch (_productReportStates[_productReportKey(product)]) {
+      'submitted' => 'Your report was received. Please do not submit it again.',
+      'pending' => 'Your report is not confirmed. Check with support before submitting again.',
+      _ => null,
+    };
   }
 
   bool productFeedbackBusy(String productId) =>
@@ -6388,11 +6402,20 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, String> _reportedProductReasons = {};
   final Set<String> _reviewableProductIds = {};
   final Map<String, Object> _productFeedbackOperations = {};
-  final Set<String> _unconfirmedProductReports = {};
+  final Map<String, String> _productReportStates = {};
+  String? _productReportJournalOwner, _productReportJournalLoadedOwner;
+  void _ensureProductReportOwner() {
+    final owner = customerStateStore?.ownerScope;
+    if (_productReportJournalOwner == owner) return;
+    _productReportJournalOwner = owner;
+    _productReportJournalLoadedOwner = null;
+    _productReportStates.clear();
+  }
   (String?, String?, String?, int, int)? _productFeedbackScope;
 
   bool _prepareProductFeedbackScope() {
     if (_collectionDisposed || !procurementScopeCurrent) return false;
+    _ensureProductReportOwner();
     final scope = _currentCustomerOrderScope;
     if (_productFeedbackScope != null && _productFeedbackScope != scope) {
       _productFeedbackOperations.clear();
@@ -6403,7 +6426,6 @@ class BuyV2Session extends ChangeNotifier {
       }
       _customerReviews.clear();
       _reportedProductReasons.clear();
-      _unconfirmedProductReports.clear();
       _reviewableProductIds.clear();
       _productReportsAvailable = false;
     }
@@ -8904,6 +8926,8 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       if (snapshot == null) {
+        _ensureProductReportOwner();
+        _productReportJournalLoadedOwner = ownerScope;
         _balanceHoldsLoadedOwner = ownerScope;
         _retainedProductIdentityKeys.clear();
         if (customerStateRecoveryPending) {
@@ -8914,6 +8938,7 @@ class BuyV2Session extends ChangeNotifier {
           notifyListeners();
         }
         _procurementBrowseReady = true;
+        notifyListeners();
         return;
       }
       final retainedDraft = snapshot.procurementDraft;
@@ -9039,6 +9064,9 @@ class BuyV2Session extends ChangeNotifier {
   }) {
     final owner = customerStateStore?.ownerScope;
     // Validate every resolved binding before replacing any live Cart state.
+    if (!snapshot.hasValidProductReportStates) {
+      throw const FormatException('Saved product report recovery needs checking.');
+    }
     for (final entry in snapshot.cartScheduledFulfilments.entries) {
       final product = findProduct(entry.key), quantity = snapshot.cartQuantities[entry.key];
       if (!entry.value.valid || entry.key != entry.value.listing.listingId ||
@@ -9067,6 +9095,9 @@ class BuyV2Session extends ChangeNotifier {
       _balancePaymentHolds[hold.storageKey] = hold;
     }
     _balanceHoldsLoadedOwner = owner;
+    _ensureProductReportOwner();
+    _productReportStates..clear()..addAll(snapshot.productReportStates);
+    _productReportJournalLoadedOwner = owner;
     _ensureSupplierPolicyOwner();
     _supplierPolicyAcceptances
       ..clear()
@@ -9475,8 +9506,10 @@ class BuyV2Session extends ChangeNotifier {
     }
     _ensureReviewDraftOwner();
     _ensureSupplierPolicyOwner();
+    _ensureProductReportOwner();
     final snapshot = BuyV2CustomerStateSnapshot(
       reviewDrafts: Map.unmodifiable(_reviewDrafts),
+      productReportStates: Map.unmodifiable(_productReportStates),
       supplierPolicyAcceptances: Map.unmodifiable(
         supplierPolicyAcceptances ??
             _supplierPolicyAcceptancesInFlight ??
@@ -14849,7 +14882,8 @@ class BuyV2Session extends ChangeNotifier {
     if (!_prepareProductFeedbackScope()) return false;
     final product = findProduct(productId);
     return product != null &&
-        _reportedProductReasons.containsKey(_productReportKey(product));
+        (_reportedProductReasons.containsKey(_productReportKey(product)) ||
+          _productReportStates[_productReportKey(product)] == 'submitted');
   }
 
   bool reportProduct({required String productId, required String reason}) {
@@ -15019,40 +15053,76 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!canReportProduct(productId)) {
-      notice = _unconfirmedProductReports.contains(_productReportKey(product))
-          ? 'Your report is not confirmed. Check with support before submitting again.'
-          : 'Product reporting is unavailable right now. Try again later.';
+      notice = productReportRetentionMessage(productId) ??
+          'Product reporting is unavailable right now. Restore your saved choices and try again.';
       notifyListeners();
       return false;
     }
     if (_productFeedbackOperations.containsKey(productId)) return false;
     final operation = Object();
     final scope = _productFeedbackScope;
+    final key = _productReportKey(product);
     _productFeedbackOperations[productId] = operation;
     bool current() => _productFeedbackCurrent(productId, scope, operation) &&
         identical(findProduct(productId), product);
     notice = null;
+    Future<bool> cancelUnsent(String message) async {
+      if (!current()) return false;
+      _productReportStates.remove(key);
+      final restored = await (_persistCustomerState() ?? Future<bool>.value(false))
+          .catchError((Object _) => false);
+      if (!current()) return false;
+      if (!restored) {
+        _customerStateRecoveryOwnerScope = customerStateStore?.ownerScope;
+        _customerStateOwnerScope = null;
+        _customerStateSnapshotLoaded = false;
+        _productReportJournalLoadedOwner = null;
+      }
+      notice = message;
+      return false;
+    }
     try {
+      _productReportStates[key] = 'pending';
       notifyListeners();
       if (!current()) return false;
+      var confirmedWrite = false;
+      final saved = await (_persistCustomerState(written: (value) => confirmedWrite = value) ?? Future<bool>.value(false))
+          .catchError((Object _) => false);
+      if (!current()) return false;
+      if (!saved || !confirmedWrite) {
+        return await cancelUnsent('Your report was not sent because its recovery details could not be saved. Restore saved choices and try again.');
+      }
+      if (!_productReportsAvailable || commerceLoadState != BuyV2CommerceLoadState.ready || customerStateRecoveryPending) {
+        return await cancelUnsent('Product reporting became unavailable. Your report was not sent.');
+      }
       final result = await commerceAdapter.reportProduct(
         product: product,
         reason: cleanReason,
       );
       if (!current()) return false;
-      if (result.customerMessage.trim().isEmpty) {
-        _unconfirmedProductReports.add(_productReportKey(product));
+      if (result.customerMessage.trim().isEmpty || !result.accepted) {
+        // The boolean/message API provides no definitive rejection/retry proof.
         notice = 'Your report is not confirmed. Check with support before submitting again.';
         return false;
       }
-      if (result.accepted) {
-        _reportedProductReasons[_productReportKey(product)] = cleanReason;
+      _productReportStates[key] = 'submitted';
+      final retained = await (_persistCustomerState() ?? Future<bool>.value(false))
+          .catchError((Object _) => false);
+      if (!current()) return false;
+      if (!retained) {
+        _productReportStates[key] = 'pending';
+        await (_persistCustomerState() ?? Future<bool>.value(false)).catchError((Object _) => false);
+        if (!current()) return false;
+        notice = 'Your report was received, but its saved status is not confirmed. Check with support before submitting again.';
+        return false;
       }
+      _reportedProductReasons[key] = cleanReason;
       notice = result.customerMessage;
       return result.accepted;
     } on Object {
       if (!current()) return false;
-      _unconfirmedProductReports.add(_productReportKey(product));
+      _productReportStates[key] = 'pending';
+      _persistCustomerState();
       notice = 'Your report is not confirmed. Check with support before submitting again.';
       return false;
     } finally {

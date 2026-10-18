@@ -337,6 +337,7 @@ final class _ShopCommerceAdapter
     accepted: true,
     customerMessage: 'Report received.',
   );
+  Completer<BuyV2MutationResult>? reportGate;
   BuyV2OrderRefreshResult orderRefreshResult = const BuyV2OrderRefreshResult(
     state: BuyV2CommerceLoadState.unavailable,
     customerMessage: 'Order updates are unavailable right now.',
@@ -406,6 +407,7 @@ final class _ShopCommerceAdapter
     required String reason,
   }) async {
     reportCalls += 1;
+    if (reportGate case final gate?) return gate.future;
     return reportResult;
   }
 
@@ -810,6 +812,7 @@ _openProductionCheckout({
     reviewDataEnabled: false,
   );
   await session.restoreCommerce();
+  if (productReportsAvailable) await session.restoreCustomerState();
   session.addProduct(product.id);
   session.openCart(scope: BuyV2CartScope.shop);
   session.openCheckout();
@@ -15772,6 +15775,190 @@ void main() {
       );
     });
 
+    for (final accepted in [false, true]) {
+      test('LF13 report journal survives encoded restart accepted=$accepted', () async {
+        final prefs = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner');
+        final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true, customerStateStore: store);
+        addTearDown(f.session.dispose);
+        f.adapter.reportResult = BuyV2MutationResult(accepted: accepted, customerMessage: accepted ? 'Report received.' : '');
+        expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), accepted);
+        await f.session.retainedAccountState();
+        final core = BuySession();
+        final next = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store, commerceAdapter: f.adapter);
+        addTearDown(next.dispose); addTearDown(core.dispose);
+        await next.restoreCommerce(); await next.restoreCustomerState();
+        expect(next.canReportProduct(f.product.id), isFalse);
+        expect(next.hasReportedProduct(f.product.id), accepted);
+        expect(await next.reportProductOnline(productId: f.product.id, reason: 'Retry'), isFalse);
+        expect(f.adapter.reportCalls, 1);
+      });
+    }
+    test('LF13 report journal saves before dispatch and blocks duplicate taps', () async {
+      final store = _MemoryCustomerStateStore('host-report-owner');
+      final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed,
+        productReportsAvailable: true, customerStateStore: store);
+      addTearDown(f.session.dispose);
+      await f.session.retainedAccountState();
+      final hold = store.pendingWrite = Completer<void>();
+      final reporting = f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack');
+      expect(f.adapter.reportCalls, 0);
+      expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Duplicate'), isFalse);
+      hold.complete(); expect(await reporting, isTrue); expect(f.adapter.reportCalls, 1);
+    });
+    test('LF13 report journal failed preflight sends nothing and retry restores old state', () async {
+      final store = _MemoryCustomerStateStore('host-report-owner');
+      final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed,
+        productReportsAvailable: true, customerStateStore: store);
+      addTearDown(f.session.dispose); await f.session.retainedAccountState();
+      store.rejectWrites = true;
+      expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), isFalse);
+      expect(f.adapter.reportCalls, 0); expect(f.session.customerStateRecoveryPending, isTrue);
+      expect(store.snapshot!.productReportStates, isEmpty);
+      store.rejectWrites = false; await f.session.restoreCustomerState();
+      expect(f.session.canReportProduct(f.product.id), isTrue);
+      expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), isTrue);
+      expect(f.adapter.reportCalls, 1);
+    });
+    test('LF13 report journal failed completion retains pending and blocks restart retry', () async {
+      final store = _MemoryCustomerStateStore('host-report-owner');
+      final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed,
+        productReportsAvailable: true, customerStateStore: store);
+      addTearDown(f.session.dispose);
+      final gate = f.adapter.reportGate = Completer<BuyV2MutationResult>();
+      final request = f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack');
+      for (var i = 0; i < 30 && f.adapter.reportCalls == 0; i++) { await Future<void>.delayed(Duration.zero); }
+      expect(f.adapter.reportCalls, 1); expect(store.snapshot!.productReportStates.values.single, 'pending');
+      store.rejectWrites = true;
+      gate.complete(const BuyV2MutationResult(accepted: true, customerMessage: 'Report received.'));
+      expect(await request, isFalse); expect(f.session.canReportProduct(f.product.id), isFalse);
+      expect(f.session.hasReportedProduct(f.product.id), isFalse);
+      store.rejectWrites = false;
+      final core = BuySession();
+      final next = BuyV2Session(core: core, reviewDataEnabled: false,
+        customerStateStore: store, commerceAdapter: f.adapter);
+      addTearDown(next.dispose); addTearDown(core.dispose);
+      await next.restoreCommerce(); await next.restoreCustomerState();
+      expect(next.canReportProduct(f.product.id), isFalse); expect(f.adapter.reportCalls, 1);
+    });
+    for (final beforeDispatch in [false, true]) {
+      test('LF13 report journal retired owner keeps original pending beforeDispatch=$beforeDispatch', () async {
+        final prefs = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner');
+        final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed,
+          productReportsAvailable: true, customerStateStore: store);
+        await f.session.retainedAccountState();
+        final writeGate = beforeDispatch ? Completer<void>() : null;
+        if (writeGate != null) prefs.holdNextWrite = writeGate;
+        final result = f.adapter.reportGate = Completer<BuyV2MutationResult>();
+        final request = f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack');
+        if (!beforeDispatch) {
+          for (var i = 0; i < 30 && f.adapter.reportCalls == 0; i++) { await Future<void>.delayed(Duration.zero); }
+          expect(f.adapter.reportCalls, 1);
+        }
+        f.session.dispose();
+        writeGate?.complete();
+        if (!beforeDispatch) result.completeError(StateError('Host response lost after retirement'));
+        expect(await request, isFalse);
+        await f.session.retainedAccountState();
+        expect((await store.read())!.productReportStates.values.single, 'pending');
+        final core = BuySession();
+        final next = BuyV2Session(core: core, reviewDataEnabled: false, commerceAdapter: f.adapter, customerStateStore: store);
+        addTearDown(next.dispose); addTearDown(core.dispose);
+        await next.restoreCommerce(); await next.restoreCustomerState();
+        expect(next.canReportProduct(f.product.id), isFalse);
+        final otherCore = BuySession();
+        final other = BuyV2Session(core: otherCore, reviewDataEnabled: false, commerceAdapter: f.adapter,
+          customerStateStore: BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner-B'));
+        addTearDown(other.dispose); addTearDown(otherCore.dispose);
+        await other.restoreCommerce(); await other.restoreCustomerState();
+        expect(other.canReportProduct(f.product.id), isTrue);
+        expect(f.adapter.reportCalls, beforeDispatch ? 0 : 1);
+      });
+    }
+    test('LF13 report journal negative message is not definitive retry permission', () async {
+      final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed, productReportsAvailable: true);
+      addTearDown(f.session.dispose);
+      f.adapter.reportResult = const BuyV2MutationResult(accepted: false, customerMessage: 'Try again.');
+      expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), isFalse);
+      expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Repeat'), isFalse);
+      expect(f.adapter.reportCalls, 1); expect(f.session.notice, contains('not confirmed'));
+    });
+    for (final corruption in ['null', 'version', 'float version', 'records', 'state', 'target', 'store', 'encoding', 'extra']) {
+      test('LF13 report journal corrupt data preserves recovery bytes $corruption', () async {
+        final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner');
+        final key = jsonEncode(['host-store', 'shop|listing:host-sku']);
+        expect(await store.write(BuyV2CustomerStateSnapshot(productReportStates: {key: 'pending'})), isTrue);
+        final storageKey = prefs.values.keys.single, raw = jsonDecode(prefs.values.values.single);
+        final journal = raw['productReportStates'];
+        switch (corruption) {
+          case 'null': raw['productReportStates'] = null;
+          case 'version': journal['version'] = 2;
+          case 'float version': journal['version'] = 1.0;
+          case 'records': journal['records'] = [];
+          case 'state': journal['records'][key] = 'unknown';
+          case 'target': journal['records'] = {'not-json': 'pending'};
+          case 'store': journal['records'] = {jsonEncode(['', 'shop|listing:host-sku']): 'pending'};
+          case 'encoding': journal['records'] = {jsonEncode(['host-store', 'shop|listing:%2f']): 'pending'};
+          case 'extra': journal['unexpected'] = true;
+        }
+        final bytes = jsonEncode(raw); prefs.values[storageKey] = bytes;
+        await expectLater(store.read(), throwsFormatException);
+        final writes = prefs.writesStarted, core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCustomerState(); session.setAvailableProductsOnly(true);
+        expect(session.customerStateRecoveryPending, isTrue); expect(session.canReportProduct('host-sku'), isFalse);
+        expect(prefs.writesStarted, writes); expect(prefs.values[storageKey], bytes);
+      });
+    }
+    test('LF13 report journal is not discarded with an unreadable legacy procurement draft', () async {
+      final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner');
+      final key = jsonEncode(['host-store', 'shop|listing:host-sku']);
+      await store.write(BuyV2CustomerStateSnapshot(productReportStates: {key: 'pending'}));
+      final storageKey = prefs.values.keys.single;
+      prefs.values[storageKey] = jsonEncode({'procurementDraft': null,
+        'productReportStates': {'version': 1, 'records': {key: 'pending'}}});
+      final bytes = prefs.values[storageKey], writes = prefs.writesStarted;
+      await expectLater(store.read(), throwsFormatException);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isTrue);
+      expect(session.canReportProduct('host-sku'), isFalse);
+      expect(prefs.values[storageKey], bytes); expect(prefs.writesStarted, writes);
+      prefs.values[storageKey] = jsonEncode({'procurementDraft': null, 'productReportStates': null});
+      await expectLater(store.read(), throwsFormatException);
+    });
+    test('LF13 report journal rejects malformed writes and keeps legacy absence', () async {
+      final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-report-owner');
+      await store.write(const BuyV2CustomerStateSnapshot());
+      final original = prefs.values.values.single, writes = prefs.writesStarted;
+      expect(jsonDecode(original).containsKey('productReportStates'), isFalse);
+      expect(await store.write(const BuyV2CustomerStateSnapshot(productReportStates: {'bad': 'submitted'})), isFalse);
+      expect(prefs.writesStarted, writes); expect(prefs.values.values.single, original);
+    });
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF13 report journal retained explanation fits product UI scale=$scale', (tester) async {
+        tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(390, 844); addTearDown(tester.view.reset);
+        final f = await _openProductionCheckout(outcome: BuyV2OrderPlacementOutcome.failed, productReportsAvailable: true);
+        addTearDown(f.session.dispose); f.adapter.reportResult = const BuyV2MutationResult(accepted: false, customerMessage: '');
+        expect(await f.session.reportProductOnline(productId: f.product.id, reason: 'Wrong pack'), isFalse);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+          home: BuyV2Screen(session: f.session, productId: f.product.id)));
+        await tester.pumpAndSettle();
+        final message = find.byKey(ValueKey('buy-product-report-retention-${f.product.id}'));
+        await tester.scrollUntilVisible(message, 200, scrollable: find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-${f.product.id}')).last, matching: find.byType(Scrollable)).first);
+        await Scrollable.ensureVisible(tester.element(message), alignment: .5); await tester.pumpAndSettle();
+        expect(tester.widget<Text>(message).maxLines, isNull);
+        expect(find.textContaining('Check with support before submitting again.'), findsOneWidget);
+        expect(f.session.canReportProduct(f.product.id), isFalse); expect(tester.takeException(), isNull);
+      });
+    }
     test(
       'verified purchase review and product report require real acceptance',
       () async {
@@ -15840,7 +16027,7 @@ void main() {
         expect(fixture.session.hasReportedProduct(fixture.product.id), isFalse);
         expect(
           fixture.session.notice,
-          'This report could not be sent. Try again.',
+          'Your report is not confirmed. Check with support before submitting again.',
         );
       },
     );

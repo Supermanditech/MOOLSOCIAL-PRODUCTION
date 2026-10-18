@@ -288,6 +288,7 @@ class BuyV2CustomerStateSnapshot {
     this.excludedCartProductIds = const {},
     this.productIdentityKeys = const {},
     this.reviewDrafts = const {},
+    this.productReportStates = const {},
     this.supplierPolicyAcceptances = const {},
     this.supplierPolicyRequiredProductKeys = const {},
     this.supplierPolicyUnresolvedProductKeys = const {},
@@ -335,6 +336,23 @@ class BuyV2CustomerStateSnapshot {
   /// Retained identity constraints only, never listing or purchase authority.
   final Map<String, String> productIdentityKeys;
   final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
+  /// Local original-owner retry protection, not moderation/publication state.
+  final Map<String, String> productReportStates;
+  bool get hasValidProductReportStates => productReportStates.entries.every((entry) {
+    if (!const {'pending', 'submitted'}.contains(entry.value)) return false;
+    try {
+      final target = jsonDecode(entry.key);
+      if (target is! List || target.length != 2 || target.any((v) => v is! String) ||
+          (target[0] as String).trim().isEmpty || target[0] != (target[0] as String).trim() ||
+          jsonEncode(target) != entry.key) {
+        return false;
+      }
+      final key = target[1] as String, separator = key.indexOf('|listing:');
+      if (separator < 0 || !BuyV2Destination.values.any((d) => d != BuyV2Destination.orders && d.name == key.substring(0, separator))) return false;
+      final encoded = key.substring(separator + 9), id = Uri.decodeComponent(encoded);
+      return id.trim().isNotEmpty && id == id.trim() && Uri.encodeComponent(id) == encoded;
+    } on Object { return false; }
+  });
 
   /// Local buyer-scoped evidence only; never backend acceptance authority.
   final Map<String, String> supplierPolicyAcceptances;
@@ -459,8 +477,13 @@ final class BuyV2SharedPreferencesCustomerStateStore
       if (decoded is! Map<String, Object?>) {
         throw const FormatException('Saved customer state is unreadable.');
       }
-      if (decoded.containsKey('procurementDraft') &&
-          _decodeProcurementDraft(decoded['procurementDraft']) == null &&
+      final invalidDraft = decoded.containsKey('procurementDraft') &&
+          _decodeProcurementDraft(decoded['procurementDraft']) == null;
+      if (invalidDraft && decoded.containsKey('productReportStates')) {
+        // Neither the draft nor report history may become an empty account.
+        throw const FormatException('Saved purchase and report recovery need checking.');
+      }
+      if (invalidDraft &&
           decoded['checkoutIdempotencyKey'] == null &&
           !decoded.containsKey('legacyCheckoutAttempt') &&
           !decoded.containsKey('checkoutPaymentAttempt') &&
@@ -478,6 +501,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
+    if (!snapshot.hasValidProductReportStates) return false;
     try {
       for (final order in snapshot.orders.where(_hasInvoiceContext)) {
         _decodeInvoiceContext(_encodeInvoiceContext(order));
@@ -546,6 +570,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       growable: false,
     ),
     'productIdentityKeys': snapshot.productIdentityKeys,
+    if (snapshot.productReportStates.isNotEmpty)
+      'productReportStates': {'version': 1, 'records': snapshot.productReportStates},
     'supplierPolicyAcceptances': snapshot.supplierPolicyAcceptances,
     'supplierPolicyUnresolvedProductKeys': snapshot.supplierPolicyUnresolvedProductKeys.toList(),
     'supplierPolicyRequiredProductKeys': snapshot
@@ -680,6 +706,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       source['excludedCartProductIds'],
     ).toSet(),
     productIdentityKeys: _stringMap(source['productIdentityKeys']),
+    productReportStates: source.containsKey('productReportStates')
+        ? _decodeProductReportStates(source['productReportStates']) : const {},
     supplierPolicyAcceptances: _stringMap(source['supplierPolicyAcceptances']),
     supplierPolicyUnresolvedProductKeys: _unresolvedPolicyKeys(source['supplierPolicyUnresolvedProductKeys']),
     supplierPolicyRequiredProductKeys: _stringList(
@@ -1828,6 +1856,24 @@ final class BuyV2SharedPreferencesCustomerStateStore
       invoiceAvailable: source['invoiceAvailable'] != false,
       receiptReference: _string(source['receiptReference']),
     );
+  }
+
+  static Map<String, String> _decodeProductReportStates(Object? raw) {
+    if (raw is! Map || raw.length != 2 || !raw.containsKey('records') ||
+        raw['version'] is! int || raw['version'] != 1 || raw['records'] is! Map) {
+      throw const FormatException('Saved product report recovery needs checking.');
+    }
+    final records = <String, String>{};
+    for (final entry in (raw['records'] as Map).entries) {
+      if (entry.key is! String || entry.value is! String) {
+        throw const FormatException('Saved product report target needs checking.');
+      }
+      records[entry.key as String] = entry.value as String;
+    }
+    if (!BuyV2CustomerStateSnapshot(productReportStates: records).hasValidProductReportStates) {
+      throw const FormatException('Saved product report target needs checking.');
+    }
+    return Map.unmodifiable(records);
   }
 
   static String? _string(Object? value) =>
