@@ -67140,15 +67140,51 @@ void main() {
       final storage = find.byKey(const Key('work-product-guided-Storage'));
       expect(tester.widget<TextField>(storage).controller!.text, 'Dry');
       expect(find.byKey(const Key('work-product-guided-Preparation')), findsOneWidget);
+      const foodLabels = {
+        'After opening': 'Keep refrigerated after opening',
+        'Contains allergens': 'Milk', 'May contain allergens': 'Peanuts',
+        'Food declaration': 'Host pack declaration', 'Nutrition basis': 'Per 100 ml',
+        'Serving size': '15 ml', 'Nutrition details': 'Energy 90 kcal per labelled serving',
+      };
+      for (final label in foodLabels.keys) {
+        final field = find.byKey(Key('work-product-guided-$label'));
+        expect(field, findsOneWidget);
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty,
+          reason: 'Optional label guidance must not create a supplied claim');
+        final hint = tester.widget<TextField>(field).decoration!.helper! as Text;
+        expect(hint.data, WorkspaceProductContent.guidedHintForLabel(label));
+        expect(hint.maxLines, isNull, reason: 'Source guidance must wrap at enlarged text, not truncate');
+      }
+      final declaration = find.byKey(const Key('work-product-guided-Food declaration'));
+      final declarationEditor = find.descendant(of: declaration, matching: find.byType(EditableText));
+      await show(declaration); await tester.tap(declarationEditor); await tester.pumpAndSettle();
+      expect(tester.widget<EditableText>(declarationEditor).focusNode.hasFocus, isTrue);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      final dialogTop = tester.getTopLeft(find.byType(AlertDialog)).dy;
+      final actionTop = tester.getTopLeft(find.byKey(const Key('work-product-guided-cancel'))).dy;
+      expect(tester.getTopLeft(declarationEditor).dy, greaterThanOrEqualTo(dialogTop),
+        reason: 'Focused label entry must stay inside the visible dialog after keyboard resize');
+      expect(tester.getBottomRight(declarationEditor).dy, lessThanOrEqualTo(actionTop),
+        reason: 'Focused label entry must not hide behind fixed dialog actions');
+      expect(tester.widget<TextField>(declaration).controller!.text, isEmpty);
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
       expect(find.text('No'), findsNothing);
       await tester.enterText(storage, 'Cancelled edit');
       await tester.tap(find.byKey(const Key('work-product-guided-cancel'))); await tester.pumpAndSettle();
       expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Dry');
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       await tester.enterText(storage, 'Cool, dry place');
+      for (final entry in foodLabels.entries) {
+        final field = find.byKey(Key('work-product-guided-${entry.key}'));
+        await show(field); await tester.enterText(field, entry.value);
+      }
       final apply = find.byKey(const Key('work-product-guided-apply'));
       await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      final expectedDetails = {'Container': 'Pouch', 'storage': 'Cool, dry place', ...foodLabels};
+      expect(WorkspaceProductContent.parse({'specifications':
+        tester.widget<TextField>(specs).controller!.text}).specifications, expectedDetails);
       final productDetails = find.byKey(const Key('work-product-details-section'));
       await show(productDetails); await tester.tap(productDetails); await tester.pumpAndSettle();
       Future<void> category(String query, String id) async {
@@ -67162,20 +67198,23 @@ void main() {
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       expect(tester.widget<TextField>(storage).controller!.text, 'Cool, dry place');
       expect(find.byKey(const Key('work-product-guided-Preparation')), findsNothing);
+      expect(find.byKey(const Key('work-product-guided-Contains allergens')), findsNothing);
       expect(find.byKey(const Key('work-product-guided-Dilution')), findsOneWidget);
       final usage = find.byKey(const Key('work-product-guided-Usage'));
       await show(usage); await tester.enterText(usage, 'Unsaved care edit');
       final cancel = find.byKey(const Key('work-product-guided-cancel'));
       await show(cancel); await tester.tap(cancel); await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      expect(WorkspaceProductContent.parse({'specifications':
+        tester.widget<TextField>(specs).controller!.text}).specifications, expectedDetails);
       await category('Other', 'other');
       expect(guide, findsNothing);
-      expect(tester.widget<TextField>(specs).controller!.text, 'Container: Pouch\nstorage: Cool, dry place');
+      expect(WorkspaceProductContent.parse({'specifications':
+        tester.widget<TextField>(specs).controller!.text}).specifications, expectedDetails);
       await category('Cooking', workspaceMasterCatalogue.first.categoryId);
       await show(find.byKey(const Key('work-product-save')));
       await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
       final saved = work.workspaceCatalogueItems.single;
-      expect(saved.content.specifications, {'Container': 'Pouch', 'storage': 'Cool, dry place'});
+      expect(saved.content.specifications, expectedDetails);
       expect(saved.catalogueFactsRequireReview, isTrue); expect(saved.publicListing, isFalse);
       expect(saved.stock, 0); expect(tester.takeException(), isNull);
     });

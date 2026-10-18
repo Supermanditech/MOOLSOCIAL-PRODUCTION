@@ -24946,12 +24946,35 @@ class _StoreGuidedDetailsDialog extends StatefulWidget {
   State<_StoreGuidedDetailsDialog> createState() => _StoreGuidedDetailsDialogState();
 }
 
-class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog> {
+class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
+    with WidgetsBindingObserver {
   late final _controllers = {for (final label in widget.labels) label: TextEditingController(text:
     widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
+  late final _focusNodes = {for (final label in widget.labels) label: FocusNode()};
+  late final _fieldKeys = {for (final label in widget.labels) label: GlobalKey()};
   String? _error;
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    for (final node in _focusNodes.values) { node.addListener(_revealFocusedField); }
+  }
+  @override
+  void didChangeMetrics() => _revealFocusedField();
+  void _revealFocusedField() {
+    // The keyboard can shrink the dialog after EditableText's initial reveal.
+    // Re-evaluate only this dialog's focused field after the resized layout.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final focused = _focusNodes.entries.where((entry) => entry.value.hasFocus).firstOrNull;
+      final target = focused == null ? null : _fieldKeys[focused.key]?.currentContext;
+      if (target != null) Scrollable.ensureVisible(target, alignment: .15);
+    });
+  }
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    for (final node in _focusNodes.values) { node.dispose(); }
     for (final controller in _controllers.values) { controller.dispose(); }
     super.dispose();
   }
@@ -24964,10 +24987,13 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog> {
       for (final entry in _controllers.entries) ...[
         const SizedBox(height: 16),
         Text(entry.key),
-        Semantics(label: '${entry.key} details', child: TextField(
+        Semantics(key: _fieldKeys[entry.key], label: '${entry.key} details', child: TextField(
           key: Key('work-product-guided-${entry.key}'), controller: entry.value,
+          focusNode: _focusNodes[entry.key],
           minLines: 1, maxLines: 3, maxLength: 500,
-          decoration: const InputDecoration(hintText: 'Optional', counterText: ''),
+          decoration: InputDecoration(hintText: 'Optional', counterText: '',
+            helper: WorkspaceProductContent.guidedHintForLabel(entry.key) == 'Optional'
+              ? null : Text(WorkspaceProductContent.guidedHintForLabel(entry.key), softWrap: true)),
           onChanged: (_) { if (_error != null) setState(() => _error = null); })),
       ],
       if (_error != null) Semantics(liveRegion: true, child: Text(_error!,

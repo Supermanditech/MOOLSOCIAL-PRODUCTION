@@ -47,16 +47,34 @@ class WorkspaceProductContent {
       'air-waste-care', 'diapers-wipes', 'baby-care'}.contains(categoryId)) {
       return const ['Intended use', 'Usage', 'Storage'];
     }
-    if (const {'fruits-vegetables', 'dairy-bakery', 'eggs-poultry', 'meat-seafood',
+    if (const {'fruits-vegetables', 'eggs-poultry', 'meat-seafood'}.contains(categoryId)) {
+      return const ['Storage', 'Preparation'];
+    }
+    if (const {'dairy-bakery',
       'flour-rice-grains', 'flour-grains', 'dals-staples', 'oils-ghee', 'cooking-oil',
       'ground-spices', 'whole-spices', 'salt-spices', 'breakfast-cereals',
       'instant-foods', 'sauces-spreads', 'biscuits-chocolate', 'namkeen-chips',
       'tea-coffee', 'juices-water', 'frozen-foods', 'icecream-cheese',
       'horeca-food-packs'}.contains(categoryId)) {
-      return const ['Storage', 'Preparation'];
+      return const ['Storage', 'Preparation', 'After opening',
+        'Contains allergens', 'May contain allergens', 'Food declaration',
+        'Nutrition basis', 'Serving size', 'Nutrition details'];
     }
     return const [];
   }
+
+  /// Hints are never saved values or declarations of suitability. Keep nutrient
+  /// units/basis exactly as supplied; this map does not calculate nutrition.
+  static String guidedHintForLabel(String label) => switch (label) {
+    'Contains allergens' => 'Copy the contains statement. Blank does not mean allergen-free.',
+    'May contain allergens' => 'Copy the separate may-contain statement, if supplied.',
+    'Food declaration' => 'Copy the vegetarian or non-vegetarian declaration on the pack.',
+    'Nutrition basis' => 'Copy whether the label uses 100 g, 100 ml or a serving.',
+    'Serving size' => 'Copy the labelled serving amount and its unit.',
+    'Nutrition details' => 'Copy nutrient names, amounts and units with their label basis.',
+    'After opening' => 'Copy storage and use instructions after opening, if supplied.',
+    _ => 'Optional',
+  };
 
   WorkspaceProductContent withGuidedDetails(Map<String, String> changes) {
     final updated = Map<String, String>.of(specifications);

@@ -2221,8 +2221,15 @@ void main() {
     for (final scale in [1.0, 2.0]) {
       testWidgets('CONTENT-GUIDE reviewed details display supplied fields only trade=$trade scale=$scale', (tester) async {
         final base = listingItem();
+        const publishedDetails = {
+          'Storage': 'Host published storage instructions',
+          'Contains allergens': 'Milk', 'May contain allergens': 'Peanuts',
+          'Food declaration': 'Host pack declaration', 'Nutrition basis': 'Per 100 ml',
+          'Serving size': '15 ml', 'Nutrition details': 'Energy 90 kcal per labelled serving',
+          'After opening': 'Keep refrigerated after opening',
+        };
         final authored = base.copyWith(content: base.content.withGuidedDetails({
-          'Storage': 'Host published storage instructions', 'Preparation': ''}));
+          ...publishedDetails, 'Preparation': ''}));
         final saved = WorkspaceCatalogueItem.fromInventoryJson(authored.toInventoryJson());
         final projection = saved.toBuyPublicContent(storeId: 'store-one', sourceId: 'Host reviewed source');
         // This is a labelled accepted-source host response, not automatic publication.
@@ -2232,13 +2239,18 @@ void main() {
         final entry = factoryEntry(data, channel: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail);
         final content = _HostOptionalProductContent()..specifications = entry.readback.content.specifications;
         final session = await optionalDetailsSession(entry.product, content);
-        final privateEdit = saved.copyWith(content: saved.content.withGuidedDetails({'Storage': 'Host private unpublished edit'}));
+        final privateEdit = saved.copyWith(content: saved.content.withGuidedDetails({
+          'Storage': 'Host private unpublished edit', 'Contains allergens': 'Host private allergen edit'}));
         expect(privateEdit.content.specifications['Storage'], 'Host private unpublished edit');
         await mountOptionalDetails(tester, session, scale);
         final details = find.byKey(ValueKey('buy-product-content-ready-${entry.product.id}'));
         await revealOptionalDetails(tester, entry.product, details);
-        expect(find.text('Host published storage instructions'), findsOneWidget);
+        for (final field in publishedDetails.entries) {
+          expect(find.text(field.key), findsOneWidget);
+          expect(find.text(field.value), findsOneWidget);
+        }
         expect(find.text('Host private unpublished edit'), findsNothing);
+        expect(find.text('Host private allergen edit'), findsNothing);
         expect(find.text('Preparation'), findsNothing);
         expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());

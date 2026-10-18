@@ -55,12 +55,58 @@ class _Lf05ConsentStore implements BuyV2CustomerStateStore {
 
 void main() {
   test('CONTENT-GUIDE optional descriptive controls follow category without forcing variants', () {
-    expect(WorkspaceProductContent.guidedLabelsForCategory('cooking-oil'), ['Storage', 'Preparation']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('cooking-oil'), [
+      'Storage', 'Preparation', 'After opening', 'Contains allergens',
+      'May contain allergens', 'Food declaration', 'Nutrition basis',
+      'Serving size', 'Nutrition details',
+    ]);
+    for (final category in ['fruits-vegetables', 'eggs-poultry', 'meat-seafood']) {
+      expect(WorkspaceProductContent.guidedLabelsForCategory(category), ['Storage', 'Preparation']);
+    }
     expect(WorkspaceProductContent.guidedLabelsForCategory('surface-cleaners'), ['Intended use', 'Usage', 'Dilution', 'Storage']);
     expect(WorkspaceProductContent.guidedLabelsForCategory('hair-care'), ['Intended use', 'Usage', 'Storage']);
     expect(WorkspaceProductContent.guidedLabelsForCategory('other'), isEmpty);
     expect(WorkspaceProductContent.guidedLabelsForCategory('unknown-category'), isEmpty);
     expect(const WorkspaceProductContent().withGuidedDetails({'Storage': '', 'Preparation': ' '}).isEmpty, isTrue);
+  });
+  test('CONTENT-GUIDE food source values stay separate through save and CSV without default claims', () {
+    final base = workspaceMasterCatalogue.first;
+    const values = {
+      'Contains allergens': 'Milk', 'May contain allergens': 'Peanuts',
+      'Food declaration': 'Host pack declaration', 'Nutrition basis': 'Per 100 ml',
+      'Serving size': '15 ml', 'Nutrition details': 'Energy 90 kcal per labelled serving',
+      'After opening': 'Use within the printed period', 'Storage': 'Keep cool',
+      'Preparation': '',
+    };
+    final content = const WorkspaceProductContent().withGuidedDetails(values);
+    final authored = base.copyWith(content: content, publicListing: false);
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(authored.toInventoryJson());
+    expect(restored.content.specifications, Map.of(values)..remove('Preparation'));
+    final raw = {'title': base.title, 'brand': base.brand, 'pack': base.pack, 'variant': base.variant,
+      'canonicalId': base.canonicalId, 'purchasePrice': '200', 'sellingPrice': '260',
+      'stock': '0', ...content.inputValues};
+    final imported = WorkspaceProductImport.parse(jsonEncode([raw]), json: true,
+      catalogue: [base], owned: []).rows.single;
+    expect(imported.issue, isNull);
+    expect(imported.product!.content.specifications, content.specifications);
+    expect(imported.product!.publicListing, isFalse);
+    final empty = const WorkspaceProductContent().withGuidedDetails({
+      for (final label in WorkspaceProductContent.guidedLabelsForCategory('cooking-oil')) label: '',
+    });
+    expect(empty.isEmpty, isTrue);
+    final cleared = content.withGuidedDetails({'Contains allergens': ''});
+    expect(cleared.specifications.containsKey('Contains allergens'), isFalse);
+    expect(cleared.specifications['May contain allergens'], 'Peanuts');
+    expect(cleared.specifications['Nutrition basis'], 'Per 100 ml');
+    expect(cleared.specifications['Nutrition details'], values['Nutrition details']);
+    final full = WorkspaceProductContent(specifications: {
+      'contains allergens': 'Old source',
+      for (var i = 0; i < 29; i++) 'Other $i': 'Retain',
+    });
+    expect(full.withGuidedDetails({'Contains allergens': 'Milk'}).specifications.length, 30);
+    expect(full.withGuidedDetails({'Contains allergens': 'Milk'}).specifications['contains allergens'], 'Milk');
+    expect(() => full.withGuidedDetails({'May contain allergens': 'Peanuts'}), throwsFormatException);
+    expect(full.specifications['contains allergens'], 'Old source');
   });
   test('CONTENT-GUIDE edit and clear retain original case and unrelated source details', () {
     final original = WorkspaceProductContent.parse({'description': 'Host description', 'highlights': 'Host highlight',
