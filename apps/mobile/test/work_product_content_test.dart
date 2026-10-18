@@ -63,11 +63,48 @@ void main() {
     for (final category in ['fruits-vegetables', 'eggs-poultry', 'meat-seafood']) {
       expect(WorkspaceProductContent.guidedLabelsForCategory(category), ['Storage', 'Preparation']);
     }
-    expect(WorkspaceProductContent.guidedLabelsForCategory('surface-cleaners'), ['Intended use', 'Usage', 'Dilution', 'Storage']);
-    expect(WorkspaceProductContent.guidedLabelsForCategory('hair-care'), ['Intended use', 'Usage', 'Storage']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('surface-cleaners'), ['Intended use', 'Usage', 'Dilution', 'Storage', 'Form or material', 'Intended surface']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('hair-care'), ['Intended use', 'Usage', 'Storage', 'Form or material', 'Skin or hair type']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('oral-care'), ['Intended use', 'Usage', 'Storage', 'Form or material']);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('baby-care'), ['Intended use', 'Usage', 'Storage', 'Form or material', 'Age or size guidance']);
     expect(WorkspaceProductContent.guidedLabelsForCategory('other'), isEmpty);
     expect(WorkspaceProductContent.guidedLabelsForCategory('unknown-category'), isEmpty);
     expect(const WorkspaceProductContent().withGuidedDetails({'Storage': '', 'Preparation': ' '}).isEmpty, isTrue);
+  });
+  test('CONTENT-GUIDE electronics and care source details preserve unrelated case through recovery and import', () {
+    final original = WorkspaceProductContent.parse({'specifications':
+      'model code: Host model\nStorage: Keep dry\nUnknown source field: Retain'});
+    const values = {'Model code': 'Host model revised', 'RAM': '8 GB',
+      'Storage capacity': '256 GB', 'Compatibility': 'Host supplied standard',
+      'In the box': 'Host listed items', 'Form or material': 'Host material'};
+    final changed = original.withGuidedDetails(values);
+    expect(changed.specifications['model code'], values['Model code']);
+    expect(changed.specifications.containsKey('Model code'), isFalse);
+    expect(changed.specifications['Storage'], 'Keep dry');
+    expect(changed.specifications['Storage capacity'], '256 GB');
+    expect(changed.specifications['RAM'], '8 GB');
+    expect(changed.specifications['Unknown source field'], 'Retain');
+    final base = workspaceMasterCatalogue.first.copyWith(categoryId: 'other', content: changed, publicListing: false);
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(base.toInventoryJson());
+    expect(restored.content.specifications, changed.specifications);
+    final imported = WorkspaceProductImport.parse(jsonEncode([{'title': base.title, 'brand': base.brand,
+      'pack': base.pack, 'variant': base.variant, 'canonicalId': base.canonicalId,
+      'purchasePrice': '200', 'sellingPrice': '260', 'stock': '0', ...changed.inputValues}]),
+      json: true, catalogue: [base], owned: []).rows.single;
+    expect(imported.issue, isNull); expect(imported.product!.content.specifications, changed.specifications);
+    expect(imported.product!.publicListing, isFalse);
+    final cleared = changed.withGuidedDetails({'Model code': ''});
+    expect(cleared.specifications.containsKey('model code'), isFalse);
+    expect(cleared.specifications['RAM'], '8 GB');
+    final full = WorkspaceProductContent(specifications: {
+      'model code': 'Original', for (var i = 0; i < 29; i++) 'Host $i': 'Retain'});
+    expect(full.withGuidedDetails({'Model code': 'Revised'}).specifications.length, 30);
+    expect(() => full.withGuidedDetails({'RAM': '8 GB'}), throwsFormatException);
+    expect(WorkspaceProductContent.electronicsGuideLabels.toSet().length, 13);
+    for (final label in [...WorkspaceProductContent.electronicsGuideLabels,
+      'Form or material', 'Intended surface', 'Skin or hair type', 'Age or size guidance']) {
+      expect(WorkspaceProductContent.guidedHintForLabel(label), isNotEmpty);
+    }
   });
   test('CONTENT-GUIDE food source values stay separate through save and CSV without default claims', () {
     final base = workspaceMasterCatalogue.first;

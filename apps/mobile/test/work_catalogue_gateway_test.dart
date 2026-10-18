@@ -2227,9 +2227,12 @@ void main() {
           'Food declaration': 'Host pack declaration', 'Nutrition basis': 'Per 100 ml',
           'Serving size': '15 ml', 'Nutrition details': 'Energy 90 kcal per labelled serving',
           'After opening': 'Keep refrigerated after opening',
+          'Model code': 'Host published model', 'RAM': '8 GB', 'Storage capacity': '256 GB',
+          'Compatibility': 'Host published standard', 'In the box': 'Host published included items',
+          'Form or material': 'Host published material', 'Intended surface': 'Host source surface',
         };
         final authored = base.copyWith(content: base.content.withGuidedDetails({
-          ...publishedDetails, 'Preparation': ''}));
+          ...publishedDetails, 'Preparation': '', 'Power rating': '', 'Age or size guidance': ''}));
         final saved = WorkspaceCatalogueItem.fromInventoryJson(authored.toInventoryJson());
         final projection = saved.toBuyPublicContent(storeId: 'store-one', sourceId: 'Host reviewed source');
         // This is a labelled accepted-source host response, not automatic publication.
@@ -2240,7 +2243,8 @@ void main() {
         final content = _HostOptionalProductContent()..specifications = entry.readback.content.specifications;
         final session = await optionalDetailsSession(entry.product, content);
         final privateEdit = saved.copyWith(content: saved.content.withGuidedDetails({
-          'Storage': 'Host private unpublished edit', 'Contains allergens': 'Host private allergen edit'}));
+          'Storage': 'Host private unpublished edit', 'Contains allergens': 'Host private allergen edit',
+          'Model code': 'Host private model edit'}));
         expect(privateEdit.content.specifications['Storage'], 'Host private unpublished edit');
         await mountOptionalDetails(tester, session, scale);
         final details = find.byKey(ValueKey('buy-product-content-ready-${entry.product.id}'));
@@ -2251,7 +2255,10 @@ void main() {
         }
         expect(find.text('Host private unpublished edit'), findsNothing);
         expect(find.text('Host private allergen edit'), findsNothing);
+        expect(find.text('Host private model edit'), findsNothing);
         expect(find.text('Preparation'), findsNothing);
+        expect(find.text('Power rating'), findsNothing);
+        expect(find.text('Age or size guidance'), findsNothing);
         expect(session.cartLines, isEmpty); expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });

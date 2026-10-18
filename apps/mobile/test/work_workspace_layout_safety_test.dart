@@ -67207,14 +67207,61 @@ void main() {
       expect(WorkspaceProductContent.parse({'specifications':
         tester.widget<TextField>(specs).controller!.text}).specifications, expectedDetails);
       await category('Other', 'other');
-      expect(guide, findsNothing);
+      expect(guide, findsOneWidget, reason: 'Other products need an explicit optional detail guide, not forced food fields');
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      final detailGuide = find.byKey(const Key('work-product-detail-guide'));
+      expect(detailGuide, findsOneWidget);
+      expect(find.byKey(const Key('work-product-guided-Storage')), findsNothing);
+      expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
+      await tester.tap(detailGuide); await tester.pumpAndSettle();
+      await tester.tap(find.text('Electronics').last); await tester.pumpAndSettle();
+      for (final label in ['Model code', 'RAM', 'Storage capacity', 'Compatibility', 'In the box']) {
+        final field = find.byKey(Key('work-product-guided-$label'));
+        expect(field, findsOneWidget);
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+      }
+      const electronics = {'Model code': 'Host model', 'RAM': '8 GB', 'Storage capacity': '256 GB'};
+      for (final entry in electronics.entries) {
+        final field = find.byKey(Key('work-product-guided-${entry.key}'));
+        await show(field); await tester.enterText(field, entry.value);
+      }
+      Future<void> chooseGuide(String name) async {
+        await show(detailGuide); await tester.tap(detailGuide); await tester.pumpAndSettle();
+        await tester.tap(find.text(name).last); await tester.pumpAndSettle();
+      }
+      await chooseGuide('General');
+      expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
+      await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
+      final allDetails = {...expectedDetails, ...electronics};
       expect(WorkspaceProductContent.parse({'specifications':
-        tester.widget<TextField>(specs).controller!.text}).specifications, expectedDetails);
+        tester.widget<TextField>(specs).controller!.text}).specifications, allDetails,
+        reason: 'Changing the guide is not a delete command for hidden edits or original details');
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
+      expect(find.text('Saved details stay in Specifications. Choose Electronics for guided fields.'), findsOneWidget);
+      await chooseGuide('Electronics');
+      for (final entry in electronics.entries) {
+        expect(tester.widget<TextField>(find.byKey(Key('work-product-guided-${entry.key}'))).controller!.text, entry.value);
+      }
+      final model = find.byKey(const Key('work-product-guided-Model code'));
+      await show(model); await tester.enterText(model, '');
+      await chooseGuide('General');
+      await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
+      final clearedDetails = Map<String, String>.of(allDetails)..remove('Model code');
+      expect(WorkspaceProductContent.parse({'specifications':
+        tester.widget<TextField>(specs).controller!.text}).specifications, clearedDetails);
+      await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
+      await chooseGuide('Electronics');
+      await show(model); await tester.enterText(model, 'Cancelled electronics edit');
+      await chooseGuide('General');
+      await show(cancel); await tester.tap(cancel); await tester.pumpAndSettle();
+      expect(WorkspaceProductContent.parse({'specifications':
+        tester.widget<TextField>(specs).controller!.text}).specifications, clearedDetails);
       await category('Cooking', workspaceMasterCatalogue.first.categoryId);
       await show(find.byKey(const Key('work-product-save')));
       await tester.tap(find.byKey(const Key('work-product-save'))); await tester.pumpAndSettle();
       final saved = work.workspaceCatalogueItems.single;
-      expect(saved.content.specifications, expectedDetails);
+      expect(saved.content.specifications, clearedDetails);
       expect(saved.catalogueFactsRequireReview, isTrue); expect(saved.publicListing, isFalse);
       expect(saved.stock, 0); expect(tester.takeException(), isNull);
     });

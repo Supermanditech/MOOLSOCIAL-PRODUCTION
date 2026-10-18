@@ -39,13 +39,25 @@ class WorkspaceProductContent {
   };
   /// Optional descriptive capture over the existing specification map, not typed
   /// nutrition, safety certification, or a change to the reviewed wire format.
+  /// This guide is chosen explicitly; it never classifies or enables a product.
+  static const electronicsGuideLabels = [
+    'Model code', 'RAM', 'Storage capacity', 'Display', 'Processor',
+    'Operating system', 'Compatibility', 'Ports & connectivity',
+    'Battery capacity', 'Power rating', 'Dimensions', 'Weight', 'In the box',
+  ];
+
   static List<String> guidedLabelsForCategory(String categoryId) {
     if (const {'surface-cleaners', 'laundry-dishwash'}.contains(categoryId)) {
-      return const ['Intended use', 'Usage', 'Dilution', 'Storage'];
+      return const ['Intended use', 'Usage', 'Dilution', 'Storage', 'Form or material', 'Intended surface'];
     }
-    if (const {'bath-hand-care', 'oral-care', 'hair-care', 'skin-care',
-      'air-waste-care', 'diapers-wipes', 'baby-care'}.contains(categoryId)) {
-      return const ['Intended use', 'Usage', 'Storage'];
+    if (const {'bath-hand-care', 'hair-care', 'skin-care'}.contains(categoryId)) {
+      return const ['Intended use', 'Usage', 'Storage', 'Form or material', 'Skin or hair type'];
+    }
+    if (const {'oral-care', 'air-waste-care'}.contains(categoryId)) {
+      return const ['Intended use', 'Usage', 'Storage', 'Form or material'];
+    }
+    if (const {'diapers-wipes', 'baby-care'}.contains(categoryId)) {
+      return const ['Intended use', 'Usage', 'Storage', 'Form or material', 'Age or size guidance'];
     }
     if (const {'fruits-vegetables', 'eggs-poultry', 'meat-seafood'}.contains(categoryId)) {
       return const ['Storage', 'Preparation'];
@@ -73,6 +85,23 @@ class WorkspaceProductContent {
     'Serving size' => 'Copy the labelled serving amount and its unit.',
     'Nutrition details' => 'Copy nutrient names, amounts and units with their label basis.',
     'After opening' => 'Copy storage and use instructions after opening, if supplied.',
+    'Form or material' => 'Copy the product form or material stated on its label.',
+    'Intended surface' => 'Copy the surfaces named for this product.',
+    'Skin or hair type' => 'Copy the stated type; do not infer suitability.',
+    'Age or size guidance' => 'Copy stated age or size guidance; do not infer suitability.',
+    'Model code' => 'Copy the manufacturer model or part code, not your Store SKU.',
+    'RAM' => 'Copy memory amount and unit. Keep it separate from storage.',
+    'Storage capacity' => 'Copy device storage and unit, not storage or care instructions.',
+    'Display' => 'Copy the display size and specifications for this exact model.',
+    'Processor' => 'Copy the processor stated for this exact model.',
+    'Operating system' => 'Copy the supplied system and version, without promising future updates.',
+    'Compatibility' => 'Copy compatible devices or standards stated for this exact model.',
+    'Ports & connectivity' => 'Copy the supplied ports and connection standards.',
+    'Battery capacity' => 'Copy capacity and unit, not estimated battery life.',
+    'Power rating' => 'Copy the printed power rating and unit; do not estimate.',
+    'Dimensions' => 'Copy dimensions and units for this exact model.',
+    'Weight' => 'Copy weight and unit for this exact model.',
+    'In the box' => 'Copy included items, not optional accessories.',
     _ => 'Optional',
   };
 

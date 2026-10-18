@@ -24939,19 +24939,25 @@ class _StoreEmptyPanel extends StatelessWidget {
 }
 
 class _StoreGuidedDetailsDialog extends StatefulWidget {
-  const _StoreGuidedDetailsDialog({required this.original, required this.labels});
+  const _StoreGuidedDetailsDialog({required this.original, required this.labels, this.allowElectronics = false});
   final WorkspaceProductContent original;
   final List<String> labels;
+  final bool allowElectronics;
   @override
   State<_StoreGuidedDetailsDialog> createState() => _StoreGuidedDetailsDialogState();
 }
 
 class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     with WidgetsBindingObserver {
-  late final _controllers = {for (final label in widget.labels) label: TextEditingController(text:
+  late final _allLabels = {...widget.labels,
+    if (widget.allowElectronics) ...WorkspaceProductContent.electronicsGuideLabels};
+  late final _controllers = {for (final label in _allLabels) label: TextEditingController(text:
     widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
-  late final _focusNodes = {for (final label in widget.labels) label: FocusNode()};
-  late final _fieldKeys = {for (final label in widget.labels) label: GlobalKey()};
+  late final _focusNodes = {for (final label in _allLabels) label: FocusNode()};
+  late final _fieldKeys = {for (final label in _allLabels) label: GlobalKey()};
+  String _guide = 'general';
+  List<String> get _visibleLabels => _guide == 'electronics'
+    ? WorkspaceProductContent.electronicsGuideLabels : widget.labels;
   String? _error;
   @override
   void initState() {
@@ -24981,10 +24987,25 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
   @override
   Widget build(BuildContext context) => AlertDialog(
     scrollable: true,
-    title: Text('Category details', style: Theme.of(context).textTheme.titleMedium),
+    title: Text(widget.allowElectronics ? 'Product details' : 'Category details', style: Theme.of(context).textTheme.titleMedium),
     content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Text('Optional details from the product label. Blank fields are omitted from public pages.'),
-      for (final entry in _controllers.entries) ...[
+      if (widget.allowElectronics) ...[
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(key: const Key('work-product-detail-guide'),
+          initialValue: _guide, isExpanded: true, itemHeight: null,
+          decoration: const InputDecoration(labelText: 'Detail guide'),
+          items: const [DropdownMenuItem(value: 'general', child: Text('General')),
+            DropdownMenuItem(value: 'electronics', child: Text('Electronics'))],
+          onChanged: (value) {
+            if (value == null) return;
+            FocusScope.of(context).unfocus();
+            setState(() { _guide = value; _error = null; });
+          }),
+        if (_guide == 'general') const Padding(padding: EdgeInsets.only(top: 8),
+          child: Text('Saved details stay in Specifications. Choose Electronics for guided fields.')),
+      ],
+      for (final entry in _controllers.entries.where((entry) => _visibleLabels.contains(entry.key))) ...[
         const SizedBox(height: 16),
         Text(entry.key),
         Semantics(key: _fieldKeys[entry.key], label: '${entry.key} details', child: TextField(
@@ -26601,7 +26622,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   Future<void> _editGuidedDetails() async {
     final labels = WorkspaceProductContent.guidedLabelsForCategory(_category.text);
-    if (labels.isEmpty || _savingInventory) return;
+    final allowElectronics = _category.text == 'other';
+    if ((labels.isEmpty && !allowElectronics) || _savingInventory) return;
     FocusScope.of(context).unfocus();
     WorkspaceProductContent original;
     try {
@@ -26612,7 +26634,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       return;
     }
     final result = await showDialog<WorkspaceProductContent>(context: context,
-      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels));
+      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels, allowElectronics: allowElectronics));
     if (!mounted || result == null) return;
     setState(() => _contentFields['specifications']!.text = result.inputValues['specifications']!);
     _clearFieldError('specifications');
@@ -27107,11 +27129,12 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                               ),
                               const SizedBox(height: 8),
                             ],
-                            if (WorkspaceProductContent.guidedLabelsForCategory(_category.text).isNotEmpty) ...[
+                            if (WorkspaceProductContent.guidedLabelsForCategory(_category.text).isNotEmpty || _category.text == 'other') ...[
                               Align(alignment: Alignment.centerLeft, child: TextButton.icon(
                                 key: const Key('work-product-guided-details'),
                                 onPressed: _savingInventory ? null : _editGuidedDetails,
-                                icon: const Icon(Icons.edit_note), label: const Text('Edit category details'))),
+                                icon: const Icon(Icons.edit_note), label: Text(_category.text == 'other'
+                                  ? 'Choose detail guide' : 'Edit category details'))),
                               const SizedBox(height: 8),
                             ],
                             _field(
