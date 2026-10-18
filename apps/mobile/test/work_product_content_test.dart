@@ -54,6 +54,54 @@ class _Lf05ConsentStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
+  test('PF06 appliance facts use the same optional map through save restore and import', () {
+    const values = {'Model code': 'Host model', 'Capacity': 'Host supplied 7 kg',
+      'Dimensions': 'Host dimensions and units', 'Weight': 'Host 20 kg',
+      'Power rating': 'Host printed power', 'Electrical supply': 'Host voltage and frequency',
+      'Energy label': 'Host rating and period', 'Certification reference': 'Host printed reference',
+      'Installation requirements': 'Host clearance instructions', 'In the box': 'Host listed items'};
+    final original = WorkspaceProductContent.parse({'specifications': 'capacity: Old value\nCustom detail: Retain'});
+    final content = original.withGuidedDetails(values);
+    expect(content.specifications['capacity'], values['Capacity']);
+    expect(content.specifications.containsKey('Capacity'), isFalse);
+    expect(content.specifications['Custom detail'], 'Retain');
+    final product = workspaceMasterCatalogue.first.copyWith(categoryId: 'other', content: content, publicListing: false);
+    final restored = WorkspaceCatalogueItem.fromInventoryJson(product.toInventoryJson());
+    expect(restored.content.specifications, content.specifications);
+    expect(restored.id, product.id); expect(restored.sku, product.sku);
+    expect(restored.publicListing, isFalse);
+    final raw = {'title': product.title, 'brand': product.brand,
+      'pack': product.pack, 'variant': product.variant, 'canonicalId': product.canonicalId,
+      'purchasePrice': '200', 'sellingPrice': '260', 'stock': '0', ...content.inputValues};
+    final imported = WorkspaceProductImport.parse(jsonEncode([raw]),
+      json: true, catalogue: [product], owned: []).rows.single;
+    expect(imported.issue, isNull);
+    expect(imported.product!.content.specifications, content.specifications);
+    expect(imported.product!.publicListing, isFalse);
+    String quoted(String value) => '"${value.replaceAll('"', '""')}"';
+    final csv = '${raw.keys.map(quoted).join(',')}\n${raw.values.map(quoted).join(',')}';
+    final csvImported = WorkspaceProductImport.parse(csv, json: false,
+      catalogue: [product], owned: []).rows.single;
+    expect(csvImported.issue, isNull);
+    expect(csvImported.product!.content.specifications, content.specifications);
+    expect(csvImported.product!.publicListing, isFalse);
+    final cleared = content.withGuidedDetails({'Capacity': ''});
+    expect(cleared.specifications.containsKey('capacity'), isFalse);
+    expect(cleared.specifications['Electrical supply'], values['Electrical supply']);
+    expect(cleared.specifications['Custom detail'], 'Retain');
+  });
+  test('PF06 guide creates no empty facts certification or installation promise', () {
+    final labels = WorkspaceProductContent.applianceGuideLabels;
+    expect(labels.toSet().length, 10);
+    expect(const WorkspaceProductContent().withGuidedDetails({for (final label in labels) label: ' '}).isEmpty, isTrue);
+    for (final label in labels) {
+      expect(WorkspaceProductContent.guidedHintForLabel(label), isNot('Optional'));
+    }
+    final content = const WorkspaceProductContent().withGuidedDetails({'Energy label': 'Supplied value'});
+    expect(content.specifications.keys, ['Energy label']);
+    expect(() => content.withGuidedDetails({'Capacity': 'First\nSecond'}), throwsFormatException);
+    expect(WorkspaceProductContent.guidedLabelsForCategory('fruits-vegetables'), ['Storage', 'Preparation']);
+  });
   test('CONTENT-GUIDE optional descriptive controls follow category without forcing variants', () {
     expect(WorkspaceProductContent.guidedLabelsForCategory('cooking-oil'), [
       'Storage', 'Preparation', 'After opening', 'Contains allergens',

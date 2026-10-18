@@ -24939,10 +24939,10 @@ class _StoreEmptyPanel extends StatelessWidget {
 }
 
 class _StoreGuidedDetailsDialog extends StatefulWidget {
-  const _StoreGuidedDetailsDialog({required this.original, required this.labels, this.allowElectronics = false});
+  const _StoreGuidedDetailsDialog({required this.original, required this.labels, this.allowProductGuides = false});
   final WorkspaceProductContent original;
   final List<String> labels;
-  final bool allowElectronics;
+  final bool allowProductGuides;
   @override
   State<_StoreGuidedDetailsDialog> createState() => _StoreGuidedDetailsDialogState();
 }
@@ -24950,14 +24950,19 @@ class _StoreGuidedDetailsDialog extends StatefulWidget {
 class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     with WidgetsBindingObserver {
   late final _allLabels = {...widget.labels,
-    if (widget.allowElectronics) ...WorkspaceProductContent.electronicsGuideLabels};
+    if (widget.allowProductGuides) ...WorkspaceProductContent.electronicsGuideLabels,
+    if (widget.allowProductGuides) ...WorkspaceProductContent.applianceGuideLabels};
   late final _controllers = {for (final label in _allLabels) label: TextEditingController(text:
     widget.original.specifications.entries.where((e) => e.key.toLowerCase() == label.toLowerCase()).firstOrNull?.value ?? '')};
   late final _focusNodes = {for (final label in _allLabels) label: FocusNode()};
-  late final _fieldKeys = {for (final label in _allLabels) label: GlobalKey()};
+  bool _revealPending = false;
+  double? _viewportDimension;
   String _guide = 'general';
-  List<String> get _visibleLabels => _guide == 'electronics'
-    ? WorkspaceProductContent.electronicsGuideLabels : widget.labels;
+  List<String> get _visibleLabels => switch (_guide) {
+    'electronics' => WorkspaceProductContent.electronicsGuideLabels,
+    'appliances' => WorkspaceProductContent.applianceGuideLabels,
+    _ => widget.labels,
+  };
   String? _error;
   @override
   void initState() {
@@ -24968,13 +24973,16 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
   @override
   void didChangeMetrics() => _revealFocusedField();
   void _revealFocusedField() {
-    // The keyboard can shrink the dialog after EditableText's initial reveal.
-    // Re-evaluate only this dialog's focused field after the resized layout.
+    if (_revealPending) return;
+    _revealPending = true;
+    // Dialog inset animation can resize the scroll viewport after the device
+    // metrics event. Reveal the input, not its potentially much taller helper.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _revealPending = false;
       if (!mounted) return;
       final focused = _focusNodes.entries.where((entry) => entry.value.hasFocus).firstOrNull;
-      final target = focused == null ? null : _fieldKeys[focused.key]?.currentContext;
-      if (target != null) Scrollable.ensureVisible(target, alignment: .15);
+      final target = focused?.value.context;
+      if (target != null && target.mounted) Scrollable.ensureVisible(target, alignment: .15);
     });
   }
   @override
@@ -24985,36 +24993,46 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
     super.dispose();
   }
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => NotificationListener<ScrollMetricsNotification>(
+    onNotification: (notification) {
+      if (notification.metrics.axis == Axis.vertical &&
+          _viewportDimension != notification.metrics.viewportDimension) {
+        _viewportDimension = notification.metrics.viewportDimension;
+        _revealFocusedField();
+      }
+      return false;
+    },
+    child: AlertDialog(
     scrollable: true,
-    title: Text(widget.allowElectronics ? 'Product details' : 'Category details', style: Theme.of(context).textTheme.titleMedium),
+    title: Text(widget.allowProductGuides ? 'Product details' : 'Category details', style: Theme.of(context).textTheme.titleMedium),
     content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('Optional details from the product label. Blank fields are omitted from public pages.'),
-      if (widget.allowElectronics) ...[
+      const Text('Optional details from the product label or manufacturer information. Blank fields are omitted from public pages.'),
+      if (widget.allowProductGuides) ...[
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(key: const Key('work-product-detail-guide'),
           initialValue: _guide, isExpanded: true, itemHeight: null,
           decoration: const InputDecoration(labelText: 'Detail guide'),
           items: const [DropdownMenuItem(value: 'general', child: Text('General')),
-            DropdownMenuItem(value: 'electronics', child: Text('Electronics'))],
+            DropdownMenuItem(value: 'electronics', child: Text('Electronics')),
+            DropdownMenuItem(value: 'appliances', child: Text('Appliances'))],
           onChanged: (value) {
             if (value == null) return;
             FocusScope.of(context).unfocus();
             setState(() { _guide = value; _error = null; });
           }),
         if (_guide == 'general') const Padding(padding: EdgeInsets.only(top: 8),
-          child: Text('Saved details stay in Specifications. Choose Electronics for guided fields.')),
+          child: Text('Saved details stay in Specifications. Choose Electronics or Appliances for guided fields.')),
       ],
-      for (final entry in _controllers.entries.where((entry) => _visibleLabels.contains(entry.key))) ...[
+      for (final label in _visibleLabels) ...[
         const SizedBox(height: 16),
-        Text(entry.key),
-        Semantics(key: _fieldKeys[entry.key], label: '${entry.key} details', child: TextField(
-          key: Key('work-product-guided-${entry.key}'), controller: entry.value,
-          focusNode: _focusNodes[entry.key],
+        Text(label),
+        Semantics(label: '$label details', child: TextField(
+          key: Key('work-product-guided-$label'), controller: _controllers[label],
+          focusNode: _focusNodes[label],
           minLines: 1, maxLines: 3, maxLength: 500,
           decoration: InputDecoration(hintText: 'Optional', counterText: '',
-            helper: WorkspaceProductContent.guidedHintForLabel(entry.key) == 'Optional'
-              ? null : Text(WorkspaceProductContent.guidedHintForLabel(entry.key), softWrap: true)),
+            helper: WorkspaceProductContent.guidedHintForLabel(label) == 'Optional'
+              ? null : Text(WorkspaceProductContent.guidedHintForLabel(label), softWrap: true)),
           onChanged: (_) { if (_error != null) setState(() => _error = null); })),
       ],
       if (_error != null) Semantics(liveRegion: true, child: Text(_error!,
@@ -25033,7 +25051,7 @@ class _StoreGuidedDetailsDialogState extends State<_StoreGuidedDetailsDialog>
         }
       }, child: const Text('Apply')),
     ],
-  );
+  ));
 }
 
 class _CatalogueProductEditor extends StatefulWidget {
@@ -26622,8 +26640,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
 
   Future<void> _editGuidedDetails() async {
     final labels = WorkspaceProductContent.guidedLabelsForCategory(_category.text);
-    final allowElectronics = _category.text == 'other';
-    if ((labels.isEmpty && !allowElectronics) || _savingInventory) return;
+    final allowProductGuides = _category.text == 'other';
+    if ((labels.isEmpty && !allowProductGuides) || _savingInventory) return;
     FocusScope.of(context).unfocus();
     WorkspaceProductContent original;
     try {
@@ -26634,7 +26652,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       return;
     }
     final result = await showDialog<WorkspaceProductContent>(context: context,
-      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels, allowElectronics: allowElectronics));
+      builder: (_) => _StoreGuidedDetailsDialog(original: original, labels: labels, allowProductGuides: allowProductGuides));
     if (!mounted || result == null) return;
     setState(() => _contentFields['specifications']!.text = result.inputValues['specifications']!);
     _clearFieldError('specifications');

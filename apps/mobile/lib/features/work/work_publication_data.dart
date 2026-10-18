@@ -45,6 +45,11 @@ class WorkspaceProductContent {
     'Operating system', 'Compatibility', 'Ports & connectivity',
     'Battery capacity', 'Power rating', 'Dimensions', 'Weight', 'In the box',
   ];
+  static const applianceGuideLabels = [
+    'Model code', 'Capacity', 'Dimensions', 'Weight', 'Power rating',
+    'Electrical supply', 'Energy label', 'Certification reference',
+    'Installation requirements', 'In the box',
+  ];
 
   static List<String> guidedLabelsForCategory(String categoryId) {
     if (const {'surface-cleaners', 'laundry-dishwash'}.contains(categoryId)) {
@@ -102,6 +107,11 @@ class WorkspaceProductContent {
     'Dimensions' => 'Copy dimensions and units for this exact model.',
     'Weight' => 'Copy weight and unit for this exact model.',
     'In the box' => 'Copy included items, not optional accessories.',
+    'Capacity' => 'Copy the manufacturer capacity and unit for this exact model.',
+    'Electrical supply' => 'Copy the printed voltage, frequency and supply requirements; do not infer.',
+    'Energy label' => 'Copy supplied energy-rating details and their rating period; do not estimate.',
+    'Certification reference' => 'Copy the supplied certification name or reference. This does not verify it.',
+    'Installation requirements' => 'Copy installation requirements, not a promise of an installation service.',
     _ => 'Optional',
   };
 

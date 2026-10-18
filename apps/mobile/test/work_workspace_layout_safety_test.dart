@@ -67229,16 +67229,45 @@ void main() {
         await show(detailGuide); await tester.tap(detailGuide); await tester.pumpAndSettle();
         await tester.tap(find.text(name).last); await tester.pumpAndSettle();
       }
+      await chooseGuide('Appliances');
+      const applianceDetails = {'Capacity': 'Host supplied 7 kg',
+        'Electrical supply': 'Host supplied 230 V, 50 Hz', 'Energy label': 'Host printed rating period',
+        'Certification reference': 'Host supplied reference', 'Installation requirements': 'Host supplied clearance'};
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-guided-Model code'))).controller!.text,
+        electronics['Model code'], reason: 'Shared model facts must not duplicate or reset when changing guides');
+      expect(find.byKey(const Key('work-product-guided-RAM')), findsNothing);
+      final installation = find.byKey(const Key('work-product-guided-Installation requirements'));
+      final installationEditor = find.descendant(of: installation, matching: find.byType(EditableText));
+      await show(installation); await tester.tap(installationEditor); await tester.pumpAndSettle();
+      for (final inset in [80.0, 160.0, 240.0, 284.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pump(const Duration(milliseconds: 32));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.getBottomRight(installationEditor).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('work-product-guided-cancel'))).dy),
+        reason: 'A long helper must not hide the focused input behind actions as the native keyboard animates');
+      expect(tester.getTopLeft(installationEditor).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(find.byType(AlertDialog)).dy));
+      tester.view.viewInsets = const FakeViewPadding();
+      FocusManager.instance.primaryFocus?.unfocus(); await tester.pumpAndSettle();
+      for (final entry in applianceDetails.entries) {
+        final field = find.byKey(Key('work-product-guided-${entry.key}'));
+        await show(field); await tester.enterText(field, entry.value);
+      }
+      await chooseGuide('Electronics');
+      expect(find.byKey(const Key('work-product-guided-Capacity')), findsNothing);
+      expect(tester.widget<TextField>(find.byKey(const Key('work-product-guided-RAM'))).controller!.text, electronics['RAM']);
       await chooseGuide('General');
       expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
       await show(apply); await tester.tap(apply); await tester.pumpAndSettle();
-      final allDetails = {...expectedDetails, ...electronics};
+      final allDetails = {...expectedDetails, ...electronics, ...applianceDetails};
       expect(WorkspaceProductContent.parse({'specifications':
         tester.widget<TextField>(specs).controller!.text}).specifications, allDetails,
         reason: 'Changing the guide is not a delete command for hidden edits or original details');
       await show(guide); await tester.tap(guide); await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-product-guided-Model code')), findsNothing);
-      expect(find.text('Saved details stay in Specifications. Choose Electronics for guided fields.'), findsOneWidget);
+      expect(find.text('Saved details stay in Specifications. Choose Electronics or Appliances for guided fields.'), findsOneWidget);
       await chooseGuide('Electronics');
       for (final entry in electronics.entries) {
         expect(tester.widget<TextField>(find.byKey(Key('work-product-guided-${entry.key}'))).controller!.text, entry.value);

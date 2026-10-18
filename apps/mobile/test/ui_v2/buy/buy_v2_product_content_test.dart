@@ -1180,6 +1180,44 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final trade in [false, true]) {
+      testWidgets('PF06 supplied appliance details render without empty fields trade$trade text$scale', (tester) async {
+        final product = BuyV2Product(id: 'host-appliance', canonicalId: 'host-appliance-canonical',
+          storeId: 'host-appliance-store', destination: trade ? BuyV2Destination.wholesale : BuyV2Destination.shop,
+          categoryId: 'other', brand: 'Host maker', title: 'Host appliance', variant: 'Exact supplied model',
+          pack: '1 unit', priceMinor: 5000000, unitPrice: '', badge: '', seller: 'Host Store', sellerType: 'Retailer',
+          deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
+          offerClass: trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail);
+        final core = BuySession(), adapter = _ContentAdapter()
+          ..highlights = []..omitDescription = true
+          ..specifications = const [
+            BuyV2ProductSpecification(label: 'Capacity', value: 'Host supplied 7 kg'),
+            BuyV2ProductSpecification(label: 'Electrical supply', value: 'Host supplied voltage and frequency'),
+            BuyV2ProductSpecification(label: 'Installation requirements', value: 'Host supplied clearance instructions'),
+          ];
+        final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(product),
+          productContentAdapter: adapter, reviewDataEnabled: false);
+        addTearDown(core.dispose); addTearDown(session.dispose);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await session.restoreCommerce();
+        await mountReferenceGallery(tester, session, product.id);
+        tester.view.physicalSize = const Size(320, 800); await tester.pumpAndSettle();
+        final tab = find.byKey(ValueKey('buy-product-details-tab-0-${product.id}'));
+        await revealProductControl(tester, session, tab); await tester.tap(tab.hitTestable()); await tester.pumpAndSettle();
+        for (final value in ['Host supplied 7 kg', 'Host supplied voltage and frequency', 'Host supplied clearance instructions']) {
+          await revealProductControl(tester, session, find.text(value));
+          expect(find.text(value), findsOneWidget);
+        }
+        expect(find.text('Energy label'), findsNothing);
+        expect(find.text('Certified'), findsNothing);
+        expect(session.itemCount, 0);
+        expect(session.product(product.id).priceMinor, 5000000);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   testWidgets(
     'CAT01 category facts render once in the shared product journey',
     (tester) async {

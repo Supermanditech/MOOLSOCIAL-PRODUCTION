@@ -1038,6 +1038,23 @@ void main() {
     expect(entry.product.hasValidPackTerms, isTrue);
     expect(entry.readback.content.state, BuyV2ProductContentState.ready);
   });
+  test('PF06 reviewed appliance specifications reach the exact public SKU without invented fields', () {
+    final data = publicPage();
+    (row(data)['content'] as Map)..['categoryId'] = 'other'..['specifications'] = [
+      {'label': 'Capacity', 'value': 'Host supplied 7 kg'},
+      {'label': 'Electrical supply', 'value': 'Host supplied voltage and frequency'},
+      {'label': 'Installation requirements', 'value': 'Host supplied clearance'},
+    ];
+    final entry = WorkspacePublicCatalogueEntry.fromResponse(data,
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+    expect(entry.readback.content.specifications.map((s) => [s.label, s.value]).toList(), [
+      ['Capacity', 'Host supplied 7 kg'], ['Electrical supply', 'Host supplied voltage and frequency'],
+      ['Installation requirements', 'Host supplied clearance'],
+    ]);
+    expect(entry.product.sourceSkuId, 'sku-one');
+    expect(entry.product.priceMinor, 26000);
+    expect(entry.readback.content.specifications.any((s) => s.label == 'Certification reference'), isFalse);
+  });
   test('LF-FACTS owner record retains the exact reviewed extension through serialization', () {
     final original = ownerRow();
     (original['content'] as Map)['productFacts'] = descriptiveFacts();
