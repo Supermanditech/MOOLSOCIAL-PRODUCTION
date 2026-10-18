@@ -838,7 +838,7 @@ class WorkspaceReviewedVariantMembership {
 
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
-class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource {
+class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource {
   WorkspaceStoreCatalogueSource({required this.gateway, required this.storeId, required this.current, this.contentReadback});
   final AuthenticatedWorkspaceCatalogueGateway gateway;
   final String storeId;
@@ -848,6 +848,132 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   int? _metadataHighwater;
   String? _metadataFingerprint;
   String? _publicStoreName;
+  int _promotionGeneration = 0;
+  final _promotionHeads = <String, ({int revision, DateTime observed, String copy})>{};
+  @override
+  bool get storeOffersActive => current();
+
+  @override
+  Future<List<BuyV2PublishedCatalogueOffer>> loadStoreOffers({required String storeId,
+    required BuyV2Destination destination}) {
+    var reading = true;
+    final generation = ++_promotionGeneration;
+    bool active() => reading && current() && generation == _promotionGeneration;
+    return _readStoreOffers(storeId, destination, active)
+      .timeout(const Duration(seconds: 25)).whenComplete(() => reading = false);
+  }
+
+  Future<List<BuyV2PublishedCatalogueOffer>> _readStoreOffers(String requestedStore,
+      BuyV2Destination destination, bool Function() active) async {
+    if (requestedStore != storeId || !active() ||
+        !{BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(destination)) {
+      throw const FormatException('Promotions could not be checked.');
+    }
+    _id(storeId);
+    final contentOwner = contentReadback?.context();
+    final results = <BuyV2PublishedCatalogueOffer>[];
+    final entries = <WorkspacePublicCatalogueEntry>[];
+    final resolved = <String, WorkspacePublicCatalogueEntry>{};
+    final heads = <String, ({int revision, DateTime observed, String copy})>{};
+    final cursors = <String>{}, publications = <String>{};
+    String? after;
+    var complete = false;
+    for (var page = 0; page < 20; page++) {
+      if (!active()) throw const FormatException();
+      final response = await gateway._ownerRequest({'operation': 'readPublicStorePromotions',
+        'storeId': storeId, 'limit': 20, 'after': ?after}, active, mutation: false);
+      if (!active() || response?.statusCode != 200) throw const FormatException();
+      final envelope = _map(jsonDecode(response!.body));
+      if (envelope['ok'] != true) throw const FormatException();
+      final data = _map(envelope['data']);
+      _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'state', 'coverage',
+        'orderingAvailable', 'items', 'nextCursor']);
+      final observed = _time(data['observedAt']), now = gateway.now().toUtc();
+      if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
+          data['storeId'] != storeId || data['state'] != 'ready' ||
+          data['coverage'] != 'verified_public_promotions_only' || data['orderingAvailable'] != false ||
+          observed.isAfter(now)) { throw const FormatException(); }
+      var previous = after;
+      for (final raw in _list(data['items'], 20)) {
+        final row = _map(raw);
+        _keys(row, ['publicationId', 'revision', 'publisherType', 'publisherId', 'publisherName',
+          'headline', 'detail', 'sourceId', 'observedAt', 'validUntil', 'product']);
+        final id = _id(row['publicationId']), revision = _int(row['revision'], 1, 1000000000);
+        final source = _string(row['sourceId'], 512), itemObserved = _time(row['observedAt']);
+        if (!publications.add(id) || previous != null && id.compareTo(previous) <= 0 ||
+            row['publisherType'] != 'retailer' || row['publisherId'] != storeId ||
+            source != 'store-promotion:${gateway.realm}:$storeId:$id:$revision' || itemObserved.isAfter(observed)) {
+          throw const FormatException();
+        }
+        previous = id;
+        final headline = _string(row['headline'], 160), detail = _string(row['detail'], 2000, true);
+        final expiry = _time(row['validUntil']), sku = _map(row['product']);
+        _keys(Map<String, dynamic>.of(sku)..remove('supplierPolicy'), ['skuId', 'canonicalProductId',
+          'verifiedPackId', 'sku', 'revision', 'observedAt', 'content', 'pack', 'channels']);
+        final channelRow = _map(_list(sku['channels'], 1).single);
+        final channel = BuyV2OfferClass.values.where((c) => c.name == channelRow['kind']).single;
+        if (!itemObserved.isBefore(expiry) || !now.isBefore(expiry)) throw const FormatException();
+        if ((channel == BuyV2OfferClass.retail ? BuyV2Destination.shop : BuyV2Destination.wholesale) != destination) { continue; }
+        final skuId = _id(sku['skuId']), resolutionKey = jsonEncode([skuId, channel.name]);
+        final entry = resolved[resolutionKey] ?? await gateway.readPublicEntry(storeId: storeId, skuId: skuId,
+          channel: channel, current: active);
+        if (!active() || entry == null || entry.product.storeId != storeId ||
+            entry.product.publicListingIdentity?.realm != gateway.realm) { throw const FormatException(); }
+        resolved[resolutionKey] = entry;
+        // Resolve the real listing first. Compare every immutable SKU/pack/media/
+        // content/price fact, and separately pin the governed term window. Never
+        // manufacture the missing listings/envelope from a promotion payload.
+        final expected = _map(jsonDecode(entry.readback.fingerprint!))..remove('listings');
+        expected['channels'] = _list(expected['channels'], 2).map(_map)
+          .where((c) => c['kind'] == channel.name).toList();
+        final actual = Map<String, dynamic>.of(sku)..remove('supplierPolicy');
+        actual['channels'] = [Map<String, dynamic>.of(channelRow)..remove('revision')..remove('validUntil')];
+        final expectedMedia = _list(_map(expected['content'])['media'], 10),
+          actualMedia = _list(_map(actual['content'])['media'], 10);
+        if (expectedMedia.length != actualMedia.length) throw const FormatException();
+        for (var index = 0; index < actualMedia.length; index++) {
+          final actualFile = _map(_map(actualMedia[index])['file']),
+            expectedFile = _map(_map(expectedMedia[index])['file']);
+          // Existing public promotion contract omits static-frame negotiation.
+          // Only the reviewed default1 may be absent; all media facts still match.
+          if (!actualFile.containsKey('frameCount') && expectedFile['frameCount'] == 1) {
+            expectedFile.remove('frameCount');
+          }
+        }
+        if (jsonEncode(_sorted(actual)) != jsonEncode(_sorted(expected)) ||
+            channelRow['revision'] != entry.product.packTerms?.revision ||
+            _time(channelRow['validUntil']) != entry.product.packTerms?.priceValidUntil ||
+            expiry.isAfter(entry.product.packTerms!.priceValidUntil!)) { throw const FormatException(); }
+        final copy = jsonEncode([source, headline, detail, _sorted(actual)]);
+        final head = (revision: revision, observed: itemObserved, copy: copy), old = _promotionHeads[id];
+        if (old != null && (revision < old.revision || itemObserved.isBefore(old.observed) ||
+            revision == old.revision && copy != old.copy)) { throw const FormatException(); }
+        heads[id] = head;
+        entries.add(entry);
+        results.add(BuyV2PublishedCatalogueOffer(publicationId: id, revision: revision,
+          product: entry.product, publisherType: BuyV2OfferPublisherType.retailer, publisherId: storeId,
+          publisherName: _string(row['publisherName'], 240), headline: headline, detail: detail,
+          sourceId: source, observedAt: itemObserved, validUntil: expiry));
+      }
+      final next = data['nextCursor'] == null ? null : _id(data['nextCursor']);
+      if (next == null) { complete = true; break; }
+      // The service filters rows after paging, so even an empty page can have a
+      // genuine next cursor. It cannot loop or move backwards past shown rows.
+      if (!cursors.add(next) || after != null && next.compareTo(after) <= 0 ||
+          previous != null && next.compareTo(previous) < 0) { throw const FormatException(); }
+      after = next;
+    }
+    final completedAt = gateway.now().toUtc();
+    if (!complete || !active() || results.any((r) => !r.isCurrent(now: completedAt))) {
+      throw const FormatException('Promotions could not be fully checked.');
+    }
+    // No high-water/cache admission from a partial, retired or expired traversal.
+    _promotionHeads.addAll(heads);
+    if (contentReadback != null && contentOwner != null) {
+      for (final entry in entries) { contentReadback!.admitPublicEntry(entry, expectedContext: contentOwner); }
+    }
+    return List.unmodifiable(results);
+  }
 
   Map<String, Object?> _query(BuyV2CatalogueQuery query, {Set<String> listingIds = const {}}) {
     if (query.storeId != storeId || query.areaScope != BuyV2CatalogueAreaScope.allAreas ||

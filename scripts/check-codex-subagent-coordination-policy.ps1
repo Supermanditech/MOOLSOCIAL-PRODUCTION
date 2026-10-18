@@ -8039,7 +8039,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     $promotion=$Continuation.batch02Promotions
     $promotionOwners=@('apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
       'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
-      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart')
+      'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+      'apps/mobile/lib/features/work/work_catalogue_gateway.dart',
+      'apps/mobile/test/work_catalogue_gateway_test.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart')
     if ($null -eq $promotion -or $promotion -isnot [pscustomobject]) { return $false }
     foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
       if ($null -eq $promotion.PSObject.Properties[$key]) { return $false }

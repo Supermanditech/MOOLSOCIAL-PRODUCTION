@@ -343,6 +343,54 @@ final class _LiveOffersSource implements BuyV2LivePublishedOffersSource {
   }
 }
 
+// Host-only typed Store source; never inserted into runtime provider/storage.
+class _Lf04StoreOffers implements BuyV2CataloguePageSource, BuyV2StorePublishedOffersSource {
+  _Lf04StoreOffers() {
+    final now = DateTime.now().toUtc();
+    final identity = BuyV2PublicListingIdentity(listingId: 'listing-${'a' * 64}', realm: 'evaluation',
+      storeId: 'host-store', skuId: 'host-sku', canonicalProductId: 'host-product', verifiedPackId: 'host-pack',
+      channel: BuyV2OfferClass.retail);
+    product = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato').copyWith(id: identity.listingId,
+      canonicalId: 'host-product', storeId: 'host-store', publicListingIdentity: identity,
+      title: 'Host Store tomato', seller: 'Host Store', offerClass: BuyV2OfferClass.retail,
+      packTerms: BuyV2PackTerms(skuId: identity.listingId, revision: 'host-term', sellUnit: 'piece',
+        sourceLabel: '1 piece', netContentMilli: 1000, contentUnit: 'piece', pricingStoreId: 'host-store',
+        priceObservedAt: now.subtract(const Duration(minutes: 1)), priceValidUntil: now.add(const Duration(hours: 1))));
+    offers = [BuyV2PublishedCatalogueOffer(publicationId: 'host-placement', revision: 1, product: product,
+      publisherType: BuyV2OfferPublisherType.retailer, publisherId: 'host-store', publisherName: 'Host Store',
+      headline: 'Host Store promotion', detail: 'Host published product details.', sourceId: 'host-publication',
+      observedAt: now.subtract(const Duration(minutes: 1)), validUntil: now.add(const Duration(minutes: 30)))];
+  }
+  late BuyV2Product product;
+  late List<BuyV2PublishedCatalogueOffer> offers;
+  bool active = true, fail = false;
+  BuyV2Product? storePreview;
+  int calls = 0;
+  Completer<List<BuyV2PublishedCatalogueOffer>>? pending;
+  @override
+  bool get storeOffersActive => active;
+  @override
+  Future<List<BuyV2PublishedCatalogueOffer>> loadStoreOffers({required String storeId,
+    required BuyV2Destination destination}) async {
+    calls++;
+    if (!active || fail || storeId != 'host-store') throw const FormatException();
+    return pending?.future ?? offers;
+  }
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query, {String? cursor,
+    required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key, snapshotId: 'host-products',
+      items: [product], startIndex: 0, totalCount: 1);
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query, {String? cursor,
+    required int pageSize}) async => BuyV2CataloguePage(queryKey: query.key, snapshotId: 'host-stores',
+      items: [if (storePreview != null) BuyV2StoreListing(id: 'host-store', name: 'Host Store',
+        area: 'Host City', address: 'Host street', regionId: 'jodhpur', previewProduct: storePreview)],
+      startIndex: 0, totalCount: storePreview == null ? 0 : 1);
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async =>
+    [if (productIds.contains(product.id)) product];
+}
+
 final class _FixedDeliveryPromiseFactsAdapter
     implements BuyV2ProductFactsAdapter {
   const _FixedDeliveryPromiseFactsAdapter(this.deliveryPromise);
@@ -11145,6 +11193,165 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF04 STORE UI exact off-page product action detail and fit scale=$scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(320, 844); addTearDown(tester.view.reset);
+      final core = BuySession(), source = _Lf04StoreOffers();
+      final session = BuyV2Session(core: core, cataloguePageSource: source);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      BuyV2Product? opened;
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: r66VisualCaptureRoot(child!)),
+        home: Scaffold(body: SingleChildScrollView(child: BuyV2StorePublishedPromotions(session: session,
+          storeId: 'host-store', destination: BuyV2Destination.shop, onOpenProduct: (p) => opened = p)))));
+      await tester.pumpAndSettle();
+      expect(find.text('Promotions from this Store'), findsOneWidget);
+      expect(session.findProduct(source.product.id), isNull, reason: 'Feed loading must not admit/off-page cache a product');
+      await captureR66Visual(tester, 'lf04-store-section-card-$scale');
+      final detail = find.byKey(ValueKey('buy-offer-details-${BuyV2PublishedOffer(productId: source.product.id,
+        publisherType: BuyV2OfferPublisherType.retailer, publisherId: 'host-store',
+        publicationId: 'host-placement', revision: 1, headline: 'Host Store promotion').identity}'));
+      await tester.ensureVisible(detail); await tester.tap(detail); await tester.pumpAndSettle();
+      expect(find.text('Host published product details.'), findsOneWidget);
+      await captureR66Visual(tester, 'lf04-store-section-$scale');
+      await tester.tap(find.byKey(const ValueKey('buy-offer-detail-product'))); await tester.pumpAndSettle();
+      expect(opened?.id, source.product.id); expect(session.findProduct(source.product.id), same(source.product));
+      expect(session.itemCount, 0); expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+  testWidgets('LF04 STORE UI unavailable retry empty and retired dialog remain truthful', (tester) async {
+    final core = BuySession(), source = _Lf04StoreOffers()..fail = true;
+    final session = BuyV2Session(core: core, cataloguePageSource: source);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    var opened = false;
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: Scaffold(body: SingleChildScrollView(
+      child: BuyV2StorePublishedPromotions(session: session, storeId: 'host-store', destination: BuyV2Destination.shop,
+        onOpenProduct: (_) => opened = true)))));
+    await tester.pumpAndSettle();
+    expect(find.text('Store promotions could not be checked.'), findsOneWidget);
+    expect(find.text('No promotions'), findsNothing);
+    source.fail = false;
+    await tester.tap(find.byKey(const ValueKey('buy-store-promotions-retry'))); await tester.pumpAndSettle();
+    expect(source.calls, 2);
+    final detail = find.text('Offer details'); await tester.ensureVisible(detail); await tester.tap(detail);
+    await tester.pumpAndSettle(); source.active = false;
+    await tester.tap(find.byKey(const ValueKey('buy-offer-detail-product'))); await tester.pumpAndSettle();
+    expect(opened, isFalse); expect(session.findProduct(source.product.id), isNull); expect(session.itemCount, 0);
+    expect(find.text('This offer changed. Close and refresh the offers.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('buy-offer-detail-close'))); await tester.pumpAndSettle();
+    source.active = true; source.offers = [];
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed); await tester.pumpAndSettle();
+    expect(find.text('Promotions from this Store'), findsNothing);
+    expect(find.text('Store promotions could not be checked.'), findsNothing); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+  test('LF04 STORE UI admission replaces old same-ID cache without changing saved Cart', () {
+    final core = BuySession(), source = _Lf04StoreOffers();
+    final session = BuyV2Session(core: core, cataloguePageSource: source);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final old = source.product.copyWith(priceMinor: source.product.priceMinor - 1);
+    session.retainCatalogueStoreBrowse(old);
+    expect(session.product(old.id).priceMinor, old.priceMinor);
+    expect(session.admitStorePromotion(source, source.offers.single), isTrue);
+    expect(session.product(old.id).priceMinor, source.product.priceMinor);
+    final other = _Lf04StoreOffers();
+    expect(session.admitStorePromotion(other, other.offers.single), isFalse);
+    source.active = false;
+    expect(session.admitStorePromotion(source, source.offers.single), isFalse);
+    expect(session.itemCount, 0);
+  });
+  testWidgets('LF04 STORE UI actual Visit Store opens exact promoted product and returns', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(390, 844); addTearDown(tester.view.reset);
+    final core = BuySession(), source = _Lf04StoreOffers();
+    final session = BuyV2Session(core: core, cataloguePageSource: source);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    expect(await session.openLinkedProduct(source.product.id), isTrue);
+    await tester.pumpWidget(app(session)); await tester.pumpAndSettle();
+    expect(session.openProduct(source.product.id), isTrue); await tester.pumpAndSettle();
+    expect(find.byKey(PageStorageKey('buy-product-${source.product.id}')), findsOneWidget);
+    final action = find.byKey(ValueKey('buy-shop-seller-action-${source.product.id}'));
+    await tester.scrollUntilVisible(action, 220, scrollable: scrollableWithin(PageStorageKey('buy-product-${source.product.id}')));
+    await tester.tap(action); await tester.pumpAndSettle();
+    final section = find.byKey(const ValueKey('buy-store-promotions-host-store'));
+    await tester.ensureVisible(section); await tester.pumpAndSettle();
+    expect(ModalRoute.of(tester.element(section))!.settings.name, 'buy-public-store');
+    final detail = find.text('Offer details'); await tester.ensureVisible(detail); await tester.tap(detail); await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-offer-detail-product'))); await tester.pumpAndSettle();
+    expect(session.selectedProductId, source.product.id);
+    await tester.binding.handlePopRoute(); await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-store-promotions-host-store')), findsOneWidget);
+    expect(session.itemCount, 0); expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+  test('LF04 STORE UI cache survives later old page retention while selected and reopened', () async {
+    final core = BuySession(), source = _Lf04StoreOffers(), newest = source.product;
+    final session = BuyV2Session(core: core, cataloguePageSource: source);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    source.product = newest.copyWith(priceMinor: newest.priceMinor - 1);
+    final pager = session.acquireCatalogueProducts('host-promotion-cache');
+    final query = session.catalogueQuery(storeId: 'host-store');
+    await pager.open(query);
+    expect(session.product(newest.id).priceMinor, newest.priceMinor - 1);
+    source.product = newest;
+    expect(session.admitStorePromotion(source, source.offers.single), isTrue);
+    expect(session.openProduct(newest.id), isTrue);
+    session.releaseCatalogueProducts('host-promotion-cache'); // Lease release runs actual cached-page retention.
+    expect(session.product(newest.id).priceMinor, newest.priceMinor);
+    expect(session.selectedProductId, newest.id);
+    session.openDestination(BuyV2Destination.shop); session.openProduct(newest.id);
+    expect(session.product(newest.id).priceMinor, newest.priceMinor);
+    expect(session.itemCount, 0);
+  });
+  for (final change in ['newer page', 'rejected input', 'two lease update']) {
+    test('LF04 STORE UI retained promotion permits $change safely', () async {
+      final core = BuySession(), source = _Lf04StoreOffers(), original = source.product;
+      final session = BuyV2Session(core: core, cataloguePageSource: source);
+      addTearDown(core.dispose); addTearDown(session.dispose);
+      source.product = original.copyWith(priceMinor: original.priceMinor - 1);
+      final pager = session.acquireCatalogueProducts('host-retained-promotion');
+      await pager.open(session.catalogueQuery(storeId: 'host-store'));
+      if (change == 'two lease update') {
+        await session.acquireCatalogueProducts('host-later-old-page').open(session.catalogueQuery(storeId: 'host-store'));
+      }
+      source.product = original;
+      expect(session.admitStorePromotion(source, source.offers.single), isTrue);
+      if (change != 'rejected input') {
+        source.product = original.copyWith(priceMinor: original.priceMinor + 100);
+        await pager.refresh();
+        expect(session.product(original.id).priceMinor, original.priceMinor + 100);
+        if (change == 'two lease update') {
+          session.releaseCatalogueProducts('host-later-old-page');
+          expect(session.product(original.id).priceMinor, original.priceMinor + 100);
+        }
+      } else {
+        final originalOffer = source.offers.single;
+        final invalid = BuyV2PublishedCatalogueOffer(publicationId: originalOffer.publicationId, revision: 2,
+          product: original.copyWith(minimumOrder: 0), publisherType: originalOffer.publisherType,
+          publisherId: originalOffer.publisherId, publisherName: originalOffer.publisherName,
+          headline: originalOffer.headline, sourceId: originalOffer.sourceId,
+          observedAt: originalOffer.observedAt, validUntil: originalOffer.validUntil);
+        expect(session.admitStorePromotion(source, invalid), isFalse);
+        session.releaseCatalogueProducts('host-retained-promotion');
+        expect(session.product(original.id).minimumOrder, original.minimumOrder);
+        expect(session.product(original.id).priceMinor, original.priceMinor);
+      }
+      expect(session.itemCount, 0);
+    });
+  }
+  test('LF04 STORE UI ordinary Store preview cannot overwrite a fresh page without any opened promotion', () async {
+    final core = BuySession(), source = _Lf04StoreOffers(), original = source.product;
+    source.storePreview = original.copyWith(priceMinor: original.priceMinor - 1);
+    final session = BuyV2Session(core: core, cataloguePageSource: source);
+    addTearDown(core.dispose); addTearDown(session.dispose);
+    final query = session.catalogueQuery(storeId: 'host-store');
+    await session.acquireCatalogueStores('host-old-preview').open(query);
+    expect(session.product(original.id).priceMinor, original.priceMinor - 1);
+    source.product = original.copyWith(priceMinor: original.priceMinor + 100);
+    await session.acquireCatalogueProducts('host-fresh-page').open(query);
+    expect(session.product(original.id).priceMinor, original.priceMinor + 100);
+    expect(session.itemCount, 0);
+  });
   test('LF04 COPY publication metadata preserves legacy identities and issuer revisions', () {
     const legacy = BuyV2PublishedOffer(productId: 's-tomato', publisherType: BuyV2OfferPublisherType.retailer,
       headline: 'Host headline', publicationId: 'host-placement');

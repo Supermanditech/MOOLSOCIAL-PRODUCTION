@@ -534,6 +534,17 @@ abstract interface class BuyV2PublishedCatalogueSource {
   });
 }
 
+/// Optional exact-Store publications. This finite read is not a global Offers
+/// page, a catalogue snapshot/count, or authority to apply a monetary benefit.
+/// Throw on unavailable or incomplete reads; an empty list means verified empty.
+abstract interface class BuyV2StorePublishedOffersSource {
+  bool get storeOffersActive;
+  Future<List<BuyV2PublishedCatalogueOffer>> loadStoreOffers({
+    required String storeId,
+    required BuyV2Destination destination,
+  });
+}
+
 /// A sourced Store capability, not proof of stock, payment or order readiness.
 /// An absent or expired capability never advertises customer collection.
 @immutable

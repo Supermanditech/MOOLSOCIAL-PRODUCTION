@@ -978,10 +978,14 @@ class _PublishedOfferPromotion extends StatefulWidget {
     required this.session,
     required this.entries,
     required this.moolSocial,
+    this.onOpenProduct,
+    this.canOpen,
   });
   final bool moolSocial;
   final BuyV2Session session;
   final List<({BuyV2PublishedOffer offer, BuyV2Product product})> entries;
+  final ValueChanged<BuyV2Product>? onOpenProduct;
+  final bool Function()? canOpen;
 
   @override
   State<_PublishedOfferPromotion> createState() =>
@@ -1164,7 +1168,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                           entry.offer.publisherName ??
                           (_mool ? 'MoolSocial' : product.seller);
                       final owner = widget.session;
-                      bool current() => mounted && identical(widget.session, owner) && widget.entries.any((e) =>
+                      bool current() => mounted && identical(widget.session, owner) && (widget.canOpen?.call() ?? true) && widget.entries.any((e) =>
                         e.offer.identity == entry.offer.identity && e.product.id == product.id &&
                         e.offer.publisherId == entry.offer.publisherId && e.offer.publisherName == entry.offer.publisherName &&
                         e.offer.publisherType == entry.offer.publisherType &&
@@ -1175,7 +1179,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         if (!current()) return;
                         widget.session.featuredOfferPublicationId =
                             entry.offer.identity;
-                        widget.session.openProduct(product.id);
+                        final handler = widget.onOpenProduct;
+                        if (handler != null) { handler(product); } else { widget.session.openProduct(product.id); }
                       }
                       void details() => showDialog<void>(context: context,
                         builder: (dialogContext) => StatefulBuilder(builder: (context, update) => AlertDialog(
@@ -8051,6 +8056,100 @@ class _PagedPublicStorePreviewState extends State<_PagedPublicStorePreview> {
   }
 }
 
+/// Finite exact-Store section within existing Visit Store, not global Offers.
+class BuyV2StorePublishedPromotions extends StatefulWidget {
+  const BuyV2StorePublishedPromotions({super.key, required this.session, required this.storeId,
+    required this.destination, required this.onOpenProduct});
+  final BuyV2Session session;
+  final String storeId;
+  final BuyV2Destination destination;
+  final ValueChanged<BuyV2Product> onOpenProduct;
+  @override
+  State<BuyV2StorePublishedPromotions> createState() => _BuyV2StorePublishedPromotionsState();
+}
+
+class _BuyV2StorePublishedPromotionsState extends State<BuyV2StorePublishedPromotions> with WidgetsBindingObserver {
+  List<BuyV2PublishedCatalogueOffer> _offers = const [];
+  Timer? _expiry;
+  int _sequence = 0;
+  bool _loading = true, _failed = false;
+  BuyV2StorePublishedOffersSource? get _source {
+    final source = widget.session.cataloguePageSource;
+    return source is BuyV2StorePublishedOffersSource ? source as BuyV2StorePublishedOffersSource : null;
+  }
+  bool get _current => mounted && !_loading && !_failed && _source?.storeOffersActive == true &&
+    _offers.every((offer) => offer.isCurrent(now: DateTime.now().toUtc()));
+  @override
+  void initState() { super.initState(); WidgetsBinding.instance.addObserver(this); unawaited(_load()); }
+  @override
+  void didUpdateWidget(covariant BuyV2StorePublishedPromotions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) || oldWidget.storeId != widget.storeId ||
+        oldWidget.destination != widget.destination) { unawaited(_load()); }
+  }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_load());
+  }
+  @override
+  void dispose() { _sequence++; _expiry?.cancel(); WidgetsBinding.instance.removeObserver(this); super.dispose(); }
+
+  Future<void> _load() async {
+    final source = _source, session = widget.session, store = widget.storeId, destination = widget.destination;
+    final sequence = ++_sequence;
+    _expiry?.cancel();
+    setState(() { _offers = const []; _loading = true; _failed = false; });
+    bool current() => mounted && sequence == _sequence && identical(session, widget.session) &&
+      identical(source, _source) && store == widget.storeId && destination == widget.destination;
+    try {
+      if (source == null || !source.storeOffersActive) throw const FormatException();
+      final offers = await source.loadStoreOffers(storeId: store, destination: destination)
+        .timeout(const Duration(seconds: 26));
+      if (!current()) return;
+      final now = DateTime.now().toUtc(), identities = <String>{};
+      if (!source.storeOffersActive || offers.any((offer) => !offer.isCurrent(now: now) ||
+          offer.product.storeId != store || offer.publisherId != store || offer.product.destination != destination ||
+          !identities.add('${offer.publisherId}:${offer.publicationId}'))) { throw const FormatException(); }
+      setState(() { _offers = List.unmodifiable(offers); _loading = false; });
+      if (offers.isNotEmpty) {
+        final until = offers.map((offer) => offer.validUntil).reduce((a, b) => a.isBefore(b) ? a : b);
+        _expiry = Timer(until.difference(now), () => unawaited(_load()));
+      }
+    } on Object {
+      if (current()) setState(() { _offers = const []; _loading = false; _failed = true; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_source == null) return const SizedBox.shrink();
+    if (_loading || _failed) {
+      return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [
+        Expanded(child: Text(_loading ? 'Checking Store promotions…' : 'Store promotions could not be checked.',
+          style: context.buyBody)),
+        if (_loading) const Padding(padding: EdgeInsets.all(12), child: SizedBox.square(dimension: 16,
+          child: CircularProgressIndicator(strokeWidth: 2)))
+        else TextButton(key: const ValueKey('buy-store-promotions-retry'), onPressed: () => unawaited(_load()),
+          child: const Text('Retry'))]));
+    }
+    if (_offers.isEmpty) return const SizedBox.shrink();
+    return Column(key: ValueKey('buy-store-promotions-${widget.storeId}'), crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 4), child: Text('Promotions from this Store',
+        style: context.buyBody.copyWith(fontWeight: FontWeight.w700))),
+        _PublishedOfferPromotion(session: widget.session, moolSocial: false, canOpen: () => _current,
+          entries: [for (final offer in _offers) (product: offer.product, offer: BuyV2PublishedOffer(
+            productId: offer.product.id, publisherType: offer.publisherType, publisherId: offer.publisherId,
+            publisherName: offer.publisherName, publicationId: offer.publicationId, revision: offer.revision,
+            headline: offer.headline, detail: offer.detail))],
+          onOpenProduct: (product) {
+            final source = _source;
+            final offer = _offers.where((offer) => offer.product.id == product.id).firstOrNull;
+            if (!_current || source == null || offer == null || !widget.session.admitStorePromotion(source, offer)) return;
+            widget.onOpenProduct(product);
+          })]);
+  }
+}
+
 class _PagedFullStoreCatalogue extends StatefulWidget {
   const _PagedFullStoreCatalogue({
     required this.session,
@@ -8988,7 +9087,9 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                 )
               : base,
           onOpenProduct: openProduct,
-          header: header,
+          header: Column(children: [header,
+            if (!_searching) BuyV2StorePublishedPromotions(session: widget.session, storeId: product.storeId!,
+              destination: product.destination, onOpenProduct: openProduct)]),
           footer: moreStores,
         ),
       ),

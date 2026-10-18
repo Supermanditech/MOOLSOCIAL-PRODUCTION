@@ -4595,19 +4595,42 @@ class BuyV2Session extends ChangeNotifier {
 
   void _retainCataloguePages({bool notify = true}) {
     if (_collectionDisposed) return;
+    var promotion = _openedStorePromotion;
+    if (promotion != null && (!promotion.source.storeOffersActive ||
+        !promotion.offer.isCurrent(now: DateTime.now().toUtc()) ||
+        _catalogueStoreBrowseAnchors[promotion.product.destination] != promotion.product.id)) {
+      _openedStorePromotion = promotion = null;
+    }
+    var promotedProduct = promotion?.product;
+    final superseded = Set<BuyV2Product>.identity()..addAll(promotion?.superseded ?? const []);
+    final imported = Set<BuyV2Product>.identity();
+    void remember(BuyV2Product product) {
+      if (promotion != null && product.id == promotedProduct!.id) {
+        imported.add(product);
+        if (superseded.contains(product)) return;
+        if (!identical(product, promotedProduct)) {
+          superseded.add(promotedProduct!);
+          promotedProduct = product;
+          _productFacts.remove(product.id);
+          _productContent.remove(product.id);
+          _productContentMediaInputs.remove(product.id);
+        }
+      }
+      _pagedProducts[product.id] = product;
+    }
     for (final lease in _catalogueOfferPagers.values) {
       for (final offer in lease.pager.cachedItems) {
-        _pagedProducts[offer.product.id] = offer.product;
+        remember(offer.product);
       }
     }
     for (final lease in _catalogueProductPagers.values) {
       for (final product in lease.pager.cachedItems) {
-        _pagedProducts[product.id] = product;
+        remember(product);
       }
     }
     for (final product
         in _variantFamily?.candidates ?? const <BuyV2Product>[]) {
-      _pagedProducts[product.id] = product;
+      remember(product);
     }
     final storeIds = <String>{};
     for (final lease in _catalogueStorePagers.values) {
@@ -4617,7 +4640,19 @@ class BuyV2Session extends ChangeNotifier {
           _admittedStoreListings[store] = true;
           _rememberPagedStore(store);
         }
+        if (promotion != null) {
+          final preview = store.previewProduct;
+          if (preview != null && preview.id == promotedProduct!.id) { remember(preview); }
+        }
       }
+    }
+    if (promotion != null) {
+      // Preserve one opened navigation product, skipping only the exact cached
+      // representations it replaced. A fresh import wins even if a later lease
+      // still holds a superseded object. No provider snapshot is rewritten.
+      _pagedProducts[promotedProduct!.id] = promotedProduct!;
+      _openedStorePromotion = (source: promotion.source, offer: promotion.offer,
+        product: promotedProduct!, superseded: imported..remove(promotedProduct));
     }
     final retained = <String>{
       ...?_variantFamily?.candidates.map((product) => product.id),
@@ -4671,6 +4706,41 @@ class BuyV2Session extends ChangeNotifier {
       _catalogueOfferPagers[scopeKey]?.pager.query;
 
   final Map<BuyV2Destination, String> _catalogueStoreBrowseAnchors = {};
+  ({BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer,
+    BuyV2Product product, Set<BuyV2Product> superseded})? _openedStorePromotion;
+
+  /// Open-only admission of a resolved public promotion. Loading a promotion
+  /// section must not move Store return anchors or replace Cart/order snapshots.
+  bool admitStorePromotion(BuyV2StorePublishedOffersSource source, BuyV2PublishedCatalogueOffer offer) {
+    final product = offer.product, now = DateTime.now().toUtc();
+    if (_collectionDisposed || !identical(source, cataloguePageSource) || !source.storeOffersActive ||
+        !offer.isCurrent(now: now) || offer.publisherId != product.storeId ||
+        product.publicListingIdentity?.valid != true || !product.publicListingIdentity!.matches(product) ||
+        product.packTerms?.pricingCurrentAt(now) != true) { return false; }
+    final previous = findProduct(product.id);
+    if (previous != null && (previous.storeId != product.storeId || previous.canonicalId != product.canonicalId ||
+        previous.publicListingIdentity != product.publicListingIdentity)) { return false; }
+    try {
+      final superseded = Set<BuyV2Product>.identity()..addAll([
+        ?previous,
+        for (final lease in _catalogueProductPagers.values) ...lease.pager.cachedItems,
+        for (final lease in _catalogueOfferPagers.values) ...lease.pager.cachedItems.map((offer) => offer.product),
+        ...?_variantFamily?.candidates,
+        for (final store in _pagedStores.values) ?store.previewProduct,
+      ].where((candidate) => candidate.id == product.id && !identical(candidate, product)));
+      retainCatalogueStoreBrowse(product);
+      // Install only after validation/retention succeeds. A rejected product
+      // cannot become a later cache import through this navigation pointer.
+      _openedStorePromotion = (source: source, offer: offer, product: product, superseded: superseded);
+      // Retention imports current cached pages. Only after that step replace a
+      // stale same-ID object with this validated exact source product.
+      _pagedProducts[product.id] = product;
+      _productFacts.remove(product.id);
+      _productContent.remove(product.id);
+      _productContentMediaInputs.remove(product.id);
+      return true;
+    } on Object { return false; }
+  }
 
   /// One public Store return anchor per destination, independent of page LRU.
   void retainCatalogueStoreBrowse(BuyV2Product product) {

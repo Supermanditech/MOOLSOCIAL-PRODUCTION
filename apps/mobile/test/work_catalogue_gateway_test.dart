@@ -859,6 +859,138 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
+  // LF04 readonly public-service fixtures. No owner draft or native feed injection.
+  Map<String, dynamic> promotionRow({String id = 'promotion-one', int revision = 1}) {
+    final sku = row(publicPage())..remove('listings');
+    return {'publicationId': id, 'revision': revision, 'publisherType': 'retailer',
+      'publisherId': 'store-one', 'publisherName': 'Host Store', 'headline': 'Host promotion',
+      'detail': 'Host supplied detail', 'sourceId': 'store-promotion:production:store-one:$id:$revision',
+      'observedAt': at.toIso8601String(),
+      'validUntil': at.add(const Duration(minutes: 30)).toIso8601String(), 'product': sku};
+  }
+  Map<String, dynamic> promotionPage(List<Map<String, dynamic>> items, {String? next}) => {
+    'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+    'observedAt': at.toIso8601String(), 'state': 'ready',
+    'coverage': 'verified_public_promotions_only', 'orderingAvailable': false,
+    'items': items, 'nextCursor': next};
+  test('LF04 STORE reader traverses empty filtered page and resolves genuine listing and copy', () async {
+    final requests = <Map<String, Object?>>[];
+    final transport = OwnerTransport((body) async {
+      requests.add(body);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data':
+        body['operation'] == 'readPublicStorePromotions'
+          ? body['after'] == null ? promotionPage([], next: 'promotion-before')
+              : promotionPage([promotionRow(), promotionRow(id: 'promotion-two')])
+          : publicPage()}));
+    });
+    final source = WorkspaceStoreCatalogueSource(gateway: ownerGateway(transport), storeId: 'store-one', current: () => true);
+    final results = await source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+    expect(results.length, 2); expect(results.map((r) => r.publicationId), ['promotion-one', 'promotion-two']);
+    expect(results.map((r) => r.product.id).toSet(), {publicIdentity().listingId});
+    expect(results.first.detail, 'Host supplied detail'); expect(results.first.revision, 1);
+    expect(results.first.product.priceMinor, 26000); expect(results.first.product.storeId, 'store-one');
+    expect(results.first.isCurrent(now: at), isTrue);
+    expect(requests.first, {'operation': 'readPublicStorePromotions', 'storeId': 'store-one', 'limit': 20});
+    expect(requests[1]['after'], 'promotion-before');
+    expect(requests.where((b) => b['operation'] == 'readPublicStoreCatalogue').length, 1,
+      reason: 'Resolve a SKU/channel once, retain both separate publications');
+  });
+  for (final change in ['store', 'realm', 'unavailable', 'ordering', 'coverage', 'future', 'expired',
+    'issuer', 'revision', 'source', 'duplicate', 'loop', 'bound', 'sku money', 'sku pack', 'sku content', 'term revision']) {
+    test('LF04 STORE reader rejects $change without partial/public fallback', () async {
+      final placement = promotionRow(), data = promotionPage([placement]);
+      if (change == 'store') data['storeId'] = 'other-store';
+      if (change == 'realm') data['realm'] = 'evaluation';
+      if (change == 'unavailable') data['state'] = 'unavailable';
+      if (change == 'ordering') data['orderingAvailable'] = true;
+      if (change == 'coverage') data['coverage'] = 'all_promotions';
+      if (change == 'future') data['observedAt'] = at.add(const Duration(minutes: 1)).toIso8601String();
+      if (change == 'expired') placement['validUntil'] = at.toIso8601String();
+      if (change == 'issuer') placement['publisherId'] = 'other-store';
+      if (change == 'revision') placement['revision'] = 0;
+      if (change == 'source') placement['sourceId'] = 'unbound-source';
+      if (change == 'duplicate') (data['items'] as List).add(promotionRow());
+      if (change == 'sku money') (((placement['product'] as Map)['channels'] as List).single as Map)['priceMinor'] = 26001;
+      if (change == 'sku pack') ((placement['product'] as Map)['pack'] as Map)['label'] = 'Different pack';
+      if (change == 'sku content') ((placement['product'] as Map)['content'] as Map)['description'] = 'Different copy';
+      if (change == 'term revision') (((placement['product'] as Map)['channels'] as List).single as Map)['revision'] = 'changed-term';
+      var pages = 0;
+      final transport = OwnerTransport((body) async {
+        if (body['operation'] != 'readPublicStorePromotions') {
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': publicPage()}));
+        }
+        pages++;
+        final returned = change == 'loop' ? promotionPage([], next: 'repeated-cursor') :
+          change == 'bound' ? promotionPage([], next: 'cursor-${pages.toString().padLeft(4, '0')}') : data;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': returned}));
+      });
+      final source = WorkspaceStoreCatalogueSource(gateway: ownerGateway(transport), storeId: 'store-one', current: () => true);
+      await expectLater(source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop), throwsFormatException);
+      expect(pages, lessThanOrEqualTo(20));
+    });
+  }
+  test('LF04 STORE retired lifetime and wrong Store send no public reads', () async {
+    final transport = OwnerTransport((_) async => throw StateError('Must not send'));
+    final source = WorkspaceStoreCatalogueSource(gateway: ownerGateway(transport), storeId: 'store-one', current: () => false);
+    await expectLater(source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop), throwsFormatException);
+    await expectLater(source.loadStoreOffers(storeId: 'other-store', destination: BuyV2Destination.shop), throwsFormatException);
+    expect(transport.calls, 0);
+  });
+  for (final change in ['revision rollback', 'same revision copy', 'late retirement', 'late expiry', 'late replacement']) {
+    test('LF04 STORE rejects $change after an asynchronous read', () async {
+      var active = true, clock = at, revision = 2, copy = 'Host supplied detail';
+      final entered = Completer<void>(), released = Completer<void>();
+      var delayed = false;
+      final transport = OwnerTransport((body) async {
+        if (body['operation'] == 'readPublicStorePromotions') {
+          return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data':
+            promotionPage([promotionRow(revision: revision)..['detail'] = copy])}));
+        }
+        if (delayed) { entered.complete(); await released.future; }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': publicPage()}));
+      });
+      final connection = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+        'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+        credentials: Credentials(), transport: transport, now: () => clock);
+      final source = WorkspaceStoreCatalogueSource(gateway: connection, storeId: 'store-one', current: () => active);
+      Future<List<BuyV2PublishedCatalogueOffer>> read() => source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+      expect((await read()).single.revision, 2);
+      if (change == 'revision rollback') revision = 1;
+      if (change == 'same revision copy') copy = 'Changed without revision';
+      if (change.startsWith('late')) delayed = true;
+      final pending = read();
+      final failure = expectLater(pending, throwsFormatException);
+      if (delayed) {
+        await entered.future;
+        if (change == 'late retirement') active = false;
+        if (change == 'late expiry') clock = at.add(const Duration(minutes: 31));
+        if (change == 'late replacement') {
+          await expectLater(source.loadStoreOffers(storeId: 'wrong-store', destination: BuyV2Destination.shop), throwsFormatException);
+        }
+        released.complete();
+      }
+      await failure;
+    });
+  }
+  for (final changedWidth in [false, true]) {
+    test('LF04 STORE normalizes only omitted static frame count, changedWidth=$changedWidth', () async {
+      final data = publicPage();
+      (row(data)['content'] as Map)['media'] = [<String, Object?>{
+        'id': 'host-image', 'revision': 'image-one', 'url': 'https://example.com/host-image.jpg',
+        'storeId': 'store-one', 'skuId': 'sku-one', 'canonicalProductId': 'canonical-one',
+        'publisherWorkspaceId': 'supplier-one', 'file': {'mimeType': 'image/jpeg', 'byteLength': 1024,
+          'width': 640, 'height': 640, 'normalized': true, 'frameCount': 1}}];
+      final promotion = promotionRow()..['product'] = (jsonDecode(jsonEncode(row(data))) as Map<String, dynamic>..remove('listings'));
+      final file = ((((promotion['product'] as Map)['content'] as Map)['media'] as List).single['file']) as Map;
+      file.remove('frameCount'); if (changedWidth) file['width'] = 320;
+      final transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': body['operation'] == 'readPublicStorePromotions' ? promotionPage([promotion]) : data})));
+      final source = WorkspaceStoreCatalogueSource(gateway: ownerGateway(transport), storeId: 'store-one', current: () => true);
+      final result = source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+      if (changedWidth) { await expectLater(result, throwsFormatException); }
+      else { expect((await result).single.product.mediaAssets.single.binding!.file.frameCount, 1); }
+    });
+  }
   Map<String, dynamic> descriptiveFacts() => {
     'schemaVersion': 1,
     'compliance': {
