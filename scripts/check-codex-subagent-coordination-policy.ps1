@@ -8007,6 +8007,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/test/work_store_publication_settings_test.dart') {
       $factsOwners += 'apps/mobile/test/work_store_publication_settings_test.dart'
     }
+    if (@($facts.owners) -ccontains 'apps/mobile/test/work_product_promotions_test.dart') {
+      $factsOwners += 'apps/mobile/test/work_product_promotions_test.dart'
+    }
     foreach ($canonicalOwner in @('backend/functions/src/commerce/catalogue_contract.ts',
         'backend/functions/src/commerce/catalogue_contract.test.ts')) {
       if (@($facts.owners) -ccontains $canonicalOwner) { $factsOwners += $canonicalOwner }

@@ -298,6 +298,7 @@ if ($RequireLfPublicationProbes) {
         'apps/mobile/lib/features/work/widgets/store_publication_settings.dart',
         'apps/mobile/lib/features/work/work_publication.dart',
         'apps/mobile/test/work_store_publication_settings_test.dart',
+        'apps/mobile/test/work_product_promotions_test.dart',
         'backend/functions/src/commerce/catalogue_contract.ts',
         'backend/functions/src/commerce/catalogue_contract.test.ts',
         'apps/mobile/lib/features/work/work_services.dart',

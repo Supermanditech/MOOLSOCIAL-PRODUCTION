@@ -13,6 +13,14 @@ import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/work/work_product_promotions.dart';
 
 // Isolated host records/transport only; never native Store or published offers.
+class _FamilyCatalogue extends catalogue.SessionCatalogue implements WorkspaceVariantFamilyOwnerGateway {
+  bool supported = true;
+  @override bool get variantFamilySubmissionSupported => supported;
+  @override Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope,
+    {required bool Function() current}) => throw StateError('Promotion read must not access family commands');
+  @override Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+    {required bool Function() current, bool reconcile = false}) => throw StateError('Promotion read must not submit family');
+}
 const scope = (account: 'owner-one', store: 'store-one', realm: 'evaluation');
 final at = DateTime.utc(2026, 10, 17, 4);
 StorePromotionInput input({bool active = true}) => StorePromotionInput(
@@ -314,10 +322,16 @@ void main() {
       );
       expect(mirror?.revision, 1);
       await owner.workspaceProductPromotions!.refresh('promotion-one');
+      // WorkSession uses the real clock; keep this host save active when the
+      // suite runs later, while fixed-clock expiry tests below remain unchanged.
+      final base = input();
+      final activeInput = StorePromotionInput(skuId: base.skuId, skuRevision: base.skuRevision,
+        channel: base.channel, headline: base.headline, detail: base.detail,
+        validFrom: at, validUntil: DateTime.now().toUtc().add(const Duration(days: 1)), active: true);
       expect(
         (await owner.submitWorkspaceProductPromotion(
           'promotion-one',
-          input(),
+          activeInput,
         )).state,
         StorePromotionResultState.saved,
       );
@@ -355,6 +369,65 @@ void main() {
     expect(owner.workspaceCatalogueItems.single.stock, 7);
     expect(provider.writes, 0);
     expect(owner.workspaceOrders, isEmpty); expect(owner.workspaceInvoices, isEmpty);
+  });
+  test('LF03-FAMILY promotion source accepts only negotiated exact structured SKU mirrors', () async {
+    final connected = _FamilyCatalogue()..ownerRead = source().ownerRead;
+    final provider = Provider();
+    final owner = work(Pending(), provider, connected);
+    addTearDown(owner.dispose);
+    owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(
+      variantMembership: WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'black'}));
+    final original = owner.workspaceCatalogueItems.single;
+    final before = jsonEncode(owner.workspaceCatalogueItems.single.toInventoryJson());
+    expect((await owner.readWorkspacePromotionSource('sku-one', channel: 'retail'))?.revision, 1);
+    expect(await owner.readWorkspacePromotionSource('sku-one', channel: 'wholesale'), isNull);
+    connected.supported = false;
+    expect(await owner.readWorkspacePromotionSource('sku-one', channel: 'retail'), isNull);
+    connected.supported = true;
+    owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(sellingPriceMinor: 26001);
+    expect(await owner.readWorkspacePromotionSource('sku-one', channel: 'retail'), isNull);
+    owner.workspaceCatalogueItems[0] = original;
+    expect(jsonEncode(owner.workspaceCatalogueItems.single.toInventoryJson()), before);
+    expect(provider.writes, 0); expect(connected.submitted, 0);
+    expect(owner.workspaceStockMovements, isEmpty); expect(owner.workspaceOrders, isEmpty); expect(owner.workspaceInvoices, isEmpty);
+  });
+  test('LF03-FAMILY legacy reader cannot silently strip structured options', () async {
+    final provider = Provider();
+    final owner = work(Pending(), provider, source());
+    addTearDown(owner.dispose);
+    owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(
+      variantMembership: WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'black'}));
+    expect(await owner.readWorkspacePromotionSource('sku-one', channel: 'retail'), isNull);
+    expect(provider.writes, 0);
+  });
+  for (final initiallyStructured in [false, true]) {
+  test('LF03-FAMILY promotion source rejects changed options during SKU read structured=$initiallyStructured', () async {
+    final connected = _FamilyCatalogue(), delayed = Completer<WorkspaceCatalogueOwnedSku?>();
+    final owner = work(Pending(), Provider(), connected); addTearDown(owner.dispose);
+    if (initiallyStructured) {
+      owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(
+        variantMembership: WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'black'}));
+    }
+    connected.ownerRead = () => delayed.future;
+    final pending = owner.readWorkspacePromotionSource('sku-one', channel: 'retail');
+    await Future<void>.delayed(Duration.zero);
+    owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(
+      variantMembership: WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'red'}));
+    delayed.complete(await source().ownerRead());
+    expect(await pending, isNull);
+  });
+  }
+  test('LF03-FAMILY promotion source rejects account retirement during structured SKU read', () async {
+    final connected = _FamilyCatalogue(), delayed = Completer<WorkspaceCatalogueOwnedSku?>();
+    final owner = work(Pending(), Provider(), connected); addTearDown(owner.dispose);
+    owner.workspaceCatalogueItems[0] = owner.workspaceCatalogueItems.single.copyWith(
+      variantMembership: WorkspaceVariantMembership(familyId: 'family-one', selections: {'colour': 'black'}));
+    connected.ownerRead = () => delayed.future;
+    final pending = owner.readWorkspacePromotionSource('sku-one', channel: 'retail');
+    await Future<void>.delayed(Duration.zero);
+    (owner.contactDraftStore! as catalogue.ListingAccount).owner = 'other-owner';
+    delayed.complete(await source().ownerRead());
+    expect(await pending, isNull);
   });
   for (final scale in [1.0, 2.0]) {
     testWidgets(

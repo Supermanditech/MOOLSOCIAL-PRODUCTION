@@ -937,7 +937,8 @@ class WorkSession extends ChangeNotifier {
     final exact = price % 100 != 0 || mrp != null && mrp % 100 != 0;
     final values = [_policySelectionSignature({skuId}), exact ? price : price ~/ 100,
       mrp == null ? null : exact ? mrp : mrp ~/ 100,
-      item.minimumOrder, item.retailEnabled, item.wholesaleOffer?.toJson(), item.content.toJson(), item.cataloguePhoto?.toJson()];
+      item.minimumOrder, item.retailEnabled, item.wholesaleOffer?.toJson(), item.content.toJson(), item.cataloguePhoto?.toJson(),
+      if (item.variantMembership != null) item.variantMembership!.toJson()];
     return jsonEncode(exact ? {'version': 2, 'moneyUnit': 'minor', 'values': values} : values);
   }
   WorkspaceCatalogueOwnerGateway? _promotionCatalogueOwner() {
@@ -958,7 +959,9 @@ class WorkSession extends ChangeNotifier {
       final saved = await source.readOwnedSku(storeId: store, skuId: skuId, current: current);
       final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
       if (!current() || saved == null || saved.realm != source.realm || item == null ||
-          !_listingMirrorIdentityMatches(saved, item) || !_listingMirrorMatches(saved, item) || saved.input['publicListing'] != true ||
+          !_listingMirrorIdentityMatches(saved, item) || !_listingMirrorMatches(saved, item,
+            reviewedFamily: source is WorkspaceVariantFamilyOwnerGateway &&
+              (source as WorkspaceVariantFamilyOwnerGateway).variantFamilySubmissionSupported) || saved.input['publicListing'] != true ||
           !(saved.input['channels'] as List).any((raw) => (raw as Map)['kind'] == channel)) {
         return null;
       }
