@@ -8053,6 +8053,21 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($promotion.owners|Sort-Object) -join '|') -cne (@($promotionOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners += $promotionOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch03PolicyRecovery']) {
+    $recovery=$Continuation.batch03PolicyRecovery
+    $recoveryOwners=@('apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
+      'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart')
+    if ($null -eq $recovery -or $recovery -isnot [pscustomobject]) { return $false }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if ($null -eq $recovery.PSObject.Properties[$key]) { return $false }
+    }
+    if ($recovery.ticket -cne 'LF-08-C02' -or $recovery.batch -ne 3 -or
+        $recovery.sourceCheckpoint -cne '50498accdb1362b96192eb78c3aff1360e9ad36f' -or
+        $recovery.state -cne 'founder_authorized_frontend_original_policy_recovery' -or
+        (@($recovery.owners|Sort-Object) -join '|') -cne (@($recoveryOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $recoveryOwners
+  }
   return (@($Continuation.owners | Sort-Object) -join '|') -ceq
       (@($exactOwners | Sort-Object) -join '|') -and
     @($ChangedOwners | Where-Object { $_ -cnotin $allowedOwners }).Count -eq 0
@@ -8341,6 +8356,9 @@ function Invoke-Lf01Admission {
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts'] -and
         @($record.frontendContinuation.batch02Facts.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart') {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart'
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch03PolicyRecovery']) {
+      $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Chat']) {
       Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',

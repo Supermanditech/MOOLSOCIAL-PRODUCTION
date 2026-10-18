@@ -119,6 +119,7 @@
         "apps/mobile/test/journey_session_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_coverage_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_honest_recovery_origin_continuity_test.dart",
@@ -494,6 +495,20 @@
         "implementation": "Both-side optional descriptive guidance and SKU-dependent private-entry slice implemented; supported workflow qualification recorded above. Remaining PF/category/provider work stays partially open; not a second content engine or whole-category completion.",
         "founderAccepted": false
       }
+    },
+    "batch03PolicyRecovery": {
+      "ticket": "LF-08-C02", "batch": 3,
+      "sourceCheckpoint": "50498accdb1362b96192eb78c3aff1360e9ad36f",
+      "state": "founder_authorized_frontend_original_policy_recovery",
+      "owners": ["apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart", "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart", "apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart"],
+      "scope": "PF07 original purchased-policy display recovery only under existing LF08-C02/LF10-C01/LF12-C01. Supplied return text and complete protection survive the existing customer-state codec/restart; independently versioned optional subdocument, absent legacy unknown, strict present malformed throws without automatic rewrite. Original cache is not warranty/return/payment authority. Keep family/money schemas unchanged. Correct one existing policy-screen host fixture to explicitly select an eligible payment; never relax runtime guards.",
+      "qualification": "Supported recovery slice qualified, not whole PF07/Batch03/provider completion. Original missing-policy true redv2 reproduced null accepted return text after restart for Retail/Wholesale. Full affected session/variant/policy-screen run842 had841pass and one stale widget failure; retained without claiming green. Corrected widget separately passes1 and strengthened final17 focused cases overlap the841, not extra unique counts. Together842 distinct affected cases have passing evidence with unchanged final runtime source. Exact strings, remedy order/duplicates, nullable/empty, all14 protection fields, long labels, rewrite, legacy absence and11 malformed cases covered. Final runtime restoration loads changed catalogue policyB but original order retainsA; malformed originals set recoverypending and actual persistence-triggering filter change cannot overwrite bytes. Three-owner analysis clean. OPPO same runtime hotrestart10982ms; actual Cart164soap/payment hold and29550Stock retained, fresh Cart/Store overview PNGs inspected. Populated original warranty native recovery remains host-only; no new native save/order/payment, fixture injection, deployment or APK.",
+      "compatibility": "Optional purchasedPolicy version1 carries return text separately from the full supplied protection. Product v1/v2/v3 and exact-money/family encoding unchanged; no-policy output unchanged. Unsupported/malformed present snapshots throw, no silent order-line filtering or current-catalogue fallback. Existing session read catch/write guard retains bytes. Historical display only, restored catalogueListing=false and no eligibility/entitlement/payment authority. Old records already lacking policy remain unknown; older application writers may discard new subdocument, downgrade-safe writing not claimed.",
+      "logs": ["followup-b03-policy-retention-red-20261018-v1.jsonl", "followup-b03-policy-retention-red-20261018-v2.jsonl", "followup-b03-policy-retention-focused-20261018-v3.jsonl", "followup-b03-policy-retention-affected-20261018-v1.jsonl", "followup-b03-policy-screen-fixture-20261018-v3.jsonl", "followup-b03-policy-retention-analysis-20261018-v2.log"],
+      "diagnostics": "First red fixture assumed nonexistent copyWith(returnPolicy), corrected constructor fixture before true red, not counted as behavior failure. Repeated wrong-root readonly path probes produced no writes; use absolute application paths when command cwd is apps/mobile. Older policy widget assumed primary CTA meant next-step; current unified CTA submits, creating review hold. First Card-only fixture attempt therefore failed too; final uses guarded address/payment transitions before local review confirm, keeps all policyUI assertions and runtime guards. Existing continuation rejected session-test owner despite cumulative claim; exact three-owner Batch03 registration plus one cumulative test path added,188 positive/negative probes passed and148-owner actual implementation passed. My initial cumulative-path condition accessed record before load; moved after load and actual gate passed, failed invocation retained. Existing REG4649-linked diagnostics, no registry/config/policy or new framework/phase.",
+      "nativeEvidence": ["followup-b03-policy-restarted-20261018-v1.png", "followup-b03-policy-cart-20261018-v1.png", "followup-b03-policy-workspaces-20261018-v1.png"],
+      "founderReview": "Standing frontend implementation authority only; no new founder/provider/APK acceptance inferred. Normal common publication and remaining mapped scope stay pending.",
+      "authority": "Existing standing narrow frontend batch authority. Three literal owners only registered in current continuation; one existing test added to cumulative claim. No policy/config/registry, baseline provenance, safety flag, backend, deployment, transaction or APK scope changed."
     },
     "batch02Promotions": {
       "ticket": "LF-04-C01",

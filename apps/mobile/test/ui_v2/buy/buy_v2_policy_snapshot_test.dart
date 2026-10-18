@@ -36,13 +36,14 @@ void main() {
     session.openCart(scope: BuyV2CartScope.shop);
     expect(session.openCheckout(), isTrue);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('buy-checkout-primary-address')),
-    );
+    // The unified primary CTA submits; it is not the old step-navigation CTA.
+    // Exercise the guarded public transitions without starting a review payment.
+    expect(session.continueCheckoutFromAddress(), isTrue);
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('buy-checkout-primary-payment')),
-    );
+    // Explicit review-method selection still uses the normal eligibility guard.
+    expect(session.choosePayment('Card'), isTrue, reason: '${session.notice}; methods=${session.availablePaymentMethods}; recovery=${session.checkoutRequiresResolution}');
+    await tester.pumpAndSettle();
+    expect(session.continueCheckoutFromPayment(), isTrue);
     await tester.pumpAndSettle();
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
     final summary =

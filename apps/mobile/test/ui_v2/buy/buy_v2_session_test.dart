@@ -5880,7 +5880,7 @@ void main() {
       lines: [BuyV2CartLine(product: product, quantity: 3)],
     );
     // Host-only bound public listings; no live provider/Stock/payment authority.
-    BuyV2Product publicListing(bool trade) {
+    BuyV2Product publicListing(bool trade, {String? returnPolicy}) {
       final id = 'listing-${(trade ? 'e' : 'd') * 64}';
       final channel = trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail;
       return BuyV2Product(id: id, canonicalId: 'host-canonical', storeId: 'host-store',
@@ -5891,9 +5891,60 @@ void main() {
         categoryId: 'grocery', brand: 'Host', title: 'Host oil', variant: 'Sunflower', pack: '1 L',
         price: trade ? 250 : 260, minimumOrder: trade ? 10 : 1, unitPrice: '', badge: '',
         seller: 'Host Store', sellerType: 'Retailer', deliveryPromise: '', origin: '', confirmedOn: '',
-        visualLabel: '', visualKind: 'unavailable', offerClass: channel);
+        visualLabel: '', visualKind: 'unavailable', offerClass: channel, returnPolicy: returnPolicy);
     }
     for (final trade in [false, true]) {
+      test('PF07 purchased policy survives restart without current catalogue substitution trade=$trade', () async {
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        const original = BuyV2PurchaseProtection(summary: 'Host original returns', remedies: ['Repair', 'Replacement'],
+          windowLabel: 'Host original window', conditionsLabel: 'Host original conditions',
+          verificationLabel: 'Host source check', initiationLabel: 'Host request instructions',
+          approvalLabel: 'Host approval terms', pickupLabel: 'Host pickup terms',
+          refundMethodLabel: 'Host original method', refundTimelineLabel: 'Host original timeline',
+          warrantyLabel: 'Host issuer warranty', nonReturnableReason: 'Host original exception',
+          policyVersion: 'host-policy-A', effectiveFromLabel: 'Host effective date');
+        final selected = publicListing(trade, returnPolicy: 'Host accepted return text').copyWith(purchaseProtection: original);
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)])), isTrue);
+        final currentCatalogue = publicListing(trade, returnPolicy: 'Host changed return text').copyWith(
+          purchaseProtection: const BuyV2PurchaseProtection(summary: 'Host changed returns', warrantyLabel: 'Host changed warranty', policyVersion: 'host-policy-B'));
+        final fresh = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        final restored = (await fresh.read())!.orders.single.lines.single.product;
+        expect(restored.returnPolicy, selected.returnPolicy);
+        expect(restored.purchaseProtection?.summary, original.summary);
+        expect(restored.purchaseProtection?.remedies, original.remedies);
+        expect(restored.purchaseProtection?.windowLabel, original.windowLabel);
+        expect(restored.purchaseProtection?.conditionsLabel, original.conditionsLabel);
+        expect(restored.purchaseProtection?.verificationLabel, original.verificationLabel);
+        expect(restored.purchaseProtection?.initiationLabel, original.initiationLabel);
+        expect(restored.purchaseProtection?.approvalLabel, original.approvalLabel);
+        expect(restored.purchaseProtection?.pickupLabel, original.pickupLabel);
+        expect(restored.purchaseProtection?.refundMethodLabel, original.refundMethodLabel);
+        expect(restored.purchaseProtection?.refundTimelineLabel, original.refundTimelineLabel);
+        expect(restored.purchaseProtection?.warrantyLabel, original.warrantyLabel);
+        expect(restored.purchaseProtection?.nonReturnableReason, original.nonReturnableReason);
+        expect(restored.purchaseProtection?.policyVersion, original.policyVersion);
+        expect(restored.purchaseProtection?.effectiveFromLabel, original.effectiveFromLabel);
+        expect(restored.purchaseProtection?.warrantyLabel, isNot(currentCatalogue.purchaseProtection!.warrantyLabel));
+        expect(restored.catalogueListing, isFalse); expect(restored.reviewDeliveryOptions, isEmpty);
+        expect(restored.procurementSupplierGrant, isNull); expect(restored.publicListingIdentity, selected.publicListingIdentity);
+        expect(restored.priceMinor, selected.priceMinor);
+        final key = preferences.values.keys.single;
+        final firstPolicy = jsonDecode(preferences.values[key]!)['orders'][0]['lines'][0]['purchasedProduct']['purchasedPolicy'];
+        expect(await fresh.write((await fresh.read())!), isTrue);
+        expect(jsonDecode(preferences.values[key]!)['orders'][0]['lines'][0]['purchasedProduct']['purchasedPolicy'], firstPolicy);
+        final core = BuySession();
+        final commerce = _R669ProcurementCommerce(BuyV2CommerceSnapshot(
+          state: BuyV2CommerceLoadState.ready, products: [currentCatalogue]));
+        final session = BuyV2Session(core: core, reviewDataEnabled: false,
+          customerStateStore: fresh, commerceAdapter: commerce);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCommerce(); await session.restoreCustomerState();
+        final originalLine = session.orders.where((order) => order.id == 'retained-order').single.lines.single;
+        expect(originalLine.product.returnPolicy, selected.returnPolicy);
+        expect(originalLine.product.purchaseProtection?.policyVersion, 'host-policy-A');
+        expect(originalLine.product.purchaseProtection?.warrantyLabel, original.warrantyLabel);
+      });
       test('LF-LISTING purchased restart preserves original source identity without eligibility trade=$trade', () async {
         final preferences = _R669StringPreferences(), selected = publicListing(trade);
         final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
@@ -5905,6 +5956,83 @@ void main() {
         expect(restored.hasValidPublicListingIdentity, isTrue);
         expect(restored.catalogueListing, isFalse); expect(restored.procurementSupplierGrant, isNull);
         expect(restored.reviewDeliveryOptions, isEmpty); expect(restored.packTerms, isNull);
+      });
+    }
+    test('PF07 purchased policy legacy absence remains unknown and does not rewrite current terms', () async {
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+      final selected = publicListing(false);
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)])), isTrue);
+      final key = preferences.values.keys.single;
+      final raw = jsonDecode(preferences.values[key]!);
+      expect((raw['orders'][0]['lines'][0]['purchasedProduct'] as Map).containsKey('purchasedPolicy'), isFalse);
+      final restored = (await store.read())!;
+      expect(restored.orders.single.lines.single.product.returnPolicy, isNull);
+      expect(restored.orders.single.lines.single.product.purchaseProtection, isNull);
+      expect(await store.write(restored), isTrue);
+      expect(jsonDecode(preferences.values[key]!), raw);
+    });
+    for (final shape in ['return only', 'protection only', 'blank and nullable']) {
+      test('PF07 purchased policy optional fields preserve exact supplied values $shape', () async {
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        final text = shape == 'return only' ? '  Host exact return text  ' : shape == 'blank and nullable' ? '' : null;
+        final protection = shape == 'return only' ? null : BuyV2PurchaseProtection(
+          summary: '', remedies: const [' Repair ', 'Repair'],
+          warrantyLabel: shape == 'blank and nullable' ? '' : List.filled(5000, 'w').join(), policyVersion: null);
+        final selected = publicListing(false, returnPolicy: text).copyWith(purchaseProtection: protection);
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)])), isTrue);
+        final restored = (await store.read())!.orders.single.lines.single.product;
+        expect(restored.returnPolicy, text);
+        expect(restored.purchaseProtection?.summary, protection?.summary);
+        expect(restored.purchaseProtection?.remedies, protection?.remedies);
+        expect(restored.purchaseProtection?.warrantyLabel, protection?.warrantyLabel);
+        expect(restored.purchaseProtection?.policyVersion, isNull);
+      });
+    }
+    for (final corruption in ['null snapshot', 'unknown version', 'noninteger version', 'extra field',
+      'missing field', 'wrong return type', 'wrong protection type', 'wrong summary',
+      'wrong remedies', 'wrong optional type', 'extra protection field']) {
+      test('PF07 purchased policy corrupt original blocks restore and automatic overwrite $corruption', () async {
+        final preferences = _R669StringPreferences();
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        final selected = publicListing(false, returnPolicy: 'Host original').copyWith(
+          purchaseProtection: const BuyV2PurchaseProtection(summary: 'Host terms', warrantyLabel: 'Host warranty'));
+        await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(selected)]));
+        final key = preferences.values.keys.single;
+        final raw = jsonDecode(preferences.values[key]!);
+        final product = raw['orders'][0]['lines'][0]['purchasedProduct'] as Map;
+        final policy = product['purchasedPolicy'] as Map;
+        final protection = policy['protection'] as Map;
+        switch (corruption) {
+          case 'null snapshot': product['purchasedPolicy'] = null;
+          case 'unknown version': policy['version'] = 2;
+          case 'noninteger version': policy['version'] = 1.0;
+          case 'extra field': policy['future'] = 'Unrecognised original';
+          case 'missing field': policy.remove('returnPolicy');
+          case 'wrong return type': policy['returnPolicy'] = true;
+          case 'wrong protection type': policy['protection'] = 'Host invalid';
+          case 'wrong summary': protection['summary'] = null;
+          case 'wrong remedies': protection['remedies'] = ['Repair', 1];
+          case 'wrong optional type': protection['warrantyLabel'] = false;
+          case 'extra protection field': protection['future'] = 'Unrecognised original';
+        }
+        final bytes = jsonEncode(raw); preferences.values[key] = bytes;
+        final fresh = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        await expectLater(fresh.read(), throwsFormatException);
+        final writes = preferences.writesStarted;
+        final core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: fresh);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCustomerState();
+        expect(session.customerStateRecoveryPending, isTrue);
+        expect(session.notice, contains('could not be restored'));
+        session.updateQuery('Host recovery browse');
+        session.setAvailableProductsOnly(true);
+        expect(session.availableProductsOnly, isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(preferences.writesStarted, writes);
+        expect(preferences.values[key], bytes);
       });
     }
     test('LF-LISTING procurement restart preserves source identity and refuses malformed present binding', () async {

@@ -171,6 +171,29 @@ if ($RequireLfPublicationProbes) {
       $cases+=2
     }
   }
+  if ($null -ne $continuation.PSObject.Properties['batch03PolicyRecovery']) {
+    foreach ($owner in $continuation.batch03PolicyRecovery.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-policy recovery owner rejected.'
+      $cases++
+    }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch03PolicyRecovery.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Recovery missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch03PolicyRecovery.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Recovery changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch03PolicyRecovery.owners+='backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Recovery widened into backend.'
+    $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $legacy.PSObject.Properties.Remove('batch03PolicyRecovery')
+    Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical continuation rejected.'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'))) 'Unclaimed recovery fixture admitted.'
+    $cases+=3
+  }
   if ($null -ne $continuation.PSObject.Properties['batch02Promotions']) {
     foreach ($owner in $continuation.batch02Promotions.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact promotion owner rejected.'

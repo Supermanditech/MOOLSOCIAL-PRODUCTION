@@ -1802,6 +1802,63 @@ final class BuyV2SharedPreferencesCustomerStateStore
       return true;
     } on FormatException { return false; }
   }
+  // Historical display only, independently versioned from family/money codecs.
+  // Legacy absence cannot be filled from today's catalogue or Store settings.
+  static Map<String, Object?> _encodePurchasedPolicy(BuyV2Product product) => {
+    'version': 1,
+    'returnPolicy': product.returnPolicy,
+    'protection': product.purchaseProtection == null ? null : {
+      'summary': product.purchaseProtection!.summary,
+      'remedies': [...product.purchaseProtection!.remedies],
+      'windowLabel': product.purchaseProtection!.windowLabel,
+      'conditionsLabel': product.purchaseProtection!.conditionsLabel,
+      'verificationLabel': product.purchaseProtection!.verificationLabel,
+      'initiationLabel': product.purchaseProtection!.initiationLabel,
+      'approvalLabel': product.purchaseProtection!.approvalLabel,
+      'pickupLabel': product.purchaseProtection!.pickupLabel,
+      'refundMethodLabel': product.purchaseProtection!.refundMethodLabel,
+      'refundTimelineLabel': product.purchaseProtection!.refundTimelineLabel,
+      'warrantyLabel': product.purchaseProtection!.warrantyLabel,
+      'nonReturnableReason': product.purchaseProtection!.nonReturnableReason,
+      'policyVersion': product.purchaseProtection!.policyVersion,
+      'effectiveFromLabel': product.purchaseProtection!.effectiveFromLabel,
+    },
+  };
+  static Map<String, Object?> _exactPurchasedPolicyMap(Object? value, Set<String> keys) {
+    if (value is! Map || value.length != keys.length ||
+        keys.any((key) => !value.containsKey(key))) {
+      throw const FormatException('Saved purchased policy needs checking.');
+    }
+    return Map<String, Object?>.from(value);
+  }
+  static ({String? returnPolicy, BuyV2PurchaseProtection? protection}) _decodePurchasedPolicy(Object? value) {
+    final source = _exactPurchasedPolicyMap(value, {'version', 'returnPolicy', 'protection'});
+    if (source['version'] is! int || source['version'] != 1 ||
+        (source['returnPolicy'] != null && source['returnPolicy'] is! String)) {
+      throw const FormatException('Saved purchased policy needs checking.');
+    }
+    if (source['protection'] == null) {
+      return (returnPolicy: source['returnPolicy'] as String?, protection: null);
+    }
+    const optionalFields = {'windowLabel', 'conditionsLabel', 'verificationLabel',
+      'initiationLabel', 'approvalLabel', 'pickupLabel', 'refundMethodLabel',
+      'refundTimelineLabel', 'warrantyLabel', 'nonReturnableReason', 'policyVersion', 'effectiveFromLabel'};
+    final p = _exactPurchasedPolicyMap(source['protection'], {'summary', 'remedies', ...optionalFields});
+    if (p['summary'] is! String || p['remedies'] is! List ||
+        (p['remedies'] as List).any((value) => value is! String) ||
+        optionalFields.any((key) => p[key] != null && p[key] is! String)) {
+      throw const FormatException('Saved purchased policy needs checking.');
+    }
+    return (returnPolicy: source['returnPolicy'] as String?, protection: BuyV2PurchaseProtection(
+      summary: p['summary'] as String, remedies: List<String>.unmodifiable(p['remedies'] as List),
+      windowLabel: p['windowLabel'] as String?, conditionsLabel: p['conditionsLabel'] as String?,
+      verificationLabel: p['verificationLabel'] as String?, initiationLabel: p['initiationLabel'] as String?,
+      approvalLabel: p['approvalLabel'] as String?, pickupLabel: p['pickupLabel'] as String?,
+      refundMethodLabel: p['refundMethodLabel'] as String?, refundTimelineLabel: p['refundTimelineLabel'] as String?,
+      warrantyLabel: p['warrantyLabel'] as String?, nonReturnableReason: p['nonReturnableReason'] as String?,
+      policyVersion: p['policyVersion'] as String?, effectiveFromLabel: p['effectiveFromLabel'] as String?,
+    ));
+  }
   static Map<String, Object?> _encodePurchasedProduct(BuyV2Product product) => {
     'version': product.variantFamilyId != null ? 3 : _hasExactProductMoney(product) ? 2 : 1,
     'id': product.id,
@@ -1825,6 +1882,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'requiresPrescription': product.requiresPrescription,
     'composition': product.composition,
     'regulatoryNote': product.regulatoryNote,
+    if (product.returnPolicy != null || product.purchaseProtection != null)
+      'purchasedPolicy': _encodePurchasedPolicy(product),
   };
 
   static BuyV2Product? _decodePurchasedProduct(Object? value) {
@@ -1832,6 +1891,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
     if (!_validRetainedFamily(source, source['version'])) {
       throw const FormatException('Saved purchased family needs checking.');
     }
+    final policy = source.containsKey('purchasedPolicy')
+        ? _decodePurchasedPolicy(source['purchasedPolicy'])
+        : (returnPolicy: null, protection: null);
     final id = _string(source['id']);
     final canonicalId = _string(source['canonicalId']);
     final destination = _destination(_string(source['destination']));
@@ -1888,6 +1950,8 @@ final class BuyV2SharedPreferencesCustomerStateStore
       requiresPrescription: source['requiresPrescription'] as bool,
       composition: _string(source['composition']),
       regulatoryNote: _string(source['regulatoryNote']),
+      returnPolicy: policy.returnPolicy,
+      purchaseProtection: policy.protection,
       badge: '',
       deliveryPromise: '',
       confirmedOn: '',
