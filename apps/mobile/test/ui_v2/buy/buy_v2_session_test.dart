@@ -603,6 +603,17 @@ final class _Lf11ScheduledFacts implements BuyV2ProductFactsAdapter {
         scheduledSlotId: slot, scheduledStart: instant.add(start), scheduledEnd: instant.add(end)));
 }
 
+class _Lf11WindowPolicy implements BuyV2ProductContentAdapter {
+  String revision = 'host-policy-A';
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) => BuyV2ProductContentSnapshot(
+    productId: product.id, state: BuyV2ProductContentState.ready, sourceId: 'host-window-policy',
+    supplierPolicyAcceptanceRequired: true, supplierPolicy: BuyV2SupplierPolicy(
+      id: 'host-policy', storeId: product.storeId!, revision: revision,
+      title: 'Store policy', body: 'Host delivery and return terms', productIds: {product.sourceSkuId},
+      sourceRealm: product.publicListingIdentity?.realm, requiresAcceptance: true));
+}
+
 /// Isolated proposed selected-window connector; never injected into native data.
 class _Lf11ScheduledCommerce extends TestLegacyRecoveryCommerce
     implements BuyV2ScheduledOrderPlacementAdapter {
@@ -6039,8 +6050,10 @@ void main() {
       locationKey: 'host-region|host-place|1', slotId: 'host-slot-A',
       startsAt: DateTime.utc(2020, 1, 1, 9), endsAt: DateTime.utc(2020, 1, 1, 10));
     Future<({BuyV2Session session, TestPaymentCommerce commerce, _Lf11ScheduledFacts facts,
-      _MemoryCustomerStateStore store, BuyV2ScheduledFulfilment selected, void Function(Duration) advance})> scheduledCheckout({
-      BuyV2CheckoutQuoteAdapter? quote, TestPaymentCommerce? connector, bool review = false}) async {
+      _MemoryCustomerStateStore store, BuyV2ScheduledFulfilment selected, void Function(Duration) advance,
+      void Function() retire})> scheduledCheckout({
+      BuyV2CheckoutQuoteAdapter? quote, TestPaymentCommerce? connector, bool review = false,
+      BuyV2ProductContentAdapter? content}) async {
       final product = publicListing(false);
       var now = DateTime.now().toUtc();
       final facts = _Lf11ScheduledFacts(now);
@@ -6056,9 +6069,11 @@ void main() {
       commerce.snapshot = snapshot(null);
       final core = BuySession();
       final session = BuyV2Session(core: core, reviewDataEnabled: review, commerceAdapter: commerce,
-        productFactsAdapter: facts, customerStateStore: store, checkoutQuoteAdapter: quote, catalogueNow: () => now,
+        productFactsAdapter: facts, productContentAdapter: content, customerStateStore: store, checkoutQuoteAdapter: quote, catalogueNow: () => now,
         cataloguePageSource: review ? (_PagingRecoverySource()..resolutionProducts = {product.id: product}) : null);
-      addTearDown(session.dispose); addTearDown(core.dispose);
+      var retired = false;
+      void retire() { if (!retired) { retired = true; session.dispose(); } }
+      addTearDown(retire); addTearDown(core.dispose);
       await session.restoreCommerce(); await session.restoreCustomerState();
       expect(session.customerStateRecoveryPending, isFalse, reason: session.notice);
       session.openCart(); expect(session.openCheckout(), isTrue, reason: session.notice);
@@ -6066,8 +6081,203 @@ void main() {
       await session.restoreCommerce();
       expect(session.choosePayment('Card'), isTrue, reason: session.notice);
       return (session: session, commerce: commerce, facts: facts, store: store, selected: selected,
-        advance: (Duration elapsed) { now = now.add(elapsed); });
+        advance: (Duration elapsed) { now = now.add(elapsed); }, retire: retire);
     }
+    test('LF11 window action requires explicit conflict replacement and retains quantity', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!;
+      f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      expect(await s.addProductForScheduledWindow(id, next), isFalse);
+      expect(identical(s.cartLineFor(id), old), isTrue);
+      expect(await s.addProductForScheduledWindow(id, next, replaceLine: old), isTrue, reason: s.notice);
+      expect(s.quantityFor(id), 3); expect(s.cartLineFor(id)!.scheduledFulfilment, next);
+      expect(f.store.snapshot!.cartScheduledFulfilments[id], next);
+      expect(await s.addProductForScheduledWindow(id, next), isTrue);
+      expect(s.quantityFor(id), 4);
+      expect(s.addProduct(id), isTrue); expect(s.quantityFor(id), 5);
+      expect(s.cartLineFor(id)!.scheduledFulfilment, next);
+    });
+    test('LF11 window action first Add uses normal validation and saves exact choice', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final product = s.cartLineFor(id)!.product;
+      s.remove(id); await Future<void>.delayed(Duration.zero);
+      final selected = s.scheduledWindowFor(product)!;
+      expect(await s.addProductForScheduledWindow(id, selected), isTrue, reason: s.notice);
+      expect(s.quantityFor(id), 1); expect(f.store.snapshot!.cartScheduledFulfilments[id], selected);
+      await s.restoreCustomerState();
+      expect(s.cartLineFor(id)!.scheduledFulfilment, selected); expect(s.quantityFor(id), 1);
+      f.facts.scheduled = false; s.refreshProductFacts(id); expect(s.scheduledWindowFor(product), isNull);
+    });
+    test('LF11 window action rejects stale confirmation without mutation', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      expect(s.setCartQuantity(id, '4'), isTrue);
+      expect(await s.addProductForScheduledWindow(id, next, replaceLine: old), isFalse);
+      expect(s.quantityFor(id), 4); expect(s.cartLineFor(id)!.scheduledFulfilment, f.selected);
+    });
+    test('LF11 window save blocks duplicate Add and checkout during original write', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      final gate = Completer<void>(); f.store.pendingWrite = gate;
+      final saving = s.addProductForScheduledWindow(id, next, replaceLine: old);
+      expect(s.checkoutBusy, isTrue); expect(s.addProduct(id), isFalse);
+      expect(await s.addProductForScheduledWindow(id, next), isFalse);
+      expect(s.setCartQuantity(id, '6'), isFalse); expect(s.openCheckout(), isFalse);
+      gate.complete(); expect(await saving, isTrue); expect(s.checkoutBusy, isFalse);
+      expect(s.quantityFor(id), 3);
+    });
+    test('LF11 failed window save supersedes rejected retry snapshot before recovery', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      f.store.rejectWrites = true;
+      expect(await s.addProductForScheduledWindow(id, next, replaceLine: old), isFalse);
+      expect(identical(s.cartLineFor(id), old), isTrue); expect(s.customerStateRecoveryPending, isTrue);
+      expect(s.cartChangesBlocked, isTrue);
+      f.store.rejectWrites = false; await s.restoreCustomerState();
+      expect(s.customerStateRecoveryPending, isFalse);
+      expect(s.quantityFor(id), 3); expect(s.cartLineFor(id)!.scheduledFulfilment, f.selected);
+      expect(f.store.snapshot!.cartScheduledFulfilments[id], f.selected);
+    });
+    test('LF11 window expiry during saving restores only original line and snapshot', () async {
+      final f = await scheduledCheckout(); final s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      final gate = Completer<void>(); f.store.pendingWrite = gate;
+      final saving = s.addProductForScheduledWindow(id, next, replaceLine: old);
+      s.setAvailableProductsOnly(true); // queues an unrelated preference behind candidate
+      f.advance(const Duration(hours: 5)); gate.complete();
+      expect(await saving, isFalse);
+      expect(identical(s.cartLineFor(id), old), isTrue);
+      expect(f.store.snapshot!.cartScheduledFulfilments[id], f.selected);
+      expect(s.checkoutBusy, isFalse);
+    });
+    for (final skipped in [false, true]) {
+      test('LF11 window retired failed or skipped write hands back original choice skipped=$skipped', () async {
+        final f = await scheduledCheckout(), s = f.session, id = f.selected.listing.listingId;
+        final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+        final gate = Completer<void>(); f.store.pendingWrite = gate;
+        if (skipped) s.setAvailableProductsOnly(true); // earlier queued unrelated write
+        final saving = s.addProductForScheduledWindow(id, s.scheduledWindowFor(old.product)!, replaceLine: old);
+        f.retire(); final handback = s.retainedAccountState();
+        f.store.rejectWrites = !skipped; gate.complete();
+        expect(await saving, isFalse);
+        final pending = await handback;
+        expect(pending, isNotNull); expect(pending!.cartScheduledFulfilments[id], f.selected);
+        expect(pending.cartQuantities[id], 3);
+        f.store.rejectWrites = false;
+        final core = BuySession();
+        final next = BuyV2Session(core: core, reviewDataEnabled: false,
+          commerceAdapter: f.commerce, customerStateStore: f.store, pendingAccountState: Future.value(pending));
+        addTearDown(next.dispose); addTearDown(core.dispose);
+        await next.restoreCommerce(); await next.restoreCustomerState();
+        expect(next.cartLineFor(id)!.scheduledFulfilment, f.selected);
+        expect(next.quantityFor(id), 3);
+      });
+    }
+    for (final replacement in [false, true]) {
+      test('LF11 window policy resumes same exact operation replacement=$replacement', () async {
+        final policy = _Lf11WindowPolicy(), f = await scheduledCheckout(content: policy);
+        final s = f.session, id = f.selected.listing.listingId;
+        if (!replacement) { s.remove(id); await Future<void>.delayed(Duration.zero); }
+        f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id); s.refreshProductContent(id);
+        final old = s.cartLineFor(id), product = s.findProduct(id)!;
+        final next = s.scheduledWindowFor(product)!;
+        expect(await s.addProductForScheduledWindow(id, next, replaceLine: replacement ? old : null), isFalse);
+        final intent = s.pendingSupplierPolicyAdd!;
+        expect(intent.scheduledFulfilment, next);
+        expect(await s.acceptSupplierPolicyAndAdd(intent), isTrue, reason: s.notice);
+        expect(s.quantityFor(id), replacement ? 3 : 1);
+        expect(s.cartLineFor(id)!.scheduledFulfilment, next);
+        expect(f.store.snapshot!.cartScheduledFulfilments[id], next);
+      });
+    }
+    test('LF11 window changed grant during consent never resumes plain Add', () async {
+      final policy = _Lf11WindowPolicy(), f = await scheduledCheckout(content: policy);
+      final s = f.session, id = f.selected.listing.listingId, old = f.session.cartLines.single;
+      f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id); s.refreshProductContent(id);
+      final next = s.scheduledWindowFor(old.product)!;
+      expect(await s.addProductForScheduledWindow(id, next, replaceLine: old), isFalse);
+      final intent = s.pendingSupplierPolicyAdd!;
+      f.facts.slot = 'host-slot-C'; s.refreshProductFacts(id);
+      expect(await s.acceptSupplierPolicyAndAdd(intent), isFalse);
+      expect(identical(s.cartLineFor(id), old), isTrue);
+    });
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF11 window UI explicit replacement and preserved quantity scale=$scale', (tester) async {
+        tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final f = await scheduledCheckout(), s = f.session, id = f.selected.listing.listingId;
+        f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+        s.openProduct(id, reviewScheduledWindow: true);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+          home: BuyV2Screen(session: s, productId: id)));
+        await tester.pumpAndSettle();
+        s.openProduct(id, reviewScheduledWindow: true); await tester.pumpAndSettle();
+        final action = find.byKey(ValueKey('buy-product-use-window-$id'));
+        await tester.scrollUntilVisible(action, 200, scrollable: find.descendant(
+          of: find.byKey(PageStorageKey('buy-product-$id')).last, matching: find.byType(Scrollable)).first);
+        await Scrollable.ensureVisible(tester.element(action), alignment: .5); await tester.pumpAndSettle();
+        await tester.tap(action); await tester.pumpAndSettle();
+        expect(find.text('Replace delivery choice?'), findsOneWidget);
+        expect(find.textContaining('All 3 packs'), findsOneWidget);
+        await tester.tap(find.text('Keep current')); await tester.pumpAndSettle();
+        expect(s.quantityFor(id), 3); expect(s.cartLineFor(id)!.scheduledFulfilment, f.selected);
+        await tester.tap(action); await tester.pumpAndSettle();
+        await tester.tap(find.text('Replace choice')); await tester.pumpAndSettle();
+        expect(s.quantityFor(id), 3); expect(s.cartLineFor(id)!.scheduledFulfilment!.slotId, 'host-slot-B');
+        expect(tester.takeException(), isNull);
+      });
+    }
+    testWidgets('LF11 window action uses displayed grant not silently refreshed choice', (tester) async {
+      final f = await scheduledCheckout(), s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; s.remove(id); await tester.pump();
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(session: s, productId: id)));
+      await tester.pumpAndSettle();
+      final action = find.byKey(ValueKey('buy-product-use-window-$id'));
+      await tester.scrollUntilVisible(action, 200, scrollable: find.descendant(
+        of: find.byKey(PageStorageKey('buy-product-$id')).last, matching: find.byType(Scrollable)).first);
+      await Scrollable.ensureVisible(tester.element(action), alignment: .5); await tester.pumpAndSettle();
+      // Update cached source after build but before tapping the displayed A action.
+      f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      await tester.tap(action); await tester.pumpAndSettle();
+      expect(s.quantityFor(id), 0); expect(s.notice, contains('changed or expired'));
+      expect(s.cartLineFor(id), isNull); expect(old.scheduledFulfilment, f.selected);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('LF11 window policy replacement wording never asks to add zero', (tester) async {
+      final f = await scheduledCheckout(content: _Lf11WindowPolicy()), s = f.session, id = f.selected.listing.listingId;
+      final old = s.cartLineFor(id)!; f.facts.slot = 'host-slot-B'; s.refreshProductFacts(id);
+      expect(await s.addProductForScheduledWindow(id, s.scheduledWindowFor(old.product)!, replaceLine: old), isFalse);
+      late BuildContext host;
+      await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) {
+        host = context; return const Scaffold(body: Text('Policy host'));
+      })));
+      final showing = showBuyV2SupplierPolicySheet(host, s, intent: s.pendingSupplierPolicyAdd);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('replace the delivery choice for all 3 packs'), findsOneWidget);
+      expect(find.textContaining('add 0'), findsNothing);
+      Navigator.of(host).pop(); await tester.pumpAndSettle(); await showing;
+      expect(s.pendingSupplierPolicyAdd, isNull); expect(s.cartLineFor(id), same(old));
+    });
+    testWidgets('LF11 window absent source hides controls and retains exact old request', (tester) async {
+      final f = await scheduledCheckout(), s = f.session, id = f.selected.listing.listingId;
+      f.facts.scheduled = false; s.refreshProductFacts(id);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(session: s, productId: id)));
+      await tester.pumpAndSettle();
+      s.openProduct(id, reviewScheduledWindow: true); await tester.pumpAndSettle();
+      final target = find.textContaining('No delivery window is currently confirmed');
+      await tester.scrollUntilVisible(target, 200, scrollable: find.descendant(
+        of: find.byKey(PageStorageKey('buy-product-$id')).last, matching: find.byType(Scrollable)).first);
+      expect(target, findsOneWidget);
+      expect(find.byKey(ValueKey('buy-product-use-window-$id')), findsNothing);
+      expect(s.cartLineFor(id)!.scheduledFulfilment, f.selected);
+      expect(tester.takeException(), isNull);
+    });
     test('LF11 selected quote acknowledgements defensively copy exact quantity and context', () {
       final product = publicListing(false), selected = desiredSchedule(publicListing(false));
       final entries = {product.id: (selection: selected, quantity: 3)};
@@ -6118,6 +6328,31 @@ void main() {
       expect(fixture.commerce.requests, hasLength(1));
       expect(fixture.commerce.requests.single.lines.single.scheduledFulfilment, fixture.selected);
       expect(fixture.session.orders.single.lines.single.scheduledFulfilment, fixture.selected);
+    });
+    test('LF11 window full first-Add quote placement original and encoded restart chain', () async {
+      final quote = _Lf11AcknowledgedQuote();
+      final connector = _Lf11ScheduledCommerce()
+        ..onPlace = (request) => testGroupedPlacement(request, reference: 'host-selected-chain');
+      final f = await scheduledCheckout(quote: quote, connector: connector), s = f.session;
+      final product = s.cartLines.single.product;
+      s.remove(product.id); await Future<void>.delayed(Duration.zero);
+      final displayed = s.scheduledWindowFor(product)!;
+      expect(await s.addProductForScheduledWindow(product.id, displayed, quantity: 3), isTrue);
+      expect(await s.refreshCheckoutQuote(), isTrue);
+      expect(await s.submitOrder(), isTrue, reason: s.notice);
+      expect(connector.requests.single.lines.single.scheduledFulfilment, displayed);
+      await s.retainedAccountState();
+      final bytes = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(bytes, ownerScope: f.store.ownerScope);
+      expect(await store.write(f.store.snapshot!), isTrue);
+      final core = BuySession();
+      final next = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+      addTearDown(next.dispose); addTearDown(core.dispose);
+      await next.restoreCustomerState();
+      expect(next.orders.single.lines.single.scheduledFulfilment, displayed);
+      expect(next.orders.single.lines.single.quantity, 3);
+      expect(next.orders.single.lines.single.totalMinor, product.priceMinor * 3);
+      expect(connector.requests, hasLength(1));
     });
     test('LF11 selected placement cannot replace frozen quote during save wait', () async {
       final quote = _Lf11AcknowledgedQuote()..quoteId = 'host-Q1'..validity = const Duration(minutes: 1);

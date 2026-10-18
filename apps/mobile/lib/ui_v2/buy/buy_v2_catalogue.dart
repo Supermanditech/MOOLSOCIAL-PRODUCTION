@@ -12863,8 +12863,11 @@ class _FeaturedProductAction extends StatelessWidget {
                                     ? null
                                     : () {
                                         HapticFeedback.selectionClick();
-                                        if (requiresOfferReview) {
-                                          session.openProduct(product.id);
+                                        final scheduled = product.destination == BuyV2Destination.shop &&
+                                            session.view == BuyV2View.catalogue &&
+                                            session.shopSaleType == BuyV2ShopSaleType.courier;
+                                        if (requiresOfferReview || scheduled) {
+                                          session.openProduct(product.id, reviewScheduledWindow: scheduled);
                                           return;
                                         }
                                         final added = session.addProduct(
@@ -13273,8 +13276,15 @@ class BuyV2ProductCard extends StatelessWidget {
                               ? null
                               : () async {
                                   HapticFeedback.selectionClick();
-                                  if (requiresOfferReview) {
-                                    openProduct();
+                                  final scheduled = product.destination == BuyV2Destination.shop &&
+                                      session.view == BuyV2View.catalogue &&
+                                      session.shopSaleType == BuyV2ShopSaleType.courier;
+                                  if (requiresOfferReview || scheduled) {
+                                    if (scheduled) {
+                                      session.openProduct(product.id, reviewScheduledWindow: true);
+                                    } else {
+                                      openProduct();
+                                    }
                                     return;
                                   }
                                   final count =

@@ -3156,6 +3156,9 @@ class BuyV2SupplierPolicyAddIntent {
     required this.ownerScope,
     required this.accountIdentity,
     this.checkoutFingerprint,
+    this.scheduledFulfilment,
+    this.initialCartLine,
+    this.replaceScheduledLine = false,
   });
 
   final BuyV2Product product;
@@ -3166,6 +3169,9 @@ class BuyV2SupplierPolicyAddIntent {
   final String? ownerScope;
   final Object? accountIdentity;
   final String? checkoutFingerprint;
+  final BuyV2ScheduledFulfilment? scheduledFulfilment;
+  final BuyV2CartLine? initialCartLine;
+  final bool replaceScheduledLine;
 }
 
 /// Frontend receipt-bound intent only; the adapter owns authenticated truth.
@@ -5301,6 +5307,7 @@ class BuyV2Session extends ChangeNotifier {
   /// Disposal is not proof that an already-dispatched business attempt stopped.
   Future<BuyV2CustomerStateSnapshot?> retainedAccountState() async {
     final inherited = _pendingAccountStateImported ? null : await pendingAccountState;
+    await _scheduledCartSettlement?.future;
     await _consumerStateWrites;
     return _consumerPendingSnapshot ??
       (_pendingAccountStateImported ? null : inherited);
@@ -6000,8 +6007,11 @@ class BuyV2Session extends ChangeNotifier {
   bool get addressRequestsAvailable => reviewDataEnabled;
 
   bool _checkoutPreflightBusy = false;
+  Object? _scheduledCartSave;
+  Completer<void>? _scheduledCartSettlement;
 
   bool get checkoutBusy =>
+      _scheduledCartSave != null ||
       _paymentCompletionSaving ||
       _checkoutPreflightBusy ||
       (collectionCheckout?.busy ?? false) ||
@@ -9441,11 +9451,16 @@ class BuyV2Session extends ChangeNotifier {
 
   Future<bool>? _persistCustomerState({
     Map<String, String>? supplierPolicyAcceptances,
+    void Function(bool)? written,
+    ({BuyV2CustomerStateStore store, Object operation})? retainScheduledRollback,
   }) {
-    if (_collectionDisposed || !procurementScopeCurrent ||
+    final retainOnly = retainScheduledRollback != null && !isStoreProcurement &&
+        identical(retainScheduledRollback.store, customerStateStore) &&
+        identical(retainScheduledRollback.operation, _scheduledCartSave);
+    if (!retainOnly && (_collectionDisposed || !procurementScopeCurrent ||
         (customerStateRecoveryPending &&
             (!_customerStateSnapshotLoaded ||
-                !_customerStateRestoreInFlight))) {
+                !_customerStateRestoreInFlight)))) {
       return null;
     }
     final store = customerStateStore;
@@ -9590,6 +9605,12 @@ class BuyV2Session extends ChangeNotifier {
         ..addAll(snapshot.productIdentityKeys);
     }
     final ownerScope = store.ownerScope;
+    if (retainOnly) {
+      // Original-owner handoff only. No write, success receipt or UI notification.
+      _consumerPendingSnapshot = snapshot;
+      _consumerPendingSnapshotOwnerScope = ownerScope;
+      return Future<bool>.value(false);
+    }
     final revision = _customerStateMutationRevision;
     bool currentWrite() =>
         !_collectionDisposed &&
@@ -9597,9 +9618,11 @@ class BuyV2Session extends ChangeNotifier {
         customerStateStore?.ownerScope == ownerScope;
     final Future<bool> write;
     if (isStoreProcurement) {
-      write = _procurementStateWrites.then<bool>((_) {
+      write = _procurementStateWrites.then<bool>((_) async {
         if (!currentWrite()) return true;
-        return store.write(snapshot);
+        final saved = await store.write(snapshot);
+        written?.call(saved);
+        return saved;
       });
       _procurementStateWrites = write.then<void>(
         (_) {},
@@ -9615,6 +9638,7 @@ class BuyV2Session extends ChangeNotifier {
         if (alreadyWriting) await priorWrites;
         if (!currentWrite()) return true;
         final saved = await store.write(snapshot);
+        written?.call(saved);
         if (saved && identical(_consumerPendingSnapshot, snapshot)) {
           _consumerPendingSnapshot = null;
         }
@@ -13186,7 +13210,10 @@ class BuyV2Session extends ChangeNotifier {
     }
   }
 
-  bool openProduct(String id, {bool preserveComparisonOrigin = false}) {
+  String? _scheduledReviewProductId;
+  bool get productScheduledReview => _scheduledReviewProductId == selectedProductId && selectedProductId != null;
+
+  bool openProduct(String id, {bool preserveComparisonOrigin = false, bool reviewScheduledWindow = false}) {
     final item = findProduct(id);
     if (item == null || !_matchesRetainedProductIdentity(item)) {
       notice = 'This product could not be found.';
@@ -13217,6 +13244,7 @@ class BuyV2Session extends ChangeNotifier {
     }
     destination = item.destination;
     selectedProductId = item.id;
+    _scheduledReviewProductId = reviewScheduledWindow ? item.id : null;
     view = BuyV2View.product;
     notice = null;
     _recordRecentlyViewed(item);
@@ -13473,6 +13501,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool openCheckout() {
+    if (_scheduledCartSave != null) {
+      _holdCartForPaymentResolution();
+      return false;
+    }
     if (!_allowProcurementLines(cartLines)) return false;
     if (!checkoutRequiresResolution) {
       for (final line in cartLines.where(
@@ -15309,6 +15341,11 @@ class BuyV2Session extends ChangeNotifier {
 
   bool _holdCartForPaymentResolution() {
     if (!cartChangesBlocked) return false;
+    if (_scheduledCartSave != null) {
+      notice = 'Saving your delivery choice. Please wait.';
+      notifyListeners();
+      return true;
+    }
     if (customerStateRecoveryPending &&
         (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) {
       notice =
@@ -15532,6 +15569,8 @@ class BuyV2Session extends ChangeNotifier {
           identical(collectionIdentity?.value, intent.accountIdentity) &&
           procurementScopeCurrent &&
           quantityFor(intent.product.id) == intent.initialQuantity &&
+          (intent.scheduledFulfilment == null ||
+              identical(_cart[intent.product.id], intent.initialCartLine)) &&
           (intent.checkoutFingerprint == null ||
               (view == BuyV2View.checkout &&
                   !checkoutRequiresResolution &&
@@ -15593,6 +15632,13 @@ class BuyV2Session extends ChangeNotifier {
         notice = 'Store policy accepted. Review your order before continuing.';
         return true;
       }
+      if (intent.scheduledFulfilment case final selected?) {
+        return await addProductForScheduledWindow(
+          intent.product.id, selected,
+          quantity: intent.quantity,
+          replaceLine: intent.replaceScheduledLine ? intent.initialCartLine : null,
+        );
+      }
       return addProduct(intent.product.id, quantity: intent.quantity);
     } finally {
       if (sequence == _supplierPolicyConsentSequence) {
@@ -15604,6 +15650,109 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool addProduct(String id, {int? quantity}) {
+    return _prepareProductAddition(id, quantity: quantity, onPrepared: (line) {
+      final firstAddition = _cart.isEmpty;
+      _cart[id] = line;
+      _finishProductAddition(line, firstAddition: firstAddition);
+      _persistCustomerState();
+      notifyListeners();
+    });
+  }
+
+  /// A desired window from the existing eligibility source, not a reservation.
+  BuyV2ScheduledFulfilment? scheduledWindowFor(BuyV2Product product) {
+    final listing = product.publicListingIdentity;
+    final grant = productFactsFor(product).eligibility;
+    if (listing == null || grant == null ||
+        !deliveryOptionsFor(product).contains(BuyV2DeliveryOption.scheduled)) {
+      return null;
+    }
+    final selected = BuyV2ScheduledFulfilment(
+      listing: listing, sourceRevision: grant.sourceRevision,
+      locationKey: grant.customerLocationKey, slotId: grant.scheduledSlotId!,
+      startsAt: grant.scheduledStart!.toUtc(), endsAt: grant.scheduledEnd!.toUtc(),
+    );
+    return selected.valid && selected.matches(product) ? selected : null;
+  }
+
+  BuyV2CartLine? cartLineFor(String id) => _cart[id];
+
+  /// Confirmation passes the exact old line. Replacement never adds units.
+  Future<bool> addProductForScheduledWindow(
+    String id, BuyV2ScheduledFulfilment selected, {
+    int? quantity, BuyV2CartLine? replaceLine,
+  }) async {
+    BuyV2CartLine? prepared;
+    if (!_prepareProductAddition(id, quantity: quantity,
+        scheduledFulfilment: selected, replaceLine: replaceLine,
+        onPrepared: (line) => prepared = line)) {
+      return false;
+    }
+    final candidate = prepared!;
+    final firstAddition = _cart.isEmpty;
+    final original = _cart[id];
+    final store = customerStateStore;
+    final owner = store?.ownerScope;
+    if (owner == null) {
+      notice = 'Sign in to retain your delivery choice.';
+      notifyListeners();
+      return false;
+    }
+    final account = collectionIdentity?.value;
+    final operation = Object();
+    _scheduledCartSave = operation;
+    final settlement = Completer<void>();
+    _scheduledCartSettlement = settlement;
+    _cart[id] = candidate;
+    bool current() => !_collectionDisposed && procurementScopeCurrent &&
+        identical(_scheduledCartSave, operation) && identical(customerStateStore, store) &&
+        customerStateStore?.ownerScope == owner &&
+        identical(collectionIdentity?.value, account) && identical(_cart[id], candidate);
+    notifyListeners();
+    try {
+      var confirmedWrite = false;
+      final saved = await (_persistCustomerState(written: (saved) => confirmedWrite = saved) ?? Future<bool>.value(false))
+          .catchError((Object _) => false);
+      if (!current()) {
+        if (!confirmedWrite && identical(_scheduledCartSave, operation) &&
+            identical(customerStateStore, store) && identical(_cart[id], candidate)) {
+          if (original == null) { _cart.remove(id); } else { _cart[id] = original; }
+          _persistCustomerState(retainScheduledRollback: (store: store!, operation: operation));
+        }
+        return false;
+      }
+      if (!saved || !_selectedScheduledLinesCurrent([candidate])) {
+        if (original == null) { _cart.remove(id); } else { _cart[id] = original; }
+        // Supersede the rejected pending snapshot in the same serialized queue.
+        final restored = await (_persistCustomerState() ?? Future<bool>.value(false))
+            .catchError((Object _) => false);
+        if (!_collectionDisposed && identical(_scheduledCartSave, operation) &&
+            identical(customerStateStore, store) && identical(collectionIdentity?.value, account)) {
+          if (!restored) {
+            _customerStateRecoveryOwnerScope = owner;
+            _customerStateOwnerScope = null;
+            _customerStateSnapshotLoaded = false;
+          }
+          notice = restored
+              ? 'Delivery choice was not saved. Your previous Cart is kept. Check the window and try again.'
+              : 'Your previous Cart is kept. Restore saved choices before continuing.';
+        }
+        return false;
+      }
+      _finishProductAddition(candidate, replacement: replaceLine != null, firstAddition: firstAddition);
+      return true;
+    } finally {
+      if (!settlement.isCompleted) settlement.complete();
+      if (identical(_scheduledCartSettlement, settlement)) _scheduledCartSettlement = null;
+      if (identical(_scheduledCartSave, operation)) _scheduledCartSave = null;
+      if (!_collectionDisposed) notifyListeners();
+    }
+  }
+
+  bool _prepareProductAddition(String id, {
+    int? quantity, BuyV2ScheduledFulfilment? scheduledFulfilment,
+    BuyV2CartLine? replaceLine, required void Function(BuyV2CartLine) onPrepared,
+  }) {
     _ensureSupplierPolicyOwner();
     if (_pendingSupplierPolicyAdd != null || _supplierPolicyConsentBusy) {
       return false;
@@ -15658,14 +15807,35 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final current = _cart[id];
+    if (replaceLine != null && (!identical(current, replaceLine) ||
+        _buyV2ProductIdentityKey(item) != _buyV2ProductIdentityKey(replaceLine.product) ||
+        _productAtPackQuantity(item, replaceLine.quantity).priceMinor != replaceLine.product.priceMinor)) {
+      notice = 'Your Cart or price changed. Review it before replacing the delivery choice.';
+      notifyListeners();
+      return false;
+    }
+    if (scheduledFulfilment != null) {
+      if (!_selectedScheduledLinesCurrent([BuyV2CartLine(
+          product: item, quantity: current?.quantity ?? item.minimumOrder,
+          scheduledFulfilment: scheduledFulfilment)])) {
+        notice = 'This delivery window changed or expired. Check delivery availability again.';
+        notifyListeners();
+        return false;
+      }
+      if (current != null && current.scheduledFulfilment != scheduledFulfilment && replaceLine == null) {
+        notice = 'Review replacing the delivery choice for this Cart item.';
+        notifyListeners();
+        return false;
+      }
+    }
     final addedQuantity =
-        quantity ??
+        replaceLine != null ? 0 : quantity ??
         (current != null && item.packTerms != null
             ? item.quantityStep
             : item.minimumOrder);
     final proposedQuantity = (current?.quantity ?? 0) + addedQuantity;
-    if (addedQuantity <= 0 ||
-        (item.packTerms == null && addedQuantity < item.minimumOrder) ||
+    if ((replaceLine == null && addedQuantity <= 0) ||
+        (replaceLine == null && item.packTerms == null && addedQuantity < item.minimumOrder) ||
         proposedQuantity < item.minimumOrder ||
         (proposedQuantity - item.minimumOrder) % item.quantityStep != 0 ||
         BigInt.from(addedQuantity) > BigInt.from(9007199254740991)) {
@@ -15725,22 +15895,30 @@ class BuyV2Session extends ChangeNotifier {
           policy: policy!,
           ownerScope: owner,
           accountIdentity: collectionIdentity?.value,
+          scheduledFulfilment: scheduledFulfilment,
+          initialCartLine: current,
+          replaceScheduledLine: replaceLine != null,
         );
         notice = null;
         notifyListeners();
         return false;
       }
     }
-    if (_cart.isEmpty &&
+    onPrepared(BuyV2CartLine(
+      product: pricedItem,
+      quantity: proposedQuantity,
+      scheduledFulfilment: scheduledFulfilment ?? current?.scheduledFulfilment,
+    ));
+    return true;
+  }
+
+  void _finishProductAddition(BuyV2CartLine line, {bool replacement = false, bool firstAddition = false}) {
+    final item = line.product;
+    if (firstAddition &&
         !isStoreProcurement &&
         item.destination != BuyV2Destination.medicine) {
       cartDisplayFilter = 'all';
     }
-    _cart[id] = BuyV2CartLine(
-      product: pricedItem,
-      quantity: (current?.quantity ?? 0) + addedQuantity,
-      scheduledFulfilment: current?.scheduledFulfilment,
-    );
     // A fresh addition from discovery should reveal the basket, not a saved
     // recommendation offset. In-cart edits retain their current viewport.
     if (view != BuyV2View.cart) {
@@ -15754,12 +15932,9 @@ class BuyV2Session extends ChangeNotifier {
     }
     _pruneCartSelections();
     _acknowledgeCart(
-      '${item.customerTitle} added',
+      replacement ? 'Delivery choice updated. Quantity unchanged.' : '${item.customerTitle} added',
       destination: item.destination,
     );
-    _persistCustomerState();
-    notifyListeners();
-    return true;
   }
 
   bool approveSavedPrescription(String prescriptionId) {

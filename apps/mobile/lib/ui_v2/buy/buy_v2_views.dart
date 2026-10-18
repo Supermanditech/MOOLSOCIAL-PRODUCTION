@@ -694,6 +694,8 @@ Future<void> showBuyV2SupplierPolicySheet(
                         title: Text(
                           intent.checkoutFingerprint != null
                               ? 'I agree to this Store’s updated policy'
+                              : intent.replaceScheduledLine
+                              ? 'I accept this policy and replace the delivery choice for all ${intent.initialQuantity} packs. Quantity stays unchanged.'
                               : 'I accept this policy and add ${intent.quantity} × ${item.customerTitle}',
                           style: context.buyBody,
                         ),
@@ -738,6 +740,57 @@ Future<void> showBuyV2SupplierPolicySheet(
   } finally {
     if (intent != null && identical(session.pendingSupplierPolicyAdd, intent)) {
       session.cancelSupplierPolicyAdd();
+    }
+  }
+}
+
+String _scheduledWindowLabel(BuildContext context, BuyV2ScheduledFulfilment selected) {
+  final local = MaterialLocalizations.of(context);
+  final start = selected.startsAt.toLocal(), end = selected.endsAt.toLocal();
+  final sameDay = DateUtils.isSameDay(start, end);
+  String time(DateTime value) => local.formatTimeOfDay(TimeOfDay.fromDateTime(value),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context));
+  return '${local.formatFullDate(start)} · ${time(start)} – '
+      '${sameDay ? '' : '${local.formatFullDate(end)} · '}${time(end)}';
+}
+
+Future<void> _addWithScheduledWindow(BuildContext context, BuyV2Session session,
+    BuyV2Product product, BuyV2ScheduledFulfilment selected) async {
+  if (session.cartChangesBlocked) return;
+  final original = session.cartLineFor(product.id);
+  final account = session.collectionIdentity?.value;
+  final replace = original != null && original.scheduledFulfilment != selected;
+  if (replace) {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Replace delivery choice?'),
+        content: SingleChildScrollView(child: Text(
+          '${product.customerTitle}\n'
+          'Current: ${original.scheduledFulfilment == null ? 'No window selected' : _scheduledWindowLabel(context, original.scheduledFulfilment!)}\n\n'
+          'New: ${_scheduledWindowLabel(context, selected)}\n\n'
+          'All ${original.quantity} packs will use this window. Quantity stays unchanged. '
+          'Availability and price must still be confirmed at Checkout.',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep current')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Replace choice')),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted ||
+        !identical(account, session.collectionIdentity?.value)) {
+      return;
+    }
+  }
+  final saved = await session.addProductForScheduledWindow(product.id, selected,
+      replaceLine: replace ? original : null);
+  if (!context.mounted) return;
+  if (!saved) {
+    if (session.pendingSupplierPolicyAdd case final intent?) {
+      await showBuyV2SupplierPolicySheet(context, session, intent: intent);
+    } else if (session.pendingPrescriptionProductId == product.id) {
+      await showBuyV2PrescriptionSheet(context, session);
     }
   }
 }
@@ -845,8 +898,17 @@ class BuyV2ProductView extends StatelessWidget {
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
+    final displayedWindow = session.scheduledWindowFor(product);
+    final purchaseEnabled = !session.cartChangesBlocked &&
+        (!session.productScheduledReview || displayedWindow != null);
     void addProduct() {
       HapticFeedback.selectionClick();
+      if (session.productScheduledReview) {
+        if (displayedWindow != null) {
+          _addWithScheduledWindow(context, session, product, displayedWindow);
+        }
+        return;
+      }
       final added = session.addProduct(product.id);
       if (!added && session.pendingPrescriptionProductId == product.id) {
         showBuyV2PrescriptionSheet(context, session);
@@ -1216,8 +1278,7 @@ class BuyV2ProductView extends StatelessWidget {
                                                           'buy-product-inline-action-${product.id}',
                                                         ),
                                                         product: product,
-                                                        enabled: !session
-                                                            .cartChangesBlocked,
+                                                        enabled: purchaseEnabled,
                                                         quantity: quantity,
                                                         showPurchaseFacts:
                                                             false,
@@ -1353,8 +1414,7 @@ class BuyV2ProductView extends StatelessWidget {
                                                       'buy-product-inline-action-${product.id}',
                                                     ),
                                                     product: product,
-                                                    enabled: !session
-                                                        .cartChangesBlocked,
+                                                    enabled: purchaseEnabled,
                                                     quantity: quantity,
                                                     showPurchaseFacts: false,
                                                     deliveryDecision:
@@ -1488,7 +1548,7 @@ class BuyV2ProductView extends StatelessWidget {
                                       'buy-product-inline-action-${product.id}',
                                     ),
                                     product: product,
-                                    enabled: !session.cartChangesBlocked,
+                                    enabled: purchaseEnabled,
                                     quantity: quantity,
                                     showPurchaseFacts: false,
                                     deliveryDecision: buyerPromise,
@@ -2230,6 +2290,8 @@ class _PublicProductOrderInformationState
     final product = widget.product;
     final facts = widget.facts;
     final buyerPromise = widget.buyerPromise;
+    final window = session.scheduledWindowFor(product);
+    final retained = session.cartLineFor(product.id)?.scheduledFulfilment;
 
     String normalize(String text) =>
         text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -2328,6 +2390,35 @@ class _PublicProductOrderInformationState
               const Divider(height: 1, thickness: .5, color: BuyV2Colors.line),
             rows[i],
           ],
+          if (retained != null) ...[
+            const SizedBox(height: 6),
+            Text('Selected window · ${_scheduledWindowLabel(context, retained)}',
+              key: ValueKey('buy-product-selected-window-${product.id}'),
+              style: context.buyMeta.copyWith(color: BuyV2Colors.ink)),
+          ],
+          if (window != null) ...[
+            const Divider(height: 14, color: BuyV2Colors.line),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Padding(padding: EdgeInsets.only(top: 2, right: 8),
+                child: Icon(Icons.event_available_outlined, size: 20, color: BuyV2Colors.navy)),
+              Expanded(child: Text('Scheduled · ${_scheduledWindowLabel(context, window)}',
+                key: ValueKey('buy-product-offered-window-${product.id}'),
+                style: context.buyBody.copyWith(fontSize: 12, height: 1.4))),
+            ]),
+            TextButton.icon(
+              key: ValueKey('buy-product-use-window-${product.id}'),
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48),
+                alignment: Alignment.centerLeft),
+              onPressed: session.cartChangesBlocked ? null : () => _addWithScheduledWindow(context, session, product, window),
+              icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+              label: Text(session.cartLineFor(product.id) == null ? 'Add with this window'
+                  : retained == window ? 'Add another with this window' : 'Use this window'),
+            ),
+            Text('Requested window only. Confirm availability and price at Checkout.', style: context.buyMeta),
+          ] else if (session.productScheduledReview)
+            Padding(padding: const EdgeInsets.only(top: 8),
+              child: Text('No delivery window is currently confirmed for this address. Check availability again.',
+                style: context.buyMeta)),
           const Divider(height: 12, thickness: .5, color: BuyV2Colors.line),
           widget.storeSummary,
           const Divider(height: 10, thickness: .5, color: BuyV2Colors.line),
@@ -14978,6 +15069,10 @@ class BuyV2OrderItemsView extends StatelessWidget {
                                 _recordedItemSummary(order, product),
                                 style: context.buyMeta,
                               ),
+                              if (order.lines.where((line) => line.product.id == product.id)
+                                  .firstOrNull?.scheduledFulfilment case final selected?)
+                                Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
+                                  key: ValueKey('buy-order-item-window-${product.id}'), style: context.buyMeta),
                               if (_purchaseProtectionLines(product)
                                   case final policyLines
                                   when policyLines.isNotEmpty) ...[
@@ -24299,6 +24394,7 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
                     laneId: 'recommendations',
                     products: visible,
                     showDeal: true,
+                    reviewScheduledWindow: _purchaseType == 'scheduled',
                     onBrowseScroll: _browseScroll,
                   )
                 : Container(
@@ -24361,6 +24457,7 @@ class _CartDiscoverySectionsState extends State<_CartDiscoverySections> {
                                   laneId: 'recommendations-${shelf.key}',
                                   products: shelf.value,
                                   showDeal: true,
+                                  reviewScheduledWindow: _purchaseType == 'scheduled',
                                   onBrowseScroll: _browseScroll,
                                 ),
                               ],
@@ -24401,6 +24498,7 @@ class _CartProductLane extends StatelessWidget {
     required this.laneId,
     required this.products,
     this.showDeal = false,
+    this.reviewScheduledWindow = false,
     this.onBrowseScroll,
   });
 
@@ -24409,6 +24507,7 @@ class _CartProductLane extends StatelessWidget {
   final String laneId;
   final List<BuyV2Product> products;
   final bool showDeal;
+  final bool reviewScheduledWindow;
   final bool Function(ScrollNotification)? onBrowseScroll;
 
   @override
@@ -24436,6 +24535,7 @@ class _CartProductLane extends StatelessWidget {
                       session: session,
                       product: products[index],
                       showDeal: showDeal,
+                      reviewScheduledWindow: reviewScheduledWindow,
                     ),
                   ],
                 ],
@@ -24453,11 +24553,13 @@ class _CartRecommendationCard extends StatelessWidget {
     required this.session,
     required this.product,
     this.showDeal = false,
+    this.reviewScheduledWindow = false,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final bool showDeal;
+  final bool reviewScheduledWindow;
 
   @override
   Widget build(BuildContext context) {
@@ -24611,6 +24713,10 @@ class _CartRecommendationCard extends StatelessWidget {
                         key: ValueKey('buy-cart-add-${product.id}'),
                         tooltip: 'Add ${product.customerTitle}',
                         onPressed: () {
+                          if (reviewScheduledWindow) {
+                            session.openProduct(product.id, reviewScheduledWindow: true);
+                            return;
+                          }
                           final added = session.addProduct(product.id);
                           if (!added &&
                               session.pendingPrescriptionProductId ==
@@ -25886,6 +25992,16 @@ class _CartLine extends StatelessWidget {
                         ],
                       ),
                     if (compactTitle && !stackMedia) purchaseControls,
+                    if (line.scheduledFulfilment case final selected?) ...[
+                      const SizedBox(height: 5),
+                      Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
+                        key: ValueKey('buy-cart-selected-window-${product.id}'),
+                        style: context.buyMeta.copyWith(color: BuyV2Colors.navy)),
+                      TextButton(
+                        style: TextButton.styleFrom(alignment: Alignment.centerLeft, minimumSize: const Size(48, 48)),
+                        onPressed: () => session.openProduct(product.id, reviewScheduledWindow: true),
+                        child: const Text('Review delivery window')),
+                    ],
                     if (tradeFacts != null) ...[
                       const SizedBox(height: 4),
                       tradeFacts,
@@ -26112,6 +26228,10 @@ class _CheckoutDeliverySummaryCardState
             if (group.destination == BuyV2Destination.wholesale)
               _WholesaleCheckoutReceivingLines(group: group),
             for (final line in group.lines) ...[
+              if (line.scheduledFulfilment case final selected?)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
+                    key: ValueKey('buy-checkout-selected-window-${line.product.id}'), style: context.buyMeta)),
               if (group.destination != BuyV2Destination.wholesale)
                 Padding(
                   padding: const EdgeInsets.only(top: 3),
@@ -26763,6 +26883,9 @@ class _CompactOrderCardState extends State<_CompactOrderCard> {
                                 '${line.product.pack} · Quantity ${line.quantity}',
                                 style: context.buyMeta.copyWith(fontSize: 11),
                               ),
+                              if (line.scheduledFulfilment case final selected?)
+                                Text('Requested delivery · ${_scheduledWindowLabel(context, selected)}',
+                                  style: context.buyMeta.copyWith(fontSize: 11)),
                             ],
                             if (order.lines.length > 2)
                               Text(
