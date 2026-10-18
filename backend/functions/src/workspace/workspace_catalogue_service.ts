@@ -225,10 +225,51 @@ export interface CatalogueProducerAuthority {
   schemaVersion: 1; userId: string; revision: number; enabled: boolean;
   actor: SupplyActor; validFrom: string; expiresAt: string;
 }
-export interface CatalogueProductionReceipt {fingerprint: string; result: CatalogueAggregate}
+export interface CatalogueSubmissionReference {
+  realm: "evaluation" | "production"; storeId: string; skuId: string;
+  revision: number; fingerprint: string;
+}
+export interface CatalogueProductionReceipt {
+  fingerprint: string; result: CatalogueAggregate; submission?: CatalogueSubmissionReference;
+}
 export interface CatalogueProduction {
   operatorUserId: string; identity: CatalogueIdentity;
   input: Readonly<Record<string, unknown>>; observedAt: string;
+  submission?: CatalogueSubmissionReference;
+}
+
+function submissionReference(raw: unknown): CatalogueSubmissionReference {
+  const value = exact(raw, ["realm", "storeId", "skuId", "revision", "fingerprint"]);
+  if (!["evaluation", "production"].includes(String(value.realm)) ||
+      typeof value.fingerprint !== "string" || !/^[A-F0-9]{64}$/u.test(value.fingerprint)) invalid();
+  return {realm: value.realm as CatalogueSubmissionReference["realm"], storeId: id(value.storeId),
+    skuId: id(value.skuId), revision: integer(value.revision, 1, 1000000000), fingerprint: value.fingerprint};
+}
+
+/** Derive facts from a saved source, never accept owner-supplied approval or hashes.
+ * Media nominations need the separate verified asset producer; do not drop them.
+ */
+export function submittedCatalogueInput(source: StoreProductSubmissionRecord,
+  raw: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const saved = checkedProductSubmission(source, source.realm, source.storeId, source.skuId);
+  if (saved.product.mediaIntent.pendingUpload || saved.product.mediaIntent.publishedReferences.length !== 0) {
+    throw new WorkspaceProfileError("unavailable", "Product images must finish their review first.", 503);
+  }
+  const type = text(raw.type, 32), common = ["type", "commandId", "expectedVersion", "productId"];
+  const contentSha256 = cataloguePayloadHash({...saved.product.content, media: []});
+  if (type === "propose_product") {
+    exact(raw, [...common, "brandId", "codes"]);
+    return productionInput({...raw, categoryId: saved.product.content.categoryId, contentSha256});
+  }
+  if (type === "propose_product_revision") {
+    exact(raw, [...common, "previousContentSha256"]);
+    return productionInput({...raw, contentSha256});
+  }
+  if (type === "propose_pack") {
+    exact(raw, [...common, "packId", "codes"]);
+    return productionInput({...raw, descriptorSha256: cataloguePayloadHash(saved.product.pack)});
+  }
+  invalid("Saved submissions can only propose product facts or packs; independent review remains separate.");
 }
 
 function producerActor(operator: string, identity: CatalogueIdentity, at: string,
@@ -329,7 +370,9 @@ export function planCatalogueProduction(command: CatalogueProduction,
       capability, at: authorizationAt, categoryId, ...(serviceAreaId === undefined ? {} : {serviceAreaId}),
     }))) throw deny();
   }
-  const fingerprint = cataloguePayloadHash({operator, identity, input});
+  const submission = command.submission === undefined ? undefined : submissionReference(command.submission);
+  if (submission && actor.workspaceId !== submission.storeId) throw deny();
+  const fingerprint = cataloguePayloadHash({operator, identity, input, ...(submission ? {submission} : {})});
   if (receipt) {
     if (receipt.fingerprint !== fingerprint || !validAggregate(receipt.result) || !current ||
         receipt.result.version > current.version) {
@@ -1539,18 +1582,46 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
    */
   async produceCatalogue(operatorUserId: string, identity: CatalogueIdentity,
     input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate> {
+    return this.produceCatalogueCommand(operatorUserId, identity, input);
+  }
+  /** Internal proposal bridge. No HTTP review operation or automatic publication. */
+  async proposeSubmittedCatalogue(operatorUserId: string, identity: CatalogueIdentity,
+    source: CatalogueSubmissionReference, input: Readonly<Record<string, unknown>>): Promise<CatalogueAggregate> {
+    return this.produceCatalogueCommand(operatorUserId, identity, input, source);
+  }
+  private async produceCatalogueCommand(operatorUserId: string, identity: CatalogueIdentity,
+    input: Readonly<Record<string, unknown>>, source?: CatalogueSubmissionReference): Promise<CatalogueAggregate> {
     const operator = id(operatorUserId), catalogueId = id(identity.catalogueId);
-    const normalized = productionInput(input);
-    const command: CatalogueProduction = {operatorUserId: operator,
-      identity: {catalogueId, tenantId: id(identity.tenantId)}, input: normalized,
-      observedAt: this.now().toISOString()};
+    const original = structuredClone(input), pinned = source === undefined ? undefined : submissionReference(source);
+    if (pinned && pinned.realm !== this.realm) invalid("Submission realm changed.");
+    const resolvedIdentity = {catalogueId, tenantId: id(identity.tenantId)}, observedAt = this.now().toISOString();
+    const commandId = id(original.commandId);
     const root = this.firestore.collection("workspaceCatalogues").doc(this.realm);
     const aggregateRef = root.collection("canonicalCatalogues").doc(catalogueId);
     const receiptRef = aggregateRef.collection("producerReceipts")
-      .doc(cataloguePayloadHash([operator, normalized.commandId]));
+      .doc(cataloguePayloadHash([operator, commandId]));
     const authorityRef = root.collection("producerAuthorities").doc(operator);
     return this.firestore.runTransaction(async transaction => {
       const [authorityDoc, aggregateDoc, receiptDoc] = await transaction.getAll(authorityRef, aggregateRef, receiptRef);
+      let normalized: Record<string, unknown>;
+      if (pinned) {
+        const saved = await transaction.get(this.productSubmissionHead(pinned.storeId, pinned.skuId)
+          .collection("revisions").doc(String(pinned.revision)));
+        if (!saved.exists) throw new WorkspaceProfileError("not_found", "Saved product submission is not available.", 404);
+        const record = checkedProductSubmission(saved.data(), this.realm, pinned.storeId, pinned.skuId);
+        if (record.revision !== pinned.revision || record.fingerprint !== pinned.fingerprint) {
+          throw new WorkspaceProfileError("conflict", "Saved product source changed.", 409);
+        }
+        if (record.submittedBy !== operator) throw new WorkspaceProfileError("forbidden", "Use the original Store owner submission.", 403);
+        normalized = submittedCatalogueInput(record, original);
+        const aggregate = aggregateDoc?.data() as CatalogueAggregate | undefined;
+        if (!receiptDoc?.exists && normalized.type === "propose_pack" && (!aggregate || !reviewedCanonicalProduct(aggregate, String(normalized.productId),
+          cataloguePayloadHash({...record.product.content, media: []})))) {
+          invalid("Pack proposal requires this exact reviewed product content.");
+        }
+      } else normalized = productionInput(original);
+      const command: CatalogueProduction = {operatorUserId: operator, identity: resolvedIdentity,
+        input: normalized, observedAt, ...(pinned ? {submission: pinned} : {})};
       const authority = authorityDoc?.data() as CatalogueProducerAuthority | undefined;
       let participant: SupplyParticipantWorkspace | undefined, profile: WorkspaceProfileRecord | undefined;
       if (["propose_product", "propose_product_revision", "propose_pack", "create_offer"].includes(String(normalized.type)) &&
@@ -1571,7 +1642,8 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       if (!result.replayed) {
         transaction.set(aggregateRef, result.aggregate);
         transaction.create(aggregateRef.collection("revisions").doc(String(result.aggregate.version)), result.aggregate);
-        transaction.create(receiptRef, {fingerprint: result.fingerprint, result: result.aggregate});
+        transaction.create(receiptRef, {fingerprint: result.fingerprint, result: result.aggregate,
+          ...(pinned ? {submission: pinned} : {})});
       }
       return result.aggregate;
     });
