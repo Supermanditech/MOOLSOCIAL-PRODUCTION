@@ -478,6 +478,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
     if (!_ownerCurrent) return false;
+    try {
+      for (final order in snapshot.orders.where(_hasInvoiceContext)) {
+        _decodeInvoiceContext(_encodeInvoiceContext(order));
+      }
+    } on FormatException { return false; }
     if (snapshot.cartScheduledFulfilments.entries.any((entry) =>
         !entry.value.valid || entry.key != entry.value.listing.listingId ||
         (snapshot.cartQuantities[entry.key] ?? 0) < 1 ||
@@ -1527,6 +1532,96 @@ final class BuyV2SharedPreferencesCustomerStateStore
     } on FormatException { return false; }
   }
 
+  static bool _hasInvoiceContext(BuyV2Order order) => order.taxInvoiceState != null ||
+      order.taxInvoiceDetails != null || order.platformTaxInvoiceDetails != null;
+
+  static Map<String, Object?> _encodeInvoiceContext(BuyV2Order order) => {
+    'version': 1, 'state': order.taxInvoiceState?.name,
+    'seller': order.taxInvoiceDetails == null ? null : _encodeInvoiceDetails(order.taxInvoiceDetails!),
+    'platform': order.platformTaxInvoiceDetails == null ? null : _encodeInvoiceDetails(order.platformTaxInvoiceDetails!),
+  };
+
+  static Map<String, Object?> _encodeInvoiceDetails(BuyV2TaxInvoiceDetails d) => {
+    'invoiceNumber': d.invoiceNumber, 'issuedAt': d.issuedAt.toIso8601String(),
+    'sellerLegalName': d.sellerLegalName, 'sellerAddress': d.sellerAddress, 'sellerGstin': d.sellerGstin,
+    'buyerGstin': d.buyerGstin, 'placeOfSupply': d.placeOfSupply, 'sourceId': d.sourceId,
+    'revisionLabel': d.revisionLabel, 'recipientLegalName': d.recipientLegalName,
+    'recipientBillingAddress': d.recipientBillingAddress, 'sellerPan': d.sellerPan, 'sellerCin': d.sellerCin,
+    'sellerFssaiNumber': d.sellerFssaiNumber, 'reverseCharge': d.reverseCharge, 'irn': d.irn,
+    'acknowledgementNumber': d.acknowledgementNumber, 'authorizedSignatory': d.authorizedSignatory,
+    'supplyStatement': d.supplyStatement,
+    'lines': [for (final l in d.lines) {
+      'description': l.description, 'hsnSac': l.hsnSac, 'taxableValue': l.taxableValue, 'gstRate': l.gstRate,
+      'cgst': l.cgst, 'sgst': l.sgst, 'igst': l.igst, 'cess': l.cess,
+      'quantity': l.quantity, 'unit': l.unit, 'unitPrice': l.unitPrice,
+    }],
+  };
+
+  static ({BuyV2TaxInvoiceState? state, BuyV2TaxInvoiceDetails? seller,
+      BuyV2TaxInvoiceDetails? platform}) _decodeInvoiceContext(Object? raw) {
+    if (raw is! Map || raw.length != 4 ||
+        !raw.keys.toSet().containsAll({'version', 'state', 'seller', 'platform'}) ||
+        raw['version'] is! int || raw['version'] != 1) {
+      throw const FormatException('Saved invoice context needs checking.');
+    }
+    final state = raw['state'];
+    if (state != null && (state is! String || !BuyV2TaxInvoiceState.values.any((s) => s.name == state))) {
+      throw const FormatException('Saved invoice state needs checking.');
+    }
+    if (state == null && raw['seller'] == null && raw['platform'] == null) {
+      throw const FormatException('Saved invoice context is empty.');
+    }
+    return (state: state == null ? null : BuyV2TaxInvoiceState.values.firstWhere((s) => s.name == state),
+      seller: raw['seller'] == null ? null : _decodeInvoiceDetails(raw['seller']),
+      platform: raw['platform'] == null ? null : _decodeInvoiceDetails(raw['platform']));
+  }
+
+  static BuyV2TaxInvoiceDetails _decodeInvoiceDetails(Object? raw) {
+    const requiredText = {'invoiceNumber', 'issuedAt', 'sellerLegalName', 'sellerAddress', 'sellerGstin', 'placeOfSupply', 'sourceId'};
+    const optionalText = {'buyerGstin', 'revisionLabel', 'recipientLegalName', 'recipientBillingAddress',
+      'sellerPan', 'sellerCin', 'sellerFssaiNumber', 'irn', 'acknowledgementNumber', 'authorizedSignatory', 'supplyStatement'};
+    final keys = {...requiredText, ...optionalText, 'reverseCharge', 'lines'};
+    if (raw is! Map || raw.length != keys.length || raw.keys.any((key) => !keys.contains(key)) ||
+        requiredText.any((key) => raw[key] is! String) ||
+        optionalText.any((key) => raw[key] != null && raw[key] is! String) ||
+        raw['reverseCharge'] is! bool || raw['lines'] is! List) {
+      throw const FormatException('Saved invoice details need checking.');
+    }
+    final issuedAt = DateTime.tryParse(raw['issuedAt'] as String);
+    if (issuedAt == null || issuedAt.toIso8601String() != raw['issuedAt']) {
+      throw const FormatException('Saved invoice date needs checking.');
+    }
+    bool integer(Object? value) => value is int && value >= -9007199254740991 && value <= 9007199254740991;
+    final lines = <BuyV2TaxInvoiceLine>[];
+    for (final line in raw['lines'] as List) {
+      const lineKeys = {'description', 'hsnSac', 'taxableValue', 'gstRate', 'cgst', 'sgst', 'igst', 'cess', 'quantity', 'unit', 'unitPrice'};
+      const amounts = {'taxableValue', 'cgst', 'sgst', 'igst', 'cess'};
+      if (line is! Map || line.length != lineKeys.length || line.keys.any((key) => !lineKeys.contains(key)) ||
+          line['description'] is! String || line['hsnSac'] is! String ||
+          amounts.any((key) => !integer(line[key])) || line['gstRate'] is! num ||
+          !(line['gstRate'] as num).isFinite ||
+          (line['quantity'] != null && !integer(line['quantity'])) ||
+          (line['unitPrice'] != null && !integer(line['unitPrice'])) ||
+          (line['unit'] != null && line['unit'] is! String)) {
+        throw const FormatException('Saved invoice line needs checking.');
+      }
+      lines.add(BuyV2TaxInvoiceLine(description: line['description'] as String, hsnSac: line['hsnSac'] as String,
+        taxableValue: line['taxableValue'] as int, gstRate: (line['gstRate'] as num).toDouble(),
+        cgst: line['cgst'] as int, sgst: line['sgst'] as int, igst: line['igst'] as int, cess: line['cess'] as int,
+        quantity: line['quantity'] as int?, unit: line['unit'] as String?, unitPrice: line['unitPrice'] as int?));
+    }
+    return BuyV2TaxInvoiceDetails(invoiceNumber: raw['invoiceNumber'] as String, issuedAt: issuedAt,
+      sellerLegalName: raw['sellerLegalName'] as String, sellerAddress: raw['sellerAddress'] as String,
+      sellerGstin: raw['sellerGstin'] as String, placeOfSupply: raw['placeOfSupply'] as String,
+      sourceId: raw['sourceId'] as String, lines: List.unmodifiable(lines), buyerGstin: raw['buyerGstin'] as String?,
+      revisionLabel: raw['revisionLabel'] as String?, recipientLegalName: raw['recipientLegalName'] as String?,
+      recipientBillingAddress: raw['recipientBillingAddress'] as String?, sellerPan: raw['sellerPan'] as String?,
+      sellerCin: raw['sellerCin'] as String?, sellerFssaiNumber: raw['sellerFssaiNumber'] as String?,
+      reverseCharge: raw['reverseCharge'] as bool, irn: raw['irn'] as String?,
+      acknowledgementNumber: raw['acknowledgementNumber'] as String?, authorizedSignatory: raw['authorizedSignatory'] as String?,
+      supplyStatement: raw['supplyStatement'] as String?);
+  }
+
   Map<String, Object?> _encodeOrder(BuyV2Order order) => {
     'id': order.id,
     'destination': order.destination.name,
@@ -1578,10 +1673,13 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'deliveryServiceLevel': order.deliveryServiceLevel,
     'proofOfDeliveryStatus': order.proofOfDeliveryStatus,
     'invoiceAvailable': order.invoiceAvailable,
+    if (_hasInvoiceContext(order)) 'invoiceContext': _encodeInvoiceContext(order),
     'receiptReference': order.receiptReference,
   };
 
   BuyV2Order? _decodeOrder(Map<String, Object?> source) {
+    final invoice = source.containsKey('invoiceContext') ? _decodeInvoiceContext(source['invoiceContext'])
+        : (state: null, seller: null, platform: null);
     const components = ['tipMinor', 'discountMinor', 'balanceDueMinor', 'taxMinor',
       'freightMinor', 'deliveryFeeMinor', 'paymentChargeMinor'];
     const legacyMoney = ['total', 'tip', 'discount', 'amountPaidNow', 'balanceDue',
@@ -1674,6 +1772,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
         dispatchPromise: _string(source['dispatchPromise']), deliveryPartnerName: _string(source['deliveryPartnerName']),
         deliveryPartnerType: _string(source['deliveryPartnerType']), trackingReference: _string(source['trackingReference']),
         deliveryServiceLevel: _string(source['deliveryServiceLevel']), proofOfDeliveryStatus: _string(source['proofOfDeliveryStatus']),
+        taxInvoiceState: invoice.state, taxInvoiceDetails: invoice.seller, platformTaxInvoiceDetails: invoice.platform,
         invoiceAvailable: source['invoiceAvailable'] != false, receiptReference: _string(source['receiptReference']));
       if (!_validExactOrderStorage(order)) throw const FormatException('Saved exact order facts need checking');
       return order;
@@ -1723,6 +1822,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
       trackingReference: _string(source['trackingReference']),
       deliveryServiceLevel: _string(source['deliveryServiceLevel']),
       proofOfDeliveryStatus: _string(source['proofOfDeliveryStatus']),
+      taxInvoiceState: invoice.state,
+      taxInvoiceDetails: invoice.seller,
+      platformTaxInvoiceDetails: invoice.platform,
       invoiceAvailable: source['invoiceAvailable'] != false,
       receiptReference: _string(source['receiptReference']),
     );

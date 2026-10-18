@@ -6032,6 +6032,144 @@ void main() {
       lines: [BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: scheduledFulfilment)],
     );
     // Host-only bound public listings; no live provider/Stock/payment authority.
+    BuyV2TaxInvoiceDetails invoiceFacts(String issuer, {double rate = 18, int amount = 500}) => BuyV2TaxInvoiceDetails(
+      invoiceNumber: '$issuer-invoice', issuedAt: DateTime.utc(2026, 10, 18, 8, 45),
+      sellerLegalName: '$issuer legal name', sellerAddress: 'Host Jaipur address', sellerGstin: '08ABCDE1234F1Z5',
+      buyerGstin: '08AAAAA0000A1Z5', placeOfSupply: 'Rajasthan 08', sourceId: '$issuer-source',
+      revisionLabel: 'Correction 2', recipientLegalName: 'Host purchaser', recipientBillingAddress: 'Host recipient address',
+      sellerPan: 'ABCDE1234F', sellerCin: 'Host CIN', sellerFssaiNumber: 'Host FSSAI', reverseCharge: true,
+      irn: '$issuer-IRN', acknowledgementNumber: '$issuer-ACK', authorizedSignatory: 'Host signatory',
+      supplyStatement: 'Original supplied statement', lines: [BuyV2TaxInvoiceLine(
+        description: 'Host साबुन', hsnSac: '3401', taxableValue: amount, gstRate: rate,
+        cgst: 45, sgst: 45, igst: 0, cess: 0, quantity: 3, unit: 'pack', unitPrice: 200)]);
+    List<Object?> invoiceFields(BuyV2TaxInvoiceDetails d) => [d.invoiceNumber, d.issuedAt.toIso8601String(),
+      d.sellerLegalName, d.sellerAddress, d.sellerGstin, d.buyerGstin, d.placeOfSupply, d.sourceId,
+      d.revisionLabel, d.recipientLegalName, d.recipientBillingAddress, d.sellerPan, d.sellerCin,
+      d.sellerFssaiNumber, d.reverseCharge, d.irn, d.acknowledgementNumber, d.authorizedSignatory, d.supplyStatement,
+      for (final l in d.lines) [l.description, l.hsnSac, l.taxableValue, l.gstRate, l.cgst, l.sgst, l.igst,
+        l.cess, l.quantity, l.unit, l.unitPrice]];
+    BuyV2Order invoiceOrder(bool exact, BuyV2TaxInvoiceState? state, {bool invalidRate = false, int? invalidAmount}) {
+      final product = BuyV2Catalogue.products.firstWhere((p) => p.destination == BuyV2Destination.shop);
+      final lines = [BuyV2CartLine(product: product, quantity: 3)];
+      final seller = state == BuyV2TaxInvoiceState.ready || state == BuyV2TaxInvoiceState.corrected
+          ? invoiceFacts('seller', rate: invalidRate ? double.nan : 18, amount: invalidAmount ?? 500) : null;
+      final platform = seller == null ? null : invoiceFacts('platform');
+      return exact ? BuyV2Order.minor(id: 'host-invoice-order', destination: product.destination,
+        title: 'Host order', itemSummary: '3 packs', totalMinor: product.priceMinor * 3 + 9000,
+        partner: product.seller, partnerType: product.sellerType, promise: 'Host promise', destinationLabel: 'Host address',
+        progress: .5, status: BuyV2OrderStatus.confirmed, purchaseId: 'host-invoice-purchase', productIds: [product.id],
+        lines: lines, taxMinor: 9000, taxInvoiceState: state, taxInvoiceDetails: seller, platformTaxInvoiceDetails: platform)
+        : BuyV2Order(id: 'host-invoice-order', destination: product.destination, title: 'Host order', itemSummary: '3 packs',
+          total: product.price * 3 + 90, partner: product.seller, partnerType: product.sellerType, promise: 'Host promise',
+          destinationLabel: 'Host address', progress: .5, status: BuyV2OrderStatus.confirmed,
+          purchaseId: 'host-invoice-purchase', productIds: [product.id], lines: lines, tax: 90,
+          taxInvoiceState: state, taxInvoiceDetails: seller, platformTaxInvoiceDetails: platform);
+    }
+    for (final exact in [false, true]) {
+      for (final state in BuyV2TaxInvoiceState.values) {
+        test('LF12 invoice cache preserves explicit state and all supplied facts exact=$exact state=$state', () async {
+          final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-invoice-owner');
+          final original = invoiceOrder(exact, state);
+          expect(await store.write(BuyV2CustomerStateSnapshot(orders: [original])), isTrue);
+          final restored = (await store.read())!.orders.single;
+          expect(restored.taxInvoiceState, state);
+          expect(BuyV2InvoiceDocument(order: restored).hasExactLines,
+            state == BuyV2TaxInvoiceState.ready || state == BuyV2TaxInvoiceState.corrected);
+          if (original.taxInvoiceDetails case final seller?) {
+            expect(invoiceFields(restored.taxInvoiceDetails!), invoiceFields(seller));
+            expect(invoiceFields(restored.platformTaxInvoiceDetails!), invoiceFields(original.platformTaxInvoiceDetails!));
+          } else {
+            expect(restored.taxInvoiceDetails, isNull); expect(restored.platformTaxInvoiceDetails, isNull);
+          }
+          expect(restored.payableTotalMinor, original.payableTotalMinor);
+          final bytes = prefs.values.values.single;
+          expect(await store.write(BuyV2CustomerStateSnapshot(orders: [restored])), isTrue);
+          expect(prefs.values.values.single, bytes);
+        });
+      }
+    }
+    for (final party in ['seller', 'platform']) {
+      test('LF12 invoice cache independent issuer and blank optional facts $party', () async {
+        final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-invoice-owner');
+        await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false, BuyV2TaxInvoiceState.ready)]));
+        final key = prefs.values.keys.single, raw = jsonDecode(prefs.values.values.single);
+        final context = raw['orders'][0]['invoiceContext'];
+        context[party == 'seller' ? 'platform' : 'seller'] = null;
+        context['state'] = null; // preserve supplied facts without inferring issuance
+        context[party]['buyerGstin'] = null; context[party]['revisionLabel'] = '';
+        context[party]['issuedAt'] = '2020-01-02T03:04:05.000'; // canonical historical local DateTime
+        final line = context[party]['lines'][0]; line['quantity'] = null; line['unit'] = ''; line['unitPrice'] = null;
+        context[party]['lines'].add({...line, 'description': 'Second original line'});
+        prefs.values[key] = jsonEncode(raw);
+        final restored = (await store.read())!.orders.single;
+        expect(restored.taxInvoiceState, isNull);
+        final selected = party == 'seller' ? restored.taxInvoiceDetails! : restored.platformTaxInvoiceDetails!;
+        expect(party == 'seller' ? restored.platformTaxInvoiceDetails : restored.taxInvoiceDetails, isNull);
+        expect(selected.buyerGstin, isNull); expect(selected.revisionLabel, '');
+        expect(selected.issuedAt.toIso8601String(), '2020-01-02T03:04:05.000');
+        expect(selected.lines.map((l) => l.description), ['Host साबुन', 'Second original line']);
+        expect(selected.lines.first.quantity, isNull); expect(selected.lines.first.unit, '');
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [restored])), isTrue);
+        final again = (await store.read())!.orders.single;
+        expect(invoiceFields(party == 'seller' ? again.taxInvoiceDetails! : again.platformTaxInvoiceDetails!), invoiceFields(selected));
+      });
+    }
+    test('LF12 invoice cache rejects minimum signed integer before writing', () async {
+      final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-invoice-owner');
+      await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false, BuyV2TaxInvoiceState.pending)]));
+      final original = prefs.values.values.single, writes = prefs.writesStarted;
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false,
+        BuyV2TaxInvoiceState.ready, invalidAmount: -9223372036854775808)])), isFalse);
+      expect(prefs.writesStarted, writes); expect(prefs.values.values.single, original);
+    });
+    for (final corruption in ['null', 'empty', 'version', 'version type', 'state', 'missing key', 'extra key', 'seller type',
+      'date', 'rate', 'amount', 'min amount', 'min quantity', 'line extra', 'lines type', 'optional type']) {
+      test('LF12 invoice cache corrupt context holds original bytes $corruption', () async {
+        final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-invoice-owner');
+        await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(true, BuyV2TaxInvoiceState.corrected)]));
+        final key = prefs.values.keys.single, raw = jsonDecode(prefs.values.values.single);
+        final context = raw['orders'][0]['invoiceContext'];
+        switch (corruption) {
+          case 'null': raw['orders'][0]['invoiceContext'] = null;
+          case 'empty': context['state'] = null; context['seller'] = null; context['platform'] = null;
+          case 'version': context['version'] = 2;
+          case 'version type': context['version'] = 1.0;
+          case 'state': context['state'] = 'issued';
+          case 'missing key': context.remove('state');
+          case 'extra key': context['issued'] = true;
+          case 'seller type': context['seller'] = 'lost details';
+          case 'date': context['seller']['issuedAt'] = '2026-10-18';
+          case 'rate': context['seller']['lines'][0]['gstRate'] = '18';
+          case 'amount': context['seller']['lines'][0]['taxableValue'] = 500.5;
+          case 'min amount': context['seller']['lines'][0]['taxableValue'] = -9223372036854775808;
+          case 'min quantity': context['seller']['lines'][0]['quantity'] = -9223372036854775808;
+          case 'line extra': context['seller']['lines'][0]['unknown'] = 1;
+          case 'lines type': context['seller']['lines'] = {};
+          case 'optional type': context['platform']['buyerGstin'] = false;
+        }
+        final bytes = jsonEncode(raw); prefs.values[key] = bytes;
+        await expectLater(store.read(), throwsFormatException);
+        final writes = prefs.writesStarted, core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCustomerState(); session.setAvailableProductsOnly(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(session.customerStateRecoveryPending, isTrue);
+        expect(prefs.writesStarted, writes); expect(prefs.values[key], bytes);
+      });
+    }
+    test('LF12 invoice cache legacy absence stays absent and failed save keeps originals', () async {
+      final prefs = _R669StringPreferences(), store = BuyV2SharedPreferencesCustomerStateStore(prefs, ownerScope: 'host-invoice-owner');
+      await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false, null)]));
+      expect(jsonDecode(prefs.values.values.single)['orders'][0].containsKey('invoiceContext'), isFalse);
+      expect(BuyV2InvoiceDocument(order: (await store.read())!.orders.single).hasExactLines, isTrue);
+      final original = prefs.values.values.single, writes = prefs.writesStarted;
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false, BuyV2TaxInvoiceState.ready, invalidRate: true)])), isFalse);
+      expect(prefs.writesStarted, writes); expect(prefs.values.values.single, original);
+      prefs.failWrites = true;
+      expect(await store.write(BuyV2CustomerStateSnapshot(orders: [invoiceOrder(false, BuyV2TaxInvoiceState.pending)])), isFalse);
+      expect(prefs.values.values.single, original);
+    });
     BuyV2Product publicListing(bool trade, {String? returnPolicy}) {
       final id = 'listing-${(trade ? 'e' : 'd') * 64}';
       final channel = trade ? BuyV2OfferClass.wholesale : BuyV2OfferClass.retail;
