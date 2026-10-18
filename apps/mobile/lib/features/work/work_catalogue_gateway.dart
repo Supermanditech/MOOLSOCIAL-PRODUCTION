@@ -853,6 +853,134 @@ class WorkspaceReviewedVariantMembership {
   }
 }
 
+/// Existing workspace endpoint, negotiated only with its reviewed-family contract.
+/// A private owner family is never a fallback for missing reviewed readback.
+class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource {
+  WorkspaceHttpReviewedVariantSource(this.gateway);
+  final AuthenticatedWorkspaceCatalogueGateway gateway;
+
+  Future<Map<String, dynamic>> _read(String storeId, List<BuyV2PublicListingIdentity> listings,
+      bool Function() current, {String? familyId}) async {
+    if (!current() || listings.isEmpty || listings.length > 50 ||
+        listings.any((i) => !i.valid || i.storeId != storeId || i.realm != gateway.realm)) { throw const FormatException(); }
+    final response = await gateway._ownerRequest({'operation': 'readPublicStoreVariantFamilies', 'storeId': storeId,
+      'listings': [for (final i in listings) {'listingId': i.listingId, 'skuId': i.skuId, 'channel': i.channel.name}],
+      'familyId': ?familyId}, current, mutation: false);
+    if (!current() || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body));
+    if (envelope['ok'] != true) throw const FormatException();
+    final data = _map(envelope['data']);
+    if (data['state'] != 'ready') throw const FormatException('Published options are unavailable.');
+    _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
+      'catalogueVersion', 'publicStore', 'sourceId', 'revision', 'validUntil', 'memberships', 'family']);
+    final now = gateway.now().toUtc(), observed = _time(data['observedAt']), expires = _time(data['validUntil']);
+    if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
+        data['storeId'] != storeId || data['orderingAvailable'] != false || observed.isAfter(now) ||
+        !now.isBefore(expires) || !observed.isBefore(expires) || expires.difference(observed) > const Duration(minutes: 5) ||
+        data['sourceId'] != 'store-reviewed-variants:${gateway.realm}:$storeId') { throw const FormatException(); }
+    _int(data['revision'], 1, 1000000000); _int(data['catalogueVersion'], 1, 1000000001);
+    _publicStore(data, storeId, gateway.realm, now);
+    return data;
+  }
+
+  BuyV2VariantAttribute _attribute(Object? raw) {
+    final row = _map(raw);
+    _keys(row, ['dimensionId', 'dimensionLabel', 'optionId', 'optionLabel', 'kind', 'swatchArgb']);
+    final kinds = BuyV2VariantDimensionKind.values.where((v) => v.name == row['kind']);
+    if (kinds.length != 1) throw const FormatException();
+    final result = BuyV2VariantAttribute(dimensionId: _id(row['dimensionId']), dimensionLabel: _string(row['dimensionLabel'], 120),
+      optionId: _id(row['optionId']), optionLabel: _string(row['optionLabel'], 120), kind: kinds.single,
+      swatchArgb: row['swatchArgb'] == null ? null : _int(row['swatchArgb'], 0, 0xffffffff));
+    if (!result.isValid) throw const FormatException();
+    return result;
+  }
+
+  WorkspaceReviewedVariantMembership _membership(Object? raw, Map<String, dynamic> data) {
+    final row = _map(raw);
+    _keys(row, ['listing', 'skuRevision', 'catalogueVersion', 'familyId', 'sourceId', 'revision',
+      'observedAt', 'validUntil', 'attributes']);
+    final listing = BuyV2PublicListingIdentity.fromJson(row['listing']);
+    if (listing == null || !listing.valid || listing.realm != gateway.realm || listing.storeId != data['storeId'] ||
+        row['sourceId'] != data['sourceId'] || row['revision'] != data['revision'] ||
+        row['catalogueVersion'] != data['catalogueVersion'] || row['observedAt'] != data['observedAt'] ||
+        row['validUntil'] != data['validUntil']) { throw const FormatException(); }
+    return WorkspaceReviewedVariantMembership(listing: listing, skuRevision: _int(row['skuRevision'], 1, 1000000000),
+      catalogueVersion: _int(row['catalogueVersion'], 1, 1000000001), familyId: row['familyId'] == null ? null : _id(row['familyId']),
+      sourceId: _string(row['sourceId']), revision: _int(row['revision'], 1, 1000000000),
+      observedAt: _time(row['observedAt']), validUntil: _time(row['validUntil']),
+      attributes: _list(row['attributes'], 8).map(_attribute));
+  }
+
+  @override
+  Future<List<WorkspaceReviewedVariantMembership>> readMemberships(List<WorkspacePublicCatalogueEntry> entries,
+      {required bool Function() current}) async {
+    final checked = <String, WorkspaceReviewedVariantMembership>{};
+    final stores = entries.map((e) => e.product.storeId).toSet();
+    for (final storeId in stores) {
+      if (storeId == null) throw const FormatException();
+      final group = entries.where((e) => e.product.storeId == storeId).toList();
+      for (var offset = 0; offset < group.length; offset += 50) {
+        final batch = group.sublist(offset, min(offset + 50, group.length));
+        final listings = batch.map((e) => e.product.publicListingIdentity).toList();
+        if (listings.any((i) => i == null)) throw const FormatException();
+        final data = await _read(storeId, listings.cast<BuyV2PublicListingIdentity>(), current);
+        final rows = _list(data['memberships'], 50).map((r) => _membership(r, data)).toList();
+        if (rows.length != batch.length) throw const FormatException();
+        for (final row in rows) {
+          final matches = batch.where((e) => e.product.id == row.listing.listingId);
+          if (checked.containsKey(row.listing.listingId) || matches.length != 1 ||
+              !row.validFor(matches.single, gateway.realm, gateway.now().toUtc())) { throw const FormatException(); }
+          checked[row.listing.listingId] = row;
+        }
+        if (data['family'] != null) throw const FormatException();
+      }
+    }
+    if (!current()) throw const FormatException();
+    return List.unmodifiable(entries.map((e) => checked[e.product.id]!));
+  }
+
+  @override
+  Future<BuyV2VariantFamilySnapshot> readFamily(BuyV2Product selected, BuyV2CatalogueQuery query,
+      {required bool Function() current}) async {
+    // Only the gateway admits a complete batch after its monotonicity checks.
+    // A rejected reply must never replace the context of a retained product.
+    final previous = gateway._variantMemberships[selected.id], identity = selected.publicListingIdentity;
+    if (previous == null || identity == null || previous.familyId == null || previous.familyId != selected.variantFamilyId ||
+        !identity.matches(selected) || !gateway.now().toUtc().isBefore(previous.validUntil)) { throw const FormatException(); }
+    final data = await _read(identity.storeId, [identity], current, familyId: previous.familyId);
+    final memberships = _list(data['memberships'], 1).map((r) => _membership(r, data)).toList();
+    if (memberships.length != 1 || memberships.single.listing != identity || memberships.single.fingerprint != previous.fingerprint ||
+        memberships.single.revision != previous.revision || memberships.single.skuRevision != previous.skuRevision ||
+        memberships.single.catalogueVersion != previous.catalogueVersion) { throw const FormatException('Options changed. Refresh this product.'); }
+    final family = _map(data['family']);
+    _keys(family, ['familyId', 'options', 'products']);
+    if (family['familyId'] != previous.familyId) throw const FormatException();
+    final products = <BuyV2Product>[];
+    for (final raw in _list(family['products'], 80)) {
+      final row = _map(raw); _keys(row, ['product', 'membership']);
+      final member = _membership(row['membership'], data);
+      final entry = WorkspacePublicCatalogueEntry.fromResponse({'schemaVersion': 1, 'realm': gateway.realm,
+        'storeId': identity.storeId, 'observedAt': data['observedAt'], 'state': 'ready', 'orderingAvailable': false,
+        'coverage': 'verified_public_only', 'listingCoverage': 'complete', 'listingReadbackVersion': 1,
+        'productFactsReadbackVersion': 1, 'mediaReadbackVersion': 1, 'unbrandedProduceReadbackVersion': 1,
+        'catalogueVersion': data['catalogueVersion'], 'publicStore': data['publicStore'], 'items': [row['product']], 'nextCursor': null},
+        storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc());
+      if (!member.validFor(entry, gateway.realm, gateway.now().toUtc()) || member.familyId != previous.familyId ||
+          products.any((p) => p.id == entry.product.id)) { throw const FormatException(); }
+      products.add(entry.product.copyWith(variantFamilyId: member.familyId, variantAttributes: member.attributes));
+    }
+    if (!current()) throw const FormatException();
+    final expiry = _time(data['validUntil']);
+    return BuyV2VariantFamilySnapshot(productId: selected.id, canonicalId: selected.canonicalId,
+      variantFamilyId: previous.familyId, categoryId: selected.categoryId, offerClass: selected.offerClass,
+      realm: gateway.realm, storeId: identity.storeId, destination: selected.destination, queryKey: query.key,
+      sourceId: previous.sourceId, revision: '${previous.revision}', observedAt: _time(data['observedAt']),
+      validUntil: expiry.isBefore(previous.validUntil) ? expiry : previous.validUntil, complete: true,
+      selectedAvailable: products.any((p) => p.id == selected.id),
+      options: _list(family['options'], 128).map(_attribute), candidates: products);
+  }
+}
+
 /// Genuine exact-Store catalogue source. Global/geo discovery and Store address
 /// metadata require their own providers; an unsupported call is not an empty feed.
 class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2VariantFamilySource, BuyV2StorePublishedOffersSource {
@@ -1166,6 +1294,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     policyReadbackRequired: true,
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
+    reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
   );
 }
 
@@ -1189,9 +1318,10 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.policyReadbackRequired = false,
     this.productFactsReadbackSupported = false,
     this.unbrandedProduceReadbackSupported = false,
-    this.reviewedVariants,
+    WorkspacePublicVariantSource? reviewedVariants,
+    this.reviewedFamilyReadbackSupported = false,
     DateTime Function()? now,
-  }) : now = now ?? DateTime.now {
+  }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
         !{'production', 'evaluation'}.contains(realm)) {
       throw ArgumentError('Invalid catalogue connection.');
@@ -1208,7 +1338,10 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool productFactsReadbackSupported;
   // Negotiated only with a matching service; legacy strict endpoints reject new keys.
   final bool unbrandedProduceReadbackSupported;
-  final WorkspacePublicVariantSource? reviewedVariants;
+  final bool reviewedFamilyReadbackSupported;
+  final WorkspacePublicVariantSource? _reviewedVariantsOverride;
+  late final WorkspacePublicVariantSource? reviewedVariants = _reviewedVariantsOverride ??
+      (reviewedFamilyReadbackSupported ? WorkspaceHttpReviewedVariantSource(this) : null);
   final Map<String, WorkspaceReviewedVariantMembership> _variantMemberships = {};
   final Map<String, String> _variantInputs = {};
   bool _policyObserved = false;
@@ -1227,7 +1360,8 @@ class AuthenticatedWorkspaceCatalogueGateway
       policyReadbackRequired: policyReadbackRequired,
       productFactsReadbackSupported: productFactsReadbackSupported,
       unbrandedProduceReadbackSupported: unbrandedProduceReadbackSupported,
-      reviewedVariants: reviewedVariants,
+      reviewedVariants: _reviewedVariantsOverride,
+      reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
       now: now,
     );
   }

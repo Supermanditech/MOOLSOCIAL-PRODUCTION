@@ -8,7 +8,9 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   type CatalogueProductionReceipt, type CatalogueSave, type StoreSkuInput, type StoreSkuContent,
   FirestoreWorkspaceCatalogueRepository, type StoreSkuRecord, type WorkspaceCatalogueRepository, type PublicCatalogueSource,
   planStorePublicDetailsSave, normalizeStorePublicDetails, type StorePublicDetailsCommand,
-  type StorePublicDetailsRecord, type StorePublicDetailsReceipt} from "./workspace_catalogue_service.js";
+  type StorePublicDetailsRecord, type StorePublicDetailsReceipt,
+  normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
+  planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
 import type {WorkspaceProfileRecord} from "./workspace_profile_service.js";
 import {WorkspacePromotionService, planPromotionSave, type PromotionRepository, type PromotionRecord} from "./workspace_promotion_service.js";
 import {createCatalogueAggregate, type CatalogueAggregate} from "../commerce/catalogue_contract.js";
@@ -17,6 +19,12 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test("reviewed family has real persistent submission, receipt and trusted review entries", () => {
+  const repository = FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>;
+  for (const method of ["submitVariantFamily", "readVariantFamily", "reconcileVariantFamily", "reviewVariantFamily"]) {
+    assert.equal(typeof repository[method], "function", method);
+  }
+});
 test("local canonical producer has a persistent transaction entry, not only readback fixtures", () => {
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as
     Record<string, unknown>).produceCatalogue, "function");
@@ -104,6 +112,221 @@ function produceAll(value = input()) {
   }
   return {aggregate: aggregate!, participant, receipts};
 }
+
+function familyFixture() {
+  const value = input(), other = input("sku-two");
+  const records: StoreSkuRecord[] = [value, other].map(row => ({...row, schemaVersion: 1,
+    storeId: "store-one", revision: 1, observedAt: at}));
+  const family: StoreVariantFamilyInput = {familyId: "family-one", localRevision: 1,
+    title: value.content.title, brand: value.content.brand, categoryId: value.content.categoryId,
+    options: [{dimensionId: "colour", dimensionLabel: "Colour", optionId: "pink", optionLabel: "Pink", kind: "colour", swatchArgb: 0xffffc0cb},
+      {dimensionId: "colour", dimensionLabel: "Colour", optionId: "blue", optionLabel: "Blue", kind: "colour", swatchArgb: 0xff0000ff},
+      {dimensionId: "storage", dimensionLabel: "Storage", optionId: "128", optionLabel: "128 GB", kind: "storage", swatchArgb: null},
+      {dimensionId: "storage", dimensionLabel: "Storage", optionId: "512", optionLabel: "512 GB", kind: "storage", swatchArgb: null}],
+    members: [{skuId: "sku-one", skuRevision: 1, selections: {colour: "pink", storage: "128"}},
+      {skuId: "sku-two", skuRevision: 1, selections: {colour: "blue", storage: "512"}}]};
+  const command = storeVariantFamilySubmission("owner-one", "evaluation", {
+    storeId: "store-one", expectedRevision: 0, idempotencyKey: "family-request-one", family}, at);
+  const candidate = planStoreVariantFamilySubmission(command, profile, records);
+  const review = {expectedCandidateRevision: candidate.revision, expectedCandidateFingerprint: candidate.fingerprint,
+    expectedReviewRevision: 0, decision: "verify", reasonCode: "checked-source", idempotencyKey: "review-family-one"};
+  return {family, records, command, candidate, review, aggregate: produceAll(value).aggregate};
+}
+
+test("family submission freezes only actual combinations, not a Cartesian inventory", () => {
+  const {family, candidate} = familyFixture();
+  assert.equal(candidate.family.members.length, 2);
+  assert.equal(candidate.family.options.length, 4);
+  assert.equal(Object.hasOwn(candidate, "approved"), false);
+  family.members[0]!.selections.colour = "blue";
+  assert.equal(candidate.family.members[0]!.selections.colour, "pink");
+  assert.equal(Object.hasOwn(candidate, "stock"), false);
+});
+
+test("family HTTP classification exposes only bounded reads and owner submission, never trusted review", () => {
+  assert.equal(storeVariantFamilyOperation("submitStoreVariantFamily"), "submit");
+  assert.equal(storeVariantFamilyOperation("readStoreVariantFamily"), "owner_read");
+  assert.equal(storeVariantFamilyOperation("reconcileStoreVariantFamily"), "owner_read");
+  assert.equal(storeVariantFamilyOperation("readPublicStoreVariantFamilies"), "public_read");
+  for (const operation of ["reviewVariantFamily", "produceCatalogue", ["submitStoreVariantFamily"], null, ""]) {
+    assert.equal(storeVariantFamilyOperation(operation), undefined);
+  }
+});
+
+test("family rejects coercive option kinds, review decisions, timestamps and public identity fields", async () => {
+  const {family, candidate, records, review, aggregate} = familyFixture();
+  const badFamily = structuredClone(family); Object.assign(badFamily.options[0]!, {kind: ["colour"]});
+  assert.throws(() => normalizeStoreVariantFamily(badFamily));
+  assert.throws(() => planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, {...review, decision: ["verify"]},
+    producerAuthority(false), candidate, records, aggregate, at));
+  assert.throws(() => storeVariantFamilySubmission("owner-one", "evaluation", {storeId: "store-one", expectedRevision: 0,
+    idempotencyKey: "time-test", family}, [at] as unknown as string));
+  const binding = cataloguePublicListingBindings("evaluation", records[0]!)[0]!;
+  for (const listing of [{listingId: [binding.listingId], skuId: binding.skuId, channel: "retail"},
+    {listingId: binding.listingId, skuId: binding.skuId, channel: ["retail"]}]) {
+    await assert.rejects(new WorkspaceCatalogueService(new Memory(), catalogueIdentity, () => new Date(at))
+      .publicVariantFamilies({storeId: "store-one", listings: [listing]}), {code: "invalid_input"});
+  }
+});
+
+test("family submission original receipt survives later member edits, but changed request cannot replay", () => {
+  const {command, candidate, records} = familyFixture();
+  const receipt = {fingerprint: command.fingerprint, record: candidate};
+  records[0]!.revision = 2;
+  assert.deepEqual(planStoreVariantFamilySubmission({...command, submittedAt: "2026-10-16T12:10:00.000Z"}, profile, [], undefined, receipt), candidate);
+  const changed = storeVariantFamilySubmission("owner-one", "evaluation", {storeId: "store-one", expectedRevision: 0,
+    idempotencyKey: command.idempotencyKey, family: {...command.family, title: "Changed"}}, at);
+  assert.throws(() => planStoreVariantFamilySubmission(changed, profile, [], undefined, receipt), /changed/u);
+  assert.throws(() => planStoreVariantFamilySubmission(command, {...profile, ownerUserId: "another-owner"}, records, undefined, receipt));
+});
+
+test("family corrupt persisted timestamp cannot normalize into a valid original receipt", () => {
+  const {command, candidate} = familyFixture();
+  const corrupt = {...candidate, submittedAt: [candidate.submittedAt]} as unknown as StoreVariantFamilyCandidate;
+  assert.throws(() => planStoreVariantFamilySubmission(command, profile, [], undefined,
+    {fingerprint: command.fingerprint, record: corrupt}));
+});
+
+for (const [label, mutate] of Object.entries({
+  "duplicate tuple": (f: StoreVariantFamilyInput) => { f.members[1]!.selections = {...f.members[0]!.selections}; },
+  "duplicate SKU": (f: StoreVariantFamilyInput) => { f.members[1]!.skuId = f.members[0]!.skuId; },
+  "unknown option": (f: StoreVariantFamilyInput) => { f.members[0]!.selections.colour = "green"; },
+  "missing dimension": (f: StoreVariantFamilyInput) => { delete f.members[0]!.selections.storage; },
+  "extra dimension": (f: StoreVariantFamilyInput) => { f.members[0]!.selections.ram = "8"; },
+  "duplicate option": (f: StoreVariantFamilyInput) => { f.options.push({...f.options[0]!}); },
+  "different dimension label": (f: StoreVariantFamilyInput) => { f.options[1]!.dimensionLabel = "Paint"; },
+  "swatch on storage": (f: StoreVariantFamilyInput) => { f.options[2]!.swatchArgb = 0; },
+  "no members": (f: StoreVariantFamilyInput) => { f.members = []; },
+  "private field": (f: StoreVariantFamilyInput) => { Object.assign(f, {purchaseCostMinor: 100}); },
+})) test(`family rejects ${label}`, () => {
+  const family = structuredClone(familyFixture().family); mutate(family);
+  assert.throws(() => normalizeStoreVariantFamily(family));
+});
+
+for (const change of ["revision", "store", "title", "missing"] as const) test(`family rejects changed member ${change}`, () => {
+  const {command, records} = familyFixture();
+  if (change === "revision") records[0]!.revision++;
+  if (change === "store") records[0]!.storeId = "store-two";
+  if (change === "title") records[0]!.content.title = "Changed";
+  if (change === "missing") records.splice(0, 1);
+  assert.throws(() => planStoreVariantFamilySubmission(command, profile, records));
+});
+
+test("family candidate revision and realm cannot be silently replaced", () => {
+  const {command, candidate, records} = familyFixture();
+  assert.throws(() => planStoreVariantFamilySubmission(command, profile, records, candidate), /changed/u);
+  assert.throws(() => planStoreVariantFamilySubmission({...command, expectedRevision: 1}, profile, records, candidate));
+  const production = storeVariantFamilySubmission("owner-one", "production", {storeId: "store-one", expectedRevision: 1,
+    idempotencyKey: "realm-change", family: command.family}, at);
+  assert.throws(() => planStoreVariantFamilySubmission(production, profile, records, candidate));
+});
+
+test("trusted family approval pins candidate and does not alter product review or prices", () => {
+  const {candidate, records, review, aggregate} = familyFixture();
+  const before = cataloguePayloadHash({aggregate, records});
+  const result = planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, review, producerAuthority(false),
+    candidate, records, aggregate, at);
+  assert.equal(result.decision, "verify"); assert.equal(result.candidate.fingerprint, candidate.fingerprint);
+  assert.equal(cataloguePayloadHash({aggregate, records}), before);
+});
+
+for (const change of ["owner", "revoked", "hash", "revision", "private", "unreviewed", "terms"] as const) {
+  test(`family review rejects ${change}`, () => {
+    const {candidate, records, review, aggregate} = familyFixture();
+    const authority = producerAuthority(false); let operator = "reviewer-one";
+    if (change === "owner") { authority.userId = "owner-one"; authority.actor = {...authority.actor, actorId: "owner-one"}; operator = "owner-one"; }
+    if (change === "revoked") authority.enabled = false;
+    if (change === "hash") review.expectedCandidateFingerprint = "0".repeat(64);
+    if (change === "revision") records[0]!.revision++;
+    if (change === "private") records[0]!.publicListing = false;
+    if (change === "terms") records[0]!.channels[0]!.priceMinor++;
+    const source: CatalogueAggregate = change === "unreviewed" ? {...aggregate,
+      products: aggregate.products.map(p => ({...p, state: "rejected" as const}))} : aggregate;
+    assert.throws(() => planStoreVariantFamilyReview(operator, catalogueIdentity, review, authority, candidate, records, source, at));
+  });
+}
+
+test("trusted rejection grants no public family and needs no current offer", () => {
+  const {candidate, review} = familyFixture();
+  const result = planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, {...review, decision: "reject"},
+    producerAuthority(false), candidate, [], undefined, at);
+  assert.equal(result.decision, "reject");
+});
+
+test("family emulator private submit, trusted approval, public exact siblings, restart, conflicts and withdrawal", {
+  skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: "demo-lf03-family"}, `family-${randomUUID()}`), db = getFirestore(app);
+  const storeId = `store-${randomUUID()}`, caseId = `case-${randomUUID()}`;
+  const identity = {...catalogueIdentity, catalogueId: `catalogue-${randomUUID()}`};
+  const localProfile = {...profile, workspaceId: storeId, caseId};
+  const root = db.collection("workspaceCatalogues").doc("evaluation"), first = input(), second = input("sku-two");
+  const repository = () => new FirestoreWorkspaceCatalogueRepository(db, "evaluation", () => new Date(at));
+  const service = () => new WorkspaceCatalogueService(repository(), identity, () => new Date(at));
+  try {
+    await db.collection("workspaceProfiles").doc(caseId).set(localProfile);
+    await root.collection("participants").doc(storeId).set(producerParticipant(storeId));
+    await root.collection("producerAuthorities").doc("owner-one").set(producerAuthority(true, storeId));
+    await root.collection("producerAuthorities").doc("reviewer-one").set(producerAuthority(false));
+    for (const command of productionCommands(first)) {
+      const owner = ["propose_product", "propose_pack", "create_offer"].includes(String(command.type));
+      await repository().produceCatalogue(owner ? "owner-one" : "reviewer-one", identity, command);
+    }
+    for (const value of [first, second]) await repository().bindReviewed({ownerUserId: "owner-one", profile: localProfile,
+      input: value, expectedRevision: 0, idempotencyKey: `bind-${value.skuId}`,
+      fingerprint: cataloguePayloadHash({storeId, input: value, expectedRevision: 0}), observedAt: at}, identity);
+    const family = familyFixture().family;
+    const original = {storeId, expectedRevision: 0, idempotencyKey: "submit-family", family};
+    const command = storeVariantFamilySubmission("owner-one", "evaluation", original, at);
+    const [candidate, retried] = await Promise.all([repository().submitVariantFamily(command), repository().submitVariantFamily(command)]);
+    assert.deepEqual(candidate, retried);
+    assert.equal((await root.collection("stores").doc(storeId).collection("variantFamilies").doc(family.familyId).collection("revisions").get()).size, 1);
+    assert.deepEqual(await repository().reconcileVariantFamily(command), candidate);
+    assert.equal((await repository().readVariantFamily(storeId, family.familyId, "owner-one")).review, null);
+    await assert.rejects(repository().readVariantFamily(storeId, family.familyId, "other-owner"));
+    const binding = (await repository().publicListingBindings({...first, schemaVersion: 1, storeId, revision: 1, observedAt: at}))![0]!;
+    const query = {storeId, listings: [{listingId: binding.listingId, skuId: first.skuId, channel: "retail"}]};
+    type Result = {state: string; revision: number; memberships: Array<{familyId: string | null; attributes: Array<{optionLabel: string}>}>;
+      family: {products: Array<{product: {skuId: string; channels: Array<{priceMinor: number}>}; membership: {listing: {skuId: string}}}>} | null};
+    const before = await service().publicVariantFamilies(query) as Result;
+    assert.equal(before.state, "ready"); assert.equal(before.memberships[0]!.familyId, null);
+    assert.equal((await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result).state, "unavailable");
+    const review = {expectedCandidateRevision: 1, expectedCandidateFingerprint: candidate.fingerprint,
+      expectedReviewRevision: 0, decision: "verify", reasonCode: "checked-source", idempotencyKey: "family-review-one"};
+    await assert.rejects(repository().reviewVariantFamily("owner-one", identity, storeId, family.familyId, review));
+    const approved = await repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId, review);
+    assert.deepEqual(await repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId, review), approved);
+    const after = await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result;
+    assert.equal(after.state, "ready"); assert.equal(after.revision, before.revision + 1);
+    assert.equal(after.family!.products.length, 2);
+    assert.deepEqual(after.family!.products.map(row => row.product.skuId).sort(), ["sku-one", "sku-two"]);
+    for (const row of after.family!.products) {
+      assert.equal(row.membership.listing.skuId, row.product.skuId); assert.equal(row.product.channels[0]!.priceMinor, 26000);
+      assert.equal(Object.hasOwn(row.product, "provenance"), false);
+    }
+    await assert.rejects(repository().reviewVariantFamily("reviewer-one", identity, storeId, family.familyId,
+      {...review, reasonCode: "changed-original"}), {code: "conflict"});
+    const competing = {...family, familyId: "another-family"};
+    const another = await repository().submitVariantFamily(storeVariantFamilySubmission("owner-one", "evaluation",
+      {...original, idempotencyKey: "other-family", family: competing}, at));
+    await assert.rejects(repository().reviewVariantFamily("reviewer-one", identity, storeId, competing.familyId,
+      {...review, idempotencyKey: "other-review", expectedCandidateFingerprint: another.fingerprint}), {code: "conflict"});
+    const edited = structuredClone(family); edited.options.find(o => o.optionId === "pink")!.optionLabel = "Light Pink";
+    await repository().submitVariantFamily(storeVariantFamilySubmission("owner-one", "evaluation",
+      {...original, expectedRevision: 1, idempotencyKey: "family-edit", family: edited}, at));
+    assert.deepEqual(await repository().reconcileVariantFamily(command), candidate, "Original acknowledgement survives later private candidate");
+    const unchanged = await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result;
+    assert.equal(unchanged.revision, after.revision);
+    assert.equal(unchanged.memberships[0]!.attributes.some(a => a.optionLabel === "Pink"), true);
+    const withdrawn = {...second, publicListing: false};
+    await repository().bindReviewed({ownerUserId: "owner-one", profile: localProfile, input: withdrawn,
+      expectedRevision: 1, idempotencyKey: "withdraw-member", observedAt: at,
+      fingerprint: cataloguePayloadHash({storeId, input: withdrawn, expectedRevision: 1})}, identity);
+    assert.equal((await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result).state, "unavailable");
+    assert.equal((await new FirestoreWorkspaceCatalogueRepository(db, "production").readVariantFamily(storeId, family.familyId, "owner-one")).candidate, null);
+  } finally { await db.terminate(); await deleteApp(app); }
+});
 
 test("local producer uses real contract transitions before exact binding and public readback", async () => {
   const repository = new Memory(), value = input();
@@ -439,6 +662,59 @@ class ViewMemory extends BoundMemory {
     return result;
   }
 }
+
+test("family membership batch supports two valid families with more than80 actual combined SKUs", async () => {
+  const repository = new ViewMemory(), aggregate = produceAll().aggregate;
+  repository.aggregate = aggregate;
+  const reviews: ReturnType<typeof planStoreVariantFamilyReview>[] = [];
+  const selected: Array<{listingId: string; skuId: string; channel: string}> = [];
+  for (const group of ["one", "two"]) {
+    const family = familyFixture().family;
+    family.familyId = `family-${group}`; family.options = []; family.members = [];
+    const records: StoreSkuRecord[] = [];
+    for (let n = 0; n < 41; n++) {
+      const skuId = `sku-${group}-${String(n).padStart(3, "0")}`, optionId = `size-${String(n).padStart(3, "0")}`;
+      family.options.push({dimensionId: "size", dimensionLabel: "Size", optionId, optionLabel: `${n} units`, kind: "size", swatchArgb: null});
+      family.members.push({skuId, skuRevision: 1, selections: {size: optionId}});
+      const record: StoreSkuRecord = {...input(skuId), schemaVersion: 1, storeId: "store-one", revision: 1, observedAt: at};
+      records.push(record); repository.records.set(`store-one/${skuId}`, record);
+      if (n === 0) { const binding = cataloguePublicListingBindings("evaluation", record)[0]!;
+        selected.push({listingId: binding.listingId, skuId, channel: "retail"}); }
+    }
+    const command = storeVariantFamilySubmission("owner-one", "evaluation", {storeId: "store-one",
+      expectedRevision: 0, idempotencyKey: `submit-${group}`, family}, at);
+    const candidate = planStoreVariantFamilySubmission(command, profile, records);
+    reviews.push(planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, {expectedCandidateRevision: 1,
+      expectedCandidateFingerprint: candidate.fingerprint, expectedReviewRevision: 0, decision: "verify",
+      reasonCode: "checked-source", idempotencyKey: `review-${group}`}, producerAuthority(false), candidate, records, aggregate, at));
+  }
+  const original = repository.publicCatalogueSource.bind(repository);
+  repository.publicCatalogueSource = async (...args) => {
+    const source = await original(...args);
+    return source ? {...source, variantFamilies: {revision: 3, reviews}} : undefined;
+  };
+  const response = await subject(repository).publicVariantFamilies({storeId: "store-one", listings: selected}) as {
+    state: string; memberships: Array<{familyId: string}>};
+  assert.equal(response.state, "ready");
+  assert.deepEqual(response.memberships.map(m => m.familyId), ["family-one", "family-two"]);
+});
+
+test("family corrupt persisted review decision cannot become a standalone public product", async () => {
+  const repository = new ViewMemory(), {candidate, records, review, aggregate} = familyFixture();
+  repository.aggregate = aggregate;
+  for (const record of records) repository.records.set(`store-one/${record.skuId}`, record);
+  const approved = planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, review,
+    producerAuthority(false), candidate, records, aggregate, at);
+  const corrupt = {...approved, decision: ["verify"]} as unknown as typeof approved;
+  const original = repository.publicCatalogueSource.bind(repository);
+  repository.publicCatalogueSource = async (...args) => {
+    const source = await original(...args);
+    return source ? {...source, variantFamilies: {revision: 2, reviews: [corrupt]}} : undefined;
+  };
+  const binding = cataloguePublicListingBindings("evaluation", records[0]!)[0]!;
+  await assert.rejects(subject(repository).publicVariantFamilies({storeId: "store-one",
+    listings: [{listingId: binding.listingId, skuId: binding.skuId, channel: "retail"}]}));
+});
 const viewQuery = {destination: 'shop', search: '', categoryId: 'all', sort: 'relevance',
   brands: [], maximumPriceMinor: null, tradeType: null, listingIds: []};
 test('LF-PRODUCE negotiated owner public and paged readback preserve reviewed empty brand', async () => {

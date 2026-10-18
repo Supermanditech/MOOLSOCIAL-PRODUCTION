@@ -290,6 +290,20 @@ if ($RequireLfPublicationProbes) {
     $probe.batch02Facts.owners+= 'backend/functions/src/index.ts'
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Facts scope widened beyond its exact existing service.'
     $cases++
+    if ($null -ne $continuation.batch02Facts.PSObject.Properties['reviewedFamilyContractVersion']) {
+      $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $legacy.batch02Facts.PSObject.Properties.Remove('reviewedFamilyContractVersion')
+      $legacy.batch02Facts.owners=@($legacy.batch02Facts.owners | Where-Object { $_ -cne 'backend/functions/src/index.ts' })
+      Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical facts contract rejected.'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('backend/functions/src/index.ts'))) 'Unclaimed family dispatch admitted.'
+      $cases+=2
+      foreach ($version in @($true,'1',2)) {
+        $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $probe.batch02Facts.reviewedFamilyContractVersion=$version
+        Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Invalid family contract version admitted.'
+        $cases++
+      }
+    }
   }
   if ($null -ne $continuation.PSObject.Properties['batch02Variants']) {
     foreach($owner in $continuation.batch02Variants.owners) {

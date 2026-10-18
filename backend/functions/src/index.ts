@@ -131,6 +131,7 @@ import { GoogleCloudStorageWorkspaceProofStore } from "./workspace/workspace_pro
 import {
   FirestoreWorkspaceCatalogueRepository,
   WorkspaceCatalogueService,
+  storeVariantFamilyOperation,
 } from "./workspace/workspace_catalogue_service.js";
 import {WorkspaceSupplierPolicyService, FirestoreSupplierPolicyRepository} from "./workspace/workspace_supplier_policy_service.js";
 import {WorkspacePromotionService, FirestorePromotionRepository} from "./workspace/workspace_promotion_service.js";
@@ -2888,6 +2889,7 @@ export const moolSocialWorkspace = onRequest(
       const operation = typeof body.operation === "string"
         ? body.operation.trim()
         : "";
+      const variantFamilyOperation = storeVariantFamilyOperation(operation);
       const mutation = operation === "prepareProofUpload" ||
         operation === "confirmProofUpload" ||
         operation === "submitProfile" ||
@@ -2896,14 +2898,15 @@ export const moolSocialWorkspace = onRequest(
         operation === "setRetailerAvailability" ||
         operation === "saveRetailerProduct" ||
         operation === "saveStoreCatalogueSku" || operation === "bindReviewedStoreCatalogueSku" ||
-        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails";
+        operation === "saveStoreSupplierPolicy" || operation === "saveStorePromotion" || operation === "saveStorePublicDetails" ||
+        variantFamilyOperation === "submit";
       const supplierPolicyOperation = ["readStoreSupplierPolicy", "saveStoreSupplierPolicy",
         "reconcileStoreSupplierPolicy"].includes(operation);
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
         "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue",
-        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation);
+        "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
         operation === "requestRetailerDelivery" ||
@@ -2947,6 +2950,10 @@ export const moolSocialWorkspace = onRequest(
       const {operation: _operation, ...catalogueBody} = body;
       const result = promotionOperation
         ? await workspacePromotionService().handleOperation(ownerUserId, operation, catalogueBody)
+        : variantFamilyOperation === "public_read"
+        ? await workspaceCatalogueService().publicVariantFamilies(catalogueBody)
+        : variantFamilyOperation !== undefined
+        ? await workspaceCatalogueService().handleStoreVariantFamily(ownerUserId, operation, catalogueBody)
         : supplierPolicyOperation
         ? await workspaceSupplierPolicyService().handleOwnerOperation(ownerUserId, operation, catalogueBody)
         : operationalRead

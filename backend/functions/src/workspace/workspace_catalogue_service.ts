@@ -79,10 +79,14 @@ export interface WorkspaceCatalogueRepository {
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
   confirmPublicListingSnapshot?(storeId: string, records: readonly StoreSkuRecord[],
     identity: CatalogueIdentity, catalogueFingerprint: string, detailsFingerprint?: string): Promise<WorkspaceProfileRecord | undefined>;
-  publicCatalogueSource?(storeId: string, identity: CatalogueIdentity): Promise<PublicCatalogueSource | undefined>;
+  publicCatalogueSource?(storeId: string, identity: CatalogueIdentity, includeFamilies?: boolean): Promise<PublicCatalogueSource | undefined>;
   readStorePublicDetails?(storeId: string, ownerUserId?: string): Promise<StorePublicDetailsRecord | undefined>;
   saveStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord>;
   reconcileStorePublicDetails?(command: StorePublicDetailsCommand): Promise<StorePublicDetailsRecord | undefined>;
+  submitVariantFamily?(command: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate>;
+  reconcileVariantFamily?(command: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate | undefined>;
+  readVariantFamily?(storeId: string, familyId: string, ownerUserId: string): Promise<{
+    candidate: StoreVariantFamilyCandidate | null; review: StoreVariantFamilyReview | null}>;
 }
 
 /** Bounded whole-candidate read, including excluded/unlisted records. Never
@@ -90,6 +94,7 @@ export interface WorkspaceCatalogueRepository {
 export interface PublicCatalogueSource {
   profile: WorkspaceProfileRecord; catalogue: CatalogueAggregate; records: StoreSkuRecord[];
   bindings: PublicCatalogueListingBinding[]; policy: unknown; publicDetails?: unknown;
+  variantFamilies?: {revision: number; reviews: StoreVariantFamilyReview[]};
 }
 
 export function normalizeStorePublicDetails(raw: unknown): StorePublicDetailsInput {
@@ -301,11 +306,119 @@ export function planCatalogueProduction(command: CatalogueProduction,
   return {aggregate, fingerprint, replayed: false};
 }
 
+/** Shared with the existing HTTP handler: internal review is never an operation. */
+export function storeVariantFamilyOperation(operation: unknown): "submit" | "owner_read" | "public_read" | undefined {
+  if (operation === "submitStoreVariantFamily") return "submit";
+  if (operation === "readStoreVariantFamily" || operation === "reconcileStoreVariantFamily") return "owner_read";
+  if (operation === "readPublicStoreVariantFamilies") return "public_read";
+  return undefined;
+}
+
 export class WorkspaceCatalogueService {
   constructor(private readonly repository: WorkspaceCatalogueRepository,
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  async handleStoreVariantFamily(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const base = {schemaVersion: 1, realm: this.repository.realm, orderingAvailable: false};
+    if (operation === "readStoreVariantFamily") {
+      exact(body, ["storeId", "familyId"]);
+      if (!this.repository.readVariantFamily) throw new WorkspaceProfileError("unavailable", "Product family connection is unavailable.", 503);
+      const storeId = id(body.storeId), familyId = id(body.familyId);
+      const result = await this.repository.readVariantFamily(storeId, familyId, id(ownerUserId));
+      return {...base, storeId, familyId, ...result};
+    }
+    if (!["submitStoreVariantFamily", "reconcileStoreVariantFamily"].includes(operation)) invalid();
+    const command = storeVariantFamilySubmission(ownerUserId, this.repository.realm, body, this.now().toISOString());
+    if (!this.repository.submitVariantFamily || !this.repository.reconcileVariantFamily) {
+      throw new WorkspaceProfileError("unavailable", "Product family submission is unavailable.", 503);
+    }
+    const record = operation === "submitStoreVariantFamily"
+      ? await this.repository.submitVariantFamily(command) : await this.repository.reconcileVariantFamily(command);
+    return {...base, storeId: command.storeId, familyId: command.family.familyId,
+      state: record ? "submitted" : "not_found", candidate: record ?? null, approved: false};
+  }
+
+  async publicVariantFamilies(body: Readonly<Record<string, unknown>>): Promise<object> {
+    exact(body, ["storeId", "listings"], ["familyId"]);
+    const storeId = id(body.storeId), familyId = body.familyId === undefined ? undefined : id(body.familyId);
+    const requested = list(body.listings, 50).map(value => {
+      const row = exact(value, ["listingId", "skuId", "channel"]);
+      if (typeof row.listingId !== "string" || !/^listing-[a-f0-9]{64}$/u.test(row.listingId) ||
+          typeof row.channel !== "string" || !["retail", "wholesale", "bulk"].includes(row.channel)) invalid();
+      return {listingId: row.listingId, skuId: id(row.skuId), channel: row.channel as StoreSkuChannel["kind"]};
+    });
+    if (!requested.length || new Set(requested.map(row => row.listingId)).size !== requested.length ||
+        familyId !== undefined && requested.length !== 1) invalid();
+    const observedAt = this.now().toISOString();
+    const base = {schemaVersion: 1, realm: this.repository.realm, storeId, observedAt, orderingAvailable: false};
+    const unavailable = () => ({...base, state: "unavailable", memberships: [], family: null});
+    if (!this.identity || !this.repository.publicCatalogueSource) return unavailable();
+    const source = await this.repository.publicCatalogueSource(storeId, this.identity, true);
+    if (!source?.variantFamilies) return unavailable();
+    const revision = integer(source.variantFamilies.revision, 1, 1000000000);
+    const reviews = source.variantFamilies.reviews.map(checkedFamilyReview);
+    if (reviews.some(r => r.candidate.realm !== this.repository.realm || r.candidate.storeId !== storeId ||
+        r.catalogueId !== this.identity!.catalogueId || r.tenantId !== this.identity!.tenantId || r.reviewedAt > observedAt) ||
+        new Set(reviews.map(r => r.candidate.family.familyId)).size !== reviews.length) return unavailable();
+    const approved = reviews.filter(r => r.decision === "verify");
+    const relevant = new Set(requested.map(r => r.skuId));
+    for (const review of approved) if (review.candidate.family.members.some(m => relevant.has(m.skuId))) {
+      for (const member of review.candidate.family.members) relevant.add(member.skuId);
+    }
+    if (relevant.size > 500) return unavailable();
+    const records = source.records.filter(r => relevant.has(r.skuId));
+    const projection = await this.publicCatalogue({storeId, listingReadbackVersion: 1, policyReadbackVersion: 1,
+      productFactsReadbackVersion: 1, mediaReadbackVersion: 1, unbrandedProduceReadbackVersion: 1},
+    {...source, records}) as Record<string, unknown>;
+    if (projection.state !== "ready" || projection.listingCoverage !== "complete") return unavailable();
+    const items = projection.items as Array<Record<string, unknown>>;
+    const matches = (row: typeof requested[number]) => items.filter(item => item.skuId === row.skuId &&
+      (item.listings as PublicCatalogueListingBinding[]).some(listing => listing.listingId === row.listingId && listing.channel === row.channel));
+    if (requested.some(row => matches(row).length !== 1)) return unavailable();
+    // Revalidate every approved actual member, not just the selected discovery row.
+    for (const review of approved.filter(r => r.candidate.family.members.some(m => relevant.has(m.skuId)))) {
+      try { familyMembers(review.candidate, records); } catch { return unavailable(); }
+      if (review.candidate.family.members.some(m => !items.some(item => item.skuId === m.skuId))) return unavailable();
+    }
+    const responseAt = this.now().toISOString();
+    const deadlines = items.flatMap(item => (item.channels as Array<{validUntil: string}>).map(c => c.validUntil));
+    const validUntil = [...deadlines, new Date(Date.parse(observedAt) + 5 * 60 * 1000).toISOString()].sort()[0]!;
+    if (validUntil <= responseAt) return unavailable();
+    const sourceId = `store-reviewed-variants:${this.repository.realm}:${storeId}`;
+    const membership = (request: typeof requested[number]) => {
+      const item = matches(request)[0]!;
+      const families = approved.filter(r => r.candidate.family.members.some(m => m.skuId === request.skuId));
+      if (families.length > 1) invalid("Reviewed family membership conflicts.");
+      const review = families[0], family = review?.candidate.family;
+      const member = family?.members.find(m => m.skuId === request.skuId);
+      return {listing: (item.listings as PublicCatalogueListingBinding[]).find(b => b.listingId === request.listingId)!,
+        skuRevision: item.revision, catalogueVersion: projection.catalogueVersion, familyId: family?.familyId ?? null,
+        sourceId, revision, observedAt: responseAt, validUntil,
+        attributes: member ? family!.options.filter(o => member.selections[o.dimensionId] === o.optionId) : []};
+    };
+    const memberships = requested.map(membership);
+    let family: object | null = null;
+    if (familyId !== undefined) {
+      const selected = memberships[0]!, review = approved.find(r => r.candidate.family.familyId === familyId);
+      if (selected.familyId !== familyId || !review) return unavailable();
+      const channel = requested[0]!.channel;
+      const members = review.candidate.family.members;
+      const products = members.flatMap(member => {
+        const item = items.find(row => row.skuId === member.skuId)!;
+        const listings = (item.listings as PublicCatalogueListingBinding[]).filter(b => b.channel === channel);
+        return listings.map(listing => ({product: item, membership: membership({listingId: listing.listingId, skuId: member.skuId, channel})}));
+      });
+      if (!products.length || !products.some(p => p.membership.listing.listingId === requested[0]!.listingId)) return unavailable();
+      // No invented siblings in channels that this Store does not sell.
+      family = {familyId, options: review.candidate.family.options, products};
+    }
+    const confirmed = await this.repository.publicCatalogueSource(storeId, this.identity, true);
+    if (!confirmed || cataloguePayloadHash(confirmed) !== cataloguePayloadHash(source) || validUntil <= this.now().toISOString()) return unavailable();
+    return {...base, observedAt: responseAt, state: "ready", catalogueVersion: projection.catalogueVersion,
+      publicStore: projection.publicStore, sourceId, revision, validUntil, memberships, family};
+  }
 
   async handleStorePublicDetails(ownerUserId: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
     const body = structuredClone(raw);
@@ -828,6 +941,193 @@ function normalizeRecord(value: unknown, storeId: string): StoreSkuRecord {
 
 export interface CatalogueSaveReceipt {fingerprint: string; record: StoreSkuRecord}
 
+/** Store-owned descriptive grouping only. Each member remains one real SKU. */
+export interface StoreVariantOption {
+  dimensionId: string; dimensionLabel: string; optionId: string; optionLabel: string;
+  kind: "colour" | "size" | "storage" | "pack" | "other"; swatchArgb: number | null;
+}
+export interface StoreVariantFamilyInput {
+  familyId: string; localRevision: number; title: string; brand: string; categoryId: string;
+  options: StoreVariantOption[];
+  members: Array<{skuId: string; skuRevision: number; selections: Record<string, string>}>;
+}
+export interface StoreVariantFamilyCandidate {
+  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string;
+  revision: number; submittedAt: string; submittedBy: string;
+  fingerprint: string; family: StoreVariantFamilyInput;
+}
+export interface StoreVariantFamilySubmission {
+  ownerUserId: string; realm: "evaluation" | "production"; storeId: string;
+  expectedRevision: number; idempotencyKey: string; fingerprint: string;
+  submittedAt: string; family: StoreVariantFamilyInput;
+}
+export interface StoreVariantFamilyReceipt {fingerprint: string; record: StoreVariantFamilyCandidate}
+export interface StoreVariantFamilyReview {
+  schemaVersion: 1; revision: number; decision: "verify" | "reject";
+  reviewerUserId: string; reviewedAt: string; reasonCode: string;
+  catalogueId: string; tenantId: string; candidate: StoreVariantFamilyCandidate;
+}
+
+export function normalizeStoreVariantFamily(value: unknown): StoreVariantFamilyInput {
+  const raw = exact(value, ["familyId", "localRevision", "title", "brand", "categoryId", "options", "members"]);
+  const options = list(raw.options, 128).map(value => {
+    const row = exact(value, ["dimensionId", "dimensionLabel", "optionId", "optionLabel", "kind", "swatchArgb"]);
+    if (typeof row.kind !== "string" || !["colour", "size", "storage", "pack", "other"].includes(row.kind) ||
+        row.swatchArgb !== null && row.kind !== "colour") invalid("Check the family options.");
+    return {dimensionId: id(row.dimensionId), dimensionLabel: text(row.dimensionLabel, 120),
+      optionId: id(row.optionId), optionLabel: text(row.optionLabel, 120),
+      kind: row.kind as StoreVariantOption["kind"],
+      swatchArgb: row.swatchArgb === null ? null : integer(row.swatchArgb, 0, 0xffffffff)};
+  });
+  const dimensions = new Map<string, StoreVariantOption>();
+  const optionIds = new Set<string>(), optionLabels = new Set<string>();
+  for (const option of options) {
+    const previous = dimensions.get(option.dimensionId);
+    const key = JSON.stringify([option.dimensionId, option.optionId]);
+    const label = JSON.stringify([option.dimensionId, option.optionLabel.toLowerCase()]);
+    if (optionIds.has(key) || optionLabels.has(label) || previous &&
+        (previous.dimensionLabel !== option.dimensionLabel || previous.kind !== option.kind)) invalid("Duplicate or inconsistent family option.");
+    optionIds.add(key); optionLabels.add(label); dimensions.set(option.dimensionId, option);
+  }
+  if (!dimensions.size || dimensions.size > 8 ||
+      new Set([...dimensions.values()].map(d => d.dimensionLabel.toLowerCase())).size !== dimensions.size) invalid();
+  const skuIds = new Set<string>(), combinations = new Set<string>();
+  const members = list(raw.members, 80).map(value => {
+    const row = exact(value, ["skuId", "skuRevision", "selections"]);
+    const selections = exact(row.selections, [...dimensions.keys()]);
+    const normalized = Object.fromEntries([...dimensions.keys()].sort().map(d => [d, id(selections[d])]));
+    if (Object.entries(normalized).some(([d, o]) => !optionIds.has(JSON.stringify([d, o])))) invalid("Choose an existing family option.");
+    const skuId = id(row.skuId), combination = JSON.stringify(normalized);
+    if (skuIds.has(skuId) || combinations.has(combination)) invalid("Each actual option combination needs one SKU.");
+    skuIds.add(skuId); combinations.add(combination);
+    return {skuId, skuRevision: integer(row.skuRevision, 1, 1000000000), selections: normalized};
+  });
+  if (!members.length) invalid("Choose the saved SKUs in this family.");
+  const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+  options.sort((a, b) => compare(a.dimensionId, b.dimensionId) || compare(a.optionId, b.optionId));
+  members.sort((a, b) => compare(a.skuId, b.skuId));
+  return {familyId: id(raw.familyId), localRevision: integer(raw.localRevision, 1, 2147483647),
+    title: text(raw.title), brand: text(raw.brand, 240, true), categoryId: id(raw.categoryId), options, members};
+}
+
+export function storeVariantFamilySubmission(ownerUserId: string, realm: StoreVariantFamilySubmission["realm"],
+  body: Readonly<Record<string, unknown>>, submittedAt: string): StoreVariantFamilySubmission {
+  exact(body, ["storeId", "expectedRevision", "idempotencyKey", "family"]);
+  if (!["evaluation", "production"].includes(realm) || typeof submittedAt !== "string" || !Number.isFinite(Date.parse(submittedAt)) ||
+      new Date(submittedAt).toISOString() !== submittedAt) invalid();
+  const original = {ownerUserId: id(ownerUserId), realm, storeId: id(body.storeId),
+    expectedRevision: integer(body.expectedRevision, 0, 999999999), family: normalizeStoreVariantFamily(body.family)};
+  return {...original, idempotencyKey: id(body.idempotencyKey), submittedAt,
+    fingerprint: cataloguePayloadHash(original)};
+}
+
+function checkedFamilyCandidate(value: StoreVariantFamilyCandidate): StoreVariantFamilyCandidate {
+  const raw = exact(value, ["schemaVersion", "realm", "storeId", "revision", "submittedAt", "submittedBy", "fingerprint", "family"]);
+  const command = storeVariantFamilySubmission(id(raw.submittedBy), raw.realm as StoreVariantFamilySubmission["realm"],
+    {storeId: raw.storeId, expectedRevision: integer(raw.revision, 1, 1000000000) - 1,
+      idempotencyKey: "validation-only", family: raw.family}, text(raw.submittedAt, 32));
+  if (raw.schemaVersion !== 1 || command.fingerprint !== raw.fingerprint) invalid("Family submission needs recovery.");
+  return {schemaVersion: 1, realm: command.realm, storeId: command.storeId,
+    revision: command.expectedRevision + 1, submittedAt: command.submittedAt,
+    submittedBy: command.ownerUserId, fingerprint: command.fingerprint, family: command.family};
+}
+
+function familyMembers(candidate: StoreVariantFamilyCandidate, records: readonly StoreSkuRecord[]): StoreSkuRecord[] {
+  return candidate.family.members.map(member => {
+    const matching = records.filter(r => r.skuId === member.skuId && r.storeId === candidate.storeId);
+    if (matching.length !== 1) invalid("A family SKU is unavailable.");
+    const row = normalizeRecord(matching[0], candidate.storeId);
+    if (row.revision !== member.skuRevision || row.observedAt > candidate.submittedAt ||
+        row.content.title !== candidate.family.title || row.content.brand !== candidate.family.brand ||
+        row.content.categoryId !== candidate.family.categoryId) invalid("Family SKU details changed. Refresh before submitting.");
+    return row;
+  });
+}
+
+function checkedFamilyReview(value: unknown): StoreVariantFamilyReview {
+  const raw = exact(value, ["schemaVersion", "revision", "decision", "reviewerUserId", "reviewedAt",
+    "reasonCode", "catalogueId", "tenantId", "candidate"]);
+  const candidate = checkedFamilyCandidate(raw.candidate as StoreVariantFamilyCandidate);
+  if (raw.schemaVersion !== 1 || typeof raw.decision !== "string" || !["verify", "reject"].includes(raw.decision) ||
+      raw.reviewerUserId === candidate.submittedBy || typeof raw.reviewedAt !== "string" ||
+      !Number.isFinite(Date.parse(raw.reviewedAt)) || new Date(raw.reviewedAt).toISOString() !== raw.reviewedAt ||
+      raw.reviewedAt < candidate.submittedAt) invalid();
+  return {schemaVersion: 1, revision: integer(raw.revision, 1, 1000000000),
+    decision: raw.decision as StoreVariantFamilyReview["decision"], reviewerUserId: id(raw.reviewerUserId),
+    reviewedAt: raw.reviewedAt, reasonCode: id(raw.reasonCode), catalogueId: id(raw.catalogueId), tenantId: id(raw.tenantId), candidate};
+}
+
+export function planStoreVariantFamilySubmission(command: StoreVariantFamilySubmission,
+  profile: WorkspaceProfileRecord | undefined, records: readonly StoreSkuRecord[],
+  current?: StoreVariantFamilyCandidate, receipt?: StoreVariantFamilyReceipt): StoreVariantFamilyCandidate {
+  requireStore(profile, command.storeId, command.ownerUserId);
+  const original = storeVariantFamilySubmission(command.ownerUserId, command.realm,
+    {storeId: command.storeId, expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey,
+      family: command.family}, command.submittedAt);
+  if (original.fingerprint !== command.fingerprint) invalid();
+  if (receipt) {
+    const record = checkedFamilyCandidate(receipt.record);
+    if (receipt.fingerprint !== original.fingerprint || record.fingerprint !== original.fingerprint ||
+        record.revision !== original.expectedRevision + 1) {
+      throw new WorkspaceProfileError("conflict", "This family request changed. Check its original result.", 409);
+    }
+    return record;
+  }
+  const previous = current && checkedFamilyCandidate(current);
+  if (previous && (previous.realm !== original.realm || previous.storeId !== original.storeId ||
+      previous.family.familyId !== original.family.familyId)) invalid();
+  if ((previous?.revision ?? 0) !== original.expectedRevision) {
+    throw new WorkspaceProfileError("revision_conflict", "The family submission changed. Refresh before submitting.", 409);
+  }
+  const candidate: StoreVariantFamilyCandidate = {schemaVersion: 1, realm: original.realm,
+    storeId: original.storeId, revision: original.expectedRevision + 1, submittedAt: original.submittedAt,
+    submittedBy: original.ownerUserId, fingerprint: original.fingerprint, family: original.family};
+  familyMembers(candidate, records);
+  return candidate;
+}
+
+/** Internal review only. Does not approve product facts, packs or selling rights. */
+export function planStoreVariantFamilyReview(operatorUserId: string, identity: CatalogueIdentity,
+  body: Readonly<Record<string, unknown>>, authority: CatalogueProducerAuthority | undefined,
+  candidateValue: StoreVariantFamilyCandidate, records: readonly StoreSkuRecord[],
+  catalogue: CatalogueAggregate | undefined, at: string, current?: StoreVariantFamilyReview): StoreVariantFamilyReview {
+  exact(body, ["expectedCandidateRevision", "expectedCandidateFingerprint", "expectedReviewRevision", "decision", "reasonCode", "idempotencyKey"]);
+  id(body.idempotencyKey);
+  const actor = producerActor(id(operatorUserId), identity, at, authority);
+  const candidate = checkedFamilyCandidate(candidateValue);
+  if (current && (current.candidate.realm !== candidate.realm || current.candidate.storeId !== candidate.storeId ||
+      current.candidate.family.familyId !== candidate.family.familyId || current.catalogueId !== identity.catalogueId ||
+      current.tenantId !== identity.tenantId)) invalid();
+  if (!actor.scopes.includes("supply.catalogue.review") || operatorUserId === candidate.submittedBy) {
+    throw new WorkspaceProfileError("forbidden", "Independent catalogue review is required.", 403);
+  }
+  if (body.expectedCandidateRevision !== candidate.revision || body.expectedCandidateFingerprint !== candidate.fingerprint ||
+      integer(body.expectedReviewRevision, 0, 999999999) !== (current?.revision ?? 0) ||
+      typeof body.decision !== "string" || !["verify", "reject"].includes(body.decision) || candidate.submittedAt > at) invalid("The reviewed family changed.");
+  if (typeof at !== "string" || !Number.isFinite(Date.parse(at)) || new Date(at).toISOString() !== at) invalid();
+  if (body.decision === "verify") {
+    if (!catalogue || catalogue.schemaVersion !== 1 || !Number.isSafeInteger(catalogue.version) || catalogue.version < 1 ||
+        catalogue.catalogueId !== identity.catalogueId || catalogue.tenantId !== identity.tenantId) invalid();
+    for (const record of familyMembers(candidate, records)) {
+      const product = catalogue.products.find(p => p.productId === record.canonicalProductId);
+      const pack = catalogue.packs.find(p => p.packId === record.verifiedPackId);
+      if (!record.publicListing || product?.state !== "verified" || pack?.state !== "verified" ||
+          pack.productId !== product.productId || product.contentSha256.toUpperCase() !== cataloguePayloadHash(record.content) ||
+          pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(record.pack)) invalid("Publish each exact reviewed SKU before family approval.");
+      for (const channel of record.channels) {
+        const offer = catalogue.offers.find(o => o.offerId === channel.offerId && o.workspaceId === candidate.storeId &&
+          o.packId === pack.packId && o.buyingContext === (channel.kind === "retail" ? "consumer" : "wholesale"));
+        const term = offer && referencedOfferTermAt(offer, at);
+        if (!term || term.termSnapshotSha256.toUpperCase() !== cataloguePayloadHash(channelTerms(channel))) invalid("Family selling terms changed.");
+      }
+    }
+  }
+  return {schemaVersion: 1, revision: (current?.revision ?? 0) + 1,
+    decision: body.decision as StoreVariantFamilyReview["decision"], reviewerUserId: operatorUserId,
+    reviewedAt: at, reasonCode: id(body.reasonCode), catalogueId: id(identity.catalogueId),
+    tenantId: id(identity.tenantId), candidate};
+}
+
 /** Shared by the transaction adapter and isolated tests; no network side effects. */
 export function planCatalogueSave(command: CatalogueSave, current?: StoreSkuRecord,
   receipt?: CatalogueSaveReceipt): StoreSkuRecord {
@@ -953,6 +1253,128 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   private root(storeId: string) {
     return this.firestore.collection("workspaceCatalogues").doc(this.realm)
       .collection("stores").doc(id(storeId));
+  }
+  async submitVariantFamily(original: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate> {
+    const command = structuredClone(original);
+    if (command.realm !== this.realm) invalid();
+    command.family = normalizeStoreVariantFamily(command.family);
+    const root = this.root(command.storeId), head = root.collection("variantFamilies").doc(command.family.familyId);
+    const receipt = head.collection("receipts").doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const [profiles, current, saved] = await Promise.all([
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", command.storeId).limit(2)),
+        transaction.get(head), transaction.get(receipt)]);
+      const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
+      // Historical replay requires current owner access, not current member content.
+      const records = saved.exists ? [] : await transaction.getAll(...command.family.members.map(member => root.collection("skus").doc(member.skuId)));
+      const record = planStoreVariantFamilySubmission(command, profile,
+        records.filter(doc => doc.exists).map(doc => {
+          const row = normalizeRecord(doc.data(), command.storeId);
+          if (row.skuId !== doc.id) invalid();
+          return row;
+        }), current.exists ? current.data() as StoreVariantFamilyCandidate : undefined,
+        saved.exists ? saved.data() as StoreVariantFamilyReceipt : undefined);
+      if (!saved.exists) {
+        transaction.set(head, record);
+        transaction.create(head.collection("revisions").doc(String(record.revision)), record);
+        transaction.create(receipt, {fingerprint: command.fingerprint, record});
+      }
+      return record;
+    });
+  }
+  async reconcileVariantFamily(original: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate | undefined> {
+    const command = structuredClone(original);
+    if (command.realm !== this.realm) invalid();
+    command.family = normalizeStoreVariantFamily(command.family);
+    const receipt = this.root(command.storeId).collection("variantFamilies").doc(command.family.familyId)
+      .collection("receipts").doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const [profiles, saved] = await Promise.all([
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", command.storeId).limit(2)),
+        transaction.get(receipt)]);
+      const profile = requireStore(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, command.storeId, command.ownerUserId);
+      return saved.exists ? planStoreVariantFamilySubmission(command, profile, [], undefined,
+        saved.data() as StoreVariantFamilyReceipt) : undefined;
+    });
+  }
+  async readVariantFamily(storeId: string, familyId: string, ownerUserId: string): Promise<{
+    candidate: StoreVariantFamilyCandidate | null; review: StoreVariantFamilyReview | null}> {
+    storeId = id(storeId); familyId = id(familyId); ownerUserId = id(ownerUserId);
+    return this.firestore.runTransaction(async transaction => {
+      const [profiles, candidate, review] = await Promise.all([
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2)),
+        transaction.get(this.root(storeId).collection("variantFamilies").doc(familyId)),
+        transaction.get(this.root(storeId).collection("variantFamilyReviews").doc(familyId))]);
+      requireStore(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, storeId, ownerUserId);
+      const pending = candidate.exists ? checkedFamilyCandidate(candidate.data() as StoreVariantFamilyCandidate) : null;
+      const reviewed = review.exists ? checkedFamilyReview(review.data()) : null;
+      for (const row of [pending, reviewed?.candidate]) {
+        if (row && (row.realm !== this.realm || row.storeId !== storeId || row.family.familyId !== familyId)) invalid();
+      }
+      return {candidate: pending, review: reviewed};
+    });
+  }
+  /** Trusted internal entry only. Never dispatched from the owner HTTP API. */
+  async reviewVariantFamily(operatorUserId: string, identity: CatalogueIdentity, storeId: string,
+    familyId: string, raw: Readonly<Record<string, unknown>>): Promise<StoreVariantFamilyReview> {
+    const operator = id(operatorUserId), store = id(storeId), family = id(familyId);
+    identity = {catalogueId: id(identity.catalogueId), tenantId: id(identity.tenantId)};
+    const body = structuredClone(raw), key = id(body.idempotencyKey);
+    const root = this.root(store), catalogueRoot = this.firestore.collection("workspaceCatalogues").doc(this.realm);
+    const reviewHead = root.collection("variantFamilyReviews").doc(family);
+    const receipt = reviewHead.collection("receipts").doc(cataloguePayloadHash([operator, key]));
+    const fingerprint = cataloguePayloadHash({operator, identity, store, family, body});
+    return this.firestore.runTransaction(async transaction => {
+      const [profiles, authorityDoc, candidateDoc, catalogueDoc, reviewDoc, receiptDoc, familyDocs, publicationDoc] = await Promise.all([
+        transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", store).limit(2)),
+        transaction.get(catalogueRoot.collection("producerAuthorities").doc(operator)),
+        transaction.get(root.collection("variantFamilies").doc(family)),
+        transaction.get(catalogueRoot.collection("canonicalCatalogues").doc(identity.catalogueId)),
+        transaction.get(reviewHead), transaction.get(receipt),
+        transaction.get(root.collection("variantFamilyReviews").limit(201)),
+        transaction.get(root.collection("variantPublication").doc("current"))]);
+      requireStore(profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+        ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined, store);
+      const authority = authorityDoc.data() as CatalogueProducerAuthority | undefined;
+      const at = this.now().toISOString(), actor = producerActor(operator, identity, at, authority);
+      if (!actor.scopes.includes("supply.catalogue.review")) throw new WorkspaceProfileError("forbidden", "Catalogue review is required.", 403);
+      if (receiptDoc.exists) {
+        const saved = exact(receiptDoc.data(), ["fingerprint", "record"]), result = checkedFamilyReview(saved.record);
+        if (saved.fingerprint !== fingerprint || result.reviewerUserId !== operator ||
+            result.catalogueId !== identity.catalogueId || result.tenantId !== identity.tenantId ||
+            result.candidate.realm !== this.realm || result.candidate.storeId !== store || result.candidate.family.familyId !== family) {
+          throw new WorkspaceProfileError("conflict", "Review request changed. Use its original result.", 409);
+        }
+        return result;
+      }
+      if (!candidateDoc.exists || familyDocs.size > 200) invalid("Family review source is incomplete.");
+      const candidate = checkedFamilyCandidate(candidateDoc.data() as StoreVariantFamilyCandidate);
+      if (candidate.realm !== this.realm || candidate.storeId !== store || candidate.family.familyId !== family) invalid();
+      const skuDocs = await transaction.getAll(...candidate.family.members.map(member => root.collection("skus").doc(member.skuId)));
+      const records = skuDocs.filter(doc => doc.exists).map(doc => {
+        const row = normalizeRecord(doc.data(), store); if (row.skuId !== doc.id) invalid(); return row;
+      });
+      const result = planStoreVariantFamilyReview(operator, identity, body, authority, candidate, records,
+        catalogueDoc.data() as CatalogueAggregate | undefined, at, reviewDoc.exists ? checkedFamilyReview(reviewDoc.data()) : undefined);
+      if (result.decision === "verify") for (const doc of familyDocs.docs) {
+        const other = checkedFamilyReview(doc.data());
+        if (other.candidate.storeId !== store || other.candidate.realm !== this.realm || other.candidate.family.familyId !== doc.id) invalid();
+        if (doc.id !== family && other.decision === "verify" &&
+            other.candidate.family.members.some(m => candidate.family.members.some(v => v.skuId === m.skuId))) {
+          throw new WorkspaceProfileError("conflict", "A SKU already belongs to another reviewed family.", 409);
+        }
+      }
+      transaction.set(reviewHead, result);
+      transaction.create(reviewHead.collection("revisions").doc(String(result.revision)), result);
+      transaction.create(receipt, {fingerprint, record: result});
+      const publicationRevision = publicationDoc.exists ? integer(publicationDoc.get("revision"), 1, 999999999) : 1;
+      transaction.set(root.collection("variantPublication").doc("current"), {schemaVersion: 1,
+        realm: this.realm, storeId: store, revision: publicationRevision + 1});
+      return result;
+    });
   }
   private listingRoot() {
     return this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("publicListingBindings");
@@ -1097,7 +1519,7 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
     // This adapter never invents/reviews a canonical catalogue or seeds offer terms.
     return doc.exists ? doc.data() as CatalogueAggregate : undefined;
   }
-  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity): Promise<PublicCatalogueSource | undefined> {
+  async publicCatalogueSource(storeId: string, identity: CatalogueIdentity, includeFamilies = false): Promise<PublicCatalogueSource | undefined> {
     storeId = id(storeId);
     return this.firestore.runTransaction(async transaction => {
       const [profiles, catalogueDoc, skuDocs, policyDoc, detailsDoc] = await Promise.all([
@@ -1121,8 +1543,23 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
       const expected = records.flatMap(row => cataloguePublicListingBindings(this.realm, row));
       const docs = expected.length ? await transaction.getAll(...expected.map(row => this.listingRoot().doc(row.listingId))) : [];
       const bindings = docs.flatMap((doc, i) => doc.exists ? [checkedListingBinding(doc.data(), expected[i]!)] : []);
+      let variantFamilies: PublicCatalogueSource["variantFamilies"];
+      if (includeFamilies) {
+        const [reviews, publication] = await Promise.all([
+          transaction.get(this.root(storeId).collection("variantFamilyReviews").limit(201)),
+          transaction.get(this.root(storeId).collection("variantPublication").doc("current"))]);
+        if (reviews.size > 200 || reviews.size > 0 && !publication.exists) return undefined;
+        if (publication.exists && (publication.get("schemaVersion") !== 1 || publication.get("realm") !== this.realm ||
+            publication.get("storeId") !== storeId)) return undefined;
+        variantFamilies = {revision: publication.exists ? integer(publication.get("revision"), 1, 1000000000) : 1,
+          reviews: reviews.docs.map(doc => {
+            const row = checkedFamilyReview(doc.data());
+            if (row.candidate.family.familyId !== doc.id) invalid();
+            return row;
+          })};
+      }
       return {profile, catalogue, records, bindings, policy: policyDoc.exists ? policyDoc.data()! : null,
-        publicDetails: detailsDoc.exists ? detailsDoc.data()! : null};
+        publicDetails: detailsDoc.exists ? detailsDoc.data()! : null, ...(variantFamilies ? {variantFamilies} : {})};
     });
   }
   async publicListingBindings(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined> {
