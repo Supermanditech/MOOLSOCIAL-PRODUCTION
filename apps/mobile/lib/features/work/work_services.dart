@@ -3316,6 +3316,8 @@ class WorkPrivateProductPhotoStore {
   final bool Function() isCurrent;
   final Future<Directory> Function() _supportDirectory;
   static const _limit = 10 * 1024 * 1024;
+  // Match the existing public still-image policy; this does not grant approval.
+  static const _displaySide = 2048, _displayPixels = 4000000, _displayMinimumSide = 128;
 
   String get owner => crypto.sha256
       .convert(
@@ -3461,14 +3463,23 @@ class WorkPrivateProductPhotoStore {
           descriptor.width * descriptor.height > 32000000) {
         throw const WorkGatewayException('Choose a smaller product photo.');
       }
-      final ratio = min(1.0, 2400 / max(descriptor.width, descriptor.height));
+      final ratio = min(1.0, min(_displaySide / max(descriptor.width, descriptor.height),
+        sqrt(_displayPixels / (descriptor.width * descriptor.height))));
+      final targetWidth = max(1, (descriptor.width * ratio).floor());
+      final targetHeight = max(1, (descriptor.height * ratio).floor());
+      if (min(targetWidth, targetHeight) < _displayMinimumSide) {
+        throw const WorkGatewayException('Choose a less narrow product photo that stays clear when resized.');
+      }
       codec = await descriptor.instantiateCodec(
-        targetWidth: max(1, (descriptor.width * ratio).round()),
-        targetHeight: max(1, (descriptor.height * ratio).round()),
+        targetWidth: targetWidth,
+        targetHeight: targetHeight,
       );
       image = (await codec.getNextFrame()).image;
       width = image.width;
       height = image.height;
+      if (min(width, height) < _displayMinimumSide || max(width, height) > _displaySide || width * height > _displayPixels) {
+        throw const WorkGatewayException('Choose a product photo that stays clear when resized.');
+      }
       final encoded = await image.toByteData(format: ui.ImageByteFormat.png);
       if (encoded == null || encoded.lengthInBytes > _limit) {
         throw const WorkGatewayException('Choose a smaller product photo.');

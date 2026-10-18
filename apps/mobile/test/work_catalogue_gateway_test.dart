@@ -937,6 +937,60 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  group('LF03-MEDIA private codec display bounds', () {
+    late Directory directory;
+    final product = workspaceMasterCatalogue.first.copyWith(publicListing: false,
+      canonicalId: 'private-photo-codec-test', title: 'Codec test own product');
+    WorkPrivateProductPhotoStore store() => WorkPrivateProductPhotoStore(accountId: 'account-A', storeId: 'store-A',
+      evaluationOnly: true, isCurrent: () => true, supportDirectory: () async => directory);
+    // Codec fixtures only, never uploaded or inserted into native inventory.
+    Future<WorkPickedProof> selectedImage({required int width, required int height}) async {
+      final recorder = ui.PictureRecorder(); ui.Canvas(recorder).drawColor(const ui.Color(0xff676767), ui.BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(width, height);
+      try {
+        final data = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+        return WorkPickedProof(fileName: 'codec-test.png', contentType: 'image/png', bytes: data.buffer.asUint8List());
+      } finally { image.dispose(); picture.dispose(); }
+    }
+    setUp(() async { directory = await Directory.systemTemp.createTemp('store-private-photo-test-'); });
+    tearDown(() async { await directory.delete(recursive: true); }); // This test-created directory only.
+    for (final dimensions in [(3000, 3000), (4096, 2048), (2048, 4096), (2048, 2048), (4096, 256)]) {
+      test('actual saved PNG meets public display bounds ${dimensions.$1}x${dimensions.$2}', () async {
+        final photo = await store().save(product: product, picked: await selectedImage(width: dimensions.$1, height: dimensions.$2));
+        expect(photo.width, inInclusiveRange(128, 2048)); expect(photo.height, inInclusiveRange(128, 2048));
+        expect(photo.width * photo.height, lessThanOrEqualTo(4000000));
+        expect(photo.width, lessThanOrEqualTo(dimensions.$1)); expect(photo.height, lessThanOrEqualTo(dimensions.$2));
+        expect((photo.width * dimensions.$2 - photo.height * dimensions.$1).abs(), lessThanOrEqualTo(dimensions.$1 + dimensions.$2));
+        final saved = product.copyWith(privatePhoto: photo), bytes = await store().read(saved), codec = await ui.instantiateImageCodec(await store().read(saved));
+        try {
+          expect(codec.frameCount, 1);
+          final frame = await codec.getNextFrame();
+          try { expect(frame.image.width, photo.width); expect(frame.image.height, photo.height); }
+          finally { frame.image.dispose(); }
+        } finally { codec.dispose(); }
+        expect(sha256.convert(bytes).toString(), photo.sha256);
+        expect(saved.toBuyPublicProduct(storeName: '').mediaAssets, isEmpty, reason: 'Private codec facts are not publication approval.');
+        expect(await store().read(saved), orderedEquals(bytes));
+      });
+    }
+    test('extreme aspect cannot become a sub-minimum public derivative', () async {
+      await expectLater(store().save(product: product, picked: await selectedImage(width: 8192, height: 256)), throwsA(isA<WorkGatewayException>()));
+      expect(await directory.list(recursive: true).length, 0);
+    });
+    test('legacy private 2400px reference stays byte-identical and unapproved after restart', () async {
+      final bytes = (await selectedImage(width: 2400, height: 2400)).bytes;
+      final original = WorkspacePrivateProductPhoto(owner: store().owner, identity: WorkspacePrivateProductPhoto.identityOf(product),
+        sha256: sha256.convert(bytes).toString(), byteLength: bytes.length, width: 2400, height: 2400);
+      final identityHash = sha256.convert(utf8.encode(original.identity)).toString();
+      final legacyDirectory = await Directory('${directory.path}/store-product-photos-v1/${original.owner}').create(recursive: true);
+      final file = await File('${legacyDirectory.path}/$identityHash-${original.sha256}.png').create(exclusive: true);
+      await file.writeAsBytes(bytes, flush: true);
+      final restored = WorkspaceCatalogueItem.fromInventoryJson(jsonDecode(jsonEncode(product.copyWith(privatePhoto: original).toInventoryJson())));
+      expect(restored.privatePhoto!.toJson(), original.toJson()); expect(await store().read(restored), orderedEquals(bytes));
+      expect(await file.readAsBytes(), orderedEquals(bytes)); expect(restored.toBuyPublicProduct(storeName: '').mediaAssets, isEmpty);
+    });
+  });
   const submissionScope = (account: 'owner-one', store: 'store-one', realm: 'evaluation', sku: 'sku-one');
   WorkspaceProductSubmissionIntent submissionIntent() => WorkspaceProductSubmissionIntent(scope: submissionScope,
     expectedRevision: 0, idempotencyKey: 'product-original', input: WorkspaceProductSubmissionInput.fromSaved(listingItem()));
