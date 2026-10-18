@@ -8483,7 +8483,7 @@ function Invoke-Lf01Admission {
       $publicationBase='88aae0282aa555ad5c665286907ca6558197342d'
       Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$publicationBase,$head) | Out-Null
       $remote=@(Get-OctoberCompatibilityGitLines @('rev-parse',"origin/$($branch[0])"))
-      Assert-Coordination ($remote.Count -eq 1 -and $remote[0] -cin @($publicationBase,$head)) 'Continuation publication requires its exact fetched base or already-published candidate.'
+      Assert-Coordination ($remote.Count -eq 1 -and $remote[0] -cin @($publicationBase,'959d0f30d7261e39e9c27372a6516f909beba010',$head)) 'Continuation publication requires its exact fetched base, published continuation predecessor or already-published candidate.'
       $committedRecord=(@(Get-OctoberCompatibilityGitLines @('show',"${head}:$recordOwner")) -join "`n") | ConvertFrom-Json
       $publishedDelta=@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$publicationBase,$head))
       $continuationPublication=($null -ne $committedRecord.PSObject.Properties['frontendContinuation'] -and
