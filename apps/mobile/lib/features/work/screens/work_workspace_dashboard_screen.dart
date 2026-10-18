@@ -29721,6 +29721,7 @@ class _ExactOrderInformation extends StatelessWidget {
               Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w600)),
               _StoreMoneyLine(leading: Text('${line.quantityLabel} × ${_price(line.unitPriceMinor)}'),
                 value: _price(line.lineTotalMinor), style: const TextStyle(fontWeight: FontWeight.w600)),
+              WorkspaceOriginalBenefitsForLine(original: exact.original, lineId: line.lineId),
             ])),
       ],
       if (showAmounts) ...[

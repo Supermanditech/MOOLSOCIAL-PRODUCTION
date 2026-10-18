@@ -226,6 +226,181 @@ function receipt(suffix = "one"): TrustedPlacementReceipt {
 const rejectsCode = (code: string) => (e: unknown) =>
   e instanceof WorkspaceProfileError && e.code === code;
 
+function attributedReceipt() {
+  const legacy = receipt();
+  return {...legacy, schemaVersion: 2, stores: legacy.stores.map(s => ({...s,
+    benefitAttribution: {schemaVersion: 1, components: [
+      {componentId: "discount-component", benefitId: "supplier-coupon", benefitRevision: "benefit-v1",
+        label: "Supplier saving", publisherType: "supplier", effect: "instant_discount", amountBasis: "applied",
+        sourceReference: "trusted-benefit-one", funderReference: "private-funder-one", amountMinor: 51,
+        allocations: [{lineId: s.lines[0]!.sourceLineId, amountMinor: 51}]},
+      {componentId: "cashback-component", benefitId: "payment-offer", benefitRevision: "benefit-v2",
+        label: "Payment cashback offer", publisherType: "payment", effect: "cashback_offer", amountBasis: "maximum",
+        sourceReference: "trusted-benefit-two", funderReference: "private-funder-two", amountMinor: 25,
+        allocations: [{lineId: s.lines[0]!.sourceLineId, amountMinor: 25}]},
+    ]},
+  }))};
+}
+
+test("LF-ATTR trusted original attribution preserves exact line discount and separately quoted cashback", () => {
+  const input = attributedReceipt();
+  const result = normalizePlacement(input, "evaluation");
+  assert.deepEqual(result, input);
+  assert.equal(result.stores[0]!.totals.totalMinor, 10015);
+  assert.deepEqual(normalizePlacement(receipt(), "evaluation"), receipt(), "Legacy bytes/facts remain unchanged");
+});
+
+test("LF-ATTR supplied empty attribution is distinct from legacy unknown", () => {
+  const input = attributedReceipt();
+  input.stores.forEach(s => {
+    s.benefitAttribution.components = [];
+    s.totals.discountMinor = 0; s.totals.totalMinor += 51;
+  });
+  assert.deepEqual(normalizePlacement(input, "evaluation"), input);
+});
+
+for (const fault of ["missing", "null", "version", "extra", "unknown-line", "duplicate-component", "duplicate-line",
+  "publisher", "cashback-basis", "discount-basis", "fractional", "negative", "unsafe", "sum", "discount-total", "combined-gross"]) {
+  test(`LF-ATTR rejects ${fault} without inventing or repairing allocations`, () => {
+    const input = JSON.parse(JSON.stringify(attributedReceipt())) as {stores: Record<string, unknown>[]};
+    const store = input.stores[0]!, group = store.benefitAttribution as Record<string, unknown>;
+    const components = group.components as Record<string, unknown>[], first = components[0]!, cashback = components[1]!;
+    const allocations = first.allocations as Record<string, unknown>[];
+    if (fault === "missing") delete store.benefitAttribution;
+    if (fault === "null") store.benefitAttribution = null;
+    if (fault === "version") group.schemaVersion = 2;
+    if (fault === "extra") first.paid = true;
+    if (fault === "unknown-line") allocations[0]!.lineId = "source-two";
+    if (fault === "duplicate-component") components.push(structuredClone(first));
+    if (fault === "duplicate-line") allocations.push(structuredClone(allocations[0]!));
+    if (fault === "publisher") first.publisherType = "guessed";
+    if (fault === "cashback-basis") cashback.amountBasis = "applied";
+    if (fault === "discount-basis") first.amountBasis = "quoted";
+    if (fault === "fractional") first.amountMinor = 0.5;
+    if (fault === "negative") first.amountMinor = -1;
+    if (fault === "unsafe") first.amountMinor = Number.MAX_SAFE_INTEGER + 1;
+    if (fault === "sum") allocations[0]!.amountMinor = 50;
+    if (fault === "discount-total") {first.amountMinor = 50; allocations[0]!.amountMinor = 50;}
+    if (fault === "combined-gross") {
+      const lines = store.lines as Record<string, unknown>[];
+      lines.push({...lines[0], sourceLineId: "source-extra"});
+      const totals = store.totals as Record<string, unknown>;
+      totals.itemsMinor = 20102; totals.discountMinor = 12000; totals.totalMinor = 8117;
+      first.amountMinor = 6000; allocations[0]!.amountMinor = 6000;
+      components.push({...structuredClone(first), componentId: "second-discount-component"});
+    }
+    assert.throws(() => normalizePlacement(input, "evaluation"), rejectsCode("invalid_input"));
+  });
+}
+
+test("LF-ATTR actual materializer retains exact source allocations across restart and Store partitions", {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: "demo-lf-benefit-original"}, `benefits-${randomUUID()}`);
+  const db = getFirestore(app), suffix = randomUUID();
+  const input = {...attributedReceipt(), receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: 2 as const};
+  input.stores.forEach((s, i) => {
+    s.storeId = `store-${suffix}-${i}`; s.caseId = `case-${suffix}-${i}`; s.ownerUserId = `owner-${suffix}-${i}`;
+  });
+  for (const s of input.stores) await db.collection("workspaceProfiles").doc(s.caseId).set({
+    schemaVersion: 1, caseId: s.caseId, workspaceId: s.storeId, ownerUserId: s.ownerUserId,
+    familyId: "products-trade", profileId: "retailer-grocery", status: "live", shopEnabled: true,
+  });
+  try {
+    const source = {readFinalPlacement: async () => input as TrustedPlacementReceipt};
+    const writer = new WorkspacePurchaseProjectionService(db, "evaluation", source);
+    const created = await writer.materialize("original-benefit-source");
+    assert.deepEqual(await writer.materialize("original-benefit-source"), created);
+    const restarted = new WorkspacePurchaseProjectionService(db, "evaluation");
+    const buyer = await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId});
+    if (process.env.LF_ATTR_PROJECTION_CAPTURE === "true") {
+      console.log(`LF_ATTR_PROJECTION=${JSON.stringify(buyer)}`);
+    }
+    assert.equal(buyer.schemaVersion, 3); assert.equal(buyer.orders.length, 2);
+    for (const original of buyer.orders) {
+      assert.equal(original.factsVersion, 3);
+      assert.equal(original.original.totals.totalMinor, 10015);
+      assert.equal(original.original.benefitAttribution!.components[0]!.allocations[0]!.lineId, original.original.lines[0]!.lineId);
+      assert.equal(original.original.benefitAttribution!.components[1]!.amountBasis, "maximum");
+    }
+    const first = input.stores[0]!, order = buyer.orders.find(o => o.storeId === first.storeId)!;
+    const tuple = {purchaseId: buyer.purchaseId, storeId: order.storeId, orderId: order.orderId};
+    const seller = await restarted.readStore(first.ownerUserId, tuple);
+    assert.deepEqual(seller.orders, [order]);
+    assert.equal(JSON.stringify(seller).includes(input.stores[1]!.storeId), false);
+    assert.equal((await restarted.listStore(first.ownerUserId, {storeId: first.storeId, limit: 5, cursor: null})).references[0]!.originalFingerprint,
+      order.originalFingerprint);
+    const proof = {...operationalEvidence(), ...tuple, originalFingerprint: order.originalFingerprint, sourceRevision: buyer.sourceRevision};
+    const ops = new WorkspaceOrderOperationsService(db, "evaluation", {readOperationalOrder: async () => proof},
+      () => new Date("2026-10-16T12:00:00.000Z"));
+    await ops.initialize("benefit-operation-source");
+    const operational = await ops.read(first.ownerUserId, "seller", tuple);
+    assert.equal(operational.originalFactsVersion, 3); assert.deepEqual(operational.original, order.original);
+    const result = await ops.command(first.ownerUserId, {...tuple, version: 2, operationId: "STORE-ORDER-attribution_nonce==",
+      expectedRevision: 1, action: "accept", reason: null});
+    assert.deepEqual(result.snapshot.original, order.original);
+    assert.deepEqual((await ops.command(first.ownerUserId, {...tuple, version: 2, operationId: "STORE-ORDER-attribution_nonce==",
+      expectedRevision: 1, action: "accept", reason: null}, true)).snapshot.original, order.original);
+    const legacyInput: TrustedPlacementReceipt = {...input, schemaVersion: 1, receiptId: `legacy-${suffix}`,
+      stores: input.stores.map(({benefitAttribution: _attribution, ...store}) => store)};
+    const legacyWriter = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => legacyInput});
+    const legacyCreated = await legacyWriter.materialize("legacy-original-source");
+    const legacyRead = await restarted.readBuyer(input.buyerUserId, {purchaseId: legacyCreated.purchaseId});
+    assert.equal(legacyRead.schemaVersion, 2); assert.equal(legacyRead.buyerId, buyer.buyerId);
+    assert.equal(legacyRead.orders[0]!.original.benefitAttribution, undefined);
+    const mixedBuyer = await restarted.listBuyer(input.buyerUserId, {limit: 5, cursor: null});
+    assert.equal(new Set(mixedBuyer.references.map(r => r.purchaseId)).size, 2);
+    const mixedStore = await restarted.listStore(first.ownerUserId, {storeId: first.storeId, limit: 5, cursor: null});
+    assert.equal(mixedStore.references.length, 2);
+    for (const ref of mixedStore.references) {
+      const read = await restarted.readStore(first.ownerUserId, {purchaseId: ref.purchaseId, storeId: ref.storeId, orderId: ref.orderId});
+      assert.equal(read.orders[0]!.originalFingerprint, ref.originalFingerprint);
+    }
+    const component = input.stores[0]!.benefitAttribution.components[0]!;
+    component.amountMinor--; component.allocations[0]!.amountMinor--;
+    input.stores[0]!.totals.discountMinor--; input.stores[0]!.totals.totalMinor++;
+    await assert.rejects(writer.materialize("original-benefit-source"), rejectsCode("conflict"));
+    assert.deepEqual(await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
+test("LF-ATTR allocation-heavy source cannot commit an original exceeding client readback budget", {
+  skip: !process.env.FIRESTORE_EMULATOR_HOST,
+}, async () => {
+  assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+  const app = initializeApp({projectId: "demo-lf-benefit-budget"}, `budget-${randomUUID()}`);
+  const db = getFirestore(app), suffix = randomUUID();
+  const input: TrustedPlacementReceipt = {...receipt(), schemaVersion: 2, buyerUserId: `buyer-${suffix}`, receiptId: `receipt-${suffix}`};
+  input.stores.forEach((s, index) => {
+    s.storeId = `store-${suffix}-${index}`; s.caseId = `case-${suffix}-${index}`; s.ownerUserId = `owner-${suffix}-${index}`;
+    s.lines = Array.from({length: 100}, (_, i) => ({sourceLineId: `${index === 0 ? "a" : "b"}${String(i).padStart(2, "0")}`,
+      skuId: "sku", canonicalProductId: "prd", verifiedPackId: "pak", offerId: "ofr", offerRevision: "rev",
+      name: "d", packLabel: "p", quantityMilli: 1000, quantityUnit: "pack", unitPriceMinor: 10051, lineTotalMinor: 10051}));
+    s.totals = {...s.totals, itemsMinor: 1005100, discountMinor: 3200, totalMinor: 1001915};
+    s.benefitAttribution = {schemaVersion: 1, components: Array.from({length: 32}, (_, i) => ({
+      componentId: `component-${i}`, benefitId: `benefit-${i}`, benefitRevision: "rev", label: "x".repeat(200),
+      publisherType: "supplier", effect: "instant_discount", amountBasis: "applied", sourceReference: "src", funderReference: "fund",
+      amountMinor: 100, allocations: s.lines.map(l => ({lineId: l.sourceLineId, amountMinor: 1})),
+    }))};
+  });
+  assert.ok(Buffer.byteLength(JSON.stringify(normalizePlacement(input, "evaluation")), "utf8") < 300000,
+    "The original source must be valid below the established source bound");
+  for (const s of input.stores) await db.collection("workspaceProfiles").doc(s.caseId).set({
+    schemaVersion: 1, caseId: s.caseId, workspaceId: s.storeId, ownerUserId: s.ownerUserId,
+    familyId: "products-trade", profileId: "retailer-grocery", status: "live", shopEnabled: true,
+  });
+  try {
+    const service = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => input});
+    await assert.rejects(service.materialize("allocation-heavy-source"), rejectsCode("invalid_input"));
+    const root = db.collection("workspacePurchaseProjections").doc("evaluation");
+    assert.equal((await root.collection("purchases").where("buyerUserId", "==", input.buyerUserId).get()).empty, true);
+    const digest = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
+    assert.equal((await root.collection("buyers").doc(digest([input.authNamespace, input.buyerUserId])).get()).exists, false);
+    assert.equal((await root.collection("receipts").doc(digest([input.realm, input.authNamespace, input.buyerUserId, input.issuer, input.receiptId])).get()).exists, false);
+  } finally {await db.terminate(); await deleteApp(app);}
+});
+
 test("projection reads require default Firebase namespace, not UID equality across tenants", () => {
   requireDefaultPurchaseTenant(undefined);
   for (const tenant of ["tenant-one", "", null]) {

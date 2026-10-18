@@ -316,6 +316,7 @@ class _WorkspacePurchaseOriginalsState
                                   '${_quantity(line.quantityMilli)} ${line.quantityUnit} · ${line.packLabel}',
                                 ),
                                 _amount(line.lineTotalMinor),
+                                WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                               ],
                             ),
                           ),
@@ -394,6 +395,24 @@ class _WorkspacePurchaseOriginalsState
       );
     },
   );
+}
+
+/// Same immutable breakdown on buyer originals and Store operational details.
+/// No raw funding references, inferred savings, cashback success or new actions.
+class WorkspaceOriginalBenefitsForLine extends StatelessWidget {
+  const WorkspaceOriginalBenefitsForLine({super.key, required this.original, required this.lineId});
+  final WorkspacePurchaseOrder original;
+  final String lineId;
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    for (final component in original.benefitAttribution?.components ?? const <WorkspaceOriginalBenefitComponent>[])
+      if (component.allocations[lineId] case final amount?)
+        Padding(key: ValueKey('original-benefit-$lineId-${component.componentId}'),
+          padding: const EdgeInsets.only(top: 4), child: Text(component.isCashbackOffer
+            ? '${component.label} · ${component.amountBasis == 'maximum' ? 'Up to' : 'Quoted'} ${_money(amount)} cashback · confirmation pending'
+            : '${component.label} · Discount ${_money(amount)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4))),
+  ]);
 }
 
 String _quantity(int milli) {

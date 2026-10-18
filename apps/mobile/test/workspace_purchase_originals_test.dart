@@ -43,6 +43,66 @@ class _OrderPending implements WorkOrderPendingStore {
 }
 
 void main() {
+  for (final role in ['buyer', 'seller']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-ATTR supplied benefits render exact money without funding-reference leaks $role $scale', (tester) async {
+        await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+        tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final details = fixtures.attributedPurchaseResponse(role: role), order = details['orders'][0];
+        // The host has Inter but no Android Devanagari fallback. Use an explicit
+        // English layout fixture; the actual Unicode service response is tested
+        // separately through the strict client/hash boundary, not relabelled.
+        order['original']['lines'][0]['name'] = 'Evaluation dal';
+        fixtures.rehashPurchaseOrder(order as Map<String, dynamic>);
+        final refs = fixtures.referenceResponse(role: role);
+        refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = fixtures.Transport()..respond = (body) => body['operation'].toString().startsWith('list') ? refs : details;
+        final capture = GlobalKey();
+        await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp(theme: ThemeData(fontFamily: 'Inter'), home: Scaffold(body: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)), child: SingleChildScrollView(
+            child: WorkspacePurchaseOriginals(gateway: fixtures.projectionGateway(wire,
+              account: role == 'buyer' ? 'buyer-1' : 'owner-1'),
+              role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+              realm: 'evaluation', storeId: role == 'seller' ? 'store-one' : null)))))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+        expect(find.text('Supplier saving · Discount ₹0.51'), findsOneWidget);
+        expect(find.text('Payment cashback offer · Up to ₹0.25 cashback · confirmation pending'), findsOneWidget);
+        expect(find.text('₹100.15'), findsOneWidget);
+        expect(find.textContaining('private-funder'), findsNothing);
+        expect(find.textContaining('trusted-benefit'), findsNothing);
+        expect(find.textContaining('Cashback paid'), findsNothing);
+        expect(tester.takeException(), isNull);
+        const root = String.fromEnvironment('LF_ATTR_CAPTURE_ROOT');
+        if (root.isNotEmpty) {
+          await tester.ensureVisible(find.byKey(const ValueKey('original-benefit-line-one-cashback-component')));
+          await tester.pumpAndSettle();
+          final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+          await tester.runAsync(() async {
+            final directory = Directory(root); await directory.create(recursive: true);
+            final file = File('$root/original-benefits-$role-$scale.png');
+            expect(await file.exists(), isFalse, reason: 'Preserve previous visual evidence; use a new capture root');
+            final image = await boundary.toImage();
+            final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          });
+        }
+      });
+    }
+  }
+  for (final suppliedEmpty in [false, true]) {
+    testWidgets('LF-ATTR absent and explicitly empty attribution create no empty visual sections $suppliedEmpty', (tester) async {
+      final wire = fixtures.Transport()..data = suppliedEmpty ? fixtures.attributedPurchaseResponse(empty: true) : fixtures.purchaseResponse();
+      final original = (await fixtures.projectionGateway(wire).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2'))!.orders.single;
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOriginalBenefitsForLine(original: original, lineId: 'line-one'))));
+      expect(find.byType(Text), findsNothing);
+      expect(tester.getSize(find.byType(WorkspaceOriginalBenefitsForLine)).height, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
   for (final scale in [1.0, 2.0]) {
   testWidgets('ANALYTICS operational cold entry refresh and retirement use partial current positions $scale', (tester) async {
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -113,12 +173,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   }
-  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection')]) {
+  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
-    final raw = fixtures.operationalResponse(role: 'seller');
+    final raw = scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
+      : fixtures.operationalResponse(role: 'seller');
     if (scenario.$2 == 'collection') {
       raw['fulfilment'] = 'collection'; raw['stage'] = 'Preparing'; raw['permittedActions'] = <String>[];
     }
@@ -128,7 +189,11 @@ void main() {
     raw['fulfilmentDeadline'] = now.add(const Duration(hours: 2)).toIso8601String();
     final wire = fixtures.Transport();
     wire.respond = (body) {
-      if (body['operation'] == 'listStorePurchaseReferences') return fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one';
+      if (body['operation'] == 'listStorePurchaseReferences') {
+        final refs = fixtures.referenceResponse(role: 'seller')..['storeId'] = 'store-one';
+        refs['references'][0]['originalFingerprint'] = raw['originalFingerprint'];
+        return refs;
+      }
       if (body['operation'] == 'submitStoreOrderCommand') {
         raw['revision'] = (body['expectedRevision'] as int) + 1;
         raw['stage'] = body['action'] == 'accept' ? 'Preparing' : 'Ready';
@@ -170,7 +235,7 @@ void main() {
     await tester.tap(find.byKey(const Key('work-operational-ready-order-v2'))); await tester.pumpAndSettle();
     expect(work.workspaceOrders.single.stage, 'Ready');
     expect(find.text('Arrange delivery'), findsNothing);
-    } else {
+    } else if (scenario.$2 == 'collection') {
       expect(find.byKey(const Key('work-operational-pack-line-one')), findsNothing);
       expect(find.text('Collection actions are unavailable for this order.'), findsOneWidget);
       expect(tester.widget<FilledButton>(find.byKey(const Key('work-operational-ready-order-v2'))).onPressed, isNull);
@@ -182,6 +247,12 @@ void main() {
       expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
     }
     expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (scenario.$2 == 'attribution') {
+      expect(find.text('Supplier saving · Discount ₹0.51'), findsOneWidget);
+      expect(find.text('Payment cashback offer · Up to ₹0.25 cashback · confirmation pending'), findsOneWidget);
+      expect(find.textContaining('private-funder'), findsNothing);
+      expect(work.workspaceOrders.single.operational!.original.factsVersion, 3);
+    }
     if (const bool.fromEnvironment('MOOLSOCIAL_CAPTURE_OPERATIONAL_HOST')) {
       Future<void> captureView(String suffix) async {
         final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;

@@ -222,6 +222,25 @@ if ($RequireLfPublicationProbes) {
     Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @($reportOwner))) 'Unclaimed report fixture admitted.'
     $cases+=3
   }
+  if ($null -ne $continuation.PSObject.Properties['batch03OriginalAttribution']) {
+    foreach($owner in $continuation.batch03OriginalAttribution.owners) {
+      Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-attribution owner rejected.'
+      $cases++
+    }
+    foreach($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch03OriginalAttribution.PSObject.Properties.Remove($key)
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Original attribution missing $key admitted."
+      $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+      $probe.batch03OriginalAttribution.$key='unrelated'
+      Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) "Original attribution changed $key admitted."
+      $cases+=2
+    }
+    $probe=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $probe.batch03OriginalAttribution.owners+= 'backend/functions/src/index.ts'
+    Assert-Fixture (-not (Test-Lf27Batch01Continuation $probe @())) 'Original attribution widened into deployment/dispatch.'
+    $cases++
+  }
   if ($null -ne $continuation.PSObject.Properties['batch03PolicyRecovery']) {
     foreach ($owner in $continuation.batch03PolicyRecovery.owners) {
       Assert-Fixture (Test-Lf27Batch01Continuation $continuation @($owner)) 'Exact original-policy recovery owner rejected.'

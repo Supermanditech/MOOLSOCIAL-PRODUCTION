@@ -17,11 +17,25 @@ export interface PurchaseTotals {
 interface PlacementStore {
   storeId: string; caseId: string; ownerUserId: string;
   lines: PlacementLine[]; totals: PurchaseTotals;
+  benefitAttribution?: OriginalBenefitAttribution;
 }
+/** Immutable source facts only, not eligibility, redemption or cashback payment.
+ * On a placement receipt, allocation lineId references sourceLineId. The atomic
+ * materializer replaces it with the saved original lineId before persistence.
+ * Internal source/funder references are integrity data, not display labels. */
+export interface OriginalBenefitComponent {
+  componentId: string; benefitId: string; benefitRevision: string; label: string;
+  publisherType: "supplier" | "platform" | "payment";
+  effect: "instant_discount" | "cashback_offer";
+  amountBasis: "applied" | "quoted" | "maximum";
+  sourceReference: string; funderReference: string; amountMinor: number;
+  allocations: {lineId: string; amountMinor: number}[];
+}
+export interface OriginalBenefitAttribution {schemaVersion: 1; components: OriginalBenefitComponent[]}
 /** Server-owned FINAL PLACEMENT, not a quote, client command, payment or stock proof.
  * No real upstream implementation is configured in this local slice. */
 export interface TrustedPlacementReceipt {
-  schemaVersion: 1; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 1 | 2; realm: Realm; authNamespace: "firebase-default";
   finalPlacement: true; issuer: string; receiptId: string; revision: string;
   buyerUserId: string; stores: PlacementStore[];
 }
@@ -29,19 +43,22 @@ export interface FinalPlacementSource {
   readFinalPlacement(reference: string): Promise<TrustedPlacementReceipt | undefined>;
 }
 export interface PurchasedLine extends Omit<PlacementLine, "sourceLineId"> {lineId: string}
-export interface PurchaseOriginal {currency: "INR"; lines: PurchasedLine[]; totals: PurchaseTotals}
+export interface PurchaseOriginal {
+  currency: "INR"; lines: PurchasedLine[]; totals: PurchaseTotals;
+  benefitAttribution?: OriginalBenefitAttribution;
+}
 export interface PurchaseStoreProjection {
-  factsVersion: 2; storeId: string; orderId: string; original: PurchaseOriginal;
+  factsVersion: 2 | 3; storeId: string; orderId: string; original: PurchaseOriginal;
   originalFingerprint: string;
 }
 interface StoredOrder extends PurchaseStoreProjection {caseId: string; ownerUserId: string}
 interface PurchaseAggregate {
-  schemaVersion: 2; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 2 | 3; realm: Realm; authNamespace: "firebase-default";
   purchaseId: string; buyerUserId: string; buyerId: string; sourceRevision: string;
   sourceFingerprint: string; createdAt: string; orders: StoredOrder[]; integrity: string;
 }
 export interface PurchaseProjection {
-  schemaVersion: 2; realm: Realm; authNamespace: "firebase-default";
+  schemaVersion: 2 | 3; realm: Realm; authNamespace: "firebase-default";
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; buyerId: string; sourceRevision: string;
   // Not a mutable payment/fulfilment/eligibility status.
@@ -138,6 +155,7 @@ export interface OperationalOrderSnapshot {
   viewerRole: "buyer" | "seller"; viewerUserId: string;
   purchaseId: string; storeId: string; orderId: string;
   sourceRevision: string; originalFingerprint: string; original: PurchaseOriginal;
+  originalFactsVersion?: 3;
   operationalSourceRevision: string; revision: number; stage: OperationalOrderStage;
   fulfilment: "delivery" | "collection"; placedAt: string;
   acceptanceDeadline: string | null; fulfilmentDeadline: string | null;
@@ -218,6 +236,7 @@ export class WorkspaceOrderOperationsService {
     return {schemaVersion: 1, realm: this.realm, authNamespace: "firebase-default",
       viewerRole: role, viewerUserId: actor, purchaseId: a.purchaseId, storeId: o.storeId, orderId: o.orderId,
       sourceRevision: a.sourceRevision, originalFingerprint: o.originalFingerprint, original: o.original,
+      ...(o.factsVersion === 3 ? {originalFactsVersion: 3 as const} : {}),
       operationalSourceRevision: p.revision, revision: record.revision, stage: record.stage,
       fulfilment: p.fulfilment, placedAt: p.placedAt, acceptanceDeadline: p.acceptanceDeadline,
       fulfilmentDeadline: p.fulfilmentDeadline, permittedActions: role === "seller" ? this.permitted(record) : [],
@@ -375,6 +394,43 @@ function array(v: unknown, max: number): unknown[] {
   return v;
 }
 function unique(values: string[]): void {if (new Set(values).size !== values.length) fail();}
+function benefits(value: unknown, lines: readonly {lineId: string; lineTotalMinor: number}[],
+  discountMinor: number): OriginalBenefitAttribution {
+  const raw = exact(value, ["schemaVersion", "components"]);
+  if (raw.schemaVersion !== 1 || !Array.isArray(raw.components) || raw.components.length > 32) fail();
+  const gross = new Map(lines.map(l => [l.lineId, BigInt(l.lineTotalMinor)]));
+  const discounts = new Map<string, bigint>();
+  let totalDiscount = 0n;
+  const components = raw.components.map(value => {
+    const c = exact(value, ["componentId", "benefitId", "benefitRevision", "label", "publisherType",
+      "effect", "amountBasis", "sourceReference", "funderReference", "amountMinor", "allocations"]);
+    if (typeof c.publisherType !== "string" || !["supplier", "platform", "payment"].includes(c.publisherType) ||
+        (c.effect !== "instant_discount" && c.effect !== "cashback_offer") ||
+        (c.effect === "instant_discount" ? c.amountBasis !== "applied" :
+          c.amountBasis !== "quoted" && c.amountBasis !== "maximum")) fail();
+    const amountMinor = integer(c.amountMinor);
+    const allocations = array(c.allocations, 100).map(value => {
+      const a = exact(value, ["lineId", "amountMinor"]);
+      const lineId = id(a.lineId), amountMinor = integer(a.amountMinor);
+      if (!gross.has(lineId)) fail();
+      if (c.effect === "instant_discount") {
+        discounts.set(lineId, (discounts.get(lineId) ?? 0n) + BigInt(amountMinor));
+      }
+      return {lineId, amountMinor};
+    });
+    unique(allocations.map(a => a.lineId));
+    if (allocations.reduce((sum, a) => sum + BigInt(a.amountMinor), 0n) !== BigInt(amountMinor)) fail();
+    if (c.effect === "instant_discount") totalDiscount += BigInt(amountMinor);
+    return {componentId: id(c.componentId), benefitId: id(c.benefitId), benefitRevision: id(c.benefitRevision),
+      label: text(c.label), publisherType: c.publisherType as OriginalBenefitComponent["publisherType"],
+      effect: c.effect as OriginalBenefitComponent["effect"], amountBasis: c.amountBasis as OriginalBenefitComponent["amountBasis"],
+      sourceReference: id(c.sourceReference), funderReference: id(c.funderReference), amountMinor, allocations};
+  });
+  unique(components.map(c => c.componentId));
+  if (totalDiscount !== BigInt(discountMinor) ||
+      [...discounts].some(([lineId, amount]) => amount > gross.get(lineId)!)) fail();
+  return {schemaVersion: 1, components};
+}
 function totals(v: unknown, items: number): PurchaseTotals {
   const raw = exact(v, totalKeys);
   const result = Object.fromEntries(totalKeys.map(k => [k, integer(raw[k])])) as unknown as PurchaseTotals;
@@ -401,18 +457,21 @@ function line(v: unknown): PlacementLine {
 export function normalizePlacement(value: unknown, realm: Realm): TrustedPlacementReceipt {
   const r = exact(value, ["schemaVersion", "realm", "authNamespace", "finalPlacement", "issuer",
     "receiptId", "revision", "buyerUserId", "stores"]);
-  if (r.schemaVersion !== 1 || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+  if ((r.schemaVersion !== 1 && r.schemaVersion !== 2) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
       r.finalPlacement !== true || !["evaluation", "production"].includes(realm)) fail();
   const stores = array(r.stores, 10).map(raw => {
-    const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals"]);
+    const s = exact(raw, ["storeId", "caseId", "ownerUserId", "lines", "totals",
+      ...(r.schemaVersion === 2 ? ["benefitAttribution"] : [])]);
     const lines = array(s.lines, 100).map(line).sort((a,b) => compare(a.sourceLineId, b.sourceLineId));
     unique(lines.map(l => l.sourceLineId));
-    return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId),
-      lines, totals: totals(s.totals, lines.reduce((sum, l) => sum + l.lineTotalMinor, 0))};
+    const amounts = totals(s.totals, lines.reduce((sum, l) => sum + l.lineTotalMinor, 0));
+    return {storeId: id(s.storeId), caseId: id(s.caseId), ownerUserId: id(s.ownerUserId), lines, totals: amounts,
+      ...(r.schemaVersion === 2 ? {benefitAttribution: benefits(s.benefitAttribution,
+        lines.map(l => ({lineId: l.sourceLineId, lineTotalMinor: l.lineTotalMinor})), amounts.discountMinor)} : {})};
   }).sort((a,b) => compare(a.storeId, b.storeId));
   unique(stores.map(s => s.storeId)); unique(stores.map(s => s.caseId));
   if (stores.reduce((sum, s) => sum + s.lines.length, 0) > 200) fail();
-  const result: TrustedPlacementReceipt = {schemaVersion: 1, realm, authNamespace: "firebase-default",
+  const result: TrustedPlacementReceipt = {schemaVersion: r.schemaVersion, realm, authNamespace: "firebase-default",
     finalPlacement: true, issuer: id(r.issuer), receiptId: id(r.receiptId), revision: id(r.revision),
     buyerUserId: id(r.buyerUserId), stores};
   // Strictly below Firestore's 1MiB aggregate bound, including generated IDs.
@@ -429,20 +488,21 @@ function requireStore(value: unknown, expected: {caseId: string; storeId: string
       p.status !== "live" || p.shopEnabled !== true) fail("not_found", 404);
 }
 export function purchaseOriginalFingerprint(storeId: string, orderId: string, original: PurchaseOriginal): string {
-  return digest({factsVersion: 2, storeId, orderId, original});
+  return digest({factsVersion: original.benefitAttribution === undefined ? 2 : 3, storeId, orderId, original});
 }
 function validateAggregate(value: unknown, purchaseId: string, realm: Realm): PurchaseAggregate {
   try {
     const r = exact(value, ["schemaVersion", "realm", "authNamespace", "purchaseId", "buyerUserId",
       "buyerId", "sourceRevision", "sourceFingerprint", "createdAt", "orders", "integrity"]);
-    if (r.schemaVersion !== 2 || r.realm !== realm || r.authNamespace !== "firebase-default" ||
+    if ((r.schemaVersion !== 2 && r.schemaVersion !== 3) || r.realm !== realm || r.authNamespace !== "firebase-default" ||
         r.purchaseId !== purchaseId || !/^[a-f0-9]{64}$/u.test(String(r.sourceFingerprint))) fail();
     id(r.buyerUserId); id(r.buyerId); id(r.sourceRevision);
     if (typeof r.createdAt !== "string" || new Date(r.createdAt).toISOString() !== r.createdAt) fail();
     const orders = array(r.orders, 10).map(raw => {
       const o = exact(raw, ["factsVersion", "storeId", "orderId", "original", "originalFingerprint", "caseId", "ownerUserId"]);
-      if (o.factsVersion !== 2) fail();
-      const original = exact(o.original, ["currency", "lines", "totals"]);
+      if (o.factsVersion !== r.schemaVersion) fail();
+      const original = exact(o.original, ["currency", "lines", "totals",
+        ...(o.factsVersion === 3 ? ["benefitAttribution"] : [])]);
       if (original.currency !== "INR") fail();
       const lines = array(original.lines, 100).map(rawLine => {
         const l = exact(rawLine, [...lineKeys.filter(k => k !== "sourceLineId"), "lineId"]);
@@ -453,7 +513,8 @@ function validateAggregate(value: unknown, purchaseId: string, realm: Realm): Pu
       unique(lines.map(l => l.lineId));
       const canonical: PurchaseOriginal = {currency: "INR", lines,
         totals: totals(original.totals, lines.reduce((sum,l) => sum + l.lineTotalMinor, 0))};
-      const result: StoredOrder = {factsVersion: 2, storeId: id(o.storeId), orderId: id(o.orderId),
+      if (o.factsVersion === 3) canonical.benefitAttribution = benefits(original.benefitAttribution, lines, canonical.totals.discountMinor);
+      const result: StoredOrder = {factsVersion: o.factsVersion as 2 | 3, storeId: id(o.storeId), orderId: id(o.orderId),
         original: canonical, originalFingerprint: String(o.originalFingerprint),
         caseId: id(o.caseId), ownerUserId: id(o.ownerUserId)};
       if (result.originalFingerprint !== purchaseOriginalFingerprint(result.storeId, result.orderId, canonical)) fail();
@@ -517,13 +578,25 @@ export class WorkspacePurchaseProjectionService {
           return {lineId, ...facts};
         }).sort((a,b) => compare(a.lineId, b.lineId));
         const original: PurchaseOriginal = {currency: "INR", lines, totals: s.totals};
-        return {factsVersion: 2, storeId: s.storeId, orderId: s.orderId, original,
+        if (s.benefitAttribution !== undefined) {
+          const savedIds = new Map(s.lines.map(l => [l.sourceLineId, l.lineId]));
+          original.benefitAttribution = {...s.benefitAttribution, components: s.benefitAttribution.components.map(c => ({
+            ...c, allocations: c.allocations.map(a => ({...a, lineId: savedIds.get(a.lineId)!})),
+          }))};
+        }
+        return {factsVersion: input.schemaVersion === 2 ? 3 : 2, storeId: s.storeId, orderId: s.orderId, original,
           originalFingerprint: purchaseOriginalFingerprint(s.storeId, s.orderId, original),
           caseId: s.caseId, ownerUserId: s.ownerUserId};
       });
-      const body = {schemaVersion: 2 as const, realm: this.realm, authNamespace: "firebase-default" as const,
+      const body = {schemaVersion: (input.schemaVersion === 2 ? 3 : 2) as 2 | 3, realm: this.realm, authNamespace: "firebase-default" as const,
         purchaseId, buyerUserId: input.buyerUserId, buyerId, sourceRevision: input.revision,
         sourceFingerprint, createdAt, orders};
+      // Saved UUID line IDs expand each allocation. Bound the actual buyer
+      // projection, not only source bytes, before any transaction creates.
+      // Leave room below the existing 512KiB client cap for operational context
+      // and the response envelope. Never truncate immutable original facts.
+      const projection = this.projection(body, input.buyerUserId, "buyer", orders);
+      if (Buffer.byteLength(JSON.stringify({ok: true, data: projection}), "utf8") > 480 * 1024) fail();
       tx.create(this.root().collection("purchases").doc(purchaseId), {...body, integrity: integrityHash(body)});
       for (const order of orders) tx.create(this.referencePath(order), this.pointer(body, order));
       tx.create(receipt, {purchaseId, sourceFingerprint});
@@ -660,8 +733,9 @@ export class WorkspacePurchaseProjectionService {
     });
   }
 
-  private projection(a: PurchaseAggregate, actor: string, role: "buyer" | "seller", orders: StoredOrder[]): PurchaseProjection {
-    return {schemaVersion: 2, realm: this.realm, authNamespace: "firebase-default",
+  private projection(a: Pick<PurchaseAggregate, "schemaVersion" | "purchaseId" | "buyerId" | "sourceRevision">,
+    actor: string, role: "buyer" | "seller", orders: StoredOrder[]): PurchaseProjection {
+    return {schemaVersion: a.schemaVersion, realm: this.realm, authNamespace: "firebase-default",
       viewerRole: role, viewerUserId: actor, purchaseId: a.purchaseId, buyerId: a.buyerId,
       sourceRevision: a.sourceRevision, state: "original_facts",
       orders: orders.map(({caseId: _caseId, ownerUserId: _owner, ...publicFacts}) => publicFacts)};

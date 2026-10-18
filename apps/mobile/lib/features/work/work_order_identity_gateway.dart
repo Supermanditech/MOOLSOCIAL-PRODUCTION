@@ -325,7 +325,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] != 2 ||
+      if (data['schemaVersion'] is! int || !const [2, 3].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -344,7 +344,8 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         return null;
       }
       final orders = rawOrders.map(_decodePurchaseOrder).toList();
-      if (orders.map((o) => o.storeId).toSet().length != orders.length ||
+      if (orders.any((o) => o.factsVersion != data['schemaVersion']) ||
+          orders.map((o) => o.storeId).toSet().length != orders.length ||
           orders.map((o) => o.orderId).toSet().length != orders.length ||
           orders.fold<int>(0, (sum, o) => sum + o.lines.length) > 200 ||
           role == WorkspaceOrderIdentityRole.seller &&
@@ -665,7 +666,12 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
     String realm,
     WorkspacePurchaseReference ref,
   ) {
-    final data = _exactMap(value, [
+    final source = _map(value);
+    final enriched = source.containsKey('originalFactsVersion');
+    if (enriched && (source['originalFactsVersion'] is! int || source['originalFactsVersion'] != 3)) {
+      throw const FormatException('Unsupported original facts.');
+    }
+    final data = _exactMap(source, [
       'schemaVersion',
       'realm',
       'authNamespace',
@@ -677,6 +683,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       'sourceRevision',
       'originalFingerprint',
       'original',
+      if (enriched) 'originalFactsVersion',
       'operationalSourceRevision',
       'revision',
       'stage',
@@ -761,7 +768,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       throw const FormatException();
     }
     final original = _decodePurchaseOrder({
-      'factsVersion': 2,
+      'factsVersion': enriched ? 3 : 2,
       'storeId': ref.storeId,
       'orderId': ref.orderId,
       'originalFingerprint': ref.originalFingerprint,
@@ -978,11 +985,41 @@ class WorkspacePurchaseOrder {
     required this.originalFingerprint,
     required List<WorkspacePurchasedSkuLine> lines,
     required Map<String, int> totals,
+    this.benefitAttribution,
   }) : lines = List.unmodifiable(lines),
        totals = Map.unmodifiable(totals);
   final String storeId, orderId, originalFingerprint;
   final List<WorkspacePurchasedSkuLine> lines;
   final Map<String, int> totals;
+  final WorkspaceOriginalBenefitAttribution? benefitAttribution;
+  int get factsVersion => benefitAttribution == null ? 2 : 3;
+}
+
+/// Frozen final-placement facts, not current coupons or cashback entitlement.
+class WorkspaceOriginalBenefitAttribution {
+  WorkspaceOriginalBenefitAttribution._(List<WorkspaceOriginalBenefitComponent> components)
+    : components = List.unmodifiable(components);
+  final List<WorkspaceOriginalBenefitComponent> components;
+  Map<String, Object> toJson() => {'schemaVersion': 1, 'components': components.map((c) => c.toJson()).toList()};
+}
+
+class WorkspaceOriginalBenefitComponent {
+  WorkspaceOriginalBenefitComponent._({required this.componentId, required this.benefitId,
+    required this.benefitRevision, required this.label, required this.publisherType,
+    required this.effect, required this.amountBasis, required this.sourceReference,
+    required this.funderReference, required this.amountMinor, required Map<String, int> allocations})
+    : allocations = Map.unmodifiable(allocations);
+  final String componentId, benefitId, benefitRevision, label, publisherType, effect, amountBasis;
+  // Opaque provenance only. Never render internal references as customer copy.
+  final String sourceReference, funderReference;
+  final int amountMinor;
+  final Map<String, int> allocations;
+  bool get isCashbackOffer => effect == 'cashback_offer';
+  Map<String, Object> toJson() => {'componentId': componentId, 'benefitId': benefitId,
+    'benefitRevision': benefitRevision, 'label': label, 'publisherType': publisherType,
+    'effect': effect, 'amountBasis': amountBasis, 'sourceReference': sourceReference,
+    'funderReference': funderReference, 'amountMinor': amountMinor,
+    'allocations': allocations.entries.map((a) => {'lineId': a.key, 'amountMinor': a.value}).toList()};
 }
 
 class WorkspacePurchasedSkuLine {
@@ -1070,6 +1107,57 @@ bool _purchaseText(Object? v) =>
     v.length <= 240 &&
     !RegExp(r'[\x00-\x1f]').hasMatch(v);
 
+WorkspaceOriginalBenefitAttribution _decodeBenefits(Object? value, List<WorkspacePurchasedSkuLine> lines, int discountMinor) {
+  final group = _exactMap(value, const ['schemaVersion', 'components']);
+  final raw = group['components'];
+  if (group['schemaVersion'] is! int || group['schemaVersion'] != 1 || raw is! List || raw.length > 32) {
+    throw const FormatException('Unsupported original benefits.');
+  }
+  final gross = {for (final line in lines) line.lineId: BigInt.from(line.lineTotalMinor)};
+  final discounts = <String, BigInt>{}, ids = <String>{};
+  var totalDiscount = BigInt.zero;
+  final components = <WorkspaceOriginalBenefitComponent>[];
+  for (final item in raw) {
+    final c = _exactMap(item, const ['componentId', 'benefitId', 'benefitRevision', 'label',
+      'publisherType', 'effect', 'amountBasis', 'sourceReference', 'funderReference', 'amountMinor', 'allocations']);
+    if (const ['componentId', 'benefitId', 'benefitRevision', 'sourceReference', 'funderReference'].any((key) => !_id(c[key])) ||
+        !ids.add(c['componentId'] as String) || !_purchaseText(c['label']) || !_purchaseMoney(c['amountMinor']) ||
+        !const ['supplier', 'platform', 'payment'].contains(c['publisherType']) ||
+        !const ['instant_discount', 'cashback_offer'].contains(c['effect']) ||
+        (c['effect'] == 'instant_discount' ? c['amountBasis'] != 'applied' :
+          !const ['quoted', 'maximum'].contains(c['amountBasis']))) {
+      throw const FormatException('Invalid original benefit.');
+    }
+    final values = c['allocations'];
+    if (values is! List || values.isEmpty || values.length > 100) throw const FormatException('Invalid original allocations.');
+    final allocations = <String, int>{};
+    var sum = BigInt.zero;
+    for (final value in values) {
+      final a = _exactMap(value, const ['lineId', 'amountMinor']);
+      if (!_id(a['lineId']) || !_purchaseMoney(a['amountMinor']) ||
+          !gross.containsKey(a['lineId']) || allocations.containsKey(a['lineId'])) {
+        throw const FormatException('Invalid original allocation.');
+      }
+      final lineId = a['lineId'] as String, amount = a['amountMinor'] as int;
+      allocations[lineId] = amount;
+      sum += BigInt.from(amount);
+      if (c['effect'] == 'instant_discount') discounts[lineId] = (discounts[lineId] ?? BigInt.zero) + BigInt.from(amount);
+    }
+    if (sum != BigInt.from(c['amountMinor'] as int)) throw const FormatException('Contradictory original allocation.');
+    if (c['effect'] == 'instant_discount') totalDiscount += sum;
+    components.add(WorkspaceOriginalBenefitComponent._(componentId: c['componentId'] as String,
+      benefitId: c['benefitId'] as String, benefitRevision: c['benefitRevision'] as String,
+      label: c['label'] as String, publisherType: c['publisherType'] as String,
+      effect: c['effect'] as String, amountBasis: c['amountBasis'] as String,
+      sourceReference: c['sourceReference'] as String, funderReference: c['funderReference'] as String,
+      amountMinor: c['amountMinor'] as int, allocations: allocations));
+  }
+  if (totalDiscount != BigInt.from(discountMinor) || discounts.entries.any((entry) => entry.value > gross[entry.key]!)) {
+    throw const FormatException('Contradictory original discounts.');
+  }
+  return WorkspaceOriginalBenefitAttribution._(components);
+}
+
 WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
   final data = _exactMap(value, const [
     'factsVersion',
@@ -1078,15 +1166,17 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
     'original',
     'originalFingerprint',
   ]);
-  if (data['factsVersion'] != 2 ||
+  final version = data['factsVersion'];
+  if (version is! int || !const [2, 3].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
   }
-  final original = _exactMap(data['original'], const [
+  final original = _exactMap(data['original'], [
     'currency',
     'lines',
     'totals',
+    if (version == 3) 'benefitAttribution',
   ]);
   final rawLines = original['lines'];
   if (original['currency'] != 'INR' ||
@@ -1163,17 +1253,19 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
               totals['tipMinor']!) {
     throw const FormatException('Contradictory order total.');
   }
+  final attribution = version == 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
   final hash = sha256
       .convert(
         utf8.encode(
           jsonEncode({
-            'factsVersion': 2,
+            'factsVersion': version,
             'storeId': data['storeId'],
             'orderId': data['orderId'],
             'original': {
               'currency': 'INR',
               'lines': lines.map((l) => l.toJson()).toList(),
               'totals': totals,
+              if (attribution != null) 'benefitAttribution': attribution.toJson(),
             },
           }),
         ),
@@ -1188,5 +1280,6 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
     originalFingerprint: hash,
     lines: lines,
     totals: totals,
+    benefitAttribution: attribution,
   );
 }

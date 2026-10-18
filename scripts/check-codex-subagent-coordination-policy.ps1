@@ -8091,6 +8091,25 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
         (@($export.owners|Sort-Object) -join '|') -cne (@($exportOwners|Sort-Object) -join '|')) { return $false }
     $allowedOwners += $exportOwners
   }
+  if ($null -ne $Continuation.PSObject.Properties['batch03OriginalAttribution']) {
+    $original=$Continuation.batch03OriginalAttribution
+    $originalOwners=@('backend/functions/src/workspace/workspace_purchase_projection_service.ts',
+      'backend/functions/src/workspace/workspace_purchase_projection_service.test.ts',
+      'apps/mobile/lib/features/work/work_order_identity_gateway.dart',
+      'apps/mobile/test/work_order_identity_gateway_test.dart',
+      'apps/mobile/lib/features/work/widgets/workspace_purchase_originals.dart',
+      'apps/mobile/test/workspace_purchase_originals_test.dart',
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart')
+    if ($null -eq $original -or $original -isnot [pscustomobject]) { return $false }
+    foreach ($key in @('ticket','batch','sourceCheckpoint','state','owners')) {
+      if ($null -eq $original.PSObject.Properties[$key]) { return $false }
+    }
+    if ($original.ticket -cne 'LF-08-C02/LF-10-C01' -or $original.batch -ne 3 -or
+        $original.sourceCheckpoint -cne 'c8c10fe7779ce05d3518611baaacd0f880445a00' -or
+        $original.state -cne 'standing_authorized_minimum_original_attribution_extension' -or
+        (@($original.owners|Sort-Object) -join '|') -cne (@($originalOwners|Sort-Object) -join '|')) { return $false }
+    $allowedOwners += $originalOwners
+  }
   if ($null -ne $Continuation.PSObject.Properties['batch03PolicyRecovery']) {
     $recovery=$Continuation.batch03PolicyRecovery
     $recoveryOwners=@('apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart',

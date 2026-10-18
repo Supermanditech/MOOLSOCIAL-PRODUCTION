@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
@@ -89,6 +90,97 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  if (Platform.environment['LF_ATTR_PROJECTION_LOG'] case final path?) {
+    test('LF-ATTR actual emulator response crosses the strict Dart fingerprint boundary', () async {
+      const marker = 'LF_ATTR_PROJECTION=';
+      final row = File(path).readAsLinesSync().singleWhere((line) => line.contains(marker));
+      final data = (jsonDecode(row.substring(row.indexOf(marker) + marker.length)) as Map).cast<String, dynamic>();
+      final wire = Transport()..data = data;
+      final result = await projectionGateway(wire, account: data['viewerUserId'] as String).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId'] as String);
+      expect(result, isNotNull); expect(result!.orders, hasLength(2));
+      for (final order in result.orders) {
+        final original = (data['orders'] as List).singleWhere((raw) => raw['orderId'] == order.orderId);
+        expect(order.benefitAttribution!.toJson(), original['original']['benefitAttribution']);
+        expect(order.originalFingerprint, original['originalFingerprint']);
+      }
+    });
+  }
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'missing attribution': (d) => d['orders'][0]['original'].remove('benefitAttribution'),
+    'null attribution': (d) => d['orders'][0]['original']['benefitAttribution'] = null,
+    'unknown attribution version': (d) => d['orders'][0]['original']['benefitAttribution']['schemaVersion'] = 2,
+    'unlabelled cashback basis': (d) => d['orders'][0]['original']['benefitAttribution']['components'][1]['amountBasis'] = 'applied',
+    'discount basis': (d) => d['orders'][0]['original']['benefitAttribution']['components'][0]['amountBasis'] = 'quoted',
+    'cross-line allocation': (d) => d['orders'][0]['original']['benefitAttribution']['components'][0]['allocations'][0]['lineId'] = 'foreign-line',
+    'fractional paise': (d) => d['orders'][0]['original']['benefitAttribution']['components'][0]['amountMinor'] = 51.5,
+    'negative paise': (d) => d['orders'][0]['original']['benefitAttribution']['components'][0]['amountMinor'] = -1,
+    'inconsistent component sum': (d) => d['orders'][0]['original']['benefitAttribution']['components'][0]['allocations'][0]['amountMinor'] = 50,
+    'extra claimed payment': (d) => d['orders'][0]['original']['benefitAttribution']['components'][1]['paid'] = true,
+    'legacy downgrade': (d) {d['schemaVersion'] = 2; d['orders'][0]['factsVersion'] = 2;},
+    'contradictory envelope version': (d) => d['schemaVersion'] = 2,
+  }.entries) {
+    test('LF-ATTR rejects ${fault.key} even with a recomputed untrusted envelope hash', () async {
+      final data = (jsonDecode(jsonEncode(attributedPurchaseResponse())) as Map).cast<String, dynamic>();
+      fault.value(data);
+      rehashPurchaseOrder(data['orders'][0] as Map<String, dynamic>);
+      final wire = Transport()..data = data;
+      expect(await projectionGateway(wire).readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+        realm: 'evaluation', purchaseId: 'purchase-v2'), isNull);
+    });
+  }
+  for (final marker in [null, 2, true, 3.0]) {
+    test('LF-ATTR invalid operational original version cannot silently downgrade $marker', () async {
+      final raw = attributedOperationalResponse()..['originalFactsVersion'] = marker;
+      final order = attributedPurchaseResponse()['orders'][0];
+      final reference = WorkspacePurchaseReference(purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2',
+        sourceRevision: 'revision-1', originalFingerprint: order['originalFingerprint']);
+      final wire = Transport()..data = raw;
+      expect(await AuthenticatedWorkspaceOrderOperationsGateway(projectionGateway(wire)).read(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', reference: reference), isNull);
+    });
+  }
+  test('LF-ATTR known none and unknown legacy remain distinct and immutable', () async {
+    final wire = Transport()..data = attributedPurchaseResponse(empty: true);
+    final gateway = projectionGateway(wire);
+    final known = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!;
+    expect(known.orders.single.benefitAttribution!.components, isEmpty);
+    expect(() => known.orders.single.benefitAttribution!.components.clear(), throwsUnsupportedError);
+    wire.data = purchaseResponse();
+    final legacy = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!;
+    expect(legacy.orders.single.benefitAttribution, isNull);
+    wire.data = attributedPurchaseResponse();
+    final supplied = (await gateway.readPurchaseProjection(role: WorkspaceOrderIdentityRole.buyer,
+      realm: 'evaluation', purchaseId: 'purchase-v2'))!;
+    expect(() => supplied.orders.single.benefitAttribution!.components.first.allocations.clear(), throwsUnsupportedError);
+  });
+  for (final role in ['buyer', 'seller']) {
+    test('LF-ATTR original $role consumer admits source supplied attribution without changing money', () async {
+      final wire = Transport()..data = attributedPurchaseResponse(role: role);
+      final value = await projectionGateway(wire, account: role == 'buyer' ? 'buyer-1' : 'owner-1').readPurchaseProjection(
+        role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+        realm: 'evaluation', purchaseId: 'purchase-v2', storeId: role == 'seller' ? 'store-one' : null,
+        orderId: role == 'seller' ? 'order-v2' : null);
+      expect(value, isNotNull);
+      expect(value!.orders.single.totals['totalMinor'], 10015);
+    });
+    test('LF-ATTR operational $role consumer retains original new-version facts', () async {
+      final purchase = attributedPurchaseResponse(role: role), order = purchase['orders'][0];
+      final raw = operationalResponse(role: role)..['originalFactsVersion'] = 3
+        ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
+      final wire = Transport()..data = raw;
+      final reference = WorkspacePurchaseReference(purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2',
+        sourceRevision: 'revision-1', originalFingerprint: order['originalFingerprint']);
+      final result = await AuthenticatedWorkspaceOrderOperationsGateway(
+        projectionGateway(wire, account: role == 'buyer' ? 'buyer-1' : 'owner-1')).read(
+          role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+          realm: 'evaluation', reference: reference);
+      expect(result, isNotNull);
+      expect(result!.original.totals['totalMinor'], 10015);
+    });
+  }
   for (final reconcile in [false, true]) {
     for (final action in ['accept', 'ready', 'reject']) {
       test(
@@ -865,6 +957,41 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
       },
     ],
   };
+}
+
+Map<String, dynamic> attributedPurchaseResponse({String role = 'buyer', bool empty = false}) {
+  final response = purchaseResponse(role: role)..['schemaVersion'] = 3;
+  final order = response['orders'][0] as Map<String, dynamic>;
+  order['factsVersion'] = 3;
+  final original = order['original'] as Map<String, Object>;
+  original['benefitAttribution'] = {'schemaVersion': 1, 'components': empty ? <Object>[] : [
+    {'componentId': 'discount-component', 'benefitId': 'supplier-coupon', 'benefitRevision': 'benefit-v1',
+      'label': 'Supplier saving', 'publisherType': 'supplier', 'effect': 'instant_discount', 'amountBasis': 'applied',
+      'sourceReference': 'trusted-benefit-one', 'funderReference': 'private-funder-one', 'amountMinor': 51,
+      'allocations': [{'lineId': 'line-one', 'amountMinor': 51}]},
+    {'componentId': 'cashback-component', 'benefitId': 'payment-offer', 'benefitRevision': 'benefit-v2',
+      'label': 'Payment cashback offer', 'publisherType': 'payment', 'effect': 'cashback_offer', 'amountBasis': 'maximum',
+      'sourceReference': 'trusted-benefit-two', 'funderReference': 'private-funder-two', 'amountMinor': 25,
+      'allocations': [{'lineId': 'line-one', 'amountMinor': 25}]},
+  ]};
+  if (empty) {
+    final totals = original['totals'] as Map<String, int>;
+    totals['discountMinor'] = 0; totals['totalMinor'] = 10066;
+  }
+  rehashPurchaseOrder(order);
+  return response;
+}
+
+void rehashPurchaseOrder(Map<String, dynamic> order) {
+  order['originalFingerprint'] = sha256.convert(utf8.encode(jsonEncode({
+    'factsVersion': order['factsVersion'], 'storeId': order['storeId'], 'orderId': order['orderId'], 'original': order['original'],
+  }))).toString();
+}
+
+Map<String, dynamic> attributedOperationalResponse({String role = 'buyer'}) {
+  final order = attributedPurchaseResponse(role: role)['orders'][0];
+  return operationalResponse(role: role)..['originalFactsVersion'] = 3
+    ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
 }
 
 Map<String, dynamic> referenceResponse({String role = 'buyer'}) {
