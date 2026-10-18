@@ -8001,6 +8001,9 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
       if ($facts.reviewedFamilyContractVersion -isnot [long] -and $facts.reviewedFamilyContractVersion -isnot [int] -or
           $facts.reviewedFamilyContractVersion -ne 1) { return $false }
       $factsOwners += 'backend/functions/src/index.ts'
+      if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/work_services.dart') {
+        $factsOwners += 'apps/mobile/lib/features/work/work_services.dart'
+      }
     }
     if ($facts.ticket -cne 'LF-03-C01' -or $facts.batch -ne 2 -or
         $facts.sourceCheckpoint -cne 'd29879a31412d4cc2859c1eb23a8debe959d5786' -or

@@ -621,6 +621,7 @@ class WorkSession extends ChangeNotifier {
     this.publicDetailsRealm,
     this.publicDetailsJournalFactory,
     this.catalogueBindingPendingStoreFactory,
+    this.variantFamilyJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -686,6 +687,7 @@ class WorkSession extends ChangeNotifier {
     this.publicDetailsRealm,
     this.publicDetailsJournalFactory,
     this.catalogueBindingPendingStoreFactory,
+    this.variantFamilyJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -1056,6 +1058,101 @@ class WorkSession extends ChangeNotifier {
       draft.productIds.every((id) => workspaceCatalogueItems.any((p) => p.id == id)));
   }
   final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
+  final WorkspaceVariantFamilyJournal Function(WorkspaceVariantFamilyScope scope)? variantFamilyJournalFactory;
+  final Map<WorkspaceVariantFamilyScope, WorkspaceVariantFamilyController> _variantFamilyPublishers = {};
+  final Map<WorkspaceVariantFamilyScope, WorkspaceVariantFamilyController> _variantFamilyLoads = {};
+  WorkspaceVariantFamilyController? workspaceVariantFamilyPublisher(String familyId) {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null ||
+        source is! WorkspaceVariantFamilyOwnerGateway ||
+        source is! WorkspaceCatalogueOwnerGateway ||
+        source is AuthenticatedWorkspaceCatalogueGateway && gateway is ReviewWorkGateway ||
+        !workspaceVariantFamilies.any((f) => f.id == familyId)) { return null; }
+    if (!(source as WorkspaceVariantFamilyOwnerGateway).variantFamilySubmissionSupported) return null;
+    final WorkspaceVariantFamilyOwnerGateway ownerSource = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(account) : source as WorkspaceVariantFamilyOwnerGateway;
+    final scope = (account: account, store: store, realm: ownerSource.realm, family: familyId);
+    final previous = _variantFamilyPublishers[scope];
+    if (previous != null && !previous.active) {
+      _variantFamilyPublishers.remove(scope);
+      if (identical(_variantFamilyLoads[scope], previous)) {
+        _variantFamilyLoads.remove(scope);
+      }
+      previous.removeListener(notifyListeners);
+      previous.dispose();
+    }
+    return _variantFamilyPublishers.putIfAbsent(scope, () => WorkspaceVariantFamilyController(scope: scope,
+      gateway: ownerSource, journal: variantFamilyJournalFactory?.call(scope) ?? SecureWorkVariantFamilyJournal(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ||
+        !workspaceVariantFamilies.any((f) => f.id == familyId) ? null : publicationPreferencesContext)
+      ..addListener(notifyListeners));
+  }
+  bool workspaceVariantFamilyBusy(String familyId) {
+    final publisher = workspaceVariantFamilyPublisher(familyId);
+    return publisher != null && (publisher.busy || identical(_variantFamilyLoads[publisher.scope], publisher));
+  }
+  String? _savedFamilySignature(String familyId) {
+    final family = workspaceVariantFamilies.where((f) => f.id == familyId).firstOrNull;
+    if (family == null) return null;
+    final members = workspaceCatalogueItems.where((p) => p.variantMembership?.familyId == familyId).toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    return jsonEncode([family.toJson(), for (final p in members) p.toInventoryJson()]);
+  }
+  Future<bool> checkWorkspaceVariantFamily(String familyId, {bool original = false, bool retry = false}) async {
+    final publisher = workspaceVariantFamilyPublisher(familyId);
+    if (publisher == null || workspaceVariantFamilyBusy(familyId)) return false;
+    final ok = original || retry
+      ? (retry ? await publisher.retryOriginal() : await publisher.reconcile()).state == WorkspaceVariantFamilyWriteState.submitted
+      : await publisher.refresh();
+    return ok;
+  }
+  Future<bool> submitWorkspaceVariantFamily(String familyId, {required bool Function() inputCurrent}) async {
+    final publisher = workspaceVariantFamilyPublisher(familyId), owner = publicationPreferencesContext;
+    if (publisher == null || !publisher.canSubmit || workspaceVariantFamilyBusy(familyId) || !inputCurrent()) return false;
+    final signature = _savedFamilySignature(familyId);
+    if (signature == null) return false;
+    bool current() => !_disposed && publicationPreferencesContext == owner && publisher.active;
+    bool unchanged() => current() && inputCurrent() && _savedFamilySignature(familyId) == signature;
+    _variantFamilyLoads[publisher.scope] = publisher; notifyListeners();
+    try {
+      if (localInventoryEnabled && !await workspaceInventorySaved || !unchanged()) return false;
+      final family = workspaceVariantFamilies.firstWhere((f) => f.id == familyId);
+      final members = workspaceCatalogueItems.where((p) => p.variantMembership?.familyId == familyId).toList();
+      if (members.isEmpty || members.length > 80) {
+        showError('Submit a group with 1–80 saved SKU combinations.'); return false;
+      }
+      WorkspaceVariantFamily.validateInventory([family], members);
+      final source = publisher.gateway as WorkspaceCatalogueOwnerGateway, revisions = <String, int>{};
+      for (var offset = 0; offset < members.length; offset += 8) {
+        final batch = members.sublist(offset, min(offset + 8, members.length));
+        final rows = await Future.wait(batch.map((item) => source.readOwnedSku(storeId: publisher.scope.store,
+          skuId: item.id, current: unchanged).timeout(const Duration(seconds: 25))));
+        if (!unchanged()) return false;
+        for (var index = 0; index < batch.length; index++) {
+          final row = rows[index], item = batch[index];
+          if (row == null || row.realm != publisher.scope.realm || row.input['publicListing'] != true ||
+              !_listingMirrorIdentityMatches(row, item) || !_listingMirrorMatches(row, item, reviewedFamily: true)) {
+            showError('Each saved SKU needs matching reviewed listing details before this group can be submitted. Your Stock is unchanged.');
+            return false;
+          }
+          revisions[item.id] = row.revision;
+        }
+      }
+      final input = WorkspaceVariantFamilySubmissionInput.fromSaved(family, members, revisions);
+      if (!unchanged()) return false;
+      final result = await publisher.submit(input, inputCurrent: unchanged);
+      if (!current()) return false;
+      return result.state == WorkspaceVariantFamilyWriteState.submitted;
+    } catch (_) {
+      if (current()) showError('Saved group details could not be checked. Nothing has been approved or published.');
+      return false;
+    } finally {
+      if (identical(_variantFamilyLoads[publisher.scope], publisher)) {
+        _variantFamilyLoads.remove(publisher.scope);
+      }
+      if (current()) notifyListeners();
+    }
+  }
   final Map<WorkspaceCatalogueBindingScope, WorkspaceCatalogueListingController> _catalogueListings = {};
   final Set<WorkspaceCatalogueBindingScope> _catalogueListingLoads = {};
   WorkspaceCatalogueListingController? get _catalogueListingController {
@@ -1129,10 +1226,10 @@ class WorkSession extends ChangeNotifier {
       origin != null && origin.valid && origin.productId == item.id &&
       _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
   }
-  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
+  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item, {bool reviewedFamily = false}) {
     // The legacy reviewed reader has no family contract. Never strip options
     // and publish a different legacy SKU while that connection is pending.
-    if (item.variantMembership != null) return false;
+    if (item.variantMembership != null && !reviewedFamily) return false;
     final value = owned.input, origin = item.stockEntry, measure = item.packMeasure;
     if (owned.storeId != activeWorkspace?.id || owned.skuId != item.id || owned.canonicalProductId != item.canonicalId ||
         value['sku'] != item.sku || origin == null || !origin.valid || measure?.valid != true ||
@@ -1227,7 +1324,9 @@ class WorkSession extends ChangeNotifier {
         skuId: productId, current: unchanged);
       if (!unchanged()) return false;
       if (owned == null || owned.realm != controller.scope.realm ||
-          !(listed ? _listingMirrorIdentityMatches(owned, item) && _listingMirrorMatches(owned, item)
+          !(listed ? _listingMirrorIdentityMatches(owned, item) && _listingMirrorMatches(owned, item,
+              reviewedFamily: controller.gateway is WorkspaceVariantFamilyOwnerGateway &&
+                (controller.gateway as WorkspaceVariantFamilyOwnerGateway).variantFamilySubmissionSupported)
             : _listingMirrorIdentityMatches(owned, item))) {
         showError('This product needs matching reviewed details before its listing can be updated. Store stock is unchanged.'); return false;
       }
@@ -12867,6 +12966,8 @@ class WorkSession extends ChangeNotifier {
     _supplierPolicies.clear();
     for (final listing in _catalogueListings.values) { listing.dispose(); }
     _catalogueListings.clear();
+    for (final publisher in _variantFamilyPublishers.values) { publisher.dispose(); }
+    _variantFamilyPublishers.clear();
     for (final reader in _catalogueReadbacks.values) { reader.dispose(); }
     _catalogueReadbacks.clear();
     for (final promotion in _productPromotions.values) { promotion.dispose(); }

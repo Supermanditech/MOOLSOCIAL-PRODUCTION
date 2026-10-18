@@ -25558,9 +25558,57 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               }
             }
           })),
-        const Text('Options stay private until the product group and each SKU are reviewed.'),
+        if (_wasOwned && widget.importRow == null && widget.onDraftReviewed == null && widget.purchaseScope == null)
+          _variantPublicationControls(family)
+        else
+          const Text('Save this SKU first. Options stay private until the group and each SKU are reviewed.'),
       ],
     ], initiallyExpanded: family != null);
+  }
+
+  Widget _variantPublicationControls(WorkspaceVariantFamily family) {
+    final publisher = widget.session.workspaceVariantFamilyPublisher(family.id);
+    if (publisher == null) {
+      return const Padding(padding: EdgeInsets.only(top: 8), child: Text(
+        'Saved group options stay private. Review submission is not connected yet.',
+        key: Key('work-product-family-submission-unavailable')));
+    }
+    return ListenableBuilder(listenable: Listenable.merge([publisher, widget.session, ..._importControllers.values]),
+      builder: (context, _) {
+        final busy = _savingInventory || widget.session.workspaceVariantFamilyBusy(family.id);
+        final pending = publisher.pending != null;
+        final actionStyle = TextButton.styleFrom(minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 8));
+        return Padding(padding: const EdgeInsets.only(top: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          key: const Key('work-product-family-submission'), children: [
+            Text(publisher.message ?? 'Save stays private. Submit the saved combinations for review separately.',
+              style: Theme.of(context).textTheme.bodySmall),
+            if (_hasUnsavedEdits && !pending) Text('Save current product changes before submitting the group.',
+              style: Theme.of(context).textTheme.bodySmall),
+            Wrap(spacing: 8, runSpacing: 2, children: [
+              TextButton.icon(key: const Key('work-product-family-check-status'),
+                style: actionStyle,
+                onPressed: busy ? null : () async {
+                  await widget.session.checkWorkspaceVariantFamily(family.id, original: pending);
+                  if (mounted) setState(() {});
+                }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
+                label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
+              if (!pending && publisher.headLoaded) TextButton.icon(key: const Key('work-product-family-submit'),
+                style: actionStyle,
+                onPressed: busy || _hasUnsavedEdits || !publisher.canSubmit ? null : () async {
+                  await widget.session.submitWorkspaceVariantFamily(family.id,
+                    inputCurrent: () => mounted && !_hasUnsavedEdits && !_savingInventory && _variantFamily?.id == family.id);
+                  if (mounted) setState(() {});
+                }, icon: const Icon(Icons.send_outlined, size: 18), label: const Text('Submit group for review')),
+              if (pending && publisher.canRetryOriginal) TextButton.icon(key: const Key('work-product-family-retry-original'),
+                style: actionStyle,
+                onPressed: busy ? null : () async {
+                  await widget.session.checkWorkspaceVariantFamily(family.id, retry: true);
+                  if (mounted) setState(() {});
+                }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original submission')),
+            ]),
+          ]));
+      });
   }
 
   Future<void> _editVariantOptions({bool create = false}) async {

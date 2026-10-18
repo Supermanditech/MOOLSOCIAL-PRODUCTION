@@ -4178,6 +4178,74 @@ class SecureWorkCatalogueBindingPendingStore implements WorkspaceCatalogueBindin
   });
 }
 
+/// Same scoped encrypted-journal pattern as listing requests. One immutable
+/// original per family; native tails finish before any later read/write.
+class SecureWorkVariantFamilyJournal implements WorkspaceVariantFamilyJournal {
+  SecureWorkVariantFamilyJournal({FlutterSecureStorage? storage, String? Function()? currentAccount})
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _currentAccount = currentAccount ?? SecureWorkOrderPendingStore._signedInAccount;
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  static final _tails = <String, Future<void>>{};
+  String _key(WorkspaceVariantFamilyScope scope) => 'moolsocial.workspace.variant-family.v1.${
+    base64UrlEncode(utf8.encode(jsonEncode([scope.account, scope.store, scope.realm, scope.family])))}';
+  void _check(WorkspaceVariantFamilyScope scope) {
+    if (scope.account.isEmpty || scope.store.isEmpty || scope.family.isEmpty ||
+        !{'production', 'evaluation'}.contains(scope.realm) || _currentAccount() != scope.account) {
+      throw const WorkGatewayException('Sign in again to check the group submission.');
+    }
+  }
+  Future<T> _serial<T>(WorkspaceVariantFamilyScope scope, Future<T> Function() action) {
+    final key = _key(scope), result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _tails[key] = tail;
+    unawaited(tail.then((_) { if (identical(_tails[key], tail)) _tails.remove(key); }));
+    return result;
+  }
+  Future<WorkspaceVariantFamilyIntent?> _read(WorkspaceVariantFamilyScope scope) async {
+    _check(scope);
+    final raw = await _storage.read(key: _key(scope));
+    _check(scope);
+    if (raw == null) return null;
+    final envelope = jsonDecode(raw);
+    const keys = {'schemaVersion', 'accountId', 'storeId', 'realm', 'familyId', 'original'};
+    if (envelope is! Map || envelope.length != keys.length || envelope.keys.any((k) => !keys.contains(k)) ||
+        envelope['schemaVersion'] is! int || envelope['schemaVersion'] != 1 || envelope['accountId'] != scope.account ||
+        envelope['storeId'] != scope.store || envelope['realm'] != scope.realm || envelope['familyId'] != scope.family) {
+      throw const FormatException('The original group submission needs recovery.');
+    }
+    if (envelope['original'] == null) return null;
+    final intent = WorkspaceVariantFamilyIntent.fromJson(envelope['original']);
+    if (intent.scope != scope) throw const FormatException('The group request belongs to another context.');
+    return intent;
+  }
+  Future<void> _write(WorkspaceVariantFamilyScope scope, WorkspaceVariantFamilyIntent? original) async {
+    _check(scope);
+    await _storage.write(key: _key(scope), value: jsonEncode({'schemaVersion': 1, 'accountId': scope.account,
+      'storeId': scope.store, 'realm': scope.realm, 'familyId': scope.family, 'original': original?.toJson()}));
+    _check(scope);
+  }
+  @override
+  Future<WorkspaceVariantFamilyIntent?> readPending(WorkspaceVariantFamilyScope scope) => _serial(scope, () => _read(scope));
+  @override
+  Future<void> savePending(WorkspaceVariantFamilyIntent original) => _serial(original.scope, () async {
+    WorkspaceVariantFamilyIntent.fromJson(original.toJson());
+    final prior = await _read(original.scope);
+    if (prior != null) {
+      if (prior.fingerprint == original.fingerprint) return;
+      throw const FormatException('Check the earlier group request before another submission.');
+    }
+    await _write(original.scope, original);
+  });
+  @override
+  Future<void> removePending(WorkspaceVariantFamilyIntent original) => _serial(original.scope, () async {
+    final prior = await _read(original.scope);
+    if (prior == null) return;
+    if (prior.fingerprint != original.fingerprint) throw const FormatException('Keep the original group request.');
+    await _write(original.scope, null);
+  });
+}
+
 /// Encrypted private policy draft and original request. Native tails remain
 /// serialized across instances through actual completion, not caller timeouts.
 /// Secure original-request recovery, not a local published-promotion database.

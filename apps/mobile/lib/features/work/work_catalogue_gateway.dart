@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:crypto/crypto.dart' as crypto;
 
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../shared/social_content_gateway.dart';
 import 'work_publication_data.dart';
+import 'work_models.dart' show WorkspaceVariantFamily, WorkspaceVariantMembership, WorkspaceCatalogueItem;
 
 /// Read-only public catalogue content, never an order/price/Stock authority.
 abstract interface class WorkspaceCatalogueGateway {
@@ -19,6 +21,313 @@ abstract interface class WorkspacePublicProductGateway {
     required String storeId, required String skuId, required BuyV2OfferClass channel,
     required bool Function() current,
   });
+}
+
+typedef WorkspaceVariantFamilyScope = ({String account, String store, String realm, String family});
+
+/// Frozen descriptive input, never Stock, publication approval or live availability.
+class WorkspaceVariantFamilySubmissionInput {
+  WorkspaceVariantFamilySubmissionInput._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get familyId => toJson()['familyId'] as String;
+  String get fingerprint => _encoded;
+  static WorkspaceVariantFamilySubmissionInput fromSaved(WorkspaceVariantFamily family,
+      Iterable<WorkspaceCatalogueItem> products, Map<String, int> serverRevisions) {
+    final members = products.where((p) => p.variantMembership?.familyId == family.id).toList();
+    WorkspaceVariantFamily.validateInventory([family], members);
+    if (members.isEmpty || serverRevisions.length != members.length ||
+        members.any((p) => !serverRevisions.containsKey(p.id))) {
+      throw const FormatException('Check every saved SKU before submitting its group.');
+    }
+    return fromJson({'familyId': family.id, 'localRevision': family.revision, 'title': family.title,
+      'brand': family.brand, 'categoryId': family.categoryId,
+      'options': family.toJson()['options'], 'members': [for (final p in members) {
+        'skuId': p.id, 'skuRevision': serverRevisions[p.id], 'selections': p.variantMembership!.selections}]});
+  }
+  static WorkspaceVariantFamilySubmissionInput fromJson(Object? raw) {
+    final value = _map(raw);
+    _keys(value, ['familyId', 'localRevision', 'title', 'brand', 'categoryId', 'options', 'members']);
+    final family = WorkspaceVariantFamily.fromJson({'version': 1, 'id': _id(value['familyId']),
+      'revision': _int(value['localRevision'], 1, 2147483647), 'title': value['title'], 'brand': value['brand'],
+      'categoryId': _id(value['categoryId']), 'options': value['options'],
+      'content': {'description': '', 'highlights': <String>[], 'specifications': <String, String>{}}});
+    final tuples = <String>{}, skus = <String>{};
+    final members = <Map<String, dynamic>>[];
+    for (final raw in _list(value['members'], 80)) {
+      final member = _map(raw); _keys(member, ['skuId', 'skuRevision', 'selections']);
+      final selected = _map(member['selections']);
+      _keys(selected, family.dimensionIds);
+      final membership = WorkspaceVariantMembership(familyId: family.id,
+        selections: {for (final key in selected.keys) _id(key): _id(selected[key])});
+      family.attributesFor(membership);
+      final sku = _id(member['skuId']), tuple = jsonEncode(_sorted(membership.selections));
+      if (!skus.add(sku) || !tuples.add(tuple)) throw const FormatException('Keep one SKU per option combination.');
+      members.add({'skuId': sku, 'skuRevision': _int(member['skuRevision'], 1, 1000000000),
+        'selections': membership.selections});
+    }
+    if (members.isEmpty) throw const FormatException('Save a SKU before submitting its group.');
+    final options = _list(family.toJson()['options'], 128).cast<Map<String, Object?>>().toList()
+      ..sort((a, b) => (a['dimensionId'] as String).compareTo(b['dimensionId'] as String) != 0
+        ? (a['dimensionId'] as String).compareTo(b['dimensionId'] as String)
+        : (a['optionId'] as String).compareTo(b['optionId'] as String));
+    members.sort((a, b) => (a['skuId'] as String).compareTo(b['skuId'] as String));
+    return WorkspaceVariantFamilySubmissionInput._(jsonEncode(_sorted({'familyId': family.id,
+      'localRevision': family.revision, 'title': family.title, 'brand': family.brand, 'categoryId': family.categoryId,
+      'options': options, 'members': members})));
+  }
+}
+
+class WorkspaceVariantFamilyIntent {
+  WorkspaceVariantFamilyIntent({required this.scope, required this.expectedRevision,
+    required this.idempotencyKey, required WorkspaceVariantFamilySubmissionInput input})
+    : input = WorkspaceVariantFamilySubmissionInput.fromJson(input.toJson()) {
+    for (final id in [scope.account, scope.store, scope.family, idempotencyKey]) { _id(id); }
+    _int(expectedRevision, 0, 999999999);
+    if (!{'evaluation', 'production'}.contains(scope.realm) || scope.family != input.familyId) throw const FormatException();
+  }
+  final WorkspaceVariantFamilyScope scope;
+  final int expectedRevision;
+  final String idempotencyKey;
+  final WorkspaceVariantFamilySubmissionInput input;
+  Map<String, Object?> get body => {'storeId': scope.store, 'expectedRevision': expectedRevision,
+    'idempotencyKey': idempotencyKey, 'family': input.toJson()};
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account, 'realm': scope.realm, ...body};
+  String get fingerprint => jsonEncode(_sorted(toJson()));
+  String get candidateFingerprint => crypto.sha256.convert(utf8.encode(jsonEncode(_sorted({
+    'ownerUserId': scope.account, 'realm': scope.realm, 'storeId': scope.store,
+    'expectedRevision': expectedRevision, 'family': input.toJson()})))).toString().toUpperCase();
+  static WorkspaceVariantFamilyIntent fromJson(Object? raw) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'accountId', 'realm', 'storeId', 'expectedRevision', 'idempotencyKey', 'family']);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1) throw const FormatException();
+    final input = WorkspaceVariantFamilySubmissionInput.fromJson(value['family']);
+    return WorkspaceVariantFamilyIntent(scope: (account: _id(value['accountId']), store: _id(value['storeId']),
+      realm: _string(value['realm']), family: input.familyId), expectedRevision: _int(value['expectedRevision'], 0, 999999999),
+      idempotencyKey: _id(value['idempotencyKey']), input: input);
+  }
+}
+
+class WorkspaceVariantFamilyCandidate {
+  WorkspaceVariantFamilyCandidate._(this._encoded, this.input, this.revision, this.fingerprint);
+  final String _encoded;
+  final WorkspaceVariantFamilySubmissionInput input;
+  final int revision;
+  final String fingerprint;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  static WorkspaceVariantFamilyCandidate decode(Object? raw, WorkspaceVariantFamilyScope scope, DateTime now) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'realm', 'storeId', 'revision', 'submittedAt', 'submittedBy', 'fingerprint', 'family']);
+    final input = WorkspaceVariantFamilySubmissionInput.fromJson(value['family']), revision = _int(value['revision'], 1, 1000000000);
+    final time = _time(value['submittedAt']);
+    final original = WorkspaceVariantFamilyIntent(scope: (account: _id(value['submittedBy']),
+      store: scope.store, realm: scope.realm, family: scope.family), expectedRevision: revision - 1,
+      idempotencyKey: 'validation-only', input: input);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['realm'] != scope.realm ||
+        value['storeId'] != scope.store || input.familyId != scope.family || time.isAfter(now.toUtc()) ||
+        time.toIso8601String() != value['submittedAt'] || original.candidateFingerprint != value['fingerprint']) { throw const FormatException(); }
+    return WorkspaceVariantFamilyCandidate._(jsonEncode(_sorted(value)), input, revision, original.candidateFingerprint);
+  }
+  bool matches(WorkspaceVariantFamilyIntent original) => revision == original.expectedRevision + 1 &&
+    fingerprint == original.candidateFingerprint && toJson()['submittedBy'] == original.scope.account &&
+    input.fingerprint == original.input.fingerprint;
+}
+
+class WorkspaceVariantFamilyHead {
+  const WorkspaceVariantFamilyHead({required this.candidate, required this.reviewedCandidate,
+    required this.reviewRevision, required this.reviewFingerprint, required this.decision});
+  final WorkspaceVariantFamilyCandidate? candidate, reviewedCandidate;
+  final int reviewRevision;
+  final String? reviewFingerprint, decision;
+  static WorkspaceVariantFamilyHead decode(Object? raw, WorkspaceVariantFamilyScope scope, DateTime now) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'realm', 'storeId', 'familyId', 'orderingAvailable', 'candidate', 'review']);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['realm'] != scope.realm ||
+        value['storeId'] != scope.store || value['familyId'] != scope.family || value['orderingAvailable'] != false) { throw const FormatException(); }
+    final candidate = value['candidate'] == null ? null : WorkspaceVariantFamilyCandidate.decode(value['candidate'], scope, now);
+    if (value['review'] == null) {
+      return WorkspaceVariantFamilyHead(candidate: candidate, reviewedCandidate: null,
+        reviewRevision: 0, reviewFingerprint: null, decision: null);
+    }
+    final review = _map(value['review']);
+    _keys(review, ['schemaVersion', 'revision', 'decision', 'reviewerUserId', 'reviewedAt',
+      'reasonCode', 'catalogueId', 'tenantId', 'candidate']);
+    final reviewed = WorkspaceVariantFamilyCandidate.decode(review['candidate'], scope, now), at = _time(review['reviewedAt']);
+    if (review['schemaVersion'] is! int || review['schemaVersion'] != 1 ||
+        !{'verify', 'reject'}.contains(review['decision']) || at.isAfter(now.toUtc()) || at.toIso8601String() != review['reviewedAt'] ||
+        at.isBefore(_time(reviewed.toJson()['submittedAt'])) || review['reviewerUserId'] == reviewed.toJson()['submittedBy'] ||
+        candidate == null || reviewed.revision > candidate.revision ||
+        reviewed.revision == candidate.revision && reviewed.fingerprint != candidate.fingerprint) { throw const FormatException(); }
+    for (final key in ['reviewerUserId', 'reasonCode', 'catalogueId', 'tenantId']) { _id(review[key]); }
+    return WorkspaceVariantFamilyHead(candidate: candidate, reviewedCandidate: reviewed,
+      reviewRevision: _int(review['revision'], 1, 1000000000), reviewFingerprint: jsonEncode(_sorted(review)),
+      decision: review['decision'] as String);
+  }
+}
+
+enum WorkspaceVariantFamilyWriteState {notSent, rejected, unknown, submitted, notFound}
+class WorkspaceVariantFamilyWriteResult {
+  const WorkspaceVariantFamilyWriteResult(this.state, [this.candidate]);
+  final WorkspaceVariantFamilyWriteState state;
+  final WorkspaceVariantFamilyCandidate? candidate;
+}
+abstract interface class WorkspaceVariantFamilyOwnerGateway {
+  String get realm;
+  bool get variantFamilySubmissionSupported;
+  Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope, {required bool Function() current});
+  Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+    {required bool Function() current, bool reconcile = false});
+}
+abstract interface class WorkspaceVariantFamilyJournal {
+  Future<WorkspaceVariantFamilyIntent?> readPending(WorkspaceVariantFamilyScope scope);
+  Future<void> savePending(WorkspaceVariantFamilyIntent original);
+  Future<void> removePending(WorkspaceVariantFamilyIntent original);
+}
+
+/// Device recovery and remote submission/review are separate states. No restore,
+/// refresh or reconcile creates a new mutation or reads current edits as a retry.
+class WorkspaceVariantFamilyController extends ChangeNotifier {
+  WorkspaceVariantFamilyController({required this.scope, required this.gateway, required this.journal,
+    required this.context, DateTime Function()? now}) : _lifetime = context(), now = now ?? DateTime.now {
+    for (final id in [scope.account, scope.store, scope.family]) { _id(id); }
+    if (scope.realm != gateway.realm || !{'evaluation', 'production'}.contains(scope.realm)) throw const FormatException();
+  }
+  final WorkspaceVariantFamilyScope scope;
+  final WorkspaceVariantFamilyOwnerGateway gateway;
+  final WorkspaceVariantFamilyJournal journal;
+  final Object? Function() context;
+  final DateTime Function() now;
+  final Object? _lifetime;
+  bool _closed = false, ready = false, busy = false, headLoaded = false, originalNotFound = false;
+  int _candidateRevision = 0, _reviewRevision = 0;
+  String? _candidateBytes, _reviewBytes;
+  WorkspaceVariantFamilyHead? head;
+  WorkspaceVariantFamilyIntent? pending;
+  String? message;
+  Future<bool>? _restoring;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool get canSubmit => active && gateway.variantFamilySubmissionSupported && ready && headLoaded && !busy && pending == null;
+  bool get canRetryOriginal => active && ready && !busy && pending != null && originalNotFound;
+  void _notify() { if (active) notifyListeners(); }
+  Future<bool> restore() {
+    if (!active) return Future.value(false);
+    if (ready) return Future.value(true);
+    return _restoring ??= _restore().whenComplete(() => _restoring = null);
+  }
+  Future<bool> _restore() async {
+    try {
+      final original = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (original != null && (original.scope != scope ||
+          pending != null && original.fingerprint != pending!.fingerprint)) { throw const FormatException(); }
+      pending ??= original;
+      ready = true;
+      message = pending == null ? null : 'An earlier group submission needs checking. Your saved options are kept.';
+      return true;
+    } catch (_) {
+      if (active) { ready = false; message = 'The saved submission could not be opened. Your group is kept.'; }
+      return false;
+    } finally { _notify(); }
+  }
+  Future<bool> refresh() async {
+    if (!active || busy || !gateway.variantFamilySubmissionSupported) return false;
+    busy = true; headLoaded = false; _notify();
+    try {
+      if (!await restore() || !active) return false;
+      if (pending != null) { message = 'Check the original request before another submission.'; return false; }
+      final next = await gateway.readVariantFamily(scope, current: () => active).timeout(const Duration(seconds: 25));
+      if (!active) return false;
+      final candidate = next.candidate, bytes = candidate == null ? null : jsonEncode(_sorted(candidate.toJson()));
+      if ((candidate?.revision ?? 0) < _candidateRevision || next.reviewRevision < _reviewRevision ||
+          candidate != null && candidate.revision == _candidateRevision && _candidateBytes != bytes ||
+          next.reviewRevision == _reviewRevision && _reviewBytes != next.reviewFingerprint) { throw const FormatException(); }
+      head = next; headLoaded = true;
+      _candidateRevision = candidate?.revision ?? 0; _candidateBytes = bytes;
+      _reviewRevision = next.reviewRevision; _reviewBytes = next.reviewFingerprint;
+      message = candidate == null ? 'This saved group has not been submitted.'
+        : next.reviewedCandidate?.fingerprint != candidate.fingerprint ? 'Submitted changes are waiting for review.'
+        : next.decision == 'verify' ? 'Last submitted options approved. Current listings and availability need separate checks.'
+        : 'Review requested changes. Update and save the group before submitting again.';
+      return true;
+    } catch (_) {
+      if (active) message = 'Group review status could not be confirmed. Your saved options are kept.';
+      return false;
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceVariantFamilyWriteResult> submit(WorkspaceVariantFamilySubmissionInput input,
+      {required bool Function() inputCurrent}) async {
+    if (!canSubmit || input.familyId != scope.family || !inputCurrent()) {
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notSent);
+    }
+    if (head?.candidate?.input.fingerprint == input.fingerprint) {
+      message = 'These saved combinations are already submitted. Check review status.'; _notify();
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notSent);
+    }
+    busy = true; _notify();
+    try {
+      final original = WorkspaceVariantFamilyIntent(scope: scope, expectedRevision: head?.candidate?.revision ?? 0,
+        idempotencyKey: 'family-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}', input: input);
+      pending = original; originalNotFound = false;
+      await journal.savePending(original).timeout(const Duration(seconds: 10));
+      if (!active || !inputCurrent()) {
+        if (active) message = 'Saved group details changed. Check the original request before submitting again.';
+        return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      }
+      final result = await gateway.writeVariantFamily(original, current: () => active && inputCurrent())
+        .timeout(const Duration(seconds: 25));
+      if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      return await _finish(original, result, recovery: false);
+    } catch (_) {
+      if (active) { ready = false; message = 'Submission is not confirmed. The original request and saved group are kept.'; }
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceVariantFamilyWriteResult> reconcile() => _recover(retry: false);
+  Future<WorkspaceVariantFamilyWriteResult> retryOriginal() => _recover(retry: true);
+  Future<WorkspaceVariantFamilyWriteResult> _recover({required bool retry}) async {
+    if (!active || busy || !gateway.variantFamilySubmissionSupported || retry && !canRetryOriginal) {
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    }
+    busy = true; _notify();
+    try {
+      if (!await restore() || !active || pending == null) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      final original = pending!;
+      originalNotFound = false;
+      if (retry) await journal.savePending(original).timeout(const Duration(seconds: 10));
+      if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      final result = await gateway.writeVariantFamily(original, current: () => active, reconcile: !retry)
+        .timeout(const Duration(seconds: 25));
+      if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      if (!retry && result.state == WorkspaceVariantFamilyWriteState.notFound) originalNotFound = true;
+      return await _finish(original, result, recovery: true);
+    } catch (_) {
+      if (active) message = 'The original submission is still unconfirmed. It is kept for checking.';
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceVariantFamilyWriteResult> _finish(WorkspaceVariantFamilyIntent original,
+      WorkspaceVariantFamilyWriteResult result, {required bool recovery}) async {
+    final candidate = result.candidate;
+    final submitted = result.state == WorkspaceVariantFamilyWriteState.submitted && candidate != null && candidate.matches(original);
+    final definitive = submitted || !recovery &&
+      {WorkspaceVariantFamilyWriteState.notSent, WorkspaceVariantFamilyWriteState.rejected}.contains(result.state);
+    if (!definitive) {
+      message = originalNotFound ? 'No result found yet. Retry sends the same saved request, not current edits.'
+        : 'Group submission is not confirmed. Check the original request.';
+      return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    }
+    await journal.removePending(original).timeout(const Duration(seconds: 10));
+    if (!active) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+    pending = null; originalNotFound = false; headLoaded = false;
+    if (submitted && candidate.revision >= _candidateRevision) {
+      _candidateRevision = candidate.revision; _candidateBytes = jsonEncode(_sorted(candidate.toJson()));
+    }
+    message = submitted ? 'Group submitted for review—not approval or public publication.'
+      : 'The group was not submitted. Your saved options are unchanged.';
+    return result;
+  }
+  @override
+  void dispose() { _closed = true; super.dispose(); }
 }
 
 class WorkspacePublicDetailsRecord {
@@ -1308,7 +1617,8 @@ bool _validEndpoint(Uri value) =>
     !value.hasPort;
 
 class AuthenticatedWorkspaceCatalogueGateway
-    implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway, WorkspacePublicDetailsOwnerGateway {
+    implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
+      WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -1339,6 +1649,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Negotiated only with a matching service; legacy strict endpoints reject new keys.
   final bool unbrandedProduceReadbackSupported;
   final bool reviewedFamilyReadbackSupported;
+  @override
+  bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
   final WorkspacePublicVariantSource? _reviewedVariantsOverride;
   late final WorkspacePublicVariantSource? reviewedVariants = _reviewedVariantsOverride ??
       (reviewedFamilyReadbackSupported ? WorkspaceHttpReviewedVariantSource(this) : null);
@@ -1364,6 +1676,54 @@ class AuthenticatedWorkspaceCatalogueGateway
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
       now: now,
     );
+  }
+
+  bool _familyOwner(WorkspaceVariantFamilyScope scope, bool Function() current) => current() &&
+    variantFamilySubmissionSupported && scope.realm == realm && ownerAccountId == scope.account;
+  @override
+  Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope,
+      {required bool Function() current}) async {
+    if (!_familyOwner(scope, current)) throw const FormatException('Group submission is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreVariantFamily',
+      'storeId': _id(scope.store), 'familyId': _id(scope.family)}, current, mutation: false);
+    if (!_familyOwner(scope, current) || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body));
+    if (envelope['ok'] != true) throw const FormatException();
+    return WorkspaceVariantFamilyHead.decode(envelope['data'], scope, now().toUtc());
+  }
+  @override
+  Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    if (!_familyOwner(original.scope, current)) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notSent);
+    var dispatching = false;
+    try {
+      original = WorkspaceVariantFamilyIntent.fromJson(original.toJson());
+      if (!_familyOwner(original.scope, current)) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notSent);
+      dispatching = true;
+      final response = await _ownerRequest({'operation': reconcile ? 'reconcileStoreVariantFamily' : 'submitStoreVariantFamily',
+        ...original.body}, current, mutation: !reconcile);
+      if (!_familyOwner(original.scope, current) || response == null) return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown);
+      if (response.statusCode != 200) {
+        return WorkspaceVariantFamilyWriteResult(!reconcile && _definitiveDetailsRejection(response)
+          ? WorkspaceVariantFamilyWriteState.rejected : WorkspaceVariantFamilyWriteState.unknown);
+      }
+      final envelope = _map(jsonDecode(response.body));
+      if (envelope['ok'] != true) throw const FormatException();
+      final data = _map(envelope['data']);
+      _keys(data, ['schemaVersion', 'realm', 'storeId', 'familyId', 'orderingAvailable', 'state', 'candidate', 'approved']);
+      if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != realm ||
+          data['storeId'] != original.scope.store || data['familyId'] != original.scope.family ||
+          data['orderingAvailable'] != false || data['approved'] != false) { throw const FormatException(); }
+      if (reconcile && data['state'] == 'not_found' && data['candidate'] == null) {
+        return const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notFound);
+      }
+      if (data['state'] != 'submitted') throw const FormatException();
+      final candidate = WorkspaceVariantFamilyCandidate.decode(data['candidate'], original.scope, now().toUtc());
+      if (!candidate.matches(original)) throw const FormatException();
+      return WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, candidate);
+    } catch (_) {
+      return WorkspaceVariantFamilyWriteResult(dispatching ? WorkspaceVariantFamilyWriteState.unknown : WorkspaceVariantFamilyWriteState.notSent);
+    }
   }
 
   Future<List<WorkspacePublicCatalogueEntry>> _enrichVariants(

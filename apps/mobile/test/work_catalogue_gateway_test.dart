@@ -473,6 +473,52 @@ class Credentials implements SocialContentCredentials {
   }
 }
 
+// Host-only originals; never injected into native Store storage or a live service.
+class _FamilyJournal implements WorkspaceVariantFamilyJournal {
+  WorkspaceVariantFamilyIntent? pending;
+  bool failSave = false, failRemove = false;
+  int saves = 0, removes = 0;
+  Future<void> Function()? beforeSave;
+  @override
+  Future<WorkspaceVariantFamilyIntent?> readPending(WorkspaceVariantFamilyScope scope) async => pending;
+  @override
+  Future<void> savePending(WorkspaceVariantFamilyIntent original) async {
+    saves++;
+    if (beforeSave != null) await beforeSave!();
+    if (failSave) throw StateError('Host journal failure');
+    if (pending != null && pending!.fingerprint != original.fingerprint) throw StateError('Keep original');
+    pending = WorkspaceVariantFamilyIntent.fromJson(original.toJson());
+  }
+  @override
+  Future<void> removePending(WorkspaceVariantFamilyIntent original) async {
+    removes++;
+    if (failRemove) throw StateError('Host cleanup failure');
+    if (pending?.fingerprint != original.fingerprint) throw StateError('Keep original');
+    pending = null;
+  }
+}
+class _FamilyOwner implements WorkspaceVariantFamilyOwnerGateway {
+  @override
+  String get realm => 'production';
+  @override
+  bool variantFamilySubmissionSupported = true;
+  WorkspaceVariantFamilyHead head = const WorkspaceVariantFamilyHead(candidate: null, reviewedCandidate: null,
+    reviewRevision: 0, reviewFingerprint: null, decision: null);
+  final submitted = <WorkspaceVariantFamilyIntent>[], reconciled = <WorkspaceVariantFamilyIntent>[];
+  Future<WorkspaceVariantFamilyWriteResult> Function(WorkspaceVariantFamilyIntent, bool)? write;
+  Future<WorkspaceVariantFamilyHead> Function()? read;
+  @override
+  Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope,
+      {required bool Function() current}) async => read == null ? head : await read!();
+  @override
+  Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    (reconcile ? reconciled : submitted).add(original);
+    return write == null ? const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown)
+      : await write!(original, reconcile);
+  }
+}
+
 class Transport implements SocialContentTransport {
   Transport(this.data);
   Map<String, dynamic> data;
@@ -746,6 +792,27 @@ class SessionCatalogue extends ListingGateway
       );
 }
 
+class _SessionFamilyCatalogue extends SessionCatalogue implements WorkspaceVariantFamilyOwnerGateway {
+  final family = _FamilyOwner();
+  final rows = <String, WorkspaceCatalogueOwnedSku>{};
+  Future<void> Function(String)? beforeRead;
+  @override
+  bool get variantFamilySubmissionSupported => family.variantFamilySubmissionSupported;
+  @override
+  Future<WorkspaceCatalogueOwnedSku?> readOwnedSku({required String storeId, required String skuId,
+      required bool Function() current}) async {
+    ownerReads++;
+    if (beforeRead != null) await beforeRead!(skuId);
+    return current() ? rows[skuId] : null;
+  }
+  @override
+  Future<WorkspaceVariantFamilyHead> readVariantFamily(WorkspaceVariantFamilyScope scope,
+      {required bool Function() current}) => family.readVariantFamily(scope, current: current);
+  @override
+  Future<WorkspaceVariantFamilyWriteResult> writeVariantFamily(WorkspaceVariantFamilyIntent original,
+      {required bool Function() current, bool reconcile = false}) => family.writeVariantFamily(original, current: current, reconcile: reconcile);
+}
+
 WorkspaceCatalogueItem listingItem() => WorkspaceCatalogueItem(
   id: 'sku-one',
   canonicalId: 'canonical-one',
@@ -805,7 +872,350 @@ WorkSession listingSession(SessionCatalogue source, BindingStore journal) =>
       ..workspaceId = 'store-one'
       ..workspaceCatalogueItems.add(listingItem());
 
+Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size = const Size(360, 740)}) async {
+  tester.view.devicePixelRatio = 1; tester.view.physicalSize = size;
+  addTearDown(tester.view.reset);
+  work.retailerSetupSaved = true; work.reviewStage = WorkReviewStage.live;
+  final core = BuySession(), consumer = BuyV2Session(core: core, reviewDataEnabled: false);
+  addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(consumer.dispose);
+  await tester.pumpWidget(MaterialApp(home: WorkWorkspaceDashboardScreen(session: work,
+    procurementSession: consumer, initialSection: 'stock', accountAuthenticated: true)));
+  await tester.pumpAndSettle();
+  final edit = find.byKey(const Key('work-catalogue-edit-sku-one'));
+  await tester.ensureVisible(edit); await tester.tap(edit); await tester.pumpAndSettle();
+}
+
 void main() {
+  const familyScope = (account: 'owner-one', store: 'store-one', realm: 'production', family: 'family-one');
+  WorkspaceVariantFamilySubmissionInput ownerFamilyInput() => WorkspaceVariantFamilySubmissionInput.fromJson({
+    'familyId': familyScope.family, 'localRevision': 1, 'title': 'Host option product', 'brand': 'Host fixture',
+    'categoryId': 'electronics', 'options': [for (final colour in ['pink', 'blue']) {
+      'dimensionId': 'colour', 'dimensionLabel': 'Colour', 'optionId': colour, 'optionLabel': colour,
+      'kind': 'colour', 'swatchArgb': null}], 'members': [
+      {'skuId': 'sku-one', 'skuRevision': 1, 'selections': {'colour': 'pink'}},
+      {'skuId': 'sku-two', 'skuRevision': 1, 'selections': {'colour': 'blue'}}]});
+  WorkspaceVariantFamilyIntent familyIntent({WorkspaceVariantFamilyScope scope = familyScope, int expectedRevision = 0}) =>
+    WorkspaceVariantFamilyIntent(scope: scope, expectedRevision: expectedRevision, idempotencyKey: 'family-original-request', input: ownerFamilyInput());
+  Map<String, Object?> familyCandidateData(WorkspaceVariantFamilyIntent original) => {'schemaVersion': 1,
+    'realm': original.scope.realm, 'storeId': original.scope.store, 'revision': original.expectedRevision + 1,
+    'submittedAt': at.toIso8601String(), 'submittedBy': original.scope.account, 'fingerprint': original.candidateFingerprint,
+    'family': original.input.toJson()};
+  WorkspaceVariantFamilyCandidate familyCandidate(WorkspaceVariantFamilyIntent original) =>
+    WorkspaceVariantFamilyCandidate.decode(jsonDecode(jsonEncode(familyCandidateData(original))), original.scope, at);
+  WorkspaceVariantFamilyController familyController(_FamilyOwner owner, _FamilyJournal journal, {Object? Function()? context}) =>
+    WorkspaceVariantFamilyController(scope: familyScope, gateway: owner, journal: journal, context: context ?? () => 'host-owner', now: () => at);
+  test('LF03 OWNER-FAMILY freezes exact input and rejects extra combinations and private fields', () {
+    final original = familyIntent(), data = original.toJson(), family = data['family'] as Map;
+    ((family['members'] as List).first['selections'] as Map)['colour'] = 'green';
+    expect((original.input.toJson()['members'] as List).first['selections']['colour'], 'pink');
+    expect(() => WorkspaceVariantFamilyIntent.fromJson(jsonDecode(jsonEncode(data))), throwsFormatException);
+    expect(() => WorkspaceVariantFamilySubmissionInput.fromJson({...ownerFamilyInput().toJson(), 'stock': 10}), throwsFormatException);
+    final duplicate = ownerFamilyInput().toJson();
+    ((duplicate['members'] as List).last as Map)['selections'] = {'colour': 'pink'};
+    expect(() => WorkspaceVariantFamilySubmissionInput.fromJson(duplicate), throwsFormatException);
+    expect(WorkspaceVariantFamilyIntent.fromJson(jsonDecode(jsonEncode(original.toJson()))).candidateFingerprint,
+      original.candidateFingerprint);
+  });
+  test('LF03 OWNER-FAMILY journal precedes send, receipt is submission not approval', () async {
+    final owner = _FamilyOwner(), journal = _FamilyJournal(), controller = familyController(owner, journal);
+    addTearDown(controller.dispose);
+    owner.write = (original, _) async {
+      expect(journal.pending!.fingerprint, original.fingerprint);
+      return WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(original));
+    };
+    expect(await controller.refresh(), isTrue);
+    expect(owner.submitted, isEmpty); expect(controller.canSubmit, isTrue);
+    expect((await controller.submit(ownerFamilyInput(), inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.submitted);
+    expect(journal.pending, isNull); expect(owner.submitted.length, 1); expect(controller.headLoaded, isFalse);
+    expect(controller.message, contains('not approval'));
+  });
+  test('LF03 OWNER-FAMILY uncertain result survives restart; only exact original may reconcile or retry', () async {
+    final owner = _FamilyOwner(), journal = _FamilyJournal(), first = familyController(owner, journal);
+    expect(await first.refresh(), isTrue);
+    expect((await first.submit(ownerFamilyInput(), inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+    final original = journal.pending!; first.dispose();
+    final next = familyController(owner, journal); addTearDown(next.dispose);
+    expect(await next.restore(), isTrue); expect(next.canSubmit, isFalse); expect(owner.submitted.length, 1);
+    owner.write = (_, _) async => const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.notFound);
+    await next.reconcile(); expect(next.canRetryOriginal, isTrue); expect(journal.pending!.fingerprint, original.fingerprint);
+    owner.write = (request, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(request));
+    expect((await next.retryOriginal()).state, WorkspaceVariantFamilyWriteState.submitted);
+    expect(owner.submitted.last.fingerprint, original.fingerprint);
+    expect(owner.reconciled.single.fingerprint, original.fingerprint); expect(journal.pending, isNull);
+  });
+  test('LF03 OWNER-FAMILY failed journal blocks dispatch and keeps original input', () async {
+    final owner = _FamilyOwner(), journal = _FamilyJournal()..failSave = true, controller = familyController(owner, journal);
+    addTearDown(controller.dispose); expect(await controller.refresh(), isTrue);
+    expect((await controller.submit(ownerFamilyInput(), inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+    expect(owner.submitted, isEmpty); expect(controller.pending, isNotNull); expect(controller.canSubmit, isFalse);
+    journal.failSave = false; expect(await controller.restore(), isTrue); expect(controller.pending, isNotNull);
+  });
+  test('LF03 OWNER-FAMILY saved-input change during journal write never sends current or old unreviewed values', () async {
+    var unchanged = true;
+    final owner = _FamilyOwner(), journal = _FamilyJournal()..beforeSave = (() async { unchanged = false; });
+    final controller = familyController(owner, journal); addTearDown(controller.dispose);
+    expect(await controller.refresh(), isTrue);
+    await controller.submit(ownerFamilyInput(), inputCurrent: () => unchanged);
+    expect(owner.submitted, isEmpty); expect(journal.pending, isNotNull); expect(controller.canSubmit, isFalse);
+  });
+  test('LF03 OWNER-FAMILY failed receipt cleanup keeps recovery and blocks a fresh submission', () async {
+    final owner = _FamilyOwner(), journal = _FamilyJournal()..failRemove = true, controller = familyController(owner, journal);
+    addTearDown(controller.dispose); expect(await controller.refresh(), isTrue);
+    owner.write = (request, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(request));
+    expect((await controller.submit(ownerFamilyInput(), inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+    expect(controller.pending, isNotNull); expect(journal.pending, isNotNull); expect(controller.canSubmit, isFalse);
+    journal.failRemove = false;
+    expect((await controller.reconcile()).state, WorkspaceVariantFamilyWriteState.submitted);
+    expect(journal.pending, isNull); expect(owner.submitted.length, 1);
+  });
+  test('LF03 OWNER-FAMILY wrong-owner or mutated acknowledgements retain the original', () async {
+    final owner = _FamilyOwner(), journal = _FamilyJournal(), controller = familyController(owner, journal);
+    addTearDown(controller.dispose); expect(await controller.refresh(), isTrue);
+    owner.write = (request, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted,
+      familyCandidate(familyIntent(scope: (account: 'other-owner', store: familyScope.store, realm: familyScope.realm, family: familyScope.family))));
+    expect((await controller.submit(ownerFamilyInput(), inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+    expect(journal.pending, isNotNull); expect(controller.pending, isNotNull);
+  });
+  test('LF03 OWNER-FAMILY retired account cannot admit a delayed status or acknowledgement', () async {
+    Object? lifetime = 'owner-before';
+    final owner = _FamilyOwner(), journal = _FamilyJournal(), controller = familyController(owner, journal, context: () => lifetime);
+    addTearDown(controller.dispose);
+    final reply = Completer<WorkspaceVariantFamilyHead>(); owner.read = () => reply.future;
+    final read = controller.refresh(); await Future<void>.delayed(Duration.zero); lifetime = 'owner-after';
+    reply.complete(owner.head); expect(await read, isFalse); expect(controller.headLoaded, isFalse);
+    expect(owner.submitted, isEmpty);
+  });
+  Map<String, Object?> ownerFamilyAck(WorkspaceVariantFamilyIntent original, {bool absent = false}) => {
+    'schemaVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store, 'familyId': original.scope.family,
+    'orderingAvailable': false, 'state': absent ? 'not_found' : 'submitted',
+    'candidate': absent ? null : familyCandidateData(original), 'approved': false};
+  Map<String, Object?> ownerFamilyHead({WorkspaceVariantFamilyIntent? candidate, Map<String, Object?>? review}) => {
+    'schemaVersion': 1, 'realm': familyScope.realm, 'storeId': familyScope.store, 'familyId': familyScope.family,
+    'orderingAvailable': false, 'candidate': candidate == null ? null : familyCandidateData(candidate), 'review': review};
+  AuthenticatedWorkspaceCatalogueGateway familyOwnerConnection(OwnerTransport transport, {Credentials? credentials}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'), credentials: credentials ?? Credentials(),
+      transport: transport, ownerAccountId: familyScope.account, now: () => at, reviewedFamilyReadbackSupported: true);
+  test('LF03 OWNER-FAMILY endpoint preserves exact original and mutation-only AppCheck', () async {
+    final original = familyIntent(), credentials = Credentials(), requests = <Map<String, Object?>>[];
+    final source = familyOwnerConnection(OwnerTransport((body) async {
+      requests.add(body);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data':
+        body['operation'] == 'readStoreVariantFamily' ? ownerFamilyHead() : ownerFamilyAck(original)}));
+    }), credentials: credentials);
+    expect((await source.readVariantFamily(familyScope, current: () => true)).candidate, isNull);
+    expect((await source.writeVariantFamily(original, current: () => true)).state, WorkspaceVariantFamilyWriteState.submitted);
+    expect((await source.writeVariantFamily(original, current: () => true, reconcile: true)).state, WorkspaceVariantFamilyWriteState.submitted);
+    expect(credentials.modes, [SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard]);
+    expect(requests.map((r) => r['operation']), ['readStoreVariantFamily', 'submitStoreVariantFamily', 'reconcileStoreVariantFamily']);
+    for (final request in requests.skip(1)) {
+      final body = Map<String, Object?>.of(request)..remove('operation'); expect(body, original.body);
+      expect(body.containsKey('approved'), isFalse); expect(body.containsKey('actor'), isFalse);
+    }
+    expect((await source.forOwnerAccount('other-owner').writeVariantFamily(original, current: () => true)).state,
+      WorkspaceVariantFamilyWriteState.notSent);
+    expect((await source.writeVariantFamily(original, current: () => false)).state, WorkspaceVariantFamilyWriteState.notSent);
+    expect(requests.length, 3);
+  });
+  for (final corrupt in ['Store', 'family', 'realm', 'owner', 'revision', 'hash', 'timestamp', 'approval', 'payload']) {
+    test('LF03 OWNER-FAMILY endpoint retains uncertainty for wrong $corrupt acknowledgement', () async {
+      final original = familyIntent(), data = ownerFamilyAck(familyIntent());
+      final candidate = data['candidate'] as Map;
+      if (corrupt == 'Store') data['storeId'] = 'store-other';
+      if (corrupt == 'family') data['familyId'] = 'family-other';
+      if (corrupt == 'realm') data['realm'] = 'evaluation';
+      if (corrupt == 'owner') candidate['submittedBy'] = 'owner-other';
+      if (corrupt == 'revision') candidate['revision'] = 2;
+      if (corrupt == 'hash') candidate['fingerprint'] = '0' * 64;
+      if (corrupt == 'timestamp') candidate['submittedAt'] = [at.toIso8601String()];
+      if (corrupt == 'approval') data['approved'] = true;
+      if (corrupt == 'payload') (candidate['family'] as Map)['title'] = 'Changed';
+      final source = familyOwnerConnection(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+        body: jsonEncode({'ok': true, 'data': data}))));
+      expect((await source.writeVariantFamily(original, current: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+    });
+  }
+  test('LF03 OWNER-FAMILY not-found permits only original reconciliation, not submit success', () async {
+    final original = familyIntent();
+    final source = familyOwnerConnection(OwnerTransport((_) async => SocialContentResponse(statusCode: 200,
+      body: jsonEncode({'ok': true, 'data': ownerFamilyAck(original, absent: true)}))));
+    expect((await source.writeVariantFamily(original, current: () => true, reconcile: true)).state, WorkspaceVariantFamilyWriteState.notFound);
+    expect((await source.writeVariantFamily(original, current: () => true)).state, WorkspaceVariantFamilyWriteState.unknown);
+  });
+  test('LF03 OWNER-FAMILY older trusted approval is distinct from newer submitted changes', () async {
+    final reviewed = familyIntent(), next = familyIntent(expectedRevision: 1);
+    final data = ownerFamilyHead(candidate: next, review: {'schemaVersion': 1, 'revision': 1,
+      'decision': 'verify', 'reviewerUserId': 'reviewer-one', 'reviewedAt': at.toIso8601String(),
+      'reasonCode': 'checked-source', 'catalogueId': 'catalogue-one', 'tenantId': 'tenant-one', 'candidate': familyCandidateData(reviewed)});
+    final head = WorkspaceVariantFamilyHead.decode(jsonDecode(jsonEncode(data)), familyScope, at);
+    final source = _FamilyOwner()..head = head, controller = familyController(source, _FamilyJournal());
+    addTearDown(controller.dispose); expect(await controller.refresh(), isTrue);
+    expect(controller.message, contains('waiting for review')); expect(controller.message, isNot(contains('approved')));
+    source.head = WorkspaceVariantFamilyHead.decode(jsonDecode(jsonEncode(ownerFamilyHead(candidate: reviewed))), familyScope, at);
+    expect(await controller.refresh(), isFalse); expect(controller.head!.candidate!.revision, 2);
+  });
+  test('LF03 OWNER-FAMILY does not create repeated submissions for unchanged saved combinations', () async {
+    final original = familyIntent(), owner = _FamilyOwner()..head = WorkspaceVariantFamilyHead.decode(
+      jsonDecode(jsonEncode(ownerFamilyHead(candidate: familyIntent()))), familyScope, at);
+    final journal = _FamilyJournal(), controller = familyController(owner, journal); addTearDown(controller.dispose);
+    expect(await controller.refresh(), isTrue);
+    expect((await controller.submit(original.input, inputCurrent: () => true)).state, WorkspaceVariantFamilyWriteState.notSent);
+    expect(owner.submitted, isEmpty); expect(journal.saves, 0);
+  });
+  test('LF03 OWNER-FAMILY secure journal restarts with account Store realm family and original isolated', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var account = familyScope.account;
+    SecureWorkVariantFamilyJournal fresh() => SecureWorkVariantFamilyJournal(currentAccount: () => account);
+    final original = familyIntent(); await fresh().savePending(original);
+    expect((await fresh().readPending(familyScope))!.fingerprint, original.fingerprint);
+    final other = WorkspaceVariantFamilyIntent.fromJson(jsonDecode(jsonEncode(original.toJson()..['idempotencyKey'] = 'different-request')));
+    await expectLater(fresh().savePending(other), throwsFormatException);
+    await expectLater(fresh().removePending(other), throwsFormatException);
+    for (final scope in [
+      (account: account, store: 'store-other', realm: 'production', family: 'family-one'),
+      (account: account, store: 'store-one', realm: 'evaluation', family: 'family-one'),
+      (account: account, store: 'store-one', realm: 'production', family: 'family-other'),
+    ]) { expect(await fresh().readPending(scope), isNull); }
+    account = 'owner-other'; await expectLater(fresh().readPending(familyScope), throwsA(isA<WorkGatewayException>()));
+    account = familyScope.account; await fresh().removePending(original); expect(await fresh().readPending(familyScope), isNull);
+  });
+  test('LF03 OWNER-FAMILY journal native tails survive caller timeout across instances', () async {
+    final storage = _DelayedDetailsStorage(), original = familyIntent();
+    SecureWorkVariantFamilyJournal fresh() => SecureWorkVariantFamilyJournal(storage: storage, currentAccount: () => familyScope.account);
+    final first = fresh().savePending(original); await storage.entered.future;
+    await expectLater(first.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final remove = fresh().removePending(original);
+    await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await first; await remove;
+    expect(storage.writes, 2); expect(await fresh().readPending(familyScope), isNull);
+  });
+  WorkSession ownerFamilySession(_SessionFamilyCatalogue source, _FamilyJournal journal, {ListingAccount? account}) {
+    final work = WorkSession(contactDraftStore: account ?? ListingAccount(), catalogueGateway: source,
+      catalogueBindingPendingStoreFactory: (_) => BindingStore(), variantFamilyJournalFactory: (_) => journal)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+        profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+      ..workspaceId = 'store-one';
+    final base = listingItem();
+    final family = WorkspaceVariantFamily(id: 'family-one', revision: 1, title: base.title, brand: base.brand,
+      categoryId: base.categoryId, content: base.content, options: [for (final variety in ['sunflower', 'olive'])
+        BuyV2VariantAttribute(dimensionId: 'variety', dimensionLabel: 'Variety', optionId: variety,
+          optionLabel: variety, kind: BuyV2VariantDimensionKind.other)]);
+    for (final second in [false, true]) {
+      final skuId = second ? 'sku-two' : 'sku-one';
+      final item = WorkspaceCatalogueItem.fromInventoryJson({...base.toInventoryJson(), 'id': skuId,
+        'canonicalId': second ? 'canonical-two' : 'canonical-one', 'sku': second ? 'HOST-TWO' : 'HOST-ONE',
+        'variant': second ? 'Olive' : 'Sunflower',
+        'stockEntry': {...base.stockEntry!.toJson(), 'productId': skuId, 'sku': second ? 'HOST-TWO' : 'HOST-ONE'}})
+        .copyWith(variantMembership: WorkspaceVariantMembership(familyId: family.id,
+          selections: {'variety': second ? 'olive' : 'sunflower'}));
+      expect(work.addOrUpdateWorkspaceProduct(item, variantFamily: family,
+        stockEntryMethod: WorkspaceStockEntryMethod.manual), isTrue);
+      final row = ownerRow(listed: true)
+        ..['skuId'] = skuId ..['canonicalProductId'] = item.canonicalId ..['sku'] = item.sku
+        ..['verifiedPackId'] = second ? 'pack-two' : 'pack-one';
+      (row['content'] as Map)['variant'] = item.variant;
+      (row['provenance'] as Map)['sourceRecordId'] = skuId;
+      source.rows[skuId] = WorkspaceCatalogueOwnedSku.decode(row, storeId: 'store-one', skuId: skuId, realm: 'production', now: at);
+    }
+    return work;
+  }
+  test('LF03 OWNER-FAMILY session submits all saved exact members without changing Stock or invoices', () async {
+    final source = _SessionFamilyCatalogue(), journal = _FamilyJournal(), work = ownerFamilySession(source, journal);
+    addTearDown(work.dispose);
+    final before = work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList();
+    source.family.write = (original, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(original));
+    expect(await work.checkWorkspaceVariantFamily('family-one'), isTrue);
+    expect(await work.submitWorkspaceVariantFamily('family-one', inputCurrent: () => true), isTrue, reason: work.errorMessage);
+    final sent = source.family.submitted.single.input.toJson();
+    expect((sent['members'] as List).map((m) => m['skuId']).toSet(), {'sku-one', 'sku-two'});
+    expect(sent.containsKey('stock'), isFalse); expect(sent.containsKey('purchasePrice'), isFalse);
+    expect(work.workspaceCatalogueItems.map((p) => p.toInventoryJson()).toList(), before);
+    expect(work.workspaceInvoices, isEmpty); expect(work.workspaceOrders, isEmpty); expect(journal.pending, isNull);
+  });
+  test('LF03 OWNER-FAMILY Store loop restores original under a fresh lifetime and rejects retired reply', () async {
+    final source = _SessionFamilyCatalogue(), journal = _FamilyJournal()..pending = familyIntent();
+    final work = ownerFamilySession(source, journal); addTearDown(work.dispose);
+    final first = work.workspaceVariantFamilyPublisher('family-one')!; expect(await first.restore(), isTrue);
+    final original = journal.pending!, delayed = Completer<WorkspaceVariantFamilyWriteResult>();
+    addTearDown(() { if (!delayed.isCompleted) delayed.complete(const WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.unknown)); });
+    source.family.write = (_, _) => delayed.future;
+    final old = work.checkWorkspaceVariantFamily('family-one', original: true); await Future<void>.delayed(Duration.zero);
+    final store = work.activeWorkspace!;
+    work.activeWorkspace = const WorkWorkspace(id: 'store-two', name: 'Other host Store', profileLabel: 'Grocery',
+      profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    work.activeWorkspace = store;
+    final next = work.workspaceVariantFamilyPublisher('family-one')!;
+    expect(next, isNot(same(first))); expect(next.active, isTrue); expect(first.active, isFalse);
+    source.family.write = (request, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(request));
+    expect(await work.checkWorkspaceVariantFamily('family-one', original: true), isTrue);
+    expect(next.pending, isNull); expect(journal.pending, isNull);
+    delayed.complete(WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(original)));
+    expect(await old, isFalse); expect(next.pending, isNull); expect(source.family.submitted, isEmpty);
+  });
+  test('LF03 OWNER-FAMILY retired preparation cannot clear successor busy marker after Store loop', () async {
+    final source = _SessionFamilyCatalogue(), journal = _FamilyJournal(), work = ownerFamilySession(source, journal);
+    addTearDown(work.dispose); expect(await work.checkWorkspaceVariantFamily('family-one'), isTrue);
+    final oldEntered = Completer<void>(), nextEntered = Completer<void>(), oldRelease = Completer<void>(), nextRelease = Completer<void>();
+    addTearDown(() { if (!oldRelease.isCompleted) oldRelease.complete(); if (!nextRelease.isCompleted) nextRelease.complete(); });
+    var phase = 0;
+    source.beforeRead = (_) async {
+      if (phase == 0) { if (!oldEntered.isCompleted) oldEntered.complete(); await oldRelease.future; }
+      else { if (!nextEntered.isCompleted) nextEntered.complete(); await nextRelease.future; }
+    };
+    final old = work.submitWorkspaceVariantFamily('family-one', inputCurrent: () => true); await oldEntered.future;
+    final store = work.activeWorkspace!;
+    work.activeWorkspace = const WorkWorkspace(id: 'store-two', name: 'Other host Store', profileLabel: 'Grocery',
+      profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    work.activeWorkspace = store;
+    expect(await work.checkWorkspaceVariantFamily('family-one'), isTrue);
+    phase = 1;
+    source.family.write = (request, _) async => WorkspaceVariantFamilyWriteResult(WorkspaceVariantFamilyWriteState.submitted, familyCandidate(request));
+    final next = work.submitWorkspaceVariantFamily('family-one', inputCurrent: () => true); await nextEntered.future;
+    oldRelease.complete(); expect(await old, isFalse);
+    expect(work.workspaceVariantFamilyBusy('family-one'), isTrue);
+    nextRelease.complete(); expect(await next, isTrue);
+    expect(source.family.submitted.length, 1); expect(work.workspaceVariantFamilyBusy('family-one'), isFalse);
+  });
+  for (final fault in ['missing mirror', 'changed price', 'unsaved editor', 'retired owner', 'changed saved group']) {
+    test('LF03 OWNER-FAMILY session blocks $fault before any submission', () async {
+      final source = _SessionFamilyCatalogue(), journal = _FamilyJournal(), account = ListingAccount();
+      final work = ownerFamilySession(source, journal, account: account); addTearDown(work.dispose);
+      expect(await work.checkWorkspaceVariantFamily('family-one'), isTrue);
+      if (fault == 'missing mirror') source.rows.remove('sku-two');
+      if (fault == 'changed price') work.workspaceCatalogueItems[1] = work.workspaceCatalogueItems[1].copyWith(sellingPrice: 261);
+      if (fault == 'retired owner') {
+        source.beforeRead = (_) async { account.owner = 'other-owner'; };
+      }
+      if (fault == 'changed saved group') {
+        source.beforeRead = (_) async {
+          work.workspaceCatalogueItems[1] = work.workspaceCatalogueItems[1].copyWith(sellingPrice: 261);
+        };
+      }
+      expect(await work.submitWorkspaceVariantFamily('family-one', inputCurrent: () => fault != 'unsaved editor'), isFalse);
+      expect(source.family.submitted, isEmpty); expect(journal.pending, isNull);
+    });
+  }
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03 OWNER-FAMILY saved editor inline status and dirty guard at $scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 844);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset); addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final source = _SessionFamilyCatalogue(), journal = _FamilyJournal(), work = ownerFamilySession(source, journal);
+      await openListingEditor(tester, work);
+      final check = find.byKey(const Key('work-product-family-check-status'));
+      await tester.ensureVisible(check); await tester.pumpAndSettle(); await tester.tap(check); await tester.pumpAndSettle();
+      final submit = find.byKey(const Key('work-product-family-submit'));
+      await tester.ensureVisible(submit); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(submit).onPressed, isNotNull); expect(source.family.submitted, isEmpty);
+      expect(tester.getSize(submit).height, greaterThanOrEqualTo(48));
+      final title = find.byKey(const Key('work-product-title'));
+      await tester.ensureVisible(title); await tester.pumpAndSettle(); await tester.enterText(title, 'Unsaved host edit');
+      await tester.pumpAndSettle(); await tester.ensureVisible(submit); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(submit).onPressed, isNull); expect(source.family.submitted, isEmpty);
+      expect(find.text('Save current product changes before submitting the group.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   TestWidgetsFlutterBinding.ensureInitialized();
   Map<String, dynamic> policyEnvelope({
     int revision = 1,
@@ -4753,34 +5163,6 @@ void main() {
       expect(reader.snapshotFor(product).supplierPolicyResolutionPending, true);
     },
   );
-  Future<void> openListingEditor(WidgetTester tester, WorkSession work) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(360, 740);
-    addTearDown(tester.view.reset);
-    work.retailerSetupSaved = true;
-    work.reviewStage = WorkReviewStage.live;
-    final core = BuySession(),
-        consumer = BuyV2Session(core: core, reviewDataEnabled: false);
-    addTearDown(work.dispose);
-    addTearDown(core.dispose);
-    addTearDown(consumer.dispose);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: WorkWorkspaceDashboardScreen(
-          session: work,
-          procurementSession: consumer,
-          initialSection: 'stock',
-          accountAuthenticated: true,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final edit = find.byKey(const Key('work-catalogue-edit-sku-one'));
-    await tester.ensureVisible(edit);
-    await tester.tap(edit);
-    await tester.pumpAndSettle();
-  }
-
   testWidgets(
     'reachable product editor saves an explicit listing request without a Stock movement',
     (tester) async {

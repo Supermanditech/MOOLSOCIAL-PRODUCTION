@@ -270,6 +270,7 @@ if ($RequireLfPublicationProbes) {
     }
     foreach ($optionalOwner in @('apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
         'apps/mobile/lib/features/work/work_publication_data.dart',
+        'apps/mobile/lib/features/work/work_services.dart',
         'backend/functions/src/workspace/workspace_promotion_service.ts')) {
       $legacyFacts=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
       $legacyFacts.batch02Facts.owners=@($legacyFacts.batch02Facts.owners | Where-Object { $_ -cne $optionalOwner })
@@ -293,7 +294,7 @@ if ($RequireLfPublicationProbes) {
     if ($null -ne $continuation.batch02Facts.PSObject.Properties['reviewedFamilyContractVersion']) {
       $legacy=$continuation | ConvertTo-Json -Depth 12 | ConvertFrom-Json
       $legacy.batch02Facts.PSObject.Properties.Remove('reviewedFamilyContractVersion')
-      $legacy.batch02Facts.owners=@($legacy.batch02Facts.owners | Where-Object { $_ -cne 'backend/functions/src/index.ts' })
+      $legacy.batch02Facts.owners=@($legacy.batch02Facts.owners | Where-Object { $_ -cnotin @('backend/functions/src/index.ts', 'apps/mobile/lib/features/work/work_services.dart') })
       Assert-Fixture (Test-Lf27Batch01Continuation $legacy @()) 'Historical facts contract rejected.'
       Assert-Fixture (-not (Test-Lf27Batch01Continuation $legacy @('backend/functions/src/index.ts'))) 'Unclaimed family dispatch admitted.'
       $cases+=2
