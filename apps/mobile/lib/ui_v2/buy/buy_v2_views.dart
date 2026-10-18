@@ -22694,7 +22694,8 @@ List<String> _purchaseProtectionLines(BuyV2Product product) {
       .whereType<String>()
       .toList(growable: false);
   return [
-    ?_nonBlankComplianceValue(protection.summary),
+    ?(_nonBlankComplianceValue(protection.summary) ??
+        _nonBlankComplianceValue(product.returnPolicy)),
     if (remedies.isNotEmpty) 'Available options: ${remedies.join(', ')}',
     if (_nonBlankComplianceValue(protection.windowLabel) case final value?)
       'Request window: $value',

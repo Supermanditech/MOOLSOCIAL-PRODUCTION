@@ -3851,6 +3851,97 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 1.4]) {
+    for (final summary in ['', '   ', 'Host supplied structured returns']) {
+      testWidgets('PF07 supplied returns survive warranty-only protection summary=$summary scale=$scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 700);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final original = BuyV2Catalogue.products.firstWhere((p) =>
+          p.destination == BuyV2Destination.shop && (p.returnPolicy?.trim().isNotEmpty ?? false));
+        final product = original.copyWith(purchaseProtection: BuyV2PurchaseProtection(
+          summary: summary, warrantyLabel: 'Host supplied manufacturer warranty'));
+        final core = BuySession();
+        final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(product), reviewDataEnabled: false);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCommerce();
+        expect(session.openProduct(product.id), isTrue);
+        await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), home: BuyV2Screen(
+          session: session, initialDestination: product.destination,
+          initialView: BuyV2View.product, productId: product.id)));
+        await tester.pumpAndSettle();
+        final returns = find.byKey(ValueKey('buy-product-assurance-returns-${product.id}'));
+        final scroll = find.descendant(of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+          matching: find.byType(Scrollable)).first;
+        await tester.scrollUntilVisible(returns, 220, scrollable: scroll);
+        await Scrollable.ensureVisible(tester.element(returns), alignment: .4);
+        await tester.pumpAndSettle();
+        await tester.tap(returns.hitTestable()); await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        final expected = summary.trim().isEmpty ? original.returnPolicy! : summary;
+        expect(find.descendant(of: sheet, matching: find.text(expected)), findsOneWidget,
+          reason: 'A separate supplied warranty must not suppress the Store return disclosure');
+        expect(find.descendant(of: sheet, matching: find.text('Warranty: Host supplied manufacturer warranty')), findsOneWidget);
+        if (summary.trim().isNotEmpty) {
+          expect(find.descendant(of: sheet, matching: find.text(original.returnPolicy!)), findsNothing,
+            reason: 'A nonblank structured summary remains authoritative, not a duplicate return rule');
+        }
+        expect(session.countForDestination(product.destination), 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('PF07 original purchased return disclosure survives cache and changed catalogue', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 700);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final original = BuyV2Catalogue.products.firstWhere((p) =>
+      p.destination == BuyV2Destination.shop && (p.returnPolicy?.trim().isNotEmpty ?? false))
+      .copyWith(purchaseProtection: const BuyV2PurchaseProtection(
+        summary: '  ', warrantyLabel: 'Original supplied warranty'));
+    final order = BuyV2Order.minor(id: 'host-pf07-original-order', destination: original.destination,
+      title: 'Host original purchase', itemSummary: '1 purchased pack', totalMinor: original.priceMinor,
+      partner: original.seller, partnerType: original.sellerType, promise: 'Host original delivery',
+      destinationLabel: 'Host address', progress: 1, status: BuyV2OrderStatus.delivered,
+      productIds: [original.id], lines: [BuyV2CartLine(product: original, quantity: 1)],
+      invoiceAvailable: false);
+    final preferences = _SupplierPolicyPreferences();
+    final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'host-pf07-buyer');
+    expect(await store.write(BuyV2CustomerStateSnapshot(orders: [order])), isTrue);
+    final restored = (await store.read())!.orders.single;
+    expect(restored.lines.single.product.returnPolicy, original.returnPolicy);
+    expect(restored.lines.single.product.purchaseProtection!.warrantyLabel, 'Original supplied warranty');
+    final changed = original.copyWith(purchaseProtection: const BuyV2PurchaseProtection(
+      summary: 'Changed current catalogue terms', warrantyLabel: 'Changed current warranty'));
+    final core = BuySession();
+    final session = BuyV2Session(core: core, commerceAdapter: _SingleProductCommerceAdapter(changed),
+      customerStateStore: store, reviewDataEnabled: false);
+    addTearDown(session.dispose); addTearDown(core.dispose);
+    await session.restoreCommerce(); await session.restoreCustomerState();
+    expect(session.openOrderItems(order.id), isTrue);
+    // Isolate the restored original-order consumer; a fresh authoritative empty
+    // feed from the single-product fixture is not an order-retention contract.
+    await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(),
+      home: Scaffold(body: BuyV2OrderItemsView(session: session))));
+    await tester.pumpAndSettle();
+    final policy = find.byKey(ValueKey('buy-order-item-policy-${original.id}'));
+    await tester.scrollUntilVisible(policy, 180, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    expect(policy, findsOneWidget);
+    final text = tester.widget<Text>(policy).data!;
+    expect(text, contains(original.returnPolicy!));
+    expect(text, contains('Warranty: Original supplied warranty'));
+    expect(text, isNot(contains('Changed current')));
+    expect(tester.widget<Text>(policy).maxLines, isNull);
+    expect(session.cartLines, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'published protection fields remain complete at compact large text',
     (tester) async {
