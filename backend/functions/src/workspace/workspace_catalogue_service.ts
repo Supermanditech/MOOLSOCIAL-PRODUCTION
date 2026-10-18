@@ -77,6 +77,8 @@ export interface WorkspaceCatalogueRepository {
   page(profile: WorkspaceProfileRecord, ownerUserId: string | undefined,
     after: string | undefined, limit: number, skuId?: string): Promise<StoreSkuRecord[]>;
   catalogue(catalogueId: string): Promise<CatalogueAggregate | undefined>;
+  /** Complete bounded directory, never public product facts or approval. */
+  publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
   confirmPublicListingSnapshot?(storeId: string, records: readonly StoreSkuRecord[],
     identity: CatalogueIdentity, catalogueFingerprint: string, detailsFingerprint?: string): Promise<WorkspaceProfileRecord | undefined>;
@@ -182,6 +184,15 @@ function checkedListingBinding(value: unknown, expected: PublicCatalogueListingB
   const row = exact(value, ["schemaVersion", "realm", "listingId", "storeId", "skuId", "channel", "canonicalProductId", "verifiedPackId"]);
   if (cataloguePayloadHash(row) !== cataloguePayloadHash(expected)) invalid("Public listing identity conflicts with its saved SKU.");
   return structuredClone(expected);
+}
+function discoveryBinding(value: unknown, realm: WorkspaceCatalogueRepository["realm"]): PublicCatalogueListingBinding {
+  const row = exact(value, ["schemaVersion", "realm", "listingId", "storeId", "skuId", "channel", "canonicalProductId", "verifiedPackId"]);
+  if (row.schemaVersion !== 1 || row.realm !== realm || typeof row.channel !== "string" ||
+      !["retail", "wholesale", "bulk"].includes(row.channel)) invalid("Listing directory is invalid.");
+  const storeId = id(row.storeId), skuId = id(row.skuId), channel = row.channel as StoreSkuChannel["kind"];
+  return checkedListingBinding(row, {schemaVersion: 1, realm, storeId, skuId, channel,
+    canonicalProductId: id(row.canonicalProductId), verifiedPackId: id(row.verifiedPackId),
+    listingId: `listing-${cataloguePayloadHash([1, realm, storeId, skuId, channel]).toLowerCase()}`});
 }
 export interface CatalogueIdentity {catalogueId: string; tenantId: string}
 
@@ -330,6 +341,129 @@ export class WorkspaceCatalogueService {
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  /** Complete bounded discovery, not serviceability, Stock or ordering authority.
+   * Directory rows are only candidates: every item uses the existing reviewed
+   * projection. Above capacity fail honestly; never sort/count a truncated set.
+   */
+  async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
+    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor"]);
+    if (body.discoveryPageVersion !== 1) invalid();
+    const query = publicPageQuery(body.query), pageSize = integer(body.pageSize, 1, 50);
+    const identity = this.identity && {...this.identity};
+    if (!identity || !this.repository.publicDiscoveryBindings || !this.repository.publicCatalogueSource) {
+      throw new WorkspaceProfileError("unavailable", "Public catalogue is not connected.", 503);
+    }
+    const unavailable = () => new WorkspaceProfileError("unavailable", "The complete public catalogue could not be confirmed.", 503);
+    const directory = async () => {
+      const raw = await this.repository.publicDiscoveryBindings!();
+      if (!Array.isArray(raw) || raw.length > 500) throw unavailable();
+      const bindings = raw.map(row => discoveryBinding(row, this.repository.realm))
+        .sort((a, b) => a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1);
+      if (new Set(bindings.map(b => b.listingId)).size !== bindings.length) throw unavailable();
+      return bindings;
+    };
+    const bindings = await directory(), storeIds = [...new Set(bindings.map(b => b.storeId))].sort();
+    if (storeIds.length > 20) throw unavailable();
+    const readSource = async (storeId: string) => {
+      const profile = await this.repository.store(storeId);
+      if (!profile || profile.workspaceId !== storeId || profile.familyId !== "products-trade" ||
+          typeof profile.profileId !== "string" || !profile.profileId.startsWith("retailer-") ||
+          !["pending", "approved", "rejected", "suspended", "live"].includes(profile.status) ||
+          typeof profile.shopEnabled !== "boolean") throw unavailable();
+      // Keep confirmed withdrawal in the snapshot. Undefined source also means
+      // missing catalogue/duplicate profiles/tenant mismatch; it is NOT zero.
+      if (profile.status !== "live" || profile.shopEnabled === false) return {profile, source: null};
+      const source = await this.repository.publicCatalogueSource!(storeId, identity);
+      if (!source || source.records.length > 500 || cataloguePayloadHash(source.profile) !== cataloguePayloadHash(profile)) throw unavailable();
+      return {profile, source};
+    };
+    const sources: Array<{profile: WorkspaceProfileRecord; source: PublicCatalogueSource | null}> = [];
+    for (const storeId of storeIds) sources.push(await readSource(storeId));
+    const sourceHash = cataloguePayloadHash([identity, this.repository.realm, bindings, sources]);
+    const project = async (at: string, values: typeof sources) => {
+      const service = new WorkspaceCatalogueService(this.repository, identity, () => new Date(at), this.policyReader);
+      const projections: Record<string, unknown>[] = [];
+      for (let i = 0; i < storeIds.length; i++) {
+        const source = values[i]!.source;
+        if (!source) continue;
+        const data = await service.publicCatalogue({storeId: storeIds[i], listingReadbackVersion: 1,
+          productFactsReadbackVersion: 1, unbrandedProduceReadbackVersion: 1,
+          storeDetailsReadbackVersion: 1, storeClassificationReadbackVersion: 1,
+          mediaReadbackVersion: 1, policyReadbackVersion: 1}, source) as Record<string, unknown>;
+        if (data.state === "unavailable" && (source.profile.status !== "live" || !source.profile.shopEnabled)) continue;
+        if (data.state !== "ready" || data.listingCoverage !== "complete") throw unavailable();
+        projections.push(data);
+      }
+      return projections;
+    };
+    const projections = await project(this.now().toISOString(), sources);
+    // Final whole-directory and whole-source read detects inserted, withdrawn,
+    // private, or excluded candidates, not just the visible returned page.
+    if (cataloguePayloadHash(await directory()) !== cataloguePayloadHash(bindings)) {
+      throw new WorkspaceProfileError("stale_snapshot", "Public catalogue changed. Refresh products.", 409);
+    }
+    const confirmed: typeof sources = [];
+    for (const storeId of storeIds) confirmed.push(await readSource(storeId));
+    if (cataloguePayloadHash(await directory()) !== cataloguePayloadHash(bindings)) {
+      throw new WorkspaceProfileError("stale_snapshot", "Public catalogue changed. Refresh products.", 409);
+    }
+    if (cataloguePayloadHash([identity, this.repository.realm, bindings, confirmed]) !== sourceHash) {
+      throw new WorkspaceProfileError("stale_snapshot", "Public catalogue changed. Refresh products.", 409);
+    }
+    const observedAt = this.now().toISOString(), finalProjections = await project(observedAt, confirmed);
+    const stable = (values: typeof projections) => values.map(stablePublicProjection);
+    if (cataloguePayloadHash(stable(finalProjections)) !== cataloguePayloadHash(stable(projections))) {
+      throw new WorkspaceProfileError("stale_snapshot", "Public catalogue changed. Refresh products.", 409);
+    }
+    type Row = {skuId: string; content: StoreSkuContent; pack: StoreSkuPack;
+      channels: Array<StoreSkuChannel & {revision: string; validUntil: string}>; listings: PublicCatalogueListingBinding[]};
+    const selected: Array<{channel: StoreSkuChannel["kind"]; listing: Record<string, unknown>; listingId: string; price: number}> = [];
+    for (const data of finalProjections) for (const row of data.items as Row[]) for (const channel of row.channels) {
+      if (query.destination === "shop" ? channel.kind !== "retail" : channel.kind === "retail") continue;
+      if (query.tradeType !== null && channel.kind !== query.tradeType) continue;
+      const binding = row.listings.find(b => b.channel === channel.kind)!;
+      const candidate = bindings.find(b => b.listingId === binding.listingId);
+      if (!candidate || cataloguePayloadHash(candidate) !== cataloguePayloadHash(binding)) throw unavailable();
+      if (query.listingIds.length && !query.listingIds.includes(binding.listingId) ||
+          query.categoryId !== "all" && row.content.categoryId !== query.categoryId ||
+          query.brands.length && !query.brands.includes(row.content.brand) ||
+          query.maximumPriceMinor !== null && channel.priceMinor > query.maximumPriceMinor ||
+          query.search && ![row.content.title, row.content.brand, row.content.variant, row.pack.label]
+            .join(" ").toLowerCase().replace(/\s+/gu, " ").includes(query.search)) continue;
+      selected.push({channel: channel.kind, listingId: binding.listingId, price: channel.priceMinor,
+        listing: {...data, items: [row], nextCursor: null}});
+    }
+    if (selected.length > 500 || new Set(selected.map(item => item.listingId)).size !== selected.length) throw unavailable();
+    selected.sort((a, b) => (query.sort === "priceLowToHigh" ? a.price - b.price :
+      query.sort === "priceHighToLow" ? b.price - a.price : 0) ||
+      (a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1));
+    const queryHash = cataloguePayloadHash([identity, this.repository.realm, query]).toLowerCase();
+    const snapshotId = cataloguePayloadHash([sourceHash, stable(finalProjections)]).toLowerCase();
+    let index = 0;
+    if (body.cursor !== undefined) {
+      const encoded = text(body.cursor, 2048);
+      let cursor: Record<string, unknown>;
+      try { cursor = exact(JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")), ["v", "q", "s", "n", "i"]); }
+      catch { invalid("Public catalogue cursor is invalid."); }
+      if (Buffer.from(JSON.stringify(cursor)).toString("base64url") !== encoded || cursor.v !== 1 ||
+          cursor.q !== queryHash || cursor.s !== snapshotId || cursor.n !== pageSize) {
+        throw new WorkspaceProfileError("stale_cursor", "Public catalogue changed. Refresh products.", 409);
+      }
+      index = integer(cursor.i, 0, 500);
+      if (index % pageSize || index >= selected.length) invalid("Public catalogue cursor is outside this snapshot.");
+    }
+    const cursorAt = (i: number) => Buffer.from(JSON.stringify({v: 1, q: queryHash, s: snapshotId, n: pageSize, i})).toString("base64url");
+    const nextCursor = index + pageSize < selected.length ? cursorAt(index + pageSize) : null;
+    const result = {schemaVersion: 1, discoveryPageVersion: 1, realm: this.repository.realm,
+      state: "ready", coverage: "verified_public_only", directoryCoverage: "complete_bounded",
+      orderingAvailable: false, observedAt, query,
+      items: selected.slice(index, index + pageSize).map(({channel, listing}) => ({channel, listing})),
+      page: {snapshotId, startIndex: index, totalCount: selected.length,
+        previousCursor: index === 0 ? null : cursorAt(Math.max(0, index - pageSize)), nextCursor}};
+    if (Buffer.byteLength(JSON.stringify(result), "utf8") > 480 * 1024) throw unavailable();
+    return result;
+  }
 
   async handleStoreVariantFamily(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
     const base = {schemaVersion: 1, realm: this.repository.realm, orderingAvailable: false};
@@ -1424,6 +1558,15 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   }
   private listingRoot() {
     return this.firestore.collection("workspaceCatalogues").doc(this.realm).collection("publicListingBindings");
+  }
+  async publicDiscoveryBindings(): Promise<PublicCatalogueListingBinding[]> {
+    const snapshot = await this.listingRoot().orderBy(FieldPath.documentId()).limit(501).get();
+    if (snapshot.size > 500) throw new WorkspaceProfileError("unavailable", "Public catalogue capacity requires a larger discovery source.", 503);
+    return snapshot.docs.map(doc => {
+      const binding = discoveryBinding(doc.data(), this.realm);
+      if (binding.listingId !== doc.id) invalid("Listing directory identity changed.");
+      return binding;
+    });
   }
   private detailsHead(storeId: string) { return this.root(storeId).collection("publicDetails").doc("current"); }
   async readStorePublicDetails(storeId: string, ownerUserId?: string): Promise<StorePublicDetailsRecord | undefined> {

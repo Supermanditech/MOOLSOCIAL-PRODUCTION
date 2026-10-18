@@ -2905,7 +2905,7 @@ export const moolSocialWorkspace = onRequest(
       const promotionOperation = ["readStorePromotion", "saveStorePromotion", "reconcileStorePromotion",
         "listStorePromotions", "readPublicStorePromotions"].includes(operation);
       const catalogueOperation = ["saveStoreCatalogueSku", "bindReviewedStoreCatalogueSku",
-        "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue",
+        "reconcileStoreCatalogueBinding", "listStoreCatalogueSkus", "readPublicStoreCatalogue", "readPublicCatalogueDiscovery",
         "readStorePublicDetails", "saveStorePublicDetails", "reconcileStorePublicDetails"].includes(operation) || variantFamilyOperation !== undefined;
       const orderMutation = operation === "acceptRetailerOrder" ||
         operation === "packRetailerOrder" ||
@@ -2985,6 +2985,8 @@ export const moolSocialWorkspace = onRequest(
           ? await workspaceCatalogueService().listSkus(ownerUserId, catalogueBody)
           : operation === "readPublicStoreCatalogue"
             ? await workspaceCatalogueService().publicCatalogue(catalogueBody)
+          : operation === "readPublicCatalogueDiscovery"
+            ? await workspaceCatalogueService().publicDiscovery(catalogueBody)
         : operation === "listWorkspaces"
         ? await service.listWorkspaces(ownerUserId)
         : operation === "prepareProofUpload"

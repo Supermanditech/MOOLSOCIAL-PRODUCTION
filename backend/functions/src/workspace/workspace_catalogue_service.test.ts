@@ -5,7 +5,7 @@ import {initializeApp, deleteApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingBindings, channelTerms, planCatalogueSave, normalizeSku,
   planCatalogueProduction, planReviewedCatalogueSave, type CatalogueProducerAuthority,
-  type CatalogueProductionReceipt, type CatalogueSave, type StoreSkuInput, type StoreSkuContent,
+  type CatalogueProductionReceipt, type CatalogueSave, type StoreSkuInput, type StoreSkuContent, type StoreSkuChannel,
   FirestoreWorkspaceCatalogueRepository, type StoreSkuRecord, type WorkspaceCatalogueRepository, type PublicCatalogueSource,
   planStorePublicDetailsSave, normalizeStorePublicDetails, type StorePublicDetailsCommand,
   type StorePublicDetailsRecord, type StorePublicDetailsReceipt,
@@ -19,6 +19,10 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test("LF-DISCOVERY resolves directory candidates through reviewed public readback", () => {
+  assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).publicDiscovery, "function");
+  assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).publicDiscoveryBindings, "function");
+});
 test("reviewed family has real persistent submission, receipt and trusted review entries", () => {
   const repository = FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>;
   for (const method of ["submitVariantFamily", "readVariantFamily", "reconcileVariantFamily", "reviewVariantFamily"]) {
@@ -917,6 +921,151 @@ type ViewResult = {state: string; items: Array<{channel: string; row: {skuId: st
   page: {snapshotId: string; totalCount: number; startIndex: number; nextCursor: string | null; previousCursor: string | null}};
 const viewRequest = (extra: Record<string, unknown> = {}) => ({storeId: 'store-one', cataloguePageVersion: 1,
   query: viewQuery, pageSize: 1, ...extra});
+class DiscoveryMemory extends ViewMemory {
+  directoryOverride?: unknown[];
+  async publicDiscoveryBindings() {
+    return structuredClone(this.directoryOverride ?? [...this.records.values()]
+      .flatMap(record => cataloguePublicListingBindings(this.realm, record))) as ReturnType<typeof cataloguePublicListingBindings>;
+  }
+}
+type DiscoveryResult = {state: string; orderingAvailable: boolean; items: Array<{channel: string;
+  listing: {storeId: string; items: Array<{skuId: string; channels: StoreSkuChannel[]}>}}>;
+  page: {snapshotId: string; totalCount: number; startIndex: number; nextCursor: string | null; previousCursor: string | null}};
+const discoveryRequest = (extra: Record<string, unknown> = {}) => ({discoveryPageVersion: 1,
+  query: {...viewQuery, sort: 'priceLowToHigh'}, pageSize: 1, ...extra});
+async function discoveryFixture() {
+  const repository = new DiscoveryMemory();
+  repository.stores.set('store-two', {...profile, workspaceId: 'store-two', caseId: 'case-two', name: 'Host fixture second Store'});
+  repository.aggregate = produceAll().aggregate;
+  const second = input('sku-two'); second.channels[0]!.offerId = 'offer-two'; second.channels[0]!.priceMinor = 10025;
+  const firstOffer = repository.aggregate.offers[0]!;
+  repository.aggregate = {...repository.aggregate, offers: [...repository.aggregate.offers, {...firstOffer,
+    offerId: 'offer-two', workspaceId: 'store-two', termWindows: firstOffer.termWindows.map(window => ({...window,
+      termSnapshotSha256: cataloguePayloadHash(channelTerms(second.channels[0]!))}))}]};
+  await subject(repository).saveSku('owner-one', save());
+  await subject(repository).saveSku('owner-one', save(second, {storeId: 'store-two'}));
+  await subject(repository).saveSku('owner-one', save({...input('private-one'), publicListing: false}));
+  const unreviewed = input('unreviewed-one'); unreviewed.content.title = 'Unreviewed private replacement';
+  await subject(repository).saveSku('owner-one', save(unreviewed));
+  return repository;
+}
+test('LF-DISCOVERY two Stores exact paise filters deterministic pages and isolated public envelopes', async () => {
+  const repository = await discoveryFixture(), service = subject(repository);
+  const first = await service.publicDiscovery(discoveryRequest()) as DiscoveryResult;
+  assert.equal(first.page.totalCount, 2); assert.equal(first.orderingAvailable, false);
+  assert.equal(first.items[0]!.listing.storeId, 'store-two');
+  assert.equal(first.items[0]!.listing.items[0]!.channels[0]!.priceMinor, 10025);
+  const second = await service.publicDiscovery(discoveryRequest({cursor: first.page.nextCursor})) as DiscoveryResult;
+  assert.equal(second.page.snapshotId, first.page.snapshotId); assert.equal(second.page.startIndex, 1);
+  assert.equal(second.items[0]!.listing.storeId, 'store-one'); assert.equal(second.page.nextCursor, null);
+  const previous = await service.publicDiscovery(discoveryRequest({cursor: second.page.previousCursor})) as DiscoveryResult;
+  assert.deepEqual(previous.items, first.items);
+  assert.doesNotMatch(JSON.stringify(first), /ownerUserId|sourceRecordId|provenance|unreviewed-one|private-one|Unreviewed private/);
+  const filtered = await service.publicDiscovery(discoveryRequest({query: {...viewQuery, maximumPriceMinor: 10025}})) as DiscoveryResult;
+  assert.equal(filtered.page.totalCount, 1); assert.equal(filtered.items[0]!.listing.storeId, 'store-two');
+  const empty = await service.publicDiscovery(discoveryRequest({query: {...viewQuery, search: 'absent'}})) as DiscoveryResult;
+  assert.equal(empty.page.totalCount, 0); assert.equal(empty.page.nextCursor, null); assert.deepEqual(empty.items, []);
+});
+for (const change of ['withdrawn', 'unreviewed', 'closed', 'expired']) {
+  test(`LF-DISCOVERY refresh excludes ${change} despite retained directory identity`, async () => {
+    const repository = await discoveryFixture();
+    const directory = await repository.publicDiscoveryBindings(); repository.directoryOverride = directory;
+    if (change === 'withdrawn') repository.records.get('store-two/sku-two')!.publicListing = false;
+    if (change === 'unreviewed') repository.records.get('store-two/sku-two')!.content.title = 'Changed without review';
+    if (change === 'closed') repository.stores.set('store-two', {...repository.stores.get('store-two')!, shopEnabled: false});
+    if (change === 'expired') repository.aggregate = {...repository.aggregate!, offers: repository.aggregate!.offers.map(offer =>
+      offer.workspaceId === 'store-two' ? {...offer, termWindows: offer.termWindows.map(window => ({...window, expiresAt: at}))} : offer)};
+    const result = await subject(repository).publicDiscovery(discoveryRequest({pageSize: 50})) as DiscoveryResult;
+    assert.equal(result.page.totalCount, 1); assert.equal(result.items[0]!.listing.storeId, 'store-one');
+    assert.equal((await repository.publicDiscoveryBindings()).length, directory.length);
+  });
+}
+test('LF-DISCOVERY strict identity capacity and cursor binding never produce false complete pages', async () => {
+  for (const kind of ['realm', 'listingId', 'duplicate', 'capacity']) {
+    const repository = await discoveryFixture(), bindings = await repository.publicDiscoveryBindings();
+    repository.directoryOverride = kind === 'duplicate' ? [...bindings, bindings[0]!] : kind === 'capacity'
+      ? Array(501).fill(bindings[0]) : bindings.map((row, i) => i ? row : {...row, [kind]: 'foreign'});
+    await assert.rejects(subject(repository).publicDiscovery(discoveryRequest()), Error, kind);
+  }
+  const repository = await discoveryFixture(), service = subject(repository);
+  const first = await service.publicDiscovery(discoveryRequest()) as DiscoveryResult;
+  for (const extra of [{pageSize: 2}, {query: {...viewQuery, search: 'oil'}}]) {
+    await assert.rejects(service.publicDiscovery(discoveryRequest({...extra, cursor: first.page.nextCursor})), {code: 'stale_cursor'});
+  }
+  repository.records.get('store-one/sku-one')!.publicListing = false;
+  await assert.rejects(service.publicDiscovery(discoveryRequest({cursor: first.page.nextCursor})), {code: 'stale_cursor'});
+  for (const request of [{discoveryPageVersion: 2}, {query: {...viewQuery, quick: true}},
+    {query: {...viewQuery, sort: 'deliveryFastest'}}, {storeId: 'store-one'}]) {
+    await assert.rejects(service.publicDiscovery(discoveryRequest(request)), {code: 'invalid_input'});
+  }
+});
+test('LF-DISCOVERY hidden source mutation and temporal expiry reject stale snapshots', async () => {
+  const repository = await discoveryFixture();
+  repository.onSourceRead = read => { if (read === 1) repository.records.get('store-one/private-one')!.revision++; };
+  await assert.rejects(subject(repository).publicDiscovery(discoveryRequest()), {code: 'stale_snapshot'});
+  const clean = await discoveryFixture(); let clockReads = 0;
+  const service = new WorkspaceCatalogueService(clean, catalogueIdentity,
+    () => new Date(++clockReads === 1 ? at : '2026-10-16T14:00:00.000Z'));
+  await assert.rejects(service.publicDiscovery(discoveryRequest()), {code: 'stale_snapshot'});
+});
+test('LF-DISCOVERY unresolved canonical source is unavailable not a complete empty catalogue', async () => {
+  const repository = await discoveryFixture();
+  delete repository.aggregate;
+  await assert.rejects(subject(repository).publicDiscovery(discoveryRequest()), {code: 'unavailable'});
+});
+test('LF-DISCOVERY directory insertion during confirmed source reread cannot escape complete coverage', async () => {
+  const repository = await discoveryFixture();
+  repository.directoryOverride = await repository.publicDiscoveryBindings();
+  repository.onSourceRead = read => {
+    if (read === 3) repository.directoryOverride!.push(cataloguePublicListingBindings('evaluation',
+      {...input('later-one'), schemaVersion: 1, storeId: 'store-later', revision: 1, observedAt: at})[0]!);
+  };
+  await assert.rejects(subject(repository).publicDiscovery(discoveryRequest()), {code: 'stale_snapshot'});
+});
+test('LF-DISCOVERY emulator actual trusted production binding restart discovery and withdrawal',
+  {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+    assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+    const app = initializeApp({projectId: `demo-lf03-discovery-${randomUUID().slice(0, 8)}`}, `discovery-${randomUUID()}`);
+    const db = getFirestore(app), root = db.collection('workspaceCatalogues').doc('evaluation');
+    const repository = () => new FirestoreWorkspaceCatalogueRepository(db, 'evaluation', () => new Date(at));
+    const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at));
+    try {
+      await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+      await root.collection('participants').doc('store-one').set(producerParticipant());
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority());
+      await root.collection('producerAuthorities').doc('reviewer-one').set(producerAuthority(false));
+      for (const command of productionCommands()) {
+        const owner = ['propose_product', 'propose_pack', 'create_offer'].includes(String(command.type));
+        await repository().produceCatalogue(owner ? 'owner-one' : 'reviewer-one', catalogueIdentity, command);
+      }
+      await service().bindReviewedSku('owner-one', save());
+      const secondProfile = {...profile, caseId: 'case-two', workspaceId: 'store-two', name: 'Second produced Store'};
+      const second = input('sku-two'); second.channels[0]!.offerId = 'offer-two'; second.channels[0]!.priceMinor = 10025;
+      await db.collection('workspaceProfiles').doc(secondProfile.caseId).set(secondProfile);
+      await root.collection('participants').doc('store-two').set(producerParticipant('store-two'));
+      await root.collection('producerAuthorities').doc('owner-one').set(producerAuthority(true, 'store-two'));
+      await repository().produceCatalogue('owner-one', catalogueIdentity,
+        {...productionCommands(second).at(-1)!, commandId: 'producer-second-offer', expectedVersion: 6});
+      await service().bindReviewedSku('owner-one', save(second, {storeId: 'store-two'}));
+      await service().saveSku('owner-one', save({...input('private-one'), publicListing: false}));
+      const unreviewed = input('unreviewed-one'); unreviewed.content.description = 'Not approved for publication';
+      await service().saveSku('owner-one', save(unreviewed));
+      const first = await service().publicDiscovery(discoveryRequest({pageSize: 50})) as DiscoveryResult;
+      assert.equal(first.page.totalCount, 2); assert.equal(first.items[0]!.listing.storeId, 'store-two');
+      assert.equal(first.items[0]!.listing.items[0]!.channels[0]!.priceMinor, 10025);
+      assert.deepEqual(await service().publicDiscovery(discoveryRequest({pageSize: 50})), first);
+      assert.equal((await repository().publicDiscoveryBindings()).length, 4);
+      assert.deepEqual(await new FirestoreWorkspaceCatalogueRepository(db, 'production').publicDiscoveryBindings(), []);
+      console.log(`LF_DISCOVERY_PROJECTION=${JSON.stringify(first)}`); // Isolated emulator response for the actual Dart decoder.
+      await service().bindReviewedSku('owner-one', save({...second, publicListing: false}, {
+        storeId: 'store-two', expectedRevision: 1, idempotencyKey: 'withdraw-second'}));
+      const refreshed = await service().publicDiscovery(discoveryRequest({pageSize: 50})) as DiscoveryResult;
+      assert.equal(refreshed.page.totalCount, 1); assert.equal(refreshed.items[0]!.listing.storeId, 'store-one');
+      assert.equal((await repository().publicDiscoveryBindings()).length, 4);
+      await root.collection('canonicalCatalogues').doc(catalogueIdentity.catalogueId).update({tenantId: 'foreign-tenant'});
+      await assert.rejects(service().publicDiscovery(discoveryRequest()), {code: 'unavailable'});
+    } finally { await db.terminate(); await deleteApp(app); }
+  });
 const publicDetails = {street: 'Host building, market road', city: 'Jodhpur', state: 'Rajasthan', pinCode: '342003',
   publicContactPhone: '+91 90000 00001', openingTime: '09:00', closingTime: '9:00 PM'};
 const detailsRequest = (extra: Record<string, unknown> = {}) => ({storeId: 'store-one', expectedRevision: 0,
