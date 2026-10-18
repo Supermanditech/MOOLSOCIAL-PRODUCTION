@@ -115,7 +115,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     final original = publisher.pending?.fingerprint;
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Retry the original update?'),
-      content: const Text('This sends the address, contact and hours saved in the earlier request—not your current edits. '
+      content: Text('${publisher.pending?.details.businessType == null ? 'This sends the address, contact and hours' : 'This sends the public Store details'} saved in the earlier request—not your current edits. '
         'Its result is still unconfirmed. It will not start a different update.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Retry original'))]));
@@ -135,15 +135,20 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     return AnimatedBuilder(animation: publisher, builder: (context, _) {
       final savedInputs = widget.session.workspacePublicDetailsFieldsForPublishing;
       final pending = publisher.pending != null;
+      final classification = savedInputs?.businessType != null || publisher.pending?.details.businessType != null ||
+        publisher.published?.details.businessType != null;
+      final classificationMissing = publisher.published?.details.businessType != null && savedInputs?.businessType == null;
       return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
         key: const Key('work-publication-public-update'), crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Public address, contact & hours', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(classification ? 'Public Store details' : 'Public address, contact & hours', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           Text(publisher.message ?? 'Check current public details before updating.', style: const TextStyle(fontSize: 12)),
           if (_publicEditsUnsaved) const Text('Apply Store details first. Unsaved entries are not sent publicly.',
             style: TextStyle(fontSize: 12)),
           if (!pending && !_publicEditsUnsaved && savedInputs == null)
             const Text('Save valid Store details and any changed hours on this device first.', style: TextStyle(fontSize: 12)),
+          if (!pending && classificationMissing)
+            const Text('Choose a business type or Not shown publicly before updating.', style: TextStyle(fontSize: 12)),
           Wrap(spacing: 8, runSpacing: 4, children: [
             TextButton(key: const Key('work-publication-check-public'),
               onPressed: publisher.busy || !_contextCurrent ? null : () async {
@@ -154,7 +159,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
                 }
               }, child: Text(publisher.busy ? 'Checking…' : pending ? 'Check original update' : 'Check public details')),
             if (!pending) FilledButton(key: const Key('work-publication-update-public'),
-              onPressed: !publisher.canPublish || savedInputs == null || _publicEditsUnsaved || !_contextCurrent
+              onPressed: !publisher.canPublish || savedInputs == null || classificationMissing || _publicEditsUnsaved || !_contextCurrent
                 ? null : () async {
                   await widget.session.publishWorkspacePublicDetails(inputCurrent: () => mounted &&
                     _contextCurrent && !_publicEditsUnsaved && identical(publisher, _publisher));
@@ -173,7 +178,7 @@ class _StorePublicationSettingsState extends State<StorePublicationSettings> {
     if (!_canApply()) return;
     final details = WorkspaceStorePublicationDetails.fromJson({
       ...widget.session.workspacePublicationDetails.toJson(),
-      'businessType': type ?? _businessType,
+      'businessType': ?type,
       'retailChannelEnabled': retail ?? _retail,
       'wholesaleChannelEnabled': wholesale ?? _wholesale,
     });

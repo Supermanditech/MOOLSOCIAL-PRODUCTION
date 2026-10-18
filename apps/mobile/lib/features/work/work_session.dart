@@ -903,6 +903,7 @@ class WorkSession extends ChangeNotifier {
     }
     final knownHours = tradingPreferencesPersistenceAvailable && workspaceTradingPreferencesSaved &&
       _storeData.tradingPreferencesOwner == _contactAccountScope;
+    final source = publicDetailsGateway ?? catalogueGateway;
     try {
       // A trading record which is genuinely absent does not publish the session's
       // default hours. The owner can save hours in their existing editor later.
@@ -910,7 +911,7 @@ class WorkSession extends ChangeNotifier {
         ...workspacePublicationDetails.toJson(),
         'openingTime': knownHours ? workspaceOpeningTime : '',
         'closingTime': knownHours ? workspaceClosingTime : '',
-      }));
+      }), includeBusinessType: source is AuthenticatedWorkspaceCatalogueGateway && source.storeClassificationReadbackSupported);
     } catch (_) { return null; }
   }
   Future<WorkspacePublicDetailsWriteResult> publishWorkspacePublicDetails({required bool Function() inputCurrent}) async {
@@ -11146,7 +11147,8 @@ class WorkSession extends ChangeNotifier {
   }
   Map<String, Object?> _publicationInputFields([WorkspaceStorePublicationDetails? details]) {
     final value = (details ?? workspacePublicationDetails).toJson();
-    return {for (final key in _publicationInputKeys) key: value[key]};
+    return {for (final key in _publicationInputKeys)
+      if (key != 'businessType' || value.containsKey(key)) key: value[key]};
   }
   static bool _ownerInputValuesEqual(Object? a, Object? b) {
     if (a is Map && b is Map) {
@@ -11161,6 +11163,8 @@ class WorkSession extends ChangeNotifier {
   }
   void _restorePublicationInputs(Map<String, Object?> fields) {
     final current = workspacePublicationDetails.toJson();
+    // Absence is an unknown owner choice, not the current dropdown fallback.
+    if (!fields.containsKey('businessType')) current.remove('businessType');
     final addressChanged = const ['street', 'city', 'state', 'pinCode']
         .any((key) => current[key] != fields[key]);
     _storeData.publicationDetails = WorkspaceStorePublicationDetails.fromJson({
@@ -11202,8 +11206,9 @@ class WorkSession extends ChangeNotifier {
       if (saved != null) {
         final fields = saved['fields'];
         if (saved['schemaVersion'] != 1 || saved['storeId'] != id || saved.length != 3 ||
-            fields is! Map || fields.length != _publicationInputKeys.length ||
-            fields.keys.any((key) => !_publicationInputKeys.contains(key))) {
+            fields is! Map ||
+            fields.keys.any((key) => !_publicationInputKeys.contains(key)) ||
+            _publicationInputKeys.any((key) => key != 'businessType' && !fields.containsKey(key))) {
           throw const FormatException('Invalid Store defaults');
         }
         final inputs = Map<String, Object?>.from(fields);

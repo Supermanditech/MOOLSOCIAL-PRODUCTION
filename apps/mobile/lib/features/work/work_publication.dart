@@ -145,6 +145,7 @@ abstract final class WorkspacePublicationContract {
   static const productBindings = <String, String>{
     'id': 'Server-issued listing identity when bound; legacy Store SKU identity otherwise',
     'canonicalId': 'Exact catalogue family identity',
+    'variantFamilyId': 'Explicit reviewed same-Store variant family; legacy products have no inferred family',
     'storeId': 'Store branch identity',
     'publicListingIdentity': 'Server-issued realm/Store/SKU/channel binding; legacy local preview has none, never fabricated',
     'destination':

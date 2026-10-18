@@ -1110,7 +1110,8 @@ class WorkspacePublicCatalogueEntry {
       regulatoryNote: facts?.regulatoryNote, requiresPrescription: facts?.requiresPrescription ?? false,
       pack: label, packTerms: packTerms, priceMinor: _int(terms['priceMinor']),
       mrpMinor: terms['mrpMinor'] == null ? null : _int(terms['mrpMinor']),
-      unitPrice: '', badge: '', seller: _string(store['name'], 240), sellerType: '',
+      unitPrice: '', badge: '', seller: _string(store['name'], 240),
+      sellerType: _publicSellerType(data, storeId, realm, now),
       deliveryPromise: '', origin: '', confirmedOn: '', visualLabel: '', visualKind: '',
       minimumOrder: _int(terms['minimumOrder']), offerClass: channel);
     final readback = _decode(data, product, realm, now.toUtc(), policyRequired: true);
@@ -1173,6 +1174,7 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     if (!current() || listings.isEmpty || listings.length > 50 ||
         listings.any((i) => !i.valid || i.storeId != storeId || i.realm != gateway.realm)) { throw const FormatException(); }
     final response = await gateway._ownerRequest({'operation': 'readPublicStoreVariantFamilies', 'storeId': storeId,
+      if (gateway.storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
       'listings': [for (final i in listings) {'listingId': i.listingId, 'skuId': i.skuId, 'channel': i.channel.name}],
       'familyId': ?familyId}, current, mutation: false);
     if (!current() || response?.statusCode != 200) throw const FormatException();
@@ -1180,7 +1182,9 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
     if (data['state'] != 'ready') throw const FormatException('Published options are unavailable.');
-    _keys(data, ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
+    _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
+    if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
+    _keys(Map<String, dynamic>.of(data)..remove('storeClassificationReadbackVersion')..remove('storeDetailsReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'observedAt', 'orderingAvailable', 'state',
       'catalogueVersion', 'publicStore', 'sourceId', 'revision', 'validUntil', 'memberships', 'family']);
     final now = gateway.now().toUtc(), observed = _time(data['observedAt']), expires = _time(data['validUntil']);
     if (data['schemaVersion'] is! int || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
@@ -1233,6 +1237,10 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         final listings = batch.map((e) => e.product.publicListingIdentity).toList();
         if (listings.any((i) => i == null)) throw const FormatException();
         final data = await _read(storeId, listings.cast<BuyV2PublicListingIdentity>(), current);
+        if (data['storeClassificationReadbackVersion'] == 1 && batch.any((entry) =>
+            entry.product.sellerType != _publicSellerType(data, storeId, gateway.realm, gateway.now().toUtc()))) {
+          throw const FormatException('Store details changed. Refresh this product.');
+        }
         final rows = _list(data['memberships'], 50).map((r) => _membership(r, data)).toList();
         if (rows.length != batch.length) throw const FormatException();
         for (final row in rows) {
@@ -1272,6 +1280,8 @@ class WorkspaceHttpReviewedVariantSource implements WorkspacePublicVariantSource
         'storeId': identity.storeId, 'observedAt': data['observedAt'], 'state': 'ready', 'orderingAvailable': false,
         'coverage': 'verified_public_only', 'listingCoverage': 'complete', 'listingReadbackVersion': 1,
         'productFactsReadbackVersion': 1, 'mediaReadbackVersion': 1, 'unbrandedProduceReadbackVersion': 1,
+        if (data.containsKey('storeClassificationReadbackVersion')) 'storeClassificationReadbackVersion': data['storeClassificationReadbackVersion'],
+        if (data.containsKey('storeDetailsReadbackVersion')) 'storeDetailsReadbackVersion': data['storeDetailsReadbackVersion'],
         'catalogueVersion': data['catalogueVersion'], 'publicStore': data['publicStore'], 'items': [row['product']], 'nextCursor': null},
         storeId: identity.storeId, realm: gateway.realm, channel: identity.channel, now: gateway.now().toUtc());
       if (!member.validFor(entry, gateway.realm, gateway.now().toUtc()) || member.familyId != previous.familyId ||
@@ -1454,6 +1464,7 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       'storeId': storeId, 'cataloguePageVersion': 1, 'query': request, 'pageSize': pageSize,
       if (gateway.productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
       'storeDetailsReadbackVersion': 1,
+      if (gateway.storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
       'cursor': ?cursor}, active, mutation: false);
     if (!active() || response == null || response.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response.body));
@@ -1461,6 +1472,8 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     final data = _map(envelope['data']);
     _checkProductFactsReadbackVersion(data);
     _checkProduceReadback(data, supported: gateway.unbrandedProduceReadbackSupported);
+    _checkStoreClassificationReadback(data, supported: gateway.storeClassificationReadbackSupported);
+    if (gateway.storeClassificationReadbackSupported && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
     if (data['cataloguePageVersion'] != 1 || data['schemaVersion'] != 1 || data['realm'] != gateway.realm ||
         data['storeId'] != storeId || data['state'] != 'ready' || data['listingReadbackVersion'] != 1 ||
         data['mediaReadbackVersion'] != 1 || data['listingCoverage'] != 'complete' ||
@@ -1498,21 +1511,23 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       }
       return entry;
     }).toList(growable: false);
+    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
+    final storeMetadata = data['storeDetailsReadbackVersion'] == 1
+      ? WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc()) : null;
+    final fingerprint = jsonEncode(_sorted(storeMetadata?.details?.toJson())), candidateRevision = storeMetadata?.revision;
+    void checkMetadata() {
+      if (_metadataHighwater != null && (candidateRevision == null || candidateRevision < _metadataHighwater! ||
+          candidateRevision == _metadataHighwater && fingerprint != _metadataFingerprint)) {
+        throw const FormatException('Public Store details changed. Refresh this Store.');
+      }
+    }
+    checkMetadata();
     final entries = await gateway._enrichVariants(decodedEntries, active);
     final products = entries.map((entry) => entry.product).toList(growable: false);
     if (products.map((product) => product.id).toSet().length != products.length || !active()) throw const FormatException();
-    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
-    if (data['storeDetailsReadbackVersion'] == 1) {
-      final metadata = WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc());
-      final fingerprint = jsonEncode(_sorted(metadata.details?.toJson()));
-      if (_metadataHighwater != null && (metadata.revision == null || metadata.revision! < _metadataHighwater! ||
-          metadata.revision == _metadataHighwater && fingerprint != _metadataFingerprint)) {
-        _storeMetadata = null;
-      } else {
-        _storeMetadata = metadata;
-        if (metadata.revision != null) { _metadataHighwater = metadata.revision; _metadataFingerprint = fingerprint; }
-      }
-    } else { _storeMetadata = null; }
+    checkMetadata();
+    _storeMetadata = storeMetadata;
+    if (candidateRevision != null) { _metadataHighwater = candidateRevision; _metadataFingerprint = fingerprint; }
     _publicStoreName = _string(store['name'], 240);
     if (contentReadback != null && contentOwner != null) {
       for (final entry in entries) { contentReadback!.admitPublicEntry(entry, expectedContext: contentOwner); }
@@ -1604,6 +1619,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
+    storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
   );
 }
 
@@ -1630,6 +1646,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.unbrandedProduceReadbackSupported = false,
     WorkspacePublicVariantSource? reviewedVariants,
     this.reviewedFamilyReadbackSupported = false,
+    this.storeClassificationReadbackSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
     if (!_validEndpoint(endpoint) ||
@@ -1649,6 +1666,7 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Negotiated only with a matching service; legacy strict endpoints reject new keys.
   final bool unbrandedProduceReadbackSupported;
   final bool reviewedFamilyReadbackSupported;
+  final bool storeClassificationReadbackSupported;
   @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
   final WorkspacePublicVariantSource? _reviewedVariantsOverride;
@@ -1674,6 +1692,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       unbrandedProduceReadbackSupported: unbrandedProduceReadbackSupported,
       reviewedVariants: _reviewedVariantsOverride,
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
+      storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       now: now,
     );
   }
@@ -2106,6 +2125,9 @@ class AuthenticatedWorkspaceCatalogueGateway
               if (unbrandedProduceReadbackSupported) 'unbrandedProduceReadbackVersion': 1,
               if (policyRequired) 'policyReadbackVersion': 1,
               if (product.publicListingIdentity != null) 'listingReadbackVersion': 1,
+              if (storeClassificationReadbackSupported && product.publicListingIdentity != null) ...{
+                'storeDetailsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1,
+              },
               'storeId': product.storeId,
               'skuId': product.sourceSkuId,
             },
@@ -2116,6 +2138,9 @@ class AuthenticatedWorkspaceCatalogueGateway
       if (envelope['ok'] != true) throw const FormatException();
       final data = _map(envelope['data']);
       _checkProduceReadback(data, supported: unbrandedProduceReadbackSupported);
+      _checkStoreClassificationReadback(data, supported: storeClassificationReadbackSupported);
+      if (storeClassificationReadbackSupported && product.publicListingIdentity != null &&
+          data['storeClassificationReadbackVersion'] != 1) { throw const FormatException(); }
       final items = data['items'];
       if (items is List && items.any((item) => item is Map && item.containsKey('supplierPolicy'))) {
         _policyObserved = true;
@@ -2140,11 +2165,14 @@ class AuthenticatedWorkspaceCatalogueGateway
         'listingReadbackVersion': 1, 'mediaReadbackVersion': 1, 'policyReadbackVersion': 1,
         if (productFactsReadbackSupported) 'productFactsReadbackVersion': 1,
         'storeDetailsReadbackVersion': 1,
+        if (storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1,
       }, current, mutation: false);
       if (!current() || response == null || response.statusCode != 200) return null;
       final envelope = _map(jsonDecode(response.body));
       if (envelope['ok'] != true) return null;
       _checkProduceReadback(_map(envelope['data']), supported: unbrandedProduceReadbackSupported);
+      _checkStoreClassificationReadback(_map(envelope['data']), supported: storeClassificationReadbackSupported);
+      if (storeClassificationReadbackSupported && _map(envelope['data'])['storeClassificationReadbackVersion'] != 1) throw const FormatException();
       final entry = WorkspacePublicCatalogueEntry.fromResponse(_map(envelope['data']),
         storeId: storeId, realm: realm, channel: channel, now: now().toUtc());
       // The response is scoped to the requested raw SKU, not merely a same-Store
@@ -2157,12 +2185,17 @@ class AuthenticatedWorkspaceCatalogueGateway
     }
   }
 
-  WorkspacePublicDetailsRecord? _ownerDetailsResponse(SocialContentResponse response, String operation, String storeId, String? key) {
+  WorkspacePublicDetailsRecord? _ownerDetailsResponse(SocialContentResponse response, String operation, String storeId, String? key,
+      {bool? classificationRequested}) {
     if (response.statusCode != 200) throw const FormatException();
     final envelope = _map(jsonDecode(response.body));
     if (envelope['ok'] != true) throw const FormatException();
     final data = _map(envelope['data']);
-    _keys(data, ['schemaVersion', 'realm', 'storeId', 'operation', 'idempotencyKey', 'record',
+    final classification = classificationRequested ?? storeClassificationReadbackSupported;
+    if (data.containsKey('storeClassificationReadbackVersion') &&
+        (!classification || data['storeClassificationReadbackVersion'] is! int || data['storeClassificationReadbackVersion'] != 1) ||
+        classification && data['storeClassificationReadbackVersion'] != 1) { throw const FormatException(); }
+    _keys(Map<String, dynamic>.of(data)..remove('storeClassificationReadbackVersion'), ['schemaVersion', 'realm', 'storeId', 'operation', 'idempotencyKey', 'record',
       'locationVerified', 'publicAvailabilityConfirmed']);
     if (data['schemaVersion'] != 1 || data['realm'] != realm || data['storeId'] != storeId ||
         data['operation'] != operation || data['idempotencyKey'] != key || data['locationVerified'] != false ||
@@ -2170,6 +2203,7 @@ class AuthenticatedWorkspaceCatalogueGateway
       throw const FormatException();
     }
     final record = data['record'] == null ? null : WorkspacePublicDetailsRecord.decode(data['record'], realm, storeId);
+    if (record?.details.businessType != null && !classification) throw const FormatException();
     if (record?.publishedAt.isAfter(now().toUtc()) == true) throw const FormatException();
     return record;
   }
@@ -2178,7 +2212,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   Future<WorkspacePublicDetailsRecord?> readPublicDetailsOwned({required String storeId, required bool Function() current}) async {
     if (ownerAccountId == null || !current()) throw const FormatException();
     _id(storeId);
-    final response = await _ownerRequest({'operation': 'readStorePublicDetails', 'storeId': storeId}, current, mutation: false);
+    final response = await _ownerRequest({'operation': 'readStorePublicDetails', 'storeId': storeId,
+      if (storeClassificationReadbackSupported) 'storeClassificationReadbackVersion': 1}, current, mutation: false);
     if (!current() || response == null) throw const FormatException();
     return _ownerDetailsResponse(response, 'readStorePublicDetails', storeId, null);
   }
@@ -2194,13 +2229,19 @@ class AuthenticatedWorkspaceCatalogueGateway
       _id(original.storeId); _id(original.idempotencyKey);
       _int(original.expectedRevision, 0, 999999999);
       WorkspacePublicDetailsFields.fromJson(original.details.toJson());
-      final response = await _ownerRequest({'operation': operation, ...original.body}, valid,
+      if (!reconcile && original.details.businessType != null && !storeClassificationReadbackSupported) {
+        return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notSent);
+      }
+      final classification = storeClassificationReadbackSupported || reconcile && original.details.businessType != null;
+      final response = await _ownerRequest({'operation': operation, ...original.body,
+        if (classification) 'storeClassificationReadbackVersion': 1}, valid,
         mutation: !reconcile, onDispatch: () => dispatched = true);
       if (!valid() || response == null) throw const FormatException();
       if (!reconcile && _definitiveDetailsRejection(response)) {
         return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.rejected);
       }
-      final record = _ownerDetailsResponse(response, operation, original.storeId, original.idempotencyKey);
+      final record = _ownerDetailsResponse(response, operation, original.storeId, original.idempotencyKey,
+        classificationRequested: classification);
       if (record == null && reconcile) return const WorkspacePublicDetailsWriteResult(WorkspacePublicDetailsWriteState.notFound);
       if (record == null || record.revision != original.expectedRevision + 1 ||
           jsonEncode(_sorted(record.details.toJson())) != jsonEncode(_sorted(original.details.toJson()))) {
@@ -2271,6 +2312,8 @@ class WorkspaceCatalogueReadback extends ChangeNotifier
     if (product.variantFamilyId != null) [product.variantFamilyId,
       for (final a in product.variantAttributes)
         [a.dimensionId, a.dimensionLabel, a.optionId, a.optionLabel, a.kind.name, a.swatchArgb]],
+    if (product.publicListingIdentity != null && product.sellerType.isNotEmpty)
+      {'publicSellerType': product.sellerType},
     product.pack,
     if (!WorkspaceCatalogueProductFacts.fromProduct(product).isEmpty)
       WorkspaceCatalogueProductFacts.fromProduct(product).toJson(),
@@ -2653,6 +2696,8 @@ WorkspaceCatalogueContentResult _decode(
     if (!identity.matches(product) || identity.realm != realm || data['listingReadbackVersion'] != 1 ||
         data['listingCoverage'] != 'complete') { throw const FormatException(); }
     _publicStore(data, product.storeId!, realm, now);
+    if (data['storeClassificationReadbackVersion'] == 1 &&
+        _publicSellerType(data, product.storeId!, realm, now) != product.sellerType) { throw const FormatException(); }
     final bindings = _list(row['listings'], 2).map(BuyV2PublicListingIdentity.fromJson).toList();
     if (bindings.isEmpty || bindings.any((binding) => binding == null || !binding.valid ||
         binding.realm != realm || binding.storeId != product.storeId || binding.skuId != product.sourceSkuId ||
@@ -2980,15 +3025,31 @@ WorkspaceCatalogueContentResult _decode(
 }
 
 Map<String, dynamic> _publicStore(Map<String, dynamic> data, String storeId, String realm, DateTime now) {
+  _checkStoreClassificationReadback(data);
   final store = _map(data['publicStore']);
   _keys(Map<String, dynamic>.of(store)..remove('details'), ['id', 'name', 'profileId']);
   if (store['id'] != storeId || !_string(store['profileId']).startsWith('retailer-')) throw const FormatException();
   _string(store['name'], 240);
   if (store.containsKey('details') || data['storeDetailsReadbackVersion'] == 1) {
     if (data['storeDetailsReadbackVersion'] != 1) throw const FormatException();
-    WorkspacePublicStoreMetadata.decode(store['details'], realm, storeId, now);
+    final metadata = WorkspacePublicStoreMetadata.decode(store['details'], realm, storeId, now);
+    if (metadata.details?.businessType != null && data['storeClassificationReadbackVersion'] != 1) throw const FormatException();
   }
   return store;
+}
+
+void _checkStoreClassificationReadback(Map<String, dynamic> data, {bool supported = true}) {
+  if (data.containsKey('storeClassificationReadbackVersion') &&
+      (!supported || data['storeClassificationReadbackVersion'] is! int ||
+       data['storeClassificationReadbackVersion'] != 1 || data['storeDetailsReadbackVersion'] != 1)) {
+    throw const FormatException();
+  }
+}
+
+String _publicSellerType(Map<String, dynamic> data, String storeId, String realm, DateTime now) {
+  if (data['storeClassificationReadbackVersion'] != 1) return '';
+  final store = _map(data['publicStore']);
+  return WorkspacePublicStoreMetadata.decode(store['details'], realm, storeId, now).details?.publicSellerType ?? '';
 }
 
 void _keys(Map<String, dynamic> value, List<String> allowed) {

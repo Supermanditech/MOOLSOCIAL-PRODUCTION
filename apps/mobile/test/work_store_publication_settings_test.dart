@@ -925,6 +925,46 @@ void main() {
     expect(restored.workspaceCatalogueItems, isEmpty);
   });
 
+  for (final role in [null, '', 'retailer', 'wholesaler', 'manufacturer', 'supplier']) {
+    test('LF-CLASS device defaults retain optional classification across a new owner session role=$role', () async {
+      final f = _Lf18Storage();
+      final first = f.work();
+      expect(await first.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+      final fields = _lf18Details().toJson();
+      if (role != null) fields['businessType'] = role;
+      expect(first.saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails.fromJson(fields)), isTrue);
+      expect(await first.workspacePublicationPreferencesWrite, isTrue);
+      final bytes = f.rows[f.key('lf18-a')]!;
+      expect((jsonDecode(bytes)['fields'] as Map).containsKey('businessType'), role != null);
+      first.dispose();
+      final restored = f.work();
+      addTearDown(restored.dispose);
+      expect(await restored.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+      expect(restored.workspacePublicationDetails.businessTypeSupplied, role != null);
+      expect(restored.workspacePublicationDetails.businessType, role ?? 'retailer');
+      expect(restored.workspacePublicationDetails.legalName, 'Host default business');
+      expect(f.rows[f.key('lf18-a')], bytes, reason: 'A read must not rewrite retained preferences');
+    });
+  }
+
+  test('LF-CLASS absent recovered choice cannot inherit current manufacturer or resurrect it on save', () async {
+    final f = await _lf18Prepared();
+    f.contactAvailable = false;
+    final work = f.work();
+    addTearDown(work.dispose);
+    expect(work.saveWorkspacePublicationDetails(WorkspaceStorePublicationDetails.fromJson({
+      ..._lf18Details().toJson(), 'businessType': 'manufacturer',
+    })), isTrue);
+    expect(work.workspacePublicationDetails.businessType, 'manufacturer');
+    f.contactAvailable = true;
+    expect(await work.loadWorkspacePublicationPreferences(expectedStoreId: 'lf18-a'), isTrue);
+    expect(work.workspacePublicationDetails.businessTypeSupplied, isFalse);
+    expect(work.workspacePublicationDetails.toJson().containsKey('businessType'), isFalse);
+    expect(work.saveWorkspacePublicationDetails(work.workspacePublicationDetails), isTrue);
+    expect(await work.workspacePublicationPreferencesWrite, isTrue);
+    expect((jsonDecode(f.rows[f.key('lf18-a')]!)['fields'] as Map).containsKey('businessType'), isFalse);
+  });
+
   testWidgets('LF18 Store owner defaults survive a new session', (tester) async {
     FlutterSecureStorage.setMockInitialValues({}); // Isolated host plugin fixture.
     WorkSession create() => WorkSession(gateway: ReviewWorkGateway(),
@@ -957,7 +997,7 @@ void main() {
     expect(second.workspaceCatalogueItems, isEmpty);
   });
 
-  for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin', 'nested', 'location', 'customer', 'fraction']) {
+  for (final invalid in ['version', 'store', 'missing', 'extra', 'type', 'pin', 'nested', 'location', 'customer', 'fraction', 'null-role', 'unknown-role']) {
     test('LF18 invalid saved $invalid stays intact and cannot overwrite inputs', () async {
       final f = await _lf18Prepared();
       final row = Map<String, Object?>.from(jsonDecode(f.rows[f.key('lf18-a')]!) as Map);
@@ -972,6 +1012,8 @@ void main() {
       if (invalid == 'location') fields['shoppingArea'] = {'regionId': 'invented'};
       if (invalid == 'customer') fields['customerPaymentTerms'] = {'private-id': []};
       if (invalid == 'fraction') fields['dispatchDays'] = 1.5;
+      if (invalid == 'null-role') fields['businessType'] = null;
+      if (invalid == 'unknown-role') fields['businessType'] = 'delivery operator';
       final encoded = jsonEncode(row);
       f.rows[f.key('lf18-a')] = encoded;
       final work = f.work();

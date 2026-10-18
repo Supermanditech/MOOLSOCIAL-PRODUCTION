@@ -7998,6 +7998,15 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/work_publication_data.dart') {
       $factsOwners += 'apps/mobile/lib/features/work/work_publication_data.dart'
     }
+    if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/widgets/store_publication_settings.dart') {
+      $factsOwners += 'apps/mobile/lib/features/work/widgets/store_publication_settings.dart'
+    }
+    if (@($facts.owners) -ccontains 'apps/mobile/lib/features/work/work_publication.dart') {
+      $factsOwners += 'apps/mobile/lib/features/work/work_publication.dart'
+    }
+    if (@($facts.owners) -ccontains 'apps/mobile/test/work_store_publication_settings_test.dart') {
+      $factsOwners += 'apps/mobile/test/work_store_publication_settings_test.dart'
+    }
     if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.ts') {
       $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.ts'
     }

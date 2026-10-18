@@ -56,6 +56,7 @@ export interface CatalogueSave {
 export interface StorePublicDetailsInput {
   street: string; city: string; state: string; pinCode: string;
   publicContactPhone: string; openingTime: string; closingTime: string;
+  businessType?: "" | "retailer" | "wholesaler" | "manufacturer" | "supplier";
 }
 export interface StorePublicDetailsRecord {
   schemaVersion: 1; realm: "evaluation" | "production"; storeId: string;
@@ -98,7 +99,10 @@ export interface PublicCatalogueSource {
 }
 
 export function normalizeStorePublicDetails(raw: unknown): StorePublicDetailsInput {
-  const value = exact(raw, ["street", "city", "state", "pinCode", "publicContactPhone", "openingTime", "closingTime"]);
+  const value = exact(raw, ["street", "city", "state", "pinCode", "publicContactPhone", "openingTime", "closingTime"], ["businessType"]);
+  const classified = Object.hasOwn(value, "businessType");
+  if (classified && (typeof value.businessType !== "string" ||
+      !["", "retailer", "wholesaler", "manufacturer", "supplier"].includes(value.businessType))) invalid();
   const details = {street: text(value.street, 2000), city: text(value.city), state: text(value.state),
     pinCode: text(value.pinCode, 6), publicContactPhone: text(value.publicContactPhone, 30, true),
     openingTime: text(value.openingTime, 16, true), closingTime: text(value.closingTime, 16, true)};
@@ -108,7 +112,7 @@ export function normalizeStorePublicDetails(raw: unknown): StorePublicDetailsInp
       details.publicContactPhone !== "" && (!/^\+?[0-9][0-9 ()-]*$/u.test(details.publicContactPhone) || digits.length < 7 || digits.length > 15) ||
       (details.openingTime !== "" || details.closingTime !== "") &&
         (!validTime.test(details.openingTime) || !validTime.test(details.closingTime))) invalid("Check public address, contact and hours.");
-  return details;
+  return {...details, ...(classified ? {businessType: value.businessType as NonNullable<StorePublicDetailsInput["businessType"]>} : {})};
 }
 function publicDetailsRecord(raw: unknown, realm: string, storeId: string): StorePublicDetailsRecord {
   const value = exact(raw, ["schemaVersion", "realm", "storeId", "revision", "publishedAt", "details"]);
@@ -134,7 +138,8 @@ function originalPublicDetails(command: StorePublicDetailsCommand, receipt: Stor
   }
   return record;
 }
-function publicDetailsProjection(raw: unknown, realm: string, storeId: string, profile: WorkspaceProfileRecord, at: string): object {
+function publicDetailsProjection(raw: unknown, realm: string, storeId: string, profile: WorkspaceProfileRecord, at: string,
+  classificationRequested = false): object {
   const base = {schemaVersion: 1, realm, storeId, observedAt: at, locationVerified: false,
     publicAvailabilityConfirmed: false, area: typeof profile.area === "string" ? text(profile.area, 240, true) : null};
   if (raw === undefined) return {...base, state: "unavailable", revision: null, details: null};
@@ -142,7 +147,9 @@ function publicDetailsProjection(raw: unknown, realm: string, storeId: string, p
   try {
     const record = publicDetailsRecord(raw, realm, storeId);
     if (record.publishedAt > at) throw new Error("Future metadata");
-    return {...base, state: "ready", revision: record.revision, details: record.details};
+    const {businessType, ...legacyDetails} = record.details;
+    return {...base, state: "ready", revision: record.revision,
+      details: classificationRequested ? record.details : legacyDetails};
   } catch { return {...base, state: "unavailable", revision: null, details: null}; }
 }
 export function planStorePublicDetailsSave(command: StorePublicDetailsCommand, profile: WorkspaceProfileRecord | undefined,
@@ -151,6 +158,9 @@ export function planStorePublicDetailsSave(command: StorePublicDetailsCommand, p
   if (!["evaluation", "production"].includes(command.realm)) invalid();
   if (receipt) return originalPublicDetails(command, receipt);
   const previous = current && publicDetailsRecord(current, command.realm, command.storeId);
+  if (previous?.details.businessType !== undefined && command.details.businessType === undefined) {
+    invalid("Keep the public business type or explicitly choose not to show it.");
+  }
   if ((previous?.revision ?? 0) !== command.expectedRevision) {
     throw new WorkspaceProfileError("revision_conflict", "Public Store details changed. Refresh before saving.", 409);
   }
@@ -341,7 +351,9 @@ export class WorkspaceCatalogueService {
   }
 
   async publicVariantFamilies(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "listings"], ["familyId"]);
+    exact(body, ["storeId", "listings"], ["familyId", "storeClassificationReadbackVersion"]);
+    const classificationRequested = body.storeClassificationReadbackVersion === 1;
+    if (Object.hasOwn(body, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
     const storeId = id(body.storeId), familyId = body.familyId === undefined ? undefined : id(body.familyId);
     const requested = list(body.listings, 50).map(value => {
       const row = exact(value, ["listingId", "skuId", "channel"]);
@@ -352,7 +364,8 @@ export class WorkspaceCatalogueService {
     if (!requested.length || new Set(requested.map(row => row.listingId)).size !== requested.length ||
         familyId !== undefined && requested.length !== 1) invalid();
     const observedAt = this.now().toISOString();
-    const base = {schemaVersion: 1, realm: this.repository.realm, storeId, observedAt, orderingAvailable: false};
+    const base = {schemaVersion: 1, realm: this.repository.realm, storeId, observedAt, orderingAvailable: false,
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {})};
     const unavailable = () => ({...base, state: "unavailable", memberships: [], family: null});
     if (!this.identity || !this.repository.publicCatalogueSource) return unavailable();
     const source = await this.repository.publicCatalogueSource(storeId, this.identity, true);
@@ -370,6 +383,7 @@ export class WorkspaceCatalogueService {
     if (relevant.size > 500) return unavailable();
     const records = source.records.filter(r => relevant.has(r.skuId));
     const projection = await this.publicCatalogue({storeId, listingReadbackVersion: 1, policyReadbackVersion: 1,
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1, storeDetailsReadbackVersion: 1} : {}),
       productFactsReadbackVersion: 1, mediaReadbackVersion: 1, unbrandedProduceReadbackVersion: 1},
     {...source, records}) as Record<string, unknown>;
     if (projection.state !== "ready" || projection.listingCoverage !== "complete") return unavailable();
@@ -421,8 +435,13 @@ export class WorkspaceCatalogueService {
   }
 
   async handleStorePublicDetails(ownerUserId: string, operation: string, raw: Readonly<Record<string, unknown>>): Promise<object> {
-    const body = structuredClone(raw);
+    const body: Record<string, unknown> = structuredClone(raw);
     if (Buffer.byteLength(JSON.stringify(body), "utf8") > 16000) invalid("Public Store details are too long.");
+    const classificationRequested = body.storeClassificationReadbackVersion === 1;
+    if (Object.hasOwn(body, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
+    delete body.storeClassificationReadbackVersion;
+    if (!classificationRequested && typeof body.details === "object" && body.details !== null &&
+        Object.hasOwn(body.details, "businessType")) invalid("Update MoolSocial to save public business type.");
     let record: StorePublicDetailsRecord | undefined;
     if (operation === "readStorePublicDetails") {
       exact(body, ["storeId"]);
@@ -439,7 +458,11 @@ export class WorkspaceCatalogueService {
         record = await this.repository.reconcileStorePublicDetails(command);
       } else throw new WorkspaceProfileError("unavailable", "Public details are not connected.", 503);
     }
+    if (!classificationRequested && record?.details.businessType !== undefined) {
+      throw new WorkspaceProfileError("unsupported_version", "Update MoolSocial to open these public Store details. Saved data is unchanged.", 409);
+    }
     return {schemaVersion: 1, realm: this.repository.realm, storeId: id(body.storeId),
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       operation, idempotencyKey: operation === "readStorePublicDetails" ? null : id(body.idempotencyKey),
       record: record ? publicDetailsRecord(record, this.repository.realm, id(body.storeId)) : null,
       locationVerified: false, publicAvailabilityConfirmed: false};
@@ -527,13 +550,16 @@ export class WorkspaceCatalogueService {
   }
 
   private async publicCataloguePage(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion"]);
+    exact(body, ["storeId", "cataloguePageVersion", "query", "pageSize"], ["cursor", "storeDetailsReadbackVersion", "productFactsReadbackVersion", "unbrandedProduceReadbackVersion", "storeClassificationReadbackVersion"]);
+    const classificationRequested = body.storeClassificationReadbackVersion === 1;
+    if (Object.hasOwn(body, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
     const produceRequested = body.unbrandedProduceReadbackVersion === 1;
     if (Object.hasOwn(body, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
     const factsRequested = body.productFactsReadbackVersion === 1;
     if (body.productFactsReadbackVersion !== undefined && !factsRequested) invalid();
     const detailsRequested = body.storeDetailsReadbackVersion === 1;
     if (body.storeDetailsReadbackVersion !== undefined && !detailsRequested) invalid();
+    if (classificationRequested && !detailsRequested) invalid();
     if (body.cataloguePageVersion !== 1) invalid();
     const storeId = id(body.storeId), pageSize = integer(body.pageSize, 1, 50), query = publicPageQuery(body.query);
     if (!this.identity || !this.repository.publicCatalogueSource) {
@@ -545,6 +571,7 @@ export class WorkspaceCatalogueService {
     }
     const sourceHash = cataloguePayloadHash(source);
     const data = await this.publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
@@ -606,6 +633,7 @@ export class WorkspaceCatalogueService {
     // of ALL candidates, including offers which were not active on the first pass.
     const finalProjection = await new WorkspaceCatalogueService(this.repository, this.identity,
       () => new Date(responseAt), this.policyReader).publicCatalogue({storeId, listingReadbackVersion: 1,
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(produceRequested ? {unbrandedProduceReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
@@ -625,6 +653,9 @@ export class WorkspaceCatalogueService {
   async publicCatalogue(body: Readonly<Record<string, unknown>>, source?: PublicCatalogueSource): Promise<object> {
     if (Object.hasOwn(body, "cataloguePageVersion")) return this.publicCataloguePage(body);
     const queryBody = structuredClone(body) as Record<string, unknown>;
+    const classificationRequested = queryBody.storeClassificationReadbackVersion === 1;
+    if (Object.hasOwn(queryBody, "storeClassificationReadbackVersion") && !classificationRequested) invalid();
+    delete queryBody.storeClassificationReadbackVersion;
     const produceRequested = queryBody.unbrandedProduceReadbackVersion === 1;
     if (Object.hasOwn(queryBody, "unbrandedProduceReadbackVersion") && !produceRequested) invalid();
     delete queryBody.unbrandedProduceReadbackVersion;
@@ -644,11 +675,13 @@ export class WorkspaceCatalogueService {
     if (queryBody.storeDetailsReadbackVersion !== undefined && !detailsRequested) invalid();
     delete queryBody.storeDetailsReadbackVersion;
     if (detailsRequested && !listingsRequested) invalid();
+    if (classificationRequested && !detailsRequested) invalid();
     const query = pageQuery(queryBody);
     const profile = source ? source.profile : await this.repository.store(query.storeId);
     const observedAt = this.now().toISOString();
     const base = {schemaVersion: 1, realm: this.repository.realm, storeId: query.storeId, observedAt,
       orderingAvailable: false, coverage: "verified_public_only",
+      ...(classificationRequested ? {storeClassificationReadbackVersion: 1} : {}),
       ...(factsRequested ? {productFactsReadbackVersion: 1} : {}),
       ...(mediaRequested ? {mediaReadbackVersion: 1} : {}),
       ...(detailsRequested ? {storeDetailsReadbackVersion: 1} : {}),
@@ -768,7 +801,7 @@ export class WorkspaceCatalogueService {
         state: liveLinked.length === 0 && publicItems.length > 0 ? "unavailable" : "ready",
         catalogueVersion: catalogue.version, listingCoverage: coverage,
         publicStore: {id: store.workspaceId, name: store.name, profileId: store.profileId,
-          ...(detailsRequested ? {details: publicDetailsProjection(details, this.repository.realm, query.storeId, store, responseAt)} : {})},
+          ...(detailsRequested ? {details: publicDetailsProjection(details, this.repository.realm, query.storeId, store, responseAt, classificationRequested)} : {})},
         items: liveLinked, nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
     }
     return {...base, observedAt: readbackAt, state: "ready", catalogueVersion: catalogue.version, items: publicItems,

@@ -25,6 +25,7 @@ import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_publication.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/features/work/widgets/store_publication_settings.dart';
 
 // Host fixtures only. No upload, device storage or real commerce.
 final at = DateTime.utc(2026, 10, 16, 12);
@@ -4787,6 +4788,206 @@ void main() {
       {...publicFields.toJson(), 'publicContactPhone': 'private-account-contact'},
     ]) { expect(() => WorkspacePublicDetailsFields.fromJson(invalid), throwsFormatException); }
   });
+  test('LF-CLASS optional published business type preserves unknown legacy settings and exact journal input', () {
+    final legacy = WorkspaceStorePublicationDetails.fromJson({});
+    expect(legacy.businessType, 'retailer');
+    expect(legacy.toJson().containsKey('businessType'), isFalse,
+      reason: 'A dropdown fallback is not a supplied public fact');
+    for (final type in ['', 'retailer', 'manufacturer', 'wholesaler', 'supplier']) {
+      final fields = WorkspacePublicDetailsFields.fromJson({...publicFields.toJson(), 'businessType': type});
+      expect(fields.toJson()['businessType'], type);
+      final intent = WorkspacePublicDetailsIntent.fromJson({...metadataIntent.toJson(), 'details': fields.toJson()});
+      expect(WorkspacePublicDetailsIntent.fromJson(intent.toJson()).fingerprint, intent.fingerprint);
+    }
+    expect(publicFields.toJson().containsKey('businessType'), isFalse);
+    for (final value in [null, true, 1, {}, 'Manufacturer', ' manufacturer', 'delivery fleet']) {
+      expect(() => WorkspacePublicDetailsFields.fromJson({...publicFields.toJson(), 'businessType': value}), throwsFormatException);
+    }
+  });
+  Map<String, dynamic> classifiedPublicPage(String? type) {
+    final data = publicPage()..['storeDetailsReadbackVersion'] = 1
+      ..['storeClassificationReadbackVersion'] = 1;
+    final details = metadata();
+    if (type != null) (details['details'] as Map)['businessType'] = type;
+    data['publicStore'] = <String, dynamic>{...(data['publicStore'] as Map), 'details': details};
+    return data;
+  }
+  test('LF-CLASS reviewed public factory carries only published role without verification or private facts', () {
+    for (final entry in {'manufacturer': 'Manufacturer', 'wholesaler': 'Wholesaler', 'supplier': 'Supplier', 'retailer': 'Retailer', '': ''}.entries) {
+      final result = WorkspacePublicCatalogueEntry.fromResponse(classifiedPublicPage(entry.key),
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at);
+      expect(result.product.sellerType, entry.value);
+      expect(result.product.manufacturerVerified, isFalse);
+    }
+    expect(WorkspacePublicCatalogueEntry.fromResponse(classifiedPublicPage(null),
+      storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product.sellerType, isEmpty);
+  });
+  test('LF-CLASS factory rejects unnegotiated malformed and wrong-Store classified metadata', () {
+    for (final fault in ['missing marker', 'boolean marker', 'wrong Store', 'invalid role']) {
+      final data = classifiedPublicPage('manufacturer');
+      if (fault == 'missing marker') data.remove('storeClassificationReadbackVersion');
+      if (fault == 'boolean marker') data['storeClassificationReadbackVersion'] = true;
+      final details = (data['publicStore'] as Map)['details'] as Map;
+      if (fault == 'wrong Store') details['storeId'] = 'other-store';
+      if (fault == 'invalid role') (details['details'] as Map)['businessType'] = 'delivery operator';
+      expect(() => WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at), throwsFormatException, reason: fault);
+    }
+  });
+  AuthenticatedWorkspaceCatalogueGateway classifiedGateway(OwnerTransport transport, {bool enabled = true, Credentials? credentials}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: credentials ?? Credentials(), transport: transport, storeClassificationReadbackSupported: enabled, now: () => at);
+  test('LF-CLASS saved settings distinguish explicit published type from legacy dropdown fallback', () {
+    final raw = WorkspaceStorePublicationDetails.fromJson(publicFields.toJson());
+    expect(WorkspacePublicDetailsFields.fromSettings(raw, includeBusinessType: true).businessType, isNull);
+    for (final type in ['', 'retailer', 'manufacturer', 'wholesaler', 'supplier']) {
+      final saved = WorkspaceStorePublicationDetails.fromJson({...raw.toJson(), 'businessType': type});
+      expect(saved.businessTypeSupplied, isTrue);
+      expect(WorkspacePublicDetailsFields.fromSettings(saved).toJson(), publicFields.toJson());
+      expect(WorkspacePublicDetailsFields.fromSettings(saved, includeBusinessType: true).businessType, type);
+    }
+  });
+  test('LF-CLASS owner capability clones, journals and original reconciliation keep exact descriptive field', () async {
+    final input = WorkspacePublicDetailsFields.fromJson({...publicFields.toJson(), 'businessType': 'manufacturer'});
+    final original = WorkspacePublicDetailsIntent.fromJson({...metadataIntent.toJson(), 'details': input.toJson()});
+    final before = original.fingerprint, credentials = Credentials();
+    final transport = OwnerTransport((body) async {
+      expect(body['storeClassificationReadbackVersion'], 1);
+      final data = ownerDetailsReply(body)..['storeClassificationReadbackVersion'] = 1;
+      (data['record'] as Map)['details'] = input.toJson();
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final owner = classifiedGateway(transport, credentials: credentials).forOwnerAccount('host-owner');
+    expect(owner.storeClassificationReadbackSupported, isTrue);
+    expect((await owner.writePublicDetails(original, current: () => true)).state, WorkspacePublicDetailsWriteState.saved);
+    expect((await owner.readPublicDetailsOwned(storeId: 'store-one', current: () => true))!.details.businessType, 'manufacturer');
+    final legacy = classifiedGateway(transport, enabled: false, credentials: credentials).forOwnerAccount('host-owner');
+    expect((await legacy.writePublicDetails(original, current: () => true)).state, WorkspacePublicDetailsWriteState.notSent);
+    expect((await legacy.writePublicDetails(original, current: () => true, reconcile: true)).state, WorkspacePublicDetailsWriteState.saved);
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard, SocialAppCheckTokenMode.standard]);
+    expect(original.fingerprint, before); expect(original.toJson().containsKey('storeClassificationReadbackVersion'), isFalse);
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    SecureWorkPublicDetailsJournal journal() => SecureWorkPublicDetailsJournal(currentAccount: () => 'host-owner');
+    await journal().savePending(original);
+    expect((await journal().readPending(original.scope))!.fingerprint, before);
+    await journal().removePending(original);
+  });
+  test('LF-CLASS direct and refreshed products cannot silently reuse changed public type', () async {
+    var role = 'manufacturer';
+    final transport = OwnerTransport((body) async {
+      expect(body['storeClassificationReadbackVersion'], 1); expect(body['storeDetailsReadbackVersion'], 1);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': classifiedPublicPage(role)}));
+    });
+    final gateway = classifiedGateway(transport);
+    final entry = (await gateway.readPublicEntry(storeId: 'store-one', skuId: 'sku-one', channel: BuyV2OfferClass.retail, current: () => true))!;
+    expect(entry.product.sellerType, 'Manufacturer'); expect(entry.product.manufacturerVerified, isFalse);
+    expect((await gateway.read(entry.product)).content.state, BuyV2ProductContentState.ready);
+    role = 'wholesaler';
+    expect((await gateway.read(entry.product)).content.state, BuyV2ProductContentState.unavailable);
+    final next = (await gateway.readPublicEntry(storeId: 'store-one', skuId: 'sku-one', channel: BuyV2OfferClass.retail, current: () => true))!;
+    expect(next.product.sellerType, 'Wholesaler');
+  });
+  test('LF-CLASS real Store page maps same metadata and rejects retired revision', () async {
+    var revision = 2, role = 'manufacturer';
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+      gateway: classifiedGateway(OwnerTransport((body) async {
+        expect(body['storeClassificationReadbackVersion'], 1);
+        final data = pageData(body)..['storeDetailsReadbackVersion'] = 1..['storeClassificationReadbackVersion'] = 1;
+        final info = metadata(revision: revision);
+        (info['details'] as Map)['businessType'] = role;
+        (data['publicStore'] as Map)['details'] = info;
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+    expect((await source.loadProducts(storeQuery(), pageSize: 40)).items.single.sellerType, 'Manufacturer');
+    revision = 3; role = 'supplier';
+    expect((await source.loadProducts(storeQuery(), pageSize: 40)).items.single.sellerType, 'Supplier');
+    revision = 2; await expectLater(source.loadProducts(storeQuery(), pageSize: 40), throwsFormatException);
+  });
+  test('LF-CLASS real HTTP family preserves published metadata and rejects changed selected role', () async {
+    var role = 'manufacturer';
+    final fallback = familyTransport();
+    final transport = OwnerTransport((body) async {
+      expect(body['storeClassificationReadbackVersion'], 1);
+      final data = body['operation'] == 'readPublicStoreVariantFamilies'
+        ? (httpReviewedFamily(body)..['storeClassificationReadbackVersion'] = 1..['storeDetailsReadbackVersion'] = 1)
+        : body.containsKey('cataloguePageVersion')
+          ? (jsonDecode((await fallback.postJson(Uri.parse('https://example.com'), headers: {}, body: body)).body) as Map)['data'] as Map<String, dynamic>
+          : classifiedPublicPage(role);
+      data['storeClassificationReadbackVersion'] = 1; data['storeDetailsReadbackVersion'] = 1;
+      data['publicStore'] = classifiedPublicPage(role)['publicStore'];
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse(
+      'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, now: () => at,
+      reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true);
+    final entry = (await gateway.readPublicEntry(storeId: 'store-one', skuId: 'sku-one', channel: BuyV2OfferClass.retail, current: () => true))!;
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true, gateway: gateway);
+    final query = BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null, storeId: 'store-one');
+    final family = await source.loadVariantFamily(entry.product, query);
+    expect(family.candidates.map((p) => p.sellerType).toSet(), {'Manufacturer'});
+    expect(family.candidates.every((p) => !p.manufacturerVerified), isTrue);
+    role = 'supplier'; await expectLater(source.loadVariantFamily(entry.product, query), throwsFormatException);
+  });
+  test('LF-CLASS Store promotion reader resolves descriptive role without granting publisher authority', () async {
+    final source = WorkspaceStoreCatalogueSource(storeId: 'store-one', current: () => true,
+      gateway: classifiedGateway(OwnerTransport((body) async {
+        final data = body['operation'] == 'readPublicStorePromotions'
+          ? promotionPage([promotionRow()]) : classifiedPublicPage('supplier');
+        if (body['operation'] != 'readPublicStorePromotions') expect(body['storeClassificationReadbackVersion'], 1);
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+    final offers = await source.loadStoreOffers(storeId: 'store-one', destination: BuyV2Destination.shop);
+    expect(offers.single.product.sellerType, 'Supplier'); expect(offers.single.product.manufacturerVerified, isFalse);
+    expect(offers.single.publisherType, BuyV2OfferPublisherType.retailer);
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF-CLASS Store channel edits preserve unknown type and explicit hide at $scale', (tester) async {
+      tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final work = WorkSession(gateway: ReviewWorkGateway())..activeWorkspace = const WorkWorkspace(
+        id: 'class-host-store', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jodhpur', verified: true);
+      addTearDown(work.dispose);
+      await tester.pumpWidget(MaterialApp(theme: MoolTheme.light(), builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
+        home: Scaffold(body: SingleChildScrollView(child: StorePublicationSettings(session: work)))));
+      await tester.pumpAndSettle();
+      expect(work.workspacePublicationDetails.businessTypeSupplied, isFalse);
+      for (final key in ['work-publication-channel-retail', 'work-publication-channel-wholesale']) {
+        final checkbox = find.byKey(Key(key)); await tester.ensureVisible(checkbox); await tester.tap(checkbox); await tester.pumpAndSettle();
+        expect(work.workspacePublicationDetails.businessTypeSupplied, isFalse);
+        expect(WorkspaceStorePublicationDetails.fromJson(work.workspacePublicationDetails.toJson()).businessTypeSupplied, isFalse);
+      }
+      final type = find.byKey(const Key('work-publication-business-type'));
+      await tester.ensureVisible(type); await tester.tap(type); await tester.pumpAndSettle();
+      await tester.tap(find.text('Not shown publicly').last); await tester.pumpAndSettle();
+      expect(work.workspacePublicationDetails.businessTypeSupplied, isTrue);
+      expect(WorkspacePublicDetailsFields.fromSettings(WorkspaceStorePublicationDetails.fromJson({
+        ...publicFields.toJson(), ...work.workspacePublicationDetails.toJson(),
+        'street': publicFields.street, 'city': publicFields.city, 'state': publicFields.state, 'pinCode': publicFields.pinCode,
+      }), includeBusinessType: true).businessType, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('LF-CLASS published Supplier is visible as informational supplier at $scale', (tester) async {
+      final selected = WorkspacePublicCatalogueEntry.fromResponse(classifiedPublicPage('supplier'),
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product;
+      final session = await optionalDetailsSession(selected, _HostOptionalProductContent());
+      await mountOptionalDetails(tester, session, scale);
+      final label = find.text('Store · Supplier');
+      await revealOptionalDetails(tester, selected, label);
+      expect(label, findsOneWidget); expect(selected.manufacturerVerified, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets('LF-CLASS explicitly hidden type omits empty public classification at $scale', (tester) async {
+      final selected = WorkspacePublicCatalogueEntry.fromResponse(classifiedPublicPage(''),
+        storeId: 'store-one', realm: 'production', channel: BuyV2OfferClass.retail, now: at).product;
+      final session = await optionalDetailsSession(selected, _HostOptionalProductContent());
+      await mountOptionalDetails(tester, session, scale);
+      await revealOptionalDetails(tester, selected, find.text('Store'));
+      expect(find.text('Store · Seller'), findsNothing); expect(find.text('Store · '), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
   test('LF-METADATA owner transport correlates original payload and uses mutation-only limited AppCheck', () async {
     final credentials = Credentials(), transport = OwnerTransport((body) async => SocialContentResponse(statusCode: 200,
       body: jsonEncode({'ok': true, 'data': ownerDetailsReply(body)})));

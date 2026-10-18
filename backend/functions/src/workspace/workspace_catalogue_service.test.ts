@@ -300,6 +300,14 @@ test("family emulator private submit, trusted approval, public exact siblings, r
     const after = await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result;
     assert.equal(after.state, "ready"); assert.equal(after.revision, before.revision + 1);
     assert.equal(after.family!.products.length, 2);
+    await service().handleStorePublicDetails('owner-one', 'saveStorePublicDetails', {
+      ...detailsRequest({storeClassificationReadbackVersion: 1, details: {...publicDetails, businessType: 'manufacturer'}}), storeId});
+    const classified = await service().publicVariantFamilies({...query, familyId: family.familyId,
+      storeClassificationReadbackVersion: 1}) as {state: string; storeClassificationReadbackVersion: number;
+        publicStore: {details: {details: {businessType: string}}}};
+    assert.equal(classified.state, 'ready'); assert.equal(classified.storeClassificationReadbackVersion, 1);
+    assert.equal(classified.publicStore.details.details.businessType, 'manufacturer');
+    assert.deepEqual(Object.keys((await service().publicVariantFamilies(query) as {publicStore: object}).publicStore).sort(), ['id', 'name', 'profileId']);
     assert.deepEqual(after.family!.products.map(row => row.product.skuId).sort(), ["sku-one", "sku-two"]);
     for (const row of after.family!.products) {
       assert.equal(row.membership.listing.skuId, row.product.skuId); assert.equal(row.product.channels[0]!.priceMinor, 26000);
@@ -857,6 +865,51 @@ const publicDetails = {street: 'Host building, market road', city: 'Jodhpur', st
   publicContactPhone: '+91 90000 00001', openingTime: '09:00', closingTime: '9:00 PM'};
 const detailsRequest = (extra: Record<string, unknown> = {}) => ({storeId: 'store-one', expectedRevision: 0,
   idempotencyKey: 'details-original-one', details: publicDetails, ...extra});
+
+test('LF-CLASS published descriptive business type preserves legacy bytes and original recovery', async () => {
+  const repository = await viewRepository(1), service = subject(repository);
+  const legacy = await service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', detailsRequest()) as {record: StorePublicDetailsRecord};
+  assert.deepEqual(legacy.record.details, publicDetails);
+  const request = detailsRequest({storeClassificationReadbackVersion: 1, expectedRevision: 1,
+    idempotencyKey: 'classification-one', details: {...publicDetails, businessType: 'manufacturer'}});
+  const saved = await service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', request) as {record: StorePublicDetailsRecord; storeClassificationReadbackVersion: number};
+  assert.equal(saved.storeClassificationReadbackVersion, 1);
+  assert.deepEqual(saved.record.details, {...publicDetails, businessType: 'manufacturer'});
+  assert.deepEqual((await service.handleStorePublicDetails('owner-one', 'reconcileStorePublicDetails', request) as {record: unknown}).record, saved.record);
+  assert.deepEqual((await service.handleStorePublicDetails('owner-one', 'reconcileStorePublicDetails', detailsRequest()) as {record: unknown}).record, legacy.record);
+  await assert.rejects(service.handleStorePublicDetails('owner-one', 'readStorePublicDetails', {storeId: 'store-one'}), {code: 'unsupported_version'});
+  await assert.rejects(service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', detailsRequest({expectedRevision: 2,
+    idempotencyKey: 'old-writer'})), {code: 'invalid_input'});
+  assert.deepEqual(repository.details.get('store-one')!.details, saved.record.details);
+  const oldPublic = await service.publicCatalogue({storeId: 'store-one', listingReadbackVersion: 1, storeDetailsReadbackVersion: 1}) as
+    {publicStore: {details: {details: object}}};
+  assert.deepEqual(oldPublic.publicStore.details.details, publicDetails);
+  const current = await service.publicCatalogue({storeId: 'store-one', listingReadbackVersion: 1, storeDetailsReadbackVersion: 1,
+    storeClassificationReadbackVersion: 1}) as {storeClassificationReadbackVersion: number; publicStore: {details: {details: object}}};
+  assert.equal(current.storeClassificationReadbackVersion, 1);
+  assert.deepEqual(current.publicStore.details.details, saved.record.details);
+  const paged = await service.publicCatalogue(viewRequest({storeDetailsReadbackVersion: 1,
+    storeClassificationReadbackVersion: 1})) as {publicStore: {details: {details: object}}};
+  assert.deepEqual(paged.publicStore.details.details, saved.record.details);
+  await service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', detailsRequest({storeClassificationReadbackVersion: 1,
+    expectedRevision: 2, idempotencyKey: 'explicit-hide', details: {...publicDetails, businessType: ''}}));
+  assert.deepEqual(repository.details.get('store-one')!.details, {...publicDetails, businessType: ''});
+});
+
+test('LF-CLASS rejects malformed roles, capability markers and unnegotiated enrichment', async () => {
+  const service = subject(new Memory());
+  for (const businessType of ['Manufacturer', ' manufacturer', 'delivery-operator', null, 1, {}, true]) {
+    await assert.rejects(service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', detailsRequest({
+      storeClassificationReadbackVersion: 1, details: {...publicDetails, businessType}})), {code: 'invalid_input'});
+  }
+  for (const marker of ['1', true, 2, null]) {
+    await assert.rejects(service.handleStorePublicDetails('owner-one', 'readStorePublicDetails', {
+      storeId: 'store-one', storeClassificationReadbackVersion: marker}), {code: 'invalid_input'});
+  }
+  await assert.rejects(service.handleStorePublicDetails('owner-one', 'saveStorePublicDetails', detailsRequest({
+    details: {...publicDetails, businessType: 'supplier'}})), {code: 'invalid_input'});
+  assert.deepEqual(normalizeStorePublicDetails(publicDetails), publicDetails);
+});
 test('LF-METADATA owner API saves only descriptive public fields and distinguishes original recovery', async () => {
   const repository = new ViewMemory(), service = subject(repository);
   const empty = await service.handleStorePublicDetails('owner-one', 'readStorePublicDetails', {storeId: 'store-one'}) as {record: unknown};

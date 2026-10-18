@@ -716,22 +716,32 @@ class WorkspacePaymentTerm {
 /// Invoice/bank/customer settings and resolved location are never serialized here.
 class WorkspacePublicDetailsFields {
   const WorkspacePublicDetailsFields({required this.street, required this.city, required this.state,
-    required this.pinCode, required this.publicContactPhone, required this.openingTime, required this.closingTime});
+    required this.pinCode, required this.publicContactPhone, required this.openingTime, required this.closingTime,
+    this.businessType});
   final String street, city, state, pinCode, publicContactPhone, openingTime, closingTime;
-  factory WorkspacePublicDetailsFields.fromSettings(WorkspaceStorePublicationDetails value) =>
+  final String? businessType;
+  String get publicSellerType => switch (businessType) {
+    'retailer' => 'Retailer', 'manufacturer' => 'Manufacturer', 'wholesaler' => 'Wholesaler',
+    'supplier' => 'Supplier', _ => '',
+  };
+  factory WorkspacePublicDetailsFields.fromSettings(WorkspaceStorePublicationDetails value,
+      {bool includeBusinessType = false}) =>
     WorkspacePublicDetailsFields.fromJson({'street': value.street, 'city': value.city, 'state': value.state,
       'pinCode': value.pinCode, 'publicContactPhone': value.publicContactPhone,
+      if (includeBusinessType && value.businessTypeSupplied) 'businessType': value.businessType,
       'openingTime': value.openingTime, 'closingTime': value.closingTime});
   factory WorkspacePublicDetailsFields.fromJson(Map<String, Object?> value) {
     const keys = {'street', 'city', 'state', 'pinCode', 'publicContactPhone', 'openingTime', 'closingTime'};
-    if (value.length != keys.length || !keys.every(value.containsKey) ||
+    if (!keys.every(value.containsKey) || value.keys.any((key) => !keys.contains(key) && key != 'businessType') ||
+        value.containsKey('businessType') && !WorkspaceStorePublicationDetails.businessTypes.containsKey(value['businessType']) ||
         value.values.any((raw) => raw is! String || raw != raw.trim() ||
           RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f]').hasMatch(raw))) {
       throw const FormatException();
     }
     final fields = WorkspacePublicDetailsFields(street: value['street'] as String, city: value['city'] as String,
       state: value['state'] as String, pinCode: value['pinCode'] as String, publicContactPhone: value['publicContactPhone'] as String,
-      openingTime: value['openingTime'] as String, closingTime: value['closingTime'] as String);
+      openingTime: value['openingTime'] as String, closingTime: value['closingTime'] as String,
+      businessType: value['businessType'] as String?);
     if (fields.street.isEmpty || fields.street.length > 2000 || fields.city.isEmpty || fields.city.length > 240 ||
         fields.state.isEmpty || fields.state.length > 240 || !RegExp(r'^[1-9][0-9]{5}$').hasMatch(fields.pinCode) ||
         !WorkspaceStorePublicationDetails.validPublicPhone(fields.publicContactPhone) ||
@@ -745,12 +755,13 @@ class WorkspacePublicDetailsFields {
   }
   String get address => [street, city, state, pinCode].join(', ');
   Map<String, Object?> toJson() => {'street': street, 'city': city, 'state': state, 'pinCode': pinCode,
+    if (businessType != null) 'businessType': businessType,
     'publicContactPhone': publicContactPhone, 'openingTime': openingTime, 'closingTime': closingTime};
 }
 
 class WorkspaceStorePublicationDetails {
   const WorkspaceStorePublicationDetails({
-    this.businessType = 'retailer',
+    String? businessType,
     this.retailChannelEnabled,
     this.wholesaleChannelEnabled,
     this.street = '',
@@ -776,14 +787,16 @@ class WorkspaceStorePublicationDetails {
     this.returnRemedies = const {},
     this.dispatchDays = 0,
     this.shoppingArea,
-  });
+  }) : businessType = businessType ?? 'retailer', businessTypeSupplied = businessType != null;
   static const businessTypes = {
+    '': 'Not shown publicly',
     'retailer': 'Retailer / grocery',
     'wholesaler': 'Wholesaler',
     'manufacturer': 'Manufacturer',
     'supplier': 'Goods supplier',
   };
   final String businessType;
+  final bool businessTypeSupplied;
   // Null preserves older records' explicit per-SKU channel selections. Saving
   // Store preferences makes both values explicit, without rewriting inventory.
   final bool? retailChannelEnabled, wholesaleChannelEnabled;
@@ -1011,7 +1024,7 @@ class WorkspaceStorePublicationDetails {
     collection: collection?.storeId == id ? collection : null,
   );
   Map<String, Object?> toJson() => {
-    'businessType': businessType,
+    if (businessTypeSupplied) 'businessType': businessType,
     if (retailChannelEnabled != null)
       'retailChannelEnabled': retailChannelEnabled,
     if (wholesaleChannelEnabled != null)
@@ -1127,7 +1140,7 @@ class WorkspaceStorePublicationDetails {
     final value = WorkspaceStorePublicationDetails(
       businessType: data.containsKey('businessType')
           ? text('businessType')
-          : 'retailer',
+          : null,
       retailChannelEnabled: channelFlag('retailChannelEnabled'),
       wholesaleChannelEnabled: channelFlag('wholesaleChannelEnabled'),
       street: text('street'),

@@ -1161,7 +1161,7 @@ class BuyV2ProductView extends StatelessWidget {
                                       Text(
                                         shop
                                             ? product.brandLabel
-                                            : '${product.brandLabel} · ${_sellerTypeLabel(product.sellerType)}',
+                                            : [product.brandLabel, _sellerTypeLabel(product.sellerType)].where((value) => value.isNotEmpty).join(' · '),
                                         style: context.buyEyebrow.copyWith(
                                           fontSize: 11,
                                         ),
@@ -1511,7 +1511,7 @@ class BuyV2ProductView extends StatelessWidget {
                                   _ProductHeroFact(
                                     icon: Icons.storefront_outlined,
                                     value:
-                                        '${product.customerSeller(facts.partner)} · ${_sellerTypeLabel(product.sellerType)}',
+                                        [product.customerSeller(facts.partner), _sellerTypeLabel(product.sellerType)].where((value) => value.isNotEmpty).join(' · '),
                                     trailing: storeAction,
                                   ),
                                 if (!automaticFulfilment) ...[
@@ -2052,7 +2052,7 @@ class _ProductStoreSummary extends StatelessWidget {
           runSpacing: 3,
           children: [
             Text(
-              'Store · ${_sellerTypeLabel(product.sellerType)}',
+              ['Store', _sellerTypeLabel(product.sellerType)].where((value) => value.isNotEmpty).join(' · '),
               style: context.buyMeta.copyWith(fontSize: 11, height: 1.35),
             ),
             if (status != null)
@@ -7767,7 +7767,7 @@ class _MarketplaceTrustPanel extends StatelessWidget {
               icon: Icons.storefront_outlined,
               label: 'Seller',
               value:
-                  '${product.customerSeller(trust.partnerName)} · ${_sellerTypeLabel(product.sellerType)}',
+                  [product.customerSeller(trust.partnerName), _sellerTypeLabel(product.sellerType)].where((value) => value.isNotEmpty).join(' · '),
             ),
           if (partnerRating case final rating?)
             _DecisionRow(
@@ -21909,12 +21909,14 @@ class _DecisionActionRow extends StatelessWidget {
 
 String _sellerTypeLabel(String source) {
   final value = source.trim().toLowerCase();
+  if (value.isEmpty) return '';
   if (value.contains('manufacturer')) return 'Manufacturer';
   if (value.contains('wholesaler')) return 'Wholesaler';
   if (value.contains('distributor')) return 'Distributor';
   if (value.contains('retailer')) return 'Retailer';
   if (value.contains('shop')) return 'Dealer';
   if (value.contains('producer')) return 'Producer';
+  if (value.contains('supplier')) return 'Supplier';
   return 'Seller';
 }
 
