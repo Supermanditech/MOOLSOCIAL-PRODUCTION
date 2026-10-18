@@ -797,11 +797,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
             'procurementContext': _encodeProcurementContext(context),
           'lines': [
             for (final line in group.request.lines)
-              {
-                'productId': line.product.id,
-                'quantity': line.quantity,
-                'purchasedProduct': _encodePurchasedProduct(line.product),
-              },
+              _encodeOrderLine(line),
           ],
         },
       };
@@ -1529,11 +1525,7 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'productIds': order.productIds,
     'lines': [
       for (final line in order.lines)
-        {
-          'productId': line.product.id,
-          'quantity': line.quantity,
-          'purchasedProduct': _encodePurchasedProduct(line.product),
-        },
+        _encodeOrderLine(line),
     ],
     'paymentMethod': order.paymentMethod,
     'purchaseOrderReference': order.purchaseOrderReference,
@@ -1768,15 +1760,38 @@ final class BuyV2SharedPreferencesCustomerStateStore
     return result;
   }
 
+  static Map<String, Object?> _encodeOrderLine(BuyV2CartLine line) {
+    if (!line.hasValidScheduledFulfilment) {
+      throw const FormatException('Original Scheduled choice needs checking.');
+    }
+    return {
+      'productId': line.product.id,
+      'quantity': line.quantity,
+      'purchasedProduct': _encodePurchasedProduct(line.product),
+      if (line.scheduledFulfilment case final selection?)
+        'scheduledFulfilment': selection.toJson(),
+    };
+  }
+
   static List<BuyV2CartLine> _decodeOrderLines(Object? value) {
-    return [
-      for (final source in _objectList(value))
-        if (_string(source['productId']) case final productId?)
-          if (_decodePurchasedProduct(source['purchasedProduct'])
-              case final product? when product.id == productId)
-            if (source['quantity'] case final int quantity when quantity > 0)
-              BuyV2CartLine(product: product, quantity: quantity),
-    ];
+    final result = <BuyV2CartLine>[];
+    for (final source in _objectList(value)) {
+      // A present choice must never become an apparently ordinary legacy line.
+      final hasSelection = source.containsKey('scheduledFulfilment');
+      final selection = hasSelection
+          ? BuyV2ScheduledFulfilment.fromJson(source['scheduledFulfilment']) : null;
+      final productId = _string(source['productId']);
+      final product = _decodePurchasedProduct(source['purchasedProduct']);
+      final quantity = source['quantity'];
+      if (productId == null || product == null || product.id != productId ||
+          quantity is! int || quantity <= 0 ||
+          (selection != null && !selection.matches(product))) {
+        if (hasSelection) throw const FormatException('Original Scheduled choice needs checking.');
+        continue; // Retain the existing no-selection legacy decoding behavior.
+      }
+      result.add(BuyV2CartLine(product: product, quantity: quantity, scheduledFulfilment: selection));
+    }
+    return result;
   }
 
   // Historical display data only. Never recover purchase facts from today's

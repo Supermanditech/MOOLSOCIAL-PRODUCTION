@@ -1006,19 +1006,65 @@ class BuyV2CustomerReview {
   final String updatedLabel;
 }
 
+/// A buyer's desired single Scheduled window, not a reservation or provider
+/// acknowledgement. Past windows remain valid historical data; current
+/// eligibility and quantity-aware acknowledgement are separate checks.
+class BuyV2ScheduledFulfilment {
+  const BuyV2ScheduledFulfilment({required this.listing, required this.sourceRevision,
+    required this.locationKey, required this.slotId, required this.startsAt, required this.endsAt});
+  final BuyV2PublicListingIdentity listing;
+  final String sourceRevision, locationKey, slotId;
+  final DateTime startsAt, endsAt;
+  bool get valid => listing.valid && [sourceRevision, locationKey, slotId].every(
+    (value) => value.isNotEmpty && value.trim() == value) &&
+    startsAt.isUtc && endsAt.isUtc && endsAt.isAfter(startsAt);
+  bool matches(BuyV2Product product) => valid && listing.matches(product) && product.publicListingIdentity == listing;
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'method': 'scheduled',
+    'listing': listing.toJson(), 'sourceRevision': sourceRevision, 'locationKey': locationKey,
+    'slotId': slotId, 'startsAt': startsAt.toIso8601String(), 'endsAt': endsAt.toIso8601String()};
+  static BuyV2ScheduledFulfilment fromJson(Object? value) {
+    const keys = {'schemaVersion', 'method', 'listing', 'sourceRevision', 'locationKey', 'slotId', 'startsAt', 'endsAt'};
+    if (value is! Map || value.length != keys.length || value.keys.any((key) => !keys.contains(key)) ||
+        value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['method'] != 'scheduled' ||
+        const ['sourceRevision', 'locationKey', 'slotId', 'startsAt', 'endsAt'].any((key) => value[key] is! String)) {
+      throw const FormatException('Saved Scheduled choice needs checking.');
+    }
+    final listing = BuyV2PublicListingIdentity.fromJson(value['listing']);
+    final startsAt = DateTime.tryParse(value['startsAt'] as String), endsAt = DateTime.tryParse(value['endsAt'] as String);
+    if (listing == null || startsAt == null || endsAt == null ||
+        startsAt.toIso8601String() != value['startsAt'] || endsAt.toIso8601String() != value['endsAt']) {
+      throw const FormatException('Saved Scheduled choice needs checking.');
+    }
+    final result = BuyV2ScheduledFulfilment(listing: listing, sourceRevision: value['sourceRevision'] as String,
+      locationKey: value['locationKey'] as String, slotId: value['slotId'] as String, startsAt: startsAt, endsAt: endsAt);
+    if (!result.valid) throw const FormatException('Saved Scheduled choice needs checking.');
+    return result;
+  }
+  @override
+  bool operator ==(Object other) => other is BuyV2ScheduledFulfilment && listing == other.listing &&
+    sourceRevision == other.sourceRevision && locationKey == other.locationKey && slotId == other.slotId &&
+    startsAt == other.startsAt && endsAt == other.endsAt;
+  @override
+  int get hashCode => Object.hash(listing, sourceRevision, locationKey, slotId, startsAt, endsAt);
+}
+
 class BuyV2CartLine {
-  const BuyV2CartLine({required this.product, required this.quantity});
+  const BuyV2CartLine({required this.product, required this.quantity, this.scheduledFulfilment});
 
   final BuyV2Product product;
   final int quantity;
+  final BuyV2ScheduledFulfilment? scheduledFulfilment;
+  bool get hasValidScheduledFulfilment => scheduledFulfilment?.matches(product) ?? true;
 
   int get total => product.price * quantity;
   int get totalMinor => buyV2MultiplyMinor(product.priceMinor, quantity);
 
-  BuyV2CartLine copyWith({BuyV2Product? product, int? quantity}) =>
+  BuyV2CartLine copyWith({BuyV2Product? product, int? quantity,
+    BuyV2ScheduledFulfilment? scheduledFulfilment, bool clearScheduledFulfilment = false}) =>
       BuyV2CartLine(
         product: product ?? this.product,
         quantity: quantity ?? this.quantity,
+        scheduledFulfilment: clearScheduledFulfilment ? null : scheduledFulfilment ?? this.scheduledFulfilment,
       );
 }
 

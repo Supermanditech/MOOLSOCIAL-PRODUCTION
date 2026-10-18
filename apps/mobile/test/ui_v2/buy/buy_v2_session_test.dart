@@ -5943,7 +5943,7 @@ void main() {
     },
   );
   group('D09 A02 purchased-line persistence', () {
-    BuyV2Order purchasedOrder(BuyV2Product product) => BuyV2Order(
+    BuyV2Order purchasedOrder(BuyV2Product product, {BuyV2ScheduledFulfilment? scheduledFulfilment}) => BuyV2Order(
       id: 'retained-order',
       destination: product.destination,
       title: 'Shop order',
@@ -5957,7 +5957,7 @@ void main() {
       status: BuyV2OrderStatus.confirmed,
       purchaseId: 'retained-purchase',
       productIds: [product.id],
-      lines: [BuyV2CartLine(product: product, quantity: 3)],
+      lines: [BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: scheduledFulfilment)],
     );
     // Host-only bound public listings; no live provider/Stock/payment authority.
     BuyV2Product publicListing(bool trade, {String? returnPolicy}) {
@@ -5973,7 +5973,79 @@ void main() {
         seller: 'Host Store', sellerType: 'Retailer', deliveryPromise: '', origin: '', confirmedOn: '',
         visualLabel: '', visualKind: 'unavailable', offerClass: channel, returnPolicy: returnPolicy);
     }
+    BuyV2ScheduledFulfilment desiredSchedule(BuyV2Product product) => BuyV2ScheduledFulfilment(
+      listing: product.publicListingIdentity!, sourceRevision: 'host-eligibility-A',
+      locationKey: 'host-region|host-place|1', slotId: 'host-slot-A',
+      startsAt: DateTime.utc(2020, 1, 1, 9), endsAt: DateTime.utc(2020, 1, 1, 10));
     for (final trade in [false, true]) {
+      test('LF11 selected fulfilment original order retains historical choice trade=$trade', () async {
+        final preferences = _R669StringPreferences(), product = publicListing(trade);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        final selected = desiredSchedule(product);
+        expect(await store.write(BuyV2CustomerStateSnapshot(orders: [
+          purchasedOrder(product, scheduledFulfilment: selected)])), isTrue);
+        final restored = (await store.read())!;
+        final line = restored.orders.single.lines.single;
+        expect(line.scheduledFulfilment, selected);
+        expect(line.hasValidScheduledFulfilment, isTrue);
+        expect(line.quantity, 3); expect(line.totalMinor, product.priceMinor * 3);
+        expect(await store.write(restored), isTrue);
+        expect((await store.read())!.orders.single.lines.single.scheduledFulfilment, selected);
+      });
+      for (final grouped in [false, true]) {
+        test('LF11 selected fulfilment frozen attempt retains original choice trade=$trade grouped=$grouped', () async {
+          final preferences = _R669StringPreferences(), product = publicListing(trade);
+          final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+          final selected = desiredSchedule(product);
+          final request = BuyV2OrderPlacementRequest.minor(
+            lines: [BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: selected)],
+            address: _instructionAddress, paymentMethod: 'Card', totalMinor: product.priceMinor * 3,
+            amountDueNowMinor: product.priceMinor * 3, idempotencyKey: 'host-original-attempt',
+            checkoutQuoteId: 'host-original-quote', checkoutAttemptId: grouped ? 'host-checkout' : null,
+            paymentGroupId: grouped ? 'host-group' : null);
+          final payment = BuyV2CheckoutGroupAttempt(request: request, fulfilmentKeys: {'host-fulfilment'},
+            obligations: [BuyV2CheckoutFulfilmentObligation(fulfilmentKey: 'host-fulfilment',
+              productIds: {product.id}, totalMinor: request.totalMinor, dueNowMinor: request.amountDueNowMinor)],
+            state: BuyV2CheckoutSubmissionState.submitting, paymentReference: 'host-payment');
+          expect(await store.write(BuyV2CustomerStateSnapshot(
+            legacyCheckoutAttempt: grouped ? null : BuyV2LegacyCheckoutAttempt(ownerScope: store.ownerScope, payment: payment),
+            checkoutPaymentAttempt: grouped ? BuyV2CheckoutPaymentAttempt(id: 'host-checkout', ownerScope: store.ownerScope,
+              quoteValidUntil: DateTime.utc(2020), groups: [payment]) : null)), isTrue);
+          final restored = (await store.read())!;
+          expect(restored.paymentRecoveryIncomplete, isFalse);
+          final original = grouped ? restored.checkoutPaymentAttempt!.groups.single : restored.legacyCheckoutAttempt!.payment;
+          expect(original.request.lines.single.scheduledFulfilment, selected);
+          expect(original.request.lines.single.hasValidScheduledFulfilment, isTrue);
+          expect(original.request.idempotencyKey, request.idempotencyKey);
+          expect(original.request.totalMinor, request.totalMinor);
+          expect(original.state, BuyV2CheckoutSubmissionState.paymentUnknown);
+          expect(original.paymentReference, 'host-payment');
+          expect(await store.write(restored), isTrue);
+          final again = (await store.read())!;
+          expect((grouped ? again.checkoutPaymentAttempt!.groups.single : again.legacyCheckoutAttempt!.payment)
+            .request.lines.single.scheduledFulfilment, selected);
+        });
+      }
+      test('LF11 selected fulfilment exact historical identity and line copies trade=$trade', () {
+        final product = publicListing(trade), selected = desiredSchedule(publicListing(trade));
+        expect(selected.valid, isTrue, reason: 'A historical choice is not a current eligibility grant');
+        expect(selected.matches(product), isTrue);
+        final restored = BuyV2ScheduledFulfilment.fromJson(jsonDecode(jsonEncode(selected.toJson())));
+        expect(restored, selected); expect(restored.hashCode, selected.hashCode);
+        final line = BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: selected);
+        expect(line.hasValidScheduledFulfilment, isTrue);
+        expect(line.copyWith(quantity: 4).scheduledFulfilment, same(selected));
+        expect(line.copyWith(quantity: 4).totalMinor, product.priceMinor * 4);
+        final changed = line.copyWith(product: product.copyWith(id: 'foreign-listing'));
+        expect(changed.scheduledFulfilment, same(selected));
+        expect(changed.hasValidScheduledFulfilment, isFalse,
+          reason: 'Copy must not erase or silently retarget a conflicting selection');
+        expect(line.copyWith(clearScheduledFulfilment: true).scheduledFulfilment, isNull);
+        final legacy = BuyV2CartLine(product: product, quantity: 3);
+        expect(legacy.hasValidScheduledFulfilment, isTrue); expect(legacy.scheduledFulfilment, isNull);
+        final raw = selected.toJson(); raw['slotId'] = 'host-changed';
+        expect(selected.slotId, 'host-slot-A');
+      });
       test('PF07 purchased policy survives restart without current catalogue substitution trade=$trade', () async {
         final preferences = _R669StringPreferences();
         final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
@@ -6038,6 +6110,77 @@ void main() {
         expect(restored.reviewDeliveryOptions, isEmpty); expect(restored.packTerms, isNull);
       });
     }
+    for (final corruption in ['null', 'wrong slot', 'foreign listing', 'missing product', 'wrong quantity']) {
+      test('LF11 selected fulfilment corrupt saved original preserves bytes and recovery hold $corruption', () async {
+        final preferences = _R669StringPreferences(), product = publicListing(false);
+        final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
+        await store.write(BuyV2CustomerStateSnapshot(orders: [purchasedOrder(product)]));
+        final key = preferences.values.keys.single;
+        final raw = jsonDecode(preferences.values[key]!);
+        final line = raw['orders'][0]['lines'][0] as Map;
+        final selection = desiredSchedule(product).toJson();
+        line['scheduledFulfilment'] = selection;
+        switch (corruption) {
+          case 'null': line['scheduledFulfilment'] = null;
+          case 'wrong slot': selection['slotId'] = '';
+          case 'foreign listing': (selection['listing'] as Map)['storeId'] = 'foreign-store';
+          case 'missing product': line.remove('purchasedProduct');
+          case 'wrong quantity': line['quantity'] = 1.5;
+        }
+        final bytes = jsonEncode(raw); preferences.values[key] = bytes;
+        await expectLater(store.read(), throwsFormatException);
+        final writes = preferences.writesStarted, core = BuySession();
+        final session = BuyV2Session(core: core, reviewDataEnabled: false, customerStateStore: store);
+        addTearDown(session.dispose); addTearDown(core.dispose);
+        await session.restoreCustomerState();
+        expect(session.customerStateRecoveryPending, isTrue);
+        session.updateQuery('Host recovery browse');
+        session.setAvailableProductsOnly(true);
+        expect(session.availableProductsOnly, isTrue);
+        await Future<void>.delayed(Duration.zero);
+        expect(preferences.writesStarted, writes); expect(preferences.values[key], bytes);
+      });
+    }
+    for (final corruption in ['unknown version', 'noninteger version', 'unknown field', 'missing field',
+      'different method', 'blank slot', 'wrong type', 'padded revision', 'empty location',
+      'backward window', 'non-UTC window', 'normalized invalid date', 'invalid listing']) {
+      test('LF11 selected fulfilment rejects malformed present context $corruption', () {
+        final raw = desiredSchedule(publicListing(false)).toJson();
+        switch (corruption) {
+          case 'unknown version': raw['schemaVersion'] = 2;
+          case 'noninteger version': raw['schemaVersion'] = 1.0;
+          case 'unknown field': raw['future'] = 'Must not silently disappear';
+          case 'missing field': raw.remove('slotId');
+          case 'different method': raw['method'] = 'quick';
+          case 'blank slot': raw['slotId'] = ' ';
+          case 'wrong type': raw['slotId'] = 42;
+          case 'padded revision': raw['sourceRevision'] = ' host-source ';
+          case 'empty location': raw['locationKey'] = '';
+          case 'backward window': raw['endsAt'] = '2019-12-31T00:00:00.000Z';
+          case 'non-UTC window': raw['startsAt'] = '2020-01-01T09:00:00.000+05:30';
+          case 'normalized invalid date': raw['startsAt'] = '2020-02-30T09:00:00.000Z';
+          case 'invalid listing': (raw['listing'] as Map)['schemaVersion'] = 2;
+        }
+        expect(() => BuyV2ScheduledFulfilment.fromJson(raw), throwsFormatException);
+      });
+    }
+    test('LF11 selected fulfilment scopes equal slot strings to exact listing Store SKU pack and channel', () {
+      final original = publicListing(false), selection = desiredSchedule(publicListing(false));
+      for (final identity in [
+        BuyV2PublicListingIdentity(listingId: original.id, realm: 'production', storeId: 'host-store',
+          skuId: 'host-shared-sku', canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail),
+        BuyV2PublicListingIdentity(listingId: original.id, realm: 'evaluation', storeId: 'other-store',
+          skuId: 'host-shared-sku', canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail),
+        BuyV2PublicListingIdentity(listingId: original.id, realm: 'evaluation', storeId: 'host-store',
+          skuId: 'other-sku', canonicalProductId: 'host-canonical', verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail),
+        BuyV2PublicListingIdentity(listingId: original.id, realm: 'evaluation', storeId: 'host-store',
+          skuId: 'host-shared-sku', canonicalProductId: 'host-canonical', verifiedPackId: 'other-pack', channel: BuyV2OfferClass.retail),
+      ]) {
+        expect(selection.matches(original.copyWith(publicListingIdentity: identity)), isFalse);
+      }
+      expect(selection.matches(publicListing(true)), isFalse);
+      expect(selection, isNot(desiredSchedule(publicListing(true))));
+    });
     test('PF07 purchased policy legacy absence remains unknown and does not rewrite current terms', () async {
       final preferences = _R669StringPreferences();
       final store = BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: 'receipt-buyer');
