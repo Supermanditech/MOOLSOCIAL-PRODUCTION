@@ -592,6 +592,7 @@ final class _Lf11ScheduledFacts implements BuyV2ProductFactsAdapter {
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
     const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+      orderabilityLabel: 'Available to add', storeOperatingState: BuyV2StoreOperatingState.open, stale: false,
       sourceId: 'host-slot-facts', observedAt: instant.add(renewal), deliveryPromise: 'Host same delivery label',
       promisedByLabel: 'Host same window label', eligibility: BuyV2OfferEligibility(
         productId: product.id, storeId: product.storeId!, sourceRevision: revision,
@@ -600,6 +601,62 @@ final class _Lf11ScheduledFacts implements BuyV2ProductFactsAdapter {
         channelEnabled: true, storeReady: true, fleetAvailable: true, customerLocationConfirmed: true,
         options: {BuyV2DeliveryOption.courier, if (scheduled) BuyV2DeliveryOption.scheduled},
         scheduledSlotId: slot, scheduledStart: instant.add(start), scheduledEnd: instant.add(end)));
+}
+
+/// Isolated proposed selected-window connector; never injected into native data.
+class _Lf11ScheduledCommerce extends TestLegacyRecoveryCommerce
+    implements BuyV2ScheduledOrderPlacementAdapter {
+  @override
+  bool supportsScheduledFulfilment = true;
+}
+
+class _Lf11ScheduledGroupedCommerce extends TestGroupedPaymentCommerce
+    implements BuyV2ScheduledOrderPlacementAdapter {
+  @override
+  bool supportsScheduledFulfilment = true;
+}
+
+class _Lf11AcknowledgedQuote extends TestPaymentQuote implements BuyV2MinorCheckoutQuoteAdapter {
+  String acknowledgement = 'exact';
+  String quoteId = 'host-scheduled-quote';
+  Duration validity = const Duration(hours: 1);
+  List<BuyV2FulfilmentGroup> lastGroups = [];
+  @override
+  Future<BuyV2CheckoutQuoteSnapshot> loadQuoteMinor({required List<BuyV2FulfilmentGroup> groups,
+    required BuyV2Address address, required String selectedPaymentMethod,
+    required List<BuyV2CartBenefit> selectedBenefits, required Map<String, int> tipAmountsMinorByFulfilmentKey}) async {
+    lastGroups = groups;
+    if (gate != null) await gate!.future;
+    final now = DateTime.now();
+    final lines = [for (final group in groups) () {
+      final entries = <String, ({BuyV2ScheduledFulfilment selection, int quantity})>{};
+      for (final line in group.lines) {
+        if (line.scheduledFulfilment case final selected?) {
+          final raw = selected.toJson();
+          switch (acknowledgement) {
+            case 'slot': raw['slotId'] = 'host-other-slot';
+            case 'revision': raw['sourceRevision'] = 'host-other-revision';
+            case 'location': raw['locationKey'] = 'host-other-location';
+            case 'window': raw['endsAt'] = selected.endsAt.add(const Duration(minutes: 1)).toIso8601String();
+          }
+          entries[line.product.id] = (selection: BuyV2ScheduledFulfilment.fromJson(raw),
+            quantity: acknowledgement == 'quantity' ? line.quantity + 1 : line.quantity);
+          if (acknowledgement == 'extra') entries['host-foreign-line'] = entries[line.product.id]!;
+          if (acknowledgement == 'empty') entries.clear();
+        }
+      }
+      return BuyV2CheckoutQuoteLine.minor(fulfilmentKey: group.key, itemSubtotalMinor: group.totalMinor,
+        couponSavingMinor: 0, taxMinor: 0, freightMinor: 0, deliveryFeeMinor: 0,
+        tipMinor: tipAmountsMinorByFulfilmentKey[group.key] ?? 0, paymentChargeMinor: 0,
+        totalMinor: group.totalMinor + (tipAmountsMinorByFulfilmentKey[group.key] ?? 0),
+        scheduledFulfilments: acknowledgement == 'missing' ? null : BuyV2ScheduledFulfilmentAcknowledgements(entries));
+    }()];
+    return BuyV2CheckoutQuoteSnapshot(state: BuyV2CommerceLoadState.ready,
+      quote: BuyV2CheckoutQuote.minor(id: quoteId, sourceId: 'host-scheduled-source',
+        evaluatedAt: now, validUntil: now.add(validity), lines: lines,
+        totalMinor: lines.fold(0, (sum, line) => sum + line.totalMinor),
+        paymentGroups: groupsFor?.call(lines, selectedPaymentMethod)));
+  }
 }
 
 final class _MutableCommerceFactsAdapter implements BuyV2ProductFactsAdapter {
@@ -5981,6 +6038,256 @@ void main() {
       listing: product.publicListingIdentity!, sourceRevision: 'host-eligibility-A',
       locationKey: 'host-region|host-place|1', slotId: 'host-slot-A',
       startsAt: DateTime.utc(2020, 1, 1, 9), endsAt: DateTime.utc(2020, 1, 1, 10));
+    Future<({BuyV2Session session, TestPaymentCommerce commerce, _Lf11ScheduledFacts facts,
+      _MemoryCustomerStateStore store, BuyV2ScheduledFulfilment selected, void Function(Duration) advance})> scheduledCheckout({
+      BuyV2CheckoutQuoteAdapter? quote, TestPaymentCommerce? connector, bool review = false}) async {
+      final product = publicListing(false);
+      var now = DateTime.now().toUtc();
+      final facts = _Lf11ScheduledFacts(now);
+      final selected = BuyV2ScheduledFulfilment(listing: product.publicListingIdentity!, sourceRevision: facts.revision,
+        locationKey: facts.location, slotId: facts.slot, startsAt: now.add(facts.start), endsAt: now.add(facts.end));
+      final store = _MemoryCustomerStateStore('host-scheduled-checkout')..snapshot = BuyV2CustomerStateSnapshot(
+        cartQuantities: {product.id: 3}, cartScheduledFulfilments: {product.id: selected},
+        addresses: const [_instructionAddress], selectedAddressId: _instructionAddress.id, selectedPayment: 'Card');
+      final commerce = connector ?? _Lf11ScheduledCommerce();
+      BuyV2CommerceSnapshot snapshot(List<BuyV2PaymentCapability>? capabilities) => BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready, products: [product], addresses: const [_instructionAddress],
+        selectedAddressId: _instructionAddress.id, paymentMethods: const {'Card'}, paymentCapabilities: capabilities);
+      commerce.snapshot = snapshot(null);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: review, commerceAdapter: commerce,
+        productFactsAdapter: facts, customerStateStore: store, checkoutQuoteAdapter: quote, catalogueNow: () => now,
+        cataloguePageSource: review ? (_PagingRecoverySource()..resolutionProducts = {product.id: product}) : null);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState();
+      expect(session.customerStateRecoveryPending, isFalse, reason: session.notice);
+      session.openCart(); expect(session.openCheckout(), isTrue, reason: session.notice);
+      commerce.snapshot = snapshot([testPaymentCapability(session, method: 'Card')]);
+      await session.restoreCommerce();
+      expect(session.choosePayment('Card'), isTrue, reason: session.notice);
+      return (session: session, commerce: commerce, facts: facts, store: store, selected: selected,
+        advance: (Duration elapsed) { now = now.add(elapsed); });
+    }
+    test('LF11 selected quote acknowledgements defensively copy exact quantity and context', () {
+      final product = publicListing(false), selected = desiredSchedule(publicListing(false));
+      final entries = {product.id: (selection: selected, quantity: 3)};
+      final ack = BuyV2ScheduledFulfilmentAcknowledgements(entries);
+      final line = BuyV2CartLine(product: product, quantity: 3, scheduledFulfilment: selected);
+      entries.clear(); expect(ack.byProductId, hasLength(1));
+      expect(() => ack.byProductId.clear(), throwsUnsupportedError);
+      expect(ack.matches([line]), isTrue);
+      expect(ack.matches([line.copyWith(quantity: 4)]), isFalse);
+      expect(ack.matches([line.copyWith(clearScheduledFulfilment: true)]), isFalse);
+      expect(BuyV2ScheduledFulfilmentAcknowledgements({}).matches([line]), isFalse);
+    });
+    for (final response in ['missing', 'empty', 'slot', 'window', 'revision', 'location', 'quantity', 'extra', 'exact']) {
+      test('LF11 selected quote requires exact per-line acknowledgement $response', () async {
+        final quote = _Lf11AcknowledgedQuote()..acknowledgement = response;
+        final fixture = await scheduledCheckout(quote: quote);
+        final session = fixture.session;
+        expect(await session.refreshCheckoutQuote(), response == 'exact', reason: session.checkoutQuoteMessage);
+        expect(session.checkoutQuoteReviewRequired, response != 'exact');
+        expect(quote.lastGroups.single.lines.single.scheduledFulfilment, fixture.selected);
+        expect(fixture.commerce.requests, isEmpty); expect(session.cartLines.single.quantity, 3);
+      });
+    }
+    test('LF11 selected checkout without quote cannot dispatch or fabricate review orders', () async {
+      final fixture = await scheduledCheckout(review: true);
+      final previousOrders = fixture.session.orders.map((order) => order.id).toList();
+      expect(fixture.session.checkoutQuoteReviewRequired, isTrue);
+      expect(fixture.session.confirmOrder(), isFalse);
+      expect(await fixture.session.submitOrder(), isFalse);
+      expect(fixture.commerce.requests, isEmpty);
+      expect(fixture.session.orders.map((order) => order.id).toList(), previousOrders);
+      expect(fixture.session.cartLines.single.scheduledFulfilment, fixture.selected);
+    });
+    test('LF11 selected placement requires explicit connector capability', () async {
+      final fixture = await scheduledCheckout(quote: _Lf11AcknowledgedQuote(), connector: TestLegacyRecoveryCommerce());
+      expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+      expect(await fixture.session.submitOrder(), isFalse, reason: fixture.session.notice);
+      expect(fixture.commerce.requests, isEmpty);
+      expect(fixture.session.legacyCheckoutAttempt, isNull);
+    });
+    test('LF11 selected placement positive exact request and returned original', () async {
+      final quote = _Lf11AcknowledgedQuote();
+      final connector = _Lf11ScheduledCommerce()
+        ..onPlace = (request) => testGroupedPlacement(request, reference: 'host-selected-purchase');
+      final fixture = await scheduledCheckout(quote: quote, connector: connector);
+      expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+      expect(await fixture.session.submitOrder(), isTrue, reason: fixture.session.notice);
+      expect(fixture.commerce.requests, hasLength(1));
+      expect(fixture.commerce.requests.single.lines.single.scheduledFulfilment, fixture.selected);
+      expect(fixture.session.orders.single.lines.single.scheduledFulfilment, fixture.selected);
+    });
+    test('LF11 selected placement cannot replace frozen quote during save wait', () async {
+      final quote = _Lf11AcknowledgedQuote()..quoteId = 'host-Q1'..validity = const Duration(minutes: 1);
+      final fixture = await scheduledCheckout(quote: quote);
+      expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+      await Future<void>.delayed(Duration.zero);
+      final writes = fixture.store.writeCalls, hold = Completer<void>();
+      fixture.store.pendingWrite = hold;
+      final placing = fixture.session.submitOrder();
+      for (var i = 0; i < 50 && fixture.store.writeCalls == writes; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+      expect(fixture.session.legacyCheckoutAttempt!.payment.request.checkoutQuoteId, 'host-Q1');
+      fixture.advance(const Duration(minutes: 2));
+      quote.quoteId = 'host-Q2'; quote.validity = const Duration(hours: 1);
+      expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+      expect(fixture.session.checkoutQuoteReviewRequired, isFalse);
+      hold.complete();
+      expect(await placing, isFalse);
+      expect(fixture.commerce.requests, isEmpty, reason: 'Fresh Q2 cannot renew the frozen Q1 request.');
+      expect(fixture.session.legacyCheckoutAttempt, isNull);
+      expect(fixture.session.cartLines.single.scheduledFulfilment, fixture.selected);
+    });
+    test('LF11 selected checkout cannot silently become collection', () async {
+      final fixture = await scheduledCheckout(quote: _Lf11AcknowledgedQuote());
+      expect(fixture.session.chooseCheckoutCollection(true), isFalse);
+      expect(fixture.session.collectionCheckoutSelected, isFalse);
+      expect(await fixture.session.prepareCollectionCheckout(), isFalse);
+      expect(await fixture.session.submitCollectionPurchase(), isFalse);
+      expect(fixture.session.cartLines.single.scheduledFulfilment, fixture.selected);
+      expect(fixture.commerce.requests, isEmpty);
+    });
+    BuyV2OrderPlacementResult selectedResponse(BuyV2OrderPlacementRequest request, String change) {
+      final lines = [for (final line in request.lines) () {
+        if (change == 'missing') return line.copyWith(clearScheduledFulfilment: true);
+        if (change == 'slot') {
+          return line.copyWith(scheduledFulfilment: BuyV2ScheduledFulfilment.fromJson({
+            ...line.scheduledFulfilment!.toJson(), 'slotId': 'host-other-slot'}));
+        }
+        return line;
+      }()];
+      const reference = 'host-original-selected-purchase';
+      return testGroupedPlacement(request, reference: reference, orders: [BuyV2Order(
+        id: 'host-original-selected-order', destination: lines.first.product.destination,
+        title: 'Host original', itemSummary: 'Host lines', total: request.total,
+        partner: lines.first.product.seller, partnerType: lines.first.product.sellerType,
+        promise: 'Host agreed delivery', destinationLabel: request.address.shortLine, progress: 0,
+        status: BuyV2OrderStatus.preparing, purchaseId: reference, productIds: lines.map((line) => line.product.id).toList(),
+        lines: lines, paymentMethod: request.paymentMethod, amountPaidNow: request.amountDueNow,
+        balanceDue: request.total - request.amountDueNow, recipient: request.address.recipient, addressLine: request.address.line)]);
+    }
+    for (final grouped in [false, true]) {
+      for (final echo in ['exact', 'missing', 'slot']) {
+        test('LF11 selected placement validates frozen returned context grouped=$grouped echo=$echo', () async {
+          final quote = _Lf11AcknowledgedQuote();
+          if (grouped) {
+            quote.groupsFor = (lines, method) => [for (var i = 0; i < lines.length; i++)
+              BuyV2CheckoutPaymentGroup.minor(id: 'host-group-$i', fulfilmentKeys: {lines[i].fulfilmentKey},
+                paymentMethod: method, totalMinor: lines[i].totalMinor, amountDueNowMinor: lines[i].totalMinor)];
+          }
+          final TestPaymentCommerce connector = grouped
+              ? (_Lf11ScheduledGroupedCommerce()..onGroup = (request) => selectedResponse(request, echo))
+              : (_Lf11ScheduledCommerce()..onPlace = (request) => selectedResponse(request, echo));
+          final fixture = await scheduledCheckout(quote: quote, connector: connector);
+          expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+          expect(await fixture.session.submitOrder(), echo == 'exact', reason: fixture.session.notice);
+          expect(connector.requests, hasLength(1));
+          expect(connector.requests.single.lines.single.scheduledFulfilment, fixture.selected);
+          if (echo == 'exact') {
+            expect(fixture.session.orders.single.lines.single.scheduledFulfilment, fixture.selected);
+          } else {
+            expect(fixture.session.checkoutRequiresResolution, isTrue);
+            expect(fixture.session.checkoutSubmissionState, BuyV2CheckoutSubmissionState.paymentUnknown);
+            expect(fixture.session.orders, isEmpty);
+            final original = grouped ? fixture.session.checkoutPaymentAttempt!.groups.single : fixture.session.legacyCheckoutAttempt!.payment;
+            expect(original.request.lines.single.scheduledFulfilment, fixture.selected);
+            expect(original.paymentReference, isNotNull);
+          }
+        });
+      }
+      test('LF11 selected placement expiry and removed capability do not prevent original reconciliation grouped=$grouped', () async {
+        final quote = _Lf11AcknowledgedQuote();
+        if (grouped) {
+          quote.groupsFor = (lines, method) => [BuyV2CheckoutPaymentGroup.minor(id: 'host-group',
+            fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(), paymentMethod: method,
+            totalMinor: lines.fold(0, (sum, line) => sum + line.totalMinor),
+            amountDueNowMinor: lines.fold(0, (sum, line) => sum + line.totalMinor))];
+        }
+        final TestPaymentCommerce connector = grouped ? _Lf11ScheduledGroupedCommerce() : _Lf11ScheduledCommerce();
+        final fixture = await scheduledCheckout(quote: quote, connector: connector);
+        expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+        expect(await fixture.session.submitOrder(), isFalse);
+        expect(connector.requests, hasLength(1));
+        fixture.advance(const Duration(hours: 5));
+        fixture.facts.scheduled = false; fixture.facts.revision = 'host-new-revision';
+        expect(fixture.session.refreshProductFacts(fixture.selected.listing.listingId), isTrue);
+        if (connector is _Lf11ScheduledCommerce) {
+          connector.supportsScheduledFulfilment = false;
+          connector.onReconcile = (request) => selectedResponse(request, 'exact');
+        } else if (connector is _Lf11ScheduledGroupedCommerce) {
+          connector.supportsScheduledFulfilment = false;
+          connector.onReconcile = (request) => selectedResponse(request, 'exact');
+        }
+        expect(await fixture.session.reconcilePayment(), isTrue, reason: fixture.session.notice);
+        expect(connector.requests, hasLength(1), reason: 'Reconcile the original; never dispatch again.');
+        expect(fixture.session.orders.single.lines.single.scheduledFulfilment, fixture.selected);
+      });
+      for (final change in ['slot', 'capability']) {
+        test('LF11 selected placement rechecks after saving grouped=$grouped change=$change', () async {
+          final quote = _Lf11AcknowledgedQuote();
+          if (grouped) {
+            quote.groupsFor = (lines, method) => [BuyV2CheckoutPaymentGroup.minor(id: 'host-group',
+              fulfilmentKeys: lines.map((line) => line.fulfilmentKey).toSet(), paymentMethod: method,
+              totalMinor: lines.fold(0, (sum, line) => sum + line.totalMinor),
+              amountDueNowMinor: lines.fold(0, (sum, line) => sum + line.totalMinor))];
+          }
+          final TestPaymentCommerce connector = grouped ? _Lf11ScheduledGroupedCommerce() : _Lf11ScheduledCommerce();
+          final fixture = await scheduledCheckout(quote: quote, connector: connector);
+          expect(await fixture.session.refreshCheckoutQuote(), isTrue);
+          await Future<void>.delayed(Duration.zero);
+          final writes = fixture.store.writeCalls, hold = Completer<void>();
+          fixture.store.pendingWrite = hold;
+          final placing = fixture.session.submitOrder();
+          for (var i = 0; i < 50 && fixture.store.writeCalls == writes; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+          }
+          expect(fixture.store.writeCalls, greaterThan(writes));
+          expect(grouped ? fixture.session.checkoutPaymentAttempt != null : fixture.session.legacyCheckoutAttempt != null, isTrue);
+          if (change == 'slot') {
+            fixture.facts.slot = 'host-new-slot';
+            expect(fixture.session.refreshProductFacts(fixture.selected.listing.listingId), isTrue);
+          } else if (connector is _Lf11ScheduledCommerce) {
+            connector.supportsScheduledFulfilment = false;
+          } else if (connector is _Lf11ScheduledGroupedCommerce) {
+            connector.supportsScheduledFulfilment = false;
+          }
+          hold.complete();
+          expect(await placing, isFalse);
+          expect(connector.requests, isEmpty, reason: 'No placement after a changed pre-dispatch save wait.');
+          expect(fixture.session.cartLines.single.scheduledFulfilment, fixture.selected);
+          expect(fixture.session.checkoutSubmissionState,
+            grouped ? BuyV2CheckoutSubmissionState.idle : BuyV2CheckoutSubmissionState.failed);
+        });
+      }
+    }
+    test('LF11 selected grouping keeps distinct retained slots despite identical display windows', () async {
+      final first = publicListing(false), id = 'listing-${'a' * 64}';
+      final second = first.copyWith(id: id, canonicalId: 'host-canonical-second', publicListingIdentity:
+        BuyV2PublicListingIdentity(listingId: id, realm: 'evaluation', storeId: 'host-store', skuId: 'host-second-sku',
+          canonicalProductId: 'host-canonical-second', verifiedPackId: 'host-pack', channel: BuyV2OfferClass.retail));
+      final a = desiredSchedule(first), b = BuyV2ScheduledFulfilment.fromJson({
+        ...desiredSchedule(second).toJson(), 'slotId': 'host-slot-B'});
+      final store = _MemoryCustomerStateStore('host-slot-grouping')..snapshot = BuyV2CustomerStateSnapshot(
+        cartQuantities: {first.id: 3, second.id: 3}, cartScheduledFulfilments: {first.id: a, second.id: b});
+      final commerce = TestPaymentCommerce()..snapshot = BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready, products: [first, second]);
+      final facts = _Lf11ScheduledFacts(DateTime.now().toUtc()), core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: false, commerceAdapter: commerce,
+        productFactsAdapter: facts, customerStateStore: store);
+      addTearDown(session.dispose); addTearDown(core.dispose);
+      await session.restoreCommerce(); await session.restoreCustomerState(); session.openCart();
+      final groups = session.scopedCartFulfilmentGroups;
+      expect(groups, hasLength(2)); expect(groups.map((group) => group.promise).toSet(), hasLength(1));
+      final keys = groups.map((group) => group.key).toSet(); expect(keys, hasLength(2));
+      facts.slot = 'host-current-slot-C'; facts.revision = 'host-current-revision-C';
+      session.refreshProductFacts(first.id); session.refreshProductFacts(second.id);
+      expect(session.scopedCartFulfilmentGroups.map((group) => group.key).toSet(), keys);
+      expect(session.cartLines.map((line) => line.scheduledFulfilment).toSet(), {a, b});
+      expect(commerce.requests, isEmpty);
+    });
     for (final trade in [false, true]) {
       test('LF11 selected Cart choice survives restart and removal trade=$trade', () async {
         final preferences = _R669StringPreferences(), product = publicListing(trade);

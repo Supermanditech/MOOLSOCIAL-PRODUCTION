@@ -2731,6 +2731,27 @@ abstract interface class BuyV2MinorCommercialPaymentTermsAdapter
   });
 }
 
+/// Proposed connector acknowledgement, not a reservation or payment result.
+/// Copy the input: a later provider-map mutation cannot change an accepted quote.
+@immutable
+class BuyV2ScheduledFulfilmentAcknowledgements {
+  BuyV2ScheduledFulfilmentAcknowledgements(
+    Map<String, ({BuyV2ScheduledFulfilment selection, int quantity})> entries,
+  ) : byProductId = Map.unmodifiable(entries);
+
+  final Map<String, ({BuyV2ScheduledFulfilment selection, int quantity})> byProductId;
+
+  bool matches(Iterable<BuyV2CartLine> lines) {
+    final selected = {for (final line in lines)
+      if (line.scheduledFulfilment != null) line.product.id: line};
+    return selected.length == byProductId.length && byProductId.entries.every((entry) {
+      final line = selected[entry.key];
+      return line != null && line.quantity > 0 && line.hasValidScheduledFulfilment &&
+          entry.value.selection == line.scheduledFulfilment && entry.value.quantity == line.quantity;
+    });
+  }
+}
+
 @immutable
 class BuyV2CheckoutQuoteLine {
   const BuyV2CheckoutQuoteLine({
@@ -2738,6 +2759,7 @@ class BuyV2CheckoutQuoteLine {
     required int itemSubtotal, required int couponSaving,
     required int tax, required int freight, required int deliveryFee,
     required int tip, required int paymentCharge, required int total,
+    this.scheduledFulfilments,
     // ignore: prefer_initializing_formals
   }) : _itemSubtotal = itemSubtotal, _couponSaving = couponSaving,
        // ignore: prefer_initializing_formals
@@ -2753,6 +2775,7 @@ class BuyV2CheckoutQuoteLine {
     required int itemSubtotalMinor, required int couponSavingMinor,
     required int taxMinor, required int freightMinor, required int deliveryFeeMinor,
     required int tipMinor, required int paymentChargeMinor, required int totalMinor,
+    this.scheduledFulfilments,
   // Public argument names are retained for existing provider callers.
   // ignore: prefer_initializing_formals
   }) : _itemSubtotal = null, _itemSubtotalMinor = itemSubtotalMinor,
@@ -2768,6 +2791,8 @@ class BuyV2CheckoutQuoteLine {
        _total = null, _totalMinor = totalMinor;
 
   final String fulfilmentKey;
+  /// Null is compatible only when the requested group has no selected windows.
+  final BuyV2ScheduledFulfilmentAcknowledgements? scheduledFulfilments;
   final int? _itemSubtotal, _itemSubtotalMinor, _couponSaving, _couponSavingMinor,
       _tax, _taxMinor, _freight, _freightMinor, _deliveryFee, _deliveryFeeMinor,
       _tip, _tipMinor, _paymentCharge, _paymentChargeMinor, _total, _totalMinor;
@@ -3423,6 +3448,13 @@ abstract interface class BuyV2MinorOrderPlacementAdapter {
 /// supported explicitly, without downgrading its frozen request on retry.
 abstract interface class BuyV2MinorGroupedOrderPlacementAdapter {
   Future<BuyV2OrderPlacementResult> placePaymentGroupMinor(BuyV2OrderPlacementRequest request);
+}
+
+/// Proposed opt-in for selected windows on both existing placement methods.
+/// Money/grouped capabilities still apply independently. Confirmation must echo
+/// exact selections in returned order lines; reconciliation needs no new grant.
+abstract interface class BuyV2ScheduledOrderPlacementAdapter {
+  bool get supportsScheduledFulfilment;
 }
 
 abstract interface class BuyV2CommerceAdapter {

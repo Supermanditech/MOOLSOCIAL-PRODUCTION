@@ -9781,6 +9781,12 @@ class BuyV2Session extends ChangeNotifier {
     if (storeId != null && !stores.any((store) => store.id == storeId)) {
       return false;
     }
+    final chosenStore = storeId ?? (stores.length == 1 ? stores.single.id : null);
+    if (selected && _linesForScope(checkoutScope).any((line) =>
+        (chosenStore == null || line.product.storeId == chosenStore) && line.scheduledFulfilment != null)) {
+      showNotice('Review your selected delivery window before switching to collection. Your Cart is unchanged.');
+      return false;
+    }
     _collectionCheckoutSelected = selected;
     _collectionCheckoutStoreId = selected
         ? storeId ?? (stores.length == 1 ? stores.single.id : null)
@@ -9796,6 +9802,9 @@ class BuyV2Session extends ChangeNotifier {
     final buyer = collectionIdentity?.value;
     final store = collectionCheckoutStore;
     if (!collectionCheckoutSelected || buyer == null || store == null) {
+      return null;
+    }
+    if (collectionCheckout?.unresolved != true && checkoutLines.any((line) => line.scheduledFulfilment != null)) {
       return null;
     }
     try {
@@ -9866,6 +9875,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitCollectionPurchase() async {
+    if (collectionCheckout?.unresolved != true && checkoutLines.any((line) => line.scheduledFulfilment != null)) {
+      showNotice('Review your selected delivery window before switching to collection. Your Cart is unchanged.');
+      return false;
+    }
     if (collectionCheckout?.unresolved != true &&
         !_checkoutSupplierPoliciesCurrent()) {
       return false;
@@ -10085,6 +10098,14 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2FulfilmentGroup> get checkoutFulfilmentGroups =>
       _fulfilmentGroupsFor(checkoutLines);
 
+  String? _selectedScheduledGroupIdentity(BuyV2CartLine line) {
+    final selected = line.scheduledFulfilment;
+    if (selected == null) return null;
+    return jsonEncode(['selected-scheduled-v1', selected.listing.realm,
+      selected.listing.storeId, selected.listing.channel.name, selected.sourceRevision,
+      selected.locationKey, selected.slotId, selected.startsAt.toIso8601String(), selected.endsAt.toIso8601String()]);
+  }
+
   List<BuyV2FulfilmentGroup> _fulfilmentGroupsFor(List<BuyV2CartLine> lines) {
     final grouped = <String, List<BuyV2CartLine>>{};
     for (final line in lines) {
@@ -10095,7 +10116,7 @@ class BuyV2Session extends ChangeNotifier {
       final promisedBy = facts.promisedByLabel?.trim().toLowerCase() ?? '';
       final provider = facts.deliveryProviderName?.trim() ?? '';
       final service = facts.deliveryServiceLevel?.trim() ?? '';
-      final key =
+      final key = _selectedScheduledGroupIdentity(line) ??
           '${product.destination.name}|${product.storeId ?? product.seller}|'
           '${mode.name}|$promise|$promisedBy|$provider|$service';
       grouped.putIfAbsent(key, () => []).add(line);
@@ -10130,7 +10151,8 @@ class BuyV2Session extends ChangeNotifier {
               lines.map((line) => line.product.id).toList(growable: false)
                 ..sort();
           return BuyV2FulfilmentGroup(
-            groupKey:
+            groupKey: lines.first.scheduledFulfilment != null
+                ? jsonEncode([_selectedScheduledGroupIdentity(lines.first), stableProductIds]) :
                 '${firstProduct.destination.name}|${firstProduct.storeId ?? firstProduct.seller}|'
                 '${fulfilmentModeFor(firstProduct).name}|${stableProductIds.join(',')}',
             destination: firstProduct.destination,
@@ -10845,12 +10867,13 @@ class BuyV2Session extends ChangeNotifier {
       checkoutQuoteLoadState == BuyV2CommerceLoadState.loading;
 
   bool get checkoutQuoteReviewRequired {
-    if (!checkoutQuoteEnabled) return false;
+    if (!checkoutQuoteEnabled) return checkoutLines.any((line) => line.scheduledFulfilment != null);
     final quote = _checkoutQuote;
     return checkoutQuoteLoadState != BuyV2CommerceLoadState.ready ||
         quote == null ||
         !DateTime.now().isBefore(quote.validUntil) ||
-        _checkoutQuoteFingerprint != _currentCheckoutQuoteFingerprint();
+        _checkoutQuoteFingerprint != _currentCheckoutQuoteFingerprint() ||
+        !_validCheckoutQuote(quote, checkoutFulfilmentGroups);
   }
 
   int get checkoutQuotedTaxMinor => buyV2SumMinor(_checkoutQuote?.lines.map((line) => line.taxMinor) ?? const <int>[]);
@@ -10880,7 +10903,14 @@ class BuyV2Session extends ChangeNotifier {
     final adapter = checkoutQuoteAdapter;
     final address = selectedAddressOrNull;
     final groups = checkoutFulfilmentGroups;
-    if (adapter == null) return true;
+    if (adapter == null) {
+      if (checkoutLines.any((line) => line.scheduledFulfilment != null)) {
+        checkoutQuoteLoadState = BuyV2CommerceLoadState.unavailable;
+        checkoutQuoteMessage = 'Scheduled delivery needs confirmation. Your Cart is unchanged.';
+        notifyListeners(); return false;
+      }
+      return true;
+    }
     final requestSequence = ++_checkoutQuoteRequestSequence;
     void unavailable(String message) {
       _checkoutQuote = null; _checkoutQuoteFingerprint = null;
@@ -10993,6 +11023,10 @@ class BuyV2Session extends ChangeNotifier {
       final group = groupByKey[line.fulfilmentKey];
       if (group == null ||
           !seen.add(line.fulfilmentKey) ||
+          !_selectedScheduledLinesCurrent(group.lines) ||
+          (line.scheduledFulfilments == null
+            ? group.lines.any((item) => item.scheduledFulfilment != null)
+            : !line.scheduledFulfilments!.matches(group.lines)) ||
           !line.hasValidMoney ||
           line.itemSubtotalMinor != group.totalMinor ||
           line.couponSavingMinor !=
@@ -11025,6 +11059,7 @@ class BuyV2Session extends ChangeNotifier {
           group.deliveryServiceLevel,
           for (final line in group.lines)
             [line.product.id, line.quantity, line.product.priceMinor,
+              line.scheduledFulfilment?.toJson(),
               _scheduledQuoteContext(line.product)],
         ],
       if (address != null)
@@ -11064,6 +11099,46 @@ class BuyV2Session extends ChangeNotifier {
       eligibility.scheduledEnd?.toUtc().toIso8601String(),
       deliveryOptionsFor(product).contains(BuyV2DeliveryOption.scheduled)];
   }
+
+  bool _selectedScheduledLinesCurrent(Iterable<BuyV2CartLine> lines) => lines.every((line) {
+    final selected = line.scheduledFulfilment;
+    if (selected == null) return true;
+    final grant = productFactsFor(line.product).eligibility;
+    return line.hasValidScheduledFulfilment && grant != null &&
+        deliveryOptionsFor(line.product).contains(BuyV2DeliveryOption.scheduled) &&
+        selected.sourceRevision == grant.sourceRevision && selected.locationKey == grant.customerLocationKey &&
+        selected.slotId == grant.scheduledSlotId && selected.startsAt == grant.scheduledStart?.toUtc() &&
+        selected.endsAt == grant.scheduledEnd?.toUtc();
+  });
+
+  bool _selectedScheduledConnectorSupported(Iterable<BuyV2CartLine> lines) {
+    if (!lines.any((line) => line.scheduledFulfilment != null)) return true;
+    try {
+      final adapter = commerceAdapter;
+      return adapter is BuyV2ScheduledOrderPlacementAdapter &&
+          (adapter as BuyV2ScheduledOrderPlacementAdapter).supportsScheduledFulfilment;
+    } on Object { return false; }
+  }
+
+  bool _selectedScheduledInputsCurrent(BuyV2OrderPlacementRequest request) =>
+      _selectedScheduledConnectorSupported(request.lines) && _selectedScheduledLinesCurrent(request.lines) &&
+      request.lines.every((line) {
+        if (line.scheduledFulfilment == null) return true;
+        final live = _cart[line.product.id];
+        return live != null && live.hasValidScheduledFulfilment && live.quantity == line.quantity &&
+            live.scheduledFulfilment == line.scheduledFulfilment && live.product.priceMinor == line.product.priceMinor;
+      });
+
+  // Freeze quote output as well as Cart inputs. A refreshed quote cannot renew
+  // an older request's expiry or silently change its fee allocation after save.
+  String? _selectedScheduledQuoteAgreement(BuyV2CheckoutQuote? quote) => quote == null ? null : jsonEncode([
+    quote.id, quote.sourceId, quote.evaluatedAt.toIso8601String(), quote.validUntil.toIso8601String(), quote.totalMinor,
+    for (final line in quote.lines) [line.fulfilmentKey, line.itemSubtotalMinor, line.couponSavingMinor,
+      line.taxMinor, line.freightMinor, line.deliveryFeeMinor, line.tipMinor, line.paymentChargeMinor, line.totalMinor,
+      if (line.scheduledFulfilments case final acknowledgement?)
+        for (final entry in acknowledgement.byProductId.entries)
+          [entry.key, entry.value.quantity, entry.value.selection.toJson()]],
+  ]);
 
   void _invalidateCheckoutQuote() {
     if (!checkoutQuoteEnabled) return;
@@ -16205,6 +16280,10 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     for (final line in checkoutLines) {
+      if (!_selectedScheduledLinesCurrent([line])) {
+        notice = 'Your selected delivery window needs review. Your Cart is unchanged.';
+        notifyListeners(); return false;
+      }
       if (!_availableForDiscovery(line.product)) {
         notice =
             'Availability has changed. Review your Cart before continuing.';
@@ -16216,6 +16295,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool confirmOrder() {
+    if (checkoutLines.any((line) => line.scheduledFulfilment != null)) {
+      showNotice('Scheduled delivery must be confirmed through Checkout. Your Cart is unchanged.');
+      return false;
+    }
     if (!_checkoutEligibilityCurrent(placingOrder: true)) return false;
     if (isStoreProcurement && checkoutPaymentTermsReviewRequired) {
       notice = 'Supplier payment terms must be confirmed before ordering.';
@@ -16370,7 +16453,8 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return Future<bool>.value(false);
     }
-    if (reviewDataEnabled && const {'UPI', 'Card'}.contains(selectedPayment)) {
+    if (checkoutLines.any((line) => line.scheduledFulfilment != null) ||
+        (reviewDataEnabled && const {'UPI', 'Card'}.contains(selectedPayment))) {
       return _submitOrderAsync();
     }
     if (reviewDataEnabled) {
@@ -16677,10 +16761,14 @@ class BuyV2Session extends ChangeNotifier {
       procurementContext: procurementContext,
     ), groups);
     if (request == null) {
-      notice = 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
+      notice = lines.any((line) => line.scheduledFulfilment != null)
+          ? 'Scheduled delivery could not be confirmed. Your Cart is unchanged.'
+          : 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
       notifyListeners();
       return false;
     }
+    final scheduledQuote = request.lines.any((line) => line.scheduledFulfilment != null) ? _checkoutQuote : null;
+    final scheduledQuoteAgreement = _selectedScheduledQuoteAgreement(scheduledQuote);
     final discounts = _checkoutGroupCouponSavingsMinor();
     final quoteLines = {
       for (final line
@@ -16737,6 +16825,10 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     if (!retained ||
+        (request.lines.any((line) => line.scheduledFulfilment != null) &&
+          (!_selectedScheduledInputsCurrent(request) || checkoutQuoteReviewRequired || scheduledQuote == null ||
+            request.checkoutQuoteId != scheduledQuote.id || !catalogueNow().isBefore(scheduledQuote.validUntil) ||
+            scheduledQuoteAgreement != _selectedScheduledQuoteAgreement(_checkoutQuote))) ||
         (purchaseOrderRequired &&
             (purchaseOrderReviewRequired ||
                 purchaseOrder?.review?.requestId !=
@@ -16748,7 +16840,9 @@ class BuyV2Session extends ChangeNotifier {
       _checkoutIdempotencyKey = null;
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
       notice = retained
-          ? 'Order agreement changed. Check them before payment.'
+          ? request.lines.any((line) => line.scheduledFulfilment != null)
+              ? 'Scheduled delivery changed. Review Checkout before payment.'
+              : 'Order agreement changed. Check them before payment.'
           : 'Order recovery could not be saved. No payment was started.';
       _persistCustomerState();
       notifyListeners();
@@ -16815,6 +16909,10 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2OrderPlacementRequest? _placementRequestForAdapter(
     BuyV2OrderPlacementRequest exact, List<BuyV2FulfilmentGroup> groups, {bool grouped = false}) {
     if (!exact.hasValidMoney) return null;
+    if (exact.lines.any((line) => line.scheduledFulfilment != null) &&
+        (!_selectedScheduledInputsCurrent(exact) || checkoutQuoteReviewRequired)) {
+      return null;
+    }
     if (grouped ? commerceAdapter is BuyV2MinorGroupedOrderPlacementAdapter
         : commerceAdapter is BuyV2MinorOrderPlacementAdapter) {
       return exact;
@@ -16844,7 +16942,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _placementDispatchSupported(BuyV2OrderPlacementRequest request, {required bool grouped}) {
-    if (!request.hasValidMoney) return false;
+    if (!request.hasValidMoney || request.lines.any((line) => !line.hasValidScheduledFulfilment) ||
+        !_selectedScheduledConnectorSupported(request.lines)) {
+      return false;
+    }
     if (request.usesMinorAmounts) {
       return grouped ? commerceAdapter is BuyV2MinorGroupedOrderPlacementAdapter : commerceAdapter is BuyV2MinorOrderPlacementAdapter;
     }
@@ -17006,7 +17107,9 @@ class BuyV2Session extends ChangeNotifier {
         purchaseOrderRequestId: _pendingPurchaseOrderRequestId, purchaseOrderRevision: _pendingPurchaseOrderRevision,
       ), selected, grouped: true);
       if (request == null) {
-        notice = 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
+        notice = selected.any((group) => group.lines.any((line) => line.scheduledFulfilment != null))
+            ? 'Scheduled delivery could not be confirmed. Your Cart is unchanged.'
+            : 'This order method cannot accept the exact amounts. Your Cart is kept unchanged.';
         notifyListeners(); return false;
       }
       requests[group.id] = request;
@@ -17193,6 +17296,7 @@ class BuyV2Session extends ChangeNotifier {
         final live = _cart[line.product.id];
         return live != null &&
             live.quantity == line.quantity &&
+            live.scheduledFulfilment == line.scheduledFulfilment &&
             live.product.canonicalId == line.product.canonicalId &&
             live.product.storeId == line.product.storeId &&
             live.product.variant == line.product.variant &&
@@ -17265,6 +17369,15 @@ class BuyV2Session extends ChangeNotifier {
         notice = 'Checkout could not be saved. No new payment was started.';
         notifyListeners();
         return false;
+      }
+      // This group has not dispatched yet. Recovery of a submitted group uses
+      // the separate original-attempt path and must not require a fresh grant.
+      if (request.lines.any((line) => line.scheduledFulfilment != null) &&
+          (!catalogueNow().isBefore(attempt.quoteValidUntil) || !_selectedScheduledInputsCurrent(request))) {
+        checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+        _syncCheckoutGroupState(); _checkoutIdempotencyKey = null;
+        notice = 'Scheduled delivery changed before payment. Review Checkout.';
+        _persistCustomerState(); notifyListeners(); return false;
       }
       BuyV2OrderPlacementResult result;
       var timedOut = false;
@@ -17394,6 +17507,8 @@ class BuyV2Session extends ChangeNotifier {
                 order.destination != line.product.destination ||
                 !seen.add(line.product.id) ||
                 line.quantity != original.quantity ||
+                !line.hasValidScheduledFulfilment || !original.hasValidScheduledFulfilment ||
+                line.scheduledFulfilment != original.scheduledFulfilment ||
                 line.product.canonicalId != original.product.canonicalId ||
                 line.product.storeId != original.product.storeId ||
                 line.product.destination != original.product.destination ||
@@ -17851,7 +17966,8 @@ class BuyV2Session extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (reviewDataEnabled && placement.orders.isEmpty) {
+    if (reviewDataEnabled && placement.orders.isEmpty &&
+        !request.lines.any((line) => line.scheduledFulfilment != null)) {
       final reference = placement.purchaseReference ?? _nextLocalPurchaseId();
       placement = BuyV2OrderPlacementResult(
         outcome: placement.outcome,
@@ -18332,6 +18448,7 @@ class BuyV2Session extends ChangeNotifier {
     for (final original in lines) {
       final current = _cart[original.product.id];
       if (current == null ||
+          current.scheduledFulfilment != original.scheduledFulfilment ||
           current.product.canonicalId != original.product.canonicalId ||
           current.product.storeId != original.product.storeId ||
           current.product.destination != original.product.destination ||
