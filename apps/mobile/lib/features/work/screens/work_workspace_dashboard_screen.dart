@@ -25634,14 +25634,32 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     if (controller == null) return const SizedBox.shrink();
     return ListenableBuilder(listenable: Listenable.merge([controller, widget.session, ..._importControllers.values]),
       builder: (context, _) {
-        final busy = !_reviewEditorCurrent || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id);
+        final busy = !_reviewEditorCurrent || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id) ||
+          widget.session.workspaceCatalogueListingBusy;
         final pending = controller.pending != null;
         return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
           key: const Key('work-product-review-submission'), crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(controller.message ?? 'Save keeps this product private. Submit saved details for review separately.',
               style: Theme.of(context).textTheme.bodySmall),
             if (_hasUnsavedEdits && !pending) Text('Save product changes before submitting.', style: Theme.of(context).textTheme.bodySmall),
+            if (controller.review?.state == 'ready' && !widget.session.localInventoryEnabled)
+              Text('Reviewed details need connected saved-product storage before publishing.', style: Theme.of(context).textTheme.bodySmall),
             Wrap(spacing: 8, runSpacing: 2, children: [
+              if (controller.review?.state == 'ready') TextButton.icon(key: const Key('work-product-review-publish'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !widget.session.canPublishReviewedWorkspaceProduct(widget.product.id) ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.publishReviewedWorkspaceProduct(widget.product.id,
+                    inputCurrent: () => _reviewEditorCurrent && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: const Icon(Icons.publish_outlined, size: 18), label: const Text('Publish reviewed product')),
+              if (widget.session.workspaceCatalogueListingPending) TextButton.icon(key: const Key('work-product-review-binding-recover'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.reconcileWorkspaceCatalogueListing();
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: const Icon(Icons.history, size: 18), label: const Text('Check saved listing update')),
               TextButton.icon(key: const Key('work-product-review-check'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy ? null : () async {
@@ -25650,7 +25668,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                   if (_reviewEditorCurrent) setState(() {});
                 }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
                 label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
-              if (!pending && controller.headLoaded) TextButton.icon(key: const Key('work-product-review-submit'),
+              if (!pending && controller.headLoaded && !widget.session.workspaceSavedProductAlreadySubmitted(widget.product.id)) TextButton.icon(key: const Key('work-product-review-submit'),
                 style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                 onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !controller.canSubmit ? null : () async {
                   if (!_reviewEditorCurrent) return;

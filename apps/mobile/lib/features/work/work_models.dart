@@ -10189,6 +10189,49 @@ class WorkspaceVariantFamily {
   }
 }
 
+/// Historical reviewed identity, not public visibility, Stock or selling authority.
+/// The local SKU/canonical/variant origin remains unchanged.
+class WorkspaceReviewedCatalogueLink {
+  const WorkspaceReviewedCatalogueLink({required this.realm, required this.storeId, required this.skuId,
+    required this.canonicalProductId, required this.verifiedPackId, required this.mirrorRevision,
+    required this.candidateRevision, required this.candidateFingerprint, required this.submissionRevision,
+    required this.submissionFingerprint, required this.authoredSha256});
+  final String realm, storeId, skuId, canonicalProductId, verifiedPackId;
+  final String candidateFingerprint, submissionFingerprint, authoredSha256;
+  final int mirrorRevision, candidateRevision, submissionRevision;
+  bool get valid => {'evaluation', 'production'}.contains(realm) &&
+    [storeId, skuId, canonicalProductId, verifiedPackId].every((v) => RegExp(r'^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$').hasMatch(v)) &&
+    [candidateFingerprint, submissionFingerprint, authoredSha256].every((v) => RegExp(r'^[A-F0-9]{64}$').hasMatch(v)) &&
+    [mirrorRevision, candidateRevision, submissionRevision].every((v) => v > 0 && v <= 1000000001);
+  Map<String, Object?> toJson() {
+    if (!valid) throw const FormatException('Reviewed product identity needs recovery.');
+    return {'version': 1, 'realm': realm, 'storeId': storeId, 'skuId': skuId, 'canonicalProductId': canonicalProductId,
+      'verifiedPackId': verifiedPackId, 'mirrorRevision': mirrorRevision, 'candidateRevision': candidateRevision,
+      'candidateFingerprint': candidateFingerprint, 'submissionRevision': submissionRevision,
+      'submissionFingerprint': submissionFingerprint, 'authoredSha256': authoredSha256};
+  }
+  static WorkspaceReviewedCatalogueLink fromJson(Object? raw) {
+    const fields = {'version', 'realm', 'storeId', 'skuId', 'canonicalProductId', 'verifiedPackId', 'mirrorRevision',
+      'candidateRevision', 'candidateFingerprint', 'submissionRevision', 'submissionFingerprint', 'authoredSha256'};
+    if (raw is! Map || raw.length != fields.length || !fields.every(raw.containsKey) || raw['version'] is! int || raw['version'] != 1 ||
+        ['realm', 'storeId', 'skuId', 'canonicalProductId', 'verifiedPackId', 'candidateFingerprint', 'submissionFingerprint', 'authoredSha256']
+          .any((key) => raw[key] is! String) || ['mirrorRevision', 'candidateRevision', 'submissionRevision'].any((key) => raw[key] is! int)) {
+      throw const FormatException('Reviewed product identity needs recovery.');
+    }
+    final link = WorkspaceReviewedCatalogueLink(realm: raw['realm'] as String, storeId: raw['storeId'] as String, skuId: raw['skuId'] as String,
+      canonicalProductId: raw['canonicalProductId'] as String, verifiedPackId: raw['verifiedPackId'] as String, mirrorRevision: raw['mirrorRevision'] as int,
+      candidateRevision: raw['candidateRevision'] as int, candidateFingerprint: raw['candidateFingerprint'] as String,
+      submissionRevision: raw['submissionRevision'] as int, submissionFingerprint: raw['submissionFingerprint'] as String, authoredSha256: raw['authoredSha256'] as String);
+    if (!link.valid) throw const FormatException('Reviewed product identity needs recovery.');
+    return link;
+  }
+  bool preserves(WorkspaceReviewedCatalogueLink previous) => valid && previous.valid && realm == previous.realm && storeId == previous.storeId &&
+    skuId == previous.skuId && canonicalProductId == previous.canonicalProductId && verifiedPackId == previous.verifiedPackId &&
+    (jsonEncode(toJson()) == jsonEncode(previous.toJson()) || candidateRevision > previous.candidateRevision &&
+      mirrorRevision > previous.mirrorRevision && submissionRevision >= previous.submissionRevision &&
+      (submissionRevision != previous.submissionRevision || submissionFingerprint == previous.submissionFingerprint && authoredSha256 == previous.authoredSha256));
+}
+
 /// Device-owned inventory only. QA data cannot be restored into production.
 /// This checkpoint carries no invoice, payment, publication or backend authority.
 class WorkspaceSavedInventory {
@@ -10201,8 +10244,9 @@ class WorkspaceSavedInventory {
     required List<WorkspaceCatalogueItem> products,
     required List<WorkspaceStockMovement> movements,
     List<WorkspaceVariantFamily> variantFamilies = const [],
+    List<WorkspaceReviewedCatalogueLink> reviewedCatalogueLinks = const [],
     this.manualReceiptCheckpointRevision,
-  }) : variantFamilies = List.unmodifiable(variantFamilies),
+  }) : reviewedCatalogueLinks = List.unmodifiable(reviewedCatalogueLinks), variantFamilies = List.unmodifiable(variantFamilies),
        products = List.unmodifiable(products),
        movements = List.unmodifiable(movements);
   final String account, store;
@@ -10212,14 +10256,16 @@ class WorkspaceSavedInventory {
   final List<WorkspaceCatalogueItem> products;
   final List<WorkspaceStockMovement> movements;
   final List<WorkspaceVariantFamily> variantFamilies;
+  final List<WorkspaceReviewedCatalogueLink> reviewedCatalogueLinks;
   /// Last authoritative manual-receipt checkpoint projected here. Retained even
   /// when all goods were already in Stock or damaged and no movement was added.
   final int? manualReceiptCheckpointRevision;
 
   Map<String, Object?> toJson() => {
-    'version': variantFamilies.isNotEmpty ? 4 : products.any((p) => p.usesMinorAmounts) ? 3
+    'version': reviewedCatalogueLinks.isNotEmpty ? 5 : variantFamilies.isNotEmpty ? 4 : products.any((p) => p.usesMinorAmounts) ? 3
         : products.any((p) => p.stockEntry != null) ? 2 : 1,
-    if (variantFamilies.isNotEmpty) 'variantFamilies': variantFamilies.map((f) => f.toJson()).toList(),
+    if (variantFamilies.isNotEmpty || reviewedCatalogueLinks.isNotEmpty) 'variantFamilies': variantFamilies.map((f) => f.toJson()).toList(),
+    if (reviewedCatalogueLinks.isNotEmpty) 'reviewedCatalogueLinks': reviewedCatalogueLinks.map((link) => link.toJson()).toList(),
     'account': account,
     'store': store,
     'qa': qa,
@@ -10250,16 +10296,20 @@ class WorkspaceSavedInventory {
     );
     try {
       if (raw is! Map ||
-          !const [1, 2, 3, 4].contains(raw['version']) ||
+          !const [1, 2, 3, 4, 5].contains(raw['version']) ||
           raw['products'] is! List ||
           raw['movements'] is! List ||
-          (raw['version'] == 4 ? raw['version'] is! int || raw['variantFamilies'] is! List
-            : raw.containsKey('variantFamilies'))) {
+          (const {4, 5}.contains(raw['version']) ? raw['version'] is! int || raw['variantFamilies'] is! List
+            : raw.containsKey('variantFamilies')) ||
+          (raw['version'] == 5 ? raw['reviewedCatalogueLinks'] is! List || (raw['reviewedCatalogueLinks'] as List).isEmpty
+            : raw.containsKey('reviewedCatalogueLinks'))) {
         throw invalid;
       }
       if ((raw['products'] as List).length > 10000) throw invalid;
       final result = WorkspaceSavedInventory(
-        variantFamilies: raw['version'] == 4
+        reviewedCatalogueLinks: raw['version'] == 5
+          ? [for (final link in raw['reviewedCatalogueLinks'] as List) WorkspaceReviewedCatalogueLink.fromJson(link)] : const [],
+        variantFamilies: const {4, 5}.contains(raw['version'])
           ? [for (final f in raw['variantFamilies'] as List) WorkspaceVariantFamily.fromJson(f)] : const [],
         account: raw['account'] as String,
         store: raw['store'] as String,
@@ -10295,7 +10345,7 @@ class WorkspaceSavedInventory {
       final ids = <String>{};
       final movements = <String>{};
       if (result.account.trim().isEmpty ||
-          raw['version'] != (result.variantFamilies.isNotEmpty ? 4 : result.products.any((p) => p.usesMinorAmounts) ? 3
+          raw['version'] != (result.reviewedCatalogueLinks.isNotEmpty ? 5 : result.variantFamilies.isNotEmpty ? 4 : result.products.any((p) => p.usesMinorAmounts) ? 3
               : result.products.any((p) => p.stockEntry != null) ? 2 : 1) ||
           result.store.trim().isEmpty ||
           result.revision < 1 ||
@@ -10326,6 +10376,10 @@ class WorkspaceSavedInventory {
         throw invalid;
       }
       WorkspaceVariantFamily.validateInventory(result.variantFamilies, result.products);
+      final linked = <String>{};
+      if (result.reviewedCatalogueLinks.length > result.products.length || result.reviewedCatalogueLinks.any((link) =>
+          link.storeId != result.store || link.realm != (result.qa ? 'evaluation' : 'production') ||
+          !ids.contains(link.skuId) || !linked.add(link.skuId))) { throw invalid; }
       return result;
     } on FormatException {
       rethrow;

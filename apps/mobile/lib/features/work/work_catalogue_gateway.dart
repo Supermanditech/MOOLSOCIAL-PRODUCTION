@@ -34,6 +34,7 @@ class WorkspaceProductSubmissionInput {
   Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
   String get skuId => toJson()['skuId'] as String;
   String get fingerprint => _encoded;
+  String get authoredSha256 => _catalogueHash(Map<String, dynamic>.of(toJson())..remove('catalogueProductHint'));
   bool get mediaPending => toJson()['mediaIntent']['pendingUpload'] == true;
   static WorkspaceProductSubmissionInput fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) {
     final origin = item.stockEntry, measure = item.packMeasure, membership = item.variantMembership;
@@ -203,6 +204,7 @@ abstract interface class WorkspaceProductSubmissionOwnerGateway {
 /// Negotiated private review results, never public visibility or ordering proof.
 abstract interface class WorkspaceReviewedProductSubmissionGateway {
   bool get reviewedProductSubmissionSupported;
+  DateTime get productReviewNow;
   Future<WorkspaceProductReviewReadback> readReviewedProductSubmission(WorkspaceProductSubmissionScope scope,
     {required bool Function() current});
 }
@@ -306,6 +308,9 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
   int _revision = 0;
   String? _headBytes, message;
   WorkspaceProductSubmissionRecord? head;
+  WorkspaceProductReviewReadback? review;
+  int _reviewRevision = 0;
+  String? _reviewFingerprint;
   WorkspaceProductSubmissionIntent? pending;
   Future<bool>? _restoring;
   bool get active => !_closed && _lifetime != null && context() == _lifetime;
@@ -332,18 +337,36 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
   }
   Future<bool> refresh() async {
     if (!active || busy || !gateway.productSubmissionSupported) return false;
-    busy = true; headLoaded = false; _notify();
+    busy = true; headLoaded = false; review = null; _notify();
     try {
       if (!await restore() || !active) return false;
       if (pending != null) { message = 'Check the original request before another submission.'; return false; }
-      final next = await gateway.readProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25));
+      final source = gateway;
+      final nextReview = source is WorkspaceReviewedProductSubmissionGateway && (source as WorkspaceReviewedProductSubmissionGateway).reviewedProductSubmissionSupported
+        ? await (source as WorkspaceReviewedProductSubmissionGateway).readReviewedProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25)) : null;
+      final next = nextReview == null ? await gateway.readProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25)) : nextReview.record;
       if (!active) return false;
       final revision = next?.revision ?? 0, bytes = next == null ? null : jsonEncode(_sorted(next.toJson()));
       if (revision < _revision || revision == _revision && _headBytes != bytes) throw const FormatException();
+      final candidate = nextReview?.candidate;
+      if (candidate != null && (candidate.revision < _reviewRevision || candidate.revision == _reviewRevision &&
+          _reviewFingerprint != candidate.fingerprint)) { throw const FormatException(); }
+      if (candidate != null) { _reviewRevision = candidate.revision; _reviewFingerprint = candidate.fingerprint; }
+      review = nextReview;
       head = next; _revision = revision; _headBytes = bytes; headLoaded = true;
       message = next == null ? 'This saved product has not been submitted.' : next.input.mediaPending
         ? 'Product details received privately. Photo upload and review are still needed.'
         : 'Product details received privately. Approval and public listing are not confirmed.';
+      if (nextReview != null) {
+        message = switch (nextReview.state) {
+          'ready' => 'Reviewed details are ready. Publish them only after checking this saved product.',
+          'bound' => 'Reviewed listing preference saved. Public visibility still needs confirmation.',
+          'outdated' => 'Saved details changed after review. Submit the saved changes before publishing.',
+          'unavailable' => 'Reviewed selling terms are not available now. Your saved product is kept.',
+          'awaiting_media' => 'Product details received privately. Photo upload and review are still needed.',
+          _ => next == null ? 'This saved product has not been submitted.' : 'Saved details are received privately. Review is not finished.',
+        };
+      }
       return true;
     } catch (_) {
       if (active) message = 'Product review status could not be confirmed. Your saved details are kept.';
@@ -356,7 +379,7 @@ class WorkspaceProductSubmissionController extends ChangeNotifier {
       message = 'These saved details are already submitted. Check review status.'; _notify();
       return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notSent);
     }
-    busy = true; _notify();
+    busy = true; review = null; _notify();
     try {
       final original = WorkspaceProductSubmissionIntent(scope: scope, expectedRevision: _revision, input: input,
         idempotencyKey: 'product-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}');
@@ -2279,6 +2302,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   final bool productSubmissionSupported;
   @override
   final bool reviewedProductSubmissionSupported;
+  @override
+  DateTime get productReviewNow => now().toUtc();
   final bool storeClassificationReadbackSupported;
   @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;

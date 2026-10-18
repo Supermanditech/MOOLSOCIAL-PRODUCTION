@@ -651,6 +651,56 @@ class OwnerTransport implements SocialContentTransport {
     return reply(body);
   }
 }
+// Host-only adapter delegates to the real strict client; no native provider injection.
+class _AdoptionGateway implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway,
+    WorkspaceProductSubmissionOwnerGateway, WorkspaceReviewedProductSubmissionGateway {
+  _AdoptionGateway(this.source);
+  final AuthenticatedWorkspaceCatalogueGateway source;
+  @override String get realm => source.realm;
+  @override bool get productSubmissionSupported => source.productSubmissionSupported;
+  @override bool get reviewedProductSubmissionSupported => source.reviewedProductSubmissionSupported;
+  @override DateTime get productReviewNow => source.productReviewNow;
+  @override Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) => Future.error(const FormatException('Host public reader not connected'));
+  @override Future<WorkspaceProductSubmissionRecord?> readProductSubmission(WorkspaceProductSubmissionScope scope, {required bool Function() current}) =>
+    source.readProductSubmission(scope, current: current);
+  @override Future<WorkspaceProductReviewReadback> readReviewedProductSubmission(WorkspaceProductSubmissionScope scope, {required bool Function() current}) =>
+    source.readReviewedProductSubmission(scope, current: current);
+  @override Future<WorkspaceProductSubmissionWriteResult> writeProductSubmission(WorkspaceProductSubmissionIntent original,
+    {required bool Function() current, bool reconcile = false}) => source.writeProductSubmission(original, current: current, reconcile: reconcile);
+  @override Future<WorkspaceCatalogueOwnedSku?> readOwnedSku({required String storeId, required String skuId, required bool Function() current}) =>
+    source.readOwnedSku(storeId: storeId, skuId: skuId, current: current);
+  @override Future<WorkspaceCatalogueBindingResult> bindReviewed(WorkspaceCatalogueBindingIntent original,
+    {required bool Function() current, required bool recoveringUnknown}) => source.bindReviewed(original, current: current, recoveringUnknown: recoveringUnknown);
+  @override Future<WorkspaceCatalogueBindingResult> reconcileBinding(WorkspaceCatalogueBindingIntent original, {required bool Function() current}) =>
+    source.reconcileBinding(original, current: current);
+}
+class _AdoptionInventory implements WorkInventoryStore, WorkInventoryReceiptProjectionGuard {
+  _AdoptionInventory(this.source);
+  final SecureWorkInventoryStore source;
+  bool failReviewed = false;
+  Completer<void>? holdSave, enteredSave;
+  final writes = <String>[];
+  @override Future<WorkspaceSavedInventory?> read(String account, String store, {required bool qa}) => source.read(account, store, qa: qa);
+  @override Future<void> save(WorkspaceSavedInventory inventory, {required int? expectedRevision}) async {
+    writes.add(inventory.store);
+    if (holdSave != null) { if (enteredSave?.isCompleted == false) enteredSave!.complete(); await holdSave!.future; }
+    if (failReviewed && inventory.reviewedCatalogueLinks.isNotEmpty) throw const WorkGatewayException('Host failed local link write');
+    await source.save(inventory, expectedRevision: expectedRevision);
+  }
+  @override Future<bool> projectReceipt(String account, String store, {required bool qa, required int? expectedRevision,
+    required Future<WorkspaceSavedInventory?> Function(WorkspaceSavedInventory? previous) commit}) =>
+    source.projectReceipt(account, store, qa: qa, expectedRevision: expectedRevision, commit: commit);
+}
+class _AdoptionHeldLedger implements WorkLedgerCheckpointStore {
+  _AdoptionHeldLedger(this.source);
+  final WorkLedgerCheckpointStore source;
+  final gate = Completer<void>(), entered = Completer<void>();
+  @override Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async {
+    if (!entered.isCompleted) entered.complete(); await gate.future;
+    return source.read(account, store);
+  }
+  @override Future<void> save(WorkspaceLedgerCheckpoint checkpoint, {required int? expectedRevision}) => source.save(checkpoint, expectedRevision: expectedRevision);
+}
 
 class RetiringOwnerCredentials extends Credentials {
   RetiringOwnerCredentials(this.retire);
@@ -937,6 +987,59 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  test('LF03-ADOPT inventory restores a separate reviewed identity without rewriting the saved SKU', () {
+    final item = listingItem();
+    final raw = WorkspaceSavedInventory(account: 'owner-one', store: 'store-one', qa: true, revision: 1,
+      savedAt: at, products: [item], movements: []).toJson();
+    raw['version'] = 5; raw['variantFamilies'] = <Object>[];
+    raw['reviewedCatalogueLinks'] = [
+      {'version': 1, 'realm': 'evaluation', 'storeId': 'store-one', 'skuId': item.id,
+        'canonicalProductId': 'resolved-canonical', 'verifiedPackId': 'resolved-pack', 'mirrorRevision': 1,
+        'candidateRevision': 1, 'candidateFingerprint': 'A' * 64,
+        'submissionRevision': 1, 'submissionFingerprint': 'B' * 64, 'authoredSha256': 'C' * 64},
+    ];
+    final restored = WorkspaceSavedInventory.fromJson(raw);
+    expect(restored.toJson(), raw); expect(restored.products.single.toInventoryJson(), item.toInventoryJson());
+  });
+  test('LF03-ADOPT version5 keeps variant families legacy bytes and identity history through projection', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final base = listingItem(), family = WorkspaceVariantFamily(id: 'family-one', revision: 1, title: listingItem().title,
+      brand: listingItem().brand, categoryId: listingItem().categoryId, content: listingItem().content,
+      options: const [BuyV2VariantAttribute(dimensionId: 'variety', dimensionLabel: 'Variety', optionId: 'sunflower',
+        optionLabel: 'Sunflower', kind: BuyV2VariantDimensionKind.other)]);
+    final item = base.copyWith(variantMembership: WorkspaceVariantMembership(familyId: family.id, selections: {'variety': 'sunflower'}));
+    final link = WorkspaceReviewedCatalogueLink(realm: 'evaluation', storeId: 'store-one', skuId: item.id,
+      canonicalProductId: 'resolved-canonical', verifiedPackId: 'resolved-pack', mirrorRevision: 1,
+      candidateRevision: 1, candidateFingerprint: 'A' * 64, submissionRevision: 1, submissionFingerprint: 'B' * 64, authoredSha256: 'C' * 64);
+    WorkspaceSavedInventory snapshot(int revision, List<WorkspaceReviewedCatalogueLink> links) => WorkspaceSavedInventory(
+      account: 'owner-one', store: 'store-one', qa: true, revision: revision, savedAt: at.add(Duration(seconds: revision)),
+      products: [item], movements: [], variantFamilies: [family], reviewedCatalogueLinks: links);
+    final old = snapshot(1, []), current = snapshot(1, [link]);
+    expect(old.toJson()['version'], 4); expect(WorkspaceSavedInventory.fromJson(old.toJson()).toJson(), old.toJson());
+    expect(WorkspaceSavedInventory.fromJson(current.toJson()).variantFamilies.single.toJson(), family.toJson());
+    expect(current.products.single.toInventoryJson(), old.products.single.toInventoryJson());
+    final store = SecureWorkInventoryStore(accountScope: () => 'owner-one');
+    await store.save(current, expectedRevision: null);
+    await expectLater(store.save(snapshot(2, []), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+    final changed = WorkspaceReviewedCatalogueLink.fromJson({...link.toJson(), 'candidateFingerprint': 'D' * 64});
+    await expectLater(store.save(snapshot(2, [changed]), expectedRevision: 1), throwsA(isA<WorkGatewayException>()));
+    for (final malformed in [
+      {...current.toJson(), 'reviewedCatalogueLinks': [link.toJson(), link.toJson()]},
+      {...current.toJson(), 'reviewedCatalogueLinks': [{...link.toJson(), 'storeId': 'other-store'}]},
+      {...current.toJson(), 'reviewedCatalogueLinks': [{...link.toJson(), 'realm': 'production'}]},
+    ]) { expect(() => WorkspaceSavedInventory.fromJson(malformed), throwsFormatException); }
+    // Storage/projection fixtures only: test metadata retention, not real goods acceptance.
+    for (final marker in [1, 2]) {
+      expect(await store.projectReceipt('owner-one', 'store-one', qa: true, expectedRevision: marker,
+        commit: (previous) async => WorkspaceSavedInventory(account: previous!.account, store: previous.store, qa: previous.qa,
+          revision: previous.revision + 1, savedAt: at.add(Duration(minutes: marker)), products: previous.products,
+          movements: previous.movements, variantFamilies: previous.variantFamilies, reviewedCatalogueLinks: previous.reviewedCatalogueLinks,
+          manualReceiptCheckpointRevision: marker)), isTrue);
+    }
+    final restored = (await SecureWorkInventoryStore(accountScope: () => 'owner-one').read('owner-one', 'store-one', qa: true))!;
+    expect(restored.reviewedCatalogueLinks.single.toJson(), link.toJson());
+    expect(restored.products.single.toInventoryJson(), item.toInventoryJson()); expect(restored.variantFamilies.single.toJson(), family.toJson());
+  });
   group('LF03-MEDIA private codec display bounds', () {
     late Directory directory;
     final product = workspaceMasterCatalogue.first.copyWith(publicListing: false,
@@ -1120,6 +1223,186 @@ void main() {
       AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
         credentials: Credentials(), transport: transport, realm: submissionScope.realm, ownerAccountId: submissionScope.account,
         productSubmissionSupported: true, reviewedProductSubmissionSupported: supported, now: () => now ?? at);
+    Future<({WorkSession work, _AdoptionInventory inventory, Map<String, dynamic> capture, List<Map<String, Object?>> requests})> adoptionFixture({
+      Future<void> Function(WorkSession work, _AdoptionInventory inventory)? beforeBinding,
+      bool registerDispose = true,
+    }) async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final capture = reviewCapture('LF_REVIEW_ADOPTION_PROJECTION='), requests = <Map<String, Object?>>[], account = ListingAccount();
+      final inventory = _AdoptionInventory(SecureWorkInventoryStore(accountScope: () => account.owner));
+      late WorkSession work;
+      var bound = false;
+      Map<String, dynamic> currentSaved = jsonDecode(jsonEncode(capture['response']['saved'])) as Map<String, dynamic>;
+      final source = _AdoptionGateway(reviewGateway(OwnerTransport((body) async {
+        requests.add(jsonDecode(jsonEncode(body)) as Map<String, Object?>);
+        final operation = body['operation']; Object? data;
+        if (operation == 'readStoreProductSubmission') { data = capture[bound ? 'bound' : 'ready']; }
+        else if (operation == 'bindReviewedStoreCatalogueSku' || operation == 'reconcileStoreCatalogueBinding') {
+          if (operation == 'bindReviewedStoreCatalogueSku') { await beforeBinding?.call(work, inventory); }
+          bound = true; data = capture['response'];
+          if (operation == 'bindReviewedStoreCatalogueSku' && (body['sku'] as Map)['publicListing'] == false) {
+            // Host transport continuation only; backend withdrawal is tested separately.
+            currentSaved = {...currentSaved, 'publicListing': false, 'revision': (currentSaved['revision'] as int) + 1};
+            data = {...capture['response'] as Map<String, dynamic>, 'saved': currentSaved};
+          }
+        } else if (operation == 'listStoreCatalogueSkus') {
+          data = {'schemaVersion': 1, 'realm': 'evaluation', 'storeId': 'store-one', 'mediaReadbackVersion': 1,
+            'items': [currentSaved], 'nextCursor': null};
+        } else { throw StateError('Unexpected host operation $operation'); }
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+      final product = capture['source']['product'] as Map<String, dynamic>, content = product['content'] as Map<String, dynamic>;
+      final item = listingItem().copyWith(canonicalId: 'local-canonical-nomination', title: content['title'] as String,
+        brand: content['brand'] as String, variant: content['variant'] as String, categoryId: content['categoryId'] as String,
+        sku: product['sku'] as String, barcode: product['barcode'] as String,
+        sellingPriceMinor: product['channels'][0]['priceMinor'] as int, mrpMinor: product['channels'][0]['mrpMinor'] as int,
+        content: WorkspaceProductContent(description: content['description'] as String,
+          highlights: (content['highlights'] as List).cast<String>(),
+          specifications: {for (final raw in content['specifications'] as List) raw['label'] as String: raw['value'] as String}));
+      work = WorkSession(contactDraftStore: account, catalogueGateway: source, inventoryStore: inventory,
+        productSubmissionJournalFactory: (_) => SecureWorkProductSubmissionJournal(currentAccount: () => account.owner),
+        purchaseEntryStore: SecureWorkPurchaseEntryStore(accountScope: () => account.owner),
+        catalogueBindingPendingStoreFactory: (_) => SecureWorkCatalogueBindingPendingStore(currentAccount: () => account.owner))
+        ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+        ..workspaceId = 'store-one' ..workspaceCatalogueItems.add(item);
+      if (registerDispose) addTearDown(work.dispose);
+      expect(await work.loadWorkspaceInventory(), isTrue); expect(await work.retryWorkspaceInventorySave(), isTrue);
+      expect(await work.checkWorkspaceProductSubmission(item.id), isTrue, reason: work.workspaceProductSubmission(item.id)?.message);
+      expect(work.canPublishReviewedWorkspaceProduct(item.id), isTrue);
+      return (work: work, inventory: inventory, capture: capture, requests: requests);
+    }
+    test('LF03-ADOPT explicit owner publication keeps local SKU Stock provenance and survives restart', () async {
+      final fixture = await adoptionFixture(), work = fixture.work;
+      final before = work.workspaceCatalogueItems.single.toInventoryJson();
+      expect(await work.publishReviewedWorkspaceProduct('sku-one', inputCurrent: () => true), isTrue, reason: work.errorMessage);
+      final after = work.workspaceCatalogueItems.single.toInventoryJson();
+      expect(after, {...before, 'publicListing': true}); expect(work.workspaceStockMovements, isEmpty);
+      final link = work.workspaceReviewedCatalogueLink('sku-one')!;
+      expect(link.canonicalProductId, fixture.capture['request']['sku']['canonicalProductId']);
+      expect(link.canonicalProductId, isNot(work.workspaceCatalogueItems.single.canonicalId));
+      final saved = (await fixture.inventory.read('owner-one', 'store-one', qa: true))!;
+      expect(saved.toJson()['version'], 5); expect(saved.reviewedCatalogueLinks.single.toJson(), link.toJson());
+      expect(WorkspaceSavedInventory.fromJson(jsonDecode(jsonEncode(saved.toJson()))).products.single.toInventoryJson(), after);
+      expect(work.workspaceCatalogueListingPending, isFalse); expect(work.canPublishReviewedWorkspaceProduct('sku-one'), isFalse);
+      expect(fixture.requests.where((body) => body['operation'] == 'bindReviewedStoreCatalogueSku'), hasLength(1));
+      expect(fixture.requests.first['operation'], 'readStoreProductSubmission');
+    });
+    test('LF03-ADOPT local edit blocks republishing but permits withdrawing the exact old mirror', () async {
+      final fixture = await adoptionFixture(), work = fixture.work;
+      expect(await work.publishReviewedWorkspaceProduct('sku-one', inputCurrent: () => true), isTrue);
+      final original = work.workspaceCatalogueItems.single;
+      expect(work.addOrUpdateWorkspaceProduct(original.copyWith(title: 'New private title', barcode: 'CHANGED')), isTrue);
+      expect(await work.workspaceInventorySaved, isTrue);
+      expect(await work.requestWorkspaceProductListing('sku-one', listed: true), isFalse);
+      expect(fixture.requests.where((body) => body['operation'] == 'bindReviewedStoreCatalogueSku'), hasLength(1));
+      expect(await work.requestWorkspaceProductListing('sku-one', listed: false), isTrue, reason: work.errorMessage);
+      final withdrawal = fixture.requests.lastWhere((body) => body['operation'] == 'bindReviewedStoreCatalogueSku');
+      expect((withdrawal['sku'] as Map)['publicListing'], isFalse);
+      expect(((withdrawal['sku'] as Map)['content'] as Map)['title'], original.title);
+      expect(work.workspaceCatalogueItems.single.title, 'New private title');
+      expect(work.workspaceReviewedCatalogueLink('sku-one')!.mirrorRevision, 1);
+    });
+    for (final fault in ['local save', 'private edit', 'store ABA']) {
+      test('LF03-ADOPT $fault keeps exact publication original for read-only recovery', () async {
+        WorkspaceCatalogueItem? originalItem;
+        final fixture = await adoptionFixture(beforeBinding: (work, inventory) async {
+          originalItem = work.workspaceCatalogueItems.single;
+          if (fault == 'local save') inventory.failReviewed = true;
+          if (fault == 'private edit') work.workspaceCatalogueItems[0] = originalItem!.copyWith(barcode: 'CHANGED');
+          if (fault == 'store ABA') {
+            final old = work.activeWorkspace!;
+            work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: '', verified: true);
+            work.activeWorkspace = old;
+          }
+        });
+        final work = fixture.work;
+        expect(await work.publishReviewedWorkspaceProduct('sku-one', inputCurrent: () => true), isFalse);
+        expect(work.workspaceCatalogueListingPending, isTrue);
+        final original = fixture.requests.singleWhere((body) => body['operation'] == 'bindReviewedStoreCatalogueSku');
+        expect(original['reviewCandidate'], fixture.capture['request']['reviewCandidate']);
+        fixture.inventory.failReviewed = false;
+        if (fault == 'private edit') { work.workspaceCatalogueItems[0] = originalItem!; }
+        expect(await work.reconcileWorkspaceCatalogueListing(), isTrue, reason: work.errorMessage);
+        final recovered = fixture.requests.singleWhere((body) => body['operation'] == 'reconcileStoreCatalogueBinding');
+        expect(Map<String, Object?>.of(recovered)..remove('operation'), Map<String, Object?>.of(original)..remove('operation'));
+        expect(work.workspaceCatalogueListingPending, isFalse); expect(work.workspaceCatalogueItems.single.canonicalId, 'local-canonical-nomination');
+      });
+    }
+    test('LF03-ADOPT waits preceding save then fences ABA before any further inventory write', () async {
+      final entered = Completer<void>(), release = Completer<void>();
+      final fixture = await adoptionFixture(beforeBinding: (work, inventory) async {
+        inventory.enteredSave = entered; inventory.holdSave = release;
+        unawaited(work.retryWorkspaceInventorySave()); await entered.future;
+      });
+      final posting = fixture.work.publishReviewedWorkspaceProduct('sku-one', inputCurrent: () => true);
+      await entered.future; await Future<void>.delayed(Duration.zero);
+      final old = fixture.work.activeWorkspace!;
+      fixture.work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: '', verified: true);
+      fixture.work.activeWorkspace = old;
+      final count = fixture.inventory.writes.length; release.complete();
+      expect(await posting, isFalse); expect(fixture.inventory.writes, hasLength(count));
+      expect(fixture.work.workspaceReviewedCatalogueLink('sku-one'), isNull);
+      expect(fixture.work.workspaceCatalogueListingPending, isTrue);
+      fixture.inventory.holdSave = null;
+      expect(await fixture.work.reconcileWorkspaceCatalogueListing(), isTrue);
+    });
+    test('LF03-ADOPT receipt lock acquired during binding prevents any adoption mutation', () async {
+      _AdoptionHeldLedger? held; Future<WorkspaceGoodsReceiptSaveResult>? receiving;
+      final fixture = await adoptionFixture(beforeBinding: (work, inventory) async {
+        final finance = WorkspaceFinanceSnapshot(accountScope: 'owner-one', workspaceId: 'store-one', revision: 1, asOf: at,
+          salesTodayMinor: 0, duesMinor: 0, availableMinor: 0, heldMinor: 0, requestedMinor: 0, paidOutMinor: 0,
+          feesMinor: 0, deliveryAdjustmentsMinor: 0, refundsMinor: 0, taxWithheldMinor: 0, payments: const [], payouts: const [], historyComplete: true);
+        expect(work.applyWorkspaceFinance(finance), isTrue);
+        held = _AdoptionHeldLedger(SecureWorkLedgerCheckpointStore(accountScope: () => 'owner-one'));
+        expect(work.bindCustomerCollectionGateway(accountScope: 'owner-one', storeId: 'store-one',
+          adapter: StoreReviewCustomerCollectionGateway(finance), checkpointStore: held), isTrue);
+        expect(await work.loadWorkspaceSuppliers(), isTrue);
+        final item = work.workspaceCatalogueItems.single;
+        final receipt = WorkspaceSupplierGoodsReceipt(id: 'host-lock-receipt', expectedDeliveryId: 'host-delivery', reference: 'HOST-LOCK',
+          deliveredOn: '2026-10-16', recordedAt: DateTime.now().toUtc(), lines: [WorkspaceSupplierGoodsReceiptLine(
+            sourceLineId: 'host-line', productId: item.id, productLabel: item.title, purchaseUnit: item.pack, stockUnit: item.pack,
+            unitsPerPack: 1, deliveredMilli: 6000, acceptedMilli: 6000, damagedMilli: 0, shortMilli: 0, expectedMilli: 12000)]);
+        receiving = work.confirmWorkspaceSupplierGoodsReceipt(receipt, supplierId: 'unconfirmed-host-supplier',
+          scope: work.workspaceSupplierScope!, expectedPurchaseRevision: 0, expectedSupplierRevision: 1);
+        expect(work.workspaceGoodsReceiptBusy, isTrue); await held!.entered.future;
+      });
+      expect(await fixture.work.publishReviewedWorkspaceProduct('sku-one', inputCurrent: () => true), isFalse);
+      expect(fixture.work.workspaceReviewedCatalogueLink('sku-one'), isNull);
+      expect(fixture.work.workspaceCatalogueItems.single.publicListing, isFalse);
+      expect(fixture.work.workspaceCatalogueListingPending, isTrue);
+      held!.gate.complete(); expect(await receiving, WorkspaceGoodsReceiptSaveResult.notPosted);
+      expect(fixture.work.workspaceGoodsReceiptBusy, isFalse);
+      expect(await fixture.work.reconcileWorkspaceCatalogueListing(), isTrue);
+    });
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('LF03-ADOPT explicit editor action fits and ordinary opening never publishes at $scale', (tester) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale; addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final fixture = await tester.runAsync(() => adoptionFixture(registerDispose: false));
+        const captureKey = Key('adoption-host-root');
+        await openListingEditor(tester, fixture!.work, captureKey: captureKey, theme: MoolTheme.light());
+        final publish = find.byKey(const Key('work-product-review-publish'));
+        await tester.ensureVisible(publish); await tester.pumpAndSettle();
+        expect(tester.widget<TextButton>(publish).onPressed, isNotNull); expect(tester.getSize(publish).height, greaterThanOrEqualTo(48));
+        expect(find.byKey(const Key('work-product-review-submit')), findsNothing, reason: 'Do not compete with publication by offering duplicate submission of the already-reviewed saved details');
+        expect(fixture.requests.where((b) => b['operation'] == 'bindReviewedStoreCatalogueSku'), isEmpty);
+        expect(tester.takeException(), isNull);
+        final directory = Platform.environment['LF03_ADOPTION_CAPTURE_DIR'];
+        if (directory != null) {
+          final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+          await tester.runAsync(() async {
+            final image = await boundary.toImage();
+            try {
+              final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+              await Directory(directory).create(recursive: true);
+              final file = File('$directory/reviewed-adoption-host-$scale.png');
+              if (await file.exists()) throw StateError('Preserve existing host capture');
+              await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+            } finally { image.dispose(); }
+          });
+        }
+      });
+    }
     test('LF03-REVIEW actual reviewed candidate negotiates exact facts and immutable versioned binding intent', () async {
       final actual = reviewCapture('LF_REVIEW_CANDIDATE_PROJECTION=');
       final transport = OwnerTransport((body) async {

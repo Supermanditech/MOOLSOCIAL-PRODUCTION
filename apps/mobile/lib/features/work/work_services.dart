@@ -2632,6 +2632,14 @@ class SecureWorkInventoryStore implements WorkInventoryStore, WorkInventoryRecei
         );
       }
       // Original stock-entry facts are retained, not editable current values.
+      // A current-revision writer must not silently erase reviewed identity
+      // history, or replace a newer acknowledged candidate with an older one.
+      if (previous != null) {
+        final nextLinks = {for (final link in frozen.reviewedCatalogueLinks) link.skuId: link};
+        if (previous.reviewedCatalogueLinks.any((old) => nextLinks[old.skuId]?.preserves(old) != true)) {
+          throw const WorkGatewayException('Keep saved reviewed product identities. Recover the original listing update.');
+        }
+      }
       // Reject dropped products/provenance too: an older or stale writer must
       // not erase their origin while advancing the inventory revision.
       if (previous != null) {

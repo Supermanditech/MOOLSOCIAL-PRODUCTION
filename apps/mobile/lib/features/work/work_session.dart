@@ -437,6 +437,7 @@ class _StoreOperationalData {
   String workspacePayoutAccountEnding = '';
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
   final List<WorkspaceVariantFamily> variantFamilies = [];
+  final List<WorkspaceReviewedCatalogueLink> reviewedCatalogueLinks = [];
   WorkspaceProductDefaults productDefaults = const WorkspaceProductDefaults();
   WorkspaceStorePublicationDetails publicationDetails =
       const WorkspaceStorePublicationDetails();
@@ -1244,9 +1245,94 @@ class WorkSession extends ChangeNotifier {
     final scope = (account: account, store: store, realm: ownerSource.realm);
     return _catalogueListings.putIfAbsent(scope, () => WorkspaceCatalogueListingController(
       scope: scope, gateway: ownerSource,
+      completeReviewedBinding: _completeReviewedProductBinding,
       pendingStore: catalogueBindingPendingStoreFactory?.call(scope) ?? SecureWorkCatalogueBindingPendingStore(),
       context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store
         ? null : publicationPreferencesContext)..addListener(notifyListeners));
+  }
+  WorkspaceReviewedCatalogueLink? workspaceReviewedCatalogueLink(String skuId) =>
+    _storeData.reviewedCatalogueLinks.where((link) => link.storeId == activeWorkspace?.id && link.skuId == skuId &&
+      link.realm == (catalogueGateway is WorkspaceCatalogueOwnerGateway ? (catalogueGateway as WorkspaceCatalogueOwnerGateway).realm : '')).firstOrNull;
+  bool workspaceSavedProductAlreadySubmitted(String skuId) {
+    final controller = workspaceProductSubmission(skuId);
+    if (controller?.headLoaded != true || controller?.head == null) return false;
+    try { return _savedProductSubmission(skuId)?.authoredSha256 == controller!.head!.input.authoredSha256; }
+    catch (_) { return false; }
+  }
+  bool canPublishReviewedWorkspaceProduct(String skuId) {
+    final controller = workspaceProductSubmission(skuId), source = controller?.gateway;
+    final candidate = controller?.review?.candidate;
+    if (controller == null || !controller.active || !controller.headLoaded || controller.busy || controller.pending != null ||
+        controller.review?.state != 'ready' || candidate == null || source is! WorkspaceReviewedProductSubmissionGateway ||
+        !candidate.expiresAt.isAfter((source as WorkspaceReviewedProductSubmissionGateway).productReviewNow) ||
+        !localInventoryEnabled || workspaceCatalogueListingBusy || workspaceCatalogueListingPending) { return false; }
+    try {
+      final saved = _savedProductSubmission(skuId);
+      return saved?.authoredSha256 == candidate.source.input.authoredSha256 &&
+        workspaceReviewedCatalogueLink(skuId)?.candidateFingerprint != candidate.fingerprint;
+    } catch (_) { return false; }
+  }
+  Future<bool> publishReviewedWorkspaceProduct(String skuId, {required bool Function() inputCurrent}) async {
+    if (!canPublishReviewedWorkspaceProduct(skuId) || !inputCurrent() || !_stockEditAvailable()) return false;
+    final product = workspaceProductSubmission(skuId)!, candidate = product.review!.candidate!, owner = publicationPreferencesContext;
+    final listing = _catalogueListingController;
+    if (listing == null) return false;
+    bool current() => !_disposed && owner == publicationPreferencesContext && product.active;
+    bool unchanged() => current() && inputCurrent() && _savedProductSubmission(skuId)?.authoredSha256 == candidate.source.input.authoredSha256;
+    _catalogueListingLoads.add(listing.scope); notifyListeners();
+    try {
+      if (!await listing.restore() || !unchanged() || listing.pending != null || !await workspaceInventorySaved || !unchanged()) return false;
+      final original = candidate.publicationIntent(accountId: listing.scope.account, idempotencyKey: _newCounterIdentity('reviewed-product-listing'));
+      final result = await listing.submit(original, inputCurrent: unchanged);
+      if (!current()) return false;
+      if (result.state == WorkspaceCatalogueBindingState.saved) { await product.refresh(); }
+      if (!current()) return false;
+      showNotice(result.state == WorkspaceCatalogueBindingState.saved
+        ? 'Reviewed listing preference saved. Public visibility still needs confirmation.'
+        : listing.error ?? 'Listing update is unconfirmed. The original request is kept.');
+      return result.state == WorkspaceCatalogueBindingState.saved;
+    } catch (_) {
+      if (current()) showError('Reviewed listing update needs recovery. Check the original request.');
+      return false;
+    } finally { _catalogueListingLoads.remove(listing.scope); if (current()) notifyListeners(); }
+  }
+  Future<bool> _completeReviewedProductBinding(WorkspaceCatalogueBindingIntent original, WorkspaceCatalogueOwnedSku saved,
+    bool Function() current) async {
+    final source = original.reviewedSource;
+    if (!current() || source == null || !localInventoryEnabled || _contactAccountScope != original.accountId ||
+        activeWorkspace?.id != original.storeId || _savedProductSubmission(original.skuId)?.authoredSha256 != source.input.authoredSha256) { return false; }
+    final data = _storeData;
+    final precedingSucceeded = await data.inventoryWrites;
+    // A receipt or A->B->A transition may have begun while a prior write was
+    // completing. Fence BEFORE changing memory or scheduling any further write.
+    if (!current() || !identical(data, _storeData) || !_stockEditAvailable() ||
+        _savedProductSubmission(original.skuId)?.authoredSha256 != source.input.authoredSha256) { return false; }
+    final index = data.workspaceCatalogueItems.indexWhere((item) => item.id == original.skuId);
+    if (index < 0 || !_listingMirrorMatches(saved, data.workspaceCatalogueItems[index], reviewedFamily: true, adopting: true)) return false;
+    final reference = original.body['reviewCandidate'] as Map;
+    final link = WorkspaceReviewedCatalogueLink(realm: original.realm, storeId: original.storeId, skuId: original.skuId,
+      canonicalProductId: saved.canonicalProductId, verifiedPackId: saved.verifiedPackId, mirrorRevision: saved.revision,
+      candidateRevision: reference['revision'] as int, candidateFingerprint: reference['fingerprint'] as String,
+      submissionRevision: source.revision, submissionFingerprint: source.fingerprint, authoredSha256: source.input.authoredSha256);
+    final previous = data.reviewedCatalogueLinks.where((old) => old.skuId == original.skuId).firstOrNull;
+    if (previous != null && !link.preserves(previous)) return false;
+    data.reviewedCatalogueLinks.removeWhere((old) => old.skuId == original.skuId); data.reviewedCatalogueLinks.add(link);
+    // Identity acknowledgement is not a sale, receipt, adjustment or second SKU.
+    data.workspaceCatalogueItems[index] = data.workspaceCatalogueItems[index].copyWith(publicListing: true);
+    if (!precedingSucceeded) { data.inventoryWrites = Future.value(true); data.inventoryError = null; }
+    _queueInventorySave();
+    if (!await data.inventoryWrites) return false;
+    if (!current() || !identical(data, _storeData) || _savedProductSubmission(original.skuId)?.authoredSha256 != link.authoredSha256) return false;
+    _syncRetailerProductSummary(); notifyListeners(); return true;
+  }
+  String? _listingCanonicalId(WorkspaceCatalogueItem item, {required bool currentContent}) {
+    final link = workspaceReviewedCatalogueLink(item.id);
+    if (link == null) return item.canonicalId;
+    if (currentContent) {
+      try { if (_savedProductSubmission(item.id)?.authoredSha256 != link.authoredSha256) return null; }
+      catch (_) { return null; }
+    }
+    return link.canonicalProductId;
   }
   bool get workspaceCatalogueListingPending => _catalogueListingController?.pending != null;
   bool get workspaceCatalogueListingConnectionConfigured => _catalogueListingController != null;
@@ -1299,16 +1385,16 @@ class WorkSession extends ChangeNotifier {
   }
   bool _listingMirrorIdentityMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item) {
     final origin = item.stockEntry;
-    return owned.storeId == activeWorkspace?.id && owned.skuId == item.id && owned.canonicalProductId == item.canonicalId &&
+    return owned.storeId == activeWorkspace?.id && owned.skuId == item.id && owned.canonicalProductId == _listingCanonicalId(item, currentContent: false) &&
       origin != null && origin.valid && origin.productId == item.id &&
       _ownerInputValuesEqual(owned.input['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId});
   }
-  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item, {bool reviewedFamily = false}) {
+  bool _listingMirrorMatches(WorkspaceCatalogueOwnedSku owned, WorkspaceCatalogueItem item, {bool reviewedFamily = false, bool adopting = false}) {
     // The legacy reviewed reader has no family contract. Never strip options
     // and publish a different legacy SKU while that connection is pending.
     if (item.variantMembership != null && !reviewedFamily) return false;
     final value = owned.input, origin = item.stockEntry, measure = item.packMeasure;
-    if (owned.storeId != activeWorkspace?.id || owned.skuId != item.id || owned.canonicalProductId != item.canonicalId ||
+    if (owned.storeId != activeWorkspace?.id || owned.skuId != item.id || !adopting && owned.canonicalProductId != _listingCanonicalId(item, currentContent: true) ||
         value['sku'] != item.sku || origin == null || !origin.valid || measure?.valid != true ||
         !_ownerInputValuesEqual(value['provenance'], {'entryMethod': origin.method.name, 'sourceRecordId': origin.productId}) ||
         !_ownerInputValuesEqual(value['pack'], {'label': item.pack, 'quantityMilli': measure!.quantityMilli,
@@ -2115,7 +2201,7 @@ class WorkSession extends ChangeNotifier {
               }
               projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
                 revision: previous.revision + 1, savedAt: DateTime.now().toUtc(),
-                variantFamilies: previous.variantFamilies,
+                variantFamilies: previous.variantFamilies, reviewedCatalogueLinks: previous.reviewedCatalogueLinks,
                 products: products, movements: movements,
                 manualReceiptCheckpointRevision: saved.revision);
               return projected;
@@ -2157,6 +2243,7 @@ class WorkSession extends ChangeNotifier {
       }
       data.workspaceCatalogueItems..clear()..addAll(projected!.products);
       data.variantFamilies..clear()..addAll(projected!.variantFamilies);
+      data.reviewedCatalogueLinks..clear()..addAll(projected!.reviewedCatalogueLinks);
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
@@ -2331,7 +2418,7 @@ class WorkSession extends ChangeNotifier {
           } else {
             projected = WorkspaceSavedInventory(account: key.$1, store: key.$2, qa: key.$3,
               revision: previous.revision + 1, savedAt: DateTime.now().toUtc(), products: products,
-              variantFamilies: previous.variantFamilies,
+              variantFamilies: previous.variantFamilies, reviewedCatalogueLinks: previous.reviewedCatalogueLinks,
               movements: movements, manualReceiptCheckpointRevision: saved.revision);
           }
           return projected;
@@ -2346,6 +2433,7 @@ class WorkSession extends ChangeNotifier {
       }
       data.workspaceCatalogueItems..clear()..addAll(projected!.products);
       data.variantFamilies..clear()..addAll(projected!.variantFamilies);
+      data.reviewedCatalogueLinks..clear()..addAll(projected!.reviewedCatalogueLinks);
       data.workspaceStockMovements..clear()..addAll(projected!.movements);
       data.inventoryRevision = projected!.revision;
       data.inventoryReceiptCheckpointRevision = projected!.manualReceiptCheckpointRevision;
@@ -3010,6 +3098,7 @@ class WorkSession extends ChangeNotifier {
             ..clear()
             ..addAll(saved.products);
           data.variantFamilies..clear()..addAll(saved.variantFamilies);
+          data.reviewedCatalogueLinks..clear()..addAll(saved.reviewedCatalogueLinks);
           data.workspaceStockMovements.addAll(saved.movements);
           data.inventoryRevision = saved.revision;
           data.inventoryReceiptCheckpointRevision = saved.manualReceiptCheckpointRevision;
@@ -3060,6 +3149,7 @@ class WorkSession extends ChangeNotifier {
     // Freeze caller-owned nested content before an asynchronous write.
     final List<WorkspaceCatalogueItem> frozenProducts;
     final List<WorkspaceVariantFamily> families;
+    final List<WorkspaceReviewedCatalogueLink> reviewedLinks;
     try {
       frozenProducts = [
         for (final p in data.workspaceCatalogueItems)
@@ -3069,6 +3159,7 @@ class WorkSession extends ChangeNotifier {
       ];
       families = data.variantFamilies.map((f) =>
         WorkspaceVariantFamily.fromJson(jsonDecode(jsonEncode(f.toJson())))).toList(growable: false);
+      reviewedLinks = data.reviewedCatalogueLinks.map((link) => WorkspaceReviewedCatalogueLink.fromJson(link.toJson())).toList(growable: false);
       WorkspaceVariantFamily.validateInventory(families, frozenProducts);
     } on Object {
       // Keep the existing write in sequence. A bad new record must neither
@@ -3106,6 +3197,7 @@ class WorkSession extends ChangeNotifier {
         }
         final snapshot = WorkspaceSavedInventory(
           variantFamilies: families,
+          reviewedCatalogueLinks: reviewedLinks,
           account: account,
           store: store,
           qa: !_productionSession,

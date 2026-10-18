@@ -503,6 +503,8 @@ test('LF03-REVIEW emulator private reviewed candidate to negotiated readback and
     assert.equal(candidate2.revision, 2); assert.equal(candidate2.source.revision, 2);
     const request2 = {...request, sku: changedValue, idempotencyKey: 'publish-reviewed-edit',
       reviewCandidate: {revision: candidate2.revision, fingerprint: candidate2.fingerprint}};
+    const ready2 = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission', reviewRead) as any;
+    assert.equal(ready2.review.state, 'ready');
     const bound = await service().bindReviewedSku('owner-one', request2) as any;
     assert.equal(bound.saved.skuId, 'sku-one'); assert.equal(bound.saved.revision, 1);
     assert.equal(bound.publicationConfirmed, false);
@@ -520,6 +522,7 @@ test('LF03-REVIEW emulator private reviewed candidate to negotiated readback and
     if (process.env.LF03_REVIEW_CAPTURE === 'true') {
       console.log(`LF_REVIEW_CANDIDATE_PROJECTION=${JSON.stringify(ready)}`);
       console.log(`LF_REVIEW_BINDING_PROJECTION=${JSON.stringify({request: request2, response: bound, source: saved2})}`);
+      console.log(`LF_REVIEW_ADOPTION_PROJECTION=${JSON.stringify({ready: ready2, bound: finalRead, request: request2, response: bound, source: saved2})}`);
     }
   } finally {await db.terminate(); await deleteApp(app);}
 });
