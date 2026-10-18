@@ -8474,7 +8474,22 @@ function Invoke-Lf01Admission {
     Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$accepted,$head) | Out-Null
     $parents=@((@(Get-OctoberCompatibilityGitLines @('show','-s','--format=%P',$head)))[0] -split ' ')
     $delta=@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$accepted,$head))
-    Assert-Coordination (Test-Lf27PublicationDelta $head $parents $delta) 'LF27 publication permits only accepted source or its one metadata-only successor.'
+    $acceptedPublication=Test-Lf27PublicationDelta $head $parents $delta
+    $continuationPublication=$false
+    if (-not $acceptedPublication) {
+      # Standing-authorized continuation may be published as review-pending source,
+      # not retrospectively labelled accepted. Validate committed bytes, never an
+      # unstaged claim, against the same exact continuation/owner predicate above.
+      $publicationBase='88aae0282aa555ad5c665286907ca6558197342d'
+      Get-OctoberCompatibilityGitLines @('merge-base','--is-ancestor',$publicationBase,$head) | Out-Null
+      $remote=@(Get-OctoberCompatibilityGitLines @('rev-parse',"origin/$($branch[0])"))
+      Assert-Coordination ($remote.Count -eq 1 -and $remote[0] -cin @($publicationBase,$head)) 'Continuation publication requires its exact fetched base or already-published candidate.'
+      $committedRecord=(@(Get-OctoberCompatibilityGitLines @('show',"${head}:$recordOwner")) -join "`n") | ConvertFrom-Json
+      $publishedDelta=@(Get-OctoberCompatibilityGitLines @('diff','--no-renames','--name-only',$publicationBase,$head))
+      $continuationPublication=($null -ne $committedRecord.PSObject.Properties['frontendContinuation'] -and
+        (Test-Lf27Batch01Continuation $committedRecord.frontendContinuation $publishedDelta))
+    }
+    Assert-Coordination ($acceptedPublication -or $continuationPublication) 'LF27 publication exceeds accepted source or its exact authorized continuation.'
     Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -eq 0 -and
       @(Get-OctoberCompatibilityGitLines @('diff','--name-only')).Count -eq 0 -and
       @(Get-OctoberCompatibilityGitLines @('ls-files','--others','--exclude-standard')).Count -eq 0) 'LF27 publication requires committed changes and no untracked content.'
@@ -8486,7 +8501,11 @@ function Invoke-Lf01Admission {
         $row.Substring(3) -cin $support) 'LF27 publication has unaudited worktree modifications.'
     }
     Get-OctoberCompatibilityGitLines (@('diff','--ignore-space-at-eol','--exit-code','--')+$support) | Out-Null
-    Write-Output "LF27 source publication qualified: accepted=$accepted; head=$head; no APK/provider acceptance."
+    if ($continuationPublication) {
+      Write-Output "LF27 technical source publication qualified: previouslyAccepted=$accepted; candidate=$head; candidateFounderReview=pending; no ticket closure/APK/provider acceptance."
+    } else {
+      Write-Output "LF27 source publication qualified: accepted=$accepted; head=$head; no APK/provider acceptance."
+    }
   }
   if ($ProductionPhase -ceq 'pre_commit') {
     Assert-Coordination (@(Get-OctoberCompatibilityGitLines @('diff','--cached','--name-only')).Count -gt 0 -and
