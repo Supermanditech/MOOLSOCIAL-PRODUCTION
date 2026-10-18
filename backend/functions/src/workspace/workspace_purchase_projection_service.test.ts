@@ -210,6 +210,17 @@ test("actual operational order initialization, revisions and original-attempt re
 });
 
 // Isolated trusted-source fixtures. Never runtime/native order acceptance.
+test("LF-VARIANT original snapshot preserves supplied variant and explicit no-variant without catalogue fallback", () => {
+  const source = JSON.parse(JSON.stringify(attributedReceipt()));
+  source.schemaVersion = 3;
+  source.stores[0].lines[0].variant = "Pink · 128 GB";
+  source.stores[1].lines[0].variant = "";
+  const result = normalizePlacement(source, "evaluation");
+  assert.equal((result.stores[0]!.lines[0] as unknown as {variant: string}).variant, "Pink · 128 GB");
+  assert.equal((result.stores[1]!.lines[0] as unknown as {variant: string}).variant, "");
+  assert.equal(JSON.stringify(result).includes("brandId"), false);
+});
+
 function receipt(suffix = "one"): TrustedPlacementReceipt {
   return {schemaVersion: 1, realm: "evaluation", authNamespace: "firebase-default",
     finalPlacement: true, issuer: "local-placement", receiptId: `receipt-${suffix}`,
@@ -240,6 +251,37 @@ function attributedReceipt() {
         allocations: [{lineId: s.lines[0]!.sourceLineId, amountMinor: 25}]},
     ]},
   }))};
+}
+
+function variantReceipt(): TrustedPlacementReceipt {
+  const base = normalizePlacement(attributedReceipt(), "evaluation");
+  const stores = base.stores.map((s, i) => ({...s, lines: s.lines.map(l => ({...l,
+    variant: i === 0 ? "गुलाबी\n128 GB" : ""}))}));
+  const first = stores[0]!;
+  first.lines.push({...first.lines[0]!, sourceLineId: "source-second-variant", skuId: "sku-second-variant",
+    canonicalProductId: "product-second-variant", verifiedPackId: "pack-second-variant",
+    offerId: "offer-second-variant", variant: "Blue · 512 GB"});
+  first.totals = {...first.totals, itemsMinor: 20102, totalMinor: 20066};
+  return {...base, schemaVersion: 3, stores};
+}
+
+for (const fault of ["missing", "null", "boolean", "array", "object", "outer-space", "whitespace", "control", "oversize", "old-version", "missing-benefits"]) {
+  test(`LF-VARIANT rejects ${fault} without trimming or backfilling original descriptions`, () => {
+    const input = JSON.parse(JSON.stringify(variantReceipt()));
+    const first = input.stores[0].lines[0];
+    if (fault === "missing") delete first.variant;
+    if (fault === "null") first.variant = null;
+    if (fault === "boolean") first.variant = false;
+    if (fault === "array") first.variant = ["Pink"];
+    if (fault === "object") first.variant = {label: "Pink"};
+    if (fault === "outer-space") first.variant = " Pink";
+    if (fault === "whitespace") first.variant = "\n";
+    if (fault === "control") first.variant = "Pink\u0000";
+    if (fault === "oversize") first.variant = "x".repeat(241);
+    if (fault === "old-version") input.schemaVersion = 2;
+    if (fault === "missing-benefits") delete input.stores[0].benefitAttribution;
+    assert.throws(() => normalizePlacement(input, "evaluation"), rejectsCode("invalid_input"));
+  });
 }
 
 test("LF-ATTR trusted original attribution preserves exact line discount and separately quoted cashback", () => {
@@ -293,13 +335,15 @@ for (const fault of ["missing", "null", "version", "extra", "unknown-line", "dup
   });
 }
 
-test("LF-ATTR actual materializer retains exact source allocations across restart and Store partitions", {
+for (const includeVariants of [false, true]) {
+test(`LF-ATTR actual materializer retains exact source allocations across restart and Store partitions variants=${includeVariants}`, {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
   const app = initializeApp({projectId: "demo-lf-benefit-original"}, `benefits-${randomUUID()}`);
   const db = getFirestore(app), suffix = randomUUID();
-  const input = {...attributedReceipt(), receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: 2 as const};
+  const input: TrustedPlacementReceipt = {...(includeVariants ? variantReceipt() : normalizePlacement(attributedReceipt(), "evaluation")),
+    receiptId: `benefit-${suffix}`, buyerUserId: `buyer-${suffix}`, schemaVersion: includeVariants ? 3 : 2};
   input.stores.forEach((s, i) => {
     s.storeId = `store-${suffix}-${i}`; s.caseId = `case-${suffix}-${i}`; s.ownerUserId = `owner-${suffix}-${i}`;
   });
@@ -314,15 +358,23 @@ test("LF-ATTR actual materializer retains exact source allocations across restar
     assert.deepEqual(await writer.materialize("original-benefit-source"), created);
     const restarted = new WorkspacePurchaseProjectionService(db, "evaluation");
     const buyer = await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId});
-    if (process.env.LF_ATTR_PROJECTION_CAPTURE === "true") {
+    if (!includeVariants && process.env.LF_ATTR_PROJECTION_CAPTURE === "true") {
       console.log(`LF_ATTR_PROJECTION=${JSON.stringify(buyer)}`);
     }
-    assert.equal(buyer.schemaVersion, 3); assert.equal(buyer.orders.length, 2);
+    if (includeVariants && process.env.LF_VARIANT_PROJECTION_CAPTURE === "true") {
+      console.log(`LF_VARIANT_PROJECTION=${JSON.stringify(buyer)}`);
+    }
+    assert.equal(buyer.schemaVersion, includeVariants ? 4 : 3); assert.equal(buyer.orders.length, 2);
     for (const original of buyer.orders) {
-      assert.equal(original.factsVersion, 3);
-      assert.equal(original.original.totals.totalMinor, 10015);
-      assert.equal(original.original.benefitAttribution!.components[0]!.allocations[0]!.lineId, original.original.lines[0]!.lineId);
+      const source = input.stores.find(s => s.storeId === original.storeId)!;
+      assert.equal(original.factsVersion, includeVariants ? 4 : 3);
+      assert.deepEqual(original.original.totals, source.totals);
+      const allocated = original.original.lines.find(l => l.skuId === source.lines[0]!.skuId)!;
+      assert.equal(original.original.benefitAttribution!.components[0]!.allocations[0]!.lineId, allocated.lineId);
       assert.equal(original.original.benefitAttribution!.components[1]!.amountBasis, "maximum");
+      for (const line of original.original.lines) {
+        assert.equal(line.variant, source.lines.find(l => l.skuId === line.skuId)!.variant);
+      }
     }
     const first = input.stores[0]!, order = buyer.orders.find(o => o.storeId === first.storeId)!;
     const tuple = {purchaseId: buyer.purchaseId, storeId: order.storeId, orderId: order.orderId};
@@ -336,14 +388,15 @@ test("LF-ATTR actual materializer retains exact source allocations across restar
       () => new Date("2026-10-16T12:00:00.000Z"));
     await ops.initialize("benefit-operation-source");
     const operational = await ops.read(first.ownerUserId, "seller", tuple);
-    assert.equal(operational.originalFactsVersion, 3); assert.deepEqual(operational.original, order.original);
+    assert.equal(operational.originalFactsVersion, includeVariants ? 4 : 3); assert.deepEqual(operational.original, order.original);
     const result = await ops.command(first.ownerUserId, {...tuple, version: 2, operationId: "STORE-ORDER-attribution_nonce==",
       expectedRevision: 1, action: "accept", reason: null});
     assert.deepEqual(result.snapshot.original, order.original);
     assert.deepEqual((await ops.command(first.ownerUserId, {...tuple, version: 2, operationId: "STORE-ORDER-attribution_nonce==",
       expectedRevision: 1, action: "accept", reason: null}, true)).snapshot.original, order.original);
     const legacyInput: TrustedPlacementReceipt = {...input, schemaVersion: 1, receiptId: `legacy-${suffix}`,
-      stores: input.stores.map(({benefitAttribution: _attribution, ...store}) => store)};
+      stores: input.stores.map(({benefitAttribution: _attribution, ...store}) => ({...store,
+        lines: store.lines.map(({variant: _variant, ...line}) => line)}))};
     const legacyWriter = new WorkspacePurchaseProjectionService(db, "evaluation", {readFinalPlacement: async () => legacyInput});
     const legacyCreated = await legacyWriter.materialize("legacy-original-source");
     const legacyRead = await restarted.readBuyer(input.buyerUserId, {purchaseId: legacyCreated.purchaseId});
@@ -357,13 +410,21 @@ test("LF-ATTR actual materializer retains exact source allocations across restar
       const read = await restarted.readStore(first.ownerUserId, {purchaseId: ref.purchaseId, storeId: ref.storeId, orderId: ref.orderId});
       assert.equal(read.orders[0]!.originalFingerprint, ref.originalFingerprint);
     }
-    const component = input.stores[0]!.benefitAttribution.components[0]!;
+    if (includeVariants) {
+      const original = input.stores[0]!.lines[0]!.variant!;
+      input.stores[0]!.lines[0]!.variant = "Current catalogue changed";
+      await assert.rejects(writer.materialize("original-benefit-source"), rejectsCode("conflict"));
+      assert.deepEqual(await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
+      input.stores[0]!.lines[0]!.variant = original;
+    }
+    const component = input.stores[0]!.benefitAttribution!.components[0]!;
     component.amountMinor--; component.allocations[0]!.amountMinor--;
     input.stores[0]!.totals.discountMinor--; input.stores[0]!.totals.totalMinor++;
     await assert.rejects(writer.materialize("original-benefit-source"), rejectsCode("conflict"));
     assert.deepEqual(await restarted.readBuyer(input.buyerUserId, {purchaseId: created.purchaseId}), buyer);
   } finally {await db.terminate(); await deleteApp(app);}
 });
+}
 
 test("LF-ATTR allocation-heavy source cannot commit an original exceeding client readback budget", {
   skip: !process.env.FIRESTORE_EMULATOR_HOST,

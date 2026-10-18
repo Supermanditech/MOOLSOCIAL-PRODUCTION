@@ -325,7 +325,7 @@ class AuthenticatedWorkspaceOrderIdentityGateway {
         'state',
         'orders',
       ]);
-      if (data['schemaVersion'] is! int || !const [2, 3].contains(data['schemaVersion']) ||
+      if (data['schemaVersion'] is! int || !const [2, 3, 4].contains(data['schemaVersion']) ||
           data['realm'] != realm ||
           data['authNamespace'] != 'firebase-default' ||
           data['viewerRole'] != role.name ||
@@ -668,7 +668,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
   ) {
     final source = _map(value);
     final enriched = source.containsKey('originalFactsVersion');
-    if (enriched && (source['originalFactsVersion'] is! int || source['originalFactsVersion'] != 3)) {
+    if (enriched && (source['originalFactsVersion'] is! int || !const [3, 4].contains(source['originalFactsVersion']))) {
       throw const FormatException('Unsupported original facts.');
     }
     final data = _exactMap(source, [
@@ -768,7 +768,7 @@ class AuthenticatedWorkspaceOrderOperationsGateway {
       throw const FormatException();
     }
     final original = _decodePurchaseOrder({
-      'factsVersion': enriched ? 3 : 2,
+      'factsVersion': enriched ? source['originalFactsVersion'] : 2,
       'storeId': ref.storeId,
       'orderId': ref.orderId,
       'originalFingerprint': ref.originalFingerprint,
@@ -992,7 +992,7 @@ class WorkspacePurchaseOrder {
   final List<WorkspacePurchasedSkuLine> lines;
   final Map<String, int> totals;
   final WorkspaceOriginalBenefitAttribution? benefitAttribution;
-  int get factsVersion => benefitAttribution == null ? 2 : 3;
+  int get factsVersion => lines.any((line) => line.variant != null) ? 4 : benefitAttribution == null ? 2 : 3;
 }
 
 /// Frozen final-placement facts, not current coupons or cashback entitlement.
@@ -1036,6 +1036,7 @@ class WorkspacePurchasedSkuLine {
     required this.quantityUnit,
     required this.unitPriceMinor,
     required this.lineTotalMinor,
+    this.variant,
   });
   final String lineId,
       skuId,
@@ -1044,6 +1045,8 @@ class WorkspacePurchasedSkuLine {
       offerId,
       offerRevision;
   final String name, packLabel, quantityUnit;
+  /// Null is legacy unknown; empty is a supplied original with no extra variant.
+  final String? variant;
   final int quantityMilli, unitPriceMinor, lineTotalMinor;
   String get quantityLabel {
     final fraction = quantityMilli % 1000;
@@ -1063,6 +1066,7 @@ class WorkspacePurchasedSkuLine {
     'quantityUnit': quantityUnit,
     'unitPriceMinor': unitPriceMinor,
     'lineTotalMinor': lineTotalMinor,
+    'variant': ?variant,
   };
 }
 
@@ -1167,7 +1171,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
     'originalFingerprint',
   ]);
   final version = data['factsVersion'];
-  if (version is! int || !const [2, 3].contains(version) ||
+  if (version is! int || !const [2, 3, 4].contains(version) ||
       !_id(data['storeId']) ||
       !_id(data['orderId'])) {
     throw const FormatException('Unsupported order reference.');
@@ -1176,7 +1180,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
     'currency',
     'lines',
     'totals',
-    if (version == 3) 'benefitAttribution',
+    if (version >= 3) 'benefitAttribution',
   ]);
   final rawLines = original['lines'];
   if (original['currency'] != 'INR' ||
@@ -1187,7 +1191,13 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
   }
   final lines = <WorkspacePurchasedSkuLine>[];
   for (final raw in rawLines) {
-    final l = _exactMap(raw, _purchaseLineKeys);
+    final l = _exactMap(raw, [..._purchaseLineKeys, if (version == 4) 'variant']);
+    if (version == 4 && (l['variant'] is! String ||
+        (l['variant'] as String).trim() != l['variant'] ||
+        (l['variant'] as String).length > 240 ||
+        RegExp(r'[\u0000-\u0008\u000b\u000c\u000e-\u001f]').hasMatch(l['variant'] as String))) {
+      throw const FormatException('Invalid original variant.');
+    }
     if ([
           'lineId',
           'skuId',
@@ -1228,6 +1238,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
         quantityUnit: l['quantityUnit'] as String,
         unitPriceMinor: l['unitPriceMinor'] as int,
         lineTotalMinor: l['lineTotalMinor'] as int,
+        variant: version == 4 ? l['variant'] as String : null,
       ),
     );
   }
@@ -1253,7 +1264,7 @@ WorkspacePurchaseOrder _decodePurchaseOrder(Object? value) {
               totals['tipMinor']!) {
     throw const FormatException('Contradictory order total.');
   }
-  final attribution = version == 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
+  final attribution = version >= 3 ? _decodeBenefits(original['benefitAttribution'], lines, totals['discountMinor']!) : null;
   final hash = sha256
       .convert(
         utf8.encode(

@@ -315,6 +315,7 @@ class _WorkspacePurchaseOriginalsState
                                 Text(
                                   '${_quantity(line.quantityMilli)} ${line.quantityUnit} · ${line.packLabel}',
                                 ),
+                                WorkspaceOriginalVariantForLine(line: line),
                                 _amount(line.lineTotalMinor),
                                 WorkspaceOriginalBenefitsForLine(original: details, lineId: line.lineId),
                               ],
@@ -395,6 +396,17 @@ class _WorkspacePurchaseOriginalsState
       );
     },
   );
+}
+
+/// Only supplied original text; never supplement it from today's catalogue.
+class WorkspaceOriginalVariantForLine extends StatelessWidget {
+  const WorkspaceOriginalVariantForLine({super.key, required this.line});
+  final WorkspacePurchasedSkuLine line;
+  @override
+  Widget build(BuildContext context) => line.variant == null || line.variant!.isEmpty
+    ? const SizedBox.shrink()
+    : Text(line.variant!, key: ValueKey('original-variant-${line.lineId}'),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.4));
 }
 
 /// Same immutable breakdown on buyer originals and Store operational details.

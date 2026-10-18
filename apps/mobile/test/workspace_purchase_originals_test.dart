@@ -45,6 +45,62 @@ class _OrderPending implements WorkOrderPendingStore {
 void main() {
   for (final role in ['buyer', 'seller']) {
     for (final scale in [1.0, 2.0]) {
+      testWidgets('LF-VARIANT original description is readable on $role originals $scale', (tester) async {
+        await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
+        tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final details = fixtures.variantPurchaseResponse(role: role, variant: 'Pink · 128 GB\nDual SIM model, India pack');
+        final order = details['orders'][0] as Map<String, dynamic>;
+        order['original']['lines'][0]['name'] = 'Evaluation phone';
+        fixtures.rehashPurchaseOrder(order);
+        final refs = fixtures.referenceResponse(role: role);
+        refs['references'][0]['originalFingerprint'] = order['originalFingerprint'];
+        final wire = fixtures.Transport()..respond = (body) => body['operation'].toString().startsWith('list') ? refs : details;
+        final capture = GlobalKey();
+        await tester.pumpWidget(RepaintBoundary(key: capture, child: MaterialApp(theme: ThemeData(fontFamily: 'Inter'), home: Scaffold(body: MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)), child: SingleChildScrollView(
+            child: WorkspacePurchaseOriginals(gateway: fixtures.projectionGateway(wire,
+              account: role == 'buyer' ? 'buyer-1' : 'owner-1'),
+              role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+              realm: 'evaluation', storeId: role == 'seller' ? 'store-one' : null)))))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Saved purchase details')); await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('original-order-order-v2'))); await tester.pumpAndSettle();
+        final variant = find.byKey(const ValueKey('original-variant-line-one'));
+        await tester.ensureVisible(variant); await tester.pumpAndSettle();
+        final text = tester.widget<Text>(variant);
+        expect(text.data, 'Pink · 128 GB\nDual SIM model, India pack');
+        expect(text.maxLines, isNull); expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(find.textContaining('Current catalogue'), findsNothing);
+        expect(tester.takeException(), isNull);
+        const root = String.fromEnvironment('LF_VARIANT_CAPTURE_ROOT');
+        if (root.isNotEmpty) {
+          final boundary = capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+          await tester.runAsync(() async {
+            final directory = Directory(root); await directory.create(recursive: true);
+            final file = File('$root/original-variant-$role-$scale.png');
+            expect(await file.exists(), isFalse);
+            final image = await boundary.toImage();
+            final bytes = await image.toByteData(format: ui.ImageByteFormat.png); image.dispose();
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+          });
+        }
+      });
+    }
+  }
+  for (final value in [null, '']) {
+    testWidgets('LF-VARIANT unknown or explicitly empty original adds no blank section $value', (tester) async {
+      final wire = fixtures.Transport()..data = value == null ? fixtures.attributedPurchaseResponse() : fixtures.variantPurchaseResponse(variant: value);
+      final original = (await fixtures.projectionGateway(wire).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2'))!.orders.single;
+      expect(original.lines.single.variant, value);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: WorkspaceOriginalVariantForLine(line: original.lines.single))));
+      expect(find.byType(Text), findsNothing);
+      expect(tester.getSize(find.byType(WorkspaceOriginalVariantForLine)), Size.zero);
+    });
+  }
+  for (final role in ['buyer', 'seller']) {
+    for (final scale in [1.0, 2.0]) {
       testWidgets('LF-ATTR supplied benefits render exact money without funding-reference leaks $role $scale', (tester) async {
         await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
         tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
@@ -173,12 +229,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   }
-  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution')]) {
+  for (final scenario in [(1.0, 'delivery'), (2.0, 'delivery'), (1.0, 'collection'), (1.0, 'attribution'), (2.0, 'attribution'), (1.0, 'variant'), (2.0, 'variant')]) {
   testWidgets('configured Store feed supports exact facts ${scenario.$2} scale ${scenario.$1}', (tester) async {
     await tester.runAsync(() => (FontLoader('Inter')..addFont(rootBundle.load('assets/fonts/Inter-Variable.ttf'))).load());
     tester.view.physicalSize = const Size(320, 900); tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
-    final raw = scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
+    final raw = scenario.$2 == 'variant' ? fixtures.variantOperationalResponse(role: 'seller')
+      : scenario.$2 == 'attribution' ? fixtures.attributedOperationalResponse(role: 'seller')
       : fixtures.operationalResponse(role: 'seller');
     if (scenario.$2 == 'collection') {
       raw['fulfilment'] = 'collection'; raw['stage'] = 'Preparing'; raw['permittedActions'] = <String>[];
@@ -247,6 +304,10 @@ void main() {
       expect(find.byKey(Key('work-operational-total-$key')), findsOneWidget);
     }
     expect(find.text('1 pack × ₹100.51'), findsOneWidget);
+    if (scenario.$2 == 'variant') {
+      expect(find.text('Pink · 128 GB'), findsOneWidget);
+      expect(work.workspaceOrders.single.operational!.original.factsVersion, 4);
+    }
     if (scenario.$2 == 'attribution') {
       expect(find.text('Supplier saving · Discount ₹0.51'), findsOneWidget);
       expect(find.text('Payment cashback offer · Up to ₹0.25 cashback · confirmation pending'), findsOneWidget);

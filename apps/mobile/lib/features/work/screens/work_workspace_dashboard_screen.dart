@@ -29719,6 +29719,7 @@ class _ExactOrderInformation extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('${line.name} · ${line.packLabel}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              WorkspaceOriginalVariantForLine(line: line),
               _StoreMoneyLine(leading: Text('${line.quantityLabel} × ${_price(line.unitPriceMinor)}'),
                 value: _price(line.lineTotalMinor), style: const TextStyle(fontWeight: FontWeight.w600)),
               WorkspaceOriginalBenefitsForLine(original: exact.original, lineId: line.lineId),

@@ -90,6 +90,76 @@ class Transport implements SocialContentTransport {
 }
 
 void main() {
+  if (Platform.environment['LF_VARIANT_PROJECTION_LOG'] case final path?) {
+    test('LF-VARIANT actual emulator originals cross the strict Dart boundary with immutable descriptions', () async {
+      const marker = 'LF_VARIANT_PROJECTION=';
+      final captured = File(path).readAsLinesSync().singleWhere((line) => line.contains(marker));
+      final data = (jsonDecode(captured.split(marker).last) as Map).cast<String, dynamic>();
+      final wire = Transport()..data = data;
+      final result = await projectionGateway(wire, account: data['viewerUserId'] as String).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: data['purchaseId'] as String);
+      expect(result, isNotNull);
+      expect(result!.orders, hasLength(2));
+      final variants = <String?>[];
+      for (final order in result.orders) {
+        expect(order.factsVersion, 4);
+        final source = (data['orders'] as List).singleWhere((raw) => raw['orderId'] == order.orderId);
+        for (final line in order.lines) {
+          final raw = (source['original']['lines'] as List).singleWhere((row) => row['lineId'] == line.lineId);
+          expect(line.toJson(), raw);
+          variants.add(line.variant);
+          raw['variant'] = 'Later catalogue text';
+          expect(line.variant, isNot('Later catalogue text'));
+        }
+      }
+      expect(variants, unorderedEquals(['गुलाबी\n128 GB', 'Blue · 512 GB', '']));
+    });
+  }
+  for (final variant in ['', 'गुलाबी\n128 GB', 'Pink\t128 GB', 'x' * 240]) {
+    test('LF-VARIANT valid optional original text remains exact ${variant.length}', () async {
+      final wire = Transport()..data = variantPurchaseResponse(variant: variant);
+      final result = await projectionGateway(wire).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2');
+      expect(result!.orders.single.lines.single.variant, variant);
+      expect(result.orders.single.factsVersion, 4);
+    });
+  }
+  for (final fault in <String, void Function(Map<String, dynamic>)>{
+    'missing': (d) => d['orders'][0]['original']['lines'][0].remove('variant'),
+    'null': (d) => d['orders'][0]['original']['lines'][0]['variant'] = null,
+    'boolean': (d) => d['orders'][0]['original']['lines'][0]['variant'] = false,
+    'array': (d) => d['orders'][0]['original']['lines'][0]['variant'] = ['Pink'],
+    'object': (d) => d['orders'][0]['original']['lines'][0]['variant'] = {'label': 'Pink'},
+    'outer whitespace': (d) => d['orders'][0]['original']['lines'][0]['variant'] = ' Pink',
+    'whitespace': (d) => d['orders'][0]['original']['lines'][0]['variant'] = '\n',
+    'control': (d) => d['orders'][0]['original']['lines'][0]['variant'] = 'Pink\u0000',
+    'oversize': (d) => d['orders'][0]['original']['lines'][0]['variant'] = 'x' * 241,
+    'legacy downgrade': (d) {d['schemaVersion'] = 3; d['orders'][0]['factsVersion'] = 3;},
+    'mixed versions': (d) => d['schemaVersion'] = 3,
+    'missing benefits': (d) => d['orders'][0]['original'].remove('benefitAttribution'),
+  }.entries) {
+    test('LF-VARIANT rejects ${fault.key} even with recomputed original hash', () async {
+      final data = (jsonDecode(jsonEncode(variantPurchaseResponse())) as Map).cast<String, dynamic>(); fault.value(data);
+      rehashPurchaseOrder(data['orders'][0] as Map<String, dynamic>);
+      final wire = Transport()..data = data;
+      expect(await projectionGateway(wire).readPurchaseProjection(
+        role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2'), isNull);
+    });
+  }
+  test('LF-VARIANT supplied variant cannot change beneath the original fingerprint', () async {
+    final data = variantPurchaseResponse(); data['orders'][0]['original']['lines'][0]['variant'] = 'Blue · 512 GB';
+    final wire = Transport()..data = data;
+    expect(await projectionGateway(wire).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2'), isNull);
+  });
+  test('LF-VARIANT original purchased descriptions decode without current catalogue lookup', () async {
+    final wire = Transport()..data = variantPurchaseResponse();
+    final result = await projectionGateway(wire).readPurchaseProjection(
+      role: WorkspaceOrderIdentityRole.buyer, realm: 'evaluation', purchaseId: 'purchase-v2');
+    expect(result, isNotNull);
+    expect(result!.orders.single.lines.single.toJson()['variant'], 'Pink · 128 GB');
+    expect(result.orders.single.factsVersion, 4);
+  });
   if (Platform.environment['LF_ATTR_PROJECTION_LOG'] case final path?) {
     test('LF-ATTR actual emulator response crosses the strict Dart fingerprint boundary', () async {
       const marker = 'LF_ATTR_PROJECTION=';
@@ -157,6 +227,20 @@ void main() {
     expect(() => supplied.orders.single.benefitAttribution!.components.first.allocations.clear(), throwsUnsupportedError);
   });
   for (final role in ['buyer', 'seller']) {
+    test('LF-VARIANT operational $role consumer preserves exact original variant', () async {
+      final raw = variantOperationalResponse(role: role);
+      final reference = WorkspacePurchaseReference(purchaseId: 'purchase-v2', storeId: 'store-one', orderId: 'order-v2',
+        sourceRevision: 'revision-1', originalFingerprint: raw['originalFingerprint']);
+      final wire = Transport()..data = raw;
+      final result = await AuthenticatedWorkspaceOrderOperationsGateway(
+        projectionGateway(wire, account: role == 'buyer' ? 'buyer-1' : 'owner-1')).read(
+          role: role == 'buyer' ? WorkspaceOrderIdentityRole.buyer : WorkspaceOrderIdentityRole.seller,
+          realm: 'evaluation', reference: reference);
+      expect(result, isNotNull);
+      expect(result!.original.lines.single.variant, 'Pink · 128 GB');
+      expect(result.original.factsVersion, 4);
+      expect(result.original.totals['totalMinor'], 10015);
+    });
     test('LF-ATTR original $role consumer admits source supplied attribution without changing money', () async {
       final wire = Transport()..data = attributedPurchaseResponse(role: role);
       final value = await projectionGateway(wire, account: role == 'buyer' ? 'buyer-1' : 'owner-1').readPurchaseProjection(
@@ -959,6 +1043,15 @@ Map<String, dynamic> purchaseResponse({String role = 'buyer'}) {
   };
 }
 
+Map<String, dynamic> variantPurchaseResponse({String role = 'buyer', String variant = 'Pink · 128 GB'}) {
+  final response = attributedPurchaseResponse(role: role)..['schemaVersion'] = 4;
+  final order = response['orders'][0] as Map<String, dynamic>;
+  order['factsVersion'] = 4;
+  ((order['original'] as Map)['lines'] as List).single['variant'] = variant;
+  rehashPurchaseOrder(order);
+  return response;
+}
+
 Map<String, dynamic> attributedPurchaseResponse({String role = 'buyer', bool empty = false}) {
   final response = purchaseResponse(role: role)..['schemaVersion'] = 3;
   final order = response['orders'][0] as Map<String, dynamic>;
@@ -991,6 +1084,12 @@ void rehashPurchaseOrder(Map<String, dynamic> order) {
 Map<String, dynamic> attributedOperationalResponse({String role = 'buyer'}) {
   final order = attributedPurchaseResponse(role: role)['orders'][0];
   return operationalResponse(role: role)..['originalFactsVersion'] = 3
+    ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
+}
+
+Map<String, dynamic> variantOperationalResponse({String role = 'buyer'}) {
+  final order = variantPurchaseResponse(role: role)['orders'][0];
+  return operationalResponse(role: role)..['originalFactsVersion'] = 4
     ..['original'] = order['original'] ..['originalFingerprint'] = order['originalFingerprint'];
 }
 
