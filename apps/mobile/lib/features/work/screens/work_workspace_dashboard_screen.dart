@@ -25095,6 +25095,8 @@ class _CatalogueProductEditor extends StatefulWidget {
 
 class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late final String? _storeId;
+  late final Object _reviewEditorContext;
+  bool get _reviewEditorCurrent => mounted && widget.session.publicationPreferencesContext == _reviewEditorContext;
   late final bool _wasOwned;
   bool _saved = false;
   bool _savingInventory = false;
@@ -25383,6 +25385,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   void initState() {
     super.initState();
     _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    _reviewEditorContext = widget.session.publicationPreferencesContext;
     _wasOwned =
         widget.importRow == null &&
         widget.session.workspaceCatalogueItems.any(
@@ -25438,6 +25441,11 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
       for (final entry in _importControllers.entries) entry.key: entry.value.text,
     };
     _initialVariantState = _variantState;
+    if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (_reviewEditorCurrent) { await widget.session.workspaceProductSubmission(widget.product.id)?.restore(); }
+      });
+    }
     if (_listingRecoveryRequired) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(_restoreListing());
@@ -25567,6 +25575,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   Widget _variantPublicationControls(WorkspaceVariantFamily family) {
+    if (!_reviewEditorCurrent) { return const Text('Your Store changed. Reopen this product before checking review.'); }
     final publisher = widget.session.workspaceVariantFamilyPublisher(family.id);
     if (publisher == null) {
       return const Padding(padding: EdgeInsets.only(top: 8), child: Text(
@@ -25575,7 +25584,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
     }
     return ListenableBuilder(listenable: Listenable.merge([publisher, widget.session, ..._importControllers.values]),
       builder: (context, _) {
-        final busy = _savingInventory || widget.session.workspaceVariantFamilyBusy(family.id);
+        final busy = !_reviewEditorCurrent || !publisher.active || _savingInventory || widget.session.workspaceVariantFamilyBusy(family.id);
         final pending = publisher.pending != null;
         final actionStyle = TextButton.styleFrom(minimumSize: const Size(48, 48),
           padding: const EdgeInsets.symmetric(horizontal: 8));
@@ -25589,22 +25598,67 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
               TextButton.icon(key: const Key('work-product-family-check-status'),
                 style: actionStyle,
                 onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
                   await widget.session.checkWorkspaceVariantFamily(family.id, original: pending);
-                  if (mounted) setState(() {});
+                  if (_reviewEditorCurrent) setState(() {});
                 }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
                 label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
               if (!pending && publisher.headLoaded) TextButton.icon(key: const Key('work-product-family-submit'),
                 style: actionStyle,
                 onPressed: busy || _hasUnsavedEdits || !publisher.canSubmit ? null : () async {
+                  if (!_reviewEditorCurrent) return;
                   await widget.session.submitWorkspaceVariantFamily(family.id,
-                    inputCurrent: () => mounted && !_hasUnsavedEdits && !_savingInventory && _variantFamily?.id == family.id);
-                  if (mounted) setState(() {});
+                    inputCurrent: () => _reviewEditorCurrent && !_hasUnsavedEdits && !_savingInventory && _variantFamily?.id == family.id);
+                  if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.send_outlined, size: 18), label: const Text('Submit group for review')),
               if (pending && publisher.canRetryOriginal) TextButton.icon(key: const Key('work-product-family-retry-original'),
                 style: actionStyle,
                 onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
                   await widget.session.checkWorkspaceVariantFamily(family.id, retry: true);
-                  if (mounted) setState(() {});
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original submission')),
+            ]),
+          ]));
+      });
+  }
+
+  Widget _productSubmissionControls() {
+    if (!_reviewEditorCurrent) { return const Text('Your Store changed. Reopen this product before checking review.'); }
+    final controller = widget.session.workspaceProductSubmission(widget.product.id);
+    if (controller == null) return const SizedBox.shrink();
+    return ListenableBuilder(listenable: Listenable.merge([controller, widget.session, ..._importControllers.values]),
+      builder: (context, _) {
+        final busy = !_reviewEditorCurrent || !controller.active || _savingInventory || widget.session.workspaceProductSubmissionBusy(widget.product.id);
+        final pending = controller.pending != null;
+        return Padding(padding: const EdgeInsets.only(top: 8), child: Column(
+          key: const Key('work-product-review-submission'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(controller.message ?? 'Save keeps this product private. Submit saved details for review separately.',
+              style: Theme.of(context).textTheme.bodySmall),
+            if (_hasUnsavedEdits && !pending) Text('Save product changes before submitting.', style: Theme.of(context).textTheme.bodySmall),
+            Wrap(spacing: 8, runSpacing: 2, children: [
+              TextButton.icon(key: const Key('work-product-review-check'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.checkWorkspaceProductSubmission(widget.product.id);
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: Icon(pending ? Icons.history : Icons.refresh, size: 18),
+                label: Text(busy ? 'Checking…' : pending ? 'Check original submission' : 'Check review status')),
+              if (!pending && controller.headLoaded) TextButton.icon(key: const Key('work-product-review-submit'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: busy || _choosingPhoto || _hasUnsavedEdits || !controller.canSubmit ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.submitWorkspaceProduct(widget.product.id,
+                    inputCurrent: () => _reviewEditorCurrent && !_savingInventory && !_choosingPhoto && !_hasUnsavedEdits);
+                  if (_reviewEditorCurrent) setState(() {});
+                }, icon: const Icon(Icons.send_outlined, size: 18), label: const Text('Submit saved product for review')),
+              if (pending && controller.canRetryOriginal) TextButton.icon(key: const Key('work-product-review-retry'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: busy ? null : () async {
+                  if (!_reviewEditorCurrent) return;
+                  await widget.session.checkWorkspaceProductSubmission(widget.product.id, retry: true);
+                  if (_reviewEditorCurrent) setState(() {});
                 }, icon: const Icon(Icons.replay, size: 18), label: const Text('Retry original submission')),
             ]),
           ]));
@@ -27008,6 +27062,8 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                     ? (value) => setState(() { _public = value; _listingIntentChanged = true; })
                                     : null,
                               ),
+                            if (_wasOwned && widget.purchaseScope == null && widget.importRow == null && widget.onDraftReviewed == null)
+                              _productSubmissionControls(),
                           ],
                           leading: StoreProductThumbnail(
                             product: product,

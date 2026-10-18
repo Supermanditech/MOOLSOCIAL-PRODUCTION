@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -476,6 +478,52 @@ class Credentials implements SocialContentCredentials {
 }
 
 // Host-only originals; never injected into native Store storage or a live service.
+class _ProductJournal implements WorkspaceProductSubmissionJournal {
+  WorkspaceProductSubmissionIntent? pending;
+  bool failSave = false, failRemove = false;
+  Future<void> Function()? beforeSave;
+  @override
+  Future<WorkspaceProductSubmissionIntent?> readPending(WorkspaceProductSubmissionScope scope) async => pending;
+  @override
+  Future<void> savePending(WorkspaceProductSubmissionIntent original) async {
+    if (beforeSave != null) await beforeSave!();
+    if (failSave) throw StateError('Host storage failed');
+    if (pending != null && pending!.fingerprint != original.fingerprint) throw StateError('Keep original');
+    pending = WorkspaceProductSubmissionIntent.fromJson(original.toJson());
+  }
+  @override
+  Future<void> removePending(WorkspaceProductSubmissionIntent original) async {
+    if (failRemove) throw StateError('Host cleanup failed');
+    if (pending?.fingerprint != original.fingerprint) throw StateError('Keep original');
+    pending = null;
+  }
+}
+class _ProductOwner implements WorkspaceCatalogueGateway, WorkspaceProductSubmissionOwnerGateway {
+  @override
+  String get realm => 'evaluation';
+  @override
+  bool productSubmissionSupported = true;
+  WorkspaceProductSubmissionRecord? head;
+  Future<WorkspaceProductSubmissionRecord?> Function()? readHead;
+  Future<WorkspaceProductSubmissionWriteResult> Function(WorkspaceProductSubmissionIntent, bool)? write;
+  final submitted = <WorkspaceProductSubmissionIntent>[], reconciled = <WorkspaceProductSubmissionIntent>[];
+  final readScopes = <WorkspaceProductSubmissionScope>[];
+  @override
+  Future<WorkspaceCatalogueContentResult> read(BuyV2Product product) => throw StateError('No public host feed');
+  @override
+  Future<WorkspaceProductSubmissionRecord?> readProductSubmission(WorkspaceProductSubmissionScope scope, {required bool Function() current}) async {
+    readScopes.add(scope); return readHead == null ? head : await readHead!();
+  }
+  @override
+  Future<WorkspaceProductSubmissionWriteResult> writeProductSubmission(WorkspaceProductSubmissionIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    (reconcile ? reconciled : submitted).add(original);
+    return write == null ? const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown) : await write!(original, reconcile);
+  }
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _FamilyJournal implements WorkspaceVariantFamilyJournal {
   WorkspaceVariantFamilyIntent? pending;
   bool failSave = false, failRemove = false;
@@ -874,14 +922,15 @@ WorkSession listingSession(SessionCatalogue source, BindingStore journal) =>
       ..workspaceId = 'store-one'
       ..workspaceCatalogueItems.add(listingItem());
 
-Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size = const Size(360, 740)}) async {
+Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size = const Size(360, 740), Key? captureKey, ThemeData? theme}) async {
   tester.view.devicePixelRatio = 1; tester.view.physicalSize = size;
   addTearDown(tester.view.reset);
   work.retailerSetupSaved = true; work.reviewStage = WorkReviewStage.live;
   final core = BuySession(), consumer = BuyV2Session(core: core, reviewDataEnabled: false);
   addTearDown(work.dispose); addTearDown(core.dispose); addTearDown(consumer.dispose);
-  await tester.pumpWidget(MaterialApp(home: WorkWorkspaceDashboardScreen(session: work,
-    procurementSession: consumer, initialSection: 'stock', accountAuthenticated: true)));
+  final app = MaterialApp(theme: theme, home: WorkWorkspaceDashboardScreen(session: work,
+    procurementSession: consumer, initialSection: 'stock', accountAuthenticated: true));
+  await tester.pumpWidget(captureKey == null ? app : RepaintBoundary(key: captureKey, child: app));
   await tester.pumpAndSettle();
   final edit = find.byKey(const Key('work-catalogue-edit-sku-one'));
   await tester.ensureVisible(edit); await tester.tap(edit); await tester.pumpAndSettle();
@@ -1014,6 +1063,212 @@ void main() {
     expect(result.state, WorkspaceProductSubmissionWriteState.submitted);
     expect(result.record!.fingerprint, record['fingerprint']); expect(actual['publicationConfirmed'], isFalse);
   }); }
+  WorkspaceProductSubmissionRecord submissionRecord(WorkspaceProductSubmissionIntent original) =>
+    WorkspaceProductSubmissionRecord.decode(jsonDecode(jsonEncode(submissionAck(original)['record'])), original.scope, at);
+  WorkspaceProductSubmissionController productController(_ProductOwner source, _ProductJournal journal, {Object? Function()? context}) =>
+    WorkspaceProductSubmissionController(scope: submissionScope, gateway: source, journal: journal, context: context ?? () => 'host-owner');
+  WorkSession productSession(_ProductOwner source, _ProductJournal journal) => WorkSession(contactDraftStore: ListingAccount(),
+    catalogueGateway: source, productSubmissionJournalFactory: (_) => journal)
+      ..activeWorkspace = const WorkWorkspace(id: 'store-one', name: 'Host Store', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true)
+      ..workspaceId = 'store-one' ..workspaceCatalogueItems.add(listingItem());
+  test('LF03-SUBMIT recovery journals before dispatch and never calls a reviewed mirror', () async {
+    final owner = _ProductOwner(), journal = _ProductJournal(), controller = productController(owner, journal);
+    addTearDown(controller.dispose);
+    owner.write = (original, _) async {
+      expect(journal.pending!.fingerprint, original.fingerprint);
+      return WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(original));
+    };
+    expect(await controller.refresh(), isTrue); expect(owner.submitted, isEmpty);
+    expect((await controller.submit(submissionIntent().input, inputCurrent: () => true)).state, WorkspaceProductSubmissionWriteState.submitted);
+    expect(journal.pending, isNull); expect(controller.headLoaded, isFalse); expect(controller.message, contains('not approval'));
+  });
+  test('LF03-SUBMIT uncertain request survives controller restart and retries only its frozen original', () async {
+    final owner = _ProductOwner(), journal = _ProductJournal(), first = productController(owner, journal);
+    expect(await first.refresh(), isTrue);
+    await first.submit(submissionIntent().input, inputCurrent: () => true);
+    final original = journal.pending!; first.dispose();
+    final next = productController(owner, journal); addTearDown(next.dispose);
+    expect(await next.restore(), isTrue); expect(next.canSubmit, isFalse);
+    owner.write = (_, _) async => const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notFound);
+    await next.reconcile(); expect(next.canRetryOriginal, isTrue); expect(journal.pending!.fingerprint, original.fingerprint);
+    owner.write = (request, _) async {
+      expect(request.fingerprint, original.fingerprint);
+      return WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(request));
+    };
+    expect((await next.retryOriginal()).state, WorkspaceProductSubmissionWriteState.submitted);
+    expect(owner.submitted.last.fingerprint, original.fingerprint); expect(journal.pending, isNull);
+  });
+  for (final failure in ['save', 'input changed', 'cleanup']) {
+    test('LF03-SUBMIT recovery preserves original on $failure interruption', () async {
+      final owner = _ProductOwner(), journal = _ProductJournal(), controller = productController(owner, journal);
+      addTearDown(controller.dispose); expect(await controller.refresh(), isTrue);
+      var unchanged = true;
+      if (failure == 'save') journal.failSave = true;
+      if (failure == 'input changed') journal.beforeSave = () async { unchanged = false; };
+      if (failure == 'cleanup') {
+        journal.failRemove = true;
+        owner.write = (request, _) async => WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(request));
+      }
+      expect((await controller.submit(submissionIntent().input, inputCurrent: () => unchanged)).state, WorkspaceProductSubmissionWriteState.unknown);
+      expect(controller.pending, isNotNull);
+      if (failure == 'input changed') expect(controller.message, contains('details changed'));
+      if (failure != 'cleanup') expect(owner.submitted, isEmpty);
+      if (failure != 'save') expect(journal.pending!.fingerprint, controller.pending!.fingerprint);
+    });
+  }
+  test('LF03-SUBMIT late old-lifetime reply cannot clear the durable original', () async {
+    var lifetime = Object(); final owner = _ProductOwner(), journal = _ProductJournal();
+    final controller = productController(owner, journal, context: () => lifetime); addTearDown(controller.dispose);
+    expect(await controller.refresh(), isTrue);
+    final entered = Completer<void>(), release = Completer<WorkspaceProductSubmissionWriteResult>();
+    owner.write = (_, _) {entered.complete(); return release.future;};
+    final attempt = controller.submit(submissionIntent().input, inputCurrent: () => true); await entered.future;
+    final original = journal.pending!; lifetime = Object();
+    release.complete(WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(original)));
+    expect((await attempt).state, WorkspaceProductSubmissionWriteState.unknown); expect(journal.pending!.fingerprint, original.fingerprint);
+    final next = productController(owner, journal, context: () => lifetime); addTearDown(next.dispose);
+    expect(await next.restore(), isTrue); expect(next.pending!.fingerprint, original.fingerprint);
+  });
+  test('LF03-SUBMIT head rollback and same-revision changed facts cannot enable another submit', () async {
+    final owner = _ProductOwner(), journal = _ProductJournal(), controller = productController(owner, journal);
+    addTearDown(controller.dispose); owner.head = submissionRecord(submissionIntent());
+    expect(await controller.refresh(), isTrue);
+    owner.head = null; expect(await controller.refresh(), isFalse); expect(controller.canSubmit, isFalse);
+    final changed = WorkspaceProductSubmissionIntent(scope: submissionScope, expectedRevision: 0, idempotencyKey: 'changed',
+      input: WorkspaceProductSubmissionInput.fromSaved(listingItem().copyWith(sellingPrice: 261)));
+    owner.head = submissionRecord(changed); expect(await controller.refresh(), isFalse); expect(controller.canSubmit, isFalse);
+  });
+  test('LF03-SUBMIT secure original is isolated by account Store realm and SKU across journal instances', () async {
+    TestWidgetsFlutterBinding.ensureInitialized(); FlutterSecureStorage.setMockInitialValues({});
+    var account = submissionScope.account;
+    SecureWorkProductSubmissionJournal fresh() => SecureWorkProductSubmissionJournal(currentAccount: () => account);
+    final original = submissionIntent(); await fresh().savePending(original);
+    expect((await fresh().readPending(submissionScope))!.fingerprint, original.fingerprint);
+    final other = WorkspaceProductSubmissionIntent(scope: submissionScope, expectedRevision: 0, idempotencyKey: 'different-original', input: original.input);
+    await expectLater(fresh().savePending(other), throwsFormatException); await expectLater(fresh().removePending(other), throwsFormatException);
+    for (final scope in [
+      (account: account, store: 'another-store', realm: 'evaluation', sku: 'sku-one'),
+      (account: account, store: 'store-one', realm: 'production', sku: 'sku-one'),
+      (account: account, store: 'store-one', realm: 'evaluation', sku: 'another-sku'),
+    ]) { expect(await fresh().readPending(scope), isNull); }
+    account = 'another-owner'; await expectLater(fresh().readPending(submissionScope), throwsA(isA<WorkGatewayException>()));
+    account = submissionScope.account; await fresh().removePending(original); expect(await fresh().readPending(submissionScope), isNull);
+  });
+  test('LF03-SUBMIT secure native tail survives caller timeout before remove or subsequent reads', () async {
+    final storage = _DelayedDetailsStorage(), original = submissionIntent();
+    SecureWorkProductSubmissionJournal fresh() => SecureWorkProductSubmissionJournal(storage: storage, currentAccount: () => submissionScope.account);
+    final first = fresh().savePending(original); await storage.entered.future;
+    await expectLater(first.timeout(const Duration(milliseconds: 1)), throwsA(isA<TimeoutException>()));
+    final remove = fresh().removePending(original); await Future<void>.delayed(Duration.zero); expect(storage.writes, 1);
+    storage.release.complete(); await first; await remove;
+    expect(storage.writes, 2); expect(await fresh().readPending(submissionScope), isNull);
+  });
+  test('LF03-SUBMIT session submits saved product once without mirror or altering Stock and ordinary Save', () async {
+    final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal); addTearDown(work.dispose);
+    final before = work.workspaceCatalogueItems.single.toInventoryJson();
+    owner.write = (original, _) async => WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(original));
+    expect(await work.submitWorkspaceProduct('sku-one', inputCurrent: () => true), isTrue, reason: work.errorMessage);
+    expect(owner.submitted, hasLength(1)); expect(journal.pending, isNull);
+    expect(work.workspaceCatalogueItems.single.toInventoryJson(), before); expect(work.workspaceOrders, isEmpty); expect(work.workspaceInvoices, isEmpty);
+  });
+  for (final fault in ['editor edit', 'saved edit', 'Store changed']) {
+    test('LF03-SUBMIT session fences $fault before dispatch', () async {
+      final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal); addTearDown(work.dispose);
+      owner.readHead = () async {
+        if (fault == 'saved edit') work.workspaceCatalogueItems[0] = listingItem().copyWith(sellingPrice: 261);
+        if (fault == 'Store changed') { work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery',
+          profileId: 'retailer-grocery', area: 'Jaipur', verified: true); }
+        return null;
+      };
+      expect(await work.submitWorkspaceProduct('sku-one', inputCurrent: () => fault != 'editor edit'), isFalse);
+      expect(owner.submitted, isEmpty); expect(journal.pending, isNull);
+    });
+  }
+  test('LF03-SUBMIT original recovery ignores changed or removed local product after Store loop', () async {
+    final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal); addTearDown(work.dispose);
+    await work.submitWorkspaceProduct('sku-one', inputCurrent: () => true);
+    final original = journal.pending!, first = work.workspaceProductSubmission('sku-one')!;
+    final store = work.activeWorkspace!;
+    work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+    work.activeWorkspace = store; work.workspaceCatalogueItems.clear();
+    final next = work.workspaceProductSubmission('sku-one')!; expect(next, isNot(same(first))); expect(next.active, isTrue);
+    owner.write = (request, reconcile) async {
+      expect(reconcile, isTrue); expect(request.fingerprint, original.fingerprint);
+      return WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, submissionRecord(request));
+    };
+    expect(await work.checkWorkspaceProductSubmission('sku-one'), isTrue); expect(journal.pending, isNull); expect(owner.submitted, hasLength(1));
+  });
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('LF03-SUBMIT saved editor inline controls keep dirty edits private at $scale', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale; addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal);
+      const captureKey = Key('product-submission-host-root');
+      await openListingEditor(tester, work, captureKey: captureKey, theme: MoolTheme.light());
+      final check = find.byKey(const Key('work-product-review-check'));
+      await tester.ensureVisible(check); await tester.pumpAndSettle(); await tester.tap(check); await tester.pumpAndSettle();
+      final submit = find.byKey(const Key('work-product-review-submit'));
+      await tester.ensureVisible(submit); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(submit).onPressed, isNotNull); expect(tester.getSize(submit).height, greaterThanOrEqualTo(48));
+      expect(owner.submitted, isEmpty);
+      final captureDirectory = Platform.environment['LF03_SUBMISSION_CAPTURE_DIR'];
+      if (captureDirectory != null) {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+        await tester.runAsync(() async {
+          final image = await boundary.toImage();
+          try {
+            final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))!;
+            await Directory(captureDirectory).create(recursive: true);
+            final file = File('$captureDirectory/submission-editor-host-$scale.png');
+            if (await file.exists()) { throw StateError('Preserve existing host capture.'); }
+            await file.writeAsBytes(bytes.buffer.asUint8List());
+          } finally { image.dispose(); }
+        });
+      }
+      final title = find.byKey(const Key('work-product-title'));
+      await tester.ensureVisible(title); await tester.pumpAndSettle(); await tester.enterText(title, 'Unsaved product'); await tester.pumpAndSettle();
+      await tester.ensureVisible(submit); await tester.pumpAndSettle();
+      expect(tester.widget<TextButton>(submit).onPressed, isNull); expect(owner.submitted, isEmpty); expect(tester.takeException(), isNull);
+    });
+  }
+  for (final returnToOriginal in [false, true]) {
+    testWidgets('LF03-SUBMIT stale saved editor cannot check another Store or returned generation $returnToOriginal', (tester) async {
+      final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal);
+      await openListingEditor(tester, work);
+      final check = find.byKey(const Key('work-product-review-check'));
+      await tester.ensureVisible(check); await tester.pumpAndSettle();
+      final oldAction = tester.widget<TextButton>(check).onPressed!;
+      final originalStore = work.activeWorkspace!;
+      work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+      if (returnToOriginal) work.activeWorkspace = originalStore;
+      // Exercise the already-captured gesture, not just a newly disabled button.
+      oldAction(); await tester.pumpAndSettle();
+      expect(owner.readScopes, isEmpty); expect(owner.submitted, isEmpty); expect(owner.reconciled, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+  for (final action in ['submit', 'retry']) {
+    for (final returnToOriginal in [false, true]) {
+      testWidgets('LF03-SUBMIT stale saved editor fences captured $action gesture generation $returnToOriginal', (tester) async {
+        final owner = _ProductOwner(), journal = _ProductJournal(), work = productSession(owner, journal);
+        if (action == 'retry') {
+          journal.pending = submissionIntent();
+          owner.write = (_, _) async => const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notFound);
+        }
+        await openListingEditor(tester, work);
+        final check = find.byKey(const Key('work-product-review-check'));
+        await tester.ensureVisible(check); await tester.pumpAndSettle(); await tester.tap(check); await tester.pumpAndSettle();
+        final button = find.byKey(Key('work-product-review-$action'));
+        await tester.ensureVisible(button); await tester.pumpAndSettle();
+        final oldAction = tester.widget<TextButton>(button).onPressed!;
+        final reads = owner.readScopes.length, submitted = owner.submitted.length, reconciled = owner.reconciled.length, store = work.activeWorkspace!;
+        work.activeWorkspace = const WorkWorkspace(id: 'other-store', name: 'Other', profileLabel: 'Grocery', profileId: 'retailer-grocery', area: 'Jaipur', verified: true);
+        if (returnToOriginal) work.activeWorkspace = store;
+        oldAction(); await tester.pumpAndSettle();
+        expect(owner.readScopes.length, reads); expect(owner.submitted.length, submitted); expect(owner.reconciled.length, reconciled);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   const familyScope = (account: 'owner-one', store: 'store-one', realm: 'production', family: 'family-one');
   WorkspaceVariantFamilySubmissionInput ownerFamilyInput() => WorkspaceVariantFamilySubmissionInput.fromJson({
     'familyId': familyScope.family, 'localRevision': 1, 'title': 'Host option product', 'brand': 'Host fixture',

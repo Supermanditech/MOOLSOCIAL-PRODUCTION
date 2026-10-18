@@ -622,6 +622,7 @@ class WorkSession extends ChangeNotifier {
     this.publicDetailsJournalFactory,
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
+    this.productSubmissionJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -688,6 +689,7 @@ class WorkSession extends ChangeNotifier {
     this.publicDetailsJournalFactory,
     this.catalogueBindingPendingStoreFactory,
     this.variantFamilyJournalFactory,
+    this.productSubmissionJournalFactory,
     this.supplierPolicyGateway,
     this.supplierPolicyRealm,
     this.supplierPolicyJournalFactory,
@@ -1060,6 +1062,80 @@ class WorkSession extends ChangeNotifier {
   }
   final WorkspaceCatalogueBindingPendingStore Function(WorkspaceCatalogueBindingScope scope)? catalogueBindingPendingStoreFactory;
   final WorkspaceVariantFamilyJournal Function(WorkspaceVariantFamilyScope scope)? variantFamilyJournalFactory;
+  final WorkspaceProductSubmissionJournal Function(WorkspaceProductSubmissionScope scope)? productSubmissionJournalFactory;
+  final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissions = {};
+  final Map<WorkspaceProductSubmissionScope, WorkspaceProductSubmissionController> _productSubmissionLoads = {};
+  WorkspaceProductSubmissionController? workspaceProductSubmission(String skuId) {
+    final account = _contactAccountScope, store = activeWorkspace?.id, source = catalogueGateway;
+    if (_disposed || account == null || account.isEmpty || store == null || source is! WorkspaceProductSubmissionOwnerGateway ||
+        source is AuthenticatedWorkspaceCatalogueGateway && gateway is ReviewWorkGateway ||
+        !(source as WorkspaceProductSubmissionOwnerGateway).productSubmissionSupported) { return null; }
+    final WorkspaceProductSubmissionOwnerGateway ownerSource = source is AuthenticatedWorkspaceCatalogueGateway
+      ? source.forOwnerAccount(account) : source as WorkspaceProductSubmissionOwnerGateway;
+    final scope = (account: account, store: store, realm: ownerSource.realm, sku: skuId);
+    final previous = _productSubmissions[scope];
+    if (previous != null && !previous.active) {
+      _productSubmissions.remove(scope);
+      if (identical(_productSubmissionLoads[scope], previous)) _productSubmissionLoads.remove(scope);
+      previous.removeListener(notifyListeners); previous.dispose();
+    }
+    // Keep original recovery reachable even if this local product was edited/removed.
+    return _productSubmissions.putIfAbsent(scope, () => WorkspaceProductSubmissionController(scope: scope,
+      gateway: ownerSource, journal: productSubmissionJournalFactory?.call(scope) ?? SecureWorkProductSubmissionJournal(),
+      context: () => _disposed || _contactAccountScope != account || activeWorkspace?.id != store ? null : publicationPreferencesContext)
+      ..addListener(notifyListeners));
+  }
+  bool workspaceProductSubmissionBusy(String skuId) {
+    final controller = workspaceProductSubmission(skuId);
+    return controller != null && (controller.busy || identical(_productSubmissionLoads[controller.scope], controller));
+  }
+  WorkspaceProductSubmissionInput? _savedProductSubmission(String skuId) {
+    final item = workspaceCatalogueItems.where((p) => p.id == skuId).firstOrNull;
+    if (item == null) return null;
+    final family = workspaceVariantFamilies.where((f) => f.id == item.variantMembership?.familyId).firstOrNull;
+    return WorkspaceProductSubmissionInput.fromSaved(item, family: family);
+  }
+  Future<bool> checkWorkspaceProductSubmission(String skuId, {bool retry = false}) async {
+    final controller = workspaceProductSubmission(skuId);
+    if (controller == null || workspaceProductSubmissionBusy(skuId)) return false;
+    if (!await controller.restore() || !controller.active) return false;
+    if (controller.pending != null) {
+      final result = retry ? await controller.retryOriginal() : await controller.reconcile();
+      return result.state == WorkspaceProductSubmissionWriteState.submitted;
+    }
+    return retry ? false : controller.refresh();
+  }
+  Future<bool> submitWorkspaceProduct(String skuId, {required bool Function() inputCurrent}) async {
+    final controller = workspaceProductSubmission(skuId), owner = publicationPreferencesContext;
+    if (controller == null || workspaceProductSubmissionBusy(skuId) || !inputCurrent()) return false;
+    bool current() => !_disposed && publicationPreferencesContext == owner && controller.active;
+    WorkspaceProductSubmissionInput? input;
+    try { input = _savedProductSubmission(skuId); } catch (_) {
+      showError('Check the saved pack, selling details and photo before submitting.'); return false;
+    }
+    if (input == null) return false;
+    final frozen = input;
+    bool unchanged() {
+      if (!current() || !inputCurrent()) return false;
+      try { return _savedProductSubmission(skuId)?.fingerprint == frozen.fingerprint; } catch (_) { return false; }
+    }
+    _productSubmissionLoads[controller.scope] = controller; notifyListeners();
+    try {
+      if (localInventoryEnabled && !await workspaceInventorySaved || !unchanged()) return false;
+      if (!await controller.restore() || !unchanged()) return false;
+      if (controller.pending != null) {
+        showError('Check the original product submission before sending saved changes.'); return false;
+      }
+      if (!controller.headLoaded && !await controller.refresh() || !unchanged()) return false;
+      return (await controller.submit(frozen, inputCurrent: unchanged)).state == WorkspaceProductSubmissionWriteState.submitted && current();
+    } catch (_) {
+      if (current()) showError('Product submission is not confirmed. Your original request and saved details are kept.');
+      return false;
+    } finally {
+      if (identical(_productSubmissionLoads[controller.scope], controller)) _productSubmissionLoads.remove(controller.scope);
+      if (current()) notifyListeners();
+    }
+  }
   final Map<WorkspaceVariantFamilyScope, WorkspaceVariantFamilyController> _variantFamilyPublishers = {};
   final Map<WorkspaceVariantFamilyScope, WorkspaceVariantFamilyController> _variantFamilyLoads = {};
   WorkspaceVariantFamilyController? workspaceVariantFamilyPublisher(String familyId) {
@@ -12973,6 +13049,8 @@ class WorkSession extends ChangeNotifier {
     _catalogueListings.clear();
     for (final publisher in _variantFamilyPublishers.values) { publisher.dispose(); }
     _variantFamilyPublishers.clear();
+    for (final publisher in _productSubmissions.values) { publisher.dispose(); }
+    _productSubmissions.clear();
     for (final reader in _catalogueReadbacks.values) { reader.dispose(); }
     _catalogueReadbacks.clear();
     for (final promotion in _productPromotions.values) { promotion.dispose(); }

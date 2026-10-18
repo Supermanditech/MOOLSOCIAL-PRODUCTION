@@ -200,6 +200,138 @@ abstract interface class WorkspaceProductSubmissionOwnerGateway {
     {required bool Function() current, bool reconcile = false});
 }
 
+abstract interface class WorkspaceProductSubmissionJournal {
+  Future<WorkspaceProductSubmissionIntent?> readPending(WorkspaceProductSubmissionScope scope);
+  Future<void> savePending(WorkspaceProductSubmissionIntent original);
+  Future<void> removePending(WorkspaceProductSubmissionIntent original);
+}
+
+/// One journalled original per saved SKU. Recovery never rebuilds current edits.
+class WorkspaceProductSubmissionController extends ChangeNotifier {
+  WorkspaceProductSubmissionController({required this.scope, required this.gateway, required this.journal, required this.context})
+    : _lifetime = context() {
+    for (final value in [scope.account, scope.store, scope.sku]) { _id(value); }
+    if (scope.realm != gateway.realm || !{'evaluation', 'production'}.contains(scope.realm)) throw const FormatException();
+  }
+  final WorkspaceProductSubmissionScope scope;
+  final WorkspaceProductSubmissionOwnerGateway gateway;
+  final WorkspaceProductSubmissionJournal journal;
+  final Object? Function() context;
+  final Object? _lifetime;
+  bool _closed = false, ready = false, busy = false, headLoaded = false, originalNotFound = false;
+  int _revision = 0;
+  String? _headBytes, message;
+  WorkspaceProductSubmissionRecord? head;
+  WorkspaceProductSubmissionIntent? pending;
+  Future<bool>? _restoring;
+  bool get active => !_closed && _lifetime != null && context() == _lifetime;
+  bool get canSubmit => active && gateway.productSubmissionSupported && ready && headLoaded && !busy && pending == null;
+  bool get canRetryOriginal => active && gateway.productSubmissionSupported && ready && !busy && pending != null && originalNotFound;
+  void _notify() { if (active) notifyListeners(); }
+  Future<bool> restore() {
+    if (!active) return Future.value(false);
+    if (ready) return Future.value(true);
+    return _restoring ??= _restore().whenComplete(() => _restoring = null);
+  }
+  Future<bool> _restore() async {
+    try {
+      final original = await journal.readPending(scope).timeout(const Duration(seconds: 10));
+      if (!active) return false;
+      if (original != null && (original.scope != scope || pending != null && original.fingerprint != pending!.fingerprint)) throw const FormatException();
+      pending ??= original; ready = true;
+      message = pending == null ? null : 'An earlier product submission needs checking. Your saved details are kept.';
+      return true;
+    } catch (_) {
+      if (active) { ready = false; message = 'The saved submission could not be opened. Your product is kept.'; }
+      return false;
+    } finally { _notify(); }
+  }
+  Future<bool> refresh() async {
+    if (!active || busy || !gateway.productSubmissionSupported) return false;
+    busy = true; headLoaded = false; _notify();
+    try {
+      if (!await restore() || !active) return false;
+      if (pending != null) { message = 'Check the original request before another submission.'; return false; }
+      final next = await gateway.readProductSubmission(scope, current: () => active).timeout(const Duration(seconds: 25));
+      if (!active) return false;
+      final revision = next?.revision ?? 0, bytes = next == null ? null : jsonEncode(_sorted(next.toJson()));
+      if (revision < _revision || revision == _revision && _headBytes != bytes) throw const FormatException();
+      head = next; _revision = revision; _headBytes = bytes; headLoaded = true;
+      message = next == null ? 'This saved product has not been submitted.' : next.input.mediaPending
+        ? 'Product details received privately. Photo upload and review are still needed.'
+        : 'Product details received privately. Approval and public listing are not confirmed.';
+      return true;
+    } catch (_) {
+      if (active) message = 'Product review status could not be confirmed. Your saved details are kept.';
+      return false;
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceProductSubmissionWriteResult> submit(WorkspaceProductSubmissionInput input, {required bool Function() inputCurrent}) async {
+    if (!canSubmit || input.skuId != scope.sku || !inputCurrent()) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notSent);
+    if (head?.input.fingerprint == input.fingerprint) {
+      message = 'These saved details are already submitted. Check review status.'; _notify();
+      return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notSent);
+    }
+    busy = true; _notify();
+    try {
+      final original = WorkspaceProductSubmissionIntent(scope: scope, expectedRevision: _revision, input: input,
+        idempotencyKey: 'product-${List.generate(16, (_) => Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0')).join()}');
+      pending = original; originalNotFound = false;
+      await journal.savePending(original).timeout(const Duration(seconds: 10));
+      if (!active || !inputCurrent()) {
+        if (active) message = 'Saved product details changed. Check the original request before submitting again.';
+        return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      }
+      final result = await gateway.writeProductSubmission(original, current: () => active && inputCurrent()).timeout(const Duration(seconds: 25));
+      if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      return await _finish(original, result, recovery: false);
+    } catch (_) {
+      if (active) { ready = false; message = 'Submission is not confirmed. The original request and product are kept.'; }
+      return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceProductSubmissionWriteResult> reconcile() => _recover(retry: false);
+  Future<WorkspaceProductSubmissionWriteResult> retryOriginal() => _recover(retry: true);
+  Future<WorkspaceProductSubmissionWriteResult> _recover({required bool retry}) async {
+    if (!active || busy || !gateway.productSubmissionSupported || retry && !canRetryOriginal) {
+      return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    }
+    busy = true; _notify();
+    try {
+      if (!await restore() || !active || pending == null) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      final original = pending!; originalNotFound = false;
+      if (retry) await journal.savePending(original).timeout(const Duration(seconds: 10));
+      if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      final result = await gateway.writeProductSubmission(original, current: () => active, reconcile: !retry).timeout(const Duration(seconds: 25));
+      if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+      if (!retry && result.state == WorkspaceProductSubmissionWriteState.notFound) originalNotFound = true;
+      return await _finish(original, result, recovery: true);
+    } catch (_) {
+      if (active) message = 'The original product submission is still unconfirmed. It is kept for checking.';
+      return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    } finally { busy = false; _notify(); }
+  }
+  Future<WorkspaceProductSubmissionWriteResult> _finish(WorkspaceProductSubmissionIntent original,
+      WorkspaceProductSubmissionWriteResult result, {required bool recovery}) async {
+    final record = result.record;
+    final submitted = result.state == WorkspaceProductSubmissionWriteState.submitted && record != null && record.matches(original);
+    final definitive = submitted || !recovery && {WorkspaceProductSubmissionWriteState.notSent, WorkspaceProductSubmissionWriteState.rejected}.contains(result.state);
+    if (!definitive) {
+      message = originalNotFound ? 'No result found yet. Retry sends the same saved request, not current edits.'
+        : 'Product submission is not confirmed. Check the original request.';
+      return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    }
+    await journal.removePending(original).timeout(const Duration(seconds: 10));
+    if (!active) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.unknown);
+    pending = null; originalNotFound = false; headLoaded = false;
+    if (submitted && record.revision >= _revision) { _revision = record.revision; _headBytes = jsonEncode(_sorted(record.toJson())); }
+    message = submitted ? 'Product details received privately—not approval or public publication.' : 'The product was not submitted. Saved details are unchanged.';
+    return result;
+  }
+  @override
+  void dispose() { _closed = true; super.dispose(); }
+}
+
 /// Frozen descriptive input, never Stock, publication approval or live availability.
 class WorkspaceVariantFamilySubmissionInput {
   WorkspaceVariantFamilySubmissionInput._(this._encoded);
