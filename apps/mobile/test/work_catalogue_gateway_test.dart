@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1424,6 +1425,30 @@ void main() {
     expect(entry.product.priceMinor, 26000);
     expect(entry.readback.content.state, BuyV2ProductContentState.ready);
   });
+  final canonicalPublicLog = Platform.environment['LF03_CANONICAL_PUBLIC_LOG'];
+  if (canonicalPublicLog != null) {
+    test('LF03-BRAND actual emulator producer response decodes in the public client', () {
+      const marker = 'LF03_CANONICAL_PUBLIC=';
+      final captured = File(canonicalPublicLog).readAsLinesSync()
+          .where((line) => line.contains(marker)).toList();
+      expect(captured, hasLength(1));
+      final data = jsonDecode(captured.single.split(marker).last) as Map<String, dynamic>;
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(data,
+        storeId: data['storeId'] as String, realm: 'evaluation',
+        channel: BuyV2OfferClass.retail, now: DateTime.parse(data['observedAt'] as String));
+      expect(entry.product.brand, isEmpty);
+      expect(entry.product.categoryId, 'fruits-vegetables');
+      expect(entry.product.title, 'Cucumber');
+      expect(entry.product.storeId, data['storeId']);
+      expect(entry.product.sourceSkuId, 'sku-one');
+      expect(entry.product.priceMinor, 5000);
+      expect(entry.product.hasValidPackTerms, isTrue);
+      expect(entry.product.manufacturerVerified, isFalse);
+      expect((row(data)['content'] as Map).containsKey('brandId'), isFalse);
+      expect(row(data).containsKey('brandId'), isFalse);
+      expect(entry.readback.content.state, BuyV2ProductContentState.ready);
+    });
+  }
   test('LF-PRODUCE local owned record retains empty produce brand and listing intent exactly', () {
     final original = ownerRow();
     (original['content'] as Map)..['categoryId'] = 'fruits-vegetables'..['brand'] = '';

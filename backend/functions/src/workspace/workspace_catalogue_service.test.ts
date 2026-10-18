@@ -99,10 +99,11 @@ function productionCommands(value = input()): Array<Record<string, unknown>> {
         effectiveFrom: at, expiresAt: "2026-10-16T13:00:00.000Z"}]},
   ];
 }
-function produceAll(value = input()) {
+function produceAll(value = input(), canonicalBrandId: string | null = "brand-host", canonicalCategoryId = value.content.categoryId) {
   let aggregate: CatalogueAggregate | undefined;
-  const participant = producerParticipant("store-one", value.content.categoryId), receipts: CatalogueProductionReceipt[] = [];
+  const participant = producerParticipant("store-one", canonicalCategoryId), receipts: CatalogueProductionReceipt[] = [];
   for (const command of productionCommands(value)) {
+    if (command.type === "propose_product") {command.brandId = canonicalBrandId; command.categoryId = canonicalCategoryId;}
     const owner = ["propose_product", "propose_pack", "create_offer"].includes(String(command.type));
     const authority = producerAuthority(owner);
     const result = planCatalogueProduction({operatorUserId: authority.userId, identity: catalogueIdentity,
@@ -334,6 +335,61 @@ test("family emulator private submit, trusted approval, public exact siblings, r
     assert.equal((await service().publicVariantFamilies({...query, familyId: family.familyId}) as Result).state, "unavailable");
     assert.equal((await new FirestoreWorkspaceCatalogueRepository(db, "production").readVariantFamily(storeId, family.familyId, "owner-one")).candidate, null);
   } finally { await db.terminate(); await deleteApp(app); }
+});
+
+test("LF03-BRAND real producer-to-Store-public flow needs no invented brand for produce", async () => {
+  const value = input();
+  value.content = {...value.content, title: "Cucumber", brand: "", variant: "", categoryId: "fruits-vegetables"};
+  value.pack = {...value.pack, label: "1 kg", unit: "kg"};
+  const {aggregate, participant, receipts} = produceAll(value, null);
+  assert.equal(aggregate.products[0]!.brandId, null);
+  assert.equal(aggregate.products[0]!.state, "verified");
+  const command: CatalogueSave = {ownerUserId: "owner-one", profile, input: value, expectedRevision: 0,
+    idempotencyKey: "unbranded-bind", fingerprint: cataloguePayloadHash({storeId: "store-one", input: value, expectedRevision: 0}), observedAt: at};
+  const saved = planReviewedCatalogueSave(command, catalogueIdentity, aggregate, producerAuthority(), participant);
+  const repository = new Memory(); repository.aggregate = aggregate; repository.records.set("store-one/sku-one", saved);
+  const page = await subject(repository).publicCatalogue({storeId: "store-one", unbrandedProduceReadbackVersion: 1}) as
+    {items: Array<{content: {brand: string; title: string}}>};
+  assert.equal(page.items[0]!.content.brand, ""); assert.equal(page.items[0]!.content.title, "Cucumber");
+  const original = {...productionCommands(value)[1]!, brandId: null};
+  const replay = planCatalogueProduction({operatorUserId: "owner-one", identity: catalogueIdentity, input: original, observedAt: at},
+    producerAuthority(), aggregate, participant, profile, receipts[1]);
+  assert.equal(replay.aggregate.products[0]!.brandId, null); assert.equal(replay.replayed, true);
+});
+
+test("LF03-BRAND reviewed category cannot diverge from hashed Store content category", () => {
+  const value = input(); value.content.categoryId = "fruits-vegetables";
+  const {aggregate, participant} = produceAll(value, "brand-host", "grocery");
+  const command: CatalogueSave = {ownerUserId: "owner-one", profile, input: value, expectedRevision: 0,
+    idempotencyKey: "wrong-category-bind", fingerprint: cataloguePayloadHash({storeId: "store-one", input: value, expectedRevision: 0}), observedAt: at};
+  assert.throws(() => planReviewedCatalogueSave(command, catalogueIdentity, aggregate, producerAuthority(), participant), {code: "invalid_input"});
+});
+
+for (const fault of ["branded-null", "category-mismatch"] as const) {
+  test(`LF03-BRAND ${fault} cannot bind or leak through public readback even with matching hashes`, async () => {
+    const value = input(); value.content.categoryId = "fruits-vegetables";
+    const valid = produceAll(value);
+    const command: CatalogueSave = {ownerUserId: "owner-one", profile, input: value, expectedRevision: 0,
+      idempotencyKey: "contradiction-bind", fingerprint: cataloguePayloadHash({storeId: "store-one", input: value, expectedRevision: 0}), observedAt: at};
+    const saved = planReviewedCatalogueSave(command, catalogueIdentity, valid.aggregate, producerAuthority(), valid.participant);
+    const invalid = produceAll(value, fault === "branded-null" ? null : "brand-host", fault === "category-mismatch" ? "grocery" : "fruits-vegetables");
+    assert.throws(() => planReviewedCatalogueSave(command, catalogueIdentity, invalid.aggregate, producerAuthority(), invalid.participant), {code: "invalid_input"});
+    const repository = new Memory(); repository.records.set("store-one/sku-one", saved);
+    repository.aggregate = valid.aggregate;
+    const request = {storeId: "store-one", unbrandedProduceReadbackVersion: 1};
+    assert.equal(((await subject(repository).publicCatalogue(request)) as {items: unknown[]}).items.length, 1);
+    repository.aggregate = invalid.aggregate;
+    assert.equal(((await subject(repository).publicCatalogue(request)) as {items: unknown[]}).items.length, 0);
+    assert.deepEqual(repository.records.get("store-one/sku-one"), saved, "Withhold inconsistent public data; never rewrite owner history");
+  });
+}
+
+test("LF03-BRAND family review rechecks canonical brand/category rather than hashes alone", () => {
+  const f = familyFixture();
+  assert.doesNotThrow(() => planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, f.review, producerAuthority(false), f.candidate, f.records, f.aggregate, at));
+  const inconsistent = structuredClone(f.aggregate);
+  (inconsistent.products[0] as {brandId: string | null}).brandId = null;
+  assert.throws(() => planStoreVariantFamilyReview("reviewer-one", catalogueIdentity, f.review, producerAuthority(false), f.candidate, f.records, inconsistent, at), {code: "invalid_input"});
 });
 
 test("local producer uses real contract transitions before exact binding and public readback", async () => {
@@ -1611,7 +1667,8 @@ test("Firestore emulator: atomic revisions/retries/CAS, restart, revocation and 
   } finally { await db.terminate(); await deleteApp(app); }
 });
 
-test("Firestore emulator: trusted producer to exact binding to restarted public reader", {
+for (const unbranded of [false, true]) {
+test(`Firestore emulator: trusted producer to exact binding to restarted public reader unbranded=${unbranded}`, {
   skip: process.env.FIRESTORE_EMULATOR_HOST === undefined,
 }, async () => {
   assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
@@ -1620,7 +1677,13 @@ test("Firestore emulator: trusted producer to exact binding to restarted public 
   const identity = {...catalogueIdentity, catalogueId: `catalogue-${randomUUID()}`};
   const root = db.collection("workspaceCatalogues").doc("evaluation");
   const localProfile = {...profile, workspaceId: storeId, caseId};
-  const participant = producerParticipant(storeId), value = input();
+  const value = input();
+  if (unbranded) {
+    value.content = {...value.content, title: "Cucumber", brand: "", variant: "", categoryId: "fruits-vegetables"};
+    value.pack = {...value.pack, label: "1 kg", unit: "kg"};
+    value.channels[0]!.priceMinor = 5000; value.channels[0]!.mrpMinor = 5000;
+  }
+  const participant = producerParticipant(storeId, value.content.categoryId);
   value.content.media = staticMedia(value, storeId);
   const repository = () => new FirestoreWorkspaceCatalogueRepository(db, "evaluation", () => new Date(at));
   try {
@@ -1630,12 +1693,14 @@ test("Firestore emulator: trusted producer to exact binding to restarted public 
     await root.collection("producerAuthorities").doc("owner-one").set(producerAuthority(true, storeId));
     await root.collection("producerAuthorities").doc("reviewer-one").set(producerAuthority(false));
     const commands = productionCommands(value);
+    if (unbranded) commands[1]!.brandId = null;
     for (const command of commands) {
       const owner = ["propose_product", "propose_pack", "create_offer"].includes(String(command.type));
       await repository().produceCatalogue(owner ? "owner-one" : "reviewer-one", identity, command);
     }
     const aggregateRef = root.collection("canonicalCatalogues").doc(identity.catalogueId);
     assert.equal((await aggregateRef.get()).get("version"), 6);
+    assert.equal((await repository().catalogue(identity.catalogueId))!.products[0]!.brandId, unbranded ? null : "brand-host");
     assert.equal((await aggregateRef.collection("revisions").get()).size, 6);
     const command: CatalogueSave = {ownerUserId: "owner-one", profile: localProfile,
       input: value, expectedRevision: 0, idempotencyKey: "reviewed-binding",
@@ -1662,12 +1727,16 @@ test("Firestore emulator: trusted producer to exact binding to restarted public 
     callerCommand.fingerprint = cataloguePayloadHash({storeId, input: callerCommand.input, expectedRevision: 0});
     releaseSave(); assert.deepEqual(await originalOnly, bound);
     const page = await new WorkspaceCatalogueService(repository(), identity, () => new Date(at))
-      .publicCatalogue({storeId}) as {items: Array<{skuId: string}>; orderingAvailable: boolean};
+      .publicCatalogue({storeId, ...(unbranded ? {unbrandedProduceReadbackVersion: 1} : {})}) as {items: Array<{skuId: string}>; orderingAvailable: boolean};
     assert.equal(page.items[0]?.skuId, value.skuId); assert.equal(page.orderingAvailable, false);
     const linked = await new WorkspaceCatalogueService(repository(), identity, () => new Date(at))
-      .publicCatalogue({storeId, listingReadbackVersion: 1}) as
+      .publicCatalogue({storeId, listingReadbackVersion: 1, ...(unbranded ? {
+        unbrandedProduceReadbackVersion: 1, productFactsReadbackVersion: 1, mediaReadbackVersion: 1, policyReadbackVersion: 1} : {})}) as
       {state: string; listingCoverage: string; items: Array<{listings: Array<{listingId: string; skuId: string}>}>};
     assert.equal(linked.state, "ready"); assert.equal(linked.listingCoverage, "complete");
+    if (unbranded && process.env.LF03_CANONICAL_PUBLIC_CAPTURE === "true") {
+      console.log(`LF03_CANONICAL_PUBLIC=${JSON.stringify(linked)}`);
+    }
     assert.equal(linked.items[0]!.listings[0]!.skuId, value.skuId);
     assert.equal(linked.items[0]!.listings[0]!.listingId, (await repository().publicListingBindings(bound))![0]!.listingId,
       "Real reviewed producer/binding and restarted public reader retain the same persisted listing");
@@ -1704,3 +1773,4 @@ test("Firestore emulator: trusted producer to exact binding to restarted public 
     assert.equal((await aggregateRef.collection("revisions").get()).size, 7);
   } finally { await db.terminate(); await deleteApp(app); }
 });
+}

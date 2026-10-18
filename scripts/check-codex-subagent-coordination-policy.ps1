@@ -8007,6 +8007,10 @@ function Test-Lf27Batch01Continuation($Continuation, [string[]]$ChangedOwners) {
     if (@($facts.owners) -ccontains 'apps/mobile/test/work_store_publication_settings_test.dart') {
       $factsOwners += 'apps/mobile/test/work_store_publication_settings_test.dart'
     }
+    foreach ($canonicalOwner in @('backend/functions/src/commerce/catalogue_contract.ts',
+        'backend/functions/src/commerce/catalogue_contract.test.ts')) {
+      if (@($facts.owners) -ccontains $canonicalOwner) { $factsOwners += $canonicalOwner }
+    }
     if (@($facts.owners) -ccontains 'backend/functions/src/workspace/workspace_promotion_service.ts') {
       $factsOwners += 'backend/functions/src/workspace/workspace_promotion_service.ts'
     }
@@ -8436,6 +8440,12 @@ function Invoke-Lf01Admission {
       $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_policy_snapshot_test.dart'
       if (@($record.frontendContinuation.batch03PolicyRecovery.owners) -ccontains 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart') {
         $owners += 'apps/mobile/test/ui_v2/buy/buy_v2_order_progress_test.dart'
+      }
+    }
+    if ($null -ne $record.frontendContinuation.PSObject.Properties['batch02Facts']) {
+      foreach ($canonicalOwner in @('backend/functions/src/commerce/catalogue_contract.ts',
+          'backend/functions/src/commerce/catalogue_contract.test.ts')) {
+        if (@($record.frontendContinuation.batch02Facts.owners) -ccontains $canonicalOwner) { $owners += $canonicalOwner }
       }
     }
     if ($null -ne $record.frontendContinuation.PSObject.Properties['batch04DocumentExport']) {

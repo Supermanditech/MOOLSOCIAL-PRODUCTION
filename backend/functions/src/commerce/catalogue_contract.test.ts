@@ -61,6 +61,7 @@ function supplyWorkspace(
   capabilities: readonly SupplyCapabilityKind[] = [
     "product_master_stewardship",
   ],
+  categoryId = "category.fmcg",
 ): SupplyParticipantWorkspace {
   let workspace = registerSupplyParticipantWorkspace({
     commandId: "command.workspace-register-001",
@@ -83,9 +84,9 @@ function supplyWorkspace(
       evidence: [{ kind: "identity", sha256: HASH_A }],
       qualifiers:
         capability === "product_master_stewardship"
-          ? { categoryIds: ["category.fmcg"], serviceAreaIds: [] }
+          ? { categoryIds: [categoryId], serviceAreaIds: [] }
           : {
-              categoryIds: ["category.fmcg"],
+              categoryIds: [categoryId],
               serviceAreaIds: ["area.342001"],
             },
     });
@@ -249,6 +250,39 @@ function createWholesaleOffer(
     },
     workspace,
   );
+}
+
+test("LF03-BRAND explicit authorized unbranded produce survives independent review without a fake brand identity", () => {
+  const current = emptyCatalogue(), workspace = supplyWorkspace(["product_master_stewardship"], "fruits-vegetables");
+  const proposed = applyCatalogueCommand(current, {type: "propose_product", commandId: "unbranded-proposal",
+    catalogueId: current.catalogueId, expectedVersion: current.version, occurredAt: "2026-08-03T02:00:00.000Z",
+    actor: workspaceActor, productId: "produce.cucumber", categoryId: "fruits-vegetables",
+    brandId: null, contentSha256: HASH_A, codes: [{type: "internal", value: "CUCUMBER-1KG"}]}, workspace);
+  assert.equal(proposed.products[0]!.brandId, null);
+  assert.equal(proposed.products[0]!.state, "pending_review");
+  expectCode(() => applyCatalogueCommand(proposed, {type: "review_product", commandId: "owner-cannot-review",
+    catalogueId: current.catalogueId, expectedVersion: proposed.version, occurredAt: "2026-08-03T02:01:00.000Z",
+    actor: workspaceActor, productId: "produce.cucumber", decision: "verify", reasonCode: "owner-request"}), "unauthorized");
+  const reviewed = reviewProduct(proposed, "produce.cucumber");
+  assert.equal(reviewed.products[0]!.brandId, null);
+  assert.equal(reviewed.products[0]!.state, "verified");
+  assert.equal(reviewed.products[0]!.reviewedBy, catalogueReviewer.actorId);
+  assert.equal(current.products.length, 0);
+});
+
+for (const categoryId of ["fruits-vegetables", "category.fmcg", "electronics"]) {
+  for (const [name, brandId] of [["missing", undefined], ["blank", ""], ["boolean", false], ["array", []], ["object", {}], ["null", null]] as const) {
+    if (categoryId === "fruits-vegetables" && brandId === null) continue;
+    test(`LF03-BRAND core rejects ${name} branding for ${categoryId}`, () => {
+      const current = emptyCatalogue(), workspace = supplyWorkspace(["product_master_stewardship"], categoryId);
+      expectCode(() => applyCatalogueCommand(current, {type: "propose_product", commandId: "invalid-brand-proposal",
+        catalogueId: current.catalogueId, expectedVersion: current.version, occurredAt: "2026-08-03T02:00:00.000Z",
+        actor: workspaceActor, productId: "product.invalid-brand", categoryId,
+        brandId: brandId as unknown as string | null, contentSha256: HASH_A,
+        codes: [{type: "internal", value: "EVALUATION-SKU-ONE"}]}, workspace), "invalid_input");
+      assert.equal(current.products.length, 0);
+    });
+  }
 }
 
 test("catalogue creation requires governance and starts empty", () => {

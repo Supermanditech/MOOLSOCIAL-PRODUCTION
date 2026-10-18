@@ -235,6 +235,7 @@ function productionInput(raw: Readonly<Record<string, unknown>>): Record<string,
   input.commandId = id(input.commandId);
   if (type !== "create") input.expectedVersion = integer(input.expectedVersion, 1, 1_000_000_000);
   for (const key of ["productId", "categoryId", "brandId", "packId", "offerId", "reasonCode"]) {
+    if (key === "brandId" && input[key] === null && type === "propose_product" && input.categoryId === "fruits-vegetables") continue;
     if (key in input) input[key] = id(input[key]);
   }
   for (const key of ["contentSha256", "descriptorSha256", "expectedContentSha256", "expectedDescriptorSha256"]) {
@@ -711,6 +712,7 @@ export class WorkspaceCatalogueService {
       const pack = catalogue.packs.find(p => p.packId === record.verifiedPackId);
       if (product?.state !== "verified" || pack?.state !== "verified" ||
           pack.productId !== product.productId ||
+          !canonicalContentMatches(product, record.content) ||
           product.contentSha256.toUpperCase() !== cataloguePayloadHash(record.content) ||
           pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(record.pack)) return [];
       const terms = record.channels.map(channel => {
@@ -808,6 +810,15 @@ export class WorkspaceCatalogueService {
       ...(produceRequested && publicItems.some(item => item.content.brand === "") ? {unbrandedProduceReadbackVersion: 1} : {}),
       nextCursor: !query.skuId && rows.length === query.limit ? rows.at(-1)!.skuId : null};
   }
+}
+
+function canonicalContentMatches(product: CatalogueAggregate["products"][number], content: StoreSkuContent): boolean {
+  if (product.categoryId !== content.categoryId) return false;
+  // The proposal contains a hash, not content. Independently pin its declared
+  // category/brand absence when actual content is bound, read or family-reviewed.
+  return product.brandId === null
+    ? product.categoryId === "fruits-vegetables" && content.brand === ""
+    : typeof product.brandId === "string" && product.brandId.trim().length > 0;
 }
 
 function invalid(message = "Catalogue data is invalid."): never {
@@ -1145,7 +1156,8 @@ export function planStoreVariantFamilyReview(operatorUserId: string, identity: C
       const product = catalogue.products.find(p => p.productId === record.canonicalProductId);
       const pack = catalogue.packs.find(p => p.packId === record.verifiedPackId);
       if (!record.publicListing || product?.state !== "verified" || pack?.state !== "verified" ||
-          pack.productId !== product.productId || product.contentSha256.toUpperCase() !== cataloguePayloadHash(record.content) ||
+          pack.productId !== product.productId || !canonicalContentMatches(product, record.content) ||
+          product.contentSha256.toUpperCase() !== cataloguePayloadHash(record.content) ||
           pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(record.pack)) invalid("Publish each exact reviewed SKU before family approval.");
       for (const channel of record.channels) {
         const offer = catalogue.offers.find(o => o.offerId === channel.offerId && o.workspaceId === candidate.storeId &&
@@ -1218,6 +1230,7 @@ export function planReviewedCatalogueSave(command: CatalogueSave, identity: Cata
   const product = catalogue.products.find(p => p.productId === input.canonicalProductId);
   const pack = catalogue.packs.find(p => p.packId === input.verifiedPackId);
   if (product?.state !== "verified" || pack?.state !== "verified" || pack.productId !== product.productId ||
+      !canonicalContentMatches(product, input.content) ||
       product.contentSha256.toUpperCase() !== cataloguePayloadHash(input.content) ||
       pack.descriptorSha256.toUpperCase() !== cataloguePayloadHash(input.pack)) {
     invalid("Product or pack does not match its reviewed version.");

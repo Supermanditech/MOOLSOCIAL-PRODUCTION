@@ -52,7 +52,8 @@ export interface CatalogueCodeReference {
 export interface CanonicalProductRecord {
   readonly productId: string;
   readonly categoryId: string;
-  readonly brandId: string;
+  /** Explicit null declares unbranded fresh produce, never unresolved identity. */
+  readonly brandId: string | null;
   readonly contentSha256: string;
   readonly codes: readonly CatalogueCodeReference[];
   readonly state: CatalogueReviewState | "merged";
@@ -178,7 +179,7 @@ export interface ProposeCanonicalProductCommand extends CatalogueCommandBase {
   readonly type: "propose_product";
   readonly productId: string;
   readonly categoryId: string;
-  readonly brandId: string;
+  readonly brandId: string | null;
   readonly contentSha256: string;
   readonly codes: readonly CatalogueCodeReference[];
 }
@@ -632,10 +633,16 @@ export function applyCatalogueCommand(
       ) {
         fail("capability_inactive", "product-master stewardship is not active.");
       }
+      if (command.brandId === null && categoryId !== "fruits-vegetables") {
+        fail("invalid_input", "Only fresh produce can explicitly declare no brand.");
+      }
+      if (command.brandId !== null && typeof command.brandId !== "string") {
+        fail("invalid_input", "Brand identity must be supplied explicitly.");
+      }
       const product: CanonicalProductRecord = {
         productId,
         categoryId,
-        brandId: identifier(command.brandId, "brand id"),
+        brandId: command.brandId === null ? null : identifier(command.brandId, "brand id"),
         contentSha256: sha256(command.contentSha256, "product content"),
         codes: normalizeCodes(command.codes),
         state: "pending_review",
