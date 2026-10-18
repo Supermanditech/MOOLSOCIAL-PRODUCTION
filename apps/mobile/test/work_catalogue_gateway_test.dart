@@ -888,6 +888,132 @@ Future<void> openListingEditor(WidgetTester tester, WorkSession work, {Size size
 }
 
 void main() {
+  const submissionScope = (account: 'owner-one', store: 'store-one', realm: 'evaluation', sku: 'sku-one');
+  WorkspaceProductSubmissionIntent submissionIntent() => WorkspaceProductSubmissionIntent(scope: submissionScope,
+    expectedRevision: 0, idempotencyKey: 'product-original', input: WorkspaceProductSubmissionInput.fromSaved(listingItem()));
+  Map<String, Object?> submissionAck(WorkspaceProductSubmissionIntent original) => {
+    'schemaVersion': 1, 'productSubmissionVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store,
+    'skuId': original.scope.sku, 'observedAt': at.toIso8601String(), 'idempotencyKey': original.idempotencyKey,
+    'state': original.input.mediaPending ? 'awaiting_media' : 'submitted', 'approved': false, 'publicationConfirmed': false, 'orderingAvailable': false,
+    'record': {'schemaVersion': 1, 'realm': original.scope.realm, 'storeId': original.scope.store, 'skuId': original.scope.sku,
+      'revision': original.expectedRevision + 1, 'submittedAt': at.toIso8601String(), 'submittedBy': original.scope.account,
+      'fingerprint': original.candidateFingerprint, 'product': original.input.toJson()}};
+  AuthenticatedWorkspaceCatalogueGateway submissionGateway(OwnerTransport transport, {Credentials? credentials, bool supported = true}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: credentials ?? Credentials(), transport: transport, realm: submissionScope.realm, ownerAccountId: submissionScope.account,
+      productSubmissionSupported: supported, now: () => at);
+  test('LF03-SUBMIT saved inputs allow manual Catalogue and CSV without verified mirror IDs or private inventory', () {
+    for (final method in WorkspaceStockEntryMethod.values) {
+      final base = listingItem(), item = base.copyWith(stockEntry: WorkspaceStockEntry(method: method,
+        productId: base.id, sku: base.sku, pack: base.pack, stockMode: base.stockMode, quantity: base.stock,
+        purchasePriceRupees: base.purchasePrice, recordedAt: at, stockAsOf: at));
+      final input = WorkspaceProductSubmissionInput.fromSaved(item), value = input.toJson();
+      expect(value['provenance'], {'entryMethod': method.name, 'sourceRecordId': base.id});
+      expect(value['content']['description'], base.content.description);
+      expect(value['channels'].first['priceMinor'], 26000);
+      for (final key in ['canonicalProductId', 'verifiedPackId', 'offerId', 'stock', 'purchasePrice', 'publicListing', 'deliveryPromise']) {
+        expect(input.fingerprint, isNot(contains('"$key"')));
+      }
+      expect(value['catalogueProductHint'], base.canonicalId, reason: 'A saved nomination, not an approval identity.');
+    }
+    final input = submissionIntent().input, mutated = input.toJson()..['stock'] = 100;
+    expect(() => WorkspaceProductSubmissionInput.fromJson(mutated), throwsFormatException);
+    expect(() => WorkspaceProductSubmissionInput.fromSaved(listingItem().copyWith(clearPackMeasure: true)), throwsFormatException);
+  });
+  test('LF03-SUBMIT private photo selection is retained as a change fence without private owner or image metadata', () {
+    final base = listingItem();
+    WorkspaceCatalogueItem withPhoto(String hash) => base.copyWith(privatePhoto: WorkspacePrivateProductPhoto(owner: 'private-owner-do-not-send',
+      identity: WorkspacePrivateProductPhoto.identityOf(base), sha256: hash, byteLength: 12000, width: 640, height: 640));
+    final first = WorkspaceProductSubmissionInput.fromSaved(withPhoto('a' * 64)), second = WorkspaceProductSubmissionInput.fromSaved(withPhoto('b' * 64));
+    expect(first.mediaPending, isTrue); expect(first.fingerprint, isNot(second.fingerprint));
+    for (final key in ['private-owner-do-not-send', 'byteLength', 'width', 'height', 'identity', 'localPath']) {
+      expect(first.fingerprint, isNot(contains(key)));
+    }
+    expect(first.toJson()['mediaIntent']['publishedReferences'], isEmpty);
+    final old = first.toJson(); old['mediaIntent']['pendingUpload'] = false;
+    expect(() => WorkspaceProductSubmissionInput.fromJson(old), throwsFormatException);
+  });
+  test('LF03-SUBMIT immutable request roundtrip and strict candidate identity fingerprint', () {
+    final original = submissionIntent(), data = original.toJson();
+    expect(WorkspaceProductSubmissionIntent.fromJson(data).candidateFingerprint, original.candidateFingerprint);
+    (data['product'] as Map)['sku'] = 'changed';
+    expect(original.input.toJson()['sku'], 'HOST-ONE');
+    final record = (submissionAck(original)['record'] as Map<String, Object?>);
+    expect(WorkspaceProductSubmissionRecord.decode(jsonDecode(jsonEncode(record)), submissionScope, at).matches(original), isTrue);
+    for (final key in ['storeId', 'skuId', 'realm', 'submittedBy', 'fingerprint']) {
+      expect(() => WorkspaceProductSubmissionRecord.decode(jsonDecode(jsonEncode({...record, key: 'changed'})), submissionScope, at), throwsFormatException);
+    }
+  });
+  test('LF03-SUBMIT gateway explicit opt-in and pinned owner prevent unsupported or retired dispatch', () async {
+    final transport = OwnerTransport((_) async => throw StateError('Must not dispatch'));
+    expect((await submissionGateway(transport, supported: false).writeProductSubmission(submissionIntent(), current: () => true)).state,
+      WorkspaceProductSubmissionWriteState.notSent);
+    final gateway = submissionGateway(transport);
+    expect(gateway.forOwnerAccount('another-owner').productSubmissionSupported, isTrue);
+    expect((await gateway.forOwnerAccount('another-owner').writeProductSubmission(submissionIntent(), current: () => true)).state,
+      WorkspaceProductSubmissionWriteState.notSent);
+    var current = true;
+    final retiring = submissionGateway(transport, credentials: RetiringOwnerCredentials(() => current = false));
+    expect((await retiring.writeProductSubmission(submissionIntent(), current: () => current)).state, WorkspaceProductSubmissionWriteState.notSent);
+    expect(transport.calls, 0);
+  });
+  test('LF03-SUBMIT gateway validates original receipt and uses read-only reconcile with standard App Check', () async {
+    final original = submissionIntent(), credentials = Credentials();
+    final transport = OwnerTransport((body) async {
+      expect(body['productSubmissionVersion'], 1); expect(body['product'], original.input.toJson());
+      expect(body.containsKey('family'), isFalse);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': submissionAck(original)}));
+    });
+    final gateway = submissionGateway(transport, credentials: credentials);
+    expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.submitted);
+    expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.submitted);
+    expect(credentials.modes, [SocialAppCheckTokenMode.limitedUse, SocialAppCheckTokenMode.standard]);
+  });
+  test('LF03-SUBMIT lost or mismatched acknowledgements remain uncertain and are never auto-retried', () async {
+    final original = submissionIntent();
+    for (final edit in <void Function(Map<String, Object?>)>[
+      (v) {v['approved'] = true;}, (v) {v['publicationConfirmed'] = true;}, (v) {v['orderingAvailable'] = true;},
+      (v) {v['idempotencyKey'] = 'different-original';}, (v) {v['state'] = 'published';},
+      (v) {(v['record'] as Map)['revision'] = 2;}, (v) {v['record'] = null;},
+    ]) {
+      final reply = submissionAck(original); edit(reply);
+      final transport = OwnerTransport((_) async => SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': reply})));
+      expect((await submissionGateway(transport).writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
+      expect(transport.calls, 1);
+    }
+    final lost = OwnerTransport((_) async => throw StateError('Lost response after dispatch'));
+    expect((await submissionGateway(lost).writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
+    expect(lost.calls, 1);
+  });
+  test('LF03-SUBMIT private head absence differs from original-request not-found', () async {
+    final original = submissionIntent();
+    final transport = OwnerTransport((body) async {
+      final read = body['operation'] == 'readStoreProductSubmission';
+      final data = submissionAck(original)..['record'] = null..['state'] = read ? 'none' : 'not_found'..['idempotencyKey'] = read ? null : original.idempotencyKey;
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+    });
+    final gateway = submissionGateway(transport);
+    expect(await gateway.readProductSubmission(submissionScope, current: () => true), isNull);
+    expect((await gateway.writeProductSubmission(original, current: () => true, reconcile: true)).state, WorkspaceProductSubmissionWriteState.notFound);
+    expect((await gateway.writeProductSubmission(original, current: () => true)).state, WorkspaceProductSubmissionWriteState.unknown);
+  });
+  final submissionLog = Platform.environment['LF03_SUBMISSION_LOG'];
+  if (submissionLog != null) { test('LF03-SUBMIT actual emulator receipt decodes without approving or publishing', () async {
+    const marker = 'LF_SUBMISSION_PROJECTION=';
+    final captures = File(submissionLog).readAsLinesSync().where((line) => line.contains(marker)).toList();
+    expect(captures, hasLength(1));
+    final actual = jsonDecode(captures.single.split(marker).last) as Map<String, dynamic>;
+    final record = actual['record'] as Map<String, dynamic>;
+    final original = WorkspaceProductSubmissionIntent(scope: submissionScope, expectedRevision: 0,
+      idempotencyKey: actual['idempotencyKey'] as String, input: WorkspaceProductSubmissionInput.fromJson(record['product']));
+    final gateway = submissionGateway(OwnerTransport((body) async {
+      expect(body['product'], original.input.toJson());
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}));
+    }));
+    final result = await gateway.writeProductSubmission(original, current: () => true);
+    expect(result.state, WorkspaceProductSubmissionWriteState.submitted);
+    expect(result.record!.fingerprint, record['fingerprint']); expect(actual['publicationConfirmed'], isFalse);
+  }); }
   const familyScope = (account: 'owner-one', store: 'store-one', realm: 'production', family: 'family-one');
   WorkspaceVariantFamilySubmissionInput ownerFamilyInput() => WorkspaceVariantFamilySubmissionInput.fromJson({
     'familyId': familyScope.family, 'localRevision': 1, 'title': 'Host option product', 'brand': 'Host fixture',

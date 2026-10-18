@@ -25,6 +25,181 @@ abstract interface class WorkspacePublicProductGateway {
 
 typedef WorkspaceVariantFamilyScope = ({String account, String store, String realm, String family});
 
+typedef WorkspaceProductSubmissionScope = ({String account, String store, String realm, String sku});
+
+/// Owner-authored saved facts, not a reviewed mirror, Stock upload or publication.
+class WorkspaceProductSubmissionInput {
+  WorkspaceProductSubmissionInput._(this._encoded);
+  final String _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  String get skuId => toJson()['skuId'] as String;
+  String get fingerprint => _encoded;
+  bool get mediaPending => toJson()['mediaIntent']['pendingUpload'] == true;
+  static WorkspaceProductSubmissionInput fromSaved(WorkspaceCatalogueItem item, {WorkspaceVariantFamily? family}) {
+    final origin = item.stockEntry, measure = item.packMeasure, membership = item.variantMembership;
+    if (origin?.valid != true || origin!.productId != item.id || measure?.valid != true) {
+      throw const FormatException('Save the product with its pack quantity before submitting.');
+    }
+    if (membership != null) {
+      if (family == null || family.id != membership.familyId) { throw const FormatException('Check the saved product options.'); }
+      family.attributesFor(membership);
+    } else if (family != null) { throw const FormatException(); }
+    final facts = WorkspaceCatalogueProductFacts(compliance: item.compliance?.toBuyPublicCompliance(),
+      composition: item.composition, regulatoryNote: item.regulatoryNote, requiresPrescription: item.requiresPrescription);
+    final channels = <Map<String, Object?>>[];
+    if (item.retailEnabled) { channels.add({'kind': 'retail', 'priceMinor': item.sellingPriceMinor,
+      'mrpMinor': item.mrpMinor, 'minimumOrder': item.minimumOrder, 'quantityStep': 1, 'tiers': <Object>[]}); }
+    final trade = item.wholesaleOffer;
+    if (trade?.enabled == true) {
+      if (!trade!.valid || trade.saleType == null) throw const FormatException('Check the saved trade prices.');
+      final prices = {if (trade.tiers.isNotEmpty) trade.minimumPacks: trade.priceAtMinor(trade.minimumPacks),
+        for (final tier in trade.tiers) tier.minimumPacks: tier.packPriceMinor};
+      channels.add({'kind': trade.saleType!.name, 'priceMinor': trade.priceAtMinor(trade.minimumPacks),
+        'mrpMinor': item.mrpMinor, 'minimumOrder': trade.minimumPacks, 'quantityStep': trade.incrementPacks,
+        'tiers': [for (final entry in prices.entries) {'minimumQuantity': entry.key, 'unitPriceMinor': entry.value}]});
+    }
+    final photo = item.cataloguePhoto, private = item.privatePhoto;
+    if (private != null && !private.matches(item) || private == null && photo != null && !photo.matches(item)) {
+      throw const FormatException('Check the selected photo against this saved product.');
+    }
+    final pending = private != null || photo != null && photo.status.name != 'approved';
+    // This hashes selected-reference identity only. It is not verified file metadata.
+    final selection = private != null ? {'privateSha256': private.sha256, 'skuId': item.id}
+      : photo != null ? {'assetId': photo.assetId, 'revision': photo.revision, 'status': photo.status.name} : null;
+    return fromJson({'schemaVersion': 1, 'skuId': item.id, 'sku': item.sku, 'barcode': item.barcode,
+      'catalogueProductHint': item.canonicalId.isEmpty ? null : item.canonicalId,
+      'content': {'title': item.title, 'brand': item.brand, 'variant': item.variant, 'categoryId': item.categoryId,
+        'description': item.content.description, 'highlights': item.content.highlights,
+        'specifications': [for (final entry in item.content.specifications.entries) {'label': entry.key, 'value': entry.value}],
+        if (!facts.isEmpty) 'productFacts': facts.toJson()},
+      'pack': {'label': item.pack, 'quantityMilli': measure!.quantityMilli, 'unit': measure.unitLabel == 'unit' ? 'count' : measure.unitLabel,
+        'unitsPerCase': measure.unitsPerCase}, 'channels': channels,
+      'provenance': {'entryMethod': origin.method.name, 'sourceRecordId': item.id},
+      'mediaIntent': {'pendingUpload': pending,
+        'pendingSelectionSha256': pending ? crypto.sha256.convert(utf8.encode(jsonEncode(_sorted(selection)))).toString().toUpperCase() : null,
+        'publishedReferences': [if (!pending && photo != null) {'assetId': photo.assetId, 'revision': photo.revision}]},
+      'variantIntent': membership == null ? null : {'familyId': family!.id, 'localRevision': family.revision, 'selections': membership.selections}});
+  }
+  static WorkspaceProductSubmissionInput fromJson(Object? raw) {
+    final p = _map(jsonDecode(jsonEncode(raw)));
+    _keys(p, ['schemaVersion', 'skuId', 'sku', 'barcode', 'catalogueProductHint', 'content', 'pack', 'channels', 'provenance', 'mediaIntent', 'variantIntent']);
+    if (p['schemaVersion'] is! int || p['schemaVersion'] != 1) throw const FormatException();
+    _id(p['skuId']); _string(p['sku'], 80); _string(p['barcode'], 128, true);
+    if (p['catalogueProductHint'] != null) _id(p['catalogueProductHint']);
+    final c = _map(p['content']);
+    _keys(c, ['title', 'brand', 'variant', 'categoryId', 'description', 'highlights', 'specifications', if (c.containsKey('productFacts')) 'productFacts']);
+    _string(c['title']); _id(c['categoryId']); _string(c['brand'], 240, c['categoryId'] == 'fruits-vegetables');
+    _string(c['variant'], 240, true); _string(c['description'], 4000, true);
+    for (final text in _list(c['highlights'], 20)) { _string(text, 500); }
+    for (final raw in _list(c['specifications'], 40)) {
+      final row = _map(raw); _keys(row, ['label', 'value']); _string(row['label']); _string(row['value'], 1000);
+    }
+    if (c.containsKey('productFacts')) { WorkspaceCatalogueProductFacts.fromJson(c['productFacts']); }
+    final pack = _map(p['pack']); _keys(pack, ['label', 'quantityMilli', 'unit', 'unitsPerCase']);
+    _string(pack['label']); _int(pack['quantityMilli']); _int(pack['unitsPerCase']);
+    if (!{'kg', 'L', 'count'}.contains(pack['unit'])) throw const FormatException();
+    final kinds = <String>{};
+    for (final raw in _list(p['channels'], 2)) {
+      final row = _map(raw); _keys(row, ['kind', 'priceMinor', 'mrpMinor', 'minimumOrder', 'quantityStep', 'tiers']);
+      final kind = _string(row['kind']);
+      if (!{'retail', 'wholesale', 'bulk'}.contains(kind) || !kinds.add(kind)) throw const FormatException();
+      final price = _int(row['priceMinor']), minimum = _int(row['minimumOrder']), step = _int(row['quantityStep']);
+      if (row['mrpMinor'] != null) _int(row['mrpMinor'], price);
+      int? lastQuantity, lastPrice;
+      for (final raw in _list(row['tiers'], 20)) {
+        final tier = _map(raw); _keys(tier, ['minimumQuantity', 'unitPriceMinor']);
+        final q = _int(tier['minimumQuantity']), amount = _int(tier['unitPriceMinor']);
+        if ((q - minimum) % step != 0 || (lastQuantity == null ? q != minimum || amount != price : q <= lastQuantity || amount > lastPrice!)) {
+          throw const FormatException();
+        }
+        lastQuantity = q; lastPrice = amount;
+      }
+    }
+    if (kinds.isEmpty || kinds.contains('wholesale') && kinds.contains('bulk')) throw const FormatException();
+    final origin = _map(p['provenance']); _keys(origin, ['entryMethod', 'sourceRecordId']);
+    if (!{'catalogue', 'manual', 'csv'}.contains(origin['entryMethod']) || origin['sourceRecordId'] != p['skuId']) throw const FormatException();
+    final media = _map(p['mediaIntent']); _keys(media, ['pendingUpload', 'pendingSelectionSha256', 'publishedReferences']);
+    if (media['pendingUpload'] is! bool || (media['pendingUpload'] == true
+      ? media['pendingSelectionSha256'] is! String || !RegExp(r'^[A-F0-9]{64}$').hasMatch(media['pendingSelectionSha256'] as String)
+      : media['pendingSelectionSha256'] != null)) { throw const FormatException(); }
+    final assets = <String>{};
+    for (final raw in _list(media['publishedReferences'], 10)) {
+      final asset = _map(raw); _keys(asset, ['assetId', 'revision']); _id(asset['revision']);
+      if (!assets.add(_id(asset['assetId']))) throw const FormatException();
+    }
+    if (p['variantIntent'] != null) {
+      final v = _map(p['variantIntent']); _keys(v, ['familyId', 'localRevision', 'selections']);
+      _id(v['familyId']); _int(v['localRevision'], 1, 1000000000);
+      final selected = _map(v['selections']);
+      if (selected.isEmpty || selected.length > 6) throw const FormatException();
+      for (final entry in selected.entries) { _id(entry.key); _id(entry.value); }
+    }
+    final encoded = jsonEncode(_sorted(p));
+    if (utf8.encode(encoded).length > 384 * 1024) throw const FormatException();
+    return WorkspaceProductSubmissionInput._(encoded);
+  }
+}
+
+class WorkspaceProductSubmissionIntent {
+  WorkspaceProductSubmissionIntent({required this.scope, required this.expectedRevision, required this.idempotencyKey,
+    required WorkspaceProductSubmissionInput input}) : input = WorkspaceProductSubmissionInput.fromJson(input.toJson()) {
+    for (final value in [scope.account, scope.store, scope.sku, idempotencyKey]) { _id(value); }
+    _int(expectedRevision, 0, 999999999);
+    if (!{'evaluation', 'production'}.contains(scope.realm) || scope.sku != input.skuId) throw const FormatException();
+  }
+  final WorkspaceProductSubmissionScope scope;
+  final int expectedRevision;
+  final String idempotencyKey;
+  final WorkspaceProductSubmissionInput input;
+  Map<String, Object?> get body => {'storeId': scope.store, 'expectedRevision': expectedRevision, 'idempotencyKey': idempotencyKey, 'product': input.toJson()};
+  Map<String, Object?> toJson() => {'schemaVersion': 1, 'accountId': scope.account, 'realm': scope.realm, ...body};
+  String get fingerprint => jsonEncode(_sorted(toJson()));
+  String get candidateFingerprint => crypto.sha256.convert(utf8.encode(jsonEncode(_sorted({'ownerUserId': scope.account,
+    'realm': scope.realm, 'storeId': scope.store, 'expectedRevision': expectedRevision, 'product': input.toJson()})))).toString().toUpperCase();
+  static WorkspaceProductSubmissionIntent fromJson(Object? raw) {
+    final value = _map(raw); _keys(value, ['schemaVersion', 'accountId', 'realm', 'storeId', 'expectedRevision', 'idempotencyKey', 'product']);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1) throw const FormatException();
+    final input = WorkspaceProductSubmissionInput.fromJson(value['product']);
+    return WorkspaceProductSubmissionIntent(scope: (account: _id(value['accountId']), store: _id(value['storeId']), realm: _string(value['realm']), sku: input.skuId),
+      expectedRevision: _int(value['expectedRevision'], 0, 999999999), idempotencyKey: _id(value['idempotencyKey']), input: input);
+  }
+}
+
+class WorkspaceProductSubmissionRecord {
+  WorkspaceProductSubmissionRecord._(this.input, this.revision, this.fingerprint, this._encoded);
+  final WorkspaceProductSubmissionInput input;
+  final int revision;
+  final String fingerprint, _encoded;
+  Map<String, dynamic> toJson() => _map(jsonDecode(_encoded));
+  static WorkspaceProductSubmissionRecord decode(Object? raw, WorkspaceProductSubmissionScope scope, DateTime now) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'realm', 'storeId', 'skuId', 'revision', 'submittedAt', 'submittedBy', 'fingerprint', 'product']);
+    final input = WorkspaceProductSubmissionInput.fromJson(value['product']), revision = _int(value['revision'], 1, 1000000000);
+    final at = _time(value['submittedAt']), original = WorkspaceProductSubmissionIntent(scope: (account: _id(value['submittedBy']),
+      store: scope.store, realm: scope.realm, sku: scope.sku), expectedRevision: revision - 1, idempotencyKey: 'validation-only', input: input);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['realm'] != scope.realm || value['storeId'] != scope.store ||
+        value['skuId'] != scope.sku || at.isAfter(now.toUtc()) || at.toIso8601String() != value['submittedAt'] || value['fingerprint'] != original.candidateFingerprint) {
+      throw const FormatException();
+    }
+    return WorkspaceProductSubmissionRecord._(input, revision, original.candidateFingerprint, jsonEncode(_sorted(value)));
+  }
+  bool matches(WorkspaceProductSubmissionIntent original) => revision == original.expectedRevision + 1 && fingerprint == original.candidateFingerprint &&
+    toJson()['submittedBy'] == original.scope.account && input.fingerprint == original.input.fingerprint;
+}
+enum WorkspaceProductSubmissionWriteState {notSent, rejected, unknown, submitted, notFound}
+class WorkspaceProductSubmissionWriteResult {
+  const WorkspaceProductSubmissionWriteResult(this.state, [this.record]);
+  final WorkspaceProductSubmissionWriteState state;
+  final WorkspaceProductSubmissionRecord? record;
+}
+abstract interface class WorkspaceProductSubmissionOwnerGateway {
+  String get realm;
+  bool get productSubmissionSupported;
+  Future<WorkspaceProductSubmissionRecord?> readProductSubmission(WorkspaceProductSubmissionScope scope, {required bool Function() current});
+  Future<WorkspaceProductSubmissionWriteResult> writeProductSubmission(WorkspaceProductSubmissionIntent original,
+    {required bool Function() current, bool reconcile = false});
+}
+
 /// Frozen descriptive input, never Stock, publication approval or live availability.
 class WorkspaceVariantFamilySubmissionInput {
   WorkspaceVariantFamilySubmissionInput._(this._encoded);
@@ -1802,6 +1977,7 @@ WorkspaceCatalogueGateway buildWorkspaceCatalogueGateway() {
     productFactsReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_FACTS_V1'),
     unbrandedProduceReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_UNBRANDED_PRODUCE_V1'),
     reviewedFamilyReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_REVIEWED_FAMILIES_V1'),
+    productSubmissionSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_PRODUCT_SUBMISSIONS_V1'),
     storeClassificationReadbackSupported: const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_STORE_CLASSIFICATION_V1'),
   );
 }
@@ -1817,7 +1993,7 @@ bool _validEndpoint(Uri value) =>
 
 class AuthenticatedWorkspaceCatalogueGateway
     implements WorkspaceCatalogueGateway, WorkspaceCatalogueOwnerGateway, WorkspacePublicProductGateway,
-      WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway {
+      WorkspacePublicDetailsOwnerGateway, WorkspaceVariantFamilyOwnerGateway, WorkspaceProductSubmissionOwnerGateway {
   AuthenticatedWorkspaceCatalogueGateway({
     required this.endpoint,
     required this.credentials,
@@ -1829,6 +2005,7 @@ class AuthenticatedWorkspaceCatalogueGateway
     this.unbrandedProduceReadbackSupported = false,
     WorkspacePublicVariantSource? reviewedVariants,
     this.reviewedFamilyReadbackSupported = false,
+    this.productSubmissionSupported = false,
     this.storeClassificationReadbackSupported = false,
     DateTime Function()? now,
   }) : _reviewedVariantsOverride = reviewedVariants, now = now ?? DateTime.now {
@@ -1849,6 +2026,8 @@ class AuthenticatedWorkspaceCatalogueGateway
   // Negotiated only with a matching service; legacy strict endpoints reject new keys.
   final bool unbrandedProduceReadbackSupported;
   final bool reviewedFamilyReadbackSupported;
+  @override
+  final bool productSubmissionSupported;
   final bool storeClassificationReadbackSupported;
   @override
   bool get variantFamilySubmissionSupported => reviewedFamilyReadbackSupported;
@@ -1875,9 +2054,69 @@ class AuthenticatedWorkspaceCatalogueGateway
       unbrandedProduceReadbackSupported: unbrandedProduceReadbackSupported,
       reviewedVariants: _reviewedVariantsOverride,
       reviewedFamilyReadbackSupported: reviewedFamilyReadbackSupported,
+      productSubmissionSupported: productSubmissionSupported,
       storeClassificationReadbackSupported: storeClassificationReadbackSupported,
       now: now,
     );
+  }
+
+  bool _productSubmissionOwner(WorkspaceProductSubmissionScope scope, bool Function() current) => current() &&
+    productSubmissionSupported && scope.realm == realm && ownerAccountId == scope.account;
+  WorkspaceProductSubmissionRecord? _productSubmissionResponse(Object? raw, WorkspaceProductSubmissionScope scope,
+      {required String? key, required bool reconcile}) {
+    final value = _map(raw);
+    _keys(value, ['schemaVersion', 'productSubmissionVersion', 'realm', 'storeId', 'skuId', 'observedAt', 'idempotencyKey',
+      'state', 'approved', 'publicationConfirmed', 'orderingAvailable', 'record']);
+    final observed = _time(value['observedAt']);
+    if (value['schemaVersion'] is! int || value['schemaVersion'] != 1 || value['productSubmissionVersion'] is! int || value['productSubmissionVersion'] != 1 ||
+        value['realm'] != scope.realm || value['storeId'] != scope.store || value['skuId'] != scope.sku || value['idempotencyKey'] != key ||
+        value['approved'] != false || value['publicationConfirmed'] != false || value['orderingAvailable'] != false ||
+        observed.isAfter(now().toUtc()) || observed.toIso8601String() != value['observedAt']) { throw const FormatException(); }
+    if (value['record'] == null) {
+      if (value['state'] != (reconcile ? 'not_found' : 'none')) throw const FormatException();
+      return null;
+    }
+    final record = WorkspaceProductSubmissionRecord.decode(value['record'], scope, observed);
+    if (value['state'] != (record.input.mediaPending ? 'awaiting_media' : 'submitted')) throw const FormatException();
+    return record;
+  }
+  @override
+  Future<WorkspaceProductSubmissionRecord?> readProductSubmission(WorkspaceProductSubmissionScope scope, {required bool Function() current}) async {
+    if (!_productSubmissionOwner(scope, current)) throw const FormatException('Product review is not connected.');
+    final response = await _ownerRequest({'operation': 'readStoreProductSubmission', 'productSubmissionVersion': 1,
+      'storeId': scope.store, 'skuId': scope.sku}, current, mutation: false);
+    if (!_productSubmissionOwner(scope, current) || response?.statusCode != 200) throw const FormatException();
+    final envelope = _map(jsonDecode(response!.body));
+    if (envelope['ok'] != true) throw const FormatException();
+    return _productSubmissionResponse(envelope['data'], scope, key: null, reconcile: false);
+  }
+  @override
+  Future<WorkspaceProductSubmissionWriteResult> writeProductSubmission(WorkspaceProductSubmissionIntent original,
+      {required bool Function() current, bool reconcile = false}) async {
+    var dispatched = false;
+    if (!_productSubmissionOwner(original.scope, current)) return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notSent);
+    try {
+      original = WorkspaceProductSubmissionIntent.fromJson(original.toJson());
+      final response = await _ownerRequest({'operation': reconcile ? 'reconcileStoreProductSubmission' : 'submitStoreProduct',
+        'productSubmissionVersion': 1, ...original.body}, () => _productSubmissionOwner(original.scope, current), mutation: !reconcile,
+        onDispatch: () => dispatched = true);
+      if (!_productSubmissionOwner(original.scope, current) || response == null) {
+        return WorkspaceProductSubmissionWriteResult(dispatched ? WorkspaceProductSubmissionWriteState.unknown : WorkspaceProductSubmissionWriteState.notSent);
+      }
+      if (response.statusCode != 200) { return WorkspaceProductSubmissionWriteResult(!reconcile && _definitiveDetailsRejection(response)
+        ? WorkspaceProductSubmissionWriteState.rejected : WorkspaceProductSubmissionWriteState.unknown); }
+      final envelope = _map(jsonDecode(response.body));
+      if (envelope['ok'] != true) throw const FormatException();
+      final record = _productSubmissionResponse(envelope['data'], original.scope, key: original.idempotencyKey, reconcile: reconcile);
+      if (record == null) {
+        if (!reconcile) throw const FormatException();
+        return const WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.notFound);
+      }
+      if (!record.matches(original)) throw const FormatException();
+      return WorkspaceProductSubmissionWriteResult(WorkspaceProductSubmissionWriteState.submitted, record);
+    } catch (_) {
+      return WorkspaceProductSubmissionWriteResult(dispatched ? WorkspaceProductSubmissionWriteState.unknown : WorkspaceProductSubmissionWriteState.notSent);
+    }
   }
 
   bool _familyOwner(WorkspaceVariantFamilyScope scope, bool Function() current) => current() &&

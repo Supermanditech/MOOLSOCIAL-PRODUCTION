@@ -8,6 +8,8 @@ import {WorkspaceCatalogueService, cataloguePayloadHash, cataloguePublicListingB
   type CatalogueProductionReceipt, type CatalogueSave, type StoreSkuInput, type StoreSkuContent, type StoreSkuChannel,
   FirestoreWorkspaceCatalogueRepository, type StoreSkuRecord, type WorkspaceCatalogueRepository, type PublicCatalogueSource,
   planStorePublicDetailsSave, normalizeStorePublicDetails, type StorePublicDetailsCommand,
+  normalizeSubmittedProduct, storeProductSubmission, storeProductSubmissionOperation, planStoreProductSubmission,
+  type StoreProductSubmissionInput, type StoreProductSubmissionRecord,
   type StorePublicDetailsRecord, type StorePublicDetailsReceipt,
   normalizeStoreVariantFamily, storeVariantFamilyOperation, storeVariantFamilySubmission, planStoreVariantFamilySubmission,
   planStoreVariantFamilyReview, type StoreVariantFamilyInput, type StoreVariantFamilyCandidate} from "./workspace_catalogue_service.js";
@@ -19,6 +21,10 @@ import {applySupplyParticipantCommand, registerSupplyParticipantWorkspace,
 
 // Isolated host fixtures: never uploaded or inserted into a device/evaluation Store.
 const at = "2026-10-16T12:00:00.000Z";
+test('LF03-SUBMIT new saved SKU has a private submission producer without a reviewed mirror prerequisite', () => {
+  assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).handleProductSubmission, 'function');
+  assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).submitProduct, 'function');
+});
 test("LF-DISCOVERY resolves directory candidates through reviewed public readback", () => {
   assert.equal(typeof (WorkspaceCatalogueService.prototype as unknown as Record<string, unknown>).publicDiscovery, "function");
   assert.equal(typeof (FirestoreWorkspaceCatalogueRepository.prototype as unknown as Record<string, unknown>).publicDiscoveryBindings, "function");
@@ -48,6 +54,130 @@ function input(skuId = "sku-one"): StoreSkuInput {
       minimumOrder: 1, quantityStep: 1, tiers: []}],
     provenance: {entryMethod: "manual", sourceRecordId: "saved-source-one"}};
 }
+function submittedProduct(skuId = 'sku-one'): StoreProductSubmissionInput {
+  const value = input(skuId), {media: _, ...content} = value.content;
+  return {schemaVersion: 1, skuId, sku: value.sku, barcode: '', catalogueProductHint: null,
+    content, pack: value.pack, channels: value.channels.map(({offerId: _, ...channel}) => channel),
+    provenance: {entryMethod: 'manual', sourceRecordId: skuId},
+    mediaIntent: {pendingUpload: false, pendingSelectionSha256: null, publishedReferences: []}, variantIntent: null};
+}
+function productRequest(overrides: Record<string, unknown> = {}) {
+  return {productSubmissionVersion: 1, storeId: 'store-one', expectedRevision: 0,
+    idempotencyKey: 'saved-product-one', product: submittedProduct(), ...overrides};
+}
+function productCommand(overrides: Record<string, unknown> = {}) {
+  const {productSubmissionVersion: _, ...body} = productRequest(overrides);
+  return storeProductSubmission('owner-one', 'evaluation', body, at);
+}
+test('LF03-SUBMIT accepts authored manual, CSV and Catalogue data without approved identities', () => {
+  for (const entryMethod of ['manual', 'csv', 'catalogue'] as const) {
+    const product = submittedProduct(); product.provenance.entryMethod = entryMethod;
+    product.channels[0]!.priceMinor = 10025;
+    assert.deepEqual(normalizeSubmittedProduct(product), product);
+    const candidate = planStoreProductSubmission(productCommand({product}), profile);
+    assert.equal(candidate.revision, 1); assert.equal(candidate.product.channels[0]!.priceMinor, 10025);
+    assert.equal(candidate.product.catalogueProductHint, null);
+    for (const forbidden of ['canonicalProductId', 'verifiedPackId', 'publicListing', 'offerId', 'purchasePrice', 'stock']) {
+      assert.equal(JSON.stringify(candidate).includes(`"${forbidden}"`), false);
+    }
+  }
+  for (const [op, action] of [['submitStoreProduct', 'submit'], ['readStoreProductSubmission', 'read'],
+    ['reconcileStoreProductSubmission', 'reconcile']] as const) assert.equal(storeProductSubmissionOperation(op), action);
+  for (const op of ['approveStoreProduct', 'reviewStoreProduct', 'produceCatalogue', null, ['submitStoreProduct']]) {
+    assert.equal(storeProductSubmissionOperation(op), undefined);
+  }
+});
+test('LF03-SUBMIT private input rejects extra data, coerced values and mismatched source identity', () => {
+  for (const edit of [
+    (p: any) => {p.purchasePrice = 23000;}, (p: any) => {p.stock = 50;},
+    (p: any) => {p.publicListing = true;}, (p: any) => {p.canonicalProductId = 'invented';},
+    (p: any) => {p.channels[0].offerId = 'invented';}, (p: any) => {p.pack.unit = ['L'];},
+    (p: any) => {p.channels[0].priceMinor = 100.25;}, (p: any) => {p.provenance.sourceRecordId = 'another-sku';},
+    (p: any) => {p.mediaIntent.localPath = 'C:/private/photo.jpg';},
+    (p: any) => {p.mediaIntent.pendingUpload = true;},
+    (p: any) => {p.mediaIntent.pendingSelectionSha256 = 'A'.repeat(64);},
+    (p: any) => {p.variantIntent = {familyId: 'family-one', localRevision: 1, selections: {}};},
+  ]) {
+    const value = submittedProduct(); edit(value); assert.throws(() => normalizeSubmittedProduct(value));
+  }
+});
+test('LF03-SUBMIT image/family intent is private, frozen and changes the original request fingerprint', () => {
+  const value = submittedProduct();
+  value.mediaIntent = {pendingUpload: true, pendingSelectionSha256: 'A'.repeat(64), publishedReferences: []};
+  value.variantIntent = {familyId: 'phone-family', localRevision: 3, selections: {colour: 'blue', storage: '256'}};
+  const first = productCommand({product: value});
+  value.mediaIntent.pendingSelectionSha256 = 'B'.repeat(64);
+  assert.equal(first.product.mediaIntent.pendingSelectionSha256, 'A'.repeat(64));
+  assert.notEqual(first.fingerprint, productCommand({product: value}).fingerprint);
+  assert.equal(first.product.variantIntent!.selections.storage, '256');
+});
+test('LF03-SUBMIT CAS and exact original receipt replay do not mutate a newer head', () => {
+  const command = productCommand(), first = planStoreProductSubmission(command, profile);
+  const nextProduct = submittedProduct(); nextProduct.content.description = 'Updated saved details';
+  const nextCommand = productCommand({product: nextProduct, expectedRevision: 1, idempotencyKey: 'second'});
+  const next = planStoreProductSubmission(nextCommand, profile, first);
+  assert.equal(next.revision, 2);
+  assert.deepEqual(planStoreProductSubmission(command, profile, next, {fingerprint: command.fingerprint, record: first}), first);
+  assert.throws(() => planStoreProductSubmission(command, profile, next), {code: 'revision_conflict'});
+  assert.throws(() => planStoreProductSubmission({...command, product: nextProduct}, profile, next,
+    {fingerprint: command.fingerprint, record: first}));
+  assert.throws(() => planStoreProductSubmission(command, {...profile, ownerUserId: 'other'}), {code: 'not_found'});
+  assert.throws(() => planStoreProductSubmission(command, {...profile, status: 'suspended'}), {code: 'invalid_state'});
+  assert.throws(() => planStoreProductSubmission(command, profile, undefined,
+    {fingerprint: command.fingerprint, record: {...first, skuId: 'wrong'}}));
+});
+test('LF03-SUBMIT emulator persists new private SKU, restarts, reconciles originals and fences concurrent updates',
+  {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+    assert.match(process.env.FIRESTORE_EMULATOR_HOST!, /^127\.0\.0\.1:\d+$/u);
+    const app = initializeApp({projectId: `demo-lf03-submit-${randomUUID().slice(0, 8)}`}, `submit-${randomUUID()}`);
+    const db = getFirestore(app), repository = (realm: 'evaluation' | 'production' = 'evaluation') =>
+      new FirestoreWorkspaceCatalogueRepository(db, realm, () => new Date(at));
+    const service = () => new WorkspaceCatalogueService(repository(), catalogueIdentity, () => new Date(at));
+    const root = db.collection('workspaceCatalogues').doc('evaluation').collection('stores').doc('store-one');
+    try {
+      await db.collection('workspaceProfiles').doc(profile.caseId).set(profile);
+      const original = productRequest();
+      const missing = await service().handleProductSubmission('owner-one', 'readStoreProductSubmission',
+        {productSubmissionVersion: 1, storeId: 'store-one', skuId: 'sku-one'}) as {state: string; record: null};
+      assert.equal(missing.state, 'none'); assert.equal(missing.record, null);
+      const first = await service().handleProductSubmission('owner-one', 'submitStoreProduct', original) as
+        {record: StoreProductSubmissionRecord; approved: boolean; publicationConfirmed: boolean; orderingAvailable: boolean; state: string};
+      assert.equal(first.state, 'submitted'); assert.equal(first.approved, false);
+      assert.equal(first.publicationConfirmed, false); assert.equal(first.orderingAvailable, false);
+      assert.deepEqual(await repository().readProductSubmission('store-one', 'sku-one', 'owner-one'), first.record);
+      assert.equal(await repository('production').readProductSubmission('store-one', 'sku-one', 'owner-one'), undefined);
+      assert.equal((await root.collection('skus').get()).size, 0);
+      assert.equal((await db.collection('workspaceCatalogues').doc('evaluation').collection('publicListingBindings').get()).size, 0);
+      assert.equal((await db.collection('workspaceCatalogues').doc('evaluation').collection('canonicalCatalogues').get()).size, 0);
+      const updated = submittedProduct(); updated.content.description = 'Second saved revision';
+      updated.mediaIntent = {pendingUpload: true, pendingSelectionSha256: 'A'.repeat(64), publishedReferences: []};
+      const second = await service().handleProductSubmission('owner-one', 'submitStoreProduct',
+        productRequest({expectedRevision: 1, idempotencyKey: 'second', product: updated})) as typeof first;
+      assert.equal(second.record.revision, 2); assert.equal(second.state, 'awaiting_media');
+      const recovered = await service().handleProductSubmission('owner-one', 'reconcileStoreProductSubmission', original) as typeof first;
+      assert.deepEqual(recovered.record, first.record);
+      assert.deepEqual((await service().handleProductSubmission('owner-one', 'submitStoreProduct', original) as typeof first).record, first.record);
+      assert.equal((await repository().readProductSubmission('store-one', 'sku-one', 'owner-one'))!.revision, 2);
+      const outcomes = await Promise.allSettled(['one', 'two'].map(key => service().handleProductSubmission('owner-one', 'submitStoreProduct',
+        productRequest({expectedRevision: 2, idempotencyKey: `race-${key}`, product: {...updated, sku: key}}))));
+      assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
+      assert.equal((await root.collection('productSubmissions').doc('sku-one').collection('revisions').get()).size, 3);
+      assert.equal((await root.collection('skus').get()).size, 0);
+      assert.equal((await db.collection('workspaceCatalogues').doc('evaluation').collection('publicListingBindings').get()).size, 0);
+      assert.equal((await db.collection('workspaceCatalogues').doc('evaluation').collection('canonicalCatalogues').get()).size, 0);
+      const notFound = await service().handleProductSubmission('owner-one', 'reconcileStoreProductSubmission',
+        productRequest({idempotencyKey: 'never-sent'})) as {state: string};
+      assert.equal(notFound.state, 'not_found');
+      await assert.rejects(service().handleProductSubmission('other-owner', 'reconcileStoreProductSubmission', original), {code: 'not_found'});
+      await assert.rejects(service().handleProductSubmission('owner-one', 'submitStoreProduct', {...original, approved: true}));
+      await assert.rejects(service().handleProductSubmission('owner-one', 'approveStoreProduct', original));
+      const changed = submittedProduct(); changed.content.title = 'Changed under reused key';
+      await assert.rejects(service().handleProductSubmission('owner-one', 'submitStoreProduct', productRequest({product: changed})), {code: 'conflict'});
+      await db.collection('workspaceProfiles').doc(profile.caseId).update({ownerUserId: 'new-owner'});
+      await assert.rejects(service().handleProductSubmission('owner-one', 'reconcileStoreProductSubmission', original), {code: 'not_found'});
+      if (process.env.LF03_SUBMISSION_CAPTURE === 'true') console.log(`LF_SUBMISSION_PROJECTION=${JSON.stringify(first)}`);
+    } finally {await db.terminate(); await deleteApp(app);}
+  });
 function staticMedia(value: StoreSkuInput, storeId = "store-one"): StoreSkuContent["media"] {
   return [{id: "host-reviewed-photo", revision: "host-photo-one", url: "https://example.com/host-photo.jpg",
     storeId, skuId: value.skuId, canonicalProductId: value.canonicalProductId,

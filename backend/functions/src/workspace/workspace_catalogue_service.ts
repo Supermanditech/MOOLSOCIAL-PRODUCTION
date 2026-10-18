@@ -1,5 +1,5 @@
 import {createHash} from "node:crypto";
-import {FieldPath, type Firestore} from "firebase-admin/firestore";
+import {FieldPath, type Firestore, type Transaction} from "firebase-admin/firestore";
 import {applyCatalogueCommand, createCatalogueAggregate, referencedOfferTermAt, reviewedCanonicalProduct,
   type CatalogueAggregate, type CatalogueCommand} from "../commerce/catalogue_contract.js";
 import {isSupplyCapabilityActive, type SupplyActor,
@@ -42,6 +42,27 @@ export interface StoreSkuInput {
 export interface StoreSkuRecord extends StoreSkuInput {
   schemaVersion: 1; storeId: string; revision: number; observedAt: string;
 }
+/** Owner-authored intent, not canonical/pack/offer identity or publication. */
+export interface StoreProductSubmissionInput {
+  schemaVersion: 1; skuId: string; sku: string; barcode: string;
+  catalogueProductHint: string | null;
+  content: Omit<StoreSkuContent, "media">; pack: StoreSkuPack;
+  channels: Array<Omit<StoreSkuChannel, "offerId">>;
+  provenance: StoreSkuInput["provenance"];
+  mediaIntent: {pendingUpload: boolean; pendingSelectionSha256: string | null; publishedReferences: Array<{assetId: string; revision: string}>};
+  variantIntent: {familyId: string; localRevision: number; selections: Record<string, string>} | null;
+}
+export interface StoreProductSubmissionRecord {
+  schemaVersion: 1; realm: "evaluation" | "production"; storeId: string; skuId: string;
+  revision: number; submittedAt: string; submittedBy: string; fingerprint: string;
+  product: StoreProductSubmissionInput;
+}
+export interface StoreProductSubmissionCommand {
+  ownerUserId: string; realm: StoreProductSubmissionRecord["realm"]; storeId: string;
+  expectedRevision: number; idempotencyKey: string; submittedAt: string; fingerprint: string;
+  product: StoreProductSubmissionInput;
+}
+export interface StoreProductSubmissionReceipt {fingerprint: string; record: StoreProductSubmissionRecord}
 /** Server-issued listing identity. Original Store SKU/Stock identity is unchanged. */
 export interface PublicCatalogueListingBinding {
   schemaVersion: 1; realm: "evaluation" | "production"; listingId: string;
@@ -77,6 +98,9 @@ export interface WorkspaceCatalogueRepository {
   page(profile: WorkspaceProfileRecord, ownerUserId: string | undefined,
     after: string | undefined, limit: number, skuId?: string): Promise<StoreSkuRecord[]>;
   catalogue(catalogueId: string): Promise<CatalogueAggregate | undefined>;
+  submitProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord>;
+  reconcileProduct?(command: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord | undefined>;
+  readProductSubmission?(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined>;
   /** Complete bounded directory, never public product facts or approval. */
   publicDiscoveryBindings?(): Promise<PublicCatalogueListingBinding[]>;
   publicListingBindings?(record: StoreSkuRecord): Promise<PublicCatalogueListingBinding[] | undefined>;
@@ -338,12 +362,40 @@ export function storeVariantFamilyOperation(operation: unknown): "submit" | "own
   if (operation === "readPublicStoreVariantFamilies") return "public_read";
   return undefined;
 }
+export function storeProductSubmissionOperation(operation: unknown): "submit" | "read" | "reconcile" | undefined {
+  if (operation === "submitStoreProduct") return "submit";
+  if (operation === "readStoreProductSubmission") return "read";
+  if (operation === "reconcileStoreProductSubmission") return "reconcile";
+  return undefined;
+}
 
 export class WorkspaceCatalogueService {
   constructor(private readonly repository: WorkspaceCatalogueRepository,
     private readonly identity?: CatalogueIdentity,
     private readonly now: () => Date = () => new Date(),
     private readonly policyReader?: Pick<WorkspaceSupplierPolicyService, "forPublicSku">) {}
+
+  async handleProductSubmission(ownerUserId: string, operation: string, body: Readonly<Record<string, unknown>>): Promise<object> {
+    const action = storeProductSubmissionOperation(operation);
+    if (!action || body.productSubmissionVersion !== 1) invalid();
+    const {productSubmissionVersion: _, ...request} = structuredClone(body);
+    let storeId: string, skuId: string, key: string | null = null, record: StoreProductSubmissionRecord | undefined;
+    if (action === "read") {
+      exact(request, ["storeId", "skuId"]);
+      storeId = id(request.storeId); skuId = id(request.skuId);
+      if (!this.repository.readProductSubmission) throw new WorkspaceProfileError("unavailable", "Product review is not connected.", 503);
+      record = await this.repository.readProductSubmission(storeId, skuId, id(ownerUserId));
+    } else {
+      const command = storeProductSubmission(ownerUserId, this.repository.realm, request, this.now().toISOString());
+      storeId = command.storeId; skuId = command.product.skuId; key = command.idempotencyKey;
+      if (!this.repository.submitProduct || !this.repository.reconcileProduct) throw new WorkspaceProfileError("unavailable", "Product review is not connected.", 503);
+      record = action === "submit" ? await this.repository.submitProduct(command) : await this.repository.reconcileProduct(command);
+    }
+    return {schemaVersion: 1, productSubmissionVersion: 1, realm: this.repository.realm, storeId, skuId,
+      observedAt: this.now().toISOString(), idempotencyKey: key,
+      state: record ? record.product.mediaIntent.pendingUpload ? "awaiting_media" : "submitted" : action === "reconcile" ? "not_found" : "none",
+      approved: false, publicationConfirmed: false, orderingAvailable: false, record: record ?? null};
+  }
 
   /** Complete bounded discovery, not serviceability, Stock or ordering authority.
    * Directory rows are only candidates: every item uses the existing reviewed
@@ -1044,13 +1096,43 @@ export function channelTerms(channel: StoreSkuChannel): object {
   return {currency: "INR", ...terms};
 }
 
+function authoredText(c: Record<string, unknown>): Omit<StoreSkuContent, "media" | "productFacts"> {
+  return {title: text(c.title), brand: text(c.brand, 240, c.categoryId === "fruits-vegetables"), variant: text(c.variant, 240, true),
+    categoryId: id(c.categoryId), description: text(c.description, 4000, true),
+    highlights: list(c.highlights, 20).map(h => text(h, 500)),
+    specifications: list(c.specifications, 40).map(s => {
+      const row = exact(s, ["label", "value"]); return {label: text(row.label), value: text(row.value, 1000)};
+    })};
+}
+function authoredPack(value: unknown): StoreSkuPack {
+  const p = exact(value, ["label", "quantityMilli", "unit", "unitsPerCase"]);
+  if (typeof p.unit !== "string" || !["kg", "L", "count"].includes(p.unit)) invalid();
+  return {label: text(p.label), quantityMilli: integer(p.quantityMilli), unit: p.unit as StoreSkuPack["unit"], unitsPerCase: integer(p.unitsPerCase)};
+}
+function authoredChannel(a: Record<string, unknown>): Omit<StoreSkuChannel, "offerId"> {
+  if (typeof a.kind !== "string" || !["retail", "wholesale", "bulk"].includes(a.kind)) invalid();
+  const priceMinor = integer(a.priceMinor), minimumOrder = integer(a.minimumOrder), quantityStep = integer(a.quantityStep);
+  const mrpMinor = a.mrpMinor === null ? null : integer(a.mrpMinor, priceMinor);
+  const tiers = list(a.tiers, 20).map(t => {
+    const row = exact(t, ["minimumQuantity", "unitPriceMinor"]);
+    return {minimumQuantity: integer(row.minimumQuantity), unitPriceMinor: integer(row.unitPriceMinor)};
+  });
+  if ((tiers.length && (tiers[0]!.minimumQuantity !== minimumOrder || tiers[0]!.unitPriceMinor !== priceMinor)) ||
+      tiers.some((t, i) => (t.minimumQuantity - minimumOrder) % quantityStep !== 0 || i > 0 &&
+        (t.minimumQuantity <= tiers[i - 1]!.minimumQuantity || t.unitPriceMinor > tiers[i - 1]!.unitPriceMinor))) invalid();
+  return {kind: a.kind as StoreSkuChannel["kind"], priceMinor, mrpMinor, minimumOrder, quantityStep, tiers};
+}
+function authoredChannelsValid(channels: Array<{kind: StoreSkuChannel["kind"]}>): void {
+  if (!channels.length || new Set(channels.map(c => c.kind)).size !== channels.length ||
+      channels.some(c => c.kind === "wholesale") && channels.some(c => c.kind === "bulk")) invalid();
+}
+
 export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
   const v = exact(value, ["skuId", "canonicalProductId", "verifiedPackId", "sku", "publicListing",
     "content", "pack", "channels", "provenance"]);
   const skuId = id(v.skuId), canonicalProductId = id(v.canonicalProductId);
   const c = exact(v.content, ["title", "brand", "variant", "categoryId", "description", "highlights", "specifications", "media"], ["productFacts"]);
-  const p = exact(v.pack, ["label", "quantityMilli", "unit", "unitsPerCase"]);
-  if (!["kg", "L", "count"].includes(String(p.unit))) invalid();
+  const pack = authoredPack(v.pack);
   const provenance = exact(v.provenance, ["entryMethod", "sourceRecordId"]);
   if (!["catalogue", "manual", "csv"].includes(String(provenance.entryMethod))) invalid();
   const media = list(c.media, 10).map(value => {
@@ -1071,34 +1153,90 @@ export function normalizeSku(value: unknown, storeId: string): StoreSkuInput {
   if (new Set(media.map(m => m.id)).size !== media.length) invalid();
   const channels = list(v.channels, 2).map(value => {
     const a = exact(value, ["kind", "offerId", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"]);
-    if (!["retail", "wholesale", "bulk"].includes(String(a.kind))) invalid();
-    const priceMinor = integer(a.priceMinor), minimumOrder = integer(a.minimumOrder), quantityStep = integer(a.quantityStep);
-    const mrpMinor = a.mrpMinor === null ? null : integer(a.mrpMinor, priceMinor);
-    const tiers = list(a.tiers, 20).map(t => {
-      const row = exact(t, ["minimumQuantity", "unitPriceMinor"]);
-      return {minimumQuantity: integer(row.minimumQuantity), unitPriceMinor: integer(row.unitPriceMinor)};
-    });
-    if ((tiers.length &&
-        (tiers[0]!.minimumQuantity !== minimumOrder || tiers[0]!.unitPriceMinor !== priceMinor)) ||
-        tiers.some((t, i) => (t.minimumQuantity - minimumOrder) % quantityStep !== 0 || (i > 0 &&
-          (t.minimumQuantity <= tiers[i - 1]!.minimumQuantity || t.unitPriceMinor > tiers[i - 1]!.unitPriceMinor)))) invalid();
-    return {kind: a.kind as StoreSkuChannel["kind"], offerId: id(a.offerId), priceMinor, mrpMinor,
-      minimumOrder, quantityStep, tiers};
+    const terms = authoredChannel(a);
+    return {kind: terms.kind, offerId: id(a.offerId), priceMinor: terms.priceMinor, mrpMinor: terms.mrpMinor,
+      minimumOrder: terms.minimumOrder, quantityStep: terms.quantityStep, tiers: terms.tiers};
   });
-  if (!channels.length || new Set(channels.map(c => c.kind)).size !== channels.length ||
-      (channels.some(c => c.kind === "wholesale") && channels.some(c => c.kind === "bulk"))) invalid();
+  authoredChannelsValid(channels);
   return {skuId, canonicalProductId, verifiedPackId: id(v.verifiedPackId), sku: text(v.sku, 80),
     publicListing: boolean(v.publicListing),
-    content: {title: text(c.title), brand: text(c.brand, 240, c.categoryId === "fruits-vegetables"), variant: text(c.variant, 240, true),
-      categoryId: id(c.categoryId), description: text(c.description, 4000, true),
-      highlights: list(c.highlights, 20).map(h => text(h, 500)),
-      specifications: list(c.specifications, 40).map(s => {
-        const row = exact(s, ["label", "value"]); return {label: text(row.label), value: text(row.value, 1000)};
-      }), media, ...(Object.hasOwn(c, "productFacts") ? {productFacts: normalizeProductFacts(c.productFacts)} : {})},
-    pack: {label: text(p.label), quantityMilli: integer(p.quantityMilli), unit: p.unit as StoreSkuPack["unit"],
-      unitsPerCase: integer(p.unitsPerCase)}, channels,
+    content: {...authoredText(c), media, ...(Object.hasOwn(c, "productFacts") ? {productFacts: normalizeProductFacts(c.productFacts)} : {})},
+    pack, channels,
     provenance: {entryMethod: provenance.entryMethod as StoreSkuInput["provenance"]["entryMethod"],
       sourceRecordId: id(provenance.sourceRecordId)}};
+}
+
+export function normalizeSubmittedProduct(value: unknown): StoreProductSubmissionInput {
+  const p = exact(value, ["schemaVersion", "skuId", "sku", "barcode", "catalogueProductHint", "content", "pack", "channels",
+    "provenance", "mediaIntent", "variantIntent"]);
+  if (p.schemaVersion !== 1) invalid();
+  const skuId = id(p.skuId), c = exact(p.content, ["title", "brand", "variant", "categoryId", "description", "highlights", "specifications"], ["productFacts"]);
+  const channels = list(p.channels, 2).map(raw => authoredChannel(exact(raw,
+    ["kind", "priceMinor", "mrpMinor", "minimumOrder", "quantityStep", "tiers"])));
+  authoredChannelsValid(channels);
+  const origin = exact(p.provenance, ["entryMethod", "sourceRecordId"]);
+  if (typeof origin.entryMethod !== "string" || !["catalogue", "manual", "csv"].includes(origin.entryMethod) || origin.sourceRecordId !== skuId) invalid();
+  const m = exact(p.mediaIntent, ["pendingUpload", "pendingSelectionSha256", "publishedReferences"]);
+  const pendingUpload = boolean(m.pendingUpload);
+  // A nomination/change fence only: never a verified asset hash or public image.
+  if (pendingUpload ? typeof m.pendingSelectionSha256 !== "string" || !/^[A-F0-9]{64}$/u.test(m.pendingSelectionSha256)
+    : m.pendingSelectionSha256 !== null) invalid();
+  const references = list(m.publishedReferences, 10).map(raw => {
+    const asset = exact(raw, ["assetId", "revision"]); return {assetId: id(asset.assetId), revision: id(asset.revision)};
+  });
+  if (new Set(references.map(asset => asset.assetId)).size !== references.length) invalid();
+  let variant: StoreProductSubmissionInput["variantIntent"] = null;
+  if (p.variantIntent !== null) {
+    const v = exact(p.variantIntent, ["familyId", "localRevision", "selections"]), selections = object(v.selections);
+    if (!Object.keys(selections).length || Object.keys(selections).length > 6) invalid();
+    variant = {familyId: id(v.familyId), localRevision: integer(v.localRevision, 1, 1000000000),
+      selections: Object.fromEntries(Object.entries(selections).map(([dimension, option]) => [id(dimension), id(option)]))};
+  }
+  const result: StoreProductSubmissionInput = {schemaVersion: 1, skuId, sku: text(p.sku, 80), barcode: text(p.barcode, 128, true),
+    catalogueProductHint: p.catalogueProductHint === null ? null : id(p.catalogueProductHint),
+    content: {...authoredText(c), ...(Object.hasOwn(c, "productFacts") ? {productFacts: normalizeProductFacts(c.productFacts)} : {})},
+    pack: authoredPack(p.pack), channels, provenance: {entryMethod: origin.entryMethod as StoreSkuInput["provenance"]["entryMethod"], sourceRecordId: skuId},
+    mediaIntent: {pendingUpload, pendingSelectionSha256: m.pendingSelectionSha256 as string | null, publishedReferences: references}, variantIntent: variant};
+  if (Buffer.byteLength(JSON.stringify(result), "utf8") > 384 * 1024) invalid("Product details are too large to submit.");
+  return result;
+}
+export function storeProductSubmission(ownerUserId: string, realm: StoreProductSubmissionRecord["realm"],
+  body: Readonly<Record<string, unknown>>, at: string): StoreProductSubmissionCommand {
+  exact(body, ["storeId", "expectedRevision", "idempotencyKey", "product"]);
+  if (!["evaluation", "production"].includes(realm) || typeof at !== "string" || !Number.isFinite(Date.parse(at)) || new Date(at).toISOString() !== at) invalid();
+  const command = {ownerUserId: id(ownerUserId), realm, storeId: id(body.storeId), expectedRevision: integer(body.expectedRevision, 0, 999999999),
+    idempotencyKey: id(body.idempotencyKey), submittedAt: at, product: normalizeSubmittedProduct(body.product)};
+  return {...command, fingerprint: cataloguePayloadHash({ownerUserId: command.ownerUserId, realm, storeId: command.storeId,
+    expectedRevision: command.expectedRevision, product: command.product})};
+}
+function checkedProductSubmission(raw: unknown, realm: StoreProductSubmissionRecord["realm"], storeId: string, skuId: string): StoreProductSubmissionRecord {
+  const r = exact(raw, ["schemaVersion", "realm", "storeId", "skuId", "revision", "submittedAt", "submittedBy", "fingerprint", "product"]);
+  const original = storeProductSubmission(id(r.submittedBy), realm, {storeId, expectedRevision: integer(r.revision, 1, 1000000000) - 1,
+    idempotencyKey: "validation-only", product: r.product}, text(r.submittedAt, 32));
+  if (r.schemaVersion !== 1 || r.realm !== realm || r.storeId !== storeId || r.skuId !== skuId ||
+      original.product.skuId !== skuId || r.fingerprint !== original.fingerprint) invalid("Saved product submission is invalid.");
+  return {schemaVersion: 1, realm, storeId, skuId, revision: original.expectedRevision + 1, submittedAt: original.submittedAt,
+    submittedBy: original.ownerUserId, fingerprint: original.fingerprint, product: original.product};
+}
+export function planStoreProductSubmission(command: StoreProductSubmissionCommand, profile: WorkspaceProfileRecord | undefined,
+  current?: StoreProductSubmissionRecord, receipt?: StoreProductSubmissionReceipt): StoreProductSubmissionRecord {
+  requireStore(profile, command.storeId, command.ownerUserId);
+  const normalized = storeProductSubmission(command.ownerUserId, command.realm, {storeId: command.storeId,
+    expectedRevision: command.expectedRevision, idempotencyKey: command.idempotencyKey, product: command.product}, command.submittedAt);
+  if (normalized.fingerprint !== command.fingerprint) invalid();
+  if (receipt) {
+    const record = checkedProductSubmission(receipt.record, command.realm, command.storeId, command.product.skuId);
+    if (receipt.fingerprint !== command.fingerprint || record.fingerprint !== command.fingerprint) {
+      throw new WorkspaceProfileError("conflict", "The saved submission request changed. Check its original result.", 409);
+    }
+    return record;
+  }
+  const previous = current && checkedProductSubmission(current, command.realm, command.storeId, command.product.skuId);
+  if ((previous?.revision ?? 0) !== command.expectedRevision) throw new WorkspaceProfileError("revision_conflict", "Product submission changed. Refresh before submitting.", 409);
+  if (previous && command.submittedAt < previous.submittedAt) invalid("Submission time precedes the saved request.");
+  return {schemaVersion: 1, realm: command.realm, storeId: command.storeId, skuId: command.product.skuId,
+    revision: command.expectedRevision + 1, submittedAt: command.submittedAt, submittedBy: command.ownerUserId,
+    fingerprint: command.fingerprint, product: normalized.product};
 }
 
 function normalizeProductFacts(value: unknown): StoreSkuProductFacts {
@@ -1442,6 +1580,56 @@ export class FirestoreWorkspaceCatalogueRepository implements WorkspaceCatalogue
   private root(storeId: string) {
     return this.firestore.collection("workspaceCatalogues").doc(this.realm)
       .collection("stores").doc(id(storeId));
+  }
+  private productSubmissionHead(storeId: string, skuId: string) {
+    return this.root(storeId).collection("productSubmissions").doc(id(skuId));
+  }
+  private checkedProductCommand(original: StoreProductSubmissionCommand): StoreProductSubmissionCommand {
+    const command = storeProductSubmission(original.ownerUserId, original.realm, {storeId: original.storeId,
+      expectedRevision: original.expectedRevision, idempotencyKey: original.idempotencyKey, product: original.product}, original.submittedAt);
+    if (command.realm !== this.realm || command.fingerprint !== original.fingerprint) invalid();
+    return command;
+  }
+  private async productSubmissionOwner(transaction: Transaction, storeId: string, owner: string): Promise<WorkspaceProfileRecord> {
+    const profiles = await transaction.get(this.firestore.collection("workspaceProfiles").where("workspaceId", "==", storeId).limit(2));
+    const profile = profiles.size === 1 && profiles.docs[0]!.id === profiles.docs[0]!.get("caseId")
+      ? profiles.docs[0]!.data() as WorkspaceProfileRecord : undefined;
+    return requireStore(profile, storeId, owner);
+  }
+  async submitProduct(original: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord> {
+    const command = this.checkedProductCommand(original), head = this.productSubmissionHead(command.storeId, command.product.skuId);
+    const receiptRef = head.collection("receipts").doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const profile = await this.productSubmissionOwner(transaction, command.storeId, command.ownerUserId);
+      const [current, receipt] = await transaction.getAll(head, receiptRef);
+      const result = planStoreProductSubmission(command, profile,
+        current?.exists ? current.data() as StoreProductSubmissionRecord : undefined,
+        receipt?.exists ? receipt.data() as StoreProductSubmissionReceipt : undefined);
+      if (!receipt?.exists) {
+        transaction.set(head, result);
+        transaction.create(head.collection("revisions").doc(String(result.revision)), result);
+        transaction.create(receiptRef, {fingerprint: command.fingerprint, record: result});
+      }
+      return result;
+    });
+  }
+  async reconcileProduct(original: StoreProductSubmissionCommand): Promise<StoreProductSubmissionRecord | undefined> {
+    const command = this.checkedProductCommand(original), head = this.productSubmissionHead(command.storeId, command.product.skuId);
+    const receiptRef = head.collection("receipts").doc(cataloguePayloadHash([command.ownerUserId, command.idempotencyKey]));
+    return this.firestore.runTransaction(async transaction => {
+      const profile = await this.productSubmissionOwner(transaction, command.storeId, command.ownerUserId);
+      const receipt = await transaction.get(receiptRef);
+      return receipt.exists ? planStoreProductSubmission(command, profile, undefined, receipt.data() as StoreProductSubmissionReceipt) : undefined;
+    });
+  }
+  async readProductSubmission(storeId: string, skuId: string, ownerUserId: string): Promise<StoreProductSubmissionRecord | undefined> {
+    storeId = id(storeId); skuId = id(skuId); ownerUserId = id(ownerUserId);
+    const head = this.productSubmissionHead(storeId, skuId);
+    return this.firestore.runTransaction(async transaction => {
+      await this.productSubmissionOwner(transaction, storeId, ownerUserId);
+      const doc = await transaction.get(head);
+      return doc.exists ? checkedProductSubmission(doc.data(), this.realm, storeId, skuId) : undefined;
+    });
   }
   async submitVariantFamily(original: StoreVariantFamilySubmission): Promise<StoreVariantFamilyCandidate> {
     const command = structuredClone(original);
