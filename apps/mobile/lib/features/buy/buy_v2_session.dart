@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../work/scan_and_pick_contract.dart';
 import '../work/work_order_identity_gateway.dart';
+import '../work/work_catalogue_gateway.dart';
 import 'buy_session.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_content_contracts.dart';
@@ -3338,7 +3339,8 @@ typedef BuyV2AccountPersistenceIdentity = ({String environment, String projectId
 class BuyV2RootSessions {
   BuyV2RootSessions({required this.core, required this.currentIdentity,
     this.preserveReview = false, this.accountStoreFactory, this.accountSessionFactory,
-    this.purchaseReaderFactory, this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
+    this.purchaseReaderFactory, this.catalogueSourceFactory,
+    this.purchaseRealm = const String.fromEnvironment('MOOLSOCIAL_PURCHASE_REALM'),
   }) : guest = BuyV2Session(core: core, reviewDataEnabled: preserveReview ? null : false),
        unavailable = BuyV2Session(core: core, reviewDataEnabled: false) {
     current = guest;
@@ -3347,6 +3349,7 @@ class BuyV2RootSessions {
   final BuySession core;
   final String purchaseRealm;
   final AuthenticatedWorkspaceOrderIdentityGateway? Function(BuyV2AccountPersistenceIdentity, bool Function())? purchaseReaderFactory;
+  final WorkspacePublicDiscoverySource? Function(BuyV2AccountPersistenceIdentity, bool Function())? catalogueSourceFactory;
   final BuyV2AccountPersistenceIdentity? Function() currentIdentity;
   final bool preserveReview;
   final BuyV2CustomerStateStore Function(BuyV2AccountPersistenceIdentity,
@@ -3384,9 +3387,15 @@ class BuyV2RootSessions {
         identity: identity, currentIdentity: currentIdentity,
         isSessionCurrent: () => alive && !_disposed);
     final pending = _retired[identity]?.retainedAccountState();
+    bool catalogueCurrent() => alive && !_disposed && currentIdentity() == identity;
+    final catalogue = accountSessionFactory != null ? null : catalogueSourceFactory != null
+      ? catalogueSourceFactory!(identity, catalogueCurrent)
+      : configuredWorkspacePublicDiscovery(environment: identity.environment, projectId: identity.projectId,
+          tenantId: identity.tenantId, accountUserId: identity.userId, realm: purchaseRealm, current: catalogueCurrent);
     final next = accountSessionFactory?.call(store, pending) ??
       BuyV2Session(core: core, reviewDataEnabled: false,
         customerStateStore: store, pendingAccountState: pending,
+        cataloguePageSource: catalogue, variantFamilySource: catalogue, productContentAdapter: catalogue,
         purchaseRealm: purchaseRealm,
         purchaseReader: purchaseReaderFactory != null
           ? purchaseReaderFactory!(identity, () => alive && !_disposed && currentIdentity() == identity)
@@ -3397,7 +3406,18 @@ class BuyV2RootSessions {
     next._customerStateRecoveryOwnerScope = store.ownerScope;
     next._customerStateSnapshotLoaded = false;
     current = next;
-    _retireLifetime = () => alive = false;
+    void catalogueChanged() {
+      if (!catalogueCurrent() || !identical(current, next) || catalogue == null) return;
+      for (final id in catalogue.observedProductIds) {
+        if (next.findProduct(id) != null) next.refreshProductContent(id);
+      }
+    }
+    catalogue?.addListener(catalogueChanged);
+    _retireLifetime = () {
+      alive = false;
+      catalogue?.removeListener(catalogueChanged);
+      catalogue?.dispose();
+    };
     _retired.remove(identity);
     return true;
   }

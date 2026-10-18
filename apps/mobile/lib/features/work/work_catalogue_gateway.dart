@@ -1314,6 +1314,26 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
   String? _publicStoreName;
   int _promotionGeneration = 0;
   final _promotionHeads = <String, ({int revision, DateTime observed, String copy})>{};
+  void Function() _prepareMetadata(Map<String, dynamic> data) {
+    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
+    final metadata = data['storeDetailsReadbackVersion'] == 1
+      ? WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc()) : null;
+    final fingerprint = jsonEncode(_sorted(metadata?.details?.toJson())), revision = metadata?.revision;
+    void check() {
+      if (_metadataHighwater != null && (revision == null || revision < _metadataHighwater! ||
+          revision == _metadataHighwater && fingerprint != _metadataFingerprint)) {
+        throw const FormatException('Public Store details changed. Refresh this Store.');
+      }
+    }
+    check();
+    final name = _string(store['name'], 240);
+    return () {
+      check();
+      _storeMetadata = metadata;
+      if (revision != null) { _metadataHighwater = revision; _metadataFingerprint = fingerprint; }
+      _publicStoreName = name;
+    };
+  }
   @override
   bool get storeOffersActive => current();
 
@@ -1511,24 +1531,11 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
       }
       return entry;
     }).toList(growable: false);
-    final store = _publicStore(data, storeId, gateway.realm, gateway.now().toUtc());
-    final storeMetadata = data['storeDetailsReadbackVersion'] == 1
-      ? WorkspacePublicStoreMetadata.decode(store['details'], gateway.realm, storeId, gateway.now().toUtc()) : null;
-    final fingerprint = jsonEncode(_sorted(storeMetadata?.details?.toJson())), candidateRevision = storeMetadata?.revision;
-    void checkMetadata() {
-      if (_metadataHighwater != null && (candidateRevision == null || candidateRevision < _metadataHighwater! ||
-          candidateRevision == _metadataHighwater && fingerprint != _metadataFingerprint)) {
-        throw const FormatException('Public Store details changed. Refresh this Store.');
-      }
-    }
-    checkMetadata();
+    final admitMetadata = _prepareMetadata(data);
     final entries = await gateway._enrichVariants(decodedEntries, active);
     final products = entries.map((entry) => entry.product).toList(growable: false);
     if (products.map((product) => product.id).toSet().length != products.length || !active()) throw const FormatException();
-    checkMetadata();
-    _storeMetadata = storeMetadata;
-    if (candidateRevision != null) { _metadataHighwater = candidateRevision; _metadataFingerprint = fingerprint; }
-    _publicStoreName = _string(store['name'], 240);
+    admitMetadata();
     if (contentReadback != null && contentOwner != null) {
       for (final entry in entries) { contentReadback!.admitPublicEntry(entry, expectedContext: contentOwner); }
     }
@@ -1583,6 +1590,182 @@ class WorkspaceStoreCatalogueSource implements BuyV2CataloguePageSource, BuyV2Va
     if (!current() || requestCurrent?.call() == false) throw const FormatException();
     return List.unmodifiable(products);
   }
+}
+
+/// One authenticated account-generation's public discovery/content owner.
+/// Unsupported geography/fulfilment filters require their actual producer.
+class WorkspacePublicDiscoverySource extends ChangeNotifier
+    implements BuyV2CataloguePageSource, BuyV2VariantFamilySource,
+      BuyV2ProductContentAdapter, BuyV2StorePublishedOffersSource {
+  WorkspacePublicDiscoverySource({required this.gateway, required this.current}) {
+    if (!gateway.productFactsReadbackSupported || !gateway.unbrandedProduceReadbackSupported ||
+        !gateway.storeClassificationReadbackSupported) { throw ArgumentError('Matching discovery contracts are required.'); }
+    _readback = WorkspaceCatalogueReadback(gateway: gateway, context: () => active ? this : null, now: gateway.now);
+    _readback.addListener(_changed);
+  }
+  final AuthenticatedWorkspaceCatalogueGateway gateway;
+  final bool Function() current;
+  late final WorkspaceCatalogueReadback _readback;
+  final _stores = <String, WorkspaceStoreCatalogueSource>{};
+  bool _closed = false;
+  bool get active => !_closed && current();
+  Iterable<String> get observedProductIds => _readback.observedProductIds;
+  void _changed() { if (active) notifyListeners(); }
+  WorkspaceStoreCatalogueSource _store(String storeId) => _stores.putIfAbsent(_id(storeId), () =>
+    WorkspaceStoreCatalogueSource(gateway: gateway, storeId: storeId, current: () => active, contentReadback: _readback));
+
+  Map<String, Object?> _query(BuyV2CatalogueQuery query, Set<String> ids) {
+    if (query.areaScope != BuyV2CatalogueAreaScope.allAreas ||
+        !{BuyV2Destination.shop, BuyV2Destination.wholesale}.contains(query.destination) ||
+        query.shopSaleType != null || query.fulfilmentMode != null || query.pack != null || query.filter != null ||
+        query.availableOnly || query.offersOnly || query.collectionOnly || query.offerPublisher != null ||
+        query.supplierOffersOnly || query.procurementContext != null || query.sort == BuyV2ProductSort.deliveryFastest) {
+      throw const FormatException('These filters require another connected provider.');
+    }
+    if (query.storeId != null) _id(query.storeId);
+    return {'destination': query.destination.name,
+      'search': query.query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '),
+      'categoryId': query.categoryId, 'sort': query.sort.name, 'brands': query.brands.toList()..sort(),
+      'maximumPriceMinor': query.maximumPrice == null ? null : query.maximumPrice! * 100,
+      'tradeType': query.wholesaleSaleType?.name, 'listingIds': ids.toList()..sort()};
+  }
+
+  Future<({BuyV2CataloguePage<BuyV2Product> products, List<BuyV2StoreListing> stores})> _load(
+    BuyV2CatalogueQuery query, {required int pageSize, String? cursor, String kind = 'products',
+    Set<String> ids = const {}, bool Function()? requestCurrent}) async {
+    bool valid() => active && (requestCurrent?.call() ?? true);
+    if (!valid() || pageSize < 1 || pageSize > 50) throw const FormatException();
+    final requested = _query(query, ids);
+    final response = await gateway._ownerRequest({'operation': 'readPublicCatalogueDiscovery',
+      'discoveryPageVersion': 1, 'query': requested, 'pageSize': pageSize, 'resultKind': kind,
+      if (query.storeId != null) 'storeId': query.storeId, 'cursor': ?cursor}, valid, mutation: false);
+    if (!valid() || response?.statusCode != 200 || utf8.encode(response!.body).length > 512 * 1024) throw const FormatException();
+    final envelope = _map(jsonDecode(response.body));
+    _keys(envelope, ['ok', 'data']);
+    if (envelope['ok'] != true) throw const FormatException();
+    final data = _map(envelope['data']);
+    _keys(data, ['schemaVersion', 'discoveryPageVersion', 'realm', 'state', 'coverage', 'directoryCoverage',
+      'orderingAvailable', 'observedAt', 'query', 'resultKind', 'requestedStore', 'items', 'page']);
+    if (_int(data['schemaVersion'], 1, 1) != 1 || _int(data['discoveryPageVersion'], 1, 1) != 1 ||
+        data['realm'] != gateway.realm || data['state'] != 'ready' || data['coverage'] != 'verified_public_only' ||
+        data['directoryCoverage'] != 'complete_bounded' || data['orderingAvailable'] != false ||
+        data['resultKind'] != kind || data['requestedStore'] != query.storeId ||
+        _time(data['observedAt']).isAfter(gateway.now().toUtc()) ||
+        jsonEncode(_sorted(data['query'])) != jsonEncode(_sorted(requested))) { throw const FormatException(); }
+    final metadata = _map(data['page']);
+    _keys(metadata, ['snapshotId', 'startIndex', 'totalCount', 'previousCursor', 'nextCursor']);
+    final snapshotId = _string(metadata['snapshotId'], 64);
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(snapshotId)) throw const FormatException();
+    final start = _int(metadata['startIndex'], 0, 500), total = _int(metadata['totalCount'], 0, 500);
+    final next = metadata['nextCursor'] == null ? null : _string(metadata['nextCursor'], 2048);
+    final previous = metadata['previousCursor'] == null ? null : _string(metadata['previousCursor'], 2048);
+    final rows = _list(data['items'], pageSize);
+    if ((cursor == null && start != 0) || start % pageSize != 0 || start + rows.length > total ||
+        (start == 0) != (previous == null) || (next == null) != (start + rows.length == total) ||
+        (rows.isEmpty && total != 0)) { throw const FormatException(); }
+    final admissions = <void Function()>[], storeCopies = <String, String>{};
+    final decoded = rows.map((raw) {
+      final item = _map(raw); _keys(item, ['channel', 'listing']);
+      final listing = _map(item['listing']), storeId = _id(listing['storeId']);
+      final channels = BuyV2OfferClass.values.where((value) => value.name == item['channel']);
+      if (channels.length != 1 || query.storeId != null && query.storeId != storeId ||
+          listing['productFactsReadbackVersion'] != 1 || listing['storeClassificationReadbackVersion'] != 1 ||
+          listing['storeDetailsReadbackVersion'] != 1 ||
+          _time(listing['observedAt']).isAfter(_time(data['observedAt']))) { throw const FormatException(); }
+      final entry = WorkspacePublicCatalogueEntry.fromResponse(listing, storeId: storeId,
+        realm: gateway.realm, channel: channels.single, now: gateway.now().toUtc());
+      if (entry.product.destination != query.destination || ids.isNotEmpty && !ids.contains(entry.product.id) ||
+          query.wholesaleSaleType != null && entry.product.offerClass?.name != query.wholesaleSaleType!.name) { throw const FormatException(); }
+      final storeCopy = jsonEncode(_sorted(listing['publicStore']));
+      if (storeCopies[storeId] != null && storeCopies[storeId] != storeCopy) throw const FormatException();
+      storeCopies[storeId] = storeCopy;
+      admissions.add(_store(storeId)._prepareMetadata(listing));
+      return entry;
+    }).toList(growable: false);
+    if (decoded.map((e) => kind == 'stores' ? e.product.storeId! : e.product.id).toSet().length != decoded.length) throw const FormatException();
+    final entries = await gateway._enrichVariants(decoded, valid);
+    if (!valid()) throw const FormatException();
+    for (final admission in admissions) { admission(); }
+    for (final entry in entries) { _readback.admitPublicEntry(entry, expectedContext: this); }
+    final products = entries.map((entry) => entry.product).toList(growable: false);
+    final stores = <BuyV2StoreListing>[];
+    if (kind == 'stores') { for (final product in products) {
+      final store = _store(product.storeId!), metadata = store._storeMetadata, details = metadata?.details;
+      stores.add(BuyV2StoreListing(id: product.storeId!, name: store._publicStoreName!,
+        area: metadata?.area ?? (details == null ? '' : '${details.city}, ${details.state}'),
+        address: details?.address ?? '', regionId: '', previewProduct: product,
+        publicContactPhone: details?.publicContactPhone.isNotEmpty == true ? details!.publicContactPhone : null,
+        openingHoursLabel: details?.openingTime.isNotEmpty == true ? '${details!.openingTime} – ${details.closingTime}' : null));
+    } }
+    return (products: BuyV2CataloguePage(queryKey: query.key, snapshotId: snapshotId, items: products,
+      startIndex: start, totalCount: total, previousCursor: previous, nextCursor: next), stores: List<BuyV2StoreListing>.unmodifiable(stores));
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(BuyV2CatalogueQuery query, {String? cursor, required int pageSize}) async =>
+    (await _load(query, cursor: cursor, pageSize: pageSize)).products;
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(BuyV2CatalogueQuery query, {String? cursor, required int pageSize}) async {
+    final result = await _load(query, cursor: cursor, pageSize: pageSize, kind: 'stores'), page = result.products;
+    return BuyV2CataloguePage(queryKey: page.queryKey, snapshotId: page.snapshotId, items: result.stores,
+      startIndex: page.startIndex, totalCount: page.totalCount, previousCursor: page.previousCursor, nextCursor: page.nextCursor);
+  }
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds, {bool Function()? requestCurrent}) async {
+    if (productIds.isEmpty) return const [];
+    if (productIds.length > 50 || productIds.any((id) => !RegExp(r'^listing-[a-f0-9]{64}$').hasMatch(id))) throw const FormatException();
+    final results = <BuyV2Product>[];
+    for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+      results.addAll((await _load(BuyV2CatalogueQuery(destination: destination, regionId: null,
+        areaScope: BuyV2CatalogueAreaScope.allAreas), pageSize: 50, ids: productIds, requestCurrent: requestCurrent)).products.items);
+    }
+    if (!active || requestCurrent?.call() == false) throw const FormatException();
+    return List.unmodifiable(results);
+  }
+  @override
+  Future<BuyV2VariantFamilySnapshot> loadVariantFamily(BuyV2Product selected, BuyV2CatalogueQuery context) {
+    var reading = true;
+    bool valid() => reading && active;
+    return gateway._readReviewedFamily(selected, context, valid, (ids) => resolveProducts(ids, requestCurrent: valid))
+      .whenComplete(() => reading = false);
+  }
+  @override
+  bool get storeOffersActive => active;
+  @override
+  Future<List<BuyV2PublishedCatalogueOffer>> loadStoreOffers({required String storeId, required BuyV2Destination destination}) =>
+    _store(storeId).loadStoreOffers(storeId: storeId, destination: destination);
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    if (!active || product.publicListingIdentity?.realm != gateway.realm) return _unavailable(product);
+    final snapshot = _readback.snapshotFor(product);
+    if (snapshot.state == BuyV2ProductContentState.unavailable) unawaited(_readback.refresh(product));
+    return snapshot;
+  }
+  @override
+  void dispose() {
+    _closed = true;
+    _readback.removeListener(_changed);
+    _readback.dispose();
+    super.dispose();
+  }
+}
+
+/// Only an explicitly matched deployed read contract may activate this root seam.
+/// This function does not deploy, change configuration or bind a review account.
+WorkspacePublicDiscoverySource? configuredWorkspacePublicDiscovery({required String environment,
+  required String projectId, required String? tenantId, required String accountUserId,
+  required String realm, required bool Function() current}) {
+  if (!const bool.fromEnvironment('MOOLSOCIAL_WORKSPACE_DISCOVERY_V1') ||
+      environment != 'firebase-service' || projectId != 'moolsocial-dev-503018' || tenantId != null ||
+      !{'evaluation', 'production'}.contains(realm)) { return null; }
+  final endpoint = Uri.tryParse(const String.fromEnvironment('MOOLSOCIAL_WORKSPACE_URL'));
+  if (endpoint == null || !_validEndpoint(endpoint)) return null;
+  final gateway = AuthenticatedWorkspaceCatalogueGateway(endpoint: endpoint,
+    credentials: FirebaseSocialContentCredentials(), transport: IoSocialContentTransport(), realm: realm,
+    ownerAccountId: _id(accountUserId), policyReadbackRequired: true,
+    productFactsReadbackSupported: true, unbrandedProduceReadbackSupported: true,
+    reviewedFamilyReadbackSupported: true, storeClassificationReadbackSupported: true);
+  return WorkspacePublicDiscoverySource(gateway: gateway, current: current);
 }
 
 BuyV2ProductContentSnapshot _unavailable(BuyV2Product product, {bool policyResolutionPending = false}) =>

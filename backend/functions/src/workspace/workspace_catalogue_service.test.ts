@@ -995,9 +995,25 @@ test('LF-DISCOVERY strict identity capacity and cursor binding never produce fal
   repository.records.get('store-one/sku-one')!.publicListing = false;
   await assert.rejects(service.publicDiscovery(discoveryRequest({cursor: first.page.nextCursor})), {code: 'stale_cursor'});
   for (const request of [{discoveryPageVersion: 2}, {query: {...viewQuery, quick: true}},
-    {query: {...viewQuery, sort: 'deliveryFastest'}}, {storeId: 'store-one'}]) {
+    {query: {...viewQuery, sort: 'deliveryFastest'}}, {resultKind: 'unsupported'}, {resultKind: null}]) {
     await assert.rejects(service.publicDiscovery(discoveryRequest(request)), {code: 'invalid_input'});
   }
+});
+test('LF-DISCOVERY Store pager counts each matched Store once and binds kind and exact Store filter', async () => {
+  const repository = await discoveryFixture(), service = subject(repository);
+  await service.saveSku('owner-one', save(input('another-public-sku')));
+  const products = await service.publicDiscovery(discoveryRequest()) as DiscoveryResult;
+  assert.equal(products.page.totalCount, 3);
+  const first = await service.publicDiscovery(discoveryRequest({resultKind: 'stores'})) as DiscoveryResult;
+  assert.equal(first.page.totalCount, 2); assert.equal(first.items[0]!.listing.storeId, 'store-two');
+  const second = await service.publicDiscovery(discoveryRequest({resultKind: 'stores', cursor: first.page.nextCursor})) as DiscoveryResult;
+  assert.equal(second.items[0]!.listing.storeId, 'store-one'); assert.equal(second.page.nextCursor, null);
+  await assert.rejects(service.publicDiscovery(discoveryRequest({cursor: first.page.nextCursor})), {code: 'stale_cursor'});
+  await assert.rejects(service.publicDiscovery(discoveryRequest({storeId: 'store-one', cursor: products.page.nextCursor})), {code: 'stale_cursor'});
+  const scoped = await service.publicDiscovery(discoveryRequest({storeId: 'store-one', pageSize: 50})) as DiscoveryResult;
+  assert.equal(scoped.page.totalCount, 2); assert.ok(scoped.items.every(item => item.listing.storeId === 'store-one'));
+  const missing = await service.publicDiscovery(discoveryRequest({storeId: 'not-published'})) as DiscoveryResult;
+  assert.equal(missing.page.totalCount, 0);
 });
 test('LF-DISCOVERY hidden source mutation and temporal expiry reject stale snapshots', async () => {
   const repository = await discoveryFixture();

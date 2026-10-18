@@ -347,8 +347,11 @@ export class WorkspaceCatalogueService {
    * projection. Above capacity fail honestly; never sort/count a truncated set.
    */
   async publicDiscovery(body: Readonly<Record<string, unknown>>): Promise<object> {
-    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor"]);
+    exact(body, ["discoveryPageVersion", "query", "pageSize"], ["cursor", "resultKind", "storeId"]);
     if (body.discoveryPageVersion !== 1) invalid();
+    const resultKind = body.resultKind === undefined ? "products" : body.resultKind;
+    if (typeof resultKind !== "string" || !["products", "stores"].includes(resultKind)) invalid();
+    const requestedStore = body.storeId === undefined ? null : id(body.storeId);
     const query = publicPageQuery(body.query), pageSize = integer(body.pageSize, 1, 50);
     const identity = this.identity && {...this.identity};
     if (!identity || !this.repository.publicDiscoveryBindings || !this.repository.publicCatalogueSource) {
@@ -420,6 +423,7 @@ export class WorkspaceCatalogueService {
       channels: Array<StoreSkuChannel & {revision: string; validUntil: string}>; listings: PublicCatalogueListingBinding[]};
     const selected: Array<{channel: StoreSkuChannel["kind"]; listing: Record<string, unknown>; listingId: string; price: number}> = [];
     for (const data of finalProjections) for (const row of data.items as Row[]) for (const channel of row.channels) {
+      if (requestedStore !== null && data.storeId !== requestedStore) continue;
       if (query.destination === "shop" ? channel.kind !== "retail" : channel.kind === "retail") continue;
       if (query.tradeType !== null && channel.kind !== query.tradeType) continue;
       const binding = row.listings.find(b => b.channel === channel.kind)!;
@@ -438,7 +442,9 @@ export class WorkspaceCatalogueService {
     selected.sort((a, b) => (query.sort === "priceLowToHigh" ? a.price - b.price :
       query.sort === "priceHighToLow" ? b.price - a.price : 0) ||
       (a.listingId < b.listingId ? -1 : a.listingId === b.listingId ? 0 : 1));
-    const queryHash = cataloguePayloadHash([identity, this.repository.realm, query]).toLowerCase();
+    const resultItems = resultKind === "products" ? selected : selected.filter((value, i) =>
+      selected.findIndex(other => other.listing.storeId === value.listing.storeId) === i);
+    const queryHash = cataloguePayloadHash([identity, this.repository.realm, query, resultKind, requestedStore]).toLowerCase();
     const snapshotId = cataloguePayloadHash([sourceHash, stable(finalProjections)]).toLowerCase();
     let index = 0;
     if (body.cursor !== undefined) {
@@ -451,15 +457,15 @@ export class WorkspaceCatalogueService {
         throw new WorkspaceProfileError("stale_cursor", "Public catalogue changed. Refresh products.", 409);
       }
       index = integer(cursor.i, 0, 500);
-      if (index % pageSize || index >= selected.length) invalid("Public catalogue cursor is outside this snapshot.");
+      if (index % pageSize || index >= resultItems.length) invalid("Public catalogue cursor is outside this snapshot.");
     }
     const cursorAt = (i: number) => Buffer.from(JSON.stringify({v: 1, q: queryHash, s: snapshotId, n: pageSize, i})).toString("base64url");
-    const nextCursor = index + pageSize < selected.length ? cursorAt(index + pageSize) : null;
+    const nextCursor = index + pageSize < resultItems.length ? cursorAt(index + pageSize) : null;
     const result = {schemaVersion: 1, discoveryPageVersion: 1, realm: this.repository.realm,
       state: "ready", coverage: "verified_public_only", directoryCoverage: "complete_bounded",
-      orderingAvailable: false, observedAt, query,
-      items: selected.slice(index, index + pageSize).map(({channel, listing}) => ({channel, listing})),
-      page: {snapshotId, startIndex: index, totalCount: selected.length,
+      orderingAvailable: false, observedAt, query, resultKind, requestedStore,
+      items: resultItems.slice(index, index + pageSize).map(({channel, listing}) => ({channel, listing})),
+      page: {snapshotId, startIndex: index, totalCount: resultItems.length,
         previousCursor: index === 0 ? null : cursorAt(Math.max(0, index - pageSize)), nextCursor}};
     if (Buffer.byteLength(JSON.stringify(result), "utf8") > 480 * 1024) throw unavailable();
     return result;

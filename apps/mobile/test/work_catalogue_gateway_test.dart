@@ -1271,6 +1271,128 @@ void main() {
     row(data)['supplierPolicy'] = policyEnvelope();
     return data;
   }
+  AuthenticatedWorkspaceCatalogueGateway discoveryGateway(SocialContentTransport transport, {String realm = 'production'}) =>
+    AuthenticatedWorkspaceCatalogueGateway(endpoint: Uri.parse('https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialWorkspace'),
+      credentials: Credentials(), transport: transport, realm: realm, productFactsReadbackSupported: true,
+      unbrandedProduceReadbackSupported: true, storeClassificationReadbackSupported: true, now: () => at);
+  Map<String, dynamic> discoveryData(Map<String, Object?> body, {bool empty = false}) {
+    final listing = publicPage();
+    listing.addAll({'productFactsReadbackVersion': 1, 'storeClassificationReadbackVersion': 1, 'storeDetailsReadbackVersion': 1});
+    listing['publicStore'] = <String, dynamic>{...listing['publicStore'] as Map, 'details': {'schemaVersion': 1, 'realm': 'production', 'storeId': 'store-one',
+      'observedAt': at.toIso8601String(), 'state': 'none', 'revision': 0, 'details': null, 'area': null,
+      'locationVerified': false, 'publicAvailabilityConfirmed': false}};
+    ((row(listing)['channels'] as List).single as Map)['priceMinor'] = 10025;
+    return {'schemaVersion': 1, 'discoveryPageVersion': 1, 'realm': 'production', 'state': 'ready',
+      'coverage': 'verified_public_only', 'directoryCoverage': 'complete_bounded', 'orderingAvailable': false,
+      'observedAt': at.toIso8601String(), 'query': body['query'], 'resultKind': body['resultKind'], 'requestedStore': body['storeId'],
+      'items': empty ? [] : [{'channel': 'retail', 'listing': listing}],
+      'page': {'snapshotId': 'a' * 64, 'startIndex': 0, 'totalCount': empty ? 0 : 1, 'previousCursor': null, 'nextCursor': null}};
+  }
+  BuyV2CatalogueQuery discoveryQuery({String? storeId}) => BuyV2CatalogueQuery(destination: BuyV2Destination.shop,
+    regionId: null, areaScope: BuyV2CatalogueAreaScope.allAreas, storeId: storeId);
+  test('LF-DISCOVERY client products Store preview and content use exact public identity and paise', () async {
+    final requests = <Map<String, Object?>>[];
+    final connection = discoveryGateway(OwnerTransport((body) async {
+      requests.add(body);
+      return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': discoveryData(body)}));
+    }));
+    final source = WorkspacePublicDiscoverySource(gateway: connection, current: () => true);
+    addTearDown(source.dispose);
+    final products = await source.loadProducts(discoveryQuery(), pageSize: 40), selected = products.items.single;
+    expect(selected.id, publicIdentity().listingId); expect(selected.sourceSkuId, 'sku-one'); expect(selected.priceMinor, 10025);
+    expect(source.snapshotFor(selected).state, BuyV2ProductContentState.ready);
+    expect(selected.reviewDeliveryOptions, isEmpty);
+    final stores = await source.loadStores(discoveryQuery(), pageSize: 40);
+    expect(stores.totalCount, 1); expect(stores.items.single.id, 'store-one');
+    expect(stores.items.single.previewProduct!.id, selected.id);
+    expect(stores.items.single.address, isEmpty); expect(stores.items.single.hasCollectionAddress, isFalse);
+    final scoped = await source.loadProducts(discoveryQuery(storeId: 'store-one'), pageSize: 40);
+    expect(scoped.items.single.id, selected.id); expect(requests.last['storeId'], 'store-one');
+    expect(requests.map((body) => body['resultKind']), ['products', 'stores', 'products']);
+  });
+  for (final fault in ['realm', 'query', 'kind', 'Store', 'count', 'duplicate', 'future', 'version', 'binding']) {
+    test('LF-DISCOVERY client rejects mismatched public response $fault', () async {
+      final source = WorkspacePublicDiscoverySource(current: () => true, gateway: discoveryGateway(OwnerTransport((body) async {
+        final data = discoveryData(body);
+        if (fault == 'realm') data['realm'] = 'evaluation';
+        if (fault == 'query') data['query'] = {...body['query'] as Map, 'search': 'different'};
+        if (fault == 'kind') data['resultKind'] = 'stores';
+        if (fault == 'Store') data['requestedStore'] = 'foreign-store';
+        if (fault == 'count') (data['page'] as Map)['totalCount'] = 2;
+        if (fault == 'duplicate') { (data['items'] as List).add((data['items'] as List).single); (data['page'] as Map)['totalCount'] = 2; }
+        if (fault == 'future') data['observedAt'] = at.add(const Duration(hours: 1)).toIso8601String();
+        if (fault == 'version') data['discoveryPageVersion'] = 2;
+        if (fault == 'binding') ((row(((data['items'] as List).single as Map)['listing'] as Map<String, dynamic>)['listings'] as List).single as Map)['skuId'] = 'foreign-sku';
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': data}));
+      })));
+      addTearDown(source.dispose);
+      await expectLater(source.loadProducts(discoveryQuery(), pageSize: 40), throwsFormatException);
+    });
+  }
+  test('LF-DISCOVERY root A B A retires the old pending reader and owns only its new source', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const accountA = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'host-a');
+    const accountB = (environment: 'host-service', projectId: 'host-project', tenantId: null as String?, userId: 'host-b');
+    BuyV2AccountPersistenceIdentity live = accountA;
+    final core = BuySession(), sources = <WorkspacePublicDiscoverySource>[];
+    final pending = Completer<SocialContentResponse>(), started = Completer<Map<String, Object?>>();
+    final root = BuyV2RootSessions(core: core, currentIdentity: () => live,
+      accountStoreFactory: (_, _) => _HostRetirableStateStore(),
+      catalogueSourceFactory: (_, current) {
+        final first = sources.isEmpty;
+        final source = WorkspacePublicDiscoverySource(current: current, gateway: discoveryGateway(OwnerTransport((body) {
+          if (first) { started.complete(body); return pending.future; }
+          return Future.value(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': discoveryData(body)})));
+        })));
+        sources.add(source); return source;
+      });
+    addTearDown(core.dispose); addTearDown(root.dispose);
+    root.synchronize(accountRequired: true);
+    expect(root.current.cataloguePageSource, same(sources.single));
+    expect(root.current.productContentAdapter, same(sources.single));
+    final oldRead = sources.single.loadProducts(discoveryQuery(), pageSize: 40), body = await started.future;
+    live = accountB; root.synchronize(accountRequired: true);
+    live = accountA; root.synchronize(accountRequired: true);
+    expect(sources, hasLength(3)); expect(sources.first.active, isFalse); expect(sources[1].active, isFalse);
+    expect(root.current.cataloguePageSource, same(sources.last));
+    pending.complete(SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': discoveryData(body)})));
+    await expectLater(oldRead, throwsFormatException);
+    expect((await sources.last.loadProducts(discoveryQuery(), pageSize: 40)).items.single.priceMinor, 10025);
+    await expectLater(sources.last.loadProducts(root.current.catalogueQuery(), pageSize: 40), throwsFormatException,
+      reason: 'Ordinary regional Quick queries require genuine eligibility; root injection is not completion of that producer.');
+  });
+  test('LF-DISCOVERY default configuration creates no provider for review unsupported tenant or missing opt-in', () {
+    for (final environment in ['firebase-service', 'host-service', 'review']) {
+      expect(configuredWorkspacePublicDiscovery(environment: environment, projectId: 'moolsocial-dev-503018',
+        tenantId: null, accountUserId: 'host-owner', realm: 'evaluation', current: () => true), isNull);
+    }
+  });
+  final discoveryLog = Platform.environment['LF03_DISCOVERY_PUBLIC_LOG'];
+  if (discoveryLog != null) { test('LF-DISCOVERY actual emulator response enters the public client and existing Buy pager', () async {
+    const marker = 'LF_DISCOVERY_PROJECTION=';
+    final captured = File(discoveryLog).readAsLinesSync().where((line) => line.contains(marker)).toList();
+    expect(captured, hasLength(1));
+    final actual = jsonDecode(captured.single.split(marker).last) as Map<String, dynamic>;
+    final source = WorkspacePublicDiscoverySource(current: () => true,
+      gateway: discoveryGateway(OwnerTransport((body) async {
+        expect(body['query'], actual['query']); expect(body['pageSize'], anyOf(40, 50));
+        return SocialContentResponse(statusCode: 200, body: jsonEncode({'ok': true, 'data': actual}));
+      }), realm: 'evaluation'));
+    final core = BuySession(), session = BuyV2Session(core: core, reviewDataEnabled: false,
+      cataloguePageSource: source, productContentAdapter: source, catalogueNow: () => at);
+    addTearDown(core.dispose); addTearDown(session.dispose); addTearDown(source.dispose);
+    expect((await source.loadProducts(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, sort: BuyV2ProductSort.priceLowToHigh), pageSize: 50)).totalCount, 2);
+    final pager = session.acquireCatalogueProducts('host-discovery-contract');
+    await pager.open(BuyV2CatalogueQuery(destination: BuyV2Destination.shop, regionId: null,
+      areaScope: BuyV2CatalogueAreaScope.allAreas, sort: BuyV2ProductSort.priceLowToHigh));
+    expect(pager.message, isNull); expect(pager.page!.totalCount, 2);
+    expect(pager.page!.items.map((p) => p.storeId), ['store-two', 'store-one']);
+    expect(pager.page!.items.first.priceMinor, 10025);
+    expect(session.productContentFor(pager.page!.items.first).state, BuyV2ProductContentState.ready);
+    expect(session.productFactsFor(pager.page!.items.first).eligibility, isNull);
+    session.releaseCatalogueProducts('host-discovery-contract');
+  }); }
   // LF04 readonly public-service fixtures. No owner draft or native feed injection.
   Map<String, dynamic> promotionRow({String id = 'promotion-one', int revision = 1}) {
     final sku = row(publicPage())..remove('listings');
